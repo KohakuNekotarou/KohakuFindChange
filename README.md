@@ -24,14 +24,40 @@ results in a two-level tree panel.
   taken from the current UI theme (the matched text at the theme's text colour, the surrounding
   context faded toward the panel background), so it looks right in both light and dark interfaces.
 
+## Replacing what you found
+
+Every hit row carries a **check box**, ticked by default. Untick the ones you want to leave alone
+and run **`Change Checked`** from the flyout — only the ticked occurrences are replaced. This is the
+thing the built-in Find/Change cannot do: it offers Change All or one-at-a-time, never "these 17 of
+the 20, across every chapter of the book".
+
+- The replacement text is **the Find/Change dialog's own "Change to" field** (GREP back-references
+  included — they are interpreted by InDesign's engine, not by KBS). Like the search query, KBS only
+  ever reads those settings, never writes them.
+- **A confirmation prompt names the find string, the change string and the count** before anything is
+  written, with **Cancel as the default button** — the flyout is easy to open by accident. An empty
+  change string is allowed (it deletes the matches) but the prompt says so explicitly.
+- `Check All` / `Uncheck All` cover **every stored hit**, including any beyond the 500 the panel
+  displays, so the display cap can never silently shrink what a replace touches.
+- **Undo is one step per chapter**: a single Ctrl+Z in a chapter takes back everything the replace
+  did there.
+- Chapters that received a replacement are **opened in a window and left unsaved** — overwriting your
+  files stays your decision.
+- A chapter whose text no longer matches the results (edited since the search, or the query changed)
+  is **reported rather than replaced at guessed positions**; search again to refresh.
+- A replaced row shows as done and cannot be re-ticked: the text it matched is gone. **Note that
+  undoing a replacement does not un-do the panel** — the row still reads as replaced until you run
+  the search again.
+
 ## Layout
 - Plug-in sources are flat in this repo (`.cpp` / `.h` / `.fr` / `.rc`).
 - `_buildproj/` holds a backup of the build files from the SDK build tree (`build/win/prj/`), which
   is outside this repository — see `_buildproj/README.md` for how to restore and build.
 
 ## Status
-Built as a vertical-slice progression (skeleton → book search → result tree → jump → polish). The
-result tree with themed match highlighting, the hit-row jump with its marker, overset locating and
-the document / book scope toggle are all in place.
+Built as a vertical-slice progression (skeleton → book search → result tree → jump → polish →
+checked replace). The result tree with themed match highlighting, the hit-row jump with its marker,
+overset locating, the document / book scope toggle and `Change Checked` are all in place and
+verified on the real application.
 
 Prefix `0x205698`. Menu: `Plug-Ins ▸ Kohaku Plug-Ins ▸ Kohaku Search Panel`.

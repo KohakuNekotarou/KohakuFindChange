@@ -296,8 +296,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Check All / Uncheck All: select every stored hit for replacement, or none. (Replace
-		// Checked itself lands here at position 4.0 in Phase 2.)
+		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
+		kKBSReplaceCheckedActionID,
+		kKBSTargetMenuPath
+		kKBSReplaceCheckedMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Check All / Uncheck All: select every stored hit for replacement, or none.
 		kKBSCheckAllActionID,
 		kKBSTargetMenuPath
 		kKBSCheckAllMenuItemPosition,
@@ -365,6 +370,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSHidePrevChapterActionID,
 		kKBSHidePrevChapterMenuKey,		// "Hide Previous Chapter" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Change Checked. kCustomEnabling so UpdateActionStates can grey it out while nothing is
+		// checked - the same flag the toggles need.
+		kKBSActionComponentBoss,
+		kKBSReplaceCheckedActionID,
+		kKBSReplaceCheckedMenuKey,		// "Change Checked"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
