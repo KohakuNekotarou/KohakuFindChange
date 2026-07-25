@@ -226,6 +226,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSMarkerExpiryIdleTask.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSJump.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultCheckObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSStartupShutdown.cpp"/>

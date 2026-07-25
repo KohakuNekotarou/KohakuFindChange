@@ -170,44 +170,10 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 		}
 	}
 
-	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	if (model == nil)
-		return;
-	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
-	if (scanner == nil)
-		return;
-
-	// The paragraph that holds the match; excludeEOS (default) trims the paragraph terminator.
-	int32 paraLen = 0;
-	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
-	if (paraStart < 0 || paraLen <= 0)
-		return;
-
-	WideString para;
-	scanner->CopyText(paraStart, paraLen, &para);
-
-	// Split by UTF-16 unit, matching TextIndex: the match sits at [start-paraStart, end-paraStart)
-	// in the paragraph. GrabUTF16Buffer + SetXString copies exact unit ranges (a match boundary
-	// never falls inside a surrogate pair, so no code point is cut).
-	PMString paraStr(para);
-	int32 n = 0;
-	const UTF16TextChar* buf = paraStr.GrabUTF16Buffer(&n);
-	if (buf == nil || n <= 0)
-		return;
-
-	int32 ms = static_cast<int32>(start - paraStart);
-	int32 ml = static_cast<int32>(end - start);
-	if (ms < 0)		ms = 0;
-	if (ms > n)		ms = n;
-	if (ml < 0)		ml = 0;
-	if (ms + ml > n)	ml = n - ms;
-
-	outHit.preText.SetXString(buf, ms);
-	outHit.preText.SetTranslatable(kFalse);
-	outHit.matchText.SetXString(buf + ms, ml);
-	outHit.matchText.SetTranslatable(kFalse);
-	outHit.postText.SetXString(buf + ms + ml, n - ms - ml);
-	outHit.postText.SetTranslatable(kFalse);
+	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
+	// row exactly the same way from the range the replace command hands back.
+	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, end,
+		outHit.preText, outHit.matchText, outHit.postText);
 }
 
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
@@ -237,10 +203,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	if (walker->IsWalking())
 		walker->Halt();
 
-	// Whole active document: master pages / locked layers / locked stories / footnotes
-	// (defaults), but exclude hidden layers.
+	// The single shared scope definition - the replace pass re-walks each chapter with exactly
+	// these options, or the walk order the hits were numbered by would no longer line up.
 	WalkerScopeOptions scopeOptions;
-	scopeOptions.SetIncludeHiddenLayers(kFalse);
+	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
@@ -377,6 +343,61 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 }
 
 } // anonymous namespace
+
+void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
+{
+	// Whole document: master pages / locked layers / locked stories / footnotes (all defaults),
+	// but exclude hidden layers - a match the user cannot see is not a useful result, and the
+	// replace pass must not touch one either.
+	outOptions.SetIncludeHiddenLayers(kFalse);
+}
+
+void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
+	PMString& outPre, PMString& outMatch, PMString& outPost)
+{
+	outPre.Clear();		outPre.SetTranslatable(kFalse);
+	outMatch.Clear();	outMatch.SetTranslatable(kFalse);
+	outPost.Clear();	outPost.SetTranslatable(kFalse);
+
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil)
+		return;
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (scanner == nil)
+		return;
+
+	// The paragraph that holds the match; excludeEOS (default) trims the paragraph terminator.
+	int32 paraLen = 0;
+	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
+	if (paraStart < 0 || paraLen <= 0)
+		return;
+
+	WideString para;
+	scanner->CopyText(paraStart, paraLen, &para);
+
+	// Split by UTF-16 unit, matching TextIndex: the match sits at [start-paraStart, end-paraStart)
+	// in the paragraph. GrabUTF16Buffer + SetXString copies exact unit ranges (a match boundary
+	// never falls inside a surrogate pair, so no code point is cut).
+	PMString paraStr(para);
+	int32 n = 0;
+	const UTF16TextChar* buf = paraStr.GrabUTF16Buffer(&n);
+	if (buf == nil || n <= 0)
+		return;
+
+	int32 ms = static_cast<int32>(start - paraStart);
+	int32 ml = static_cast<int32>(end - start);
+	if (ms < 0)		ms = 0;
+	if (ms > n)		ms = n;
+	if (ml < 0)		ml = 0;
+	if (ms + ml > n)	ml = n - ms;
+
+	outPre.SetXString(buf, ms);
+	outPre.SetTranslatable(kFalse);
+	outMatch.SetXString(buf + ms, ml);
+	outMatch.SetTranslatable(kFalse);
+	outPost.SetXString(buf + ms + ml, n - ms - ml);
+	outPost.SetTranslatable(kFalse);
+}
 
 int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 {

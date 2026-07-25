@@ -21,6 +21,8 @@
 #define __KBSSearchEngine_h__
 
 #include "PMString.h"
+#include "UIDRef.h"
+#include "WalkerScopeOptions.h"
 
 namespace KBSSearchEngine
 {
@@ -34,6 +36,21 @@ namespace KBSSearchEngine
 	    @param outSummary  a ready-to-show status line for the panel.
 	    @return the total number of matches across the scope. */
 	int32 SearchBook(PMString& outSummary);
+
+	/** The walker scope options EVERY KBS walk uses (whole document, hidden layers excluded, all
+	    else default). The replace pass must re-walk a chapter with exactly the options the search
+	    that produced the hits used, or the walk order those hits were numbered by no longer lines
+	    up - hence one definition, shared by both. */
+	void GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions);
+
+	/** The paragraph holding [start, end), split at those exact UTF-16 offsets into the three
+	    segments a hit row paints: the text before the match, the matched text, and the text after.
+	    Any of the three may come back empty; all three are empty when the position cannot be read.
+
+	    Used by the search when a hit is collected, and again by the replace pass to rebuild a
+	    row's text from the range the replace command reports back. */
+	void SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
+		PMString& outPre, PMString& outMatch, PMString& outPost);
 }
 
 #endif // __KBSSearchEngine_h__

@@ -222,4 +222,58 @@ int32 KBSResultModel::GetCheckedCount()
 	return count;
 }
 
+int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return -1;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return -1;
+	return c.hits[hitIdx].walkOrder;
+}
+
+bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	outDocRef = c.docRef;
+	outFile = c.file;
+	return true;
+}
+
+void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	c.hits[hitIdx].textStart = start;
+	c.hits[hitIdx].textEnd = end;
+}
+
+void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
+	const PMString& newPre, const PMString& newMatch, const PMString& newPost,
+	TextIndex newStart, TextIndex newEnd)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+
+	// The locator (page) is kept: a replacement does not move the line to another page in any
+	// case worth chasing here - if the text reflowed that far, the result set is stale anyway and
+	// the user is told to search again.
+	h.preText = newPre;			h.preText.SetTranslatable(kFalse);
+	h.matchText = newMatch;		h.matchText.SetTranslatable(kFalse);
+	h.postText = newPost;		h.postText.SetTranslatable(kFalse);
+	h.textStart = newStart;
+	h.textEnd = newEnd;
+	h.replaced = true;
+	h.checked = false;
+}
+
 // End, KBSResultModel.cpp.

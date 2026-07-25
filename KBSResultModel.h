@@ -144,6 +144,28 @@ namespace KBSResultModel
 	/** How many hits are selected across all chapters (uncapped) - for the status read-out and for
 	    the replace command's enablement. */
 	int32 GetCheckedCount();
+
+	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
+	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is
+	    N - the only key that survives replacing (see Hit::walkOrder). */
+	int32 GetHitWalkOrder(int32 chapterIdx, int32 hitIdx);
+
+	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
+	    needs this without going through a hit. false = index out of range. */
+	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
+
+	/** Move a hit's stored text range, leaving everything else alone. Replacing text shifts every
+	    later match in the same story, so the replace pass writes back the positions its re-walk
+	    reports - otherwise a jump into an untouched hit would land in the wrong place afterwards. */
+	void SetHitRange(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end);
+
+	/** Record a completed replacement: the row keeps its page locator but takes the replaced
+	    line's three segments and its new range, is marked replaced, and leaves the selection. A
+	    replaced hit can never be checked again - the text it matched is gone, so a second replace
+	    pass would have nothing to line it up with. */
+	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
+		const PMString& newPre, const PMString& newMatch, const PMString& newPost,
+		TextIndex newStart, TextIndex newEnd);
 }
 
 #endif // __KBSResultModel_h__
