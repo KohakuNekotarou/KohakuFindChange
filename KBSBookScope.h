@@ -76,6 +76,14 @@ namespace KBSBookScope
 	    locked). Used when a jump target's held chapter was closed by the user since the search. */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
 
+	/** Give a chapter that is open WITHOUT a window (the search opens them that way) a real layout
+	    window, so the user can see what a replace did to it. Does NOT save, and does not bring an
+	    already-visible document to the front - a document that already has a window anywhere,
+	    including behind another tab, is left exactly as it is.
+
+	    @return true when a window was actually opened. */
+	bool ShowChapterWindow(const UIDRef& docRef);
+
 	/** The "Hide Previous Chapter" sweep (Task 3): close every OTHER document that HAS a window and
 	    needs no save, on schedule - whoever opened it. The exception document (the one a jump just
 	    landed in) and the windowless held chapters (the reopen cache) survive. Dirty documents stay

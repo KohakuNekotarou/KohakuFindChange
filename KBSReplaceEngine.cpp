@@ -308,8 +308,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				firstSkipped = chapterName;
 		}
 
-		// Task 7 hooks in here: a chapter that received a replacement gets a real window, so the
-		// change is visible and can be undone by hand.
+		// A chapter that received a replacement gets a real window, so the change is visible and
+		// can be undone - or saved - by hand. Chapters nothing landed in stay as they were:
+		// opening windows on untouched documents would only be clutter. Nothing is saved here.
+		if (replaced > 0)
+			KBSBookScope::ShowChapterWindow(docRef);
 	}
 
 	// The count leads, so it survives the narrow status field's tail truncation.

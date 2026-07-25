@@ -27,12 +27,16 @@
 #include "IDocumentPresentation.h"	// the predicate typedef / presentation handle
 #include "IDocumentUtils.h"
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
+#include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "ISession.h"
 
 // General includes:
 #include "ErrorUtils.h"			// PMSetGlobalErrorCode - a failed Open must not poison later commands
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
+#include "CmdUtils.h"
+#include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
 #include "SDKFileHelper.h"
+#include "UIDList.h"
 #include "Utils.h"
 #include "PMString.h"
 #include "WideString.h"
@@ -174,6 +178,46 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// Held, so ReleaseHeldDocs closes it later.
 	gHeldDocInfo.fCurrentOpenedDocumentList.push_back(docRef);
 	outDocRef = docRef;
+	return true;
+}
+
+bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
+{
+	IDataBase* db = docRef.GetDataBase();
+	if (db == nil)
+		return false;
+
+	// Does it already have a window - front, or behind another tab? Then leave it alone. This has
+	// to be the ALL-presentations search: GetFrontmostPresentationForDocument answers nil for a
+	// document sitting behind another tab, and acting on that would open a SECOND window on the
+	// same document.
+	FindPresentation_PreferCriteria noPreference;
+	if (Utils<IDocumentUIUtils>()->FindPresentationForDocument(db, KBSAcceptAnyPresentation, noPreference) != nil)
+		return false;
+
+	// Windowless (the search opened it that way): give it a real layout window so the user can
+	// see the replacement, undo it by hand, and decide about saving. Nothing is saved here.
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kOpenLayoutCmdBoss));
+	if (cmd == nil)
+		return false;
+	cmd->SetItemList(UIDList(docRef));
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a failed open must not poison later commands
+		return false;
+	}
+
+	// It has a window now, so it is no longer part of the windowless reopen cache - dropping it
+	// keeps a later ReleaseHeldDocs from closing a window the user is looking at.
+	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	{
+		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
+		{
+			gHeldDocInfo.fCurrentOpenedDocumentList.erase(
+				gHeldDocInfo.fCurrentOpenedDocumentList.begin() + i);
+			break;
+		}
+	}
 	return true;
 }
 
