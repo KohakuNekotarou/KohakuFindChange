@@ -159,9 +159,11 @@ DECLARE_PMID(kActionIDSpace, kKBSSeparator1ActionID, kKBSPrefix + 2)
 DECLARE_PMID(kActionIDSpace, kKBSPopupAboutThisActionID, kKBSPrefix + 3)
 DECLARE_PMID(kActionIDSpace, kKBSSearchBookActionID, kKBSPrefix + 4)
 DECLARE_PMID(kActionIDSpace, kKBSHidePrevChapterActionID, kKBSPrefix + 5)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 6)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 6)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 7)
+// "Book Scope": search the whole book (ON) or just the front document (OFF). Check-mark toggle,
+// the KESCL "Search book" pattern (kKESCLPopupSearchBookActionID).
+DECLARE_PMID(kActionIDSpace, kKBSScopeBookActionID, kKBSPrefix + 6)
+// Separator between the search command and the toggles below it (MenuDef only, no ActionDef).
+DECLARE_PMID(kActionIDSpace, kKBSSeparator2ActionID, kKBSPrefix + 7)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 8)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 9)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 10)
@@ -223,6 +225,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 
 // Menu item keys:
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
+// "Book Scope" toggle: ON = the whole book, OFF = the front document.
+#define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
 
 // Other StringKeys:
@@ -236,6 +240,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 #define kKBSTargetMenuPath kKBSInternalPopupMenuNameKey
 
 // Menu item positions:
+
+// The scope toggle and its separator sit between the search command (1.0) and Hide Previous
+// Chapter (2.0), so neither existing position had to move.
+#define kKBSSeparator2MenuItemPosition		1.3
+#define kKBSBookScopeMenuItemPosition		1.6
 
 #define kKBSSearchBookMenuItemPosition		1.0
 #define kKBSHidePrevChapterMenuItemPosition	2.0

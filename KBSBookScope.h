@@ -36,6 +36,16 @@ namespace KBSBookScope
 		IDFile		file;
 	};
 
+	/** Is the search scope the whole book (ON) or just the front document (OFF)? Session state
+	    only - every launch starts OFF, like KESCL's "Search book" toggle. */
+	bool IsBookScopeOn();
+
+	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL
+	    learned this the hard way - closing the held chapters inside the toggle crashed). The held
+	    windowless chapters are released by the next book search or at shutdown, and a jump into a
+	    chapter the user closed since reopens it through ReopenChapterDoc. */
+	void SetBookScopeOn(bool on);
+
 	/** Is there an active book right now? A cheap look at IBookManager only - nothing is
 	    opened, listed or held. */
 	bool HasActiveBook();

@@ -36,6 +36,7 @@
 #include "KBSSearchEngine.h"
 #include "KBSResultTree.h"		// rebuild the result tree after a search
 #include "KBSJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
+#include "KBSBookScope.h"		// the Book Scope toggle's session state
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -118,6 +119,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSScopeBookActionID:
+		{
+			// Toggle the search scope: the whole active book, or just the front document. Just the
+			// flag - nothing is closed and the current results stay put. Its check mark and the
+			// search command's name are drawn in UpdateActionStates.
+			KBSBookScope::SetBookScopeOn(!KBSBookScope::IsBookScopeOn());
+			break;
+		}
+
 		case kKBSHidePrevChapterActionID:
 		{
 			// Toggle the session flag that JumpToHit reads. Its check mark is drawn in
@@ -158,9 +168,29 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	{
 		const ActionID action = listToUpdate->GetNthAction(i);
 
-		if (action == kKBSHidePrevChapterActionID)
+		if (action == kKBSSearchBookActionID)
+		{
+			// The command's own name carries the scope, so it is visible BEFORE running it:
+			// "Search Book" while Book Scope is ON, "Search Document" while it is OFF. No check
+			// mark - this is the KESCL Start/Stop pattern (a name swap, not a state mark).
+			PMString name(KBSBookScope::IsBookScopeOn() ? "Search Book" : "Search Document");
+			name.SetTranslatable(kFalse);
+			listToUpdate->SetNthActionName(i, name);
+			listToUpdate->SetNthActionState(i, kEnabledAction);
+		}
+		else if (action == kKBSScopeBookActionID)
 		{
 			int16 actionState = kEnabledAction;
+			if (KBSBookScope::IsBookScopeOn())
+				actionState |= kSelectedAction;		// ON: show the check mark (OFF is the default)
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSHidePrevChapterActionID)
+		{
+			// Only meaningful in book scope (it closes the chapter a previous jump landed in), so
+			// it is greyed out in document scope. The check mark stays visible through the lock
+			// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
+			int16 actionState = KBSBookScope::IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
 			if (KBSJump::IsHidePreviousChapterOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);

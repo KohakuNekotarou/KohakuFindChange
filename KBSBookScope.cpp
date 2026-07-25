@@ -51,6 +51,24 @@ namespace
 	// book first closes the previous book's held chapters, so switching books never piles up
 	// hidden documents from every book visited.
 	PMString gHeldBookPath;
+
+	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
+	// gBookSearchOn: OFF searches the front document, ON the whole active book.
+	bool gBookScopeOn = false;
+}
+
+bool KBSBookScope::IsBookScopeOn()
+{
+	return gBookScopeOn;
+}
+
+void KBSBookScope::SetBookScopeOn(bool on)
+{
+	// Just the flag. Nothing is closed and nothing is cleared here: KESCL's first shape closed the
+	// held chapters right inside the toggle and crashed (see KESCLBookScope::SetBookSearchOn). The
+	// held chapters are released by the next book search or at shutdown, and a jump into a chapter
+	// the user closed meanwhile goes through ReopenChapterDoc anyway.
+	gBookScopeOn = on;
 }
 
 bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
@@ -105,6 +123,7 @@ void KBSBookScope::ShutdownCleanup()
 	// the vector's storage too, so the static destructor at DLL unload finds nothing to do.
 	gHeldDocInfo.Clear();
 	gHeldBookPath.Clear();
+	gBookScopeOn = false;
 }
 
 // Accepts every presentation. A local stand-in for the stock accept-all predicate (KESCL keeps

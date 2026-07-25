@@ -257,6 +257,18 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Separator between the search command and the toggles.
+		kKBSSeparator2ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator2MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document.
+		kKBSScopeBookActionID,
+		kKBSTargetMenuPath
+		kKBSBookScopeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Hide Previous Chapter: toggle (check mark). Closes the previous chapter window on jump.
 		kKBSHidePrevChapterActionID,
 		kKBSTargetMenuPath
@@ -296,12 +308,24 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+		// The search command. kCustomEnabling is what lets UpdateActionStates rename it to
+		// "Search Book" / "Search Document" as the Book Scope toggle flips; without it that hook
+		// is never called for this action.
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
-		kKBSSearchBookMenuKey,			// "Search Book"
+		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
 		kOtherActionArea,
 		kNormalAction,
-		kDisableIfLowMem,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSScopeBookActionID,
+		kKBSBookScopeMenuKey,			// "Book Scope" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 

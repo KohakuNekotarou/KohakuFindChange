@@ -40,7 +40,8 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_jaJP,
 
                 // ----- Command strings
-                kKBSSearchBookMenuKey,			"Search Book",
+                kKBSSearchBookMenuKey,			"Search",
+                kKBSBookScopeMenuKey,			"Book Scope",
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
 
                 // ----- Window strings
