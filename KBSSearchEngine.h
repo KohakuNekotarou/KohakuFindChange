@@ -4,8 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The search engine: walks the user's CURRENT Find/Change query across every chapter of the
-//  active book (or the front document when no book is open) and collects the matches into
+//  The search engine: walks the user's CURRENT Find/Change query across the scope the Book Scope
+//  toggle selects - every chapter of the active book when it is ON, just the front document when it
+//  is OFF, never a silent fallback between them - and collects the matches into
 //  KBSResultModel, grouped by chapter. Unlike KESCL - which supplied its own literal text and
 //  pinned the mode to plain text - KBS touches nothing on the Find/Change panel: it walks with
 //  whatever the user set there, MODE INCLUDED (Text or GREP). The walk is read-only (a
@@ -23,7 +24,8 @@
 
 namespace KBSSearchEngine
 {
-	/** Resolve the scope (the active book's chapters, else the front document), walk the user's
+	/** Resolve the scope from the Book Scope toggle (the active book's chapters when it is ON, the
+	    front document when it is OFF - never a silent fallback between them), walk the user's
 	    current Find/Change query across it, fill KBSResultModel with the hits (grouped by
 	    chapter, only chapters with >=1 hit), and build a one-line status summary. Releases any
 	    windowless chapters opened for the search (Task 2: the hits' display text is already

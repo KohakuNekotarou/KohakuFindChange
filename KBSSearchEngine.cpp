@@ -384,26 +384,36 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 	if (!HasFindQuery())
 	{
-		outSummary.Append("No Find/Change text set. Type what to find in Edit > Find/Change, then Search Book.");
+		outSummary.Append("No Find/Change text set. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
 		return 0;
 	}
 
-	// Resolve the scope: the active book's chapters, else the front document.
+	// Resolve the scope from the Book Scope toggle. NO implicit fallback: ON means the book and
+	// nothing else, OFF means the front document and nothing else - so the status line can always
+	// state exactly what was searched, and a missing book is reported instead of quietly searching
+	// one document behind the user's back.
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
-	bool fromBook = false;
-	if (KBSBookScope::HasActiveBook())
-		fromBook = KBSBookScope::GetBookChapterDocs(targets, bookName);
-
-	if (!fromBook || targets.empty())
+	const bool fromBook = KBSBookScope::IsBookScopeOn();
+	if (fromBook)
 	{
-		targets.clear();
+		if (!KBSBookScope::HasActiveBook())
+		{
+			outSummary.Append("Book Scope is on, but no book is open.");
+			return 0;
+		}
+		if (!KBSBookScope::GetBookChapterDocs(targets, bookName) || targets.empty())
+		{
+			outSummary.Append("The active book has no openable chapters.");
+			return 0;
+		}
+	}
+	else
+	{
 		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (doc == nil)
 		{
-			outSummary.Append(KBSBookScope::HasActiveBook()
-				? "The active book has no openable chapters."
-				: "No active book and no open document to search.");
+			outSummary.Append("No open document to search.");
 			return 0;
 		}
 		KBSBookScope::ChapterDoc single;
@@ -493,7 +503,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		}
 		else
 		{
-			outSummary.Append(" in the front document.");
+			outSummary.Append(" in document \"");
+			outSummary.Append(targets[0].shortName);
+			outSummary.Append("\".");
 		}
 		return 0;
 	}
@@ -513,7 +525,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	}
 	else
 	{
-		outSummary.Append(" - front document (no active book).");
+		outSummary.Append(" - document \"");
+		outSummary.Append(targets[0].shortName);
+		outSummary.Append("\".");
 	}
 
 	// Two separate caps can bite:
