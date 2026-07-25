@@ -1,4 +1,8 @@
-# KohakuBookSearch (KBS)
+# Kohaku Search Panel (KBS)
+
+> **On the name**: the display name is **Kohaku Search Panel**. The `.pln` file name, the VS project
+> and the code prefix stay `KohakuBookSearch` / `KBS` — the same way KESCL kept its old prefix after
+> being renamed — so the build output is still `KohakuBookSearch.sdk.pln`.
 
 An Adobe InDesign C++ plug-in that searches **every chapter of the active book (`.indb`)** at once —
 something the built-in Find/Change cannot do — and shows the results in a two-level tree panel.
@@ -24,4 +28,4 @@ something the built-in Find/Change cannot do — and shows the results in a two-
 Built as a vertical-slice progression (skeleton → book search → result tree → jump → polish). The
 result tree with themed match highlighting is in place; hit-row jump + markers are next.
 
-Prefix `0x205698`. Menu: `Plug-Ins ▸ KohakuNekotarou ▸ KohakuBookSearch`.
+Prefix `0x205698`. Menu: `Plug-Ins ▸ Kohaku Plug-Ins ▸ Kohaku Search Panel`.

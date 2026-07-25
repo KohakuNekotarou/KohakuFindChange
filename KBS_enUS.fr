@@ -32,8 +32,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         {
         	 // ----- Menu strings
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
-                kKBSAboutMenuKey,					kKBSPluginName "...",
-                kKBSPluginsMenuKey,				kKBSPluginName,
+                kKBSAboutMenuKey,					"Kohaku Search Panel...",
+                kKBSPluginsMenuKey,				"Kohaku Search Panel",
 	
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
@@ -44,12 +44,12 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // ----- Window strings
 
                 // ----- Panel/dialog strings
-                kKBSPanelTitleKey,				kKBSPluginName,
-                kKBSStaticTextKey,				kKBSPluginName,
+                kKBSPanelTitleKey,				"Kohaku Search Panel",
+                kKBSStaticTextKey,				"Kohaku Search Panel",
 
 
 		// ----- Misc strings
-                kKBSAboutBoxStringKey,			kKBSPluginName ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
+                kKBSAboutBoxStringKey,			"Kohaku Search Panel" ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
 
 		
         }
