@@ -63,23 +63,27 @@ static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, c
 class KBSRowData : public CPMUnknown<IKBSRowData>
 {
 public:
-	KBSRowData(IPMUnknown* boss) : CPMUnknown<IKBSRowData>(boss) {}
+	KBSRowData(IPMUnknown* boss) : CPMUnknown<IKBSRowData>(boss), fReplaced(false) {}
 	virtual ~KBSRowData() {}
 
-	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match, const PMString& post)
+	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match,
+		const PMString& post, bool replaced)
 	{
 		fLocator = locator; fLocator.SetTranslatable(kFalse);
 		fPre = pre;   fPre.SetTranslatable(kFalse);
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
+		fReplaced = replaced;
 	}
 
-	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost) const
+	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch,
+		PMString& outPost, bool& outReplaced) const
 	{
 		outLocator = fLocator;
 		outPre = fPre;
 		outMatch = fMatch;
 		outPost = fPost;
+		outReplaced = fReplaced;
 	}
 
 private:
@@ -87,6 +91,7 @@ private:
 	PMString fPre;
 	PMString fMatch;
 	PMString fPost;
+	bool fReplaced;
 };
 
 CREATE_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
@@ -121,7 +126,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		return;
 
 	PMString locator, pre, match, post;
-	data->GetSegments(locator, pre, match, post);
+	bool replaced = false;
+	data->GetSegments(locator, pre, match, post, replaced);
 
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
@@ -154,6 +160,10 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
 	const RealAGMColor kContextColor = BlendColor(bg, fg, kContextTextWeight);	// faded toward bg
 
+	// A replaced row is history: everything it draws recedes, so the eye goes to the rows that
+	// still need attention. (Its check box, a real widget beside this cell, is disabled to match.)
+	const RealAGMColor kMatchColor = replaced ? kContextColor : kFullColor;
+
 	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text
 	// starts at a tab stop (a fixed column from the cell's left edge, so the text lines up down
 	// the tree; a locator wider than the column just pushes the text past it with a min gap).
@@ -161,7 +171,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const PMReal kMinGap(8.0);			// min space after an over-wide locator
 	if (!locator.IsEmpty() && x < rightEdge)
 	{
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kFullColor, kFalse, kFalse);
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kFalse, kFalse);
 		const PMReal locatorEnd = x + StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X();
 		x = frame.Left() + kTextTabStop;
 		if (locatorEnd + kMinGap > x)
@@ -193,14 +203,14 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	{
 		// The whole line fits: draw the three runs unchanged.
 		drawRun(pre, kContextColor);
-		drawRun(match, kFullColor);
+		drawRun(match, kMatchColor);
 		drawRun(post, kContextColor);
 	}
 	else if (matchW >= availWidth)
 	{
 		// The match alone overflows the cell: ellipsize the match itself (tail) and drop the context.
 		const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kFalse);
-		drawRun(m, kFullColor);
+		drawRun(m, kMatchColor);
 	}
 	else
 	{
@@ -221,7 +231,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kFalse);
 
 		drawRun(preCut, kContextColor);
-		drawRun(match, kFullColor);
+		drawRun(match, kMatchColor);
 		drawRun(postCut, kContextColor);
 	}
 }

@@ -179,6 +179,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The hit row's check box (replace feature): a STOCK check box with our observer aggregated on
+	 * it, so a click flips that hit's "replace me" flag. The system draws the box, so it follows
+	 * the UI theme and needs no icon resources of ours - the layer panel's eyeball pattern
+	 * (source/open/components/layerpanel). Only the hit row resource carries one.
+	 */
+	Class
+	{
+		kKBSResultCheckWidgetBoss,
+		kCheckBoxWidgetBoss,
+		{
+			IID_IOBSERVER, kKBSResultCheckObserverImpl,
+		}
+	},
+
+	/*
 	 * Draw-event-handler service boss (Task 3): registers kDrawEventService (via IK2ServiceProvider)
 	 * so the sibling IDrwEvtHandler is hooked into the draw-event dispatcher at startup; it draws
 	 * the translucent red marker rectangle around a jumped-to hit.
@@ -275,6 +290,24 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Separator between the search/scope toggles and the replace block.
+		kKBSSeparator3ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator3MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Check All / Uncheck All: select every stored hit for replacement, or none. (Replace
+		// Checked itself lands here at position 4.0 in Phase 2.)
+		kKBSCheckAllActionID,
+		kKBSTargetMenuPath
+		kKBSCheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSUncheckAllActionID,
+		kKBSTargetMenuPath
+		kKBSUncheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// About this plug-in sub-menu for the popup menu on the panel
 		kKBSPopupAboutThisActionID,
 		kKBSTargetMenuPath
@@ -332,6 +365,26 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSHidePrevChapterActionID,
 		kKBSHidePrevChapterMenuKey,		// "Hide Previous Chapter" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Check All / Uncheck All. kCustomEnabling so UpdateActionStates can grey them out when
+		// there are no results to check.
+		kKBSActionComponentBoss,
+		kKBSCheckAllActionID,
+		kKBSCheckAllMenuKey,			// "Check All"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSUncheckAllActionID,
+		kKBSUncheckAllMenuKey,			// "Uncheck All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -445,6 +498,10 @@ type KBSResultNodeWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = k
 };
 
 type KBSColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSColorTextWidgetBoss)
+{
+};
+
+type KBSResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKBSResultCheckWidgetBoss)
 {
 };
 
@@ -597,11 +654,24 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
+		// The "replace me" check box. A stock check box drawn by the system (kSysCheckBoxPMRsrcId),
+		// so it matches the UI theme with no icon art of ours. The widget manager re-places it and
+		// pushes its state in on every apply; its observer flips the model when it is clicked.
+		KBSResultCheckWidget
+		(
+			kKBSResultCheckWidgetID, kSysCheckBoxPMRsrcId,	// WidgetId, RsrcId
+			kBindLeft | kBindTop | kBindBottom,	// Frame binding: stay at the row's left
+			Frame(34, 1, 50, 17),			// Frame (the widget manager re-places it)
+			kTrue, kTrue,					// Visible, Enabled
+			kAlignLeft,						// Alignment
+			"",								// No label: the box alone
+		),
+
 		KBSColorTextWidget
 		(
 			kKBSResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
-			Frame(34, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
+			Frame(50, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
 			kTrue, kTrue,					// Visible, Enabled
 			"",								// Panel name
 			{

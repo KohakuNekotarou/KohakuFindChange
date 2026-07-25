@@ -11,6 +11,10 @@
 //  click jumps (fresh or a re-click on the already-selected row); chapter rows just select /
 //  expand. Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
+//  The row's "replace me" check box is a real widget of its own (kKBSResultCheckWidgetBoss) that
+//  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
+//  KBSResultCheckObserver.
+//
 //========================================================================================
 
 #include "VCPlugInHeaders.h"

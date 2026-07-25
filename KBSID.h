@@ -61,9 +61,10 @@ DECLARE_PMID(kClassIDSpace, kKBSColorTextWidgetBoss, kKBSPrefix + 4)
 DECLARE_PMID(kClassIDSpace, kKBSDrawEventServiceBoss, kKBSPrefix + 5)
 DECLARE_PMID(kClassIDSpace, kKBSMarkerExpiryIdleTaskBoss, kKBSPrefix + 6)
 DECLARE_PMID(kClassIDSpace, kKBSStartupShutdownBoss, kKBSPrefix + 7)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 6)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 7)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 8)
+// Replace feature: the hit row's check box. A stock check box (kCheckBoxWidgetBoss, drawn by the
+// system so it follows the UI theme) with our observer aggregated on it, the layer panel's eyeball
+// pattern. Only hit rows carry one - the chapter row resource has no check box.
+DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKBSPrefix + 8)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 9)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 10)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 11)
@@ -129,6 +130,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSDrawEventHandlerImpl, kKBSPrefix + 6)
 DECLARE_PMID(kImplementationIDSpace, kKBSMarkerExpiryIdleTaskImpl, kKBSPrefix + 7)
 DECLARE_PMID(kImplementationIDSpace, kKBSResultNodeEHImpl, kKBSPrefix + 8)
 DECLARE_PMID(kImplementationIDSpace, kKBSStartupShutdownImpl, kKBSPrefix + 9)
+// Replace feature: the hit row check box's observer (click -> flip that hit's checked flag).
+DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKBSPrefix + 10)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)
@@ -164,10 +167,13 @@ DECLARE_PMID(kActionIDSpace, kKBSHidePrevChapterActionID, kKBSPrefix + 5)
 DECLARE_PMID(kActionIDSpace, kKBSScopeBookActionID, kKBSPrefix + 6)
 // Separator between the search command and the toggles below it (MenuDef only, no ActionDef).
 DECLARE_PMID(kActionIDSpace, kKBSSeparator2ActionID, kKBSPrefix + 7)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 8)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 9)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 10)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 11)
+// Replace feature: a separator, the replace command, and the two bulk check toggles. The replace
+// command is declared here but only wired up in Phase 2 - reserving its number now keeps the
+// numbering from shifting later.
+DECLARE_PMID(kActionIDSpace, kKBSSeparator3ActionID, kKBSPrefix + 8)
+DECLARE_PMID(kActionIDSpace, kKBSReplaceCheckedActionID, kKBSPrefix + 9)
+DECLARE_PMID(kActionIDSpace, kKBSCheckAllActionID, kKBSPrefix + 10)
+DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 12)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 13)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 14)
@@ -194,7 +200,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultChapterNodeWidgetID, kKBSPrefix + 3)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultChapterLabelWidgetID, kKBSPrefix + 4)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultHitNodeWidgetID, kKBSPrefix + 5)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 7)
+// Replace feature: the hit row's check box (hit rows only).
+DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 8)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 9)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 10)
@@ -228,6 +235,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
+// Replace feature menu item keys.
+#define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
+#define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
+#define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
 
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
@@ -248,6 +259,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 
 #define kKBSSearchBookMenuItemPosition		1.0
 #define kKBSHidePrevChapterMenuItemPosition	2.0
+
+// The replace block sits below the existing toggles, above the About separator (10.0).
+#define kKBSSeparator3MenuItemPosition		3.0
+#define kKBSReplaceCheckedMenuItemPosition	4.0
+#define kKBSCheckAllMenuItemPosition		5.0
+#define kKBSUncheckAllMenuItemPosition		6.0
 #define	kKBSSeparator1MenuItemPosition		10.0
 #define kKBSAboutThisMenuItemPosition		11.0
 

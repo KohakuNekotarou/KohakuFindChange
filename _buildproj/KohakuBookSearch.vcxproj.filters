@@ -48,6 +48,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultCheckObserver.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

@@ -27,6 +27,10 @@ namespace KBSResultTree
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
+
+	/** Write "<checked> / <total> checked." to the panel's status line (and note the display cap
+	    when the result set is bigger than the panel shows). Called after any check change. */
+	void ShowCheckedStatus();
 }
 
 #endif // __KBSResultTree_h__

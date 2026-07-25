@@ -53,7 +53,19 @@ namespace KBSResultModel
 		TextIndex	textStart;	// the match's start position in that story
 		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
 
-		Hit() : pageIndex(-1), isOverset(false), storyUID(kInvalidUID), textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex) {}
+		// --- replace support ---
+		// The order the text walker handed this match back in, WITHIN ITS CHAPTER (0-based). It is
+		// stamped before the page-order sort, and it is the ONLY key that survives a replace pass:
+		// textStart shifts the moment an earlier match is replaced, and the array order is page
+		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
+		// them up with these numbers.
+		int32		walkOrder;
+		bool		checked;	// selected for replacement (a fresh search checks every hit)
+		bool		replaced;	// already replaced in this result set - not selectable any more
+
+		Hit() : pageIndex(-1), isOverset(false), storyUID(kInvalidUID),
+				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
+				walkOrder(-1), checked(true), replaced(false) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -113,6 +125,25 @@ namespace KBSResultModel
 	/** Rebind a chapter's document reference (Task 3): after a closed chapter is reopened at jump
 	    time, later jumps must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
+
+	/** Select / deselect one hit for replacement. A hit that was already replaced is ignored (it
+	    cannot be replaced again without a fresh search - the text it matched is gone). */
+	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
+
+	/** Is this hit selected for replacement? false for an out-of-range index. */
+	bool IsHitChecked(int32 chapterIdx, int32 hitIdx);
+
+	/** A hit's row-cell flags: selected, and already replaced. false = index out of range. */
+	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced);
+
+	/** Select / deselect EVERY hit in every chapter (the flyout's Check All / Uncheck All). Applies
+	    to all stored hits, including those past the panel's display cap - the display cap must not
+	    silently shrink what a replace touches. Replaced hits are skipped. */
+	void SetAllChecked(bool checked);
+
+	/** How many hits are selected across all chapters (uncapped) - for the status read-out and for
+	    the replace command's enablement. */
+	int32 GetCheckedCount();
 }
 
 #endif // __KBSResultModel_h__

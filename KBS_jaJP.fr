@@ -43,6 +43,8 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSSearchBookMenuKey,			"Search",
                 kKBSBookScopeMenuKey,			"Book Scope",
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
+                kKBSCheckAllMenuKey,			"Check All",
+                kKBSUncheckAllMenuKey,			"Uncheck All",
 
                 // ----- Window strings
 

@@ -37,6 +37,7 @@
 #include "KBSResultTree.h"		// rebuild the result tree after a search
 #include "KBSJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
 #include "KBSBookScope.h"		// the Book Scope toggle's session state
+#include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -136,6 +137,19 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSCheckAllActionID:
+		case kKBSUncheckAllActionID:
+		{
+			// Select / deselect every stored hit - including the ones past the panel's 500-row
+			// display cap, which is why the status line spells the numbers out afterwards.
+			KBSResultModel::SetAllChecked(actionID.Get() == kKBSCheckAllActionID);
+			// Every visible row's box changes, so this one does rebuild the tree (unlike a single
+			// row click). Bounded by the display cap, so it stays cheap.
+			KBSResultTree::Rebuild();
+			KBSResultTree::ShowCheckedStatus();
+			break;
+		}
+
 
 
 		default:
@@ -194,6 +208,12 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			if (KBSJump::IsHidePreviousChapterOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
+		{
+			// Nothing to check without results. Not a toggle - no check mark either way.
+			const bool16 haveResults = (KBSResultModel::GetTotalHitCount() > 0) ? kTrue : kFalse;
+			listToUpdate->SetNthActionState(i, haveResults ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

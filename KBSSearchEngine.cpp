@@ -307,6 +307,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 
 		KBSResultModel::Hit hit;
 		BuildHit(docRef, story, start, end, hit);
+		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
+		// into page order. The replace pass re-walks the chapter and matches on this number.
+		hit.walkOrder = static_cast<int32>(outHits.size());
 		outHits.push_back(hit);
 	}
 

@@ -28,6 +28,7 @@
 #include "IPalettePanelUtils.h"			// QueryPanelByWidgetID (the rebuild reaches the tree)
 #include "IPanelControlData.h"
 #include "ITextControlData.h"
+#include "ITriStateControlData.h"		// the hit row's check box state
 #include "ITreeViewHierarchyAdapter.h"	// child count - decides the expander's visibility
 #include "ITreeViewMgr.h"				// ClearTree / ChangeRoot / ExpandNode (the rebuild)
 
@@ -55,6 +56,9 @@ namespace
 	// indent is off, as in KESCL).
 	const PMReal kRowInset = 2.0;
 	const PMReal kExpanderZone = 16.0;
+	// The hit row's check box occupies this much at the start of the row's content, and the
+	// colour cell starts after it.
+	const PMReal kCheckZone = 16.0;
 
 	// Put 'text' into a row's static-text cell. Row widgets are recycled as the tree scrolls, so
 	// every cell is written on every apply. No manual repaint: the tree draws the row right after.
@@ -190,17 +194,45 @@ private:
 		PMString locator, pre, match, post;
 		if (!KBSResultModel::GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
 			return;
+		bool checked = false, replaced = false;
+		KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), checked, replaced);
 
-		// Draw our own indent: the hit cell steps one expander zone right of the chapter row's
-		// text start, running to the row's right edge.
+		// Draw our own indent: the check box sits where the hit row's content starts (one expander
+		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + 2 * kExpanderZone;
+
+		// The check box: place it, then push the model's state in WITHOUT notifying. A notify here
+		// would come straight back through KBSResultCheckObserver as a phantom click and overwrite
+		// the model with whatever this recycled row happened to be showing.
+		IControlView* checkView = rowData->FindWidget(kKBSResultCheckWidgetID);
+		if (checkView != nil)
+		{
+			PMRect checkFrame = checkView->GetFrame();
+			checkFrame.Left(xStart);
+			checkFrame.Right(xStart + kCheckZone);
+			checkView->SetFrame(checkFrame);
+
+			InterfacePtr<ITriStateControlData> state(checkView, UseDefaultIID());
+			if (state != nil)
+			{
+				state->SetState(checked ? ITriStateControlData::kSelected : ITriStateControlData::kUnselected,
+					kTrue /*invalidate*/, kFalse /*do NOT notify*/);
+			}
+
+			// A replaced hit is out of the running: the box stays visible so the rows keep lining
+			// up, but it is disabled - and the row's faded text says why.
+			if (replaced)
+				checkView->Disable();
+			else
+				checkView->Enable();
+		}
 
 		IControlView* cell = rowData->FindWidget(kKBSResultTextWidgetID);
 		if (cell != nil)
 		{
 			PMRect frame = cell->GetFrame();
-			frame.Left(xStart);
+			frame.Left(xStart + kCheckZone);
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
@@ -208,7 +240,7 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(locator, pre, match, post);
+				data->SetSegments(locator, pre, match, post, replaced);
 			cell->Invalidate();
 		}
 	}
@@ -271,6 +303,34 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	textData->SetString(message, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	textView->Invalidate();
 	textView->ForceRedraw();
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::ShowCheckedStatus - how many hits are currently selected for replacement
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::ShowCheckedStatus()
+{
+	const int32 total = KBSResultModel::GetTotalHitCount();
+	if (total == 0)
+		return;		// no results: leave whatever the search left on the line
+
+	// The count leads, so it survives the narrow status field's tail truncation.
+	PMString msg;
+	msg.SetTranslatable(kFalse);
+	msg.AppendNumber(KBSResultModel::GetCheckedCount());
+	msg.Append(" / ");
+	msg.AppendNumber(total);
+	msg.Append(" checked.");
+	if (total > KBSResultModel::kKBSDisplayHitLimit)
+	{
+		// The panel only shows the first N rows, but checking spans every stored hit - say so, so
+		// "Check All" followed by a replace is never a surprise.
+		msg.Append(" (");
+		msg.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
+		msg.Append(" shown)");
+	}
+	KBSResultTree::ShowStatus(msg);
 }
 
 // End, KBSResultListWidgetMgr.cpp.

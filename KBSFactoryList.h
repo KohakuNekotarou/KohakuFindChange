@@ -32,3 +32,5 @@ REGISTER_PMINTERFACE(KBSDrawEventHandler, kKBSDrawEventHandlerImpl)
 REGISTER_PMINTERFACE(KBSMarkerExpiryTask, kKBSMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
+// Replace feature: the hit row check box's observer.
+REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)

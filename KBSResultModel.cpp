@@ -156,4 +156,70 @@ void KBSResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 	gChapters[chapterIdx].docRef = newDocRef;
 }
 
+void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	if (h.replaced)
+		return;		// already done: it cannot come back into the selection
+	h.checked = checked;
+}
+
+bool KBSResultModel::IsHitChecked(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	return c.hits[hitIdx].checked;
+}
+
+bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced)
+{
+	outChecked = false;
+	outReplaced = false;
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	outChecked = c.hits[hitIdx].checked;
+	outReplaced = c.hits[hitIdx].replaced;
+	return true;
+}
+
+void KBSResultModel::SetAllChecked(bool checked)
+{
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		std::vector<Hit>& hits = gChapters[ci].hits;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (hits[hi].replaced)
+				continue;
+			hits[hi].checked = checked;
+		}
+	}
+}
+
+int32 KBSResultModel::GetCheckedCount()
+{
+	int32 count = 0;
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		const std::vector<Hit>& hits = gChapters[ci].hits;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (hits[hi].checked && !hits[hi].replaced)
+				++count;
+		}
+	}
+	return count;
+}
+
 // End, KBSResultModel.cpp.
