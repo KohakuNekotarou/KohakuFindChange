@@ -202,17 +202,26 @@ private:
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + 2 * kExpanderZone;
 
-		// The check box: place it, then push the model's state in WITHOUT notifying. A notify here
-		// would come straight back through KBSResultCheckObserver as a phantom click and overwrite
-		// the model with whatever this recycled row happened to be showing.
+		// The check box. After a replace the panel lists only what CHANGED, so a replaced row has
+		// nothing left to select: its box goes away completely and the text moves into that space.
+		// Hiding alone would not be enough - a hidden widget still takes clicks - so it is disabled
+		// as well.
 		IControlView* checkView = rowData->FindWidget(kKBSResultCheckWidgetID);
-		if (checkView != nil)
+		if (checkView != nil && replaced)
+		{
+			checkView->ShowView(kFalse);
+			checkView->Disable();
+		}
+		else if (checkView != nil)
 		{
 			PMRect checkFrame = checkView->GetFrame();
 			checkFrame.Left(xStart);
 			checkFrame.Right(xStart + kCheckZone);
 			checkView->SetFrame(checkFrame);
 
+			// Push the model's state in WITHOUT notifying. A notify here would come straight back
+			// through KBSResultCheckObserver as a phantom click and overwrite the model with
+			// whatever this recycled row happened to be showing.
 			InterfacePtr<ITriStateControlData> state(checkView, UseDefaultIID());
 			if (state != nil)
 			{
@@ -220,19 +229,18 @@ private:
 					kTrue /*invalidate*/, kFalse /*do NOT notify*/);
 			}
 
-			// A replaced hit is out of the running: the box stays visible so the rows keep lining
-			// up, but it is disabled - and the row's faded text says why.
-			if (replaced)
-				checkView->Disable();
-			else
-				checkView->Enable();
+			// Rows are recycled as the tree scrolls, so a row that once showed a replaced hit has
+			// to get its box back.
+			checkView->ShowView(kTrue);
+			checkView->Enable();
 		}
 
 		IControlView* cell = rowData->FindWidget(kKBSResultTextWidgetID);
 		if (cell != nil)
 		{
 			PMRect frame = cell->GetFrame();
-			frame.Left(xStart + kCheckZone);
+			// With no box in front of it, a replaced row's text starts where the box would be.
+			frame.Left(replaced ? xStart : xStart + kCheckZone);
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
@@ -240,7 +248,7 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(locator, pre, match, post, replaced);
+				data->SetSegments(locator, pre, match, post);
 			cell->Invalidate();
 		}
 	}

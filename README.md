@@ -45,9 +45,13 @@ the 20, across every chapter of the book".
   files stays your decision.
 - A chapter whose text no longer matches the results (edited since the search, or the query changed)
   is **reported rather than replaced at guessed positions**; search again to refresh.
-- A replaced row shows as done and cannot be re-ticked: the text it matched is gone. **Note that
-  undoing a replacement does not un-do the panel** — the row still reads as replaced until you run
-  the search again.
+- **After a replace the panel turns into a list of what changed.** Only the replaced rows remain (a
+  chapter nothing landed in drops out of the tree), they carry **no check box** — there is nothing
+  left to select — and the text that replaced the match is emphasised exactly the way a match is,
+  so the result reads like the search did. Their locator drops the within-page ordinal (`P1`, not
+  `P1(3)`): with the untouched hits gone the numbering would only be gaps. Rows still jump.
+- **Undoing a replacement does not un-do the panel** — the list still shows what was replaced until
+  you run the search again.
 
 ## Layout
 - Plug-in sources are flat in this repo (`.cpp` / `.h` / `.fr` / `.rc`).

@@ -276,4 +276,74 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	h.checked = false;
 }
 
+int32 KBSResultModel::KeepOnlyReplaced()
+{
+	// A replace that landed nowhere must not empty the panel, so check before touching anything.
+	bool anyReplaced = false;
+	for (size_t ci = 0; ci < gChapters.size() && !anyReplaced; ++ci)
+	{
+		const std::vector<Hit>& hits = gChapters[ci].hits;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (hits[hi].replaced)
+			{
+				anyReplaced = true;
+				break;
+			}
+		}
+	}
+	if (!anyReplaced)
+		return GetTotalHitCount();
+
+	// Thin each chapter down to its replaced hits...
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		std::vector<Hit>& hits = gChapters[ci].hits;
+		std::vector<Hit> keep;
+		keep.reserve(hits.size());
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (!hits[hi].replaced)
+				continue;
+			Hit hit = hits[hi];
+
+			// Rebuild the locator WITHOUT the within-page ordinal. That ordinal counted a hit's
+			// place among the matches on its page; once the unreplaced ones are gone the numbers
+			// are full of gaps (P1(1), P1(3)) and say nothing true, so the page alone is what the
+			// row shows. Same shape as the search's locator (KBSSearchEngine's FinalizeChapterHits)
+			// minus the "(n)" part.
+			hit.locator.Clear();
+			hit.locator.SetTranslatable(kFalse);
+			if (hit.pageString.IsEmpty())
+			{
+				hit.locator.Append("ov");	// overset with nothing placed anywhere: no page to name
+			}
+			else
+			{
+				hit.locator.Append("P");
+				hit.locator.Append(hit.pageString);
+				if (hit.isOverset)
+					hit.locator.Append("ov");
+			}
+			keep.push_back(hit);
+		}
+		hits.swap(keep);
+	}
+
+	// ...then drop the chapters nothing was changed in, so the tree shows only the documents the
+	// replace actually touched.
+	std::vector<Chapter> remaining;
+	remaining.reserve(gChapters.size());
+	int32 kept = 0;
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		if (gChapters[ci].hits.empty())
+			continue;
+		kept += static_cast<int32>(gChapters[ci].hits.size());
+		remaining.push_back(gChapters[ci]);
+	}
+	gChapters.swap(remaining);
+	return kept;
+}
+
 // End, KBSResultModel.cpp.

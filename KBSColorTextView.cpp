@@ -63,27 +63,25 @@ static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, c
 class KBSRowData : public CPMUnknown<IKBSRowData>
 {
 public:
-	KBSRowData(IPMUnknown* boss) : CPMUnknown<IKBSRowData>(boss), fReplaced(false) {}
+	KBSRowData(IPMUnknown* boss) : CPMUnknown<IKBSRowData>(boss) {}
 	virtual ~KBSRowData() {}
 
 	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match,
-		const PMString& post, bool replaced)
+		const PMString& post)
 	{
 		fLocator = locator; fLocator.SetTranslatable(kFalse);
 		fPre = pre;   fPre.SetTranslatable(kFalse);
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
-		fReplaced = replaced;
 	}
 
 	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch,
-		PMString& outPost, bool& outReplaced) const
+		PMString& outPost) const
 	{
 		outLocator = fLocator;
 		outPre = fPre;
 		outMatch = fMatch;
 		outPost = fPost;
-		outReplaced = fReplaced;
 	}
 
 private:
@@ -91,7 +89,6 @@ private:
 	PMString fPre;
 	PMString fMatch;
 	PMString fPost;
-	bool fReplaced;
 };
 
 CREATE_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
@@ -126,8 +123,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		return;
 
 	PMString locator, pre, match, post;
-	bool replaced = false;
-	data->GetSegments(locator, pre, match, post, replaced);
+	data->GetSegments(locator, pre, match, post);
 
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
@@ -160,9 +156,10 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
 	const RealAGMColor kContextColor = BlendColor(bg, fg, kContextTextWeight);	// faded toward bg
 
-	// A replaced row is history: everything it draws recedes, so the eye goes to the rows that
-	// still need attention. (Its check box, a real widget beside this cell, is disabled to match.)
-	const RealAGMColor kMatchColor = replaced ? kContextColor : kFullColor;
+	// The emphasised run: the matched text while these are search results, and the text that
+	// REPLACED it once a replace has run (the panel then lists only what changed, so the new text
+	// is exactly what the user wants to read - it gets the same emphasis a match does).
+	const RealAGMColor kMatchColor = kFullColor;
 
 	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text
 	// starts at a tab stop (a fixed column from the cell's left edge, so the text lines up down

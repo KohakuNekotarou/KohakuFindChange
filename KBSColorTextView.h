@@ -27,21 +27,23 @@
     Set by the widget manager on every apply, read by KBSColorTextView::Draw. Non-persistent.
 
     The row's check box is NOT drawn here - it is a real check box widget beside this cell
-    (kKBSResultCheckWidgetBoss), so it follows the UI theme and can be reached from outside. Only
-    'replaced' reaches the cell, because a replaced hit's whole line is drawn faded. */
+    (kKBSResultCheckWidgetBoss), so it follows the UI theme and can be reached from outside.
+
+    A replaced row draws exactly like a found one: after a replace the panel lists only what was
+    changed, and the new text is what the user wants to read, so it gets the same emphasis a match
+    does. (The check box next to it is hidden instead - there is nothing left to select.) */
 class IKBSRowData : public IPMUnknown
 {
 public:
 	enum { kDefaultIID = IID_IKBSROWDATA };
 
-	/** Replace this row's parts: the page locator, the three line segments (any may be empty), and
-	    whether this hit has already been replaced (draws the line faded). */
+	/** Replace this row's parts: the page locator and the three line segments (any may be empty). */
 	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match,
-		const PMString& post, bool replaced) = 0;
+		const PMString& post) = 0;
 
 	/** Read this row's parts back (for the cell's Draw). */
 	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch,
-		PMString& outPost, bool& outReplaced) const = 0;
+		PMString& outPost) const = 0;
 };
 
 #endif // __KBSColorTextView_h__

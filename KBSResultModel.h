@@ -159,6 +159,14 @@ namespace KBSResultModel
 	    reports - otherwise a jump into an untouched hit would land in the wrong place afterwards. */
 	void SetHitRange(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end);
 
+	/** Drop every hit that was NOT replaced, and every chapter left without one. Called right after
+	    a replace, which turns the panel into a list of WHAT WAS CHANGED: the occurrences that were
+	    left alone are no longer results worth showing, and the replaced ones cannot be selected
+	    again in any case. Does NOTHING when no hit was replaced, so a replace that landed nowhere
+	    never wipes the result set.
+	    @return the number of hits left in the model. */
+	int32 KeepOnlyReplaced();
+
 	/** Record a completed replacement: the row keeps its page locator but takes the replaced
 	    line's three segments and its new range, is marked replaced, and leaves the selection. A
 	    replaced hit can never be checked again - the text it matched is gone, so a second replace

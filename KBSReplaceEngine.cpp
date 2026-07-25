@@ -315,6 +315,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			KBSBookScope::ShowChapterWindow(docRef);
 	}
 
+	// The panel now becomes a list of WHAT CHANGED: the occurrences left alone are no longer
+	// results worth keeping in front of the user, and a replaced row cannot be selected again
+	// anyway. A replace that landed nowhere leaves the results as they were.
+	if (totalReplaced > 0)
+		KBSResultModel::KeepOnlyReplaced();
+
 	// The count leads, so it survives the narrow status field's tail truncation.
 	outSummary.AppendNumber(totalReplaced);
 	outSummary.Append(" replaced in ");
