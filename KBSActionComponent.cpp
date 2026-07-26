@@ -216,7 +216,15 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
+	{
+		// Without the Find/Change settings there is nothing to name in the prompt, and nothing to
+		// replace with either. Say so on the status line: a menu command that produces no prompt
+		// and no message reads as a broken plug-in.
+		PMString unavailable("Find/Change settings are unavailable - nothing was changed.");
+		unavailable.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(unavailable);
 		return false;
+	}
 	// Read only - KBS never writes to the user's Find/Change settings.
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
@@ -256,6 +264,11 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 */
 void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
+	// Both counts walk every stored hit (up to the 5000 collect cap), and this list normally holds
+	// more than one action that asks for them, so take each once here instead of per action.
+	const int32 checkedCount = KBSResultModel::GetCheckedCount();
+	const int32 totalHitCount = KBSResultModel::GetTotalHitCount();
+
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
 	{
 		const ActionID action = listToUpdate->GetNthAction(i);
@@ -292,13 +305,13 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// Needs something checked. The Find/Change strings are deliberately NOT tested here -
 			// the confirmation prompt shows them, so an empty change string (a valid "delete the
 			// matches" request) still reaches the user instead of being greyed out unexplained.
-			const bool16 canReplace = (KBSResultModel::GetCheckedCount() > 0) ? kTrue : kFalse;
+			const bool16 canReplace = (checkedCount > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
 		{
 			// Nothing to check without results. Not a toggle - no check mark either way.
-			const bool16 haveResults = (KBSResultModel::GetTotalHitCount() > 0) ? kTrue : kFalse;
+			const bool16 haveResults = (totalHitCount > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, haveResults ? kEnabledAction : kDisabled_Unselected);
 		}
 	}

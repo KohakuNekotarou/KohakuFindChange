@@ -75,7 +75,13 @@ bool RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
 	// GetReplacementCount is never updated by these commands, so the result code is the only
 	// signal that something actually happened.
 	if (cmdData->GetFindChangeResult() != IFindChangeService::kSuccess)
+	{
+		// Clear here too, for the same reason as above. A command can report kSuccess and still
+		// leave an error standing, and an error standing when EndCommandSequence runs rolls the
+		// whole chapter back - including the replacements that did work.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		return false;
+	}
 
 	outStory = cmdData->GetRange(outStart, outEnd);
 	return true;
@@ -96,11 +102,16 @@ bool ChapterHasChecked(int32 chapterIdx)
 }
 
 // Replace this chapter's checked hits. Returns how many were replaced.
-// outAborted = the re-walk ended before every checked hit had come up, i.e. the document is no
-// longer the one the result set describes (edited since the search, or the query changed).
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted)
+// outAborted   = the re-walk ended before every checked hit had come up, i.e. the document is no
+//                longer the one the result set describes (edited since the search, or the query
+//                changed since).
+// outStepLimit = the walk was cut off by the safety ceiling instead. Same symptom - checked hits
+//                left over - but a different cause and different advice, so the two are kept
+//                apart rather than both reported as "edited since the search".
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit)
 {
 	outAborted = false;
+	outStepLimit = false;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -176,8 +187,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted)
 	TextIndex lastReplStart = kInvalidTextIndex;
 	TextIndex lastReplEnd = kInvalidTextIndex;
 
-	while (!targets.empty() && steps++ < kMaxSteps)
+	while (!targets.empty() && steps < kMaxSteps)
 	{
+		++steps;
+
 		// ALWAYS find first: the replace command does not search on its own, it only acts on the
 		// match a find has just made current.
 		UIDRef story;
@@ -195,6 +208,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted)
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
 
+		// An unselected hit is only counted past. Its stored text range is deliberately NOT
+		// refreshed: ReplaceChecked ends by turning the panel into a list of what CHANGED
+		// (KeepOnlyReplaced), so every row that was left alone is dropped moments later, and a
+		// pass that replaced nothing has not moved anything to begin with.
 		if (targets.find(walkIndex) != targets.end())
 		{
 			UIDRef replacedStory;
@@ -220,12 +237,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted)
 			// targets would make the chapter look like it never lined up.
 			targets.erase(walkIndex);
 		}
-		else if (hitIdx >= 0)
-		{
-			// Not selected: refresh its anchors anyway. Earlier replacements in the same story
-			// have moved it, and its row still has to jump to the right place afterwards.
-			KBSResultModel::SetHitRange(chapterIdx, hitIdx, start, end);
-		}
 		++walkIndex;
 	}
 
@@ -235,9 +246,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted)
 	if (walker->IsWalking())
 		walker->Halt();
 
-	// Checked hits the re-walk never reached: this document is not the one the results describe.
+	// Checked hits the re-walk never reached. Which of the two reasons it was decides what the
+	// summary can honestly tell the user to do about it.
 	if (!targets.empty())
-		outAborted = true;
+	{
+		if (steps >= kMaxSteps)
+			outStepLimit = true;
+		else
+			outAborted = true;
+	}
 	return replacedCount;
 }
 
@@ -263,8 +280,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	int32 totalReplaced = 0;
 	int32 chaptersTouched = 0;
 	int32 chaptersSkipped = 0;
+	int32 chaptersStepLimited = 0;
 	PMString firstSkipped;
 	firstSkipped.SetTranslatable(kFalse);
+	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
+	// otherwise never count as "the first one", and every later chapter would overwrite it.
+	bool haveFirstSkipped = false;
 
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
@@ -288,8 +309,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			if (!KBSBookScope::ReopenChapterDoc(file, reopened))
 			{
 				++chaptersSkipped;
-				if (firstSkipped.IsEmpty())
+				if (!haveFirstSkipped)
+				{
 					firstSkipped = chapterName;
+					haveFirstSkipped = true;
+				}
 				continue;	// missing / locked: report it, replace nothing here
 			}
 			docRef = reopened;
@@ -297,16 +321,22 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		}
 
 		bool aborted = false;
-		const int32 replaced = ReplaceInChapter(ci, docRef, aborted);
+		bool stepLimit = false;
+		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit);
 		totalReplaced += replaced;
 		if (replaced > 0)
 			++chaptersTouched;
 		if (aborted)
 		{
 			++chaptersSkipped;
-			if (firstSkipped.IsEmpty())
+			if (!haveFirstSkipped)
+			{
 				firstSkipped = chapterName;
+				haveFirstSkipped = true;
+			}
 		}
+		if (stepLimit)
+			++chaptersStepLimited;
 
 		// A chapter that received a replacement gets a real window, so the change is visible and
 		// can be undone - or saved - by hand. Chapters nothing landed in stay as they were:
@@ -334,6 +364,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" chapter(s) did not line up (\"");
 		outSummary.Append(firstSkipped);
 		outSummary.Append("\" first) - edited since the search? Search again.");
+	}
+
+	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying
+	// "edited since the search?" here would send the user looking for the wrong thing.
+	if (chaptersStepLimited > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(chaptersStepLimited);
+		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
 	}
 	return totalReplaced;
 }

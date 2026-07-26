@@ -15,6 +15,8 @@
 // General includes:
 #include "Utils.h"
 
+#include <utility>		// std::move - the thinning below hands whole hits over instead of copying
+
 // Project includes:
 #include "KBSResultModel.h"
 
@@ -242,17 +244,6 @@ bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDF
 	return true;
 }
 
-void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	c.hits[hitIdx].textStart = start;
-	c.hits[hitIdx].textEnd = end;
-}
-
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	const PMString& newPre, const PMString& newMatch, const PMString& newPost,
 	TextIndex newStart, TextIndex newEnd)
@@ -305,7 +296,9 @@ int32 KBSResultModel::KeepOnlyReplaced()
 		{
 			if (!hits[hi].replaced)
 				continue;
-			Hit hit = hits[hi];
+			// The source vector is thrown away at the swap below, so the hit is moved out rather
+			// than copied - a Hit carries six PMStrings.
+			Hit hit = std::move(hits[hi]);
 
 			// Rebuild the locator WITHOUT the within-page ordinal. That ordinal counted a hit's
 			// place among the matches on its page; once the unreplaced ones are gone the numbers
@@ -325,7 +318,7 @@ int32 KBSResultModel::KeepOnlyReplaced()
 				if (hit.isOverset)
 					hit.locator.Append("ov");
 			}
-			keep.push_back(hit);
+			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);
 	}
@@ -339,8 +332,8 @@ int32 KBSResultModel::KeepOnlyReplaced()
 	{
 		if (gChapters[ci].hits.empty())
 			continue;
-		kept += static_cast<int32>(gChapters[ci].hits.size());
-		remaining.push_back(gChapters[ci]);
+		kept += static_cast<int32>(gChapters[ci].hits.size());	// counted BEFORE the move
+		remaining.push_back(std::move(gChapters[ci]));
 	}
 	gChapters.swap(remaining);
 	return kept;

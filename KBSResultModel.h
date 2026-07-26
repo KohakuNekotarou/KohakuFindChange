@@ -154,11 +154,6 @@ namespace KBSResultModel
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
 
-	/** Move a hit's stored text range, leaving everything else alone. Replacing text shifts every
-	    later match in the same story, so the replace pass writes back the positions its re-walk
-	    reports - otherwise a jump into an untouched hit would land in the wrong place afterwards. */
-	void SetHitRange(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end);
-
 	/** Drop every hit that was NOT replaced, and every chapter left without one. Called right after
 	    a replace, which turns the panel into a list of WHAT WAS CHANGED: the occurrences that were
 	    left alone are no longer results worth showing, and the replaced ones cannot be selected
