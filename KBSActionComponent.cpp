@@ -267,7 +267,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// Both counts walk every stored hit (up to the 5000 collect cap), and this list normally holds
 	// more than one action that asks for them, so take each once here instead of per action.
 	const int32 checkedCount = KBSResultModel::GetCheckedCount();
-	const int32 totalHitCount = KBSResultModel::GetTotalHitCount();
+	const int32 checkableCount = KBSResultModel::GetCheckableCount();
 
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
 	{
@@ -310,9 +310,11 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
 		{
-			// Nothing to check without results. Not a toggle - no check mark either way.
-			const bool16 haveResults = (totalHitCount > 0) ? kTrue : kFalse;
-			listToUpdate->SetNthActionState(i, haveResults ? kEnabledAction : kDisabled_Unselected);
+			// Nothing to check without results - and nothing to check after a replace either, where
+			// the panel lists what CHANGED and no row has a box left. Both commands would be no-ops
+			// there, so they go grey along with the boxes. Not a toggle - no check mark either way.
+			const bool16 haveCheckable = (checkableCount > 0) ? kTrue : kFalse;
+			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

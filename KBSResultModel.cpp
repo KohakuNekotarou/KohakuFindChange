@@ -224,6 +224,21 @@ int32 KBSResultModel::GetCheckedCount()
 	return count;
 }
 
+int32 KBSResultModel::GetCheckableCount()
+{
+	int32 count = 0;
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		const std::vector<Hit>& hits = gChapters[ci].hits;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (!hits[hi].replaced)
+				++count;
+		}
+	}
+	return count;
+}
+
 int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))

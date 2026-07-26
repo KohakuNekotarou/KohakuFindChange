@@ -145,6 +145,11 @@ namespace KBSResultModel
 	    the replace command's enablement. */
 	int32 GetCheckedCount();
 
+	/** How many hits COULD be checked at all: every hit that has not been replaced (uncapped). Zero
+	    means the panel is showing a replace's aftermath, where no row has a check box - Check All /
+	    Uncheck All have nothing to act on there and are greyed out. */
+	int32 GetCheckableCount();
+
 	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
 	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is
 	    N - the only key that survives replacing (see Hit::walkOrder). */
