@@ -4,7 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Screen overlay that draws a translucent red rectangle around a jumped-to search hit. A boss
+//  Screen overlay that inverts the pixels under a jumped-to search hit. A boss
 //  carries both IK2ServiceProvider (registers kDrawEventService, so the app hooks the sibling
 //  IDrwEvtHandler into the draw-event dispatcher at startup) and IDrwEvtHandler (draws on the
 //  spread front, in spread coordinates). The marker is a single rectangle in pasteboard

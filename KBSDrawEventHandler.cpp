@@ -4,15 +4,17 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Draw-event-handler service that paints a translucent red rectangle around a jumped-to hit's
-//  first text chunk. Ported from KESCL's KESCLDrawEventHandler (KESCL left untouched):
+//  Draw-event-handler service that inverts the pixels under a jumped-to hit's first text chunk.
+//  Ported from KESCL's KESCLDrawEventHandler (KESCL left untouched):
 //    * KBSDrawEventSrvc (CServiceProvider) registers kDrawEventService, so the app finds it at
 //      startup and hooks the same boss's IDrwEvtHandler into the draw-event dispatcher.
 //    * KBSDrawEventHandler draws on kEndSpreadMessage (spread front, spread coordinates).
 //
 //  The marker rectangle is kept in pasteboard coordinates; on each spread draw we convert it to
-//  that spread's coordinates (only the owning spread paints it) and fill it solid red at 12%
-//  opacity, borderless. Screen only (printing / Overprint-Preview are skipped), non-persistent.
+//  that spread's coordinates (only the owning spread paints it) and fill it with white through the
+//  Difference blending mode, which inverts whatever is underneath - so the marker is visible on a
+//  red page, a photo or a black box alike, which a tinted rectangle was not.
+//  Screen only (printing / Overprint-Preview are skipped), non-persistent.
 //  Never dereferences the marker's IDataBase* - it resolves the document through the document
 //  list, so a marker whose document the user closed simply stops painting instead of crashing.
 //
@@ -49,6 +51,7 @@
 #include "PMMatrix.h"
 #include "PMPoint.h"
 #include "PMReal.h"
+#include "GraphicTypes.h"		// kPMBlendDifference / kPMBlendExclusion (Phase A probe)
 #include "PMString.h"
 
 // Project includes:
@@ -227,10 +230,19 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 		if (w <= 0 || h <= 0)
 			return kFalse;
 
-		// A plain solid red rectangle, very translucent - a hint, not a highlight. Borderless.
+		// Invert the pixels under the marker so it shows up on ANY background. A red rectangle is
+		// invisible on a red page, which is what this replaced; an inversion cannot be lost in the
+		// artwork because it is defined by whatever is underneath it. White over Difference gives
+		// (1 - backdrop) = a full inversion. Text stays readable because the glyphs and their
+		// background invert separately (black text on red becomes white text on cyan).
+		//
+		// The blending mode IS part of the graphics state, so AutoGSave restores it. Do NOT wrap
+		// this in a transparency group: the group would be composited in isolation, leaving no
+		// backdrop to invert against. (XOR via IRasterPort::SetXORMode was tried first and
+		// rejected - it inverts glyphs and background as one, so the text stopped being readable.)
 		AutoGSave ag(gPort);
-		gPort->setopacity(PMReal(0.12), kFalse);
-		gPort->setrgbcolor(PMReal(1.0), PMReal(0.0), PMReal(0.0));
+		gPort->setblendingmode(kPMBlendDifference);
+		gPort->setrgbcolor(PMReal(1.0), PMReal(1.0), PMReal(1.0));
 		gPort->rectfill(left, top, w, h);
 	}
 
