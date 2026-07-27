@@ -77,6 +77,56 @@ namespace
 // summary says to narrow the query.
 const int32 kKBSCollectHitLimit = 10000;
 
+// Why a chapter could not be walked AT ALL - which is a different thing from "walked it and found
+// nothing". Returning zero hits for a chapter that was never actually searched reads as "this
+// chapter has no matches", and there is no way for the user to see through that. Every failure
+// below is therefore counted and named in the summary.
+enum ChapterWalkResult
+{
+	kChapterWalked = 0,		// the walk ran (it may legitimately have found nothing)
+	kChapterNoDatabase,		// the chapter's database is gone - it was closed underneath us
+	kChapterNoOptions,		// no Find/Change options to search with
+	kChapterNoWalker,		// the text-walker service handed out no walker
+	kChapterNoScope,		// QueryDocumentWalkerScope refused this document
+	kChapterNoClient		// the find/change walker client could not be created
+};
+
+/** A short reason to put in the status line. Not translatable - it names internals. */
+const char* ChapterWalkResultText(ChapterWalkResult result)
+{
+	switch (result)
+	{
+		case kChapterNoDatabase:	return "document was closed";
+		case kChapterNoOptions:		return "no find options";
+		case kChapterNoWalker:		return "no text walker";
+		case kChapterNoScope:		return "no walker scope";
+		case kChapterNoClient:		return "no walker client";
+		default:					return "";
+	}
+}
+
+/** Name the chapters that were skipped rather than searched, and why. Appends nothing when every
+    chapter was actually walked, so the ordinary summary is unchanged. */
+void AppendUnsearchableNote(PMString& outSummary, int32 count, const PMString& firstName,
+	ChapterWalkResult reason)
+{
+	if (count <= 0)
+		return;
+
+	outSummary.Append(" ");
+	outSummary.AppendNumber(count);
+	outSummary.Append(" chapter(s) could not be searched (");
+	// The chapter name is user data and the reason names internals - neither is a translation key.
+	PMString name(firstName);
+	name.SetTranslatable(kFalse);
+	outSummary.Append(name);
+	outSummary.Append(": ");
+	PMString why(ChapterWalkResultText(reason));
+	why.SetTranslatable(kFalse);
+	outSummary.Append(why);
+	outSummary.Append(").");
+}
+
 // A search is running. The progress bar pumps events while it is up, so without this a menu command
 // could be dispatched INTO the running search. The panel's actions read it through IsSearching().
 bool gSearching = false;
@@ -191,24 +241,50 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // Read-only: the whole walk sits inside a SaveRestoreModifiedState dirty guard, so a windowless
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
 // the user's Find/Change settings verbatim, so the search mode (Text or GREP) is followed.
-void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits, bool& outCapped)
+void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits,
+	bool& outCapped, ChapterWalkResult& outResult)
 {
+	outResult = kChapterWalked;
+
+	// FIRST, before anything touches the database: a chapter whose database has gone cannot be
+	// walked, and every step below (SaveRestoreModifiedState, QueryDocumentWalkerScope) takes that
+	// database. Without this the whole function just falls through its nil checks and returns an
+	// empty hit list, which the caller cannot tell apart from "no matches here".
+	IDataBase* chapterDB = docRef.GetDataBase();
+	if (chapterDB == nil)
+	{
+		outResult = kChapterNoDatabase;
+		return;
+	}
+
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
+	{
+		outResult = kChapterNoOptions;
 		return;
+	}
 
-	IDataBase::SaveRestoreModifiedState dirtyGuard(docRef.GetDataBase());
+	IDataBase::SaveRestoreModifiedState dirtyGuard(chapterDB);
 
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	if (registry == nil)
+	{
+		outResult = kChapterNoWalker;
 		return;
+	}
 	InterfacePtr<IK2ServiceProvider> provider(registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss));
 	if (provider == nil)
+	{
+		outResult = kChapterNoWalker;
 		return;
+	}
 
 	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
 	if (walker == nil)
+	{
+		outResult = kChapterNoWalker;
 		return;
+	}
 
 	// Always start a fresh walk from the top of the document.
 	if (walker->IsWalking())
@@ -221,17 +297,26 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
+	{
+		outResult = kChapterNoScope;
 		return;
+	}
 
 	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
 	if (client == nil)
+	{
+		outResult = kChapterNoClient;
 		return;
+	}
 
 	walker->Initialize(client, scope, opts, nil);
 
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
+	{
+		outResult = kChapterNoWalker;
 		return;
+	}
 
 	// Required critical section around text-walker selection changes.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
@@ -494,6 +579,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	int32 chaptersWithHits = 0;
 	bool collectionTruncated = false;
 	bool cancelled = false;
+	// Chapters that could not be searched at all. Counted separately from "searched, no hits":
+	// the summary has to be able to say a chapter was skipped, or a book search silently returns
+	// fewer chapters than the book has and looks like the chapters simply held no matches.
+	int32 unsearchableCount = 0;
+	PMString unsearchableName;
+	ChapterWalkResult unsearchableReason = kChapterWalked;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
@@ -531,9 +622,23 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 		std::vector<KBSResultModel::Hit> hits;
 		bool docCapped = false;
-		CollectHitsInDoc(targets[i].docRef, static_cast<size_t>(remaining), hits, docCapped);
+		ChapterWalkResult walkResult = kChapterWalked;
+		CollectHitsInDoc(targets[i].docRef, static_cast<size_t>(remaining), hits, docCapped, walkResult);
 		if (docCapped)
 			collectionTruncated = true;
+		if (walkResult != kChapterWalked)
+		{
+			// This chapter was never actually searched. Keep the first one's name so the summary
+			// can say which chapter and why - a skipped chapter is indistinguishable from a chapter
+			// with no matches otherwise, and that is what made this hard to see.
+			++unsearchableCount;
+			if (unsearchableName.IsEmpty())
+			{
+				unsearchableName = targets[i].shortName;
+				unsearchableReason = walkResult;
+			}
+			continue;
+		}
 		if (hits.empty())
 			continue;
 
@@ -593,6 +698,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			outSummary.Append(targets[0].shortName);
 			outSummary.Append("\".");
 		}
+		// "No matches" is a lie if a chapter was skipped rather than searched - say so here too.
+		AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
 		return 0;
 	}
 
@@ -602,9 +709,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	outSummary.Append(" hit(s)");
 	if (fromBook)
 	{
+		// "in M of T chapter(s)": M chapters held a hit, T chapters were looked at. Without the T
+		// there is no way to tell a book whose other chapters simply had no matches from a book
+		// whose other chapters were never searched.
 		PMString chapStr;	chapStr.AppendNumber(chaptersWithHits);
+		PMString totalChapStr;	totalChapStr.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" in ");
 		outSummary.Append(chapStr);
+		outSummary.Append(" of ");
+		outSummary.Append(totalChapStr);
 		outSummary.Append(" chapter(s) - book \"");
 		outSummary.Append(bookName);
 		outSummary.Append("\".");
@@ -634,6 +747,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
 		outSummary.Append(" in the panel.");
 	}
+
+	AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
 	return total;
 }
 

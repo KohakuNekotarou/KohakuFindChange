@@ -91,7 +91,9 @@ DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
 // Per-row draw data for a hit line's colour cell: the three text segments (before / matched /
 // after) the cell paints, the match segment in a highlight colour.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSROWDATA, kKBSPrefix + 0)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 1)
+// INSTRUMENTATION: the session-attached observer that reports what a book close broadcasts. Its
+// own IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 2)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 4)
@@ -138,6 +140,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKBSPrefix + 1
 // Result invalidation: the close-document responder. No service provider of our own - a boss that
 // answers ONE signal names the API's own provider implementation instead (see KBS.fr).
 DECLARE_PMID(kImplementationIDSpace, kKBSCloseDocResponderImpl, kKBSPrefix + 11)
+// INSTRUMENTATION: book-close notification watcher (temporary - see KBSBookWatch.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)

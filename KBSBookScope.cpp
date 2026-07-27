@@ -13,11 +13,14 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IApplication.h"		// QueryPanelManager - the panel walk starts here
 #include "IBook.h"
 #include "IBookContent.h"
 #include "IBookContentMgr.h"
 #include "IBookManager.h"
+#include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
 #include "IBookUtils.h"			// OpenOneDocument, OriginallyCloseDocInfo, IsSourceDocumentAlreadyOpen
+#include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
 #include "IDataBase.h"			// IsModified (the hide sweep skips dirty docs)
 #include "IDocFileHandler.h"
 #include "IDocument.h"
@@ -28,6 +31,7 @@
 #include "IDocumentUtils.h"
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
+#include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "ISession.h"
 
 // General includes:
@@ -35,6 +39,7 @@
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
 #include "CmdUtils.h"
 #include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
+#include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "SDKFileHelper.h"
 #include "UIDList.h"
 #include "Utils.h"
@@ -59,6 +64,45 @@ namespace
 	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
 	// gBookSearchOn: OFF searches the front document, ON the whole active book.
 	bool gBookScopeOn = false;
+
+	// kBookPanelBoss lives in BOOK PANEL.APLN and is declared in no public header, so the number
+	// has to be spelled out. Taken from a live object-model dump and cross-checked against the
+	// running panel list, where every open book's panel came back as kBookPanelBoss (measured
+	// 2026-07-28, docs/ai-notes/book-panel-active-tab.md). Compared as a raw number because there
+	// is no constant to compare against. A future build could renumber it - that is why the name
+	// check below exists, and why a total miss just falls back to the active book.
+	const uint32 kBookPanelBossRawClassID = 0x10101;
+
+	/** Does this panel name belong to a book that is open right now?
+	    Backstop for the hard-coded ClassID above. A book panel is titled with the book's title
+	    name, and when two open books share a name InDesign appends " 2" to the later one - so a
+	    leading match counts too. Cheap enough: there are rarely more than a handful of books. */
+	bool PanelNameMatchesOpenBook(const PMString& panelName)
+	{
+		if (panelName.IsEmpty())
+			return false;
+
+		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+		if (bookMgr == nil)
+			return false;
+
+		const int32 bookCount = bookMgr->GetBookCount();
+		for (int32 i = 0; i < bookCount; ++i)
+		{
+			IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
+			if (book == nil)
+				continue;
+
+			const PMString bookTitle = book->GetBookTitleName();
+			if (bookTitle.IsEmpty())
+				continue;
+			if (panelName.Compare(kFalse, bookTitle) == 0)
+				return true;
+			if (panelName.IndexOfString(bookTitle) == 0)		// "Book 1" -> tab "Book 1 2"
+				return true;
+		}
+		return false;
+	}
 }
 
 bool KBSBookScope::IsBookScopeOn()
@@ -278,6 +322,152 @@ bool KBSBookScope::HasActiveBook()
 	return bookMgr->GetCurrentActiveBook() != nil;	// non-owning pointer - no release
 }
 
+bool KBSBookScope::GetHeldBookPath(PMString& outPath)
+{
+	outPath = gHeldBookPath;
+	return !gHeldBookPath.IsEmpty();
+}
+
+bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
+{
+	if (!Utils<IBookUIUtils>().Exists())
+		return false;
+
+	// Walk every registered panel instead of asking for "the" book panel. Two earlier attempts
+	// failed and are not worth repeating (measured 2026-07-27/28):
+	//   - GetBookPanelWidget() returns nil for us. It is fed by the book panel's OWN actions
+	//     (SetBookPanelWidget), so a command from another panel's flyout finds nothing stored.
+	//   - GetBookFileFromBookPanel(file, nil) falls through to QueryActiveBookPanel(), i.e. the
+	//     ACTIVE book - which is exactly the value we are trying not to use.
+	// The walk works because InDesign creates one book panel per open book (tab count == panel
+	// count) and registers each with IPanelMgr. Details: docs/ai-notes/book-panel-active-tab.md.
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	if (app == nil)
+		return false;
+
+	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	if (panelMgr == nil)
+		return false;
+
+	IDataBase* panelDB = ::GetDataBase(panelMgr);
+	if (panelDB == nil)
+		return false;
+
+	const uint32 panelCount = panelMgr->GetPanelCount();
+	for (uint32 i = 0; i < panelCount; ++i)
+	{
+		UID panelUID;
+		PMString panelName;
+		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, nil, &panelName))
+			continue;
+
+		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
+		if (panelView == nil)
+			continue;
+
+		const bool isBookPanel = (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
+								 || PanelNameMatchesOpenBook(panelName);
+		if (!isBookPanel)
+			continue;
+
+		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
+		// behind another tab still reports itself visible - all three panels came back
+		// "Visible state 1" in the measurement - while only the front tab's kTabPanelContainerType
+		// is visible. Asking panelView->IsVisible() here would match every book panel and pick
+		// whichever came first.
+		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
+		if (!container.IsValid())
+			continue;
+		if (!PaletteRefUtils::IsPaletteVisible(container))
+			continue;
+
+		// Hand the panel itself in. With a real widget this resolves THAT panel's book instead of
+		// falling through to the active book the way a nil widget does.
+		IDFile panelBookFile;
+		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
+
+		// An empty result means the panel could not be resolved - keep looking rather than handing
+		// back a blank file that would later look like "no book".
+		SDKFileHelper panelFileHelper(panelBookFile);
+		if (panelFileHelper.GetPath().empty())
+			continue;
+
+		outFile = panelBookFile;
+		return true;
+	}
+
+	// No visible book panel: it is iconised, its palette is closed, or no book is open at all.
+	// The caller falls back to the active book, which is what the user expects in that state.
+	return false;
+}
+
+void KBSBookScope::DescribeBookState(const PMString& bookPath, PMString& outText)
+{
+	outText.SetTranslatable(kFalse);
+
+	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+	if (bookMgr == nil)
+	{
+		outText.Append("no book manager");
+		return;
+	}
+
+	const int32 bookCount = bookMgr->GetBookCount();
+	outText.Append("books=");
+	outText.AppendNumber(bookCount);
+
+	for (int32 i = 0; i < bookCount; ++i)
+	{
+		IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
+		if (book == nil)
+			continue;
+		SDKFileHelper bookFileHelper(book->GetBookFileSpec());
+		const PMString openBookPath = bookFileHelper.GetPath();
+		if (!(openBookPath == bookPath))
+			continue;
+
+		outText.Append(" ours listed, IsOpen=");
+		outText.AppendNumber(book->IsOpen() ? 1 : 0);
+		outText.Append(" db=");
+		outText.AppendNumber(::GetDataBase(book) != nil ? 1 : 0);
+		return;
+	}
+	outText.Append(" ours NOT listed");
+}
+
+bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
+{
+	if (bookPath.IsEmpty())
+		return false;
+
+	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+	if (bookMgr == nil)
+		return false;
+
+	// Walk the open-book list comparing file paths: the caller is a close notification, and the
+	// path recorded at search time is the only thing left to compare against.
+	//
+	// The IsOpen() test is what makes this usable from a close notification. Measured 2026-07-27
+	// on the release build: when kCloseBookCmdBoss is broadcast, the closing book is STILL on
+	// IBookManager's list, so membership alone answers "yes, still open" for the very book that is
+	// closing - which made this guard reject the one case it exists for. IBook::IsOpen is the flag
+	// the close clears, so a book that is on the list but no longer open is not counted here.
+	const int32 bookCount = bookMgr->GetBookCount();
+	for (int32 i = 0; i < bookCount; ++i)
+	{
+		IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
+		if (book == nil)
+			continue;
+		if (!book->IsOpen())
+			continue;
+		SDKFileHelper bookFileHelper(book->GetBookFileSpec());
+		const PMString openBookPath = bookFileHelper.GetPath();
+		if (openBookPath == bookPath)
+			return true;
+	}
+	return false;
+}
+
 bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName)
 {
 	outDocs.clear();
@@ -287,14 +477,37 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 	if (bookMgr == nil)
 		return false;
 
-	// The one active book (the front-most open book panel). GetCurrentActiveBook hands out a
-	// non-owning pointer - no release.
-	IBook* book = bookMgr->GetCurrentActiveBook();
+	// Which book to search: the one the BOOK PANEL is showing, not the "active" one.
+	//
+	// Selecting a book's tab switches the panel but does NOT make that book active - only touching
+	// a chapter inside it does (measured 2026-07-27). So a user who picks a tab and runs a search
+	// gets whatever book was active before, silently. For a search that is confusing; for Change
+	// Checked it would rewrite the wrong book, which is unacceptable. Adobe splits the two ideas in
+	// IBookUIUtils itself (GetBookFileFromBookPanel vs "the active book"), so the panel's own book
+	// is the right thing to ask for.
+	//
+	// Falls back to the active book when the panel cannot be reached, which keeps the old
+	// behaviour rather than failing outright.
+	IBook* book = nil;
+	bool fromPanel = false;
+
+	IDFile panelBookFile;
+	if (GetPanelBookFile(panelBookFile))
+	{
+		book = bookMgr->FindOpenBookByName(panelBookFile);	// nil = that file is not open
+		fromPanel = (book != nil);
+	}
+
+	// GetCurrentActiveBook hands out a non-owning pointer - no release. Same for FindOpenBookByName.
+	if (book == nil)
+		book = bookMgr->GetCurrentActiveBook();
 	if (book == nil)
 		return false;
 
 	outBookName = book->GetBookTitleName();
 	outBookName.SetTranslatable(kFalse);
+	// TEMPORARY DIAGNOSTIC: which route decided the book - remove once confirmed on the release build.
+	outBookName.Append(fromPanel ? " [panel]" : " [active]");
 
 	IDataBase* bookDB = ::GetDataBase(book);
 	if (bookDB == nil)
@@ -325,20 +538,32 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 		if (content == nil)
 			continue;
 
-		// Open the chapter's document without a layout window (or reuse it if it is already
-		// open). Chapters that cannot be opened - missing file, document locked by another user -
-		// are skipped; the searchable rest is still worth having. gHeldDocInfo accumulates
-		// whatever this call had to open.
+		ChapterDoc chapter;
+		// The chapter's .indd. Read FIRST, because the open below goes by file. It is also what
+		// navigation uses to reopen the chapter if the user closes it.
+		content->GetIDFile(chapter.file);
+
+		// Open the chapter without a layout window AND with the UI suppressed, or reuse it when
+		// the user already has it open.
+		//
+		// Why not IBookUtils::OpenOneDocument, which this used to call: that API takes no
+		// UI-suppression flag (IBookUtils.h:341). A chapter that raises ANY alert while opening -
+		// a missing font, a missing link, a document last saved by another version - therefore put
+		// an alert on screen, failed to open, and was skipped here without a word. The panel then
+		// showed the book minus that chapter, which is indistinguishable from a chapter that
+		// simply held no matches. ReopenChapterDoc is the windowless + kSuppressUI open the jump
+		// path already used, so both paths now open a chapter the same way.
+		//
+		// What is given up: OpenOneDocument also watched the open-database ceiling and would close
+		// an already-opened chapter to stay under it. That behaviour is a poor fit here anyway -
+		// it can invalidate a docRef this list is still holding - and the chapters are released
+		// together by ReleaseHeldDocs.
 		UIDRef docRef;
-		if (Utils<IBookUtils>()->OpenOneDocument(bookDB, contentUID, docRef, gHeldDocInfo) != kSuccess)
+		if (!KBSBookScope::ReopenChapterDoc(chapter.file, docRef))
 			continue;
 		if (docRef == UIDRef::gNull)
 			continue;
-
-		ChapterDoc chapter;
 		chapter.docRef = docRef;
-		// The chapter's .indd, so navigation can reopen the chapter if the user closes it.
-		content->GetIDFile(chapter.file);
 		// The chapter's file name for the read-out. Via the UTF-16 buffer (AppendW), so a
 		// Japanese chapter name survives - the PMString(char*) conversions do not.
 		WideString shortName = content->GetShortName();

@@ -64,6 +64,35 @@ namespace KBSBookScope
 	    against the UIDRef without dereferencing its (possibly dead) database. */
 	bool IsDocStillOpen(const UIDRef& docRef);
 
+	/** The full file path of the book the held chapters were opened for - i.e. the book the last
+	    book search ran against. false (and an empty string) when nothing is held.
+	    NOTE: ReleaseHeldDocs clears it, so read this BEFORE releasing. */
+	bool GetHeldBookPath(PMString& outPath);
+
+	/** Is a book with this full file path still in the session's open-book list? Compares paths
+	    rather than IBook pointers because the caller is a close notification: the closed book's
+	    IBook is already gone by then, so there is no pointer left to compare. */
+	bool IsBookStillOpen(const PMString& bookPath);
+
+	/** TEMPORARY DIAGNOSTIC: describe what the book manager currently says about the book at
+	    'bookPath' - how many books are listed, whether ours is among them, and what its IsOpen /
+	    database look like. Used to find out what actually changes when a book is closed, since
+	    neither list membership nor IsOpen() had changed at notification time. */
+	void DescribeBookState(const PMString& bookPath, PMString& outText);
+
+	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
+	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not
+	    make that book active - only touching a chapter inside it does (measured 2026-07-27).
+
+	    Found by walking IPanelMgr: InDesign creates one book panel per open book, and the front
+	    tab is the one whose containing palette is visible (measured 2026-07-28, full write-up in
+	    docs/ai-notes/book-panel-active-tab.md).
+
+	    @return false when no book panel is frontmost - the panel is iconised, its palette is
+	            closed, or no book is open - leaving outFile untouched. Callers fall back to the
+	            active book in that case. */
+	bool GetPanelBookFile(IDFile& outFile);
+
 	/** Close the chapters this module opened (the originally-closed ones only). Chapters the
 	    user already had open are never touched. The closes are SCHEDULED
 	    (IDocFileHandler::kSchedule + kSuppressUI), so this is safe to call from inside a

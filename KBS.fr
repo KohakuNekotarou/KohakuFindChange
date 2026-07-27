@@ -237,6 +237,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * INSTRUMENTATION (temporary): a session-level observer that reports what is broadcast when a
+	 * book is closed. Books have no signal to responder-register for, and IID_ICLOSEBOOKMSG has no
+	 * use anywhere in the SDK, so this finds out whether anything is sent at all. IID_IBOOKMANAGER
+	 * lives on kSessionBoss, which is why the AddIn goes here. Remove once the answer is known.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKBSBOOKWATCH, kKBSBookWatchImpl,
+		}
+	},
+
+	/*
 	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
 	 * is closed - a row naming a closed document would still jump, and Change Checked would still
 	 * reopen it to replace in it. Book results are left to the book-side responder.

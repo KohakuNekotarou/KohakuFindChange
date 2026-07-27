@@ -23,6 +23,7 @@
 #include "KBSID.h"
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSBookScope.h"
+#include "KBSBookWatch.h"
 #include "KBSResultModel.h"
 
 /** Implements IStartupShutdownService for the plug-in. */
@@ -32,14 +33,19 @@ public:
 	KBSStartupShutdown(IPMUnknown* boss) : CPMUnknown<IStartupShutdownService>(boss) {}
 	virtual ~KBSStartupShutdown() {}
 
-	/** Nothing to do at startup - the panel and the draw-event service are resource-driven. */
-	virtual void Startup() {}
+	/** The panel and the draw-event service are resource-driven, so the only thing to start is the
+	    book-close watcher that retires book-scope results (see KBSBookWatch.cpp). */
+	virtual void Startup()
+	{
+		KBSBookWatchAttach();
+	}
 
 	/** Retire the marker idle task (it must leave the queue, and never be re-created, before the
 	    app tears down) and release the module's static storage, so every static destructor at DLL
 	    unload finds nothing left to do. */
 	virtual void Shutdown()
 	{
+		KBSBookWatchDetach();
 		KBSMarkerExpiryIdleTask::Shutdown();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();

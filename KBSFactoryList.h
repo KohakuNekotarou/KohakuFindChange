@@ -36,3 +36,5 @@ REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
 // Result invalidation: retire a document-scope result set when its document closes.
 REGISTER_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
+// INSTRUMENTATION: book-close notification watcher (temporary).
+REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
