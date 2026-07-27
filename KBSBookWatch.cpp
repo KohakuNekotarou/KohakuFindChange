@@ -15,30 +15,35 @@
 //  signal ServiceIDs comes from BookID.h. So it has to be an observer, and what to listen to was
 //  read off a debug build (Test > Spy, SpyOnBroadcast + SpyOnObserver).
 //
-//  WHAT THIS LISTENS TO, AND WHY IT IS NOT THE OBVIOUS ONE
+//  WHAT THIS LISTENS TO
 //
-//  Closing a book broadcasts kCloseBookCmdBoss @ kSessionBoss (IID_IBOOKCONTENT), and that looks
-//  like the thing to use - but it is useless on its own. It does not say WHICH book is closing
-//  (the subject is the session; theChange and protocol are identical every time), so the book has
-//  to be identified by comparing what we searched against what is still open - and at that instant
-//  the closing book is NOT gone yet: it is still on IBookManager's list AND IBook::IsOpen() still
-//  returns kTrue for it. Both were tried on the release build (2026-07-27) and both answered
-//  "still open", so the test rejected the very case it was written for.
+//      kCloseBookCmdBoss @ kSessionBoss (IID_IBOOKCONTENT)
 //
-//  What this listens to instead:
-//
-//      IID_IDX_ACTIVE_BOOKCONTEXT_CHANGED_MSG @ kSessionBoss (IID_IACTIVETOPICLISTCONTEXT)
-//
-//  The indexing system's "the active book context changed". It is broadcast when a book closes
-//  (always, right after kCloseBookCmdBoss) and also when the active book actually changes - so it
-//  is read here as a plain "something about the open books changed" cue, and the only question
-//  ever asked is:
+//  It does not say WHICH book closed (the subject is the session; theChange and protocol are
+//  identical every time), and it does not need to, because the only question ever asked is:
 //
 //      is the book this result set was searched in still open?
 //
 //  That question is the whole design. It needs no notion of which book closed and no two-step
 //  state: a spurious cue simply finds the book still open and does nothing, and a book that
 //  disappears by any route at all is caught by the next cue.
+//
+//  THE ONE THAT DID NOT WORK - kept here so it is not tried again (2026-07-28)
+//
+//  This first listened to IID_IDX_ACTIVE_BOOKCONTEXT_CHANGED_MSG @ kSessionBoss
+//  (IID_IACTIVETOPICLISTCONTEXT) instead, on the belief that it is "broadcast when a book closes
+//  (always)". That belief was wrong: it fires when the ACTIVE book changes, and closing a book does
+//  NOT necessarily change it. Reproduced by the user - open two books, search one, make the other
+//  active (that cue DOES arrive, the diagnostic line appears), then close both books. Neither close
+//  moved the active book, so no cue ever arrived and the result set was never retired.
+//
+//  kCloseBookCmdBoss had been written off on 2026-07-27 as "useless on its own" for two reasons,
+//  and neither survives contact with the design above: it does not identify the book (irrelevant -
+//  one question, asked about OUR book) and at broadcast time the closing book still reports
+//  IsOpen() (handled - the question is deferred, see below). Measured on a debug build to fire once
+//  per close, for the last remaining book as much as for any other, and confirmed on the release
+//  build. Listening to both messages was tried first and also worked; it was trimmed back to this
+//  one because this is the cue that actually means "a book closed".
 //
 //  WHY THE ANSWER IS NOT ASKED IMMEDIATELY
 //
@@ -71,7 +76,7 @@
 #include "CObserver.h"
 
 // ID.h files:
-#include "IndexingID.h"			// IID_IDX_ACTIVE_BOOKCONTEXT_CHANGED_MSG, IID_IACTIVETOPICLISTCONTEXT
+#include "BookID.h"				// kCloseBookCmdBoss, IID_IBOOKCONTENT
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
 
 // Project includes:
@@ -200,7 +205,7 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	const PMIID& /*protocol*/, void* /*changedBy*/)
 {
 	// One cue, one question - see the file header.
-	if (theChange != IID_IDX_ACTIVE_BOOKCONTEXT_CHANGED_MSG)
+	if (theChange != kCloseBookCmdBoss)
 		return;
 
 	// Nothing to retire? Then do not even arm the timer.
@@ -228,8 +233,8 @@ void KBSBookWatchAttach()
 		return;
 	// Ask before attaching: the layer panel's tree observer does the same, and linksui carries a
 	// live bug from attaching and detaching asymmetrically.
-	if (!subject->IsAttached(observer, IID_IACTIVETOPICLISTCONTEXT, IID_IKBSBOOKWATCH))
-		subject->AttachObserver(observer, IID_IACTIVETOPICLISTCONTEXT, IID_IKBSBOOKWATCH);
+	if (!subject->IsAttached(observer, IID_IBOOKCONTENT, IID_IKBSBOOKWATCH))
+		subject->AttachObserver(observer, IID_IBOOKCONTENT, IID_IKBSBOOKWATCH);
 }
 
 void KBSBookWatchDetach()
@@ -244,8 +249,9 @@ void KBSBookWatchDetach()
 	InterfacePtr<IObserver> observer(GetExecutionContextSession(), IID_IKBSBOOKWATCH);
 	if (observer == nil)
 		return;
-	if (subject->IsAttached(observer, IID_IACTIVETOPICLISTCONTEXT, IID_IKBSBOOKWATCH))
-		subject->DetachObserver(observer, IID_IACTIVETOPICLISTCONTEXT, IID_IKBSBOOKWATCH);
+	// Symmetric with the attach, or the session keeps a pointer into a plug-in being unloaded.
+	if (subject->IsAttached(observer, IID_IBOOKCONTENT, IID_IKBSBOOKWATCH))
+		subject->DetachObserver(observer, IID_IBOOKCONTENT, IID_IKBSBOOKWATCH);
 }
 
 // End, KBSBookWatch.cpp.
