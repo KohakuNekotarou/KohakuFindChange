@@ -23,6 +23,18 @@ namespace KBSResultTree
 	    call when the panel is closed (does nothing then). */
 	void Rebuild();
 
+	/** Repaint the existing rows from the model WITHOUT rebuilding the tree. For changes that touch
+	    only what a row DRAWS - the check boxes behind Check All / Uncheck All - where the tree's
+	    shape (which chapters, how many hits) is untouched.
+
+	    Costs one notification per CHAPTER, not per hit: NodeChanged carries childrenChangedAlso, so
+	    the framework refreshes each chapter's hit rows itself. Rebuild() by contrast tears the whole
+	    tree down and re-expands it, which is what made a large result set expensive.
+
+	    It also KEEPS the expansion state, so a chapter the user collapsed stays collapsed (Rebuild
+	    re-expands everything). Safe to call when the panel is closed (does nothing then). */
+	void RefreshRows();
+
 	/** Write a one-line message to the panel's status read-out (its single-line StaticText). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */

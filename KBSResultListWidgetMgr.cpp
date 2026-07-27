@@ -279,14 +279,51 @@ void KBSResultTree::Rebuild()
 	treeMgr->ClearTree(kTrue);
 	treeMgr->ChangeRoot(kTrue);
 
-	// Expand every chapter: this both shows the hit rows (the KBS default is fully expanded) AND
-	// PRIMES each chapter's expander arrow - the framework draws no arrow for a node whose
-	// children were never materialized, and expanding materializes them (the "no expander arrow"
-	// fix, KESCL/paneltreeview). A chapter with no hits is not in the model, so every chapter
-	// node here has children.
+	// A BOOK's chapters come up CLOSED. A book-wide search can fill the panel with the first
+	// chapter's hits, which buries the fact that other chapters matched at all; closed chapters show
+	// the whole book's shape at a glance, and the arrow opens the one you want. ClearTree(kTrue)
+	// above already forgot the expansion state, so leaving them alone is all it takes.
+	//
+	// No expand-then-collapse priming is needed to get the arrow drawn: THIS panel draws the
+	// expander itself (see ApplyChapterRow - it shows the arrow whenever the hierarchy adapter
+	// reports children, which does not depend on the node ever having been expanded). The
+	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
+	// manager overrides it.
+	if (KBSResultModel::IsFromBook())
+		return;
+
+	// A single document has just the one chapter, so open it - otherwise the result is one closed
+	// row and the hits take an extra click to reach.
 	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
 	for (int32 c = 0; c < chapters; ++c)
 		treeMgr->ExpandNode(KBSResultNodeID::Create(c), kFalse);
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::RefreshRows - repaint the rows in place, without rebuilding the tree
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::RefreshRows()
+{
+	// Same reach as Rebuild; nil when the panel is closed (do nothing then).
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
+	if (panelData == nil)
+		return;
+	IControlView* listView = panelData->FindWidget(kKBSResultListWidgetID);
+	if (listView == nil)
+		return;
+	InterfacePtr<ITreeViewMgr> treeMgr(listView, UseDefaultIID());
+	if (treeMgr == nil)
+		return;
+
+	// One notification per CHAPTER with childrenChangedAlso = kTrue: the framework refreshes that
+	// chapter's hit rows itself, so a 3000-row result costs a handful of calls rather than 3000.
+	// Only the rows that actually have widgets (the visible ones) do any drawing; the rest pick the
+	// model up when they scroll into view. The row heights do not change here, which is what
+	// NodeChanged requires.
+	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
+	for (int32 c = 0; c < chapters; ++c)
+		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
 }
 
 //----------------------------------------------------------------------------------------

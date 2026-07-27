@@ -31,7 +31,7 @@ namespace KBSResultModel
 	/** The panel shows at most this many hit rows (book order). The model still HOLDS every hit -
 	    a same-book re-search reuses them, and a future export / replace consumes them ALL - only
 	    the tree display is capped, to keep a huge result set from flooding the panel. */
-	const int32 kKBSDisplayHitLimit = 500;
+	const int32 kKBSDisplayHitLimit = 5000;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors (Task 3) point back at the exact occurrence. */
@@ -87,6 +87,17 @@ namespace KBSResultModel
 
 	/** Forget the results (an empty search, or a teardown that still wants the tree emptied). */
 	void Clear();
+
+	/** Did these results come from a BOOK search (rather than the front document)? Recorded on the
+	    results themselves rather than read from the Book Scope toggle, so flipping the toggle after
+	    a search does not change how the existing results are displayed.
+
+	    The tree uses it to decide the initial state of the chapter rows: a book's chapters come up
+	    COLLAPSED (a book-wide search can fill the panel with one chapter's hits, hiding that other
+	    chapters matched at all), a single document's one chapter comes up expanded. Cleared by
+	    Clear(), so it must be set AFTER the scope is resolved. */
+	void SetFromBook(bool fromBook);
+	bool IsFromBook();
 
 	/** Application-shutdown cleanup: release the vectors' storage, no UI. */
 	void ShutdownCleanup();

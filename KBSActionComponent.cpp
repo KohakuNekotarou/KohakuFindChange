@@ -122,10 +122,12 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSSearchBookActionID:
 		{
-			// Search the active book (or the front document) with the user's current
-			// Find/Change query. The engine fills KBSResultModel with the hits (grouped by
-			// chapter) and, as it goes, grows the tree chapter by chapter; here we do the final
-			// authoritative rebuild and show the closing summary on the status line.
+			// Search the active book (or the front document) with the user's current Find/Change
+			// query. The engine fills KBSResultModel with the hits (grouped by chapter) behind a
+			// modal progress bar; the tree is drawn here, once, when it returns.
+			if (KBSSearchEngine::IsSearching())
+				break;		// already running - the bar pumps events, so this can be reached
+
 			PMString summary;
 			KBSSearchEngine::SearchBook(summary);
 			KBSResultTree::Rebuild();
@@ -179,9 +181,10 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Select / deselect every stored hit - including the ones past the panel's 500-row
 			// display cap, which is why the status line spells the numbers out afterwards.
 			KBSResultModel::SetAllChecked(actionID.Get() == kKBSCheckAllActionID);
-			// Every visible row's box changes, so this one does rebuild the tree (unlike a single
-			// row click). Bounded by the display cap, so it stays cheap.
-			KBSResultTree::Rebuild();
+			// Only what the rows DRAW changed - the tree's shape is untouched - so repaint them in
+			// place instead of rebuilding. One notification per chapter, and the expansion state
+			// survives (a chapter the user collapsed stays collapsed).
+			KBSResultTree::RefreshRows();
 			KBSResultTree::ShowCheckedStatus();
 			break;
 		}
@@ -264,6 +267,15 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 */
 void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
+	// A search is running behind the modal progress bar. The bar pumps events, so this list can be
+	// asked for its states from inside the search: lock everything until it returns.
+	if (KBSSearchEngine::IsSearching())
+	{
+		for (int32 i = 0; i < listToUpdate->Length(); i++)
+			listToUpdate->SetNthActionState(i, kDisabled_Unselected);
+		return;
+	}
+
 	// Both counts walk every stored hit (up to the 5000 collect cap), and this list normally holds
 	// more than one action that asks for them, so take each once here instead of per action.
 	const int32 checkedCount = KBSResultModel::GetCheckedCount();

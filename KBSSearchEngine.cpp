@@ -47,6 +47,7 @@
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
+#include "ProgressBar.h"			// TaskProgressBar / SuppressProgressBarDisplay (the book search's progress + cancel)
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
@@ -62,7 +63,6 @@
 #include "KBSSearchEngine.h"
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"		// grow the tree / status chapter by chapter as the search runs
 #include "KBSOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 
 namespace
@@ -75,7 +75,18 @@ namespace
 // RESULT SET itself, so hitting it caps a future export too. A common word in a large book can
 // reach it, and that is intended: the panel shows the first kKBSDisplayHitLimit hits and the
 // summary says to narrow the query.
-const int32 kKBSCollectHitLimit = 5000;
+const int32 kKBSCollectHitLimit = 10000;
+
+// A search is running. The progress bar pumps events while it is up, so without this a menu command
+// could be dispatched INTO the running search. The panel's actions read it through IsSearching().
+bool gSearching = false;
+
+// Raise gSearching for the length of a search, whichever way SearchBook returns.
+struct SearchingFlagGuard
+{
+	SearchingFlagGuard()	{ gSearching = true; }
+	~SearchingFlagGuard()	{ gSearching = false; }
+};
 
 // Is there any text to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
@@ -404,6 +415,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
+	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
+	// the progress bar pumps events, so a command could still find its way in here.
+	if (gSearching)
+	{
+		outSummary.Append("A search is already running.");
+		return 0;
+	}
+	const SearchingFlagGuard searchingGuard;
+
 	KBSResultModel::Clear();
 
 	if (!HasFindQuery())
@@ -447,14 +467,59 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		targets.push_back(single);
 	}
 
+	// Record the scope ON THE RESULTS (KBSResultModel::Clear above wiped the previous value): the
+	// tree reads it to decide whether the chapter rows come up collapsed, and reading it from here
+	// rather than from the toggle keeps an existing result set's display stable if the user flips
+	// Book Scope afterwards.
+	KBSResultModel::SetFromBook(fromBook);
+
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
+	// The progress bar. Book scope only: a one-document search is a single step with nothing to
+	// cancel between, so it is suppressed there (SuppressProgressBarDisplay keeps it off screen).
+	// DisableChildProgressBars keeps the windowless chapter opens from raising bars of their own.
+	//
+	// showImmediate = kTrue: a book search ALWAYS puts the bar up. The default (kFalse) makes the bar
+	// wait out an internal delay first, and the search beat that delay even at 5000+ hits (measured
+	// 2026-07-27) - so the one thing the bar is really there for, the cancel button, was never on
+	// screen. Better a brief flash on a fast book than a search that cannot be stopped.
+	PMString progressTitle("Searching book...");
+	progressTitle.SetTranslatable(kFalse);
+	const SuppressProgressBarDisplay suppressBar(fromBook ? kFalse : kTrue);
+	TaskProgressBar progressBar(progressTitle, static_cast<int32>(targets.size()), kTrue, kTrue);
+	progressBar.DisableChildProgressBars(kTrue);
+
 	int32 total = 0;
 	int32 chaptersWithHits = 0;
 	bool collectionTruncated = false;
+	bool cancelled = false;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
+		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
+		// bar names what is being worked on rather than what has just finished. This is also what
+		// keeps the bar moving through chapters that hold no hits at all.
+		PMString taskLine;
+		taskLine.SetTranslatable(kFalse);
+		taskLine.Append("Chapter ");
+		taskLine.AppendNumber(static_cast<int32>(i) + 1);
+		taskLine.Append(" / ");
+		taskLine.AppendNumber(static_cast<int32>(targets.size()));
+		progressBar.SetTaskStatus(taskLine);
+		progressBar.DoTask(targets[i].shortName);
+
+		// Cancel is looked at HERE ONLY - between chapters. Inside a chapter the walk sits in a
+		// TextWalkerSelections critical section and WasCancelled pumps events, so asking in there
+		// would run UI work in the middle of a text walk; safety wins over the response time. The
+		// cost is that a huge chapter finishes before a press of Cancel takes effect.
+		// kFalse = do NOT raise the global error state: it would outlive the search and fail the
+		// commands that come after it.
+		if (progressBar.WasCancelled(kFalse))
+		{
+			cancelled = true;
+			break;
+		}
+
 		// Room left under the whole-search safety ceiling; once it is gone, stop walking further
 		// chapters too (the result set is full).
 		const int32 remaining = kKBSCollectHitLimit - total;
@@ -484,31 +549,28 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		chapter.file = targets[i].file;
 		chapter.hits.swap(hits);
 		const int32 chapterHitCount = static_cast<int32>(chapter.hits.size());
-		const int32 hitsBeforeThisChapter = total;	// hits already in the model before this chapter
 		total += chapterHitCount;
 		++chaptersWithHits;
 
-		// Progressive display. The chapter loop is a safe place to touch the UI: CollectHitsInDoc
-		// halted the text walker before returning, so nothing is mid-walk here.
+		// Into the model only. The tree is drawn ONCE, by the caller, when the search returns: the
+		// progress bar is modal, so while it is up the panel cannot be read or clicked and a
+		// per-chapter rebuild would be work nobody sees. (Growing the tree chapter by chapter used
+		// to be how the search showed it was alive; the bar does that now, and does it for chapters
+		// that hold no hits at all - which the growing tree never could.)
 		KBSResultModel::AppendChapter(chapter);
+	}
 
-		// Running status ("... N hit(s) so far in M chapter(s) ..."). The count leads, so it stays
-		// visible even when the narrow single-line status field truncates the tail.
-		PMString progress;
-		progress.SetTranslatable(kFalse);
-		progress.Append("Searching... ");
-		progress.AppendNumber(total);
-		progress.Append(" hit(s) so far in ");
-		progress.AppendNumber(chaptersWithHits);
-		progress.Append(" chapter(s)...");
-		KBSResultTree::ShowStatus(progress);
-
-		// Rebuild only while the display cap still has room for this chapter: if the hits BEFORE it
-		// already reach the cap, this chapter is entirely off-screen, so the visible tree cannot
-		// change - skip the work. The boundary chapter (hits-before < cap <= hits-after) still
-		// rebuilds, so its "(shown / total)" label is drawn.
-		if (hitsBeforeThisChapter < KBSResultModel::kKBSDisplayHitLimit)
-			KBSResultTree::Rebuild();
+	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
+	// complete one, and give the chapters back - the results that would have needed them are gone.
+	// ReleaseHeldDocs schedules its closes, so it is safe to call from in here.
+	if (cancelled)
+	{
+		KBSResultModel::Clear();
+		KBSBookScope::ReleaseHeldDocs();
+		outSummary.Clear();
+		outSummary.SetTranslatable(kFalse);
+		outSummary.Append("Search cancelled.");
+		return 0;
 	}
 
 	// Task 3: the windowless chapters stay HELD so a hit-row jump can reach them without a
@@ -573,6 +635,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(" in the panel.");
 	}
 	return total;
+}
+
+bool KBSSearchEngine::IsSearching()
+{
+	return gSearching;
 }
 
 // End, KBSSearchEngine.cpp.

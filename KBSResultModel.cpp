@@ -24,6 +24,9 @@ namespace
 {
 	std::vector<KBSResultModel::Chapter> gChapters;
 
+	// Were these results produced by a book search? Decides whether the tree opens its chapters.
+	bool gFromBook = false;
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -50,6 +53,17 @@ void KBSResultModel::AppendChapter(const Chapter& chapter)
 void KBSResultModel::Clear()
 {
 	gChapters.clear();
+	gFromBook = false;
+}
+
+void KBSResultModel::SetFromBook(bool fromBook)
+{
+	gFromBook = fromBook;
+}
+
+bool KBSResultModel::IsFromBook()
+{
+	return gFromBook;
 }
 
 void KBSResultModel::ShutdownCleanup()

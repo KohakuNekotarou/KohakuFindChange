@@ -37,6 +37,11 @@ namespace KBSSearchEngine
 	    @return the total number of matches across the scope. */
 	int32 SearchBook(PMString& outSummary);
 
+	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
+	    command could otherwise be dispatched INTO a running search. The panel's actions ask this
+	    and grey themselves out; SearchBook itself turns a re-entrant call away as a last resort. */
+	bool IsSearching();
+
 	/** The walker scope options EVERY KBS walk uses (whole document, hidden layers excluded, all
 	    else default). The replace pass must re-walk a chapter with exactly the options the search
 	    that produced the hits used, or the walk order those hits were numbered by no longer lines
