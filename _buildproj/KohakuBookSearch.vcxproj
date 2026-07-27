@@ -230,6 +230,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultCheckObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSStartupShutdown.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>

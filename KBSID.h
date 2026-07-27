@@ -65,7 +65,10 @@ DECLARE_PMID(kClassIDSpace, kKBSStartupShutdownBoss, kKBSPrefix + 7)
 // system so it follows the UI theme) with our observer aggregated on it, the layer panel's eyeball
 // pattern. Only hit rows carry one - the chapter row resource has no check box.
 DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKBSPrefix + 8)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 9)
+// Result invalidation: the "a document is about to close" responder and its service provider. A
+// result row that names a closed document still jumps and still replaces (by reopening it), so the
+// results are retired with their document. Document scope only - see KBSCloseDocResponder.cpp.
+DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 10)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 11)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 12)
@@ -132,6 +135,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultNodeEHImpl, kKBSPrefix + 8)
 DECLARE_PMID(kImplementationIDSpace, kKBSStartupShutdownImpl, kKBSPrefix + 9)
 // Replace feature: the hit row check box's observer (click -> flip that hit's checked flag).
 DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKBSPrefix + 10)
+// Result invalidation: the close-document responder. No service provider of our own - a boss that
+// answers ONE signal names the API's own provider implementation instead (see KBS.fr).
+DECLARE_PMID(kImplementationIDSpace, kKBSCloseDocResponderImpl, kKBSPrefix + 11)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)

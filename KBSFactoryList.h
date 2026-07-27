@@ -34,3 +34,5 @@ REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
+// Result invalidation: retire a document-scope result set when its document closes.
+REGISTER_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)

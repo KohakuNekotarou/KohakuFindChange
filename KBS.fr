@@ -49,6 +49,7 @@
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
 #include "GraphicsID.h"		// IID_IDRWEVTHANDLER - the red-marker draw handler (Task 3)
 #include "AppFrameworkID.h"	// IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl (Task 3)
+#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
 
 // Project includes:
 #include "KBSID.h"
@@ -235,6 +236,26 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/*
+	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
+	 * is closed - a row naming a closed document would still jump, and Change Checked would still
+	 * reopen it to replace in it. Book results are left to the book-side responder.
+	 *
+	 * A boss that answers ONE signal does not need a ServiceProvider of its own: naming the API's
+	 * kBeforeCloseDocSignalRespServiceImpl (DocumentID.h) registers this responder for that signal.
+	 * CServiceProvider + HasMultipleIDs is only for a boss that answers several, as in
+	 * linksui/ClosingDocumentsResponder.cpp. IID_IRESPONDER comes from ShuksanID.h, included above.
+	 */
+	Class
+	{
+		kKBSCloseDocResponderBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kBeforeCloseDocSignalRespServiceImpl,
+			IID_IRESPONDER,         kKBSCloseDocResponderImpl,
+		}
+	},
+
 }}};
 
 /*  
@@ -349,6 +370,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		// The search command. kCustomEnabling is what lets UpdateActionStates rename it to
 		// "Search Book" / "Search Document" as the Book Scope toggle flips; without it that hook
 		// is never called for this action.
+		// NOT kDisableIfNoFrontDocument: a book search runs off IBookManager's active book and opens
+		// its chapters windowless, so "a book is open but no document window is" is a normal, working
+		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
+		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
@@ -377,7 +402,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Change Checked. kCustomEnabling so UpdateActionStates can grey it out while nothing is
-		// checked - the same flag the toggles need.
+		// checked - the same flag the toggles need. Guarding it against closed documents has to
+		// happen in UpdateActionStates (per-hit, via KBSBookScope::IsDocStillOpen), NOT with
+		// kDisableIfNoFrontDocument: replacing in windowless book chapters is a supported case.
 		kKBSActionComponentBoss,
 		kKBSReplaceCheckedActionID,
 		kKBSReplaceCheckedMenuKey,		// "Change Checked"
