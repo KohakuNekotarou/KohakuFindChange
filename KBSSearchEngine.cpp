@@ -48,6 +48,7 @@
 #include "IDocumentLayer.h"			// IsVisible / IsLocked - is that layer switched off, or locked?
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
+#include "ILockPosition.h"			// IsPageItemLocked - Object > Lock on the frame itself
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
@@ -245,7 +246,7 @@ bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 // header on why an unresolvable position has to read as editable.
 bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
 {
-	// The story's own insert lock. This is what "locked story" means to the dialog, and
+	// (1) The STORY's insert lock. This is what "locked story" means to the Find/Change dialog, and
 	// IItemLockData sits on kTextStoryBoss (verified against a live object-model dump). The default
 	// checkParent = kTrue is wanted: an inline inside a locked story is locked too.
 	InterfacePtr<IItemLockData> storyLock(storyRef, UseDefaultIID());
@@ -255,7 +256,26 @@ bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
 	if (frameUID == kInvalidUID)
 		return true;
 
-	return !IsFrameOnLockedLayer(storyRef.GetDataBase(), frameUID);
+	IDataBase* db = storyRef.GetDataBase();
+
+	// (2) The FRAME's own lock - Object > Lock (Ctrl+L). A different thing entirely from the layer
+	// lock below and from the story lock above, and the one users reach for most.
+	//
+	// InDesign itself draws no distinction between this and a locked layer: its Find/Change refuses
+	// both with one message, "The found object was locked or on a locked layer." (measured on the
+	// running application, 2026-07-28). So neither does KBS.
+	//
+	// No walk up the hierarchy: a frame inside a LOCKED GROUP already reports itself locked
+	// (measured the same day - locking a group set locked on every item inside it).
+	//
+	// selecting = kFalse asks for the lock itself, not "would a click be refused" - the Prevent
+	// Selecting Locked Items preference has no bearing on whether text may be rewritten.
+	InterfacePtr<ILockPosition> itemLock(db, frameUID, UseDefaultIID());
+	if (itemLock != nil && itemLock->IsPageItemLocked(kFalse))
+		return false;
+
+	// (3) The LAYER the frame sits on.
+	return !IsFrameOnLockedLayer(db, frameUID);
 }
 
 // The frame a text position is composed into: position -> parcel -> frame. kInvalidUID for an
