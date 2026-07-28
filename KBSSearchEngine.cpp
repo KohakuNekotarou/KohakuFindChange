@@ -90,7 +90,7 @@ const int32 kKBSCollectHitLimit = 10000;
 enum ChapterWalkResult
 {
 	kChapterWalked = 0,		// the walk ran (it may legitimately have found nothing)
-	kChapterNoDatabase,		// the chapter's database is gone - it was closed underneath us
+	kChapterNoDatabase,		// the chapter's UIDRef carries no database, so there is nothing to walk
 	kChapterNoOptions,		// no Find/Change options to search with
 	kChapterNoWalker,		// the text-walker service handed out no walker
 	kChapterNoScope,		// QueryDocumentWalkerScope refused this document
@@ -102,7 +102,7 @@ const char* ChapterWalkResultText(ChapterWalkResult result)
 {
 	switch (result)
 	{
-		case kChapterNoDatabase:	return "document was closed";
+		case kChapterNoDatabase:	return "no database";
 		case kChapterNoOptions:		return "no find options";
 		case kChapterNoWalker:		return "no text walker";
 		case kChapterNoScope:		return "no walker scope";
@@ -326,10 +326,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 {
 	outResult = kChapterWalked;
 
-	// FIRST, before anything touches the database: a chapter whose database has gone cannot be
-	// walked, and every step below (SaveRestoreModifiedState, QueryDocumentWalkerScope) takes that
-	// database. Without this the whole function just falls through its nil checks and returns an
-	// empty hit list, which the caller cannot tell apart from "no matches here".
+	// FIRST, before anything touches the database: every step below (SaveRestoreModifiedState,
+	// QueryDocumentWalkerScope) takes it, and without this the whole function just falls through
+	// its nil checks and returns an empty hit list, which the caller cannot tell apart from "no
+	// matches here".
+	//
+	// This is NOT a liveness test, despite what it looks like: a UIDRef carries the IDataBase*
+	// itself, so a document closed underneath us leaves a dangling pointer here, not a nil one.
+	// "Is this document still open?" only has one honest answer in KBS and it is
+	// KBSBookScope::IsDocStillOpen. What this catches is a UIDRef that never had a database.
 	IDataBase* chapterDB = docRef.GetDataBase();
 	if (chapterDB == nil)
 	{
@@ -716,6 +721,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	int32 unsearchableCount = 0;
 	PMString unsearchableName;
 	ChapterWalkResult unsearchableReason = kChapterWalked;
+	// A separate flag rather than unsearchableName.IsEmpty(): a chapter whose name is empty would
+	// otherwise never count as "the first one", and every later chapter would overwrite the reason.
+	// (Same trap the replace engine's firstSkipped already sidesteps.)
+	bool haveFirstUnsearchable = false;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
@@ -763,10 +772,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			// can say which chapter and why - a skipped chapter is indistinguishable from a chapter
 			// with no matches otherwise, and that is what made this hard to see.
 			++unsearchableCount;
-			if (unsearchableName.IsEmpty())
+			if (!haveFirstUnsearchable)
 			{
 				unsearchableName = targets[i].shortName;
+				unsearchableName.SetTranslatable(kFalse);
 				unsearchableReason = walkResult;
+				haveFirstUnsearchable = true;
 			}
 			continue;
 		}

@@ -131,6 +131,9 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h">
          <Filter>Header Files</Filter>
       </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
    </ItemGroup>
    <ItemGroup>
       <ResourceCompile Include="..\..\..\source\sdksamples\KBS\KBS.rc">

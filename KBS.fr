@@ -243,10 +243,15 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * INSTRUMENTATION (temporary): a session-level observer that reports what is broadcast when a
-	 * book is closed. Books have no signal to responder-register for, and IID_ICLOSEBOOKMSG has no
-	 * use anywhere in the SDK, so this finds out whether anything is sent at all. IID_IBOOKMANAGER
-	 * lives on kSessionBoss, which is why the AddIn goes here. Remove once the answer is known.
+	 * Book-close watcher: retires a BOOK-scope result set when the book it was searched in is
+	 * closed - the book half of what KBSCloseDocResponder does for a single document. Books have
+	 * no signal to responder-register for (not one of the SDK's signal ServiceIDs comes from
+	 * BookID.h), so this has to be an observer.
+	 *
+	 * The AddIn goes on kSessionBoss because that is the subject the cue is broadcast from:
+	 * kCloseBookCmdBoss @ kSessionBoss, protocol IID_IBOOKCONTENT - read off a debug build's
+	 * Test > Spy. The attach itself is in KBSBookWatch.cpp; this line only puts our IID, and so
+	 * the observer implementation, onto the session.
 	 */
 	AddIn
 	{

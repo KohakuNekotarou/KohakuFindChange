@@ -198,7 +198,9 @@ namespace KBSResultModel
 	/** Remove one chapter from the results, leaving the others in place. For retiring a single
 	    chapter whose results have gone stale - the book-scope half of the result-invalidation work,
 	    where closing one chapter should drop that chapter rather than the whole result set.
-	    @note Indices after chapterIdx shift down by one - iterate backwards when dropping several. */
+	    @note Indices after chapterIdx shift down by one - iterate backwards when dropping several.
+	    @note NOTHING CALLS THIS YET. It is here for the chapter-level invalidation that is still to
+	          be written; until that lands it is untested, so treat it as a sketch, not as API. */
 	void DropChapter(int32 chapterIdx);
 }
 

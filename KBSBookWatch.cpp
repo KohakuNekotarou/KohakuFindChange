@@ -10,6 +10,10 @@
 //      the book a result set was searched in goes away -> the panel goes back to empty, and the
 //      chapters KBS opened windowless for that search are closed with it.
 //
+//  (This started as a temporary instrumentation build - a session observer that just reported what
+//  a book close broadcasts. It answered the question and then became the feature; the notes below
+//  are the measurements it was built to take.)
+//
 //  A book close cannot be caught with a responder: the Programming Guide states responders may
 //  only register for "a set of events the application predefines", and not one of the SDK's 105
 //  signal ServiceIDs comes from BookID.h. So it has to be an observer, and what to listen to was
@@ -85,6 +89,7 @@
 #include "KBSBookWatch.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
+#include "KBSSearchEngine.h"	// IsSearching - never retire results out from under a running walk
 
 namespace
 {
@@ -102,6 +107,14 @@ ICallbackTimer* gRetireTimer = nil;
     says nothing - when the book is still there, because this runs on every book context change. */
 void RetireBookResultsIfGone()
 {
+	// NEVER while a search is running. This clears the result model and hands the held chapters
+	// back, and the search is walking exactly those chapters - the book progress bar pumps events
+	// while it is up, so an idle callback CAN land in the middle of a walk. (Reachable in practice:
+	// close a book, then start a search inside the wait below.) The caller re-arms, so the cue is
+	// deferred rather than dropped, and the book will still be gone when it is finally asked.
+	if (KBSSearchEngine::IsSearching())
+		return;
+
 	// Document-scope results are KBSCloseDocResponder's business, not this one's.
 	if (!KBSResultModel::IsFromBook())
 		return;
@@ -140,6 +153,12 @@ void RetireBookResultsIfGone()
     (KESCMTracker.cpp, KESCMHudTimerProc): the timer is released in ONE place, and it is not here. */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
+	// A search is walking the very chapters this would hand back - wait it out. A POSITIVE return
+	// value is "call me again in this many milliseconds", so the cue is deferred rather than
+	// dropped, and it re-arms without calling StartTimer from inside the callback.
+	if (KBSSearchEngine::IsSearching())
+		return kKBSBookRetireDelayMs;
+
 	RetireBookResultsIfGone();
 
 	// NEVER return 0 here: to the idle task manager 0 means "call me again immediately", which

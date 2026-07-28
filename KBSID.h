@@ -91,8 +91,8 @@ DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
 // Per-row draw data for a hit line's colour cell: the three text segments (before / matched /
 // after) the cell paints, the match segment in a highlight colour.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSROWDATA, kKBSPrefix + 0)
-// INSTRUMENTATION: the session-attached observer that reports what a book close broadcasts. Its
-// own IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
+// The session-attached observer that retires a book-scope result set when its book closes. Its own
+// IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 2)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
@@ -140,7 +140,7 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKBSPrefix + 1
 // Result invalidation: the close-document responder. No service provider of our own - a boss that
 // answers ONE signal names the API's own provider implementation instead (see KBS.fr).
 DECLARE_PMID(kImplementationIDSpace, kKBSCloseDocResponderImpl, kKBSPrefix + 11)
-// INSTRUMENTATION: book-close notification watcher (temporary - see KBSBookWatch.cpp).
+// Result invalidation: the book-close watcher (see KBSBookWatch.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 // The panel tab's name: an observer on the panel boss whose only job is to write the current
 // scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
