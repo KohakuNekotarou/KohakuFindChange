@@ -213,9 +213,10 @@ private:
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent;
 
-		// The check box. A row with nothing to select loses it completely and the text moves into
-		// that space. Hiding alone would not be enough - a hidden widget still takes clicks - so it
-		// is disabled as well.
+		// The check box. A row with nothing to select loses it completely; the space it would have
+		// taken is left empty rather than reclaimed, so the locators stay in one column (see the
+		// cell's frame below). Hiding alone would not be enough - a hidden widget still takes
+		// clicks - so it is disabled as well.
 		IControlView* checkView = rowData->FindWidget(kKBSResultCheckWidgetID);
 		if (checkView != nil && noCheckBox)
 		{
@@ -249,8 +250,17 @@ private:
 		if (cell != nil)
 		{
 			PMRect frame = cell->GetFrame();
-			// With no box in front of it, the text starts where the box would have been.
-			frame.Left(noCheckBox ? xStart : xStart + kCheckZone);
+			// ALWAYS past the check zone, box or no box: the locators line up in one column down
+			// the whole list and the check box sits in the margin to their left.
+			//
+			//     [v] P1(1)
+			//         P1(2) lck
+			//         P1(3) lck
+			//
+			// The rows without a box used to reclaim those 16px, which read as a ragged left edge
+			// once a search turned up a lot of locked hits (user's call 2026-07-28, from a screen
+			// shot). A column that does not move is worth more than the width.
+			frame.Left(xStart + kCheckZone);
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
