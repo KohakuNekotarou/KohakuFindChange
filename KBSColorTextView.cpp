@@ -161,18 +161,23 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// is exactly what the user wants to read - it gets the same emphasis a match does).
 	const RealAGMColor kMatchColor = kFullColor;
 
-	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text
-	// starts at a tab stop (a fixed column from the cell's left edge, so the text lines up down
-	// the tree; a locator wider than the column just pushes the text past it with a min gap).
-	const PMReal kTextTabStop(48.0);	// px from the cell's left edge where the line text begins
-	const PMReal kMinGap(8.0);			// min space after an over-wide locator
+	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text follows
+	// straight after it.
+	//
+	// There used to be a tab stop here - a fixed column from the cell's left edge - so the line
+	// text would form a column of its own. It cannot: the locator's width varies by several
+	// characters now that it carries "ov", "hid" and "lock", so a short locator was flung out to
+	// the tab while a long one sat right against its text. The same list showed both gaps at once
+	// and the wide one read as a mistake (user's call 2026-07-28, from the running panel).
+	//
+	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
+	// keeps that fixed for every row (see KBSResultListWidgetMgr - the check box sits in the margin
+	// rather than pushing its row's text right).
+	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
 	if (!locator.IsEmpty() && x < rightEdge)
 	{
 		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kFalse, kFalse);
-		const PMReal locatorEnd = x + StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X();
-		x = frame.Left() + kTextTabStop;
-		if (locatorEnd + kMinGap > x)
-			x = locatorEnd + kMinGap;
+		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X() + kLocatorGap;
 	}
 
 	// The line, left to right. convertAmpersand=kFalse on draw AND measure so a literal '&' is

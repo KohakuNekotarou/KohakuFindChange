@@ -606,25 +606,25 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 				if (hits[k].isOverset)
 					locator.Append("ov");
 			}
-			// Flags for what the row cannot show any other way, in the same terse lower-case family
-			// as "ov", each separated by a space:
-			//   "hid" = on a switched-off layer, so the page will look empty on arrival
-			//   "lck" = locked, so the row carries no check box and the replace will not touch it
-			// They stack in that order, on either shape: "P1(2)ov hid lck", "ov lck", "P7 hid".
+			// Flags for what the row cannot show any other way, each separated by a space:
+			//   "hidden" = on a switched-off layer, so the page will look empty on arrival
+			//   "lock"   = locked, so the row carries no check box and the replace will not touch it
+			// They stack in that order, on either shape: "P1(2)ov hidden lock", "ov lock",
+			// "P7 hidden".
 			//
 			// A SPACE, not a "+" (user's call 2026-07-28, after seeing it on screen): "+" is
 			// InDesign's own overset symbol - the mark in the out port, and the marker KBS draws for
-			// an overset hit - so "P5+lck" read as "page 5, overset". A separator has to be a
+			// an overset hit - so "P5+lock" read as "page 5, overset". A separator has to be a
 			// character that means nothing else here.
 			//
-			// Three letters rather than one: "hid" and "lck" can be read without a legend, where "h"
-			// and "l" cannot - and "loc" was ruled out because English reads it as "location", not
-			// "locked". Still short, because the locator is drawn at full colour ahead of the line
-			// and every character here is taken from the context the user is trying to read.
+			// Spelled out rather than clipped to "hid" / "lck" (user's call, same day). These two
+			// are what explain a row the user cannot act on, so they are worth the characters -
+			// unlike "ov", which merely qualifies a page number. ("loc" was never an option:
+			// English reads it as "location".)
 			if (hits[k].isHidden)
-				locator.Append(" hid");
+				locator.Append(" hidden");
 			if (hits[k].isLocked)
-				locator.Append(" lck");
+				locator.Append(" lock");
 			// The locator is its own part now (drawn at full colour, then a tab stop before the
 			// line text) - the colour cell keeps it separate from the faded line segments.
 			hits[k].locator = locator;
