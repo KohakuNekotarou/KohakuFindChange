@@ -298,6 +298,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// story as well as frame because the story carries a lock of its own.
 	std::map<std::pair<UID, UID>, bool> editableFrames;
 
+	// The rows THIS pass replaced. Their lines are read back once the walk is over (see the pass
+	// below it), and this is the list it works from - not "every row in the chapter marked
+	// replaced", which would also pick up rows an EARLIER pass replaced, whose stored ranges this
+	// pass has very likely moved.
+	std::vector<int32> replacedRows;
+
 	while (!targets.empty() && steps < kMaxSteps)
 	{
 		++steps;
@@ -404,12 +410,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 				if (hitIdx >= 0)
 				{
-					// The reported range describes the REPLACED text, so the row's new line is
-					// read straight from it - no guessing at the change string's length, which
-					// GREP back-references would make impossible anyway.
-					PMString pre, match, post;
-					KBSSearchEngine::SplitLineAroundMatch(replacedStory, replacedStart, replacedEnd, pre, match, post);
-					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, pre, match, post, replacedStart, replacedEnd);
+					// The range ONLY. The command reports the text it wrote, so this is exact - no
+					// guessing at the change string's length, which GREP back-references would make
+					// impossible anyway - but the line around it is not read until the chapter is
+					// finished. See the pass below the walk for why it cannot be read here.
+					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStart, replacedEnd);
+					replacedRows.push_back(hitIdx);
 				}
 			}
 			else
@@ -434,6 +440,40 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 	if (walker->IsWalking())
 		walker->Halt();
+
+	// The chapter has stopped changing, so now each replaced row is given the line it ended up on.
+	//
+	// NOT while the walk was running: matches share paragraphs, and a line read at the moment its
+	// own match was written still shows the LATER matches in that paragraph as they were before.
+	// Changing every "cat" in "cat and dog and cat" to "kitten" left the first row reading
+	// "kitten and dog and cat" for good, while the document read "kitten and dog and kitten"
+	// (reported 2026-07-28). Every row now reads the paragraph in its final state.
+	//
+	// The range each row stored is still the one to read: the walk only ever moves forward, so
+	// every replacement after this row's happened LATER in the story and cannot shift its start or
+	// end - true whatever the change string's length. Reading it later is also no more work than
+	// reading it early, being the same one read per replaced row.
+	//
+	// Reading, not writing, so it belongs outside the command sequence that has just ended. A run
+	// the user cancels does reach this point, and reads text that is about to be rolled back - but
+	// the rows are rolled back with it (KBSResultModel::RollBackRows), so nothing of it survives.
+	if (!replacedRows.empty())
+	{
+		IDataBase* const db = docRef.GetDataBase();
+		for (size_t r = 0; r < replacedRows.size(); ++r)
+		{
+			const int32 hi = replacedRows[r];
+			UID rowStory = kInvalidUID;
+			TextIndex rowStart = kInvalidTextIndex, rowEnd = kInvalidTextIndex;
+			if (!KBSResultModel::GetHitReplacedRange(chapterIdx, hi, rowStory, rowStart, rowEnd)
+				|| rowStory == kInvalidUID)
+				continue;
+			PMString pre, match, post;
+			KBSSearchEngine::SplitLineAroundMatch(UIDRef(db, rowStory), rowStart, rowEnd,
+				pre, match, post);
+			KBSResultModel::SetHitSegments(chapterIdx, hi, pre, match, post);
+		}
+	}
 
 	// Checked hits the re-walk never reached. WHY it did not reach them decides what may be
 	// said about them.

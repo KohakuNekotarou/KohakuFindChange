@@ -405,7 +405,6 @@ bool KBSResultModel::GetHitStoryStamp(int32 chapterIdx, int32 hitIdx, UID& outSt
 }
 
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
-	const PMString& newPre, const PMString& newMatch, const PMString& newPost,
 	TextIndex newStart, TextIndex newEnd)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -419,13 +418,51 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	// The locator (page) is kept: a replacement does not move the line to another page in any
 	// case worth chasing here - if the text reflowed that far, the result set is stale anyway and
 	// the user is told to search again.
-	h.preText = newPre;			h.preText.SetTranslatable(kFalse);
-	h.matchText = newMatch;		h.matchText.SetTranslatable(kFalse);
-	h.postText = newPost;		h.postText.SetTranslatable(kFalse);
+	//
+	// The displayed segments are left as the search wrote them, on purpose: they are read back
+	// when the chapter is done, by which time no later replacement can still change them.
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;
 	h.checked = false;
+}
+
+bool KBSResultModel::GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
+	TextIndex& outStart, TextIndex& outEnd)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	const Hit& h = c.hits[hitIdx];
+	if (!h.replaced)
+		return false;
+	outStoryUID = h.storyUID;
+	outStart = h.textStart;
+	outEnd = h.textEnd;
+	return true;
+}
+
+void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
+	const PMString& newMatch, const PMString& newPost)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+
+	// Backed up again even though MarkHitReplaced already copied this row aside: a cancel has to
+	// put back what the search left, and RollBackRows applies the copies oldest-last, so an extra
+	// copy costs one Hit and cannot change the outcome. Nothing here relies on the earlier call
+	// having happened.
+	BackUpRow(chapterIdx, hitIdx, h);
+
+	h.preText = newPre;			h.preText.SetTranslatable(kFalse);
+	h.matchText = newMatch;		h.matchText.SetTranslatable(kFalse);
+	h.postText = newPost;		h.postText.SetTranslatable(kFalse);
 }
 
 void KBSResultModel::BuildHitLocator(Hit& hit)

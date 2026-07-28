@@ -251,13 +251,31 @@ namespace KBSResultModel
 	    @return the number of rows left in the model. */
 	int32 KeepCheckedRows();
 
-	/** Record a completed replacement: the row keeps its page locator but takes the replaced
-	    line's three segments and its new range, is marked replaced, and leaves the selection. A
-	    replaced hit can never be checked again - the text it matched is gone, so a second replace
-	    pass would have nothing to line it up with. */
-	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
-		const PMString& newPre, const PMString& newMatch, const PMString& newPost,
-		TextIndex newStart, TextIndex newEnd);
+	/** Record a completed replacement: the row keeps its page locator but takes the range the
+	    replace command reported writing, is marked replaced, and leaves the selection. A replaced
+	    hit can never be checked again - the text it matched is gone, so a second replace pass would
+	    have nothing to line it up with.
+
+	    The three displayed segments are deliberately NOT set here: several matches can share one
+	    paragraph, and a line read at the moment ITS match was written still shows the later matches
+	    in that paragraph unreplaced. The replace pass fills them in once the chapter is finished -
+	    see SetHitSegments and GetHitReplacedRange. Until then the row still shows what the search
+	    found, which is why a run that is cancelled between the two can be rolled back as one. */
+	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx, TextIndex newStart, TextIndex newEnd);
+
+	/** Where a REPLACED row's new text sits: its story and the range MarkHitReplaced recorded.
+	    The replace pass walks its chapter's rows with this at the end of the run to read each
+	    replaced line back in its final state.
+	    @return false for an index out of range, and for any row that was not replaced - so the
+	            caller's loop needs no flag test of its own. */
+	bool GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
+		TextIndex& outEnd);
+
+	/** Give a row the three text segments it displays, leaving every other field alone. The other
+	    half of MarkHitReplaced: the replace pass calls it once per replaced row after the chapter's
+	    last replacement, when the paragraphs have stopped moving. */
+	void SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
+		const PMString& newMatch, const PMString& newPost);
 
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the post-replace thinning both call it, so the two can no longer drift apart.
