@@ -34,6 +34,32 @@ namespace
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
 
+	// One row copied aside before a replace changed it. See KBSResultModel::BeginRowBackup.
+	struct BackedUpRow
+	{
+		int32					chapter;
+		int32					hit;
+		KBSResultModel::Hit		row;
+	};
+
+	// Only true while a replace is running; empty at every other moment.
+	bool gBackingUpRows = false;
+	std::vector<BackedUpRow> gRowBackup;
+
+	// Copy a row aside before it is written to, if a replace is running. Every change is kept,
+	// including a second one to the same row - RollBackRows walks the copies backwards, so the
+	// oldest is applied last and wins.
+	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KBSResultModel::Hit& row)
+	{
+		if (!gBackingUpRows)
+			return;
+		BackedUpRow saved;
+		saved.chapter = chapterIdx;
+		saved.hit = hitIdx;
+		saved.row = row;
+		gRowBackup.push_back(saved);
+	}
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -94,6 +120,10 @@ void KBSResultModel::ShutdownCleanup()
 	// Assigning a fresh vector releases the storage too, not just the contents, so the static
 	// destructor at DLL unload finds nothing left to do (the KESCL ShutdownCleanup rule).
 	gChapters = std::vector<Chapter>();
+
+	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
+	// one would leave copies behind, and these hold PMStrings like the chapters do.
+	ForgetRowBackup();
 }
 
 int32 KBSResultModel::GetChapterCount()
@@ -345,6 +375,35 @@ bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDF
 	return true;
 }
 
+bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
+	TextIndex& outStart, PMString& outMatch)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	const Hit& h = c.hits[hitIdx];
+	outStoryUID = h.storyUID;
+	outStart = h.textStart;
+	outMatch = h.matchText;
+	outMatch.SetTranslatable(kFalse);
+	return true;
+}
+
+bool KBSResultModel::GetHitStoryStamp(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
+	uint32& outChangeCount)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	outStoryUID = c.hits[hitIdx].storyUID;
+	outChangeCount = c.hits[hitIdx].storyChangeCount;
+	return true;
+}
+
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	const PMString& newPre, const PMString& newMatch, const PMString& newPost,
 	TextIndex newStart, TextIndex newEnd)
@@ -355,6 +414,7 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
 		return;
 	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
 
 	// The locator (page) is kept: a replacement does not move the line to another page in any
 	// case worth chasing here - if the text reflowed that far, the result set is stale anyway and
@@ -427,6 +487,7 @@ void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome
 	Hit& h = c.hits[hitIdx];
 	if (h.replaced)
 		return;		// it WAS replaced - nothing went wrong with it
+	BackUpRow(chapterIdx, hitIdx, h);
 	h.outcome = outcome;
 	h.checked = false;
 	BuildHitLocator(h);
@@ -445,6 +506,39 @@ KBSResultModel::ChangeOutcome KBSResultModel::GetHitOutcome(int32 chapterIdx, in
 bool KBSResultModel::IsShowingReplaceOutcome()
 {
 	return gShowingOutcome;
+}
+
+void KBSResultModel::BeginRowBackup()
+{
+	gRowBackup.clear();
+	gBackingUpRows = true;
+}
+
+void KBSResultModel::RollBackRows()
+{
+	gBackingUpRows = false;
+
+	// Backwards: a row written to more than once has several copies, and the one taken FIRST is
+	// the one the search left, so it has to be applied last.
+	for (size_t i = gRowBackup.size(); i > 0; --i)
+	{
+		const BackedUpRow& saved = gRowBackup[i - 1];
+		if (saved.chapter < 0 || saved.chapter >= static_cast<int32>(gChapters.size()))
+			continue;	// the result set changed underneath - nothing to put the row back into
+		std::vector<Hit>& hits = gChapters[saved.chapter].hits;
+		if (saved.hit < 0 || saved.hit >= static_cast<int32>(hits.size()))
+			continue;
+		hits[saved.hit] = saved.row;
+	}
+
+	// Swapping against a temporary releases the storage as well as the contents.
+	std::vector<BackedUpRow>().swap(gRowBackup);
+}
+
+void KBSResultModel::ForgetRowBackup()
+{
+	gBackingUpRows = false;
+	std::vector<BackedUpRow>().swap(gRowBackup);
 }
 
 void KBSResultModel::DropChapter(int32 chapterIdx)

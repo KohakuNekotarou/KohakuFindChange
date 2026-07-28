@@ -69,6 +69,31 @@ namespace KBSSearchEngine
 	            test existed and a "cannot tell" must not start refusing ordinary replacements. */
 	bool IsMatchEditable(const UIDRef& storyRef, TextIndex pos);
 
+	/** The frame that decides whether the match at 'pos' may be edited: the frame it composes into,
+	    or - for an overset match, composed but placed nowhere - the frame carrying the "+"
+	    indicator. kInvalidUID when neither can be resolved, which IsFrameEditable then reads as
+	    editable (see IsMatchEditable's @return).
+
+	    This and IsFrameEditable are IsMatchEditable taken apart, so a pass asking about many hits
+	    can ask the expensive half ONCE PER FRAME instead of once per hit: a chapter's hits usually
+	    share a handful of frames, and no lock can change while a replace pass is running. Callers
+	    with a single hit to ask about should keep using IsMatchEditable. */
+	UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos);
+
+	/** Are the story and that frame both unlocked? The expensive half: it climbs the page-item
+	    hierarchy and asks four separate locks, which is why it is worth remembering per frame.
+	    @see IsMatchEditable for what the answer means, and what "cannot tell" resolves to. */
+	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
+
+	/** Just the matched text at [start, end), cut where SplitLineAroundMatch would cut its match
+	    segment - clipped to the end of the paragraph holding 'start' - but WITHOUT building the
+	    line around it.
+
+	    SplitLineAroundMatch copies the whole paragraph two or three times over to produce three
+	    strings; the same-occurrence test throws two of them away. This reads the matched characters
+	    and nothing else, which is what makes it affordable once per checked hit. */
+	void CopyMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end, PMString& outMatch);
+
 	/** The paragraph holding [start, end), split at those exact UTF-16 offsets into the three
 	    segments a hit row paints: the text before the match, the matched text, and the text after.
 	    Any of the three may come back empty; all three are empty when the position cannot be read.

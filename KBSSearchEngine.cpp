@@ -65,6 +65,7 @@
 
 #include <vector>
 #include <algorithm>				// std::stable_sort (the matches' page order)
+#include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 
 // Project includes:
 #include "KBSSearchEngine.h"
@@ -340,65 +341,101 @@ UID FrameUIDForPosition(const UIDRef& storyRef, TextIndex pos)
 	return pl->GetParcelFrameUID(key);
 }
 
-// The page a visible match position sits on. Ported from KESCL: position -> parcel -> frame, then
-// GetFramePageString. Returns false for an overset position (composed but placed in no frame) and
-// the query failures around it, which read the same to the user: no page for the match itself. The
-// caller then names the "+" locator's page instead.
-// outFrameUID is the frame the match sits in (kInvalidUID when there is none), so the caller can
-// ask about its layer without walking the parcels a second time.
-bool GetMatchPageString(const UIDRef& docRef, const UIDRef& storyRef, TextIndex pos,
-	PMString& outPage, int32& outPageIndex, UID& outFrameUID)
+// Everything about a hit that its FRAME decides rather than its position: the page the frame sits
+// on, whether that frame's layer is switched off, and whether its text may be rewritten.
+//
+// Each of the three walks a structure of its own - the page climbs to the spread and formats a
+// section-aware number, and the lock question climbs the page-item hierarchy twice - while a text
+// frame usually holds many of a search's matches. So they are resolved ONCE PER FRAME and kept for
+// the length of one document's walk. Nothing here can change while that walk runs: it is read-only,
+// inside a SaveRestoreModifiedState dirty guard, and processes no commands but the finder's.
+struct FrameFacts
 {
-	outPage.Clear();
-	outPage.SetTranslatable(kFalse);
-	outPageIndex = -1;
+	PMString	pageString;
+	int32		pageIndex;
+	bool		hasPage;	// false for a frame on no page, and for "no frame at all"
+	bool		isHidden;
+	bool		isLocked;
 
-	outFrameUID = FrameUIDForPosition(storyRef, pos);
-	if (outFrameUID == kInvalidUID)
-		return false;	// overset: composed but placed in no frame
+	FrameFacts() : pageIndex(-1), hasPage(false), isHidden(false), isLocked(false) {}
+};
 
-	return GetFramePageString(docRef, outFrameUID, outPage, outPageIndex);
+// Keyed by story as well as frame. kInvalidUID stands for "no frame", which matches in two
+// different stories can both produce, and the answer for it is the STORY's own insert lock.
+typedef std::map<std::pair<UID, UID>, FrameFacts> FrameFactsCache;
+
+const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID frameUID,
+	FrameFactsCache& cache)
+{
+	const std::pair<UID, UID> key(storyRef.GetUID(), frameUID);
+	const FrameFactsCache::const_iterator known = cache.find(key);
+	if (known != cache.end())
+		return known->second;
+
+	FrameFacts facts;
+	if (frameUID != kInvalidUID)
+		facts.hasPage = GetFramePageString(docRef, frameUID, facts.pageString, facts.pageIndex);
+	if (!facts.hasPage)
+	{
+		facts.pageString.Clear();
+		facts.pageIndex = -1;
+	}
+	facts.pageString.SetTranslatable(kFalse);
+	facts.isHidden = IsFrameOnHiddenLayer(docRef.GetDataBase(), frameUID);
+	facts.isLocked = !IsEditableInFrame(storyRef, frameUID);
+	return cache.insert(std::make_pair(key, facts)).first->second;
 }
 
 // Fill a hit from one match (story, [start, end)): its jump anchors, and the containing
 // paragraph's text split into (before / matched / after) at the exact UTF-16 offsets.
-void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResultModel::Hit& outHit)
+void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
+	FrameFactsCache& frameFacts, KBSResultModel::Hit& outHit)
 {
 	outHit.storyUID = storyRef.GetUID();
 	outHit.textStart = start;
 	outHit.textEnd = end;
 
-	// The page this match sits on (for the "P<page>(<n>) " hit-row locator). Recomposes on demand -
-	// fine, the caller's dirty guard is up. When the match is overset (no page of its own), name the
-	// page of the "+" overset indicator instead (the last placed parcel's frame, climbing out of a
-	// pushed-out table) so the hit lists as "ovP<page>(n)" and sorts into that page. If nothing is
-	// placed anywhere, leave it pageless (locator falls back to a bare "ov", sorted to the end).
-	UID matchFrameUID = kInvalidUID;
-	if (!GetMatchPageString(docRef, storyRef, start, outHit.pageString, outHit.pageIndex, matchFrameUID))
+	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
+	// that follows from the frame comes out of the cache.
+	UID matchFrameUID = FrameUIDForPosition(storyRef, start);
+	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, frameFacts);
+
+	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
+	// on no page). Name the page of the "+" overset indicator instead (the last placed parcel's
+	// frame, climbing out of a pushed-out table) so the hit lists as "P<page>(n)ov" and sorts into
+	// that page. If nothing is placed anywhere, leave it pageless: the locator falls back to a bare
+	// "ov" and sorts to the end.
+	//
+	// The overset lookup itself is NOT cached: it climbs out of whatever table pushed the text out,
+	// so two overset positions in one story can legitimately land on different frames.
+	if (!facts->hasPage)
 	{
 		outHit.isOverset = true;
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
-		if (!loc.found || !GetFramePageString(docRef, loc.frameUID, outHit.pageString, outHit.pageIndex))
+		if (loc.found)
 		{
-			outHit.pageString.Clear();
-			outHit.pageIndex = -1;
-		}
-		else
-		{
-			matchFrameUID = loc.frameUID;	// the "+" indicator's frame decides the layer here
+			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, frameFacts);
+			if (oversetFacts.hasPage)
+			{
+				matchFrameUID = loc.frameUID;	// the "+" indicator's frame decides the layer here
+				facts = &oversetFacts;
+			}
 		}
 	}
+
+	outHit.pageString = facts->pageString;		// empty when the frame has no page
+	outHit.pageString.SetTranslatable(kFalse);
+	outHit.pageIndex = facts->pageIndex;		// -1 then, which sorts the hit to the end
 
 	// A match on a switched-off layer is only reachable at all because the Find/Change dialog's
 	// "Include Hidden Layers" is on. The row has to say so - the text is there and the jump works,
 	// but nothing will be visible on arrival until the layer is switched back on.
-	outHit.isHidden = IsFrameOnHiddenLayer(docRef.GetDataBase(), matchFrameUID);
+	outHit.isHidden = facts->isHidden;
 
 	// Locked content: found, listed, jumpable - and never replaceable, because InDesign gives no
 	// way to change it. Decided HERE, once, so the row can be built without a check box instead of
-	// offering one that would quietly do nothing. matchFrameUID is already the layer-deciding frame
-	// (the overset branch above put the "+" indicator's frame in it), so this costs no extra lookup.
-	outHit.isLocked = !IsEditableInFrame(storyRef, matchFrameUID);
+	// offering one that would quietly do nothing.
+	outHit.isLocked = facts->isLocked;
 	if (outHit.isLocked)
 		outHit.checked = false;		// a fresh search checks every hit it is ALLOWED to replace
 
@@ -497,6 +534,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	// Required critical section around text-walker selection changes.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
+	// What each of this document's frames answers about the hits inside it - see FrameFacts. Scoped
+	// to this walk, so it can never outlive the state it describes.
+	FrameFactsCache frameFacts;
+
+	// Each story's text-change counter as the search finds it. Stamped onto every hit, so the
+	// replace can ask "has one character moved in this story since?" instead of re-reading the text
+	// under each row. Read once per STORY: the finder does not write, so it cannot move on us.
+	std::map<UID, uint32> storyStamps;
+
 	// Walk the whole document. Each ProcessCommand advances the walker to the next match ("find
 	// next"), so we keep going until no more hits. prev* is a safety net: if the finder ever hands
 	// back the exact same occurrence twice in a row (a query that does not advance the walker, e.g.
@@ -543,8 +589,17 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			break;
 		}
 
+		std::map<UID, uint32>::const_iterator stamp = storyStamps.find(story.GetUID());
+		if (stamp == storyStamps.end())
+		{
+			InterfacePtr<ITextModel> storyModel(story, UseDefaultIID());
+			const uint32 count = (storyModel != nil) ? storyModel->GetTextChangeCount() : 0;
+			stamp = storyStamps.insert(std::make_pair(story.GetUID(), count)).first;
+		}
+
 		KBSResultModel::Hit hit;
-		BuildHit(docRef, story, start, end, hit);
+		BuildHit(docRef, story, start, end, frameFacts, hit);
+		hit.storyChangeCount = stamp->second;
 		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
 		// into page order. The replace pass re-walks the chapter and matches on this number.
 		hit.walkOrder = static_cast<int32>(outHits.size());
@@ -640,13 +695,26 @@ bool KBSSearchEngine::IsMatchEditable(const UIDRef& storyRef, TextIndex pos)
 	// carrying the "+" indicator, which is the frame the hit's own locator already names. Resolving
 	// it the same way on both sides is what keeps "the row has no check box" and "the replace
 	// refuses" describing the same set of hits.
+	return IsEditableInFrame(storyRef, KBSSearchEngine::EditableFrameForMatch(storyRef, pos));
+}
+
+UID KBSSearchEngine::EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos)
+{
 	UID frameUID = FrameUIDForPosition(storyRef, pos);
 	if (frameUID == kInvalidUID)
 	{
+		// Overset: composed but placed in no frame, so the frame that speaks for it is the one
+		// showing the "+". Only reached for overset matches, so the locator's cost is not paid on
+		// the ordinary path.
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, pos);
 		if (loc.found)
 			frameUID = loc.frameUID;
 	}
+	return frameUID;
+}
+
+bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
+{
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
@@ -676,9 +744,11 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 	// Split by UTF-16 unit, matching TextIndex: the match sits at [start-paraStart, end-paraStart)
 	// in the paragraph. GrabUTF16Buffer + SetXString copies exact unit ranges (a match boundary
 	// never falls inside a surrogate pair, so no code point is cut).
-	PMString paraStr(para);
+	// Read straight out of the WideString. GrabUTF16Buffer lives on UnicodeSavvyString, the base
+	// PMString and WideString share, so building a PMString first would copy the whole paragraph a
+	// second time to reach the same buffer - once per hit, for nothing.
 	int32 n = 0;
-	const UTF16TextChar* buf = paraStr.GrabUTF16Buffer(&n);
+	const UTF16TextChar* buf = para.GrabUTF16Buffer(&n);
 	if (buf == nil || n <= 0)
 		return;
 
@@ -706,12 +776,46 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 	if (start != expectStart + posDelta)
 		return false;
 
-	// Read with the splitter the search itself used, so both sides are cut the same way (a match
-	// spanning paragraphs is trimmed identically). The model holds the RAW text - the ellipsizing
-	// happens at draw time - so this compares like with like.
-	PMString livePre, liveMatch, livePost;
-	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, end, livePre, liveMatch, livePost);
+	// Cut the same way the search cut what it stored (a match spanning paragraphs is trimmed
+	// identically on both sides), but read ONLY the matched characters - see CopyMatchText. The
+	// model holds RAW text; the ellipsizing happens at draw time, so this compares like with like.
+	PMString liveMatch;
+	KBSSearchEngine::CopyMatchText(storyRef, start, end, liveMatch);
 	return liveMatch == expectMatch;
+}
+
+void KBSSearchEngine::CopyMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end,
+	PMString& outMatch)
+{
+	outMatch.Clear();
+	outMatch.SetTranslatable(kFalse);
+
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil)
+		return;
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (scanner == nil)
+		return;
+
+	// The paragraph is looked up for its END and nothing else: SplitLineAroundMatch cuts its match
+	// segment at the paragraph terminator (it splits a string that stops there), so a match running
+	// past one has to be cut in the same place here or the two would disagree about it. None of the
+	// paragraph is copied - that is the whole point of this function.
+	int32 paraLen = 0;
+	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
+	if (paraStart < 0 || paraLen <= 0)
+		return;
+
+	TextIndex matchEnd = end;
+	if (matchEnd > paraStart + paraLen)
+		matchEnd = paraStart + paraLen;
+	if (matchEnd <= start)
+		return;		// nothing left of the match inside this paragraph
+
+	WideString text;
+	scanner->CopyText(start, static_cast<int32>(matchEnd - start), &text);
+	outMatch = PMString(text);
+	outMatch.SetTranslatable(kFalse);
 }
 
 int32 KBSSearchEngine::SearchBook(PMString& outSummary)

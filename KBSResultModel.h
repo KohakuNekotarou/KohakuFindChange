@@ -90,10 +90,17 @@ namespace KBSResultModel
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
+		uint32	storyChangeCount;	// ITextModel::GetTextChangeCount for this hit's story, AS THE
+								// SEARCH LEFT IT. The model bumps that counter on every character
+								// inserted, removed or replaced, so a replace pass that finds it
+								// unchanged knows the story holds exactly the text it walked - and
+								// can take the whole story's hits on trust instead of re-reading
+								// the text under each one. See KBSReplaceEngine.
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
-				walkOrder(-1), checked(true), replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
+				walkOrder(-1), checked(true), replaced(false), outcome(kOutcomeNone), pageOrdinal(0),
+				storyChangeCount(0) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -218,6 +225,20 @@ namespace KBSResultModel
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
 
+	/** The three things the replace's same-occurrence test asks of a row: the story it was found
+	    in, where the match started, and what it read.
+
+	    Its own getter because it runs once per checked hit, and the two getters it replaces carry
+	    freight it does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies
+	    four PMStrings to hand back one. false = index out of range. */
+	bool GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
+		PMString& outMatch);
+
+	/** A hit's story, and the change count that story carried when the search read it. The replace
+	    asks this once per story before it writes anything, to find out which stories it can take on
+	    trust. @see Hit::storyChangeCount. false = index out of range. */
+	bool GetHitStoryStamp(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, uint32& outChangeCount);
+
 	/** Turn the result set into a REPORT of what the replace did. Keeps every row the replace was
 	    asked about - the ones it changed, and the ones it left alone with the reason on the
 	    locator - plus the locked rows, which account for a search that turned up more than the
@@ -265,6 +286,28 @@ namespace KBSResultModel
 	    aftermath can hold rows with no flag at all - a chapter the safety limit cut short, or one
 	    that could not be opened. Those were never looked at, so nothing can be said about them. */
 	bool IsShowingReplaceOutcome();
+
+	/** Start remembering every row a replace changes, so a run the user stops can be put back.
+	    Only the rows actually written to are copied - one copy each, taken just before the change -
+	    so the cost follows the work done rather than the size of the result set.
+
+	    A replace that is cancelled rolls the TEXT back through its command sequence (a regular
+	    ICommandSequence rolls the database back to where it started when the global error code is
+	    not kSuccess, which is what ProgressBar's WasCancelled(kTrue) sets). That leaves the panel
+	    describing replacements that no longer exist, so the two have to be put back together: this
+	    is the panel's half.
+
+	    Exactly one of RollBackRows (the run was cancelled) or ForgetRowBackup (it committed) must
+	    follow, or the copies stay alive until the next replace. */
+	void BeginRowBackup();
+
+	/** Put every remembered row back the way it was and stop remembering. Newest change first, so a
+	    row that was changed twice ends up holding the oldest copy - the one the search left. */
+	void RollBackRows();
+
+	/** Stop remembering and release the copies: the replace committed, so the rows keep what they
+	    were given. */
+	void ForgetRowBackup();
 
 	/** Remove one chapter from the results, leaving the others in place. For retiring a single
 	    chapter whose results have gone stale - the book-scope half of the result-invalidation work,

@@ -30,6 +30,7 @@
 #include "CmdUtils.h"				// commands and command sequences
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
+#include "ITextModel.h"				// GetTextChangeCount - "has this story moved since the search?"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// TaskProgressBar / SuppressProgressBarDisplay - as the search does it
 #include "Utils.h"
@@ -47,10 +48,13 @@
 namespace
 {
 
-// What Edit > Undo calls a replace. Passed with kUnknownEncoding wherever it is used, so it is
-// taken literally rather than looked up as a key in the string tables - an untranslated UI string
-// is otherwise liable to come back as somebody else's translation.
-const char* const kKBSReplaceSequenceName = "Kohaku Replace";
+// What Edit > Undo would call a replace, if the sequence were named. It is NOT named at the
+// moment - see the SequencePtr in ReplaceChecked. Kept here so putting the name back is one line.
+//
+// Pass it with kUnknownEncoding wherever it is used, so it is taken literally rather than looked
+// up as a key in the string tables - an untranslated UI string is otherwise liable to come back as
+// somebody else's translation.
+//const char* const kKBSReplaceSequenceName = "Kohaku Replace";
 
 // Run one find/change walker command. true = it landed on a match, with the story and range in
 // the out parameters. Anything else - no more matches, a failure, a command that would not
@@ -134,16 +138,11 @@ bool ChapterHasChecked(int32 chapterIdx)
 bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 	TextIndex start, TextIndex end, int32 posDelta)
 {
-	UIDRef docRef;
-	IDFile file;
 	UID expectStory = kInvalidUID;
-	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
-	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, expectStory, expectStart, expectEnd))
+	TextIndex expectStart = kInvalidTextIndex;
+	PMString storedMatch;
+	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, storedMatch))
 		return false;		// no row to compare against - leave the text alone
-
-	PMString locator, storedPre, storedMatch, storedPost;
-	if (!KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, locator, storedPre, storedMatch, storedPost))
-		return false;
 
 	return KBSSearchEngine::MatchIsSameOccurrence(story, start, end,
 		expectStory, expectStart, storedMatch, posDelta);
@@ -175,6 +174,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	std::map<int32, int32> rowByWalkOrder;
 	std::set<int32> targets;
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	// story -> the text-change counter the search recorded for it. Collected for the CHECKED hits
+	// only: a story nothing is going to be written to needs no trust decision.
+	std::map<UID, uint32> searchStamps;
+
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
@@ -183,10 +186,44 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		rowByWalkOrder[walkOrder] = i;
 		bool checked = false, replaced = false, locked = false;
 		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
+		{
 			targets.insert(walkOrder);
+
+			// The counter that story carried when the search read it, kept per story.
+			UID stampStory = kInvalidUID;
+			uint32 stampCount = 0;
+			if (KBSResultModel::GetHitStoryStamp(chapterIdx, i, stampStory, stampCount)
+				&& stampStory != kInvalidUID)
+			{
+				searchStamps.insert(std::make_pair(stampStory, stampCount));
+			}
+		}
 	}
 	if (targets.empty())
 		return 0;
+
+	// Which of this chapter's stories still hold EXACTLY the text the search walked.
+	//
+	// ITextModel keeps a counter it bumps on every character inserted, removed or replaced
+	// (ITextModel.h:158-163). If it reads the same now as it did during the search, not one
+	// character has moved, so the re-walk below returns the very same matches in the very same
+	// order - which is all the walk order needs to be trustworthy. Every row in such a story can
+	// then be replaced without reading the text under it first, which is what the same-occurrence
+	// test spends its time doing.
+	//
+	// Read HERE, before a single character is written: our own replacements bump the counter too,
+	// so the baseline has to be taken while the chapter is still untouched.
+	//
+	// A story that cannot be reached, or was left out of the stamps, simply is not trusted - the
+	// per-hit test runs for it as before. Every way this can be wrong points the same way: towards
+	// checking more, never towards writing something unchecked.
+	std::map<UID, bool> trustedStories;
+	for (std::map<UID, uint32>::const_iterator s = searchStamps.begin(); s != searchStamps.end(); ++s)
+	{
+		InterfacePtr<ITextModel> storyModel(docRef.GetDataBase(), s->first, UseDefaultIID());
+		trustedStories[s->first] =
+			(storyModel != nil) && (storyModel->GetTextChangeCount() == s->second);
+	}
 
 	// NO IDataBase::SaveRestoreModifiedState here. The search wraps its walk in one because it
 	// must leave a windowless chapter unmodified; a replace is meant to leave the document
@@ -252,6 +289,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// every match after the first one.
 	std::map<UID, int32> posDelta;
 
+	// "May this frame's text be written to?" answered once per FRAME rather than once per hit. The
+	// check climbs the page-item hierarchy and asks four separate locks, while a chapter's hits
+	// usually sit in a handful of frames, so this is the per-hit cost most worth remembering.
+	//
+	// Safe to remember for the length of the pass: nothing in here locks anything, and the walk
+	// holds the walker's critical section throughout, so no lock can change underneath it. Keyed by
+	// story as well as frame because the story carries a lock of its own.
+	std::map<std::pair<UID, UID>, bool> editableFrames;
+
 	while (!targets.empty() && steps < kMaxSteps)
 	{
 		++steps;
@@ -273,15 +319,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
 
-			// How far this pass has already moved the text ahead of here, in THIS story. Subtracted
-			// out before the position test below, so what is left to find is the user's editing.
-			const UID storyUID = story.GetUID();
-			int32 delta = 0;
-			{
-				const std::map<UID, int32>::const_iterator d = posDelta.find(storyUID);
-				if (d != posDelta.end())
-					delta = d->second;
-			}
+		// How far this pass has already moved the text ahead of here, in THIS story. Subtracted
+		// out before the position test below, so what is left to find is the user's editing.
+		const UID storyUID = story.GetUID();
+		int32 delta = 0;
+		{
+			const std::map<UID, int32>::const_iterator d = posDelta.find(storyUID);
+			if (d != posDelta.end())
+				delta = d->second;
+		}
 
 		// An unselected hit is only counted past. Its stored text range is deliberately NOT
 		// refreshed: ReplaceChecked ends by turning the panel into a list of what CHANGED
@@ -293,11 +339,27 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			// locked layers and locked stories, but InDesign gives no way to CHANGE what it finds
 			// there, so neither does KBS. The match had to be walked to keep the walk order lined
 			// up with the search; it is simply not written to.
-			if (!KBSSearchEngine::IsMatchEditable(story, start))
+			// The frame is resolved per hit, but the lock question is asked once per frame and
+			// remembered - see editableFrames, where the reasoning is.
+			const UID frameUID = KBSSearchEngine::EditableFrameForMatch(story, start);
+			const std::pair<UID, UID> frameKey(story.GetUID(), frameUID);
+			bool editable = false;
+			const std::map<std::pair<UID, UID>, bool>::const_iterator known = editableFrames.find(frameKey);
+			if (known != editableFrames.end())
+			{
+				editable = known->second;
+			}
+			else
+			{
+				editable = KBSSearchEngine::IsFrameEditable(story, frameUID);
+				editableFrames[frameKey] = editable;
+			}
+
+			if (!editable)
 			{
 				++outLocked;
-					if (hitIdx >= 0)
-						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeLocked);
+				if (hitIdx >= 0)
+					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeLocked);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -306,11 +368,21 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			// Last check before anything is written: is this the same occurrence the row
 			// describes - same story, same place, same text? A checked row whose text has moved or
 			// changed underneath is left alone and counted, never rewritten.
-			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
+			//
+			// Skipped outright for a story whose change counter has not moved since the search: it
+			// holds the same characters in the same order, so there is nothing for the test to
+			// find. That is the ordinary case - search, then replace - and it takes the test's cost
+			// off every row at once. See trustedStories above.
+			bool trusted = false;
+			{
+				const std::map<UID, bool>::const_iterator t = trustedStories.find(storyUID);
+				trusted = (t != trustedStories.end()) && t->second;
+			}
+			if (hitIdx < 0 || (!trusted && !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta)))
 			{
 				++outMissing;
-					if (hitIdx >= 0)
-						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
+				if (hitIdx >= 0)
+					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -325,10 +397,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 				lastReplStart = replacedStart;
 				lastReplEnd = replacedEnd;
 
-					// The command reports the range it WROTE, so the shift this replacement causes
-					// is exact - no guessing at the change string's length, which GREP
-					// back-references would make impossible anyway.
-					posDelta[storyUID] += static_cast<int32>((replacedEnd - replacedStart) - (end - start));
+				// The command reports the range it WROTE, so the shift this replacement causes is
+				// exact - no guessing at the change string's length, which GREP back-references
+				// would make impossible anyway.
+				posDelta[storyUID] += static_cast<int32>((replacedEnd - replacedStart) - (end - start));
 
 				if (hitIdx >= 0)
 				{
@@ -347,8 +419,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 				// this counter the hit just vanishes: the row came up, nothing was written, and the
 				// replaced total silently comes up short with nothing to explain it.
 				++outRefused;
-					if (hitIdx >= 0)
-						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
+				if (hitIdx >= 0)
+					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
 			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
@@ -422,8 +494,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// otherwise never count as "the first one", and every later chapter would overwrite it.
 	bool haveFirstSkipped = false;
 
-	// Set when the user stops the run from the progress bar. Everything written up to that
-	// point still commits, and still comes back with one Ctrl+Z.
+	// Set when the user stops the run from the progress bar. Cancelling gives back the document as
+	// it was: the command sequence rolls the text back, and the result model is rolled back with
+	// it, so the panel returns to being the search's results. Nothing is half done.
 	bool cancelled = false;
 
 	// Chapters that took a replacement, and so want a window afterwards. Collected rather than
@@ -500,6 +573,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		pending.push_back(chapter);
 	}
 
+	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
+	// sequence below; this is what lets the PANEL be rolled back with it, so the two cannot end up
+	// telling different stories. Exactly one of RollBackRows / ForgetRowBackup follows.
+	KBSResultModel::BeginRowBackup();
+
 	{
 	// ONE sequence around EVERY chapter, so a book-wide replace is a SINGLE undo step.
 	//
@@ -518,7 +596,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// path added inside this block must do the same. Nothing in here opens a document or a window
 	// either; both are kept outside, above and below (see the two passes around this block).
 	CmdUtils::SequencePtr seq;
-	seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
+	// DELIBERATELY UNNAMED (user's call, 2026-07-28). SetName is what Edit > Undo would say after
+	// the word "Undo"; leaving it unset lets InDesign word the step the way it words its own.
+	// To put the name back: seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
 
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
@@ -540,14 +620,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// a TextWalkerSelections critical section and WasCancelled pumps events, so asking in
 		// there would run UI work in the middle of a text walk.
 		//
-		// Stopping here is safe: every chapter is inside ONE command sequence, so what has
-		// been written so far commits together and a single Ctrl+Z still puts all of it back.
-		// The chapters not reached are left alone, and their rows carry no reason - nothing
-		// was ever asked of them.
+		// kTrue - the default - raises the global error state, and that IS the mechanism: a
+		// regular command sequence commits when the global error code is kSuccess as it ends,
+		// and otherwise rolls the database back to where it started (ICommandSequence.h). So
+		// cancelling UNDOES the chapters already replaced instead of keeping them.
 		//
-		// kFalse = do NOT raise the global error state. Raising it here would roll the WHOLE
-		// sequence back when it ends, throwing away the chapters that did succeed.
-		if (progressBar.WasCancelled(kFalse))
+		// That is the user's call (2026-07-28), and it makes cancel mean ONE thing. Keeping the
+		// finished chapters left the book half changed with nothing on screen to say where the
+		// line fell; now stopping is stopping, and the panel goes back to being the search's
+		// results. The cost is that the work done so far is thrown away - breaking off a
+		// 900-of-1000 run starts over.
+		//
+		// The panel is put back to match just below, where the error state is cleared as well,
+		// before anything else is asked to run.
+		if (progressBar.WasCancelled(kTrue))
 		{
 			cancelled = true;
 			break;
@@ -580,6 +666,25 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 	}	// the sequence ends HERE: every chapter's replacements commit together, as one undo step
 
+	if (cancelled)
+	{
+		// The sequence has just rolled the text back to where the run found it. The panel recorded
+		// those replacements as they happened, so it has to shed them too - otherwise it would show
+		// replaced rows sitting over text that is once again the original.
+		//
+		// What is left is exactly what the search produced: a work list with its checks intact,
+		// ready to be run again. No window is opened either - nothing was changed to look at.
+		KBSResultModel::RollBackRows();
+
+		// The error the cancel raised has done its work. Leaving it standing would roll back
+		// whatever command runs next, anywhere in the application.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
+		outSummary.Append("Replace cancelled - nothing was changed.");
+		return 0;
+	}
+	KBSResultModel::ForgetRowBackup();
+
 	// Windows are opened AFTER the sequence, never from inside it - the other half of the pair the
 	// resolve pass above makes: no document and no window is opened while the sequence is standing.
 	// Measured 2026-07-28: a kOpenLayoutCmdBoss processed between two chapters' replacements
@@ -600,10 +705,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	outSummary.Append(" replaced in ");
 	outSummary.AppendNumber(chaptersTouched);
 	outSummary.Append(" chapter(s). Not saved - check them and save yourself.");
-
-	// Said right after the count, ahead of the other notes: it changes what all of them mean.
-	if (cancelled)
-		outSummary.Append(" Cancelled - the chapters not reached were left untouched.");
 
 	if (chaptersSkipped > 0)
 	{
