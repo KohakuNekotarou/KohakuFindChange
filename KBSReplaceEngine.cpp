@@ -117,28 +117,35 @@ bool ChapterHasChecked(int32 chapterIdx)
 	return false;
 }
 
-// Does the text at this range still read the way the stored hit says it did?
+// Is the match the walk just landed on the SAME occurrence this row describes?
 //
 // The walk order alone cannot tell "the Nth match" apart from "a DIFFERENT Nth match". An edit
 // made between the search and the replace that removes one match and adds another elsewhere keeps
 // the COUNT intact, so every checked hit still comes up and nothing looks wrong - while the
 // numbering now points at text the user never checked, and that text gets rewritten.
 //
-// Comparing the matched text catches it. Not a proof: the same string arriving at a shifted
-// position still agrees. But every edit that changes what the matched text READS is caught, which
-// is the case that rewrites something the user did not look at.
-bool MatchTextStillAgrees(int32 chapterIdx, int32 hitIdx, const UIDRef& story, TextIndex start, TextIndex end)
+// Comparing the matched TEXT alone does not catch it: in a plain-text search every match reads the
+// same, so that question is always answered yes. Asking for the story, the position and the text
+// together does - see KBSSearchEngine::MatchIsSameOccurrence, which both this and the jump use.
+//
+// posDelta is what this pass has already added to (or taken from) this story ahead of here, so the
+// only difference left to find is the user's editing.
+bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
+	TextIndex start, TextIndex end, int32 posDelta)
 {
-	PMString locator, storedPre, storedMatch, storedPost;
-	if (!KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, locator, storedPre, storedMatch, storedPost))
+	UIDRef docRef;
+	IDFile file;
+	UID expectStory = kInvalidUID;
+	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
+	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, expectStory, expectStart, expectEnd))
 		return false;		// no row to compare against - leave the text alone
 
-	// The same splitter the search used, so the two strings are cut the same way (a match spanning
-	// paragraphs is trimmed identically on both sides). The model holds the RAW text - the
-	// ellipsizing is done by the cell at draw time - so this compares like with like.
-	PMString livePre, liveMatch, livePost;
-	KBSSearchEngine::SplitLineAroundMatch(story, start, end, livePre, liveMatch, livePost);
-	return liveMatch == storedMatch;
+	PMString locator, storedPre, storedMatch, storedPost;
+	if (!KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, locator, storedPre, storedMatch, storedPost))
+		return false;
+
+	return KBSSearchEngine::MatchIsSameOccurrence(story, start, end,
+		expectStory, expectStart, storedMatch, posDelta);
 }
 
 // Replace this chapter's checked hits. Returns how many were replaced.
@@ -241,6 +248,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 	TextIndex lastReplStart = kInvalidTextIndex;
 	TextIndex lastReplEnd = kInvalidTextIndex;
 
+	// How far THIS pass has moved the text in each story. A replacement whose change string is not
+	// the same length as the find string shifts every later match in that story - our own doing, so
+	// it is cancelled out before the position test. Without this, "cat" -> "kitten" would refuse
+	// every match after the first one.
+	std::map<UID, int32> posDelta;
+
 	while (!targets.empty() && steps < kMaxSteps)
 	{
 		++steps;
@@ -262,6 +275,16 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
 
+			// How far this pass has already moved the text ahead of here, in THIS story. Subtracted
+			// out before the position test below, so what is left to find is the user's editing.
+			const UID storyUID = story.GetUID();
+			int32 delta = 0;
+			{
+				const std::map<UID, int32>::const_iterator d = posDelta.find(storyUID);
+				if (d != posDelta.end())
+					delta = d->second;
+			}
+
 		// An unselected hit is only counted past. Its stored text range is deliberately NOT
 		// refreshed: ReplaceChecked ends by turning the panel into a list of what CHANGED
 		// (KeepOnlyReplaced), so every row that was left alone is dropped moments later, and a
@@ -280,10 +303,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 				continue;
 			}
 
-			// Last check before anything is written: does this text still read the way the row
-			// says? A checked row whose text has changed underneath is left alone and counted -
-			// rewriting it would be rewriting something the user never saw.
-			if (hitIdx < 0 || !MatchTextStillAgrees(chapterIdx, hitIdx, story, start, end))
+			// Last check before anything is written: is this the same occurrence the row
+			// describes - same story, same place, same text? A checked row whose text has moved or
+			// changed underneath is left alone and counted, never rewritten.
+			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
 			{
 				++outStale;
 				targets.erase(walkIndex);
@@ -299,6 +322,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 				lastReplStory = replacedStory.GetUID();
 				lastReplStart = replacedStart;
 				lastReplEnd = replacedEnd;
+
+					// The command reports the range it WROTE, so the shift this replacement causes
+					// is exact - no guessing at the change string's length, which GREP
+					// back-references would make impossible anyway.
+					posDelta[storyUID] += static_cast<int32>((replacedEnd - replacedStart) - (end - start));
 
 				if (hitIdx >= 0)
 				{
