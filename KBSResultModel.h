@@ -48,6 +48,10 @@ namespace KBSResultModel
 								// indicator (or "" when nothing is placed anywhere).
 		int32		pageIndex;	// that page's document order (-1 = no page); sorts hits into page order
 		bool		isOverset;	// match is overset -> the locator gets an "ov" prefix ("ovP<page>")
+		bool		isLocked;	// match sits on a locked layer or in a locked story -> the locator
+								// gets " Locked" and the row gets NO check box. InDesign can search
+								// locked content but offers no way to change it ("Search Only"), so
+								// the row is listed and jumpable but never selectable.
 		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " Hidden".
 								// Only reachable when the Find/Change dialog's "Include Hidden
 								// Layers" is on, and then the text is composed and jumpable but
@@ -64,10 +68,11 @@ namespace KBSResultModel
 		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
 		// them up with these numbers.
 		int32		walkOrder;
-		bool		checked;	// selected for replacement (a fresh search checks every hit)
+		bool		checked;	// selected for replacement (a fresh search checks every hit it is
+								// allowed to replace - see isLocked)
 		bool		replaced;	// already replaced in this result set - not selectable any more
 
-		Hit() : pageIndex(-1), isOverset(false), isHidden(false), storyUID(kInvalidUID),
+		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
 				walkOrder(-1), checked(true), replaced(false) {}
 	};
@@ -141,19 +146,22 @@ namespace KBSResultModel
 	    time, later jumps must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
-	/** Select / deselect one hit for replacement. A hit that was already replaced is ignored (it
-	    cannot be replaced again without a fresh search - the text it matched is gone). */
+	/** Select / deselect one hit for replacement. Ignored for a hit that cannot be replaced: one
+	    that was already replaced (the text it matched is gone) or one that is locked (InDesign
+	    offers no way to change locked content). Those rows carry no check box either, so this is a
+	    backstop rather than the first line of defence. */
 	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
 
 	/** Is this hit selected for replacement? false for an out-of-range index. */
 	bool IsHitChecked(int32 chapterIdx, int32 hitIdx);
 
-	/** A hit's row-cell flags: selected, and already replaced. false = index out of range. */
-	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced);
+	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this
+	    row gets no check box", for different reasons. false = index out of range. */
+	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked);
 
 	/** Select / deselect EVERY hit in every chapter (the flyout's Check All / Uncheck All). Applies
 	    to all stored hits, including those past the panel's display cap - the display cap must not
-	    silently shrink what a replace touches. Replaced hits are skipped. */
+	    silently shrink what a replace touches. Replaced and locked hits are skipped. */
 	void SetAllChecked(bool checked);
 
 	/** How many hits are selected across all chapters (uncapped) - for the status read-out and for
@@ -165,9 +173,10 @@ namespace KBSResultModel
 	    chapter means a single Ctrl+Z puts everything back, more than one means one undo each. */
 	int32 GetCheckedChapterCount();
 
-	/** How many hits COULD be checked at all: every hit that has not been replaced (uncapped). Zero
-	    means the panel is showing a replace's aftermath, where no row has a check box - Check All /
-	    Uncheck All have nothing to act on there and are greyed out. */
+	/** How many hits COULD be checked at all: every hit that is neither replaced nor locked, i.e.
+	    every row that actually has a check box (uncapped). Zero means no row has one - the panel is
+	    showing a replace's aftermath, or every match landed in locked content - and Check All /
+	    Uncheck All have nothing to act on, so they are greyed out. */
 	int32 GetCheckableCount();
 
 	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass

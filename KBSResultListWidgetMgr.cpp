@@ -194,20 +194,25 @@ private:
 		PMString locator, pre, match, post;
 		if (!KBSResultModel::GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
 			return;
-		bool checked = false, replaced = false;
-		KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), checked, replaced);
+		bool checked = false, replaced = false, locked = false;
+		KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), checked, replaced, locked);
+
+		// Two different reasons a row has NOTHING to select, handled identically from here on:
+		//   replaced - the panel is listing what changed, and a replaced hit cannot be replaced again
+		//   locked   - InDesign gives no way to change locked content, so offering a box would be
+		//              offering an action that quietly does nothing (the locator says "+lck")
+		const bool noCheckBox = replaced || locked;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + 2 * kExpanderZone;
 
-		// The check box. After a replace the panel lists only what CHANGED, so a replaced row has
-		// nothing left to select: its box goes away completely and the text moves into that space.
-		// Hiding alone would not be enough - a hidden widget still takes clicks - so it is disabled
-		// as well.
+		// The check box. A row with nothing to select loses it completely and the text moves into
+		// that space. Hiding alone would not be enough - a hidden widget still takes clicks - so it
+		// is disabled as well.
 		IControlView* checkView = rowData->FindWidget(kKBSResultCheckWidgetID);
-		if (checkView != nil && replaced)
+		if (checkView != nil && noCheckBox)
 		{
 			checkView->ShowView(kFalse);
 			checkView->Disable();
@@ -229,8 +234,8 @@ private:
 					kTrue /*invalidate*/, kFalse /*do NOT notify*/);
 			}
 
-			// Rows are recycled as the tree scrolls, so a row that once showed a replaced hit has
-			// to get its box back.
+			// Rows are recycled as the tree scrolls, so a row that once showed a replaced or locked
+			// hit has to get its box back.
 			checkView->ShowView(kTrue);
 			checkView->Enable();
 		}
@@ -239,8 +244,8 @@ private:
 		if (cell != nil)
 		{
 			PMRect frame = cell->GetFrame();
-			// With no box in front of it, a replaced row's text starts where the box would be.
-			frame.Left(replaced ? xStart : xStart + kCheckZone);
+			// With no box in front of it, the text starts where the box would have been.
+			frame.Left(noCheckBox ? xStart : xStart + kCheckZone);
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 

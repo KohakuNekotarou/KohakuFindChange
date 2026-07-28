@@ -110,8 +110,8 @@ bool ChapterHasChecked(int32 chapterIdx)
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
 	for (int32 i = 0; i < hitCount; ++i)
 	{
-		bool checked = false, replaced = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced) && checked && !replaced)
+		bool checked = false, replaced = false, locked = false;
+		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
 			return true;
 	}
 	return false;
@@ -153,13 +153,17 @@ bool MatchTextStillAgrees(int32 chapterIdx, int32 hitIdx, const UIDRef& story, T
 // outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
 //                those but offers no way to change them, so KBS does not either - they are left
 //                untouched and counted (see KBSSearchEngine::IsMatchEditable).
+// outRefused   = checked hits the replace command itself would not run on. Not a decision of ours
+//                like the two above, and not a walk that lost its place like the two flags - the
+//                command was asked and said no.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit,
-	int32& outStale, int32& outLocked)
+	int32& outStale, int32& outLocked, int32& outRefused)
 {
 	outAborted = false;
 	outStepLimit = false;
 	outStale = 0;
 	outLocked = 0;
+	outRefused = 0;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -172,8 +176,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 		if (walkOrder < 0)
 			continue;
 		rowByWalkOrder[walkOrder] = i;
-		bool checked = false, replaced = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced) && checked && !replaced)
+		bool checked = false, replaced = false, locked = false;
+		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
 			targets.insert(walkOrder);
 	}
 	if (targets.empty())
@@ -306,6 +310,14 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, pre, match, post, replacedStart, replacedEnd);
 				}
 			}
+			else
+			{
+				// The command would not run here. RunWalkerCmd has already cleared the error state
+				// (it has to - a standing error would roll the whole sequence back), so without
+				// this counter the hit just vanishes: the row came up, nothing was written, and the
+				// replaced total silently comes up short with nothing to explain it.
+				++outRefused;
+			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
 			targets.erase(walkIndex);
@@ -356,6 +368,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	int32 chaptersStepLimited = 0;
 	int32 totalStale = 0;
 	int32 totalLocked = 0;
+	int32 totalRefused = 0;
 	PMString firstSkipped;
 	firstSkipped.SetTranslatable(kFalse);
 	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
@@ -442,10 +455,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		bool stepLimit = false;
 		int32 stale = 0;
 		int32 locked = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale, locked);
+		int32 refused = 0;
+		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale, locked, refused);
 		totalReplaced += replaced;
 		totalStale += stale;
 		totalLocked += locked;
+		totalRefused += refused;
 		if (replaced > 0)
 			++chaptersTouched;
 		if (aborted)
@@ -520,6 +535,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(totalLocked);
 		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
+	}
+
+	// Checked rows the replace command itself would not run on. The one entry in this list that is
+	// a real failure rather than a deliberate decline, so it is worded as one - and reported at all,
+	// which is the point: the alternative is a replaced total that comes up short in silence.
+	if (totalRefused > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(totalRefused);
+		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
 	}
 
 	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying

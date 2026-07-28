@@ -237,6 +237,27 @@ bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 	return docLayer->IsLocked();
 }
 
+// May the text at this position be rewritten, given the frame that decides its layer? The two
+// locks the Find/Change dialog names, asked in one place so the SEARCH (which marks a hit locked
+// and withholds its check box) and the REPLACE (which refuses to write) can never disagree.
+//
+// A frame of kInvalidUID means "no layer to be locked by" - not "cannot tell, refuse". See the
+// header on why an unresolvable position has to read as editable.
+bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
+{
+	// The story's own insert lock. This is what "locked story" means to the dialog, and
+	// IItemLockData sits on kTextStoryBoss (verified against a live object-model dump). The default
+	// checkParent = kTrue is wanted: an inline inside a locked story is locked too.
+	InterfacePtr<IItemLockData> storyLock(storyRef, UseDefaultIID());
+	if (storyLock != nil && storyLock->GetInsertLock())
+		return false;
+
+	if (frameUID == kInvalidUID)
+		return true;
+
+	return !IsFrameOnLockedLayer(storyRef.GetDataBase(), frameUID);
+}
+
 // The frame a text position is composed into: position -> parcel -> frame. kInvalidUID for an
 // overset position (composed but placed in no frame) and for the query failures around it, which
 // read the same to every caller: this position has no frame of its own.
@@ -310,6 +331,14 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// "Include Hidden Layers" is on. The row has to say so - the text is there and the jump works,
 	// but nothing will be visible on arrival until the layer is switched back on.
 	outHit.isHidden = IsFrameOnHiddenLayer(docRef.GetDataBase(), matchFrameUID);
+
+	// Locked content: found, listed, jumpable - and never replaceable, because InDesign gives no
+	// way to change it. Decided HERE, once, so the row can be built without a check box instead of
+	// offering one that would quietly do nothing. matchFrameUID is already the layer-deciding frame
+	// (the overset branch above put the "+" indicator's frame in it), so this costs no extra lookup.
+	outHit.isLocked = !IsEditableInFrame(storyRef, matchFrameUID);
+	if (outHit.isLocked)
+		outHit.checked = false;		// a fresh search checks every hit it is ALLOWED to replace
 
 	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
 	// row exactly the same way from the range the replace command hands back.
@@ -515,11 +544,20 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 				if (hits[k].isOverset)
 					locator.Append("ov");
 			}
-			// Same suffix on both shapes ("P1(2) Hidden" / "ov Hidden"), spelled out rather than
-			// abbreviated like "ov": this one explains why the page will look empty on arrival,
-			// and the Find/Change dialog says "Hidden Item" for the same thing.
+			// Flags for what the row cannot show any other way, in the same terse lower-case family
+			// as "ov", each glued on after its own "+":
+			//   "+hid" = on a switched-off layer, so the page will look empty on arrival
+			//   "+lck" = locked, so the row carries no check box and the replace will not touch it
+			// They stack in that order, on either shape: "P1(2)ov+hid+lck", "ov+lck", "P7+hid".
+			//
+			// Three letters rather than one (user's call 2026-07-28): "hid" and "lck" can be read
+			// without a legend, where "h" and "l" cannot - and "loc" was ruled out because English
+			// reads it as "location", not "locked". Still short, because the locator is drawn at
+			// full colour ahead of the line and every character here is taken from the context.
 			if (hits[k].isHidden)
-				locator.Append(" Hidden");
+				locator.Append("+hid");
+			if (hits[k].isLocked)
+				locator.Append("+lck");
 			// The locator is its own part now (drawn at full colour, then a tab stop before the
 			// line text) - the colour cell keeps it separate from the faded line segments.
 			hits[k].locator = locator;
@@ -568,20 +606,19 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 
 bool KBSSearchEngine::IsMatchEditable(const UIDRef& storyRef, TextIndex pos)
 {
-	// The story's own insert lock. This is what "locked story" means to the Find/Change dialog, and
-	// IItemLockData sits on kTextStoryBoss (verified against a live object-model dump). The default
-	// checkParent = kTrue is wanted: an inline inside a locked story is locked too.
-	InterfacePtr<IItemLockData> storyLock(storyRef, UseDefaultIID());
-	if (storyLock != nil && storyLock->GetInsertLock())
-		return false;
-
-	// The layer the match is composed onto. An overset match sits in no frame at all; it is still
-	// perfectly replaceable, so a missing frame is not a lock.
-	const UID frameUID = FrameUIDForPosition(storyRef, pos);
+	// The frame that decides the layer, resolved exactly as BuildHit resolves it: the frame the
+	// match is composed into, or - for an overset match, composed but placed nowhere - the frame
+	// carrying the "+" indicator, which is the frame the hit's own locator already names. Resolving
+	// it the same way on both sides is what keeps "the row has no check box" and "the replace
+	// refuses" describing the same set of hits.
+	UID frameUID = FrameUIDForPosition(storyRef, pos);
 	if (frameUID == kInvalidUID)
-		return true;
-
-	return !IsFrameOnLockedLayer(storyRef.GetDataBase(), frameUID);
+	{
+		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, pos);
+		if (loc.found)
+			frameUID = loc.frameUID;
+	}
+	return IsEditableInFrame(storyRef, frameUID);
 }
 
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,

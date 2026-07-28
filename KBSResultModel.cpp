@@ -182,6 +182,8 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	Hit& h = c.hits[hitIdx];
 	if (h.replaced)
 		return;		// already done: it cannot come back into the selection
+	if (h.isLocked)
+		return;		// locked content cannot be changed at all - the row has no box to click either
 	h.checked = checked;
 }
 
@@ -195,10 +197,11 @@ bool KBSResultModel::IsHitChecked(int32 chapterIdx, int32 hitIdx)
 	return c.hits[hitIdx].checked;
 }
 
-bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced)
+bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked)
 {
 	outChecked = false;
 	outReplaced = false;
+	outLocked = false;
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return false;
 	const Chapter& c = gChapters[chapterIdx];
@@ -206,6 +209,7 @@ bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecke
 		return false;
 	outChecked = c.hits[hitIdx].checked;
 	outReplaced = c.hits[hitIdx].replaced;
+	outLocked = c.hits[hitIdx].isLocked;
 	return true;
 }
 
@@ -216,7 +220,9 @@ void KBSResultModel::SetAllChecked(bool checked)
 		std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (hits[hi].replaced)
+			// The two kinds of row that carry no check box are not touched by Check All either -
+			// otherwise the model would hold checked hits the panel shows no box for.
+			if (hits[hi].replaced || hits[hi].isLocked)
 				continue;
 			hits[hi].checked = checked;
 		}
@@ -264,7 +270,8 @@ int32 KBSResultModel::GetCheckableCount()
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (!hits[hi].replaced)
+			// "Could be checked" means "has a box": neither already replaced nor locked.
+			if (!hits[hi].replaced && !hits[hi].isLocked)
 				++count;
 		}
 	}
@@ -372,11 +379,15 @@ int32 KBSResultModel::KeepOnlyReplaced()
 				if (hit.isOverset)
 					hit.locator.Append("ov");
 			}
-			// The "Hidden" note survives the rewrite, exactly as in FinalizeChapterHits. It matters
-			// MORE here, not less: the user has just changed text on a switched-off layer, so going
-			// to look at it would show an empty page unless the row says why.
+			// The flags survive the rewrite, in the same order and spelling as FinalizeChapterHits.
+			// "+hid" matters MORE here, not less: the user has just changed text on a switched-off
+			// layer, so going to look at it would show an empty page unless the row says why.
+			// "+lck" cannot occur on a replaced row (locked text is never written to) - it is here
+			// so the two places that build a locator cannot drift apart.
 			if (hit.isHidden)
-				hit.locator.Append(" Hidden");
+				hit.locator.Append("+hid");
+			if (hit.isLocked)
+				hit.locator.Append("+lck");
 			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);
