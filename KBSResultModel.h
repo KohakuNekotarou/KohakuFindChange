@@ -33,6 +33,16 @@ namespace KBSResultModel
 	    the tree display is capped, to keep a huge result set from flooding the panel. */
 	const int32 kKBSDisplayHitLimit = 5000;
 
+	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
+	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */
+	enum ChangeOutcome
+	{
+		kOutcomeNone = 0,	// replaced, or never reached
+		kOutcomeChanged,	// the same text no longer stands in the same place (moved / deleted / edited)
+		kOutcomeLocked,		// it became locked between the search and the replace
+		kOutcomeRefused		// InDesign's own replace command would not run there
+	};
+
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors (Task 3) point back at the exact occurrence. */
 	struct Hit
@@ -71,10 +81,15 @@ namespace KBSResultModel
 		bool		checked;	// selected for replacement (a fresh search checks every hit it is
 								// allowed to replace - see isLocked)
 		bool		replaced;	// already replaced in this result set - not selectable any more
+		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
+								// reached at all). The locator shows it as a word.
+		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
+								// show one". Kept as a number rather than only baked into the
+								// locator string, so the locator can be rebuilt at any time.
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
-				walkOrder(-1), checked(true), replaced(false) {}
+				walkOrder(-1), checked(true), replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -203,6 +218,34 @@ namespace KBSResultModel
 	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 		const PMString& newPre, const PMString& newMatch, const PMString& newPost,
 		TextIndex newStart, TextIndex newEnd);
+
+	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
+	    pass and the post-replace thinning both call it, so the two can no longer drift apart.
+
+	        P<page>(<n>)ov hidden lock|changed|refused
+
+	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
+	    spaces and spelled out rather than clipped, because each one explains a row the user cannot
+	    act on. "+" is deliberately NOT the separator: InDesign's own overset marker is a "+", so
+	    "P5+lock" reads as "page 5, overset". "ov" stays short - it only qualifies a page number, it
+	    does not explain anything. */
+	void BuildHitLocator(Hit& hit);
+
+	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
+	    and clears the selection - a row that says why it cannot be changed must not stay checked.
+	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
+	    longer the text the row describes. Ignored for a hit that WAS replaced. */
+	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
+
+	/** A hit's outcome, or kOutcomeNone for an out-of-range index. */
+	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
+
+	/** Is the panel showing the AFTERMATH of a replace rather than a search's results? Set by
+	    KeepCheckedRows, cleared by Clear / SetResults. While it is on, no row offers a check box:
+	    the list is a report, not a work list. It is asked as well as the per-row flags because the
+	    aftermath can hold rows with no flag at all - a chapter the safety limit cut short, or one
+	    that could not be opened. Those were never looked at, so nothing can be said about them. */
+	bool IsShowingReplaceOutcome();
 
 	/** Remove one chapter from the results, leaving the others in place. For retiring a single
 	    chapter whose results have gone stale - the book-scope half of the result-invalidation work,

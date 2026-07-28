@@ -27,6 +27,10 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
+	// Is the panel showing a replace's aftermath rather than a search's results? See
+	// KBSResultModel::IsShowingReplaceOutcome.
+	bool gShowingOutcome = false;
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -43,6 +47,7 @@ namespace
 void KBSResultModel::SetResults(const std::vector<Chapter>& chapters)
 {
 	gChapters = chapters;
+	gShowingOutcome = false;
 }
 
 void KBSResultModel::AppendChapter(const Chapter& chapter)
@@ -53,6 +58,7 @@ void KBSResultModel::AppendChapter(const Chapter& chapter)
 void KBSResultModel::Clear()
 {
 	gChapters.clear();
+	gShowingOutcome = false;
 	gFromBook = false;
 }
 
@@ -321,6 +327,83 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	h.checked = false;
 }
 
+void KBSResultModel::BuildHitLocator(Hit& hit)
+{
+	hit.locator.Clear();
+	hit.locator.SetTranslatable(kFalse);
+
+	if (hit.pageString.IsEmpty())
+	{
+		hit.locator.Append("ov");	// overset with nothing placed anywhere: no page to name
+	}
+	else
+	{
+		// An overset hit carries the "+" indicator's page and sorts by it; a trailing "ov" (after
+		// the page and ordinal) marks it as overset -> e.g. "P1(2)ov".
+		hit.locator.Append("P");
+		hit.locator.Append(hit.pageString);
+		if (hit.pageOrdinal > 0)
+		{
+			hit.locator.Append("(");
+			hit.locator.AppendNumber(hit.pageOrdinal);
+			hit.locator.Append(")");
+		}
+		if (hit.isOverset)
+			hit.locator.Append("ov");
+	}
+
+	// What the row cannot show any other way, each separated by a space, in this order:
+	//   hidden  - on a switched-off layer, so the page will look empty on arrival
+	//   lock    - locked, so the row carries no check box and the replace will not touch it
+	//   changed - the same text no longer stands in the same place
+	//   refused - InDesign's own replace command would not run there
+	// The last two are set by a replace, so they never appear on a fresh search's rows. They stack
+	// on either shape: "P1(2)ov hidden lock", "ov changed", "P7 hidden".
+	//
+	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+lock" reads as "page 5,
+	// overset". Spelled out rather than clipped to "hid" / "lck" - these are what explain a row the
+	// user cannot act on, so they are worth the characters, unlike "ov", which merely qualifies a
+	// page number. ("loc" was never an option: English reads it as "location".)
+	if (hit.isHidden)
+		hit.locator.Append(" hidden");
+	if (hit.isLocked || hit.outcome == kOutcomeLocked)
+		hit.locator.Append(" lock");
+	else if (hit.outcome == kOutcomeChanged)
+		hit.locator.Append(" changed");
+	else if (hit.outcome == kOutcomeRefused)
+		hit.locator.Append(" refused");
+}
+
+void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	if (h.replaced)
+		return;		// it WAS replaced - nothing went wrong with it
+	h.outcome = outcome;
+	h.checked = false;
+	BuildHitLocator(h);
+}
+
+KBSResultModel::ChangeOutcome KBSResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return kOutcomeNone;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return kOutcomeNone;
+	return c.hits[hitIdx].outcome;
+}
+
+bool KBSResultModel::IsShowingReplaceOutcome()
+{
+	return gShowingOutcome;
+}
+
 void KBSResultModel::DropChapter(int32 chapterIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -362,32 +445,11 @@ int32 KBSResultModel::KeepOnlyReplaced()
 			Hit hit = std::move(hits[hi]);
 
 			// Rebuild the locator WITHOUT the within-page ordinal. That ordinal counted a hit's
-			// place among the matches on its page; once the unreplaced ones are gone the numbers
-			// are full of gaps (P1(1), P1(3)) and say nothing true, so the page alone is what the
-			// row shows. Same shape as the search's locator (KBSSearchEngine's FinalizeChapterHits)
-			// minus the "(n)" part.
-			hit.locator.Clear();
-			hit.locator.SetTranslatable(kFalse);
-			if (hit.pageString.IsEmpty())
-			{
-				hit.locator.Append("ov");	// overset with nothing placed anywhere: no page to name
-			}
-			else
-			{
-				hit.locator.Append("P");
-				hit.locator.Append(hit.pageString);
-				if (hit.isOverset)
-					hit.locator.Append("ov");
-			}
-			// The flags survive the rewrite, in the same order and spelling as FinalizeChapterHits.
-			// "+hid" matters MORE here, not less: the user has just changed text on a switched-off
-			// layer, so going to look at it would show an empty page unless the row says why.
-			// "+lck" cannot occur on a replaced row (locked text is never written to) - it is here
-			// so the two places that build a locator cannot drift apart.
-			if (hit.isHidden)
-				hit.locator.Append(" hidden");
-			if (hit.isLocked)
-				hit.locator.Append(" lock");
+			// place among the matches on its page; once the rows that were left alone are gone the
+			// numbers are full of gaps (P1(1), P1(3)) and say nothing true, so the page alone is
+			// what the row shows. Everything about the shape lives in BuildHitLocator now.
+			hit.pageOrdinal = 0;
+			BuildHitLocator(hit);
 			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);

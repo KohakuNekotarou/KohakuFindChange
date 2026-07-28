@@ -584,50 +584,12 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 
 		for (size_t k = i; k < j; ++k)
 		{
-			PMString locator;
-			locator.SetTranslatable(kFalse);
-			if (hits[k].pageString.IsEmpty())
-			{
-				locator.Append("ov");	// overset with nothing placed anywhere: no page to name
-			}
-			else
-			{
-				// An overset hit carries the "+" indicator's page and sorts by it; a trailing
-				// "ov" (after the page and ordinal) marks it as overset -> e.g. "P1(2)ov".
-				locator.Append("P");
-				locator.Append(hits[k].pageString);
-				if (runCount > 1)
-				{
-					const int32 ordinal = static_cast<int32>(k - i) + 1;
-					locator.Append("(");
-					locator.AppendNumber(ordinal);
-					locator.Append(")");
-				}
-				if (hits[k].isOverset)
-					locator.Append("ov");
-			}
-			// Flags for what the row cannot show any other way, each separated by a space:
-			//   "hidden" = on a switched-off layer, so the page will look empty on arrival
-			//   "lock"   = locked, so the row carries no check box and the replace will not touch it
-			// They stack in that order, on either shape: "P1(2)ov hidden lock", "ov lock",
-			// "P7 hidden".
-			//
-			// A SPACE, not a "+" (user's call 2026-07-28, after seeing it on screen): "+" is
-			// InDesign's own overset symbol - the mark in the out port, and the marker KBS draws for
-			// an overset hit - so "P5+lock" read as "page 5, overset". A separator has to be a
-			// character that means nothing else here.
-			//
-			// Spelled out rather than clipped to "hid" / "lck" (user's call, same day). These two
-			// are what explain a row the user cannot act on, so they are worth the characters -
-			// unlike "ov", which merely qualifies a page number. ("loc" was never an option:
-			// English reads it as "location".)
-			if (hits[k].isHidden)
-				locator.Append(" hidden");
-			if (hits[k].isLocked)
-				locator.Append(" lock");
-			// The locator is its own part now (drawn at full colour, then a tab stop before the
-			// line text) - the colour cell keeps it separate from the faded line segments.
-			hits[k].locator = locator;
+			// The within-page ordinal, shown only when the page holds more than one match. The
+			// locator string itself is built in ONE place - KBSResultModel::BuildHitLocator -
+			// which the post-replace rewrite calls too, so the two cannot drift apart. Every rule
+			// about its shape and its flag words lives there.
+			hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - i) + 1) : 0;
+			KBSResultModel::BuildHitLocator(hits[k]);
 		}
 		i = j;
 	}
