@@ -83,6 +83,10 @@ namespace KBSResultModel
 		bool		replaced;	// already replaced in this result set - not selectable any more
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
+		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
+								// Kept OUT of locator so the cell can paint it separately; built by
+								// BuildHitLocator alongside it. Only "missing" earns it - the other
+								// flags stay in locator and read in the normal colour.
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -146,6 +150,10 @@ namespace KBSResultModel
 
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
+
+	/** The accent-coloured word for a hit row, or empty. Drawn as its own run after the locator
+	    (see Hit::accentFlag). Empty for an out-of-range index. */
+	PMString GetHitAccentFlag(int32 chapterIdx, int32 hitIdx);
 
 	/** A hit node's display: the page locator and the three line segments to paint. false = index
 	    out of range. */

@@ -277,7 +277,9 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(locator, pre, match, post);
+				data->SetSegments(locator,
+					KBSResultModel::GetHitAccentFlag(nodeID->GetChapter(), nodeID->GetHit()),
+					pre, match, post);
 			cell->Invalidate();
 		}
 	}

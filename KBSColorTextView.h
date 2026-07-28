@@ -37,13 +37,14 @@ class IKBSRowData : public IPMUnknown
 public:
 	enum { kDefaultIID = IID_IKBSROWDATA };
 
-	/** Replace this row's parts: the page locator and the three line segments (any may be empty). */
-	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match,
-		const PMString& post) = 0;
+	/** Replace this row's parts: the page locator, the accent-coloured flag word that follows it
+	    (empty on most rows), and the three line segments. Any may be empty. */
+	virtual void SetSegments(const PMString& locator, const PMString& flag, const PMString& pre,
+		const PMString& match, const PMString& post) = 0;
 
 	/** Read this row's parts back (for the cell's Draw). */
-	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch,
-		PMString& outPost) const = 0;
+	virtual void GetSegments(PMString& outLocator, PMString& outFlag, PMString& outPre,
+		PMString& outMatch, PMString& outPost) const = 0;
 };
 
 #endif // __KBSColorTextView_h__

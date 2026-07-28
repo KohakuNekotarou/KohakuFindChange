@@ -138,6 +138,20 @@ bool KBSResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 	return true;
 }
 
+PMString KBSResultModel::GetHitAccentFlag(int32 chapterIdx, int32 hitIdx)
+{
+	PMString flag;
+	flag.SetTranslatable(kFalse);
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return flag;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return flag;
+	flag = c.hits[hitIdx].accentFlag;
+	flag.SetTranslatable(kFalse);
+	return flag;
+}
+
 bool KBSResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 	PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost)
 {
@@ -341,6 +355,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 {
 	hit.locator.Clear();
 	hit.locator.SetTranslatable(kFalse);
+	hit.accentFlag.Clear();
+	hit.accentFlag.SetTranslatable(kFalse);
 
 	if (hit.pageString.IsEmpty())
 	{
@@ -379,9 +395,9 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
 		hit.locator.Append(" lock");
 	else if (hit.outcome == kOutcomeMissing)
-		hit.locator.Append(" missing");
+		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
-		hit.locator.Append(" refused");
+		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 }
 
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)

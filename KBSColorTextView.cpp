@@ -66,19 +66,21 @@ public:
 	KBSRowData(IPMUnknown* boss) : CPMUnknown<IKBSRowData>(boss) {}
 	virtual ~KBSRowData() {}
 
-	virtual void SetSegments(const PMString& locator, const PMString& pre, const PMString& match,
-		const PMString& post)
+	virtual void SetSegments(const PMString& locator, const PMString& flag, const PMString& pre,
+		const PMString& match, const PMString& post)
 	{
 		fLocator = locator; fLocator.SetTranslatable(kFalse);
+		fFlag = flag; fFlag.SetTranslatable(kFalse);
 		fPre = pre;   fPre.SetTranslatable(kFalse);
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
 	}
 
-	virtual void GetSegments(PMString& outLocator, PMString& outPre, PMString& outMatch,
-		PMString& outPost) const
+	virtual void GetSegments(PMString& outLocator, PMString& outFlag, PMString& outPre,
+		PMString& outMatch, PMString& outPost) const
 	{
 		outLocator = fLocator;
+		outFlag = fFlag;
 		outPre = fPre;
 		outMatch = fMatch;
 		outPost = fPost;
@@ -86,6 +88,7 @@ public:
 
 private:
 	PMString fLocator;
+	PMString fFlag;
 	PMString fPre;
 	PMString fMatch;
 	PMString fPost;
@@ -122,8 +125,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (data == nil)
 		return;
 
-	PMString locator, pre, match, post;
-	data->GetSegments(locator, pre, match, post);
+	PMString locator, flag, pre, match, post;
+	data->GetSegments(locator, flag, pre, match, post);
 
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
@@ -161,6 +164,15 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// is exactly what the user wants to read - it gets the same emphasis a match does).
 	const RealAGMColor kMatchColor = kFullColor;
 
+	// The accent run: the one word that says why this row could not be acted on (missing /
+	// refused). kInterfaceItemHighLight is the theme's own accent - blue-ish in the light UI,
+	// orange in the dark one - so it stands out without a hardcoded colour that would go wrong
+	// in one theme or the other. The theme table has no red, and none is invented here.
+	RealAGMColor accent = fg;
+	if (colors != nil)
+		colors->GetRealAGMColor(kInterfaceItemHighLight, accent);
+	const RealAGMColor kAccentColor = accent;
+
 	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text follows
 	// straight after it.
 	//
@@ -177,8 +189,20 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (!locator.IsEmpty() && x < rightEdge)
 	{
 		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kFalse, kFalse);
-		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X() + kLocatorGap;
+		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X();
 	}
+	// Its own run so it can carry its own colour, with the separating space inside it - the
+	// locator is built without this word for exactly that reason (KBSResultModel::BuildHitLocator).
+	if (!flag.IsEmpty() && x < rightEdge)
+	{
+		PMString flagRun(" ");
+		flagRun.SetTranslatable(kFalse);
+		flagRun.Append(flag);
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), flagRun, fontInfo, kAccentColor, kFalse, kFalse);
+		x += StringUtils::PMMeasureString(&gc, flagRun, fontInfo, kFalse).X();
+	}
+	if (x > frame.Left())
+		x += kLocatorGap;
 
 	// The line, left to right. convertAmpersand=kFalse on draw AND measure so a literal '&' is
 	// neither underlined nor dropped. If the whole line fits it is drawn as-is; when it overflows
