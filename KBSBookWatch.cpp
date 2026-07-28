@@ -93,7 +93,9 @@ namespace
     finish unwinding, short enough that the panel clears while the user is still looking at it. */
 const uint32 kKBSBookRetireDelayMs = 300;
 
-/** The pending deferred question, or nil when none is armed. */
+/** The timer that asks the deferred question. ONE object for the whole life of the plug-in, made
+    on first use and released only by DisarmRetireTimer - see the callback on why it is never
+    released from inside itself. */
 ICallbackTimer* gRetireTimer = nil;
 
 /** Retire the results if the book they were searched in is no longer open. Does nothing - and
@@ -128,37 +130,30 @@ void RetireBookResultsIfGone()
 	KBSResultTree::ShowStatus(cleared);
 }
 
-/** Timer callback. Raw function pointer - it must never outlive this plug-in (see the detach). */
+/** Timer callback. Raw function pointer - it must never outlive this plug-in (see the detach).
+
+    NOTHING is released in here. The callback runs as the timer object's own idle task, so
+    releasing it from inside drops the last reference to the very object whose RunTask is still on
+    the stack - it would then read this function's return value out of a destroyed object. And
+    nil-ing the global first throws away the only handle a teardown StopTimer could use to stop a
+    callback that has gone wrong. KESCM hit exactly this and settled the rule the same way
+    (KESCMTracker.cpp, KESCMHudTimerProc): the timer is released in ONE place, and it is not here. */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
 	RetireBookResultsIfGone();
-
-	// Release only here, where returning kEndOfTime guarantees this callback cannot run again.
-	// (Releasing at the TOP would leave nothing for a teardown StopTimer to hold on to.)
-	if (gRetireTimer != nil)
-	{
-		gRetireTimer->StopTimer();
-		gRetireTimer->Release();
-		gRetireTimer = nil;
-	}
 
 	// NEVER return 0 here: to the idle task manager 0 means "call me again immediately", which
 	// spins this callback forever and freezes InDesign. kEndOfTime is what retires the task.
 	return IIdleTask::kEndOfTime;
 }
 
-/** Arm (or re-arm) the deferred question. */
+/** Arm (or re-arm) the deferred question. The timer object is made once and then reused: an
+    ICallbackTimer is a one-shot only in the sense that it fires once per StartTimer. */
 void ArmRetireTimer()
 {
-	if (gRetireTimer != nil)
-	{
-		// Another cue arrived while one was pending - restart the wait rather than stack timers.
-		gRetireTimer->StopTimer();
-		gRetireTimer->Release();
-		gRetireTimer = nil;
-	}
+	if (gRetireTimer == nil)
+		gRetireTimer = static_cast<ICallbackTimer*>(::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER));
 
-	gRetireTimer = static_cast<ICallbackTimer*>(::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER));
 	if (gRetireTimer == nil)
 	{
 		// No timer to be had - ask now. It will almost certainly answer "still open" and do
@@ -166,10 +161,15 @@ void ArmRetireTimer()
 		RetireBookResultsIfGone();
 		return;
 	}
+
+	// Another cue arrived while one was pending - restart the wait rather than stack timers.
+	// Harmless when nothing is armed.
+	gRetireTimer->StopTimer();
 	gRetireTimer->StartTimer(RetireTimerCallback, kKBSBookRetireDelayMs, nil);
 }
 
-/** Drop a pending question without asking it (plug-in teardown). */
+/** Drop a pending question without asking it, and give the timer back (plug-in teardown). The ONE
+    place the object is released - never from inside the callback. */
 void DisarmRetireTimer()
 {
 	if (gRetireTimer == nil)
