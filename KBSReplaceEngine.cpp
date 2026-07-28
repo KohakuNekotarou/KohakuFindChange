@@ -42,7 +42,6 @@
 #include "KBSResultModel.h"
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
-#include "KBSDiag.h"			// outside-readable record of what a replace did
 
 namespace
 {
@@ -467,11 +466,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.AppendNumber(chaptersStepLimited);
 		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
 	}
-
-	// The same line the panel shows, in a file that can be read from outside the application. Costs
-	// nothing unless the channel has been switched on (see KBSDiag.h), and it is the difference
-	// between "the replace looked wrong" and knowing what it actually did.
-	KBSDiag::Log(outSummary);
 	return totalReplaced;
 }
 
