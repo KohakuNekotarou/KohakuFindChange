@@ -372,6 +372,11 @@ int32 KBSResultModel::KeepOnlyReplaced()
 				if (hit.isOverset)
 					hit.locator.Append("ov");
 			}
+			// The "Hidden" note survives the rewrite, exactly as in FinalizeChapterHits. It matters
+			// MORE here, not less: the user has just changed text on a switched-off layer, so going
+			// to look at it would show an empty page unless the row says why.
+			if (hit.isHidden)
+				hit.locator.Append(" Hidden");
 			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);
