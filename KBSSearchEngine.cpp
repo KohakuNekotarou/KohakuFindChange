@@ -45,7 +45,9 @@
 // For marking a match that sits on a switched-off layer ("Hidden" on the hit-row locator):
 #include "ILayerUtils.h"			// GetLayerUID - the spread layer a frame sits on
 #include "ISpreadLayer.h"			// GetDocLayerUID - spread layer -> the Layers panel's row
-#include "IDocumentLayer.h"			// IsVisible - is that layer switched off?
+#include "IDocumentLayer.h"			// IsVisible / IsLocked - is that layer switched off, or locked?
+// For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
+#include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
@@ -209,6 +211,52 @@ bool IsFrameOnHiddenLayer(IDataBase* db, UID frameUID)
 	return !docLayer->IsVisible();
 }
 
+// Is this frame on a LOCKED layer? Same two-step as the hidden test above (spread layer -> the
+// document layer that carries the switch), asked so the replace can leave such a match alone.
+// A frame that resolves to no layer reads as unlocked - see IsMatchEditable on why "cannot tell"
+// must not turn into a refusal.
+bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
+{
+	if (db == nil || frameUID == kInvalidUID)
+		return false;
+
+	InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
+	if (frameHier == nil)
+		return false;
+
+	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
+	if (spreadLayerUID == kInvalidUID)
+		return false;
+	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
+	if (spreadLayer == nil)
+		return false;
+
+	InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
+	if (docLayer == nil)
+		return false;
+	return docLayer->IsLocked();
+}
+
+// The frame a text position is composed into: position -> parcel -> frame. kInvalidUID for an
+// overset position (composed but placed in no frame) and for the query failures around it, which
+// read the same to every caller: this position has no frame of its own.
+UID FrameUIDForPosition(const UIDRef& storyRef, TextIndex pos)
+{
+	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
+	if (textModel == nil)
+		return kInvalidUID;
+	InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
+	if (tpl == nil)
+		return kInvalidUID;
+	const ParcelKey key = tpl->GetParcelContaining(pos);
+	if (!key.IsValid())
+		return kInvalidUID;
+	InterfacePtr<IParcelList> pl(tpl, UseDefaultIID());
+	if (pl == nil)
+		return kInvalidUID;
+	return pl->GetParcelFrameUID(key);
+}
+
 // The page a visible match position sits on. Ported from KESCL: position -> parcel -> frame, then
 // GetFramePageString. Returns false for an overset position (composed but placed in no frame) and
 // the query failures around it, which read the same to the user: no page for the match itself. The
@@ -221,26 +269,12 @@ bool GetMatchPageString(const UIDRef& docRef, const UIDRef& storyRef, TextIndex 
 	outPage.Clear();
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = -1;
-	outFrameUID = kInvalidUID;
 
-	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
-	if (textModel == nil)
-		return false;
-	InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
-	if (tpl == nil)
-		return false;
-	const ParcelKey key = tpl->GetParcelContaining(pos);
-	if (!key.IsValid())
-		return false;
-	InterfacePtr<IParcelList> pl(tpl, UseDefaultIID());
-	if (pl == nil)
-		return false;
-	const UID frameUID = pl->GetParcelFrameUID(key);
-	if (frameUID == kInvalidUID)
+	outFrameUID = FrameUIDForPosition(storyRef, pos);
+	if (outFrameUID == kInvalidUID)
 		return false;	// overset: composed but placed in no frame
 
-	outFrameUID = frameUID;
-	return GetFramePageString(docRef, frameUID, outPage, outPageIndex);
+	return GetFramePageString(docRef, outFrameUID, outPage, outPageIndex);
 }
 
 // Fill a hit from one match (story, [start, end)): its jump anchors, and the containing
@@ -504,6 +538,17 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	//
 	// fSearchBackwards is deliberately NOT taken: the walk order is the only key joining a search
 	// to its replace pass, so KBS always walks forward.
+	//
+	// Two of the five are FIND-only in InDesign - "there is no option to change in locked stories /
+	// on locked layers" (IFindChangeOptions.h:259, 279), which is why the dialog labels them Search
+	// Only. They are still taken here, and still handed to the REPLACE walk, because both walks
+	// have to visit the same matches in the same order or the walk order the hits were numbered by
+	// stops lining up. The distinction is made where it belongs instead: the replace asks
+	// IsMatchEditable before it writes and leaves a locked match alone.
+	//
+	// (Note for anyone reading this as new behaviour: WalkerScopeOptions defaults every switch to
+	// kTrue, so locked layers and locked stories were ALREADY inside both walks before this
+	// function started reading the dialog. What changed is that the user can now turn them off.)
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return;		// nothing to read - the stock defaults stand
@@ -514,6 +559,24 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	outOptions.SetIncludeHiddenLayers(opts->GetIncludeHiddenLayers(mode));
 	outOptions.SetIncludeLockedStories(opts->GetIncludeLockedStoriesForFind(mode));
 	outOptions.SetIncludeFootnotes(opts->GetIncludeFootnotes(mode));
+}
+
+bool KBSSearchEngine::IsMatchEditable(const UIDRef& storyRef, TextIndex pos)
+{
+	// The story's own insert lock. This is what "locked story" means to the Find/Change dialog, and
+	// IItemLockData sits on kTextStoryBoss (verified against a live object-model dump). The default
+	// checkParent = kTrue is wanted: an inline inside a locked story is locked too.
+	InterfacePtr<IItemLockData> storyLock(storyRef, UseDefaultIID());
+	if (storyLock != nil && storyLock->GetInsertLock())
+		return false;
+
+	// The layer the match is composed onto. An overset match sits in no frame at all; it is still
+	// perfectly replaceable, so a missing frame is not a lock.
+	const UID frameUID = FrameUIDForPosition(storyRef, pos);
+	if (frameUID == kInvalidUID)
+		return true;
+
+	return !IsFrameOnLockedLayer(storyRef.GetDataBase(), frameUID);
 }
 
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,

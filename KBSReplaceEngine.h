@@ -50,6 +50,13 @@ namespace KBSReplaceEngine
 	    at guessed positions - that means the document was edited, or the Find/Change query
 	    changed, since the search ran.
 
+	    Three kinds of checked hit are deliberately LEFT ALONE, each counted and named in the
+	    summary rather than allowed to make the total quietly come up short:
+	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
+	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
+	      - stale: the text there no longer reads the way the panel says it does.
+	      - not reached: the re-walk ended, or hit its safety ceiling, before the hit came up.
+
 	    Chapters are left MODIFIED AND UNSAVED: overwriting the user's files is their decision.
 
 	    @param outSummary OUT a ready-to-show status line (counts, chapters that did not line up).

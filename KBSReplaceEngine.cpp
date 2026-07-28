@@ -140,11 +140,16 @@ bool MatchTextStillAgrees(int32 chapterIdx, int32 hitIdx, const UIDRef& story, T
 //                apart rather than both reported as "edited since the search".
 // outStale     = checked hits that DID come up but whose text no longer reads the way the panel
 //                says. They are left untouched and counted (see MatchTextStillAgrees).
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit, int32& outStale)
+// outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
+//                those but offers no way to change them, so KBS does not either - they are left
+//                untouched and counted (see KBSSearchEngine::IsMatchEditable).
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit,
+	int32& outStale, int32& outLocked)
 {
 	outAborted = false;
 	outStepLimit = false;
 	outStale = 0;
+	outLocked = 0;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -249,6 +254,18 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 		// pass that replaced nothing has not moved anything to begin with.
 		if (targets.find(walkIndex) != targets.end())
 		{
+			// May this text be rewritten at all? The Find/Change dialog can be told to SEARCH
+			// locked layers and locked stories, but InDesign gives no way to CHANGE what it finds
+			// there, so neither does KBS. The match had to be walked to keep the walk order lined
+			// up with the search; it is simply not written to.
+			if (!KBSSearchEngine::IsMatchEditable(story, start))
+			{
+				++outLocked;
+				targets.erase(walkIndex);
+				++walkIndex;
+				continue;
+			}
+
 			// Last check before anything is written: does this text still read the way the row
 			// says? A checked row whose text has changed underneath is left alone and counted -
 			// rewriting it would be rewriting something the user never saw.
@@ -328,6 +345,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	int32 chaptersSkipped = 0;
 	int32 chaptersStepLimited = 0;
 	int32 totalStale = 0;
+	int32 totalLocked = 0;
 	PMString firstSkipped;
 	firstSkipped.SetTranslatable(kFalse);
 	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
@@ -393,9 +411,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		bool aborted = false;
 		bool stepLimit = false;
 		int32 stale = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale);
+		int32 locked = 0;
+		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale, locked);
 		totalReplaced += replaced;
 		totalStale += stale;
+		totalLocked += locked;
 		if (replaced > 0)
 			++chaptersTouched;
 		if (aborted)
@@ -456,6 +476,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(totalStale);
 		outSummary.Append(" hit(s) left alone - the text there changed since the search.");
+	}
+
+	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
+	// Find/Change searches those when asked to and then refuses to change them ("Search Only"), and
+	// this reports the same outcome rather than letting the count quietly come up short.
+	if (totalLocked > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(totalLocked);
+		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
 	}
 
 	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying

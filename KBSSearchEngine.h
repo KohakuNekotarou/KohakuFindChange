@@ -42,11 +42,32 @@ namespace KBSSearchEngine
 	    and grey themselves out; SearchBook itself turns a re-entrant call away as a last resort. */
 	bool IsSearching();
 
-	/** The walker scope options EVERY KBS walk uses (whole document, hidden layers excluded, all
-	    else default). The replace pass must re-walk a chapter with exactly the options the search
-	    that produced the hits used, or the walk order those hits were numbered by no longer lines
-	    up - hence one definition, shared by both. */
+	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
+	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
+	    with exactly the options the search that produced the hits used, or the walk order those
+	    hits were numbered by no longer lines up - hence one definition, shared by both.
+
+	    @note Two of the five ("include locked layers" / "include locked stories") are FIND-only in
+	          InDesign - the header states there is no option to change in locked content. They stay
+	          in the shared scope so both walks visit the same matches in the same order, and the
+	          replace refuses the locked ones one at a time instead (see IsMatchEditable). */
 	void GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions);
+
+	/** May the text at this position be REWRITTEN? The Find/Change dialog can be told to search
+	    locked layers and locked stories, but InDesign offers no way to change what it finds there
+	    ("Search Only"), so the replace has to make the same distinction itself: those matches are
+	    listed and can be jumped to, and are then left untouched.
+
+	    Two locks are asked about, which is the pair the dialog names:
+	      - the STORY's insert lock (IItemLockData on the text story, which also answers for an
+	        inline by way of its parent), and
+	      - the LAYER the match's frame sits on.
+
+	    @return false ONLY when one of those two locks is positively found. Anything that cannot be
+	            resolved - a story without the lock interface, an overset match placed in no frame,
+	            an item on no layer - reads as editable, because that is what it was before this
+	            test existed and a "cannot tell" must not start refusing ordinary replacements. */
+	bool IsMatchEditable(const UIDRef& storyRef, TextIndex pos);
 
 	/** The paragraph holding [start, end), split at those exact UTF-16 offsets into the three
 	    segments a hit row paints: the text before the match, the matched text, and the text after.
