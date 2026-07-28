@@ -190,6 +190,10 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 		return;		// already done: it cannot come back into the selection
 	if (h.isLocked)
 		return;		// locked content cannot be changed at all - the row has no box to click either
+	if (h.outcome != kOutcomeNone)
+		return;		// it already says why it was left alone
+	if (gShowingOutcome)
+		return;		// the panel is a report right now, not a work list
 	h.checked = checked;
 }
 
@@ -221,14 +225,17 @@ bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecke
 
 void KBSResultModel::SetAllChecked(bool checked)
 {
+	if (gShowingOutcome)
+		return;		// nothing on a report is selectable
+
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
 	{
 		std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			// The two kinds of row that carry no check box are not touched by Check All either -
-			// otherwise the model would hold checked hits the panel shows no box for.
-			if (hits[hi].replaced || hits[hi].isLocked)
+			// The rows that carry no check box are not touched by Check All either - otherwise
+			// the model would hold checked hits the panel shows no box for.
+			if (hits[hi].replaced || hits[hi].isLocked || hits[hi].outcome != kOutcomeNone)
 				continue;
 			hits[hi].checked = checked;
 		}
@@ -270,14 +277,17 @@ int32 KBSResultModel::GetCheckedChapterCount()
 
 int32 KBSResultModel::GetCheckableCount()
 {
+	if (gShowingOutcome)
+		return 0;	// every row has lost its box, so Check All / Uncheck All grey out
+
 	int32 count = 0;
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
 	{
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			// "Could be checked" means "has a box": neither already replaced nor locked.
-			if (!hits[hi].replaced && !hits[hi].isLocked)
+			// Has a box: not replaced, not locked, and not already saying why it was left alone.
+			if (!hits[hi].replaced && !hits[hi].isLocked && hits[hi].outcome == kOutcomeNone)
 				++count;
 		}
 	}
@@ -411,26 +421,34 @@ void KBSResultModel::DropChapter(int32 chapterIdx)
 	gChapters.erase(gChapters.begin() + chapterIdx);
 }
 
-int32 KBSResultModel::KeepOnlyReplaced()
+int32 KBSResultModel::KeepCheckedRows()
 {
-	// A replace that landed nowhere must not empty the panel, so check before touching anything.
-	bool anyReplaced = false;
-	for (size_t ci = 0; ci < gChapters.size() && !anyReplaced; ++ci)
+	// A replace that was asked for nothing must not empty the panel, so check before touching
+	// anything. A row counts as asked about when any of these hold:
+	//   replaced - it was changed (its check was cleared when it was written)
+	//   outcome  - it was reached and left alone, and says why (its check was cleared then too)
+	//   checked  - still selected, so the run never reached it: the safety ceiling, a chapter that
+	//              would not open, or a cancel. Those rows carry no reason, on purpose.
+	//   isLocked - found by the search and never offerable. Kept so the list can account for a
+	//              search that turned up more than the replace was allowed to touch.
+	bool anyAsked = false;
+	for (size_t ci = 0; ci < gChapters.size() && !anyAsked; ++ci)
 	{
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (hits[hi].replaced)
+			if (hits[hi].replaced || hits[hi].checked || hits[hi].isLocked
+				|| hits[hi].outcome != kOutcomeNone)
 			{
-				anyReplaced = true;
+				anyAsked = true;
 				break;
 			}
 		}
 	}
-	if (!anyReplaced)
+	if (!anyAsked)
 		return GetTotalHitCount();
 
-	// Thin each chapter down to its replaced hits...
+	// Thin each chapter down to the rows the replace was asked about...
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
 	{
 		std::vector<Hit>& hits = gChapters[ci].hits;
@@ -438,7 +456,8 @@ int32 KBSResultModel::KeepOnlyReplaced()
 		keep.reserve(hits.size());
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (!hits[hi].replaced)
+			if (!hits[hi].replaced && !hits[hi].checked && !hits[hi].isLocked
+				&& hits[hi].outcome == kOutcomeNone)
 				continue;
 			// The source vector is thrown away at the swap below, so the hit is moved out rather
 			// than copied - a Hit carries six PMStrings.
@@ -455,8 +474,7 @@ int32 KBSResultModel::KeepOnlyReplaced()
 		hits.swap(keep);
 	}
 
-	// ...then drop the chapters nothing was changed in, so the tree shows only the documents the
-	// replace actually touched.
+	// ...then drop the chapters left with nothing.
 	std::vector<Chapter> remaining;
 	remaining.reserve(gChapters.size());
 	int32 kept = 0;
@@ -468,6 +486,9 @@ int32 KBSResultModel::KeepOnlyReplaced()
 		remaining.push_back(std::move(gChapters[ci]));
 	}
 	gChapters.swap(remaining);
+
+	// From here the panel is a report, not a work list: no row offers a check box.
+	gShowingOutcome = true;
 	return kept;
 }
 

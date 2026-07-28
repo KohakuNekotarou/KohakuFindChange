@@ -529,11 +529,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	for (size_t i = 0; i < touched.size(); ++i)
 		KBSBookScope::ShowChapterWindow(touched[i]);
 
-	// The panel now becomes a list of WHAT CHANGED: the occurrences left alone are no longer
-	// results worth keeping in front of the user, and a replaced row cannot be selected again
-	// anyway. A replace that landed nowhere leaves the results as they were.
-	if (totalReplaced > 0)
-		KBSResultModel::KeepOnlyReplaced();
+	// The panel now becomes a REPORT of what the replace did: the rows it changed, and the rows it
+	// was asked about and left alone, each saying why on its locator. The rows the user had
+	// unchecked are dropped - they were never part of the request. A replace that was asked for
+	// nothing at all leaves the results exactly as they were.
+	KBSResultModel::KeepCheckedRows();
 
 	// The count leads, so it survives the narrow status field's tail truncation.
 	outSummary.AppendNumber(totalReplaced);

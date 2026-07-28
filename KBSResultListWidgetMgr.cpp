@@ -205,11 +205,17 @@ private:
 		bool checked = false, replaced = false, locked = false;
 		KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), checked, replaced, locked);
 
-		// Two different reasons a row has NOTHING to select, handled identically from here on:
-		//   replaced - the panel is listing what changed, and a replaced hit cannot be replaced again
-		//   locked   - InDesign gives no way to change locked content, so offering a box would be
-		//              offering an action that quietly does nothing (the locator says "+lck")
-		const bool noCheckBox = replaced || locked;
+		// Reasons a row has NOTHING to select, all handled identically from here on:
+		//   replaced - it has been changed already, and cannot be changed again
+		//   locked   - InDesign gives no way to change locked content, so a box would offer an
+		//              action that quietly does nothing (the locator says lock)
+		//   outcome  - the row already carries a reason it was left alone (changed / refused)
+		//   report   - the panel is showing the aftermath of a replace, where NO row is selectable.
+		//              This is the one that catches the rows carrying no reason at all: a chapter
+		//              the safety ceiling cut short, or one that could not be opened.
+		const bool noCheckBox = replaced || locked
+			|| KBSResultModel::GetHitOutcome(nodeID->GetChapter(), nodeID->GetHit()) != KBSResultModel::kOutcomeNone
+			|| KBSResultModel::IsShowingReplaceOutcome();
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.

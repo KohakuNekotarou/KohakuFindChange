@@ -203,13 +203,17 @@ namespace KBSResultModel
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
 
-	/** Drop every hit that was NOT replaced, and every chapter left without one. Called right after
-	    a replace, which turns the panel into a list of WHAT WAS CHANGED: the occurrences that were
-	    left alone are no longer results worth showing, and the replaced ones cannot be selected
-	    again in any case. Does NOTHING when no hit was replaced, so a replace that landed nowhere
-	    never wipes the result set.
-	    @return the number of hits left in the model. */
-	int32 KeepOnlyReplaced();
+	/** Turn the result set into a REPORT of what the replace did. Keeps every row the replace was
+	    asked about - the ones it changed, and the ones it left alone with the reason on the
+	    locator - plus the locked rows, which account for a search that turned up more than the
+	    replace was allowed to touch. Drops the rows the user had unchecked, and then the chapters
+	    left with nothing.
+
+	    Does NOTHING when no row was asked about, so a replace that was asked for nothing never
+	    wipes the result set. Sets the aftermath flag (see IsShowingReplaceOutcome), which takes
+	    every check box off the panel.
+	    @return the number of rows left in the model. */
+	int32 KeepCheckedRows();
 
 	/** Record a completed replacement: the row keeps its page locator but takes the replaced
 	    line's three segments and its new range, is marked replaced, and leaves the selection. A
