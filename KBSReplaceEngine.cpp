@@ -149,24 +149,20 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 }
 
 // Replace this chapter's checked hits. Returns how many were replaced.
-// outAborted   = the re-walk ended before every checked hit had come up, i.e. the document is no
-//                longer the one the result set describes (edited since the search, or the query
-//                changed since).
-// outStepLimit = the walk was cut off by the safety ceiling instead. Same symptom - checked hits
-//                left over - but a different cause and different advice, so the two are kept
-//                apart rather than both reported as "edited since the search".
-// outStale     = checked hits that DID come up but whose text no longer reads the way the panel
-//                says. They are left untouched and counted (see MatchTextStillAgrees).
+// outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
+//                are when the walk simply runs out of matches - but these rows were never looked
+//                at, so they get no word on their locator and the summary names the chapter.
+// outStale     = checked hits that came up where the row said, but are not the occurrence the row
+//                describes any more. Left untouched, counted and marked (see MatchStillStandsHere).
 // outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
 //                those but offers no way to change them, so KBS does not either - they are left
 //                untouched and counted (see KBSSearchEngine::IsMatchEditable).
 // outRefused   = checked hits the replace command itself would not run on. Not a decision of ours
 //                like the two above, and not a walk that lost its place like the two flags - the
 //                command was asked and said no.
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit,
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit,
 	int32& outStale, int32& outLocked, int32& outRefused)
 {
-	outAborted = false;
 	outStepLimit = false;
 	outStale = 0;
 	outLocked = 0;
@@ -298,6 +294,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 			if (!KBSSearchEngine::IsMatchEditable(story, start))
 			{
 				++outLocked;
+					if (hitIdx >= 0)
+						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeLocked);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -309,6 +307,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
 			{
 				++outStale;
+					if (hitIdx >= 0)
+						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeChanged);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -345,6 +345,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 				// this counter the hit just vanishes: the row came up, nothing was written, and the
 				// replaced total silently comes up short with nothing to explain it.
 				++outRefused;
+					if (hitIdx >= 0)
+						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
 			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
@@ -359,14 +361,29 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 	if (walker->IsWalking())
 		walker->Halt();
 
-	// Checked hits the re-walk never reached. Which of the two reasons it was decides what the
-	// summary can honestly tell the user to do about it.
+	// Checked hits the re-walk never reached. WHY it did not reach them decides what may be
+	// said about them.
 	if (!targets.empty())
 	{
 		if (steps >= kMaxSteps)
+		{
+			// The safety ceiling cut the walk short. These rows were never looked at, so nothing
+			// can honestly be said about them: no word goes on their locator, and the summary
+			// explains the chapter instead.
 			outStepLimit = true;
+		}
 		else
-			outAborted = true;
+		{
+			// The walk ran to the end of the chapter without them coming up, so those matches are
+			// gone. Said on the rows THEMSELVES rather than on the chapter, which named a file and
+			// left the user to guess which of its rows it meant.
+			for (std::set<int32>::const_iterator t = targets.begin(); t != targets.end(); ++t)
+			{
+				const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(*t);
+				if (row != rowByWalkOrder.end())
+					KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeChanged);
+			}
+		}
 	}
 	return replacedCount;
 }
@@ -479,29 +496,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const int32 ci = pending[pi].chapterIdx;
 		const UIDRef& docRef = pending[pi].docRef;
 
-		bool aborted = false;
 		bool stepLimit = false;
 		int32 stale = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale, locked, refused);
+		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, stale, locked, refused);
 		totalReplaced += replaced;
 		totalStale += stale;
 		totalLocked += locked;
 		totalRefused += refused;
 		if (replaced > 0)
 			++chaptersTouched;
-		if (aborted)
-		{
-			++chaptersSkipped;
-			if (!haveFirstSkipped)
-			{
-				int32 chapterHits = 0;
-				KBSResultModel::GetChapterDisplay(ci, firstSkipped, chapterHits);
-				firstSkipped.SetTranslatable(kFalse);
-				haveFirstSkipped = true;
-			}
-		}
 		if (stepLimit)
 			++chaptersStepLimited;
 
@@ -540,9 +545,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	{
 		outSummary.Append(" ");
 		outSummary.AppendNumber(chaptersSkipped);
-		outSummary.Append(" chapter(s) did not line up (\"");
+		outSummary.Append(" chapter(s) could not be opened (\"");
 		outSummary.Append(firstSkipped);
-		outSummary.Append("\" first) - edited since the search? Search again.");
+		outSummary.Append("\" first) - moved, deleted, or in use?");
 	}
 
 	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
