@@ -93,6 +93,16 @@ bool RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
 	return true;
 }
 
+// A chapter that has work to do, already resolved to a LIVE document. Built before the command
+// sequence opens - see the comment on the resolve pass in ReplaceChecked.
+struct PendingChapter
+{
+	int32	chapterIdx;
+	UIDRef	docRef;
+
+	PendingChapter() : chapterIdx(-1) {}
+};
+
 // Does this chapter hold at least one checked, not-yet-replaced hit? Asked before the chapter is
 // opened, so a replace never brings up documents it is not going to touch.
 bool ChapterHasChecked(int32 chapterIdx)
@@ -356,6 +366,53 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// opened on the spot - see the comment on the loop that consumes this, below.
 	std::vector<UIDRef> touched;
 
+	// FIRST PASS, deliberately OUTSIDE the command sequence: turn every chapter that has work into
+	// a live document, reopening the ones the user has closed since the search.
+	//
+	// Reopening is a document OPEN, and an open processed BETWEEN two chapters' replacements is
+	// exactly what was measured on 2026-07-28 to throw away the undo history of the chapters
+	// already done - that is why ShowChapterWindow was moved out to the far end of this function.
+	// The reopen belongs on the same side of the fence for the same reason. Doing it here also
+	// means a chapter that cannot be opened at all is counted before anything has been written,
+	// instead of interrupting a run that is already half committed.
+	std::vector<PendingChapter> pending;
+	for (int32 ci = 0; ci < chapterCount; ++ci)
+	{
+		if (!ChapterHasChecked(ci))
+			continue;		// nothing selected here - do not even open this chapter
+
+		UIDRef docRef;
+		IDFile file;
+		if (!KBSResultModel::GetChapterLocation(ci, docRef, file))
+			continue;
+
+		// The chapter may have been closed since the search (a held window the user shut). Bring
+		// it back the way a jump does, and rebind the model to the live database.
+		if (!KBSBookScope::IsDocStillOpen(docRef))
+		{
+			UIDRef reopened;
+			if (!KBSBookScope::ReopenChapterDoc(file, reopened))
+			{
+				++chaptersSkipped;
+				if (!haveFirstSkipped)
+				{
+					int32 chapterHits = 0;
+					KBSResultModel::GetChapterDisplay(ci, firstSkipped, chapterHits);
+					firstSkipped.SetTranslatable(kFalse);
+					haveFirstSkipped = true;
+				}
+				continue;	// missing / locked: report it, replace nothing here
+			}
+			docRef = reopened;
+			KBSResultModel::RebindChapterDoc(ci, reopened);
+		}
+
+		PendingChapter chapter;
+		chapter.chapterIdx = ci;
+		chapter.docRef = docRef;
+		pending.push_back(chapter);
+	}
+
 	{
 	// ONE sequence around EVERY chapter, so a book-wide replace is a SINGLE undo step.
 	//
@@ -371,42 +428,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// What this costs: the run is now all-or-nothing. A failure that leaves the global error code
 	// set when this sequence ends rolls back EVERY chapter, not only the one that failed. That is
 	// why RunWalkerCmd clears the error state on both of its failure paths - and why any new exit
-	// path added inside this block must do the same.
+	// path added inside this block must do the same. Nothing in here opens a document or a window
+	// either; both are kept outside, above and below (see the two passes around this block).
 	CmdUtils::SequencePtr seq;
 	seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
 
-	for (int32 ci = 0; ci < chapterCount; ++ci)
+	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
-		if (!ChapterHasChecked(ci))
-			continue;		// nothing selected here - do not even open this chapter
-
-		UIDRef docRef;
-		IDFile file;
-		if (!KBSResultModel::GetChapterLocation(ci, docRef, file))
-			continue;
-
-		PMString chapterName;
-		int32 chapterHits = 0;
-		KBSResultModel::GetChapterDisplay(ci, chapterName, chapterHits);
-
-		// The chapter may have been closed since the search (a held window the user shut). Bring
-		// it back the way a jump does, and rebind the model to the live database.
-		if (!KBSBookScope::IsDocStillOpen(docRef))
-		{
-			UIDRef reopened;
-			if (!KBSBookScope::ReopenChapterDoc(file, reopened))
-			{
-				++chaptersSkipped;
-				if (!haveFirstSkipped)
-				{
-					firstSkipped = chapterName;
-					haveFirstSkipped = true;
-				}
-				continue;	// missing / locked: report it, replace nothing here
-			}
-			docRef = reopened;
-			KBSResultModel::RebindChapterDoc(ci, reopened);
-		}
+		const int32 ci = pending[pi].chapterIdx;
+		const UIDRef& docRef = pending[pi].docRef;
 
 		bool aborted = false;
 		bool stepLimit = false;
@@ -423,7 +453,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			++chaptersSkipped;
 			if (!haveFirstSkipped)
 			{
-				firstSkipped = chapterName;
+				int32 chapterHits = 0;
+				KBSResultModel::GetChapterDisplay(ci, firstSkipped, chapterHits);
+				firstSkipped.SetTranslatable(kFalse);
 				haveFirstSkipped = true;
 			}
 		}
@@ -440,10 +472,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 	}	// the sequence ends HERE: every chapter's replacements commit together, as one undo step
 
-	// Windows are opened AFTER the sequence, never from inside it. Measured 2026-07-28: a
-	// kOpenLayoutCmdBoss processed between two chapters' replacements discarded the undo history of
-	// the chapters already done - their text stayed replaced with nothing left to undo it with.
-	// Opening the windows once everything is committed keeps that command clear of the replacements.
+	// Windows are opened AFTER the sequence, never from inside it - the other half of the pair the
+	// resolve pass above makes: no document and no window is opened while the sequence is standing.
+	// Measured 2026-07-28: a kOpenLayoutCmdBoss processed between two chapters' replacements
+	// discarded the undo history of the chapters already done - their text stayed replaced with
+	// nothing left to undo it with. Opening the windows once everything is committed keeps that
+	// command clear of the replacements.
 	for (size_t i = 0; i < touched.size(); ++i)
 		KBSBookScope::ShowChapterWindow(touched[i]);
 
