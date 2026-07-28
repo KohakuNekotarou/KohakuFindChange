@@ -31,6 +31,7 @@
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "PreferenceUtils.h"		// QuerySessionPreferences
+#include "ProgressBar.h"		// TaskProgressBar / SuppressProgressBarDisplay - as the search does it
 #include "Utils.h"
 
 #include <map>
@@ -420,6 +421,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// otherwise never count as "the first one", and every later chapter would overwrite it.
 	bool haveFirstSkipped = false;
 
+	// Set when the user stops the run from the progress bar. Everything written up to that
+	// point still commits, and still comes back with one Ctrl+Z.
+	bool cancelled = false;
+
 	// Chapters that took a replacement, and so want a window afterwards. Collected rather than
 	// opened on the spot - see the comment on the loop that consumes this, below.
 	std::vector<UIDRef> touched;
@@ -433,6 +438,29 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The reopen belongs on the same side of the fence for the same reason. Doing it here also
 	// means a chapter that cannot be opened at all is counted before anything has been written,
 	// instead of interrupting a run that is already half committed.
+	// How many chapters the run has to work through. Counted BEFORE anything is opened, because
+	// the bar has to be up while the chapters are being opened - that is the slow part when the
+	// user has closed the windows the search was holding.
+	int32 chaptersWithWork = 0;
+	for (int32 ci = 0; ci < chapterCount; ++ci)
+	{
+		if (ChapterHasChecked(ci))
+			++chaptersWithWork;
+	}
+
+	// The progress bar. Book scope only, exactly as the search does it: a one-document replace
+	// is a single step with nothing to cancel between. DisableChildProgressBars keeps the
+	// chapter opens in the resolve pass below from raising bars of their own.
+	//
+	// showImmediate = kTrue for the reason the search learned the hard way: with the default
+	// the bar waits out an internal delay, and a fast run beats that delay - so the cancel
+	// button, the one thing the bar is really there for, never reaches the screen.
+	PMString progressTitle("Replacing...");
+	progressTitle.SetTranslatable(kFalse);
+	const SuppressProgressBarDisplay suppressBar(KBSResultModel::IsFromBook() ? kFalse : kTrue);
+	TaskProgressBar progressBar(progressTitle, chaptersWithWork, kTrue, kTrue);
+	progressBar.DisableChildProgressBars(kTrue);
+
 	std::vector<PendingChapter> pending;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
@@ -493,6 +521,37 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
+		PMString taskLine;
+		taskLine.SetTranslatable(kFalse);
+		taskLine.Append("Chapter ");
+		taskLine.AppendNumber(static_cast<int32>(pi) + 1);
+		taskLine.Append(" / ");
+		taskLine.AppendNumber(static_cast<int32>(pending.size()));
+		progressBar.SetTaskStatus(taskLine);
+
+		PMString chapterName;
+		int32 chapterHits = 0;
+		KBSResultModel::GetChapterDisplay(pending[pi].chapterIdx, chapterName, chapterHits);
+		chapterName.SetTranslatable(kFalse);
+		progressBar.DoTask(chapterName);
+
+		// Cancel is looked at HERE ONLY - between chapters. Inside a chapter the walk sits in
+		// a TextWalkerSelections critical section and WasCancelled pumps events, so asking in
+		// there would run UI work in the middle of a text walk.
+		//
+		// Stopping here is safe: every chapter is inside ONE command sequence, so what has
+		// been written so far commits together and a single Ctrl+Z still puts all of it back.
+		// The chapters not reached are left alone, and their rows carry no reason - nothing
+		// was ever asked of them.
+		//
+		// kFalse = do NOT raise the global error state. Raising it here would roll the WHOLE
+		// sequence back when it ends, throwing away the chapters that did succeed.
+		if (progressBar.WasCancelled(kFalse))
+		{
+			cancelled = true;
+			break;
+		}
+
 		const int32 ci = pending[pi].chapterIdx;
 		const UIDRef& docRef = pending[pi].docRef;
 
@@ -540,6 +599,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	outSummary.Append(" replaced in ");
 	outSummary.AppendNumber(chaptersTouched);
 	outSummary.Append(" chapter(s). Not saved - check them and save yourself.");
+
+	// Said right after the count, ahead of the other notes: it changes what all of them mean.
+	if (cancelled)
+		outSummary.Append(" Cancelled - the chapters not reached were left untouched.");
 
 	if (chaptersSkipped > 0)
 	{
