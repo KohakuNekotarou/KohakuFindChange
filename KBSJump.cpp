@@ -61,6 +61,8 @@
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
+#include "KBSSearchEngine.h"		// MatchIsSameOccurrence - the one test the replace uses too
+#include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 
 namespace
 {
@@ -332,6 +334,18 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// leave a (possibly windowless) chapter modified, or closing it later would want a save.
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 
+	// Is the text at this position still the text this row describes? The stored position is an
+	// offset into the story, so ANY edit earlier in that story moves it - and that is exactly the
+	// case where scrolling here and drawing a marker would frame text the user never searched for.
+	//
+	// The story and position arms of the test are trivially satisfied here (we are asking ABOUT the
+	// stored position, and this side has replaced nothing, so the delta is zero). What does the work
+	// is the text.
+	PMString storedLocator, storedPre, storedMatch, storedPost;
+	KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, storedLocator, storedPre, storedMatch, storedPost);
+	const bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
+		storyRef, start, end, storyUID, start, storedMatch, 0);
+
 	const bool overset = IsTextIndexOverset(storyRef, start);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
@@ -367,12 +381,31 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			ScrollFrontViewToPoint(PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
 				(pbRect.Top() + pbRect.Bottom()) / PMReal(2.0)));
-			KBSDrawEventHandler::SetMarker(db, pbRect);
+			// The marker belongs on text the row still describes. On text that has changed
+			// underneath it would be framing something the user never looked for, so the view goes
+			// there and the marker stays off; the message at the end of this function says why.
+			if (sameOccurrence)
+				KBSDrawEventHandler::SetMarker(db, pbRect);
+			else
+				KBSDrawEventHandler::ClearMarker();
 		}
 		else
 		{
 			KBSDrawEventHandler::ClearMarker();
 		}
+	}
+
+	// A row whose text has changed underneath says so from here on, and loses its check box, so
+	// the panel stops offering a replacement that would be refused anyway. The tree's SHAPE is
+	// untouched - same chapters, same rows - so the rows are repainted rather than rebuilt.
+	if (!sameOccurrence)
+	{
+		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeChanged);
+		KBSResultTree::RefreshRows();
+
+		PMString message("The text here changed since the search - search again to work on it.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
 	}
 }
 
