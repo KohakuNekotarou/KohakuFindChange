@@ -38,3 +38,5 @@ REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
 REGISTER_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
 // INSTRUMENTATION: book-close notification watcher (temporary).
 REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
+// Panel tab name: writes the scope onto the tab when the panel appears.
+REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)

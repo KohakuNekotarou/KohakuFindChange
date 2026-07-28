@@ -231,6 +231,8 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSStartupShutdown.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
@@ -257,6 +259,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSMarkerExpiryIdleTask.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSJump.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\KBS.fr">

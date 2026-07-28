@@ -63,6 +63,12 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
@@ -120,6 +126,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>

@@ -133,6 +133,12 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 * Implementation provided by the API.
 			 */
 			IID_IPANELMENUDATA, kCPanelMenuDataImpl,
+			/*
+			 * Observer whose only job is the tab's name: the panel is rebuilt every time it is
+			 * shown, and the palette that draws the tab is only laid out while it is visible, so
+			 * the scope has to be (re)written the moment the panel appears. See KBSPanelTitle.cpp.
+			 */
+			IID_IOBSERVER, kKBSPanelObserverImpl,
 		}
 	},
 

@@ -44,6 +44,7 @@
 #include "KBSBookScope.h"		// the Book Scope toggle's session state
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
+#include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -128,6 +129,11 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (KBSSearchEngine::IsSearching())
 				break;		// already running - the bar pumps events, so this can be reached
 
+			// Before the search rather than after: the progress bar is modal, and the tab stays in
+			// view behind it. This is also what puts the name back when the panel has been closed
+			// and reopened since the last toggle.
+			KBSPanelTitle::Update();
+
 			PMString summary;
 			KBSSearchEngine::SearchBook(summary);
 			KBSResultTree::Rebuild();
@@ -141,6 +147,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// flag - nothing is closed and the current results stay put. Its check mark and the
 			// search command's name are drawn in UpdateActionStates.
 			KBSBookScope::SetBookScopeOn(!KBSBookScope::IsBookScopeOn());
+			// The flyout closes with the click, so the scope it just set is written where it stays
+			// readable: the panel's own tab.
+			KBSPanelTitle::Update();
 			break;
 		}
 

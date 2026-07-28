@@ -24,6 +24,7 @@
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
+#include "KBSPanelTitle.h"
 #include "KBSResultModel.h"
 
 /** Implements IStartupShutdownService for the plug-in. */
@@ -40,11 +41,14 @@ public:
 		KBSBookWatchAttach();
 	}
 
-	/** Retire the marker idle task (it must leave the queue, and never be re-created, before the
-	    app tears down) and release the module's static storage, so every static destructor at DLL
-	    unload finds nothing left to do. */
+	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and
+	    never be re-created, before the app tears down) and release the module's static storage, so
+	    every static destructor at DLL unload finds nothing left to do. */
 	virtual void Shutdown()
 	{
+		// The tab name first, while the UI is still standing: a tab renamed with the current scope
+		// must not be what a saved workspace remembers.
+		KBSPanelTitle::Restore();
 		KBSBookWatchDetach();
 		KBSMarkerExpiryIdleTask::Shutdown();
 		KBSBookScope::ShutdownCleanup();

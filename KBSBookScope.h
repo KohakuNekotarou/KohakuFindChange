@@ -74,12 +74,6 @@ namespace KBSBookScope
 	    IBook is already gone by then, so there is no pointer left to compare. */
 	bool IsBookStillOpen(const PMString& bookPath);
 
-	/** TEMPORARY DIAGNOSTIC: describe what the book manager currently says about the book at
-	    'bookPath' - how many books are listed, whether ours is among them, and what its IsOpen /
-	    database look like. Used to find out what actually changes when a book is closed, since
-	    neither list membership nor IsOpen() had changed at notification time. */
-	void DescribeBookState(const PMString& bookPath, PMString& outText);
-
 	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
 	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not
 	    make that book active - only touching a chapter inside it does (measured 2026-07-27).

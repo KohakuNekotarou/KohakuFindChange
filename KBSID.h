@@ -142,6 +142,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKBSPrefix + 1
 DECLARE_PMID(kImplementationIDSpace, kKBSCloseDocResponderImpl, kKBSPrefix + 11)
 // INSTRUMENTATION: book-close notification watcher (temporary - see KBSBookWatch.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
+// The panel tab's name: an observer on the panel boss whose only job is to write the current
+// scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKBSPrefix + 13)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)

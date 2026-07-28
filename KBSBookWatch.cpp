@@ -113,15 +113,7 @@ void RetireBookResultsIfGone()
 
 	// The ordinary case for most cues: our book is fine, this was about some other book.
 	if (KBSBookScope::IsBookStillOpen(heldBookPath))
-	{
-		// DIAGNOSTIC: report exactly what the book manager says right now, so we can see which
-		// of these actually changes when a book is closed.
-		PMString state("after wait: ");
-		state.SetTranslatable(kFalse);
-		KBSBookScope::DescribeBookState(heldBookPath, state);
-		KBSResultTree::ShowStatus(state);
 		return;
-	}
 
 	// Back to empty, and the chapters this search opened windowless go with it: leaving them open
 	// would strand hidden documents belonging to a book nobody has open any more. The closes are

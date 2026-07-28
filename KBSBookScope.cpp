@@ -401,40 +401,6 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 	return false;
 }
 
-void KBSBookScope::DescribeBookState(const PMString& bookPath, PMString& outText)
-{
-	outText.SetTranslatable(kFalse);
-
-	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-	if (bookMgr == nil)
-	{
-		outText.Append("no book manager");
-		return;
-	}
-
-	const int32 bookCount = bookMgr->GetBookCount();
-	outText.Append("books=");
-	outText.AppendNumber(bookCount);
-
-	for (int32 i = 0; i < bookCount; ++i)
-	{
-		IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
-		if (book == nil)
-			continue;
-		SDKFileHelper bookFileHelper(book->GetBookFileSpec());
-		const PMString openBookPath = bookFileHelper.GetPath();
-		if (!(openBookPath == bookPath))
-			continue;
-
-		outText.Append(" ours listed, IsOpen=");
-		outText.AppendNumber(book->IsOpen() ? 1 : 0);
-		outText.Append(" db=");
-		outText.AppendNumber(::GetDataBase(book) != nil ? 1 : 0);
-		return;
-	}
-	outText.Append(" ours NOT listed");
-}
-
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 {
 	if (bookPath.IsEmpty())
@@ -489,14 +455,10 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 	// Falls back to the active book when the panel cannot be reached, which keeps the old
 	// behaviour rather than failing outright.
 	IBook* book = nil;
-	bool fromPanel = false;
 
 	IDFile panelBookFile;
 	if (GetPanelBookFile(panelBookFile))
-	{
 		book = bookMgr->FindOpenBookByName(panelBookFile);	// nil = that file is not open
-		fromPanel = (book != nil);
-	}
 
 	// GetCurrentActiveBook hands out a non-owning pointer - no release. Same for FindOpenBookByName.
 	if (book == nil)
@@ -506,8 +468,6 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 
 	outBookName = book->GetBookTitleName();
 	outBookName.SetTranslatable(kFalse);
-	// TEMPORARY DIAGNOSTIC: which route decided the book - remove once confirmed on the release build.
-	outBookName.Append(fromPanel ? " [panel]" : " [active]");
 
 	IDataBase* bookDB = ::GetDataBase(book);
 	if (bookDB == nil)
