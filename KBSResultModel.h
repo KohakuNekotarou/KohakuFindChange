@@ -48,6 +48,10 @@ namespace KBSResultModel
 								// indicator (or "" when nothing is placed anywhere).
 		int32		pageIndex;	// that page's document order (-1 = no page); sorts hits into page order
 		bool		isOverset;	// match is overset -> the locator gets an "ov" prefix ("ovP<page>")
+		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " Hidden".
+								// Only reachable when the Find/Change dialog's "Include Hidden
+								// Layers" is on, and then the text is composed and jumpable but
+								// draws nothing, so the row has to say why the page looks empty.
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
@@ -63,7 +67,7 @@ namespace KBSResultModel
 		bool		checked;	// selected for replacement (a fresh search checks every hit)
 		bool		replaced;	// already replaced in this result set - not selectable any more
 
-		Hit() : pageIndex(-1), isOverset(false), storyUID(kInvalidUID),
+		Hit() : pageIndex(-1), isOverset(false), isHidden(false), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
 				walkOrder(-1), checked(true), replaced(false) {}
 	};

@@ -42,6 +42,10 @@
 #include "IHierarchy.h"				// the parcel frame as a page item
 #include "ILayoutUtils.h"			// GetOwnerPageUID - frame -> page
 #include "IPageList.h"				// GetPageString / GetPageIndex - page -> "12" / "A:1"
+// For marking a match that sits on a switched-off layer ("Hidden" on the hit-row locator):
+#include "ILayerUtils.h"			// GetLayerUID - the spread layer a frame sits on
+#include "ISpreadLayer.h"			// GetDocLayerUID - spread layer -> the Layers panel's row
+#include "IDocumentLayer.h"			// IsVisible - is that layer switched off?
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
@@ -177,16 +181,47 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	return !outPage.IsEmpty();
 }
 
+// Is this frame on a layer the user has switched off? Such a match is composed and has a page like
+// any other - only its drawing is suppressed - so it can be listed and jumped to; the row just has
+// to say so, the way the Find/Change dialog says "Hidden Item".
+//
+// The layer an item sits on is a SPREAD layer (one per spread); the visibility switch lives on the
+// DOCUMENT layer it points at, which is the row in the Layers panel.
+bool IsFrameOnHiddenLayer(IDataBase* db, UID frameUID)
+{
+	if (db == nil || frameUID == kInvalidUID)
+		return false;
+
+	InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
+	if (frameHier == nil)
+		return false;
+
+	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
+	if (spreadLayerUID == kInvalidUID)
+		return false;
+	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
+	if (spreadLayer == nil)
+		return false;
+
+	InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
+	if (docLayer == nil)
+		return false;
+	return !docLayer->IsVisible();
+}
+
 // The page a visible match position sits on. Ported from KESCL: position -> parcel -> frame, then
 // GetFramePageString. Returns false for an overset position (composed but placed in no frame) and
 // the query failures around it, which read the same to the user: no page for the match itself. The
 // caller then names the "+" locator's page instead.
+// outFrameUID is the frame the match sits in (kInvalidUID when there is none), so the caller can
+// ask about its layer without walking the parcels a second time.
 bool GetMatchPageString(const UIDRef& docRef, const UIDRef& storyRef, TextIndex pos,
-	PMString& outPage, int32& outPageIndex)
+	PMString& outPage, int32& outPageIndex, UID& outFrameUID)
 {
 	outPage.Clear();
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = -1;
+	outFrameUID = kInvalidUID;
 
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
@@ -204,6 +239,7 @@ bool GetMatchPageString(const UIDRef& docRef, const UIDRef& storyRef, TextIndex 
 	if (frameUID == kInvalidUID)
 		return false;	// overset: composed but placed in no frame
 
+	outFrameUID = frameUID;
 	return GetFramePageString(docRef, frameUID, outPage, outPageIndex);
 }
 
@@ -220,7 +256,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// page of the "+" overset indicator instead (the last placed parcel's frame, climbing out of a
 	// pushed-out table) so the hit lists as "ovP<page>(n)" and sorts into that page. If nothing is
 	// placed anywhere, leave it pageless (locator falls back to a bare "ov", sorted to the end).
-	if (!GetMatchPageString(docRef, storyRef, start, outHit.pageString, outHit.pageIndex))
+	UID matchFrameUID = kInvalidUID;
+	if (!GetMatchPageString(docRef, storyRef, start, outHit.pageString, outHit.pageIndex, matchFrameUID))
 	{
 		outHit.isOverset = true;
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
@@ -229,7 +266,16 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 			outHit.pageString.Clear();
 			outHit.pageIndex = -1;
 		}
+		else
+		{
+			matchFrameUID = loc.frameUID;	// the "+" indicator's frame decides the layer here
+		}
 	}
+
+	// A match on a switched-off layer is only reachable at all because the Find/Change dialog's
+	// "Include Hidden Layers" is on. The row has to say so - the text is there and the jump works,
+	// but nothing will be visible on arrival until the layer is switched back on.
+	outHit.isHidden = IsFrameOnHiddenLayer(docRef.GetDataBase(), matchFrameUID);
 
 	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
 	// row exactly the same way from the range the replace command hands back.
@@ -430,6 +476,11 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 				if (hits[k].isOverset)
 					locator.Append("ov");
 			}
+			// Same suffix on both shapes ("P1(2) Hidden" / "ov Hidden"), spelled out rather than
+			// abbreviated like "ov": this one explains why the page will look empty on arrival,
+			// and the Find/Change dialog says "Hidden Item" for the same thing.
+			if (hits[k].isHidden)
+				locator.Append(" Hidden");
 			// The locator is its own part now (drawn at full colour, then a tab stop before the
 			// line text) - the colour cell keeps it separate from the faded line segments.
 			hits[k].locator = locator;
@@ -442,10 +493,27 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 
 void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 {
-	// Whole document: master pages / locked layers / locked stories / footnotes (all defaults),
-	// but exclude hidden layers - a match the user cannot see is not a useful result, and the
-	// replace pass must not touch one either.
-	outOptions.SetIncludeHiddenLayers(kFalse);
+	// The five switches WalkerScopeOptions carries are EXACTLY the five the Find/Change dialog
+	// shows under its search options, so they are read from there like everything else about the
+	// query - KBS sets no search option of its own.
+	//
+	// This used to force hidden layers OFF and leave the other four at their stock defaults, which
+	// made the panel disagree with the dialog it delegates to: a user who had switched Include
+	// Hidden Layers ON still got nothing from a hidden layer (user's report 2026-07-28), and the
+	// three "include" boxes they had switched OFF were ignored just as silently.
+	//
+	// fSearchBackwards is deliberately NOT taken: the walk order is the only key joining a search
+	// to its replace pass, so KBS always walks forward.
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;		// nothing to read - the stock defaults stand
+
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	outOptions.SetIncludeMasterPages(opts->GetIncludeMasterPages(mode));
+	outOptions.SetIncludeLockedLayers(opts->GetIncludeLockedLayersForFind(mode));
+	outOptions.SetIncludeHiddenLayers(opts->GetIncludeHiddenLayers(mode));
+	outOptions.SetIncludeLockedStories(opts->GetIncludeLockedStoriesForFind(mode));
+	outOptions.SetIncludeFootnotes(opts->GetIncludeFootnotes(mode));
 }
 
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
