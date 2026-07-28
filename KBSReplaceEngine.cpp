@@ -153,8 +153,9 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 // outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
 //                are when the walk simply runs out of matches - but these rows were never looked
 //                at, so they get no word on their locator and the summary names the chapter.
-// outStale     = checked hits that came up where the row said, but are not the occurrence the row
-//                describes any more. Left untouched, counted and marked (see MatchStillStandsHere).
+// outMissing   = checked hits the walk could not find where the row said they were, either
+//                because what came up there is a different occurrence, or because the row's turn
+//                never came at all. Left untouched, counted and marked (MatchStillStandsHere).
 // outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
 //                those but offers no way to change them, so KBS does not either - they are left
 //                untouched and counted (see KBSSearchEngine::IsMatchEditable).
@@ -162,10 +163,10 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 //                like the two above, and not a walk that lost its place like the two flags - the
 //                command was asked and said no.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit,
-	int32& outStale, int32& outLocked, int32& outRefused)
+	int32& outMissing, int32& outLocked, int32& outRefused)
 {
 	outStepLimit = false;
-	outStale = 0;
+	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
 
@@ -307,9 +308,9 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			// changed underneath is left alone and counted, never rewritten.
 			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
 			{
-				++outStale;
+				++outMissing;
 					if (hitIdx >= 0)
-						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeChanged);
+						KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -382,7 +383,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			{
 				const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(*t);
 				if (row != rowByWalkOrder.end())
-					KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeChanged);
+					KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeMissing);
 			}
 		}
 	}
@@ -412,7 +413,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	int32 chaptersTouched = 0;
 	int32 chaptersSkipped = 0;
 	int32 chaptersStepLimited = 0;
-	int32 totalStale = 0;
+	int32 totalMissing = 0;
 	int32 totalLocked = 0;
 	int32 totalRefused = 0;
 	PMString firstSkipped;
@@ -556,12 +557,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const UIDRef& docRef = pending[pi].docRef;
 
 		bool stepLimit = false;
-		int32 stale = 0;
+		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, stale, locked, refused);
+		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused);
 		totalReplaced += replaced;
-		totalStale += stale;
+		totalMissing += missing;
 		totalLocked += locked;
 		totalRefused += refused;
 		if (replaced > 0)
@@ -616,11 +617,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
 	// failure to line up - the row came up exactly where it was expected, the TEXT there had
 	// changed - so it is reported on its own terms.
-	if (totalStale > 0)
+	if (totalMissing > 0)
 	{
 		outSummary.Append(" ");
-		outSummary.AppendNumber(totalStale);
-		outSummary.Append(" hit(s) left alone - the text there changed since the search.");
+		outSummary.AppendNumber(totalMissing);
+		outSummary.Append(" hit(s) not found - the text is no longer where the search left it.");
 	}
 
 	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own

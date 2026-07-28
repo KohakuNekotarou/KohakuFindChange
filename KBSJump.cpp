@@ -381,13 +381,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			ScrollFrontViewToPoint(PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
 				(pbRect.Top() + pbRect.Bottom()) / PMReal(2.0)));
-			// The marker belongs on text the row still describes. On text that has changed
-			// underneath it would be framing something the user never looked for, so the view goes
-			// there and the marker stays off; the message at the end of this function says why.
-			if (sameOccurrence)
-				KBSDrawEventHandler::SetMarker(db, pbRect);
-			else
-				KBSDrawEventHandler::ClearMarker();
+			// The marker goes up either way, and in the same colour (user call, 2026-07-28). On a row
+			// whose text is missing it frames whatever stands at that position now rather than the
+			// match - which is the useful thing: it shows WHERE the hit used to be. That it is not
+			// there any more is said by the status line and by the word on the row itself.
+			KBSDrawEventHandler::SetMarker(db, pbRect);
 		}
 		else
 		{
@@ -400,10 +398,10 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// untouched - same chapters, same rows - so the rows are repainted rather than rebuilt.
 	if (!sameOccurrence)
 	{
-		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeChanged);
+		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
 		KBSResultTree::RefreshRows();
 
-		PMString message("The text here changed since the search - search again to work on it.");
+		PMString message("Not found - the text is no longer where the search left it. Search again.");
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
 	}

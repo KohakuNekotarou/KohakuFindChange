@@ -365,7 +365,7 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	// What the row cannot show any other way, each separated by a space, in this order:
 	//   hidden  - on a switched-off layer, so the page will look empty on arrival
 	//   lock    - locked, so the row carries no check box and the replace will not touch it
-	//   changed - the same text no longer stands in the same place
+	//   missing - the same text could not be found where the search left it
 	//   refused - InDesign's own replace command would not run there
 	// The last two are set by a replace, so they never appear on a fresh search's rows. They stack
 	// on either shape: "P1(2)ov hidden lock", "ov changed", "P7 hidden".
@@ -378,8 +378,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" hidden");
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
 		hit.locator.Append(" lock");
-	else if (hit.outcome == kOutcomeChanged)
-		hit.locator.Append(" changed");
+	else if (hit.outcome == kOutcomeMissing)
+		hit.locator.Append(" missing");
 	else if (hit.outcome == kOutcomeRefused)
 		hit.locator.Append(" refused");
 }

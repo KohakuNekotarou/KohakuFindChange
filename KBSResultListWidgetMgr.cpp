@@ -209,7 +209,7 @@ private:
 		//   replaced - it has been changed already, and cannot be changed again
 		//   locked   - InDesign gives no way to change locked content, so a box would offer an
 		//              action that quietly does nothing (the locator says lock)
-		//   outcome  - the row already carries a reason it was left alone (changed / refused)
+		//   outcome  - the row already carries a reason it was left alone (missing / refused)
 		//   report   - the panel is showing the aftermath of a replace, where NO row is selectable.
 		//              This is the one that catches the rows carrying no reason at all: a chapter
 		//              the safety ceiling cut short, or one that could not be opened.

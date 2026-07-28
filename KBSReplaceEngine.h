@@ -54,7 +54,7 @@ namespace KBSReplaceEngine
 	    allowed to make the total quietly come up short. Four ways that happens:
 	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
 	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
-	      - stale: the text there no longer reads the way the panel says it does.
+	      - missing: the text could not be found where the row said it was.
 	      - refused: the replace command was asked and would not run. The only one of the four that
 	        is a failure rather than a decision.
 	      - not reached: the re-walk ended, or hit its safety ceiling, before the hit came up.

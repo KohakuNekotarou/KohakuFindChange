@@ -38,7 +38,7 @@ namespace KBSResultModel
 	enum ChangeOutcome
 	{
 		kOutcomeNone = 0,	// replaced, or never reached
-		kOutcomeChanged,	// the same text no longer stands in the same place (moved / deleted / edited)
+		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused		// InDesign's own replace command would not run there
 	};
