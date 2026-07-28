@@ -165,12 +165,32 @@ namespace KBSResultModel
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
 
-	/** The accent-coloured word for a hit row, or empty. Drawn as its own run after the locator
-	    (see Hit::accentFlag). Empty for an out-of-range index. */
-	PMString GetHitAccentFlag(int32 chapterIdx, int32 hitIdx);
+	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
+	struct RowDisplay
+	{
+		PMString		locator;	// "P1(2)ov hidden lock" - drawn at the full text colour
+		PMString		accentFlag;	// "missing" / "refused", or empty - drawn in the accent colour
+		PMString		preText;	// the line, split around the match
+		PMString		matchText;
+		PMString		postText;
+		bool			checked;
+		bool			replaced;
+		bool			locked;
+		ChangeOutcome	outcome;
+
+		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone) {}
+	};
+
+	/** One row's worth of everything, in a single call.
+	    Its own getter because a row used to ask the model four separate times to draw itself - the
+	    display strings, the flags, the outcome and the accent word - each one walking to the same
+	    hit to hand back one part of it. Only the rows on screen are ever laid out, so this was
+	    never expensive; it is simply four questions where the row has one.
+	    @return false for an index out of range, leaving out untouched. */
+	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
 	/** A hit node's display: the page locator and the three line segments to paint. false = index
-	    out of range. */
+	    out of range. @see GetHitRow when the flags are wanted as well. */
 	bool GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 		PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost);
 
@@ -280,13 +300,17 @@ namespace KBSResultModel
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the post-replace thinning both call it, so the two can no longer drift apart.
 
-	        P<page>(<n>)ov hidden lock|changed|refused
+	        P<page>(<n>)ov hidden lock          -> hit.locator
+	        missing | refused                   -> hit.accentFlag, drawn after it in accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
 	    spaces and spelled out rather than clipped, because each one explains a row the user cannot
 	    act on. "+" is deliberately NOT the separator: InDesign's own overset marker is a "+", so
 	    "P5+lock" reads as "page 5, overset". "ov" stays short - it only qualifies a page number, it
-	    does not explain anything. */
+	    does not explain anything.
+
+	    The flags STACK - "P4(1) lock missing" is a locked row that has since been jumped to and
+	    found changed. Only missing and refused are exclusive, being two values of one field. */
 	void BuildHitLocator(Hit& hit);
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
@@ -294,9 +318,6 @@ namespace KBSResultModel
 	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
 	    longer the text the row describes. Ignored for a hit that WAS replaced. */
 	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
-
-	/** A hit's outcome, or kOutcomeNone for an out-of-range index. */
-	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
 
 	/** Is the panel showing the AFTERMATH of a replace rather than a search's results? Set by
 	    KeepCheckedRows, cleared by Clear / SetResults. While it is on, no row offers a check box:

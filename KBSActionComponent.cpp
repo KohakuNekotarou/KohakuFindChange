@@ -164,9 +164,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSReplaceCheckedActionID:
 		{
-			// A replace can touch several documents and only undoes chapter by chapter, so it asks
-			// first. It also sits in a flyout that gets opened by accident, which is the other
-			// reason the confirmation is not optional.
+			// Already running, reached through the events its own progress bar pumps. The engine
+			// stops this a second time on its own, but not before the confirmation prompt would
+			// have gone up over a replace that is already under way.
+			if (KBSReplaceEngine::IsReplacing())
+				break;
+
+			// A replace can touch several documents, so it asks first. It also sits in a flyout
+			// that gets opened by accident, which is the other reason the confirmation is not
+			// optional.
 			const int32 checkedCount = KBSResultModel::GetCheckedCount();
 			if (checkedCount <= 0)
 			{
@@ -334,9 +340,11 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 */
 void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
-	// A search is running behind the modal progress bar. The bar pumps events, so this list can be
-	// asked for its states from inside the search: lock everything until it returns.
-	if (KBSSearchEngine::IsSearching())
+	// A search or a replace is running behind its modal progress bar. The bar pumps events, so this
+	// list can be asked for its states from inside the run: lock everything until it returns. The
+	// replace needs it at least as much as the search - it works with a command sequence standing
+	// open, and a second run started underneath would Halt() the first one's walker mid-walk.
+	if (KBSSearchEngine::IsSearching() || KBSReplaceEngine::IsReplacing())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
 			listToUpdate->SetNthActionState(i, kDisabled_Unselected);
@@ -381,10 +389,20 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKBSReplaceCheckedActionID)
 		{
-			// Needs something checked. The Find/Change strings are deliberately NOT tested here -
-			// the confirmation prompt shows them, so an empty change string (a valid "delete the
-			// matches" request) still reaches the user instead of being greyed out unexplained.
-			const bool16 canReplace = (checkedCount > 0) ? kTrue : kFalse;
+			// Needs something checked, AND a work list to check it on. After a replace the panel is
+			// a report of what that replace did, and no row on it has a check box - but the rows the
+			// run never reached (a chapter the safety ceiling cut short, one that would not open)
+			// stay checked so the report can hold them, so the count alone would leave this enabled
+			// over a list with nothing selectable anywhere on it: a destructive command, offered
+			// against something the user cannot see or change. Check All / Uncheck All grey
+			// themselves out on the same page through GetCheckableCount, which asks this question
+			// for them.
+			//
+			// The Find/Change strings are deliberately NOT tested here - the confirmation prompt
+			// shows them, so an empty change string (a valid "delete the matches" request) still
+			// reaches the user instead of being greyed out unexplained.
+			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::IsShowingReplaceOutcome())
+				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)

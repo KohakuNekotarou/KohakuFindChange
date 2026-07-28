@@ -255,11 +255,11 @@ private:
 	void ApplyHitRow(const TreeNodePtr<KBSResultNodeID>& nodeID, IControlView* widget,
 		const InterfacePtr<IPanelControlData>& rowData) const
 	{
-		PMString locator, pre, match, post;
-		if (!KBSResultModel::GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
+		// One question, not four: the strings, the flags, the outcome and the accent word all come
+		// from the same hit, and the row wants all of them.
+		KBSResultModel::RowDisplay row;
+		if (!KBSResultModel::GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
 			return;
-		bool checked = false, replaced = false, locked = false;
-		KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), checked, replaced, locked);
 
 		// Reasons a row has NOTHING to select, all handled identically from here on:
 		//   replaced - it has been changed already, and cannot be changed again
@@ -268,9 +268,11 @@ private:
 		//   outcome  - the row already carries a reason it was left alone (missing / refused)
 		//   report   - the panel is showing the aftermath of a replace, where NO row is selectable.
 		//              This is the one that catches the rows carrying no reason at all: a chapter
-		//              the safety ceiling cut short, or one that could not be opened.
-		const bool noCheckBox = replaced || locked
-			|| KBSResultModel::GetHitOutcome(nodeID->GetChapter(), nodeID->GetHit()) != KBSResultModel::kOutcomeNone
+		//              the safety ceiling cut short, or one that could not be opened. It is a
+		//              property of the panel rather than of the row, which is why it is still a
+		//              second question.
+		const bool noCheckBox = row.replaced || row.locked
+			|| row.outcome != KBSResultModel::kOutcomeNone
 			|| KBSResultModel::IsShowingReplaceOutcome();
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
@@ -301,7 +303,7 @@ private:
 			InterfacePtr<ITriStateControlData> state(checkView, UseDefaultIID());
 			if (state != nil)
 			{
-				state->SetState(checked ? ITriStateControlData::kSelected : ITriStateControlData::kUnselected,
+				state->SetState(row.checked ? ITriStateControlData::kSelected : ITriStateControlData::kUnselected,
 					kTrue /*invalidate*/, kFalse /*do NOT notify*/);
 			}
 
@@ -319,8 +321,8 @@ private:
 			// the whole list and the check box sits in the margin to their left.
 			//
 			//     [v] P1(1)
-			//         P1(2) lck
-			//         P1(3) lck
+			//         P1(2) lock
+			//         P1(3) lock
 			//
 			// The rows without a box used to reclaim those 16px, which read as a ragged left edge
 			// once a search turned up a lot of locked hits (user's call 2026-07-28, from a screen
@@ -333,9 +335,7 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(locator,
-					KBSResultModel::GetHitAccentFlag(nodeID->GetChapter(), nodeID->GetHit()),
-					pre, match, post);
+				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText);
 			cell->Invalidate();
 		}
 	}

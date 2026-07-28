@@ -398,11 +398,27 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// untouched - same chapters, same rows - so the rows are repainted rather than rebuilt.
 	if (!sameOccurrence)
 	{
-		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
-		KBSResultTree::RefreshRows();
+		// A REPLACED row is a different case, and one the row itself cannot show: SetHitOutcome
+		// turns those away (a row that was replaced had nothing go wrong with it), so marking it
+		// would change nothing on screen while the status line announced a problem - the panel
+		// saying two things at once. What the mismatch means there is also different: the row's
+		// match text is what the REPLACE wrote, so finding something else in its place means the
+		// replacement is gone, undone or edited away, not that the search's text has moved.
+		bool checked = false, replaced = false, locked = false;
+		KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked);
 
-		PMString message("Not found - the text is no longer where the search left it. Search again.");
+		PMString message;
 		message.SetTranslatable(kFalse);
+		if (replaced)
+		{
+			message.Append("The replacement is no longer here - undone, or edited since.");
+		}
+		else
+		{
+			KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
+			KBSResultTree::RefreshRows();
+			message.Append("Not found - the text is no longer where the search left it. Search again.");
+		}
 		KBSResultTree::ShowStatus(message);
 	}
 }

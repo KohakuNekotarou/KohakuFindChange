@@ -57,13 +57,26 @@ namespace KBSReplaceEngine
 	      - missing: the text could not be found where the row said it was.
 	      - refused: the replace command was asked and would not run. The only one of the four that
 	        is a failure rather than a decision.
-	      - not reached: the re-walk ended, or hit its safety ceiling, before the hit came up.
+	      - not reached: the safety ceiling cut the re-walk short before the hit came up. Those rows
+	        are the only ones carrying NO word on their locator, because nothing was found out about
+	        them; the summary names the chapter instead. A walk that simply ran to the end of the
+	        chapter without the hit coming up is a different thing - those rows say missing.
 
 	    Chapters are left MODIFIED AND UNSAVED: overwriting the user's files is their decision.
+
+	    Refuses to run at all while another replace is up (see IsReplacing), and while the panel is
+	    showing a replace's report rather than a work list.
 
 	    @param outSummary OUT a ready-to-show status line (counts, chapters that did not line up).
 	    @return the number of hits actually replaced (0 on any early exit). */
 	int32 ReplaceChecked(PMString& outSummary);
+
+	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
+	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
+	    search guards against with KBSSearchEngine::IsSearching, and a worse one here: the run holds
+	    an open command sequence, and a second walk started underneath it would Halt() the first
+	    one's walker out from under it. The panel greys every action out while this is true. */
+	bool IsReplacing();
 }
 
 #endif // __KBSReplaceEngine_h__

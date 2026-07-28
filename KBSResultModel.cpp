@@ -185,18 +185,24 @@ bool KBSResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 	return true;
 }
 
-PMString KBSResultModel::GetHitAccentFlag(int32 chapterIdx, int32 hitIdx)
+bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 {
-	PMString flag;
-	flag.SetTranslatable(kFalse);
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return flag;
+		return false;
 	const Chapter& c = gChapters[chapterIdx];
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return flag;
-	flag = c.hits[hitIdx].accentFlag;
-	flag.SetTranslatable(kFalse);
-	return flag;
+		return false;
+	const Hit& h = c.hits[hitIdx];
+	out.locator = h.locator;
+	out.accentFlag = h.accentFlag;
+	out.preText = h.preText;
+	out.matchText = h.matchText;
+	out.postText = h.postText;
+	out.checked = h.checked;
+	out.replaced = h.replaced;
+	out.locked = h.isLocked;
+	out.outcome = h.outcome;
+	return true;
 }
 
 bool KBSResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
@@ -497,8 +503,9 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	//   lock    - locked, so the row carries no check box and the replace will not touch it
 	//   missing - the same text could not be found where the search left it
 	//   refused - InDesign's own replace command would not run there
-	// The last two are set by a replace, so they never appear on a fresh search's rows. They stack
-	// on either shape: "P1(2)ov hidden lock", "ov changed", "P7 hidden".
+	// The last two are put there by a replace, or by a jump that finds the text gone, so they never
+	// appear on a fresh search's rows. They stack on either shape: "P1(2)ov hidden lock",
+	// "ov missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+lock" reads as "page 5,
 	// overset". Spelled out rather than clipped to "hid" / "lck" - these are what explain a row the
@@ -508,7 +515,16 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" hidden");
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
 		hit.locator.Append(" lock");
-	else if (hit.outcome == kOutcomeMissing)
+
+	// NOT chained onto the test above. A locked row can be jumped to and found changed, and then it
+	// has both things to say - "P4(1) lock missing" - where an else left it saying only that it was
+	// locked, which is not why the jump landed on different text. Missing and refused do exclude
+	// each other: outcome holds one value.
+	//
+	// These two go into their own string rather than onto the locator because the cell draws them
+	// as a separate run in the theme's accent colour; the space in front of them belongs to that
+	// run and is put there when it is drawn (KBSColorTextView).
+	if (hit.outcome == kOutcomeMissing)
 		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
@@ -528,16 +544,6 @@ void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome
 	h.outcome = outcome;
 	h.checked = false;
 	BuildHitLocator(h);
-}
-
-KBSResultModel::ChangeOutcome KBSResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return kOutcomeNone;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return kOutcomeNone;
-	return c.hits[hitIdx].outcome;
 }
 
 bool KBSResultModel::IsShowingReplaceOutcome()

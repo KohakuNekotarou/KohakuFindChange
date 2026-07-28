@@ -98,14 +98,31 @@ bool RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
 	return true;
 }
 
-// A chapter that has work to do, already resolved to a LIVE document. Built before the command
-// sequence opens - see the comment on the resolve pass in ReplaceChecked.
+// A replace is running. Its progress bar pumps events, so without this a menu command could be
+// dispatched INTO the running replace. The panel's actions read it through IsReplacing().
+bool gReplacing = false;
+
+// Raise gReplacing for the length of a replace, whichever way ReplaceChecked returns - and it
+// returns from a dozen places. Modelled on KBSSearchEngine's SearchingFlagGuard.
+struct ReplacingFlagGuard
+{
+	ReplacingFlagGuard()	{ gReplacing = true; }
+	~ReplacingFlagGuard()	{ gReplacing = false; }
+};
+
+// A chapter the run has to visit. Built before the command sequence opens - see the comment on the
+// resolve pass in ReplaceChecked.
 struct PendingChapter
 {
 	int32	chapterIdx;
 	UIDRef	docRef;
+	// Did the resolve pass get a live document for it? A chapter that could not be opened stays in
+	// this list with opened = false, so the progress bar counts it like any other: the bar's total
+	// is fixed before the opening starts, and dropping the failures out of the list would leave it
+	// short of its own total and never reaching the end.
+	bool	opened;
 
-	PendingChapter() : chapterIdx(-1) {}
+	PendingChapter() : chapterIdx(-1), opened(false) {}
 };
 
 // Does this chapter hold at least one checked, not-yet-replaced hit? Asked before the chapter is
@@ -336,9 +353,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		}
 
 		// An unselected hit is only counted past. Its stored text range is deliberately NOT
-		// refreshed: ReplaceChecked ends by turning the panel into a list of what CHANGED
-		// (KeepOnlyReplaced), so every row that was left alone is dropped moments later, and a
-		// pass that replaced nothing has not moved anything to begin with.
+		// refreshed: ReplaceChecked ends by turning the panel into a report of the run
+		// (KeepCheckedRows), which keeps the rows it was ASKED about and drops the ones the user
+		// had unchecked - so a row left alone here is on its way out of the list anyway, and a pass
+		// that replaced nothing has not moved anything to begin with.
 		if (targets.find(walkIndex) != targets.end())
 		{
 			// May this text be rewritten at all? The Find/Change dialog can be told to SEARCH
@@ -509,10 +527,35 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
+	// Re-entry stop, ahead of every other question. The panel greys its actions out while a replace
+	// runs, but the progress bar below pumps events, so a command can still be dispatched into this
+	// function - and unlike the search, this one holds an open command sequence while it works: a
+	// second run underneath the first would nest a sequence inside it and Halt() the outer run's
+	// walker in the middle of its walk.
+	if (gReplacing)
+	{
+		outSummary.Append("A replace is already running.");
+		return 0;
+	}
+	const ReplacingFlagGuard replacingGuard;
+
 	const int32 chapterCount = KBSResultModel::GetChapterCount();
 	if (chapterCount <= 0)
 	{
 		outSummary.Append("No results to replace - run a search first.");
+		return 0;
+	}
+	// The panel is a report of what the LAST replace did, not a work list. Asked first, because a
+	// report can still hold checked rows: the ones the run never reached keep their check so the
+	// report can account for them, and they are exactly what a second run would go after - matches
+	// the user has no box to select or clear anywhere on screen.
+	//
+	// The menu greys the command out for the same reason (KBSActionComponent::UpdateActionStates).
+	// This is the same door on the far side of it, for a caller that never went through the menu -
+	// a script invoking the action reaches this function whatever state the menu is in.
+	if (KBSResultModel::IsShowingReplaceOutcome())
+	{
+		outSummary.Append("This is the last replace's report - search again to replace more.");
 		return 0;
 	}
 	if (KBSResultModel::GetCheckedCount() <= 0)
@@ -581,10 +624,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		if (!ChapterHasChecked(ci))
 			continue;		// nothing selected here - do not even open this chapter
 
+		// Past this line the chapter is one of the chaptersWithWork the bar was sized with, so it
+		// joins the list whatever happens below. A chapter that cannot be opened is still a step
+		// the bar has to take: dropping it here is what used to leave the bar short of its own
+		// total, stopping at 4 of 5 with nothing left to do.
+		PendingChapter chapter;
+		chapter.chapterIdx = ci;
+
 		UIDRef docRef;
 		IDFile file;
 		if (!KBSResultModel::GetChapterLocation(ci, docRef, file))
+		{
+			pending.push_back(chapter);		// unopened - the loop below only counts it past
 			continue;
+		}
 
 		// The chapter may have been closed since the search (a held window the user shut). Bring
 		// it back the way a jump does, and rebind the model to the live database.
@@ -601,15 +654,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 					firstSkipped.SetTranslatable(kFalse);
 					haveFirstSkipped = true;
 				}
-				continue;	// missing / locked: report it, replace nothing here
+				// Moved, deleted, or in use: counted and named just above, and kept in the list
+				// unopened so the bar still takes its step for it.
+				pending.push_back(chapter);
+				continue;
 			}
 			docRef = reopened;
 			KBSResultModel::RebindChapterDoc(ci, reopened);
 		}
 
-		PendingChapter chapter;
-		chapter.chapterIdx = ci;
 		chapter.docRef = docRef;
+		chapter.opened = true;
 		pending.push_back(chapter);
 	}
 
@@ -678,6 +733,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			cancelled = true;
 			break;
 		}
+
+		// A chapter the resolve pass could not open. It is in this list for the bar's sake and for
+		// nothing else - it was counted and named in the summary where the opening failed - so it
+		// takes its step above and is passed over here.
+		if (!pending[pi].opened)
+			continue;
 
 		const int32 ci = pending[pi].chapterIdx;
 		const UIDRef& docRef = pending[pi].docRef;
@@ -794,6 +855,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
 	}
 	return totalReplaced;
+}
+
+bool KBSReplaceEngine::IsReplacing()
+{
+	return gReplacing;
 }
 
 // End, KBSReplaceEngine.cpp.
