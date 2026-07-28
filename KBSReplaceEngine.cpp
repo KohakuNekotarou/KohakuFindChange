@@ -101,6 +101,30 @@ bool ChapterHasChecked(int32 chapterIdx)
 	return false;
 }
 
+// Does the text at this range still read the way the stored hit says it did?
+//
+// The walk order alone cannot tell "the Nth match" apart from "a DIFFERENT Nth match". An edit
+// made between the search and the replace that removes one match and adds another elsewhere keeps
+// the COUNT intact, so every checked hit still comes up and nothing looks wrong - while the
+// numbering now points at text the user never checked, and that text gets rewritten.
+//
+// Comparing the matched text catches it. Not a proof: the same string arriving at a shifted
+// position still agrees. But every edit that changes what the matched text READS is caught, which
+// is the case that rewrites something the user did not look at.
+bool MatchTextStillAgrees(int32 chapterIdx, int32 hitIdx, const UIDRef& story, TextIndex start, TextIndex end)
+{
+	PMString locator, storedPre, storedMatch, storedPost;
+	if (!KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, locator, storedPre, storedMatch, storedPost))
+		return false;		// no row to compare against - leave the text alone
+
+	// The same splitter the search used, so the two strings are cut the same way (a match spanning
+	// paragraphs is trimmed identically on both sides). The model holds the RAW text - the
+	// ellipsizing is done by the cell at draw time - so this compares like with like.
+	PMString livePre, liveMatch, livePost;
+	KBSSearchEngine::SplitLineAroundMatch(story, start, end, livePre, liveMatch, livePost);
+	return liveMatch == storedMatch;
+}
+
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outAborted   = the re-walk ended before every checked hit had come up, i.e. the document is no
 //                longer the one the result set describes (edited since the search, or the query
@@ -108,10 +132,13 @@ bool ChapterHasChecked(int32 chapterIdx)
 // outStepLimit = the walk was cut off by the safety ceiling instead. Same symptom - checked hits
 //                left over - but a different cause and different advice, so the two are kept
 //                apart rather than both reported as "edited since the search".
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit)
+// outStale     = checked hits that DID come up but whose text no longer reads the way the panel
+//                says. They are left untouched and counted (see MatchTextStillAgrees).
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted, bool& outStepLimit, int32& outStale)
 {
 	outAborted = false;
 	outStepLimit = false;
+	outStale = 0;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -214,6 +241,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 		// pass that replaced nothing has not moved anything to begin with.
 		if (targets.find(walkIndex) != targets.end())
 		{
+			// Last check before anything is written: does this text still read the way the row
+			// says? A checked row whose text has changed underneath is left alone and counted -
+			// rewriting it would be rewriting something the user never saw.
+			if (hitIdx < 0 || !MatchTextStillAgrees(chapterIdx, hitIdx, story, start, end))
+			{
+				++outStale;
+				targets.erase(walkIndex);
+				++walkIndex;
+				continue;
+			}
+
 			UIDRef replacedStory;
 			TextIndex replacedStart = kInvalidTextIndex, replacedEnd = kInvalidTextIndex;
 			if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, replacedStory, replacedStart, replacedEnd))
@@ -281,6 +319,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	int32 chaptersTouched = 0;
 	int32 chaptersSkipped = 0;
 	int32 chaptersStepLimited = 0;
+	int32 totalStale = 0;
 	PMString firstSkipped;
 	firstSkipped.SetTranslatable(kFalse);
 	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
@@ -322,8 +361,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 		bool aborted = false;
 		bool stepLimit = false;
-		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit);
+		int32 stale = 0;
+		const int32 replaced = ReplaceInChapter(ci, docRef, aborted, stepLimit, stale);
 		totalReplaced += replaced;
+		totalStale += stale;
 		if (replaced > 0)
 			++chaptersTouched;
 		if (aborted)
@@ -364,6 +405,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" chapter(s) did not line up (\"");
 		outSummary.Append(firstSkipped);
 		outSummary.Append("\" first) - edited since the search? Search again.");
+	}
+
+	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
+	// failure to line up - the row came up exactly where it was expected, the TEXT there had
+	// changed - so it is reported on its own terms.
+	if (totalStale > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(totalStale);
+		outSummary.Append(" hit(s) left alone - the text there changed since the search.");
 	}
 
 	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying
