@@ -35,15 +35,22 @@
 
 #include <map>
 #include <set>
+#include <vector>
 
 // Project includes:
 #include "KBSReplaceEngine.h"
 #include "KBSResultModel.h"
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
+#include "KBSDiag.h"			// outside-readable record of what a replace did
 
 namespace
 {
+
+// What Edit > Undo calls a replace. Passed with kUnknownEncoding wherever it is used, so it is
+// taken literally rather than looked up as a key in the string tables - an untranslated UI string
+// is otherwise liable to come back as somebody else's translation.
+const char* const kKBSReplaceSequenceName = "Kohaku Replace";
 
 // Run one find/change walker command. true = it landed on a match, with the story and range in
 // the out parameters. Anything else - no more matches, a failure, a command that would not
@@ -198,9 +205,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outAborted,
 	// Required critical section around text-walker selection changes.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
-	// One sequence for the whole chapter: every replacement in it undoes with a single Ctrl+Z.
-	// Undo is per document, so the chapter is the largest grain InDesign allows.
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KBS Replace Checked");
+	// A sequence around this chapter's replacements. It NESTS inside the one ReplaceChecked opens
+	// around the whole run and is absorbed by it, so it is not what the user sees on the Undo menu
+	// - the outer sequence carries the name. It is kept because it is what makes a chapter's
+	// replacements commit or roll back together.
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KBS Replace Chapter");
 
 	int32 walkIndex = 0;
 	int32 replacedCount = 0;
@@ -326,6 +335,29 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// otherwise never count as "the first one", and every later chapter would overwrite it.
 	bool haveFirstSkipped = false;
 
+	// Chapters that took a replacement, and so want a window afterwards. Collected rather than
+	// opened on the spot - see the comment on the loop that consumes this, below.
+	std::vector<UIDRef> touched;
+
+	{
+	// ONE sequence around EVERY chapter, so a book-wide replace is a SINGLE undo step.
+	//
+	// Measured on the running application, 2026-07-28: with a sequence per chapter, undoing in one
+	// document also removed the step from the OTHER chapters' histories - but did NOT revert their
+	// text. Those chapters were left replaced with nothing left to undo them with, which is a
+	// silent, unrecoverable loss of the user's content. Wrapping the whole run in one sequence is
+	// what makes a single Ctrl+Z put all of it back, whichever chapter happens to be in front.
+	//
+	// The per-chapter sequences inside ReplaceInChapter nest within this one and are absorbed by it
+	// (of nested sequences, only the outermost appears on the Undo menu).
+	//
+	// What this costs: the run is now all-or-nothing. A failure that leaves the global error code
+	// set when this sequence ends rolls back EVERY chapter, not only the one that failed. That is
+	// why RunWalkerCmd clears the error state on both of its failure paths - and why any new exit
+	// path added inside this block must do the same.
+	CmdUtils::SequencePtr seq;
+	seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
+
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
 		if (!ChapterHasChecked(ci))
@@ -379,12 +411,22 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		if (stepLimit)
 			++chaptersStepLimited;
 
-		// A chapter that received a replacement gets a real window, so the change is visible and
+		// A chapter that received a replacement wants a real window, so the change is visible and
 		// can be undone - or saved - by hand. Chapters nothing landed in stay as they were:
 		// opening windows on untouched documents would only be clutter. Nothing is saved here.
+		// The window is not opened yet - see the loop after the sequence.
 		if (replaced > 0)
-			KBSBookScope::ShowChapterWindow(docRef);
+			touched.push_back(docRef);
 	}
+
+	}	// the sequence ends HERE: every chapter's replacements commit together, as one undo step
+
+	// Windows are opened AFTER the sequence, never from inside it. Measured 2026-07-28: a
+	// kOpenLayoutCmdBoss processed between two chapters' replacements discarded the undo history of
+	// the chapters already done - their text stayed replaced with nothing left to undo it with.
+	// Opening the windows once everything is committed keeps that command clear of the replacements.
+	for (size_t i = 0; i < touched.size(); ++i)
+		KBSBookScope::ShowChapterWindow(touched[i]);
 
 	// The panel now becomes a list of WHAT CHANGED: the occurrences left alone are no longer
 	// results worth keeping in front of the user, and a replaced row cannot be selected again
@@ -425,6 +467,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.AppendNumber(chaptersStepLimited);
 		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
 	}
+
+	// The same line the panel shows, in a file that can be read from outside the application. Costs
+	// nothing unless the channel has been switched on (see KBSDiag.h), and it is the difference
+	// between "the replace looked wrong" and knowing what it actually did.
+	KBSDiag::Log(outSummary);
 	return totalReplaced;
 }
 

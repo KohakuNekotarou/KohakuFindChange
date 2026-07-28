@@ -187,6 +187,10 @@ DECLARE_PMID(kActionIDSpace, kKBSSeparator3ActionID, kKBSPrefix + 8)
 DECLARE_PMID(kActionIDSpace, kKBSReplaceCheckedActionID, kKBSPrefix + 9)
 DECLARE_PMID(kActionIDSpace, kKBSCheckAllActionID, kKBSPrefix + 10)
 DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
+// + 12 was briefly an "Undo All Replacements" command (2026-07-28). It was dropped once the replace
+// itself was fixed to be ONE command sequence across every chapter: a single Ctrl+Z now puts a
+// book-wide replace back, so a command of our own had nothing left to add. Left commented rather
+// than reused, so an old workspace referring to that ActionID cannot bind to something else.
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 12)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 13)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 14)
@@ -278,10 +282,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 // Shown in place of the change string when it is empty - which is a legitimate request (delete
 // every match), not a mistake, so it is spelled out rather than left blank.
 #define kKBSConfirmEmptyReplaceKey	kKBSStringPrefix "kKBSConfirmEmptyReplaceKey"
-// The closing line, split by how many chapters will be written to. Undo in InDesign is per
-// DOCUMENT - a command sequence cannot span two databases - so a replace across three chapters
-// lands on three separate undo stacks. Saying "one step per chapter" when only one chapter is
-// involved worries the user over something that is not true of their case.
+// The closing line, split by how many chapters will be written to. The whole replace is ONE undo
+// step however many chapters it touches - KBSReplaceEngine wraps the entire run in a single command
+// sequence, which is what lets one Ctrl+Z put all of it back. (Until 2026-07-28 this said "one undo
+// step per chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one
+// document silently stripped the step from the others without reverting their text.) The two keys
+// differ only in singular/plural, which languages that inflect cannot build from one string.
 #define kKBSConfirmUnsavedOneKey	kKBSStringPrefix "kKBSConfirmUnsavedOneKey"
 #define kKBSConfirmUnsavedManyKey	kKBSStringPrefix "kKBSConfirmUnsavedManyKey"
 

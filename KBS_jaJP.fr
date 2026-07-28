@@ -84,7 +84,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSConfirmChangeToKey,			"置換文字列: ^1",
                 kKBSConfirmEmptyReplaceKey,		"（空欄：一致した箇所は削除されます）",
                 kKBSConfirmUnsavedOneKey,		"章は開かれたまま、未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で戻せます。",
-                kKBSConfirmUnsavedManyKey,		"^1 つの章が開かれたまま、未保存の状態で残ります。取り消し（Undo）は章ごとに 1 回です（InDesign の取り消しは文書単位のため）。",
+                kKBSConfirmUnsavedManyKey,		"^1 の章が開かれたまま、未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で、すべての章が元に戻ります。",
 
               // ----- Error strings
 

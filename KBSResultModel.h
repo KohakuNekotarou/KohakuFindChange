@@ -194,6 +194,12 @@ namespace KBSResultModel
 	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 		const PMString& newPre, const PMString& newMatch, const PMString& newPost,
 		TextIndex newStart, TextIndex newEnd);
+
+	/** Remove one chapter from the results, leaving the others in place. For retiring a single
+	    chapter whose results have gone stale - the book-scope half of the result-invalidation work,
+	    where closing one chapter should drop that chapter rather than the whole result set.
+	    @note Indices after chapterIdx shift down by one - iterate backwards when dropping several. */
+	void DropChapter(int32 chapterIdx);
 }
 
 #endif // __KBSResultModel_h__

@@ -62,7 +62,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmChangeToKey,			"Change to: ^1",
                 kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
                 kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED. A single undo puts it back.",
-                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. Undo is one step per chapter - InDesign undoes one document at a time.",
+                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. A single undo puts them all back.",
 
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			"Kohaku Search Panel" ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,

@@ -314,6 +314,13 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	h.checked = false;
 }
 
+void KBSResultModel::DropChapter(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	gChapters.erase(gChapters.begin() + chapterIdx);
+}
+
 int32 KBSResultModel::KeepOnlyReplaced()
 {
 	// A replace that landed nowhere must not empty the panel, so check before touching anything.

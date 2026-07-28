@@ -37,11 +37,18 @@ namespace KBSReplaceEngine
 {
 	/** Replace every checked hit in the current result set.
 
-	    Chapters are processed one at a time and each chapter's replacements are wrapped in one
-	    command sequence, so a chapter undoes with a single Ctrl+Z (undo is per document, which
-	    makes the chapter the largest grain available). A chapter whose re-walk does not reach
-	    every checked hit is reported rather than replaced at guessed positions - that means the
-	    document was edited, or the Find/Change query changed, since the search ran.
+	    The WHOLE run is wrapped in ONE command sequence, across every chapter, so a book-wide
+	    replace undoes with a single Ctrl+Z whichever chapter the user has in front. (Corrected
+	    2026-07-28. It used to be one sequence per chapter, on the belief that "undo is per
+	    document" made the chapter the largest grain available. Measured on the running
+	    application, that arrangement was actively harmful: undoing in one document removed the
+	    step from the other chapters' histories as well WITHOUT reverting their text, leaving them
+	    replaced with no way back.) The price is that the run is all-or-nothing - an error left
+	    standing when the sequence ends rolls back every chapter.
+
+	    A chapter whose re-walk does not reach every checked hit is reported rather than replaced
+	    at guessed positions - that means the document was edited, or the Find/Change query
+	    changed, since the search ran.
 
 	    Chapters are left MODIFIED AND UNSAVED: overwriting the user's files is their decision.
 
