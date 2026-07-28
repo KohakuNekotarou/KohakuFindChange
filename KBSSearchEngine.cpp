@@ -270,9 +270,28 @@ bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
 	//
 	// selecting = kFalse asks for the lock itself, not "would a click be refused" - the Prevent
 	// Selecting Locked Items preference has no bearing on whether text may be rewritten.
+	//
+	// ASKED UP THE HIERARCHY, not on frameUID directly. frameUID comes from
+	// IParcelList::GetParcelFrameUID, which hands back the item the text is composed into - not the
+	// page item the user locks. Querying it directly found nothing at all: measured on the running
+	// application, locking a text frame left the hit fully selectable while locking its LAYER
+	// worked, because the two existing users of frameUID (GetOwnerPageUID, ILayerUtils::GetLayerUID)
+	// both climb the hierarchy themselves and so never noticed the difference. Adobe's own code
+	// climbs for lock interfaces too (CGraphicPlaceBehavior uses QueryOutermostParentFor for
+	// IID_IITEMLOCKDATA). Self first, then the outermost ancestor, so a frame locked on its own and
+	// a frame inside a locked group both answer.
 	InterfacePtr<ILockPosition> itemLock(db, frameUID, UseDefaultIID());
 	if (itemLock != nil && itemLock->IsPageItemLocked(kFalse))
 		return false;
+
+	InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
+	if (frameHier != nil)
+	{
+		InterfacePtr<ILockPosition> outerLock(static_cast<ILockPosition*>(
+			Utils<ILayoutUtils>()->QueryOutermostParentFor(frameHier, IID_ILOCKPOSITION)));
+		if (outerLock != nil && outerLock->IsPageItemLocked(kFalse))
+			return false;
+	}
 
 	// (3) The LAYER the frame sits on.
 	return !IsFrameOnLockedLayer(db, frameUID);
