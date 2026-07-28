@@ -56,11 +56,14 @@ namespace
 	// indent is off, as in KESCL).
 	const PMReal kRowInset = 2.0;
 	const PMReal kExpanderZone = 16.0;
-	// How much further right than its chapter row a hit row's content starts. A full expander zone
-	// used to be used here, which left an obvious gap in front of the locator (user's call
-	// 2026-07-28, from a screen shot: "narrow the space before P1"). Half of one still reads as a
-	// child of the chapter without wasting a column the line text could use.
-	const PMReal kHitExtraIndent = 8.0;
+	// How much further right than its chapter row a hit row's content starts. ZERO: the check box
+	// begins exactly where the chapter row's expander arrow ends, so the two line up down the left
+	// edge (user's call 2026-07-28, from a screen shot - "put the check where the arrow is").
+	//
+	// It was a full expander zone, then half of one, and both left a gap in front of the check box
+	// that bought nothing. The hierarchy is still legible without it: the chapter row's LABEL and
+	// the hit row's LOCATOR are what the eye compares, and the check box's width keeps those apart.
+	const PMReal kHitExtraIndent = 0.0;
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
