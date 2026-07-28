@@ -263,6 +263,28 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 #define kKBSInternalPopupMenuNameKey kKBSStringPrefix	"kKBSInternalPopupMenuNameKey"
 #define kKBSTargetMenuPath kKBSInternalPopupMenuNameKey
 
+// The Change Checked confirmation prompt. Its wording lives in the string tables (KBS_enUS.fr /
+// KBS_jaJP.fr) instead of being built from C++ literals, so a Japanese InDesign shows a Japanese
+// prompt - KBS.fr already routes k_jaJP to the jaJP table. The keys carry the plug-in's prefix
+// number, so they cannot collide with a built-in phrase and come back as somebody else's
+// translation.
+//
+// Singular and plural are separate keys rather than one "hit(s)": that reads like a placeholder
+// nobody filled in, and languages that inflect differently cannot be built from it at all.
+#define kKBSConfirmReplaceOneKey	kKBSStringPrefix "kKBSConfirmReplaceOneKey"
+#define kKBSConfirmReplaceManyKey	kKBSStringPrefix "kKBSConfirmReplaceManyKey"
+#define kKBSConfirmFindKey			kKBSStringPrefix "kKBSConfirmFindKey"
+#define kKBSConfirmChangeToKey		kKBSStringPrefix "kKBSConfirmChangeToKey"
+// Shown in place of the change string when it is empty - which is a legitimate request (delete
+// every match), not a mistake, so it is spelled out rather than left blank.
+#define kKBSConfirmEmptyReplaceKey	kKBSStringPrefix "kKBSConfirmEmptyReplaceKey"
+// The closing line, split by how many chapters will be written to. Undo in InDesign is per
+// DOCUMENT - a command sequence cannot span two databases - so a replace across three chapters
+// lands on three separate undo stacks. Saying "one step per chapter" when only one chapter is
+// involved worries the user over something that is not true of their case.
+#define kKBSConfirmUnsavedOneKey	kKBSStringPrefix "kKBSConfirmUnsavedOneKey"
+#define kKBSConfirmUnsavedManyKey	kKBSStringPrefix "kKBSConfirmUnsavedManyKey"
+
 // Menu item positions:
 
 // The scope toggle and its separator sit between the search command (1.0) and Hide Previous

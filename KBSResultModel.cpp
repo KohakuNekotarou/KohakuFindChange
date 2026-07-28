@@ -238,6 +238,24 @@ int32 KBSResultModel::GetCheckedCount()
 	return count;
 }
 
+int32 KBSResultModel::GetCheckedChapterCount()
+{
+	int32 count = 0;
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		const std::vector<Hit>& hits = gChapters[ci].hits;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+		{
+			if (hits[hi].checked && !hits[hi].replaced)
+			{
+				++count;
+				break;		// this chapter counts once, however many of its hits are checked
+			}
+		}
+	}
+	return count;
+}
+
 int32 KBSResultModel::GetCheckableCount()
 {
 	int32 count = 0;

@@ -29,11 +29,32 @@
 resource StringTable (kSDKDefStringsResourceID + index_jaJP)
 {
         k_jaJP,	// Locale Id
-        0,		// Character encoding converter
+        // Character encoding converter - stays 0, and THIS FILE IS SAVED AS SHIFT-JIS (CP932),
+        // not UTF-8. That is the SDK samples' convention for a Japanese string table
+        // (sdksamples/chlinguistic/CHL_jaJP.fr is CP932 with a 0 here).
+        //
+        // UTF-8 + kResourceUTF8Encoded - what the built-in panels use
+        // (open/components/layerpanel/LayerPanelStrings_jaJP.fr) - was tried first and does NOT
+        // compile: this SDK's ODFRC lexes the file as CP932, so a 3-byte UTF-8 character is read
+        // as one and a half double-byte characters, the closing quote is swallowed, and every
+        // Japanese line fails with "error R1: End of line in string".
+        //
+        // Consequence for editing: keep this file in CP932. Characters outside CP932 (an em dash,
+        // for one) cannot be used here at all.
+        //
+        // Escaping the UTF-8 bytes as \0xNN was tried as well, to keep this file ASCII. ODFRC
+        // COMPILES it, but the strings come out EMPTY at run time - \0 is taken as a NUL
+        // terminator, so each string ends before its first character. Do not go back to it.
+        //
+        // And a warning about checking this: converter 0 means "read these bytes in the running
+        // application's own encoding", so these strings can only be proof-read on a JAPANESE
+        // InDesign. On an English one they come out as mojibake no matter what is done here -
+        // measured 2026-07-28, do not read that as a bug in the table.
+        0,
 
         {
         	// ----- Menu strings
-                kKBSCompanyKey,					"Kohaku Plug-Ins",	// ãƒ¡ãƒ‹ãƒ¥ãƒ¼æŸã­å(è¡¨ç¤ºã€‚KESCMåŒæ§˜ã€ä¼šç¤¾åkKBSCompanyValueã¨ã¯åˆ¥)
+                kKBSCompanyKey,					"Kohaku Plug-Ins",	// ƒƒjƒ…[‘©‚Ë–¼(•\¦BKESCM“¯—lA‰ïĞ–¼kKBSCompanyValue‚Æ‚Í•Ê)
                 kKBSAboutMenuKey,					"Kohaku Search Panel...",
                 kKBSPluginsMenuKey,				"Kohaku Search Panel",
 
@@ -52,6 +73,18 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 // ----- Panel/dialog strings
                 kKBSPanelTitleKey,				"Kohaku Search Panel",
                 kKBSStaticTextKey,				"Kohaku Search Panel",
+
+                // ----- Change Checked confirmation prompt
+                // The panel, its menu and its status line stay English on purpose (they echo the
+                // official Find/Change wording); this prompt is the one place where the user is
+                // asked to authorise a rewrite of their book, so it speaks their language.
+                kKBSConfirmReplaceOneKey,		"ƒ`ƒFƒbƒN‚µ‚½ 1 Œ‚ğ’uŠ·‚µ‚Ü‚·‚©H",
+                kKBSConfirmReplaceManyKey,		"ƒ`ƒFƒbƒN‚µ‚½ ^1 Œ‚ğ’uŠ·‚µ‚Ü‚·‚©H",
+                kKBSConfirmFindKey,				"ŒŸõ•¶š—ñ: ^1",
+                kKBSConfirmChangeToKey,			"’uŠ·•¶š—ñ: ^1",
+                kKBSConfirmEmptyReplaceKey,		"i‹ó—“Fˆê’v‚µ‚½‰ÓŠ‚Ííœ‚³‚ê‚Ü‚·j",
+                kKBSConfirmUnsavedOneKey,		"Í‚ÍŠJ‚©‚ê‚½‚Ü‚ÜA–¢•Û‘¶‚Ìó‘Ô‚Åc‚è‚Ü‚·Bæ‚èÁ‚µiUndoj‚Í Ctrl+Z ˆê‰ñ‚Å–ß‚¹‚Ü‚·B",
+                kKBSConfirmUnsavedManyKey,		"^1 ‚Â‚ÌÍ‚ªŠJ‚©‚ê‚½‚Ü‚ÜA–¢•Û‘¶‚Ìó‘Ô‚Åc‚è‚Ü‚·Bæ‚èÁ‚µiUndoj‚ÍÍ‚²‚Æ‚É 1 ‰ñ‚Å‚·iInDesign ‚Ìæ‚èÁ‚µ‚Í•¶‘’PˆÊ‚Ì‚½‚ßjB",
 
               // ----- Error strings
 

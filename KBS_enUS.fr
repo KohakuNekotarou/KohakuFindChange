@@ -1,24 +1,24 @@
 //========================================================================================
-//  
+//
 //  $File: $
-//  
-//  Owner: 
-//  
+//
+//  Owner:
+//
 //  $Author: $
-//  
+//
 //  $DateTime: $
-//  
+//
 //  $Revision: $
-//  
+//
 //  $Change: $
-//  
+//
 //  Copyright 1997-2012 Adobe Systems Incorporated. All rights reserved.
-//  
-//  NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance 
+//
+//  NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance
 //  with the terms of the Adobe license agreement accompanying it.  If you have received
-//  this file from a source other than Adobe, then your use, modification, or 
+//  this file from a source other than Adobe, then your use, modification, or
 //  distribution of it requires the prior written permission of Adobe.
-//  
+//
 //========================================================================================
 
 #ifdef __ODFRC__
@@ -34,7 +34,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
                 kKBSAboutMenuKey,					"Kohaku Search Panel...",
                 kKBSPluginsMenuKey,				"Kohaku Search Panel",
-	
+
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
                 // ----- Command strings
@@ -51,11 +51,23 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSPanelTitleKey,				"Kohaku Search Panel",
                 kKBSStaticTextKey,				"Kohaku Search Panel",
 
+                // ----- Change Checked confirmation prompt
+                // ^1 takes real data (a count, the user's find / change string), which is marked
+                // untranslatable before it goes in - see KBSActionComponent::ConfirmReplace.
+                // The Japanese wording lives in KBS_jaJP.fr; read its header before editing it,
+                // the encoding rules there are not obvious.
+                kKBSConfirmReplaceOneKey,		"Change 1 checked hit?",
+                kKBSConfirmReplaceManyKey,		"Change ^1 checked hits?",
+                kKBSConfirmFindKey,				"Find: ^1",
+                kKBSConfirmChangeToKey,			"Change to: ^1",
+                kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
+                kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED. A single undo puts it back.",
+                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. Undo is one step per chapter - InDesign undoes one document at a time.",
 
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			"Kohaku Search Panel" ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
 
-		
+
         }
 
 };

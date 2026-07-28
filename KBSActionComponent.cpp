@@ -34,6 +34,7 @@
 #include "CoreResTypes.h"		// kLineSeparatorString - the prompt is several lines
 #include "IActionStateList.h"	// UpdateActionStates: check mark for the Hide Previous Chapter toggle
 #include "PreferenceUtils.h"	// QuerySessionPreferences
+#include "StringUtils.h"		// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
 // Project includes:
@@ -240,36 +241,93 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// Read only - KBS never writes to the user's Find/Change settings.
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
+	// The prompt is assembled from string-table entries rather than C++ literals, so a Japanese
+	// InDesign asks the question in Japanese (KBS.fr already routes k_jaJP to KBS_jaJP.fr). This is
+	// the one place where the user authorises a rewrite of their text, so it is the one place worth
+	// translating; the panel, its menu and its status line stay English on purpose, echoing the
+	// official Find/Change wording.
+	//
+	// Each piece is translated BEFORE it is appended: a key only translates while it is the WHOLE
+	// string, and what the alert receives is a concatenation. Everything pushed into a ^1 is real
+	// data (a count, the user's own find / change string) and is marked untranslatable first - a
+	// search for a word that happens to match a built-in phrase would otherwise come back as
+	// somebody else's translation.
 	PMString msg;
 	msg.SetTranslatable(kFalse);
-	msg.Append("Change ");
-	msg.AppendNumber(checkedCount);
-	msg.Append(" checked hit(s)?");
+
+	PMString countStr;
+	countStr.AppendNumber(checkedCount);
+	countStr.SetTranslatable(kFalse);
+	PMString countLine(checkedCount == 1 ? kKBSConfirmReplaceOneKey : kKBSConfirmReplaceManyKey);
+	countLine.Translate();
+	::ReplaceStringParameters(&countLine, countStr);
+	msg.Append(countLine);
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	msg.Append("Find: ");
 	PMString findStr(opts->GetFindString(mode));
 	findStr.SetTranslatable(kFalse);
-	msg.Append(findStr);
+	PMString findLine(kKBSConfirmFindKey);
+	findLine.Translate();
+	::ReplaceStringParameters(&findLine, findStr);
+	msg.Append(findLine);
 	if (mode == IFindChangeOptions::kGrepSearch)
-		msg.Append("   (GREP)");
+		msg.Append("   (GREP)");	// the dialog's own name for the mode, untranslated everywhere
 	msg.Append(kLineSeparatorString);
 
-	msg.Append("Change to: ");
 	PMString replaceStr(opts->GetReplaceString(mode));
 	replaceStr.SetTranslatable(kFalse);
 	if (replaceStr.IsEmpty())
-		msg.Append("(empty - the matches will be deleted)");
-	else
-		msg.Append(replaceStr);
+	{
+		// An empty change string is a legitimate request - it deletes every match - so it is
+		// spelled out instead of leaving a blank line for the user to interpret.
+		PMString empty(kKBSConfirmEmptyReplaceKey);
+		empty.Translate();
+		replaceStr = empty;
+		replaceStr.SetTranslatable(kFalse);
+	}
+	PMString changeLine(kKBSConfirmChangeToKey);
+	changeLine.Translate();
+	::ReplaceStringParameters(&changeLine, replaceStr);
+	msg.Append(changeLine);
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
-	msg.Append("The chapters are opened and left UNSAVED. Undo is one step per chapter.");
 
-	// Cancel is the DEFAULT button: a stray Return on a flyout opened by accident must not rewrite
-	// the book.
-	return CAlert::ModalAlert(msg, kOKString, kCancelString, kNullString, 2, CAlert::eWarningIcon) == 1;
+	// How many documents this will write to decides what can honestly be promised about undo: one
+	// chapter undoes with a single Ctrl+Z, several take one undo each because InDesign's undo
+	// history is per document.
+	const int32 chapterCount = KBSResultModel::GetCheckedChapterCount();
+	PMString chapterStr;
+	chapterStr.AppendNumber(chapterCount);
+	chapterStr.SetTranslatable(kFalse);
+	PMString unsaved(chapterCount <= 1 ? kKBSConfirmUnsavedOneKey : kKBSConfirmUnsavedManyKey);
+	unsaved.Translate();
+	::ReplaceStringParameters(&unsaved, chapterStr);
+	msg.Append(unsaved);
+
+	PMString title(kKBSPanelTitleKey);
+	title.Translate();
+
+	// A "Don't show again" check box, the way the built-in warnings have one (user's request,
+	// 2026-07-28). The state lives in the application's alert registry under this command's action
+	// ID, so it survives a restart and comes back with Preferences > General > Reset All Warning
+	// Dialogs - the same switch that revives every other suppressed InDesign warning.
+	//
+	// returnValueIfHidden = 1 (OK): once the prompt has been switched off, Change Checked runs
+	// straight away, which is what switching it off asks for.
+	//
+	// What this costs: unlike ModalAlert, this call takes no default-button argument, so Cancel can
+	// no longer be made the default. The check box was worth more to the user than that guard.
+	const int16 answer = CAlert::WarningAlertWithDontShowAgain(msg,
+		kKBSReplaceCheckedActionID,		// passed straight through, as linksui does
+		kTrue,							// show a Cancel button
+		CAlert::eWarningIcon,
+		title,
+		kNullString,					// stock "OK"
+		kNullString,					// stock "Cancel"
+		1 /*OK, when the prompt is suppressed*/);
+	// 1 = OK, 2 = OK + don't show again, 3 = Cancel, 4 = Cancel + don't show again.
+	return answer == 1 || answer == 2;
 }
 
 /* UpdateActionStates

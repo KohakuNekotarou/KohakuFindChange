@@ -160,6 +160,11 @@ namespace KBSResultModel
 	    the replace command's enablement. */
 	int32 GetCheckedCount();
 
+	/** How many CHAPTERS hold at least one checked, unreplaced hit - i.e. how many documents the
+	    replace will write to. The confirmation prompt needs it because undo is per document: one
+	    chapter means a single Ctrl+Z puts everything back, more than one means one undo each. */
+	int32 GetCheckedChapterCount();
+
 	/** How many hits COULD be checked at all: every hit that has not been replaced (uncapped). Zero
 	    means the panel is showing a replace's aftermath, where no row has a check box - Check All /
 	    Uncheck All have nothing to act on there and are greyed out. */
