@@ -385,9 +385,9 @@ int32 KBSResultModel::KeepOnlyReplaced()
 			// "+lck" cannot occur on a replaced row (locked text is never written to) - it is here
 			// so the two places that build a locator cannot drift apart.
 			if (hit.isHidden)
-				hit.locator.Append("+hid");
+				hit.locator.Append(" hid");
 			if (hit.isLocked)
-				hit.locator.Append("+lck");
+				hit.locator.Append(" lck");
 			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);

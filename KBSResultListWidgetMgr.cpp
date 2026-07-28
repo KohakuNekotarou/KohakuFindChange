@@ -56,6 +56,11 @@ namespace
 	// indent is off, as in KESCL).
 	const PMReal kRowInset = 2.0;
 	const PMReal kExpanderZone = 16.0;
+	// How much further right than its chapter row a hit row's content starts. A full expander zone
+	// used to be used here, which left an obvious gap in front of the locator (user's call
+	// 2026-07-28, from a screen shot: "narrow the space before P1"). Half of one still reads as a
+	// child of the chapter without wasting a column the line text could use.
+	const PMReal kHitExtraIndent = 8.0;
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
@@ -131,7 +136,7 @@ public:
 		// explicit offsets. Kept consistent in case a framework path ever consults it.
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
-			return PMReal(kExpanderZone);
+			return PMReal(kHitExtraIndent);
 		return 0.0;
 	}
 
@@ -206,7 +211,7 @@ private:
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
-		const PMReal xStart = kRowInset + 2 * kExpanderZone;
+		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent;
 
 		// The check box. A row with nothing to select loses it completely and the text moves into
 		// that space. Hiding alone would not be enough - a hidden widget still takes clicks - so it

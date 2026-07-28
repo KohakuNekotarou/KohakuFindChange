@@ -238,17 +238,68 @@ bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 	return docLayer->IsLocked();
 }
 
-// May the text at this position be rewritten, given the frame that decides its layer? The two
-// locks the Find/Change dialog names, asked in one place so the SEARCH (which marks a hit locked
-// and withholds its check box) and the REPLACE (which refuses to write) can never disagree.
+// Do this page item's own lock flags refuse an edit? A page item can carry TWO, independently
+// (kSplineItemBoss holds both, per a live object-model dump):
 //
-// A frame of kInvalidUID means "no layer to be locked by" - not "cannot tell, refuse". See the
+//   ILockPosition::IsPageItemLocked - Object > Lock (Ctrl+L), the one users reach for. selecting =
+//       kFalse asks for the lock itself, not "would a click be refused"; the Prevent Selecting
+//       Locked Items preference has no bearing on whether text may be rewritten.
+//   IItemLockData::GetInsertLock    - "the content cannot be edited", the insert lock InCopy sets
+//       on a managed frame. ILockPosition folds this in for managed frames (ILockPosition.h:53-56)
+//       but it is asked outright as well, so the answer does not depend on that folding.
+//
+// EACH IS ASKED AT TWO LEVELS. The UID this gets is IParcelList::GetParcelFrameUID - the item the
+// text is composed INTO, which is not the page item the lock lives on. Asking it alone found
+// nothing at all (measured on the running application: locking a text frame left its hits fully
+// selectable, while locking the LAYER worked). Nothing had depended on the distinction before,
+// because the two existing users of this UID - GetOwnerPageUID and ILayerUtils::GetLayerUID - both
+// climb the hierarchy themselves. Adobe climbs for lock interfaces too (CGraphicPlaceBehavior uses
+// QueryOutermostParentFor with IID_IITEMLOCKDATA). Self first, then the outermost ancestor, so a
+// frame locked on its own and a frame inside a locked GROUP both answer.
+bool IsPageItemLockedForEdit(IDataBase* db, UID frameUID)
+{
+	if (db == nil || frameUID == kInvalidUID)
+		return false;
+
+	InterfacePtr<ILockPosition> lockPos(db, frameUID, UseDefaultIID());
+	if (lockPos != nil && lockPos->IsPageItemLocked(kFalse))
+		return true;
+	InterfacePtr<IItemLockData> lockData(db, frameUID, UseDefaultIID());
+	if (lockData != nil && lockData->GetInsertLock())
+		return true;
+
+	InterfacePtr<IHierarchy> hier(db, frameUID, UseDefaultIID());
+	if (hier == nil)
+		return false;
+
+	// Two separate climbs: QueryOutermostParentFor finds the outermost ancestor supporting THAT
+	// interface, and the two need not land on the same item.
+	InterfacePtr<ILockPosition> outerLockPos(static_cast<ILockPosition*>(
+		Utils<ILayoutUtils>()->QueryOutermostParentFor(hier, IID_ILOCKPOSITION)));
+	if (outerLockPos != nil && outerLockPos->IsPageItemLocked(kFalse))
+		return true;
+
+	InterfacePtr<IItemLockData> outerLockData(static_cast<IItemLockData*>(
+		Utils<ILayoutUtils>()->QueryOutermostParentFor(hier, IID_IITEMLOCKDATA)));
+	if (outerLockData != nil && outerLockData->GetInsertLock())
+		return true;
+
+	return false;
+}
+
+// May the text at this position be rewritten, given the frame that decides its layer? Every lock
+// InDesign has that bears on the question, asked in ONE place so the SEARCH (which marks a hit
+// locked and withholds its check box) and the REPLACE (which refuses to write) can never disagree.
+//
+// A frame of kInvalidUID means "no page item to be locked" - not "cannot tell, refuse". See the
 // header on why an unresolvable position has to read as editable.
 bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
 {
-	// (1) The STORY's insert lock. This is what "locked story" means to the Find/Change dialog, and
-	// IItemLockData sits on kTextStoryBoss (verified against a live object-model dump). The default
-	// checkParent = kTrue is wanted: an inline inside a locked story is locked too.
+	// (1) The STORY's insert lock. This is the guard the SDK's own text replacers put in front of a
+	// write - SpellReplaceWalker.cpp:435 and SpellWordObserver.cpp:258 both ask exactly this of the
+	// ITextModel and give up with "can't change the model". IItemLockData sits on kTextStoryBoss
+	// (verified against a live object-model dump). The default checkParent = kTrue is wanted: an
+	// inline inside a locked story is locked too.
 	InterfacePtr<IItemLockData> storyLock(storyRef, UseDefaultIID());
 	if (storyLock != nil && storyLock->GetInsertLock())
 		return false;
@@ -258,40 +309,12 @@ bool IsEditableInFrame(const UIDRef& storyRef, UID frameUID)
 
 	IDataBase* db = storyRef.GetDataBase();
 
-	// (2) The FRAME's own lock - Object > Lock (Ctrl+L). A different thing entirely from the layer
-	// lock below and from the story lock above, and the one users reach for most.
-	//
-	// InDesign itself draws no distinction between this and a locked layer: its Find/Change refuses
-	// both with one message, "The found object was locked or on a locked layer." (measured on the
-	// running application, 2026-07-28). So neither does KBS.
-	//
-	// No walk up the hierarchy: a frame inside a LOCKED GROUP already reports itself locked
-	// (measured the same day - locking a group set locked on every item inside it).
-	//
-	// selecting = kFalse asks for the lock itself, not "would a click be refused" - the Prevent
-	// Selecting Locked Items preference has no bearing on whether text may be rewritten.
-	//
-	// ASKED UP THE HIERARCHY, not on frameUID directly. frameUID comes from
-	// IParcelList::GetParcelFrameUID, which hands back the item the text is composed into - not the
-	// page item the user locks. Querying it directly found nothing at all: measured on the running
-	// application, locking a text frame left the hit fully selectable while locking its LAYER
-	// worked, because the two existing users of frameUID (GetOwnerPageUID, ILayerUtils::GetLayerUID)
-	// both climb the hierarchy themselves and so never noticed the difference. Adobe's own code
-	// climbs for lock interfaces too (CGraphicPlaceBehavior uses QueryOutermostParentFor for
-	// IID_IITEMLOCKDATA). Self first, then the outermost ancestor, so a frame locked on its own and
-	// a frame inside a locked group both answer.
-	InterfacePtr<ILockPosition> itemLock(db, frameUID, UseDefaultIID());
-	if (itemLock != nil && itemLock->IsPageItemLocked(kFalse))
+	// (2) The PAGE ITEM's own locks - Object > Lock, and the insert lock a managed frame carries.
+	// InDesign itself draws no distinction between a locked object and a locked layer: its
+	// Find/Change refuses both with one message, "The found object was locked or on a locked layer."
+	// (measured on the running application, 2026-07-28). So neither does KBS.
+	if (IsPageItemLockedForEdit(db, frameUID))
 		return false;
-
-	InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
-	if (frameHier != nil)
-	{
-		InterfacePtr<ILockPosition> outerLock(static_cast<ILockPosition*>(
-			Utils<ILayoutUtils>()->QueryOutermostParentFor(frameHier, IID_ILOCKPOSITION)));
-		if (outerLock != nil && outerLock->IsPageItemLocked(kFalse))
-			return false;
-	}
 
 	// (3) The LAYER the frame sits on.
 	return !IsFrameOnLockedLayer(db, frameUID);
@@ -584,19 +607,24 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 					locator.Append("ov");
 			}
 			// Flags for what the row cannot show any other way, in the same terse lower-case family
-			// as "ov", each glued on after its own "+":
-			//   "+hid" = on a switched-off layer, so the page will look empty on arrival
-			//   "+lck" = locked, so the row carries no check box and the replace will not touch it
-			// They stack in that order, on either shape: "P1(2)ov+hid+lck", "ov+lck", "P7+hid".
+			// as "ov", each separated by a space:
+			//   "hid" = on a switched-off layer, so the page will look empty on arrival
+			//   "lck" = locked, so the row carries no check box and the replace will not touch it
+			// They stack in that order, on either shape: "P1(2)ov hid lck", "ov lck", "P7 hid".
 			//
-			// Three letters rather than one (user's call 2026-07-28): "hid" and "lck" can be read
-			// without a legend, where "h" and "l" cannot - and "loc" was ruled out because English
-			// reads it as "location", not "locked". Still short, because the locator is drawn at
-			// full colour ahead of the line and every character here is taken from the context.
+			// A SPACE, not a "+" (user's call 2026-07-28, after seeing it on screen): "+" is
+			// InDesign's own overset symbol - the mark in the out port, and the marker KBS draws for
+			// an overset hit - so "P5+lck" read as "page 5, overset". A separator has to be a
+			// character that means nothing else here.
+			//
+			// Three letters rather than one: "hid" and "lck" can be read without a legend, where "h"
+			// and "l" cannot - and "loc" was ruled out because English reads it as "location", not
+			// "locked". Still short, because the locator is drawn at full colour ahead of the line
+			// and every character here is taken from the context the user is trying to read.
 			if (hits[k].isHidden)
-				locator.Append("+hid");
+				locator.Append(" hid");
 			if (hits[k].isLocked)
-				locator.Append("+lck");
+				locator.Append(" lck");
 			// The locator is its own part now (drawn at full colour, then a tab stop before the
 			// line text) - the colour cell keeps it separate from the faded line segments.
 			hits[k].locator = locator;
