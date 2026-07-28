@@ -35,17 +35,21 @@ public:
 
 	virtual NodeID_rv GetRootNode() const
 	{
-		return KBSResultNodeID::Create(-1);
+		return KBSResultNodeID::CreateRoot();
 	}
 
 	virtual NodeID_rv GetParentNode(const NodeID& node) const
 	{
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
-		if (nodeID == nil || nodeID->GetChapter() < 0)
+		if (nodeID == nil || nodeID->IsRoot())
 			return kInvalidNodeID;	// the root has no parent
 		if (nodeID->IsHitRow())
-			return KBSResultNodeID::Create(nodeID->GetChapter());	// hit -> its chapter row
-		return KBSResultNodeID::Create(-1);							// chapter row -> root
+			return KBSResultNodeID::Create(nodeID->GetChapter());	// hit -> its document row
+		if (nodeID->IsBookRow())
+			return KBSResultNodeID::CreateRoot();
+		// A document row hangs off the book row when the results came from a book, and off the root
+		// when they came from a single document - which is the two-level tree KBS has always had.
+		return KBSResultModel::IsFromBook() ? KBSResultNodeID::CreateBook() : KBSResultNodeID::CreateRoot();
 	}
 
 	virtual int32 GetNumChildren(const NodeID& node) const
@@ -53,7 +57,9 @@ public:
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID == nil || nodeID->IsHitRow())
 			return 0;	// hit rows are the leaves
-		if (nodeID->GetChapter() < 0)
+		if (nodeID->IsRoot())
+			return KBSResultModel::IsFromBook() ? 1 : KBSResultModel::GetDisplayChapterCount();
+		if (nodeID->IsBookRow())
 			return KBSResultModel::GetDisplayChapterCount();
 		return KBSResultModel::GetDisplayHitCount(nodeID->GetChapter());
 	}
@@ -63,7 +69,17 @@ public:
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID == nil || nodeID->IsHitRow())
 			return kInvalidNodeID;
-		if (nodeID->GetChapter() < 0)
+		if (nodeID->IsRoot())
+		{
+			// The book row is the root's only child while the results came from a book. Without one
+			// the documents hang off the root directly, exactly as they always have.
+			if (KBSResultModel::IsFromBook())
+				return (nth == 0) ? KBSResultNodeID::CreateBook() : kInvalidNodeID;
+			if (nth < 0 || nth >= KBSResultModel::GetDisplayChapterCount())
+				return kInvalidNodeID;
+			return KBSResultNodeID::Create(nth);
+		}
+		if (nodeID->IsBookRow())
 		{
 			if (nth < 0 || nth >= KBSResultModel::GetDisplayChapterCount())
 				return kInvalidNodeID;
@@ -77,10 +93,12 @@ public:
 	virtual int32 GetChildIndex(const NodeID& parent, const NodeID& child) const
 	{
 		TreeNodePtr<KBSResultNodeID> childID(child);
-		if (childID == nil || childID->GetChapter() < 0)
+		if (childID == nil || childID->IsRoot())
 			return -1;
 		if (childID->IsHitRow())
 			return childID->GetHit();
+		if (childID->IsBookRow())
+			return 0;		// the root's only child
 		return childID->GetChapter();
 	}
 

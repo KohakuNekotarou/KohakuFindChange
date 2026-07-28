@@ -27,6 +27,9 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
+	// The book those results came from (file name only). Drawn on the tree's book row.
+	PMString gBookName;
+
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
@@ -60,6 +63,7 @@ void KBSResultModel::Clear()
 	gChapters.clear();
 	gShowingOutcome = false;
 	gFromBook = false;
+	gBookName.Clear();
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)
@@ -70,6 +74,19 @@ void KBSResultModel::SetFromBook(bool fromBook)
 bool KBSResultModel::IsFromBook()
 {
 	return gFromBook;
+}
+
+void KBSResultModel::SetBookName(const PMString& name)
+{
+	gBookName = name;
+	gBookName.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetBookName()
+{
+	PMString name(gBookName);
+	name.SetTranslatable(kFalse);
+	return name;
 }
 
 void KBSResultModel::ShutdownCleanup()

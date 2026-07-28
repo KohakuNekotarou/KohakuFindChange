@@ -127,6 +127,13 @@ namespace KBSResultModel
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
 
+	/** The name of the book these results came from - shown on the tree's BOOK row, which is how
+	    the panel says which book was searched. Set beside SetFromBook; the file NAME only, because
+	    a full path does not fit a palette. Empty for a document-scope search, and cleared by
+	    Clear() so a stale name can never outlive the results it belongs to. */
+	void SetBookName(const PMString& name);
+	PMString GetBookName();
+
 	/** Application-shutdown cleanup: release the vectors' storage, no UI. */
 	void ShutdownCleanup();
 

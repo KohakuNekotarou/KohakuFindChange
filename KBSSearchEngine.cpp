@@ -777,6 +777,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// Book Scope afterwards.
 	KBSResultModel::SetFromBook(fromBook);
 
+	// ...and WHICH book, for the tree's book row. Empty for a document search, which has no book
+	// row at all. This is the panel's permanent answer to "what am I looking at": a status line is
+	// one line, gets truncated, and is overwritten by the next message.
+	KBSResultModel::SetBookName(bookName);
+
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.

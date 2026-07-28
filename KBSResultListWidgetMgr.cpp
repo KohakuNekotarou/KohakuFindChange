@@ -67,6 +67,11 @@ namespace
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
+	// A BOOK row sits above the documents when the results came from a book search, and its
+	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
+	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
+	// the hierarchy. A document search has no book row and no shift, so its tree is unchanged.
+	const PMReal kBookLevelIndent = 8.0;
 
 	// Put 'text' into a row's static-text cell. Row widgets are recycled as the tree scrolls, so
 	// every cell is written on every apply. No manual repaint: the tree draws the row right after.
@@ -127,6 +132,8 @@ public:
 
 		if (nodeID->IsHitRow())
 			this->ApplyHitRow(nodeID, widget, rowData);
+		else if (nodeID->IsBookRow())
+			this->ApplyBookRow(node, widget, rowData);
 		else
 			this->ApplyChapterRow(nodeID, node, widget, rowData);
 		return kTrue;
@@ -144,21 +151,34 @@ public:
 	}
 
 private:
-	// A chapter row: its expander (shown when it has hits) and "<name>  (N)" after the zone.
-	void ApplyChapterRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+	// How far right of the outermost level this tree's document and hit rows sit: one book-level
+	// step when there is a book row above them, nothing when there is not.
+	PMReal LevelShift() const
 	{
-		PMString name;
-		int32 fullCount = 0;
-		if (!KBSResultModel::GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
-			return;
-		const int32 shownCount = KBSResultModel::GetDisplayHitCount(nodeID->GetChapter());
+		return KBSResultModel::IsFromBook() ? kBookLevelIndent : PMReal(0.0);
+	}
 
-		// The expander arrow: visible exactly when the row has children. Hide-only would still
-		// leave a click target (the stacked-widget lesson), so the hidden arrow is disabled too.
+	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
+	// after it. The frames are set here rather than left to the resource, so ONE code path decides
+	// every level's indent - the same reason the hit row has always drawn its own.
+	//
+	// The arrow is visible exactly when the row has children. Hiding it alone would leave a click
+	// target behind (the stacked-widget lesson), so a hidden arrow is disabled too.
+	void LayOutBranchRow(const NodeID& node, IControlView* widget,
+		const InterfacePtr<IPanelControlData>& rowData, const PMReal& shift, const PMString& label) const
+	{
+		const PMReal xExpander = kRowInset + shift;
+		const PMReal xLabel = kRowInset + kExpanderZone + shift;
+		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
+
 		IControlView* expander = rowData->FindWidget(kTreeNodeExpanderWidgetID);
 		if (expander != nil)
 		{
+			PMRect f = expander->GetFrame();
+			f.Left(xExpander);
+			f.Right(xExpander + kExpanderZone);
+			expander->SetFrame(f);
+
 			InterfacePtr<const ITreeViewHierarchyAdapter> adapter(this, UseDefaultIID());
 			const bool16 hasChildren =
 				(adapter != nil && adapter->GetNumChildren(node) > 0) ? kTrue : kFalse;
@@ -173,6 +193,42 @@ private:
 				expander->Disable();
 			}
 		}
+
+		IControlView* cell = rowData->FindWidget(kKBSResultChapterLabelWidgetID);
+		if (cell != nil)
+		{
+			PMRect f = cell->GetFrame();
+			f.Left(xLabel);
+			f.Right(rowRight);
+			cell->SetFrame(f);
+		}
+		SetColumnText(rowData, kKBSResultChapterLabelWidgetID, label);
+	}
+
+	// The BOOK row: which book these results came from. Only ever built for a book search, where it
+	// is the root's single child - so it is the panel's standing answer to which book is the target,
+	// which a status line cannot be (one line, truncated, overwritten by the next message).
+	void ApplyBookRow(const NodeID& node, IControlView* widget,
+		const InterfacePtr<IPanelControlData>& rowData) const
+	{
+		PMString label(KBSResultModel::GetBookName());
+		label.SetTranslatable(kFalse);
+		label.Append("  (");
+		label.AppendNumber(KBSResultModel::GetTotalHitCount());
+		label.Append(")");
+		// No shift: the book row IS the outermost level.
+		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
+	}
+
+	// A document row: its expander and "<name>  (N)" after the zone.
+	void ApplyChapterRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
+		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+	{
+		PMString name;
+		int32 fullCount = 0;
+		if (!KBSResultModel::GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
+			return;
+		const int32 shownCount = KBSResultModel::GetDisplayHitCount(nodeID->GetChapter());
 
 		// "<name>  (N)", or "<name>  (shown / total)" for the one boundary chapter the display cap
 		// splits. The panel shows the first kKBSDisplayHitLimit hits book-wide; the rest stay in the
@@ -191,7 +247,7 @@ private:
 			label.AppendNumber(fullCount);
 		}
 		label.Append(")");
-		SetColumnText(rowData, kKBSResultChapterLabelWidgetID, label);
+		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
 
 	// A hit row: the match's line into the custom colour cell (three segments), no expander,
@@ -220,7 +276,7 @@ private:
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
-		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent;
+		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + this->LevelShift();
 
 		// The check box. A row with nothing to select loses it completely; the space it would have
 		// taken is left empty rather than reclaimed, so the locators stay in one column (see the
@@ -316,12 +372,17 @@ void KBSResultTree::Rebuild()
 	// above already forgot the expansion state, so leaving them alone is all it takes.
 	//
 	// No expand-then-collapse priming is needed to get the arrow drawn: THIS panel draws the
-	// expander itself (see ApplyChapterRow - it shows the arrow whenever the hierarchy adapter
+	// expander itself (see LayOutBranchRow - it shows the arrow whenever the hierarchy adapter
 	// reports children, which does not depend on the node ever having been expanded). The
 	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
 	// manager overrides it.
 	if (KBSResultModel::IsFromBook())
+	{
+		// The book row is the root's only child, so leaving it closed would show a panel with one
+		// line on it and nothing else. Open it; the chapters underneath stay closed.
+		treeMgr->ExpandNode(KBSResultNodeID::CreateBook(), kFalse);
 		return;
+	}
 
 	// A single document has just the one chapter, so open it - otherwise the result is one closed
 	// row and the hits take an extra click to reach.
