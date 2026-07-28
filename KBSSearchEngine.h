@@ -77,6 +77,23 @@ namespace KBSSearchEngine
 	    row's text from the range the replace command reports back. */
 	void SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
 		PMString& outPre, PMString& outMatch, PMString& outPost);
+
+	/** Is the match at [start, end) the SAME occurrence a stored hit describes? Three questions,
+	    all of which must answer yes:
+
+	      - same story          (a match in another story is never the one the row means)
+	      - same position       (start == expectStart + posDelta)
+	      - same matched text   (what is there now reads the way the row says it did)
+
+	    posDelta is how far THIS pass has already moved the text ahead of this point in this story -
+	    our own replacements, cancelled out - so whatever difference is left is the USER's editing,
+	    which is exactly the case that must not be written over. A caller that has changed nothing
+	    (the jump) passes 0.
+
+	    An unreadable or out-of-range position comes back with empty text and therefore answers
+	    false, which is the safe answer: when in doubt, do not write. */
+	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
+		UID expectStoryUID, TextIndex expectStart, const PMString& expectMatch, int32 posDelta);
 }
 
 #endif // __KBSSearchEngine_h__

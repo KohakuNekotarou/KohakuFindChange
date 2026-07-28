@@ -735,6 +735,23 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 	outPost.SetTranslatable(kFalse);
 }
 
+bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
+	UID expectStoryUID, TextIndex expectStart, const PMString& expectMatch, int32 posDelta)
+{
+	if (storyRef.GetUID() != expectStoryUID)
+		return false;
+
+	if (start != expectStart + posDelta)
+		return false;
+
+	// Read with the splitter the search itself used, so both sides are cut the same way (a match
+	// spanning paragraphs is trimmed identically). The model holds the RAW text - the ellipsizing
+	// happens at draw time - so this compares like with like.
+	PMString livePre, liveMatch, livePost;
+	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, end, livePre, liveMatch, livePost);
+	return liveMatch == expectMatch;
+}
+
 int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 {
 	outSummary.Clear();
