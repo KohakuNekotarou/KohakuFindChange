@@ -42,6 +42,28 @@ namespace KBSSearchEngine
 	    and grey themselves out; SearchBook itself turns a re-entrant call away as a last resort. */
 	bool IsSearching();
 
+	/** State which Find/Change TAB to work in, by re-committing the mode the user already has
+	    selected. Call this immediately before a find or a replace walk.
+
+	    This is the ONE thing KBS sets on the Find/Change side, and it sets it to the value that is
+	    already there. It is needed because the engine does not pick the mode up from
+	    IFindChangeOptions when a command runs - the mode has to have been COMMITTED through
+	    kFindSearchModeCmdBoss, which is what the dialog itself does when a tab is clicked. Without
+	    it, a walk driven from outside the dialog runs as plain TEXT whatever tab is on screen:
+	      * a Glyph-tab search was matching its find string as literal text (it looked like it worked,
+	        because the glyph's character was in that string), and
+	      * a replace then wrote the TEXT tab's change string over what the Glyph tab had found.
+	    Both reported by the user on 2026-07-30. Every one of the four entry points in the SDK's own
+	    SnpFindAndReplace (find/replace text, find/replace glyph) does this right before it runs -
+	    including the glyph pair, which use the same kTWReplaceTextCmdBoss this does.
+
+	    Writes the value it just read, so the user's own settings never change: this STATES the mode,
+	    it does not choose one.
+
+	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
+	          command inside the replace sequence would become part of that undo step. */
+	void CommitSearchMode();
+
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
 	    with exactly the options the search that produced the hits used, or the walk order those

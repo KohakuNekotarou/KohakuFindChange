@@ -55,8 +55,8 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
         {
         	// ----- Menu strings
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// メニュー束ね名(表示。KESCM同様、会社名kKBSCompanyValueとは別)
-                kKBSAboutMenuKey,					"Kohaku Search Panel...",
-                kKBSPluginsMenuKey,				"Kohaku Search Panel",
+                kKBSAboutMenuKey,					kKBSDisplayName "...",
+                kKBSPluginsMenuKey,				kKBSDisplayName,
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_jaJP,
 
@@ -71,8 +71,8 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 // ----- Window strings
 
                 // ----- Panel/dialog strings
-                kKBSPanelTitleKey,				"Kohaku Search Panel",
-                kKBSStaticTextKey,				"Kohaku Search Panel",
+                kKBSPanelTitleKey,				kKBSDisplayName,
+                kKBSStaticTextKey,				kKBSDisplayName,
 
                 // ----- Change Checked confirmation prompt
                 // The panel, its menu and its status line stay English on purpose (they echo the
@@ -89,7 +89,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
               // ----- Error strings
 
                 // ----- Misc strings
-                kKBSAboutBoxStringKey,			"Kohaku Search Panel" ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_jaJP,
+                kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_jaJP,
 
         }
 

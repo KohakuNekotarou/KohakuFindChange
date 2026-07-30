@@ -320,7 +320,15 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	{
 		UIDRef reopened;
 		if (!KBSBookScope::ReopenChapterDoc(file, reopened))
-			return;	// missing / locked: report nothing, do not move
+		{
+			// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
+			// nothing at all when clicked reads as a broken panel, which is what this used to do:
+			// the file has been moved, deleted, renamed, or is open in another application.
+			PMString message("Cannot open that chapter - moved, deleted, or in use?");
+			message.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(message);
+			return;
+		}
 		docRef = reopened;
 		KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
 	}
@@ -352,7 +360,12 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// window can be produced, report the match without moving the view.
 	if (!EnsureDocFrontmost(docRef))
 	{
+		// Same rule as the failed reopen above: the view did not move, so the panel says why rather
+		// than leaving a click that appears to do nothing.
 		KBSDrawEventHandler::ClearMarker();
+		PMString message("Cannot bring that chapter's window to the front.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
 		return;
 	}
 

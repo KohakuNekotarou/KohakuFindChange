@@ -32,8 +32,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         {
         	 // ----- Menu strings
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
-                kKBSAboutMenuKey,					"Kohaku Search Panel...",
-                kKBSPluginsMenuKey,				"Kohaku Search Panel",
+                kKBSAboutMenuKey,					kKBSDisplayName "...",
+                kKBSPluginsMenuKey,				kKBSDisplayName,
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
@@ -48,8 +48,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // ----- Window strings
 
                 // ----- Panel/dialog strings
-                kKBSPanelTitleKey,				"Kohaku Search Panel",
-                kKBSStaticTextKey,				"Kohaku Search Panel",
+                kKBSPanelTitleKey,				kKBSDisplayName,
+                kKBSStaticTextKey,				kKBSDisplayName,
 
                 // ----- Change Checked confirmation prompt
                 // ^1 takes real data (a count, the user's find / change string), which is marked
@@ -65,7 +65,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. A single undo puts them all back.",
 
 		// ----- Misc strings
-                kKBSAboutBoxStringKey,			"Kohaku Search Panel" ", version " kKBSVersion " by " kKBSAuthor "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
+                kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
 
 
         }

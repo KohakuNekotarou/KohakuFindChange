@@ -29,13 +29,17 @@
 namespace
 {
 
-// The plain panel name, exactly as it reads in KBS_enUS.fr / KBS_jaJP.fr under kKBSPanelTitleKey.
-// It has to be repeated here because there is no way to read it back at run time:
-// PaletteRefUtils::GetPaletteLabel returns an empty string for a palette that has never been
-// visible, and IWindow::GetTitle only ever hands back the last value SET (both stated in the
-// headers). So "remember the old name, restore it later" is not available - the original must be a
-// literal on this side too. Keep the three copies in step.
-const char* const kKBSPlainPanelName = "Kohaku Search Panel";
+// The plain panel name. It has to be spelled out on THIS side, not read back from the panel, because
+// there is no way to read it back at run time: PaletteRefUtils::GetPaletteLabel returns an empty
+// string for a palette that has never been visible, and IWindow::GetTitle only ever hands back the
+// last value SET (both stated in the headers). So "remember the old name, restore it later" is not
+// available.
+//
+// It is kKBSDisplayName rather than a literal of its own: that macro is the ONE definition of the
+// display name - both string tables put it under kKBSPanelTitleKey and the .rc builds its
+// FileDescription from it - so this cannot drift out of step with the name the panel came up with,
+// which three separate literals could.
+const char* const kKBSPlainPanelName = kKBSDisplayName;
 
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */
 void SetTabLabel(const PMString& label)

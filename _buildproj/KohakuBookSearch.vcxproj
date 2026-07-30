@@ -69,10 +69,10 @@
       <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\objR\KohakuBookSearch\</IntDir>
       <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\releasex64\sdk\</OutDir>
       <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\objRx64\KohakuBookSearch\</IntDir>
-      <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectName).sdk</TargetName>
-      <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectName).sdk</TargetName>
-      <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectName).sdk</TargetName>
-      <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectName).sdk</TargetName>
+      <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectName)</TargetName>
+      <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectName)</TargetName>
+      <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectName)</TargetName>
+      <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectName)</TargetName>
       <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">.pln</TargetExt>
       <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.pln</TargetExt>
       <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">.pln</TargetExt>
@@ -259,6 +259,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSMarkerExpiryIdleTask.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSJump.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.h"/>
    </ItemGroup>

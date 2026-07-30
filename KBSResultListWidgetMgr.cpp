@@ -102,12 +102,14 @@ public:
 		RsrcID rsrcID = kKBSResultChapterNodeWidgetRsrcID;
 		if (nodeID != nil && nodeID->IsHitRow())
 			rsrcID = kKBSResultHitNodeWidgetRsrcID;
-		IControlView* retval = (IControlView*)::CreateObject(
+		// Both row resources are declared in KBSID.h and defined in KBS.fr, so nil here would mean
+		// this plug-in's own resources did not load - not a case any handling on this side could
+		// improve. It is handed straight back: the tree framework asked for the widget, so it is the
+		// one that decides what to do without one.
+		return (IControlView*)::CreateObject(
 			::GetDataBase(this),
 			RsrcSpec(LocaleSetting::GetLocale(), kKBSPluginID, kViewRsrcType, rsrcID),
 			IID_ICONTROLVIEW);
-		ASSERT(retval);
-		return retval;
 	}
 
 	virtual WidgetID GetWidgetTypeForNode(const NodeID& node) const

@@ -178,13 +178,20 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 // outRefused   = checked hits the replace command itself would not run on. Not a decision of ours
 //                like the two above, and not a walk that lost its place like the two flags - the
 //                command was asked and said no.
+// outNotWalked = the chapter could not be WALKED AT ALL: no Find/Change options, no text walker, no
+//                walker scope for this document, no walker client. Nothing was written, and nothing
+//                can honestly be said about any individual row, so the summary names the chapter
+//                instead - the same distinction the SEARCH makes with ChapterWalkResult. Without it
+//                such a chapter dropped out of a replace in complete silence, which is exactly what
+//                every other counter here exists to prevent.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit,
-	int32& outMissing, int32& outLocked, int32& outRefused)
+	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked)
 {
 	outStepLimit = false;
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
+	outNotWalked = false;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -247,18 +254,32 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// changed, so guarding it would throw away the entire point. (Do not copy it over from
 	// KBSSearchEngine::CollectHitsInDoc.)
 
+	// Every failure from here to the critical section means the walk never started - see outNotWalked
+	// on why each one has to be reported rather than returning a bare zero.
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	if (registry == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 	InterfacePtr<IK2ServiceProvider> provider(registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss));
 	if (provider == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
 	if (walker == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 
 	// Always start a fresh walk from the top of the chapter - the same starting point the search
 	// had, which is what makes the walk order comparable.
@@ -269,15 +290,24 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
 	if (client == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 	walker->Initialize(client, scope, opts, nil);
 
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
+	{
+		outNotWalked = true;
 		return 0;
+	}
 
 	// Required critical section around text-walker selection changes.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
@@ -509,8 +539,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			// The walk ran to the end of the chapter without them coming up, so those matches are
 			// gone. Said on the rows THEMSELVES rather than on the chapter, which named a file and
 			// left the user to guess which of its rows it meant.
+			//
+			// COUNTED as well, not merely marked. These are checked hits that were not replaced, and
+			// the rule this file is built on is that every one of those is named in the summary
+			// rather than letting the total quietly come up short (see this function's header, which
+			// has always said outMissing covers a row "because the row's turn never came at all").
+			// Marking the row and not counting it left a request for ten reading "7 replaced." with
+			// nothing to explain the other three, and the explanation sitting on rows the user had to
+			// go hunting for.
 			for (std::set<int32>::const_iterator t = targets.begin(); t != targets.end(); ++t)
 			{
+				++outMissing;
 				const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(*t);
 				if (row != rowByWalkOrder.end())
 					KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeMissing);
@@ -564,6 +603,47 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		return 0;
 	}
 
+	// The Find/Change tab has to be the one the SEARCH ran in. Every chapter below is RE-WALKED, and a
+	// walk in another mode returns another set of matches - so the stored walk orders would line up
+	// with occurrences the user never saw. Nothing wrong would be written (MatchIsSameOccurrence
+	// refuses each one), but the entire run would come back "missing" with nothing on screen to
+	// explain why. Better to say it before anything is opened.
+	{
+		const int32 searchedMode = KBSResultModel::GetSearchMode();
+		InterfacePtr<IFindChangeOptions> modeOpts(QuerySessionPreferences<IFindChangeOptions>());
+		const int32 currentMode = (modeOpts != nil) ? static_cast<int32>(modeOpts->GetSearchMode()) : -1;
+		if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
+		{
+			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran - search again before replacing.");
+			return 0;
+		}
+
+		// ⚠ Only the TEXT tabs can be replaced on. The replace command writes the change string of the
+		// text side, so replacing hits that came from the Glyph tab would put the TEXT tab's
+		// replacement over them - which is exactly what the user hit on 2026-07-30 ("the replace
+		// becomes a Text replace"). Those hits are still listed and still jump; they are simply not
+		// rewritten by this panel.
+		//
+		// This is a refusal, not the final answer: replacing glyph for glyph needs the glyph walk
+		// working first (see KBSSearchEngine::CommitSearchMode on why that is still open).
+		if (searchedMode >= 0
+			&& searchedMode != IFindChangeOptions::kTextSearch
+			&& searchedMode != IFindChangeOptions::kGrepSearch)
+		{
+			outSummary.Append("These results did not come from the Text or GREP tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
+			return 0;
+		}
+	}
+
+	// State the tab before anything is walked, exactly as the search does. A walk runs in the mode
+	// last COMMITTED, not the one IFindChangeOptions reports, so without this a replace ran as plain
+	// Text whatever tab was on screen - which is how a Glyph-tab search came to be overwritten with
+	// the TEXT tab's change string. See KBSSearchEngine::CommitSearchMode.
+	//
+	// Deliberately here, OUTSIDE the command sequence opened further down: this processes a command of
+	// its own, and a session-setting command inside that sequence would become part of the undo step.
+	KBSSearchEngine::CommitSearchMode();
+
 	int32 totalReplaced = 0;
 	int32 chaptersTouched = 0;
 	int32 chaptersSkipped = 0;
@@ -576,6 +656,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
 	// otherwise never count as "the first one", and every later chapter would overwrite it.
 	bool haveFirstSkipped = false;
+
+	// Chapters that opened fine but could not be WALKED (see ReplaceInChapter's outNotWalked). Kept
+	// apart from chaptersSkipped because the cause is different and so is the fix: one is a file
+	// problem, the other is the text walker refusing this document.
+	int32 chaptersNotWalked = 0;
+	PMString firstNotWalked;
+	firstNotWalked.SetTranslatable(kFalse);
+	bool haveFirstNotWalked = false;
 
 	// Set when the user stops the run from the progress bar. Cancelling gives back the document as
 	// it was: the command sequence rolls the text back, and the result model is rolled back with
@@ -744,10 +832,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const UIDRef& docRef = pending[pi].docRef;
 
 		bool stepLimit = false;
+		bool notWalked = false;
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused);
+		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused, notWalked);
 		totalReplaced += replaced;
 		totalMissing += missing;
 		totalLocked += locked;
@@ -756,6 +845,19 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			++chaptersTouched;
 		if (stepLimit)
 			++chaptersStepLimited;
+		if (notWalked)
+		{
+			// The walk never started here, so no row of this chapter carries a reason - the chapter
+			// itself has to be named, the way the resolve pass names one it could not open.
+			++chaptersNotWalked;
+			if (!haveFirstNotWalked)
+			{
+				int32 notWalkedHits = 0;
+				KBSResultModel::GetChapterDisplay(ci, firstNotWalked, notWalkedHits);
+				firstNotWalked.SetTranslatable(kFalse);
+				haveFirstNotWalked = true;
+			}
+		}
 
 		// A chapter that received a replacement wants a real window, so the change is visible and
 		// can be undone - or saved - by hand. Chapters nothing landed in stay as they were:
@@ -853,6 +955,19 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(chaptersStepLimited);
 		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
+	}
+
+	// Chapters the text walker would not run on at all. Unlike every case above, nothing on their
+	// rows explains it - the walk never got far enough to say anything about a single one - so the
+	// chapter is named here instead. The SEARCH reports the same failure the same way; without this
+	// the replace passed over such a chapter without a word.
+	if (chaptersNotWalked > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(chaptersNotWalked);
+		outSummary.Append(" chapter(s) could not be searched (\"");
+		outSummary.Append(firstNotWalked);
+		outSummary.Append("\" first) - nothing was written there.");
 	}
 	return totalReplaced;
 }

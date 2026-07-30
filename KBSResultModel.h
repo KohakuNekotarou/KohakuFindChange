@@ -7,7 +7,8 @@
 //  The result model: the last book search's hits, grouped by chapter, that the result tree
 //  (KBSResultListAdapter / KBSResultListWidgetMgr) displays. A tiny session-global store - the
 //  KBS analog of KESCL's KESCLBatchCheck, minus its filters / reverse mode / per-value rows,
-//  because the KBS tree is a flat two levels: chapter -> hit.
+//  because the KBS tree is shallow: book -> document -> hit for a book search, and document -> hit
+//  for a document search, which has no book row at all.
 //
 //  Each hit already carries its display text pre-split into three PMString segments (the text
 //  before the match, the matched text, and the text after) so the colour cell just paints three
@@ -112,12 +113,12 @@ namespace KBSResultModel
 		std::vector<Hit>	hits;
 	};
 
-	/** Replace the whole model with a fresh search's chapters (only chapters with >=1 hit). */
-	void SetResults(const std::vector<Chapter>& chapters);
-
-	/** Append one chapter to the model. The progressive search adds chapters one at a time as each
-	    finishes (after Clear), instead of one SetResults at the end. Only chapters with >=1 hit
-	    should be appended (empty branches are never shown). */
+	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
+	    then appends each chapter as it finishes. Only chapters with >=1 hit should be appended (empty
+	    branches are never shown).
+	    (A SetResults that swapped the whole vector in at once sat beside this until 2026-07-30, by
+	    which time nothing called it: two entry points for filling the same model, one of them also
+	    resetting the report flag, was a difference waiting to be tripped over.) */
 	void AppendChapter(const Chapter& chapter);
 
 	/** Forget the results (an empty search, or a teardown that still wants the tree emptied). */
@@ -133,6 +134,19 @@ namespace KBSResultModel
 	    Clear(), so it must be set AFTER the scope is resolved. */
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
+
+	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
+	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
+	    Recorded beside SetFromBook, and cleared by Clear().
+
+	    Why it has to be remembered: the replace pass RE-WALKS each chapter, and a walk runs in the
+	    mode that is current AT THAT MOMENT. Switching tabs between a search and Change Checked
+	    therefore re-walks with a different query, returns a different set of matches, and leaves
+	    every stored walk order pointing at the wrong occurrence. Nothing wrong is written - the
+	    same-occurrence test refuses each one - but the whole run comes back "missing" with nothing to
+	    explain it. Comparing this against the current mode is what lets the replace say why. */
+	void SetSearchMode(int32 mode);
+	int32 GetSearchMode();
 
 	/** The name of the book these results came from - shown on the tree's BOOK row, which is how
 	    the panel says which book was searched. Set beside SetFromBook; the file NAME only, because
@@ -209,11 +223,10 @@ namespace KBSResultModel
 	    backstop rather than the first line of defence. */
 	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
 
-	/** Is this hit selected for replacement? false for an out-of-range index. */
-	bool IsHitChecked(int32 chapterIdx, int32 hitIdx);
-
 	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this
-	    row gets no check box", for different reasons. false = index out of range. */
+	    row gets no check box", for different reasons. false = index out of range.
+	    (This also answers "is it checked?", which an IsHitChecked of its own used to do until
+	    2026-07-30 with no callers left - every asker wants the other two flags in the same breath.) */
 	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked);
 
 	/** Select / deselect EVERY hit in every chapter (the flyout's Check All / Uncheck All). Applies
@@ -320,7 +333,7 @@ namespace KBSResultModel
 	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
 
 	/** Is the panel showing the AFTERMATH of a replace rather than a search's results? Set by
-	    KeepCheckedRows, cleared by Clear / SetResults. While it is on, no row offers a check box:
+	    KeepCheckedRows, cleared by Clear. While it is on, no row offers a check box:
 	    the list is a report, not a work list. It is asked as well as the per-row flags because the
 	    aftermath can hold rows with no flag at all - a chapter the safety limit cut short, or one
 	    that could not be opened. Those were never looked at, so nothing can be said about them. */

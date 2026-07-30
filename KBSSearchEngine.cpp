@@ -27,6 +27,7 @@
 #include "IFindChangeCmdData.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "ICommand.h"
+#include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CommitSearchMode
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
@@ -145,6 +146,31 @@ struct SearchingFlagGuard
 	SearchingFlagGuard()	{ gSearching = true; }
 	~SearchingFlagGuard()	{ gSearching = false; }
 };
+
+// The Find/Change dialog's own name for a tab. Used in the status line, so the panel can name the
+// tab the user is actually looking at. Not translatable - these are the dialog's labels, which KBS
+// echoes in English throughout.
+const char* SearchModeName(int32 mode)
+{
+	switch (mode)
+	{
+		case IFindChangeOptions::kTextSearch:			return "Text";
+		case IFindChangeOptions::kGrepSearch:			return "GREP";
+		case IFindChangeOptions::kGlyphSearch:			return "Glyph";
+		case IFindChangeOptions::kObjectSearch:			return "Object";
+		case IFindChangeOptions::kTransliterateSearch:	return "Transliterate";
+		case IFindChangeOptions::kColorSearch:			return "Colour";
+		default:										return "";
+	}
+}
+
+// The Find/Change tab in force right now, as a plain int32; -1 when the options cannot be read.
+// Stored on the results so the replace can refuse to re-walk in a different mode.
+int32 CurrentSearchModeValue()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
+}
 
 // Is there any text to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
@@ -652,6 +678,53 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 
 } // anonymous namespace
 
+void KBSSearchEngine::CommitSearchMode()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+
+	// ONLY the two text modes are committed. ⚠ Committing kGlyphSearch made this panel find NOTHING on
+	// a query the official Find/Change dialog finds perfectly well (user, 2026-07-30) - so a glyph walk
+	// needs more than the mode stated (the glyph's FONT is an attribute list with UIDs, and
+	// IFindGlyphCmdData has a SetTargetDB for exactly that reason - a walk across other documents
+	// cannot be resolving it from here). Until that is understood, committing the glyph mode makes the
+	// panel strictly worse than the approximation it replaced.
+	//
+	// So the Glyph tab keeps behaving as it always did: its find string is walked as ordinary text,
+	// which is what the user saw working. Replacing on that tab is refused instead - see
+	// KBSReplaceEngine::ReplaceChecked - because the replace command would write the TEXT tab's change
+	// string over what was found.
+	//
+	// Text and GREP are committed, which is what fixes the real bug: the mode the engine walks in has
+	// to be stated, or the query runs as plain text whatever tab is on screen.
+	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+		return;
+
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
+	if (cmd == nil)
+		return;
+
+	// TWO separate int fields on this boss, both kIntDataImpl behind different IIDs (checked against a
+	// live object-model dump): the DEFAULT one is the value being set, and IID_IFINDCHANGEMODEDATA is
+	// which mode's settings are being addressed. For this command they are the same mode - exactly how
+	// SnpFindAndReplace passes it in all four of its find/replace entry points.
+	InterfacePtr<IIntData> value(cmd, UseDefaultIID());
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (value == nil || modeData == nil)
+		return;
+	value->Set(static_cast<int32>(mode));
+	modeData->Set(static_cast<int32>(mode));
+
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		// Nothing to recover - the walk simply runs in whatever mode was committed last. The error
+		// state has to be cleared though: left standing it would fail every find command after it.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
+}
+
 void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 {
 	// The five switches WalkerScopeOptions carries are EXACTLY the five the Find/Change dialog
@@ -834,11 +907,41 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 	KBSResultModel::Clear();
 
-	if (!HasFindQuery())
+	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
+	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
+	// not lines of text - so there is nothing for this panel to list, whatever it did with them.
+	//
+	// Named explicitly because the alternative is worse than useless: their find string IS empty, so
+	// without this the panel answered "No Find/Change text set." and sent the user looking for a field
+	// they had not left blank (user's question 2026-07-30).
+	const int32 tab = CurrentSearchModeValue();
+	if (tab == IFindChangeOptions::kObjectSearch || tab == IFindChangeOptions::kColorSearch)
 	{
-		outSummary.Append("No Find/Change text set. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
+		outSummary.Append("The Find/Change dialog is on the ");
+		PMString tabName(SearchModeName(tab));
+		tabName.SetTranslatable(kFalse);
+		outSummary.Append(tabName);
+		outSummary.Append(" tab, which searches objects rather than text. This panel lists text, so use InDesign's own Find/Change for that.");
 		return 0;
 	}
+
+	if (!HasFindQuery())
+	{
+		// Which tab, so this reads as "nothing typed on THIS tab" - each one keeps its own find string,
+		// so a query on another tab is no help and saying so avoids a hunt.
+		outSummary.Append("No search text set on the ");
+		PMString tabName(SearchModeName(tab));
+		tabName.SetTranslatable(kFalse);
+		outSummary.Append(tabName);
+		outSummary.Append(" tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
+		return 0;
+	}
+
+	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
+	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
+	// search driven from this panel ran as plain Text whatever tab was on screen. See
+	// KBSSearchEngine::CommitSearchMode.
+	KBSSearchEngine::CommitSearchMode();
 
 	// Resolve the scope from the Book Scope toggle. NO implicit fallback: ON means the book and
 	// nothing else, OFF means the front document and nothing else - so the status line can always
@@ -885,6 +988,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// row at all. This is the panel's permanent answer to "what am I looking at": a status line is
 	// one line, gets truncated, and is overwritten by the next message.
 	KBSResultModel::SetBookName(bookName);
+
+	// ...and WHICH TAB was searched. The replace pass re-walks each chapter, and a re-walk in another
+	// mode returns another set of matches - so Change Checked compares this against the tab in force
+	// then and refuses rather than lining rows up with the wrong occurrences.
+	KBSResultModel::SetSearchMode(CurrentSearchModeValue());
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed

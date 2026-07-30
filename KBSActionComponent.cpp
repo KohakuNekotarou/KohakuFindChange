@@ -170,6 +170,21 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (KBSReplaceEngine::IsReplacing())
 				break;
 
+			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
+			// this command out in that state (see UpdateActionStates), but a caller that never went
+			// through the menu - a script invoking the action - lands here whatever the menu says.
+			// It has to be stopped BEFORE the prompt: the rows the last run never reached keep their
+			// check so the report can account for them, so GetCheckedCount() is still positive and
+			// the user would otherwise be asked to authorise a rewrite that the engine declines on
+			// the far side of the prompt. Same wording as the engine's own door.
+			if (KBSResultModel::IsShowingReplaceOutcome())
+			{
+				PMString report("This is the last replace's report - search again to replace more.");
+				report.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(report);
+				break;
+			}
+
 			// A replace can touch several documents, so it asks first. It also sits in a flyout
 			// that gets opened by accident, which is the other reason the confirmation is not
 			// optional.
@@ -194,8 +209,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSCheckAllActionID:
 		case kKBSUncheckAllActionID:
 		{
-			// Select / deselect every stored hit - including the ones past the panel's 500-row
-			// display cap, which is why the status line spells the numbers out afterwards.
+			// Select / deselect every stored hit - including the ones past the panel's display cap
+			// (kKBSDisplayHitLimit), which is why the status line spells the numbers out
+			// afterwards. Named rather than spelled out: this read "500-row" long after it was 5000.
 			KBSResultModel::SetAllChecked(actionID.Get() == kKBSCheckAllActionID);
 			// Only what the rows DRAW changed - the tree's shape is untouched - so repaint them in
 			// place instead of rebuilding. One notification per chapter, and the expansion state
@@ -351,8 +367,10 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		return;
 	}
 
-	// Both counts walk every stored hit (up to the 5000 collect cap), and this list normally holds
-	// more than one action that asks for them, so take each once here instead of per action.
+	// Both counts walk every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling
+	// rather than the smaller number the panel displays - and this list normally holds more than one
+	// action that asks for them, so take each once here instead of per action. The cap is named
+	// rather than spelled out: this comment read "5000" long after the ceiling became 10000.
 	const int32 checkedCount = KBSResultModel::GetCheckedCount();
 	const int32 checkableCount = KBSResultModel::GetCheckableCount();
 

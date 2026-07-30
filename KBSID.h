@@ -32,10 +32,10 @@
 #define kKBSCompanyValue	"KohakuNekotarou"	// Company name displayed externally.
 
 // Plug-in:
-#define kKBSPluginName	"KohakuBookSearch"			// Name of this plug-in.
+#define kKBSPluginName	"KohakuBookSearch"			// Internal name: the ID system, the .rc InternalName, and the output .pln file name. NEVER change it - a rename would orphan every existing document's plug-in reference.
+#define kKBSDisplayName	"Kohaku Search Panel"		// Display name: the About menu item, the About box, the panel and its tab, and the .rc FileDescription. THE one definition - both string tables put it under kKBSPanelTitleKey and KBSPanelTitle.cpp restores the tab from it, so the copies cannot drift apart.
 #define kKBSPrefixNumber	0x205698 		// Unique prefix number for this plug-in(*Must* be obtained from Adobe Developer Support).
-#define kKBSVersion		kSDKDefPluginVersionString						// Version of this plug-in (for the About Box).
-#define kKBSAuthor		""					// Author of this plug-in (for the About Box).
+#define kKBSVersion		"1.0.0"						// Version of this plug-in. Shows up in three places: the About box, the .rc FileVersion, and the PluginVersion resource. First Adobe Exchange submission = 1.0.0 (2026-07-30). Was kSDKDefPluginVersionString, the SDK template's own version, which said nothing about this plug-in.
 
 // Plug-in Prefix: (please change kKBSPrefixNumber above to modify the prefix.)
 #define kKBSPrefix		RezLong(kKBSPrefixNumber)				// The unique numeric prefix for all object model IDs for this plug-in.

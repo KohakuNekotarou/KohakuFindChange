@@ -7,8 +7,13 @@
 //  Result invalidation on book close - the book-scope half of the rule the document side
 //  implements in KBSCloseDocResponder.cpp:
 //
-//      the book a result set was searched in goes away -> the panel goes back to empty, and the
-//      chapters KBS opened windowless for that search are closed with it.
+//      the book KBS opened chapters for goes away -> those windowless chapters are closed with it,
+//      and if the panel is still showing that book's results, it goes back to empty.
+//
+//  The two halves are deliberately separate. Giving the chapters back is not optional and does not
+//  depend on what the panel happens to be showing: a windowless chapter left open keeps its .indd
+//  locked (a .idlk beside the file) for the rest of the session, so nobody else can open it. Emptying
+//  the panel only makes sense while the panel is showing THAT book's results.
 //
 //  (This started as a temporary instrumentation build - a session observer that just reported what
 //  a book close broadcasts. It answered the question and then became the feature; the notes below
@@ -26,11 +31,20 @@
 //  It does not say WHICH book closed (the subject is the session; theChange and protocol are
 //  identical every time), and it does not need to, because the only question ever asked is:
 //
-//      is the book this result set was searched in still open?
+//      is the book whose chapters we are HOLDING still open?
 //
 //  That question is the whole design. It needs no notion of which book closed and no two-step
 //  state: a spurious cue simply finds the book still open and does nothing, and a book that
 //  disappears by any route at all is caught by the next cue.
+//
+//  It is asked about the HELD CHAPTERS, not about the result set. Asking it about the results (which
+//  is what this did until 2026-07-30) let two cases through, and in both of them the chapters stayed
+//  open with their files locked for the rest of the session:
+//    * a book search that found NOTHING still holds the chapters it opened to look - but there is no
+//      result set, so the old "are there results?" gate returned early;
+//    * a book search followed by a DOCUMENT-scope search - the held chapters are still ours, but
+//      IsFromBook() is false by then, so the old gate returned early as well.
+//  Nothing held means this plug-in has no stake in any book closing, which is the honest gate.
 //
 //  THE ONE THAT DID NOT WORK - kept here so it is not tried again (2026-07-28)
 //
@@ -115,13 +129,10 @@ void RetireBookResultsIfGone()
 	if (KBSSearchEngine::IsSearching())
 		return;
 
-	// Document-scope results are KBSCloseDocResponder's business, not this one's.
-	if (!KBSResultModel::IsFromBook())
-		return;
-	if (KBSResultModel::GetChapterCount() <= 0)
-		return;
-
-	// Read the path BEFORE releasing anything - ReleaseHeldDocs clears it.
+	// Which book are we holding chapters for? Read the path BEFORE releasing anything -
+	// ReleaseHeldDocs clears it. Nothing held = nothing to give back and no book of ours to ask
+	// about, which is the one honest early exit here (see the file header on why this is asked about
+	// the held chapters rather than about the result set).
 	PMString heldBookPath;
 	if (!KBSBookScope::GetHeldBookPath(heldBookPath))
 		return;
@@ -130,11 +141,30 @@ void RetireBookResultsIfGone()
 	if (KBSBookScope::IsBookStillOpen(heldBookPath))
 		return;
 
-	// Back to empty, and the chapters this search opened windowless go with it: leaving them open
-	// would strand hidden documents belonging to a book nobody has open any more. The closes are
-	// scheduled (IDocFileHandler::kSchedule), so doing this from a notification is safe.
-	KBSResultModel::Clear();
+	// Is the panel still showing THAT book's results? Decided before anything is released, because
+	// releasing does not touch the model and clearing the model must not depend on the order.
+	// Document-scope results belong to KBSCloseDocResponder instead.
+	//
+	// IsFromBook() ALONE - deliberately not "and it has at least one chapter". A book search that
+	// found NOTHING still leaves a row on the tree: the hierarchy adapter gives the root one child
+	// whenever the results came from a book, so the panel shows "book.indb  (0)". That row names a
+	// book, so once the book is gone it has to go too. (Measured 2026-07-30 by the user: with a
+	// chapter-count test in here, closing the book after a 0-hit search released the chapters but
+	// left that row sitting there and the panel said nothing at all - which also made it impossible
+	// to tell from the screen whether the close had even been noticed.)
+	const bool showingThatBooksResults = KBSResultModel::IsFromBook();
+
+	// The chapters go back FIRST, and unconditionally: leaving them open would strand hidden
+	// documents - with their .indd files locked - belonging to a book nobody has open any more. The
+	// closes are scheduled (IDocFileHandler::kSchedule), so doing this from a notification is safe.
 	KBSBookScope::ReleaseHeldDocs();
+
+	// The panel is only touched when it was showing this book's results. Anything else on screen
+	// (a document-scope search, or nothing at all) is not ours to wipe.
+	if (!showingThatBooksResults)
+		return;
+
+	KBSResultModel::Clear();
 	KBSResultTree::Rebuild();
 
 	// A panel that empties itself without a word reads as a crash.
@@ -219,10 +249,13 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	if (theChange != kCloseBookCmdBoss)
 		return;
 
-	// Nothing to retire? Then do not even arm the timer.
-	if (!KBSResultModel::IsFromBook())
-		return;
-	if (KBSResultModel::GetChapterCount() <= 0)
+	// Nothing held? Then no book closing is any of our business - there are no windowless chapters to
+	// give back, and a result set with no held chapters behind it cannot be a book's. This is the
+	// same gate the deferred question uses, kept here so a cue that will do nothing does not even
+	// arm the timer. (It used to ask whether the results came from a book, which missed the two cases
+	// named in the file header and left chapters open with their files locked.)
+	PMString heldBookPath;
+	if (!KBSBookScope::GetHeldBookPath(heldBookPath))
 		return;
 
 	// Ask one beat later: at this instant the closing book still looks completely open.

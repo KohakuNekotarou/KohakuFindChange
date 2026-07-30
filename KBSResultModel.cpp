@@ -30,6 +30,10 @@ namespace
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
+	// The Find/Change tab the search ran in (an IFindChangeOptions::SearchMode value; -1 = nothing
+	// searched yet). See KBSResultModel::SetSearchMode for why the replace has to compare against it.
+	int32 gSearchMode = -1;
+
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
@@ -73,12 +77,6 @@ namespace
 	}
 }
 
-void KBSResultModel::SetResults(const std::vector<Chapter>& chapters)
-{
-	gChapters = chapters;
-	gShowingOutcome = false;
-}
-
 void KBSResultModel::AppendChapter(const Chapter& chapter)
 {
 	gChapters.push_back(chapter);
@@ -90,6 +88,7 @@ void KBSResultModel::Clear()
 	gShowingOutcome = false;
 	gFromBook = false;
 	gBookName.Clear();
+	gSearchMode = -1;
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)
@@ -100,6 +99,16 @@ void KBSResultModel::SetFromBook(bool fromBook)
 bool KBSResultModel::IsFromBook()
 {
 	return gFromBook;
+}
+
+void KBSResultModel::SetSearchMode(int32 mode)
+{
+	gSearchMode = mode;
+}
+
+int32 KBSResultModel::GetSearchMode()
+{
+	return gSearchMode;
 }
 
 void KBSResultModel::SetBookName(const PMString& name)
@@ -262,16 +271,6 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	if (gShowingOutcome)
 		return;		// the panel is a report right now, not a work list
 	h.checked = checked;
-}
-
-bool KBSResultModel::IsHitChecked(int32 chapterIdx, int32 hitIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	return c.hits[hitIdx].checked;
 }
 
 bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked)
