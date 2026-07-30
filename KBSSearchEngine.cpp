@@ -28,6 +28,7 @@
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "ICommand.h"
 #include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CommitSearchMode
+#include "IBoolData.h"				// kFindChangeGlyphIDCmdBoss: which side of the glyph search is being set
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
@@ -53,6 +54,7 @@
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
+#include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "ProgressBar.h"			// TaskProgressBar / SuppressProgressBarDisplay (the book search's progress + cancel)
@@ -172,15 +174,57 @@ int32 CurrentSearchModeValue()
 	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
 }
 
-// Is there any text to find on the Find/Change panel right now (in the current mode)?
+// Is there anything to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return false;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+
+	// The Glyph tab's query is NOT a find string - it is a glyph ID plus the font it belongs to, so
+	// asking whether the find string is empty answers the wrong question there. (It happened to give
+	// a usable answer only because picking a glyph whose character exists also leaves that character
+	// in the find string; pick a glyph that has no character of its own and the string stays empty.)
+	//
+	// So ask the options themselves. IFindChangeOptions.h says this interface "is in a unique
+	// position to know whether there is adequate information defined on it to allow searching for
+	// something" - which for a glyph means the ID and its font attributes, held in the attribute
+	// database the options carry (GetUIDAttrDB).
+	if (mode == IFindChangeOptions::kGlyphSearch)
+		return opts->IsThereSomethingToFind(opts->GetUIDAttrDB(), mode) != kFalse;
+
 	// The find-what for the mode the user is actually in (Text vs GREP each have their own).
-	const WideString& findText = opts->GetFindString(opts->GetSearchMode());
+	const WideString& findText = opts->GetFindString(mode);
 	return !findText.empty();
+}
+
+// Re-state one side of the Glyph tab's query on the find/change options. The command carries two
+// fields: IIntData is the glyph itself, and IBoolData picks the side - kTrue for the glyph being
+// looked for, kFalse for the one that replaces it. This is what SnpFindAndReplace does in
+// Do_FindGlyph and Do_ReplaceGlyph, the only worked glyph example in the SDK.
+void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
+{
+	// Nothing chosen on that side. Committing -1 would only clear what the dialog already holds.
+	if (glyphID == kInvalidGlyphID)
+		return;
+
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeGlyphIDCmdBoss));
+	if (cmd == nil)
+		return;
+	InterfacePtr<IIntData>  value(cmd, UseDefaultIID());
+	InterfacePtr<IBoolData> side(cmd, UseDefaultIID());
+	if (value == nil || side == nil)
+		return;
+	value->Set(glyphID);
+	side->Set(findSide);
+
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		// Same reasoning as the mode commit below: the walk simply runs with whatever was committed
+		// last, but the error state has to be cleared or it fails every find command after it.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
 }
 
 // A frame UID -> its page, named the way the Pages panel names it (section prefix and all). Shared
@@ -685,22 +729,20 @@ void KBSSearchEngine::CommitSearchMode()
 		return;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
-	// ONLY the two text modes are committed. ⚠ Committing kGlyphSearch made this panel find NOTHING on
-	// a query the official Find/Change dialog finds perfectly well (user, 2026-07-30) - so a glyph walk
-	// needs more than the mode stated (the glyph's FONT is an attribute list with UIDs, and
-	// IFindGlyphCmdData has a SetTargetDB for exactly that reason - a walk across other documents
-	// cannot be resolving it from here). Until that is understood, committing the glyph mode makes the
-	// panel strictly worse than the approximation it replaced.
-	//
-	// So the Glyph tab keeps behaving as it always did: its find string is walked as ordinary text,
-	// which is what the user saw working. Replacing on that tab is refused instead - see
-	// KBSReplaceEngine::ReplaceChecked - because the replace command would write the TEXT tab's change
-	// string over what was found.
-	//
-	// Text and GREP are committed, which is what fixes the real bug: the mode the engine walks in has
-	// to be stated, or the query runs as plain text whatever tab is on screen.
-	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+	// The tabs this panel can walk with the TEXT walker. Object and Colour search by attribute
+	// through walkers of their own (kObjectWalkerService / kColorSearchWalkerService) and return page
+	// items rather than lines of text; SearchBook turns those away before reaching here, so stating
+	// their mode would only mislead the engine.
+	if (mode != IFindChangeOptions::kTextSearch
+		&& mode != IFindChangeOptions::kGrepSearch
+		&& mode != IFindChangeOptions::kGlyphSearch)
 		return;
+
+	// Read the glyph BEFORE the mode is committed. Committing a mode is a declaration, and there is
+	// no promise anywhere that it leaves that mode's other settings untouched - so take the value
+	// while it is certainly still there and hand it back afterwards.
+	const Text::GlyphID findGlyphID =
+		(mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID;
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
 	if (cmd == nil)
@@ -723,6 +765,36 @@ void KBSSearchEngine::CommitSearchMode()
 		// state has to be cleared though: left standing it would fail every find command after it.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
+
+	// Now the glyph, and for the same reason the mode needed committing at all: what the dialog
+	// HOLDS is not what the engine WALKS BY. The Glyph tab issues kFindChangeGlyphIDCmdBoss when the
+	// user picks a glyph, so a walk driven from outside the dialog has to issue it again - stating
+	// the mode by itself left the engine in glyph mode with no glyph, which is why this panel found
+	// nothing at all on a query the dialog handled perfectly well (2026-07-30).
+	//
+	// Only the FIND side is stated here. The replace side is set where the replacement happens, so
+	// a search can never leave a change glyph standing behind the user's back.
+	if (mode == IFindChangeOptions::kGlyphSearch)
+		CommitGlyphID(findGlyphID, kTrue);
+}
+
+bool KBSSearchEngine::CommitReplaceGlyph()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
+	if (opts->GetSearchMode() != IFindChangeOptions::kGlyphSearch)
+		return true;	// Not a glyph replace - nothing to state, nothing to stop.
+
+	// No glyph in the dialog's Change To box. Say so instead of walking: with nothing committed the
+	// replace command falls back on whatever change glyph was committed last, which is a glyph the
+	// user did not choose on this run and cannot see anywhere on screen.
+	const Text::GlyphID replaceGlyphID = opts->GetReplaceGlyphID();
+	if (replaceGlyphID == kInvalidGlyphID)
+		return false;
+
+	CommitGlyphID(replaceGlyphID, kFalse);	// kFalse = the replace side of the glyph query
+	return true;
 }
 
 void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
@@ -925,15 +997,42 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		return 0;
 	}
 
+	// Transliterate is the CJK character-type conversion (Kanji / kana / half- and full-width), and it
+	// is a SECOND axis: IFindChangeOptions carries it both as a search mode of its own and as a
+	// ChangeMode that sits alongside the tab. SnpFindAndReplace states outright that it "assumes
+	// Change is used, however if you want to search based on Japanese character types, you must first
+	// change the mode" with kFindChangeModeCmdBoss - a command this panel does not issue.
+	//
+	// So it is turned away rather than walked. Left to fall through it would be the Glyph bug over
+	// again, and quieter: the mode never gets stated, so the walk runs in whatever mode was committed
+	// last, while the find string is non-empty often enough to sail past the check below - a result
+	// list that looks ordinary and answers a question the user did not ask. (Nothing would be written
+	// wrongly - the replace already refuses any results that did not come from Text or GREP - so what
+	// is at stake is the truth of the list, not the text.)
+	//
+	// Refusing is also what keeps the promise this panel is built on: KBS never writes to the user's
+	// Find/Change settings. Committing kChange to force the other axis would do exactly that.
+	InterfacePtr<IFindChangeOptions> changeModeOpts(QuerySessionPreferences<IFindChangeOptions>());
+	if (tab == IFindChangeOptions::kTransliterateSearch
+		|| (changeModeOpts != nil && changeModeOpts->GetChangeMode() == IFindChangeOptions::kTransliterate))
+	{
+		outSummary.Append("Find/Change is set to transliterate character types, which this panel does not search. Switch it back to Text, GREP or Glyph, or use InDesign's own Find/Change.");
+		return 0;
+	}
+
 	if (!HasFindQuery())
 	{
-		// Which tab, so this reads as "nothing typed on THIS tab" - each one keeps its own find string,
-		// so a query on another tab is no help and saying so avoids a hunt.
-		outSummary.Append("No search text set on the ");
+		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
+		// query on another tab is no help and saying so avoids a hunt. The Glyph tab is worded for
+		// what it actually wants: a glyph picked from its grid, not text typed into a field.
+		const bool glyphTab = (tab == IFindChangeOptions::kGlyphSearch);
+		outSummary.Append(glyphTab ? "No glyph set on the " : "No search text set on the ");
 		PMString tabName(SearchModeName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
-		outSummary.Append(" tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
+		outSummary.Append(glyphTab
+			? " tab. Choose the glyph to find in Edit > Find/Change, then run the search from the panel flyout."
+			: " tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
 		return 0;
 	}
 

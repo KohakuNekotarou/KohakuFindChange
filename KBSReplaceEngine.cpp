@@ -618,19 +618,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			return 0;
 		}
 
-		// ⚠ Only the TEXT tabs can be replaced on. The replace command writes the change string of the
-		// text side, so replacing hits that came from the Glyph tab would put the TEXT tab's
-		// replacement over them - which is exactly what the user hit on 2026-07-30 ("the replace
-		// becomes a Text replace"). Those hits are still listed and still jump; they are simply not
-		// rewritten by this panel.
-		//
-		// This is a refusal, not the final answer: replacing glyph for glyph needs the glyph walk
-		// working first (see KBSSearchEngine::CommitSearchMode on why that is still open).
+		// The three tabs this panel walks. Anything else searches by attribute through a walker of its
+		// own and never produced these rows in the first place, so there is nothing here to rewrite.
 		if (searchedMode >= 0
 			&& searchedMode != IFindChangeOptions::kTextSearch
-			&& searchedMode != IFindChangeOptions::kGrepSearch)
+			&& searchedMode != IFindChangeOptions::kGrepSearch
+			&& searchedMode != IFindChangeOptions::kGlyphSearch)
 		{
-			outSummary.Append("These results did not come from the Text or GREP tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
+			outSummary.Append("These results did not come from the Text, GREP or Glyph tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
 			return 0;
 		}
 	}
@@ -643,6 +638,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// Deliberately here, OUTSIDE the command sequence opened further down: this processes a command of
 	// its own, and a session-setting command inside that sequence would become part of the undo step.
 	KBSSearchEngine::CommitSearchMode();
+
+	// ...and on the Glyph tab, the glyph that will be WRITTEN. Stated only here, never on the search
+	// path, so a search can never leave a change glyph set behind the user's back. false means the
+	// Change To box is empty: refuse rather than let the command fall back on a glyph from some
+	// earlier run. Also outside the sequence, and before it opens, so nothing has been written yet.
+	if (!KBSSearchEngine::CommitReplaceGlyph())
+	{
+		outSummary.Append("No replacement glyph is set on the Glyph tab. Choose the glyph to change to in Edit > Find/Change, then run Change Checked again.");
+		return 0;
+	}
 
 	int32 totalReplaced = 0;
 	int32 chaptersTouched = 0;

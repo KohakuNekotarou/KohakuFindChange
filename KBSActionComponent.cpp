@@ -27,6 +27,7 @@
 
 // Interface includes:
 #include "IFindChangeOptions.h"	// the find / change strings the confirmation prompt names
+#include "CTextEnum.h"			// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 
 // General includes:
 #include "CActionComponent.h"
@@ -245,6 +246,20 @@ void KBSActionComponent::DoAbout()
 	);
 }
 
+// Name a glyph the way the confirmation prompt has to name it. The Glyph tab's query is a glyph,
+// not a string, so quoting the find / change strings there would describe the wrong thing (and on
+// the change side there is no string at all). The character is shown when the glyph has one - many
+// do not, which is the whole point of that tab - and the ID is always shown, because the ID is what
+// the search and the replace actually run on. Pure data: never translated.
+static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID)
+{
+	if (!str.IsEmpty())
+		str.Append("  ");
+	str.Append("[glyph ");
+	str.AppendNumber(glyphID);
+	str.Append("]");
+}
+
 /* ConfirmReplace
 */
 bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
@@ -262,6 +277,21 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	}
 	// Read only - KBS never writes to the user's Find/Change settings.
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	const bool glyphMode = (mode == IFindChangeOptions::kGlyphSearch);
+
+	// A glyph replace with nothing in the Change To box: say so and do not prompt at all. The engine
+	// refuses this run anyway (KBSSearchEngine::CommitReplaceGlyph), so prompting would be asking the
+	// user to authorise a rewrite that cannot happen - and the prompt below would have to describe it
+	// as "delete every match", which is what an empty change STRING means and not what an empty
+	// change GLYPH means. Two gates on purpose, the same way the other refusals are done here: this
+	// one for the menu, the engine's for a DOM caller that never passes through it.
+	if (glyphMode && opts->GetReplaceGlyphID() == kInvalidGlyphID)
+	{
+		PMString noGlyph("No replacement glyph is set on the Glyph tab - nothing was changed.");
+		noGlyph.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(noGlyph);
+		return false;
+	}
 
 	// The prompt is assembled from string-table entries rather than C++ literals, so a Japanese
 	// InDesign asks the question in Japanese (KBS.fr already routes k_jaJP to KBS_jaJP.fr). This is
@@ -288,16 +318,28 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 
 	PMString findStr(opts->GetFindString(mode));
+	if (glyphMode)
+		AppendGlyphDescription(findStr, opts->GetFindGlyphID());
 	findStr.SetTranslatable(kFalse);
 	PMString findLine(kKBSConfirmFindKey);
 	findLine.Translate();
 	::ReplaceStringParameters(&findLine, findStr);
 	msg.Append(findLine);
+	// The dialog's own name for the mode, untranslated everywhere. Named for Glyph as well as GREP:
+	// on that tab what is quoted above is a glyph, and the line has to say so.
 	if (mode == IFindChangeOptions::kGrepSearch)
-		msg.Append("   (GREP)");	// the dialog's own name for the mode, untranslated everywhere
+		msg.Append("   (GREP)");
+	else if (glyphMode)
+		msg.Append("   (Glyph)");
 	msg.Append(kLineSeparatorString);
 
-	PMString replaceStr(opts->GetReplaceString(mode));
+	// On the Glyph tab the change side has no string at all - it is the glyph chosen in Change To,
+	// which the refusal above has already established is there.
+	PMString replaceStr;
+	if (glyphMode)
+		AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID());
+	else
+		replaceStr = opts->GetReplaceString(mode);
 	replaceStr.SetTranslatable(kFalse);
 	if (replaceStr.IsEmpty())
 	{

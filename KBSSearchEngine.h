@@ -60,9 +60,30 @@ namespace KBSSearchEngine
 	    Writes the value it just read, so the user's own settings never change: this STATES the mode,
 	    it does not choose one.
 
+	    On the Glyph tab it states the FIND GLYPH too, for the same reason and by the same rule: the
+	    dialog commits the glyph through kFindChangeGlyphIDCmdBoss when one is picked, so a walk driven
+	    from outside the dialog has to commit it again. Stating the mode alone left the engine in glyph
+	    mode with no glyph and the panel found nothing at all (user, 2026-07-30). The CHANGE glyph is
+	    deliberately NOT stated here - see CommitReplaceGlyph.
+
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
 	          command inside the replace sequence would become part of that undo step. */
 	void CommitSearchMode();
+
+	/** State the glyph a Glyph-tab replace will WRITE, by re-committing the one the user already has
+	    in the dialog's Change To box. Call it immediately after CommitSearchMode on the replace path
+	    only - a search must never leave a change glyph standing, since nothing on screen would say it
+	    had been set.
+
+	    Does nothing unless the Glyph tab is the mode in force. Returns false when that tab has no
+	    change glyph chosen: the caller must then refuse the replace rather than walk, because the
+	    command would otherwise write whatever glyph was committed last - a glyph the user never chose
+	    on this run, and the exact failure this whole mechanism exists to prevent.
+
+	    @return true when it is safe to replace: either not a glyph replace at all, or a change glyph
+	            is set and has been stated.
+	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
+	bool CommitReplaceGlyph();
 
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
