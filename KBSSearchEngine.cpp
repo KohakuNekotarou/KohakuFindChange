@@ -48,6 +48,7 @@
 #include "ILayerUtils.h"			// GetLayerUID - the spread layer a frame sits on
 #include "ISpreadLayer.h"			// GetDocLayerUID - spread layer -> the Layers panel's row
 #include "IDocumentLayer.h"			// IsVisible / IsLocked - is that layer switched off, or locked?
+#include "IPageItemVisibilityFacade.h"	// IsHidden - Object > Hide on the frame itself, which no layer says
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 #include "ILockPosition.h"			// IsPageItemLocked - Object > Lock on the frame itself
@@ -255,13 +256,21 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	return !outPage.IsEmpty();
 }
 
-// Is this frame on a layer the user has switched off? Such a match is composed and has a page like
-// any other - only its drawing is suppressed - so it can be listed and jumped to; the row just has
-// to say so, the way the Find/Change dialog says "Hidden Item".
+// Is this frame switched off? Such a match is composed and has a page like any other - only its
+// drawing is suppressed - so it can be listed and jumped to; the row just has to say so, the way the
+// Find/Change dialog says "Hidden Item".
 //
-// The layer an item sits on is a SPREAD layer (one per spread); the visibility switch lives on the
-// DOCUMENT layer it points at, which is the row in the Layers panel.
-bool IsFrameOnHiddenLayer(IDataBase* db, UID frameUID)
+// TWO independent switches, and both have to be asked:
+//   * its LAYER is hidden. The layer an item sits on is a SPREAD layer (one per spread); the
+//     visibility switch lives on the DOCUMENT layer it points at, which is the row in the Layers
+//     panel.
+//   * the ITEM ITSELF is hidden (Object > Hide), which no layer says anything about.
+//
+// The second one used to be missing here, so a match inside an individually hidden frame came up
+// with no "hidden" mark at all. Adobe asks both: spellpanel's DetermineIfTextIsHidden does the layer
+// test and then IPageItemVisibilityFacade::IsHidden, and states in its own comment that it is the
+// same code as FindChangeClient.cpp - i.e. this is what the Find/Change dialog itself reports.
+bool IsFrameHidden(IDataBase* db, UID frameUID)
 {
 	if (db == nil || frameUID == kInvalidUID)
 		return false;
@@ -271,16 +280,20 @@ bool IsFrameOnHiddenLayer(IDataBase* db, UID frameUID)
 		return false;
 
 	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
-	if (spreadLayerUID == kInvalidUID)
-		return false;
-	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
-	if (spreadLayer == nil)
-		return false;
+	if (spreadLayerUID != kInvalidUID)
+	{
+		InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
+		if (spreadLayer != nil)
+		{
+			InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
+			if (docLayer != nil && !docLayer->IsVisible())
+				return true;
+		}
+	}
 
-	InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
-	if (docLayer == nil)
-		return false;
-	return !docLayer->IsVisible();
+	// The item's own switch. Asked second because it is the rarer of the two, and asked even when the
+	// layer could not be resolved - "cannot tell about the layer" is not an answer about the item.
+	return Utils<Facade::IPageItemVisibilityFacade>()->IsHidden(UIDRef(db, frameUID)) != kFalse;
 }
 
 // Is this frame on a LOCKED layer? Same two-step as the hidden test above (spread layer -> the
@@ -451,7 +464,7 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 		facts.pageIndex = -1;
 	}
 	facts.pageString.SetTranslatable(kFalse);
-	facts.isHidden = IsFrameOnHiddenLayer(docRef.GetDataBase(), frameUID);
+	facts.isHidden = IsFrameHidden(docRef.GetDataBase(), frameUID);
 	facts.isLocked = !IsEditableInFrame(storyRef, frameUID);
 	return cache.insert(std::make_pair(key, facts)).first->second;
 }
