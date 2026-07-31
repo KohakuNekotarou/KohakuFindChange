@@ -19,6 +19,7 @@
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextWalker.h"			// also declares ITextWalkerClient
+#include "ITextWalkerProgressMonitor.h"	// the walker's own progress hook (source/open/interfaces/text)
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
@@ -309,6 +310,25 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		return 0;
 	}
 
+	// Progress from inside this chapter, the same way the search does it: the walker client carries
+	// ITextWalkerProgressMonitor, so it takes a RangeProgressBar (spellpanel's Change All feeds it
+	// the same way, SpellChangeAllObserver.cpp:305-314). It subdivides the chapter bar the caller
+	// holds instead of drawing a dialog of its own - which is why the caller switches child bars
+	// back on once its resolve pass is done.
+	//
+	// showCancel = kFalse deliberately. The bar above owns the cancel button, and here cancelling
+	// means something drastic - the whole run rolls back - so there must be exactly one of them.
+	//
+	// Stack object; the monitor is cleared again after the walk below, because the walker holds the
+	// client and the next chapter would otherwise find a pointer to a destroyed bar.
+	PMString walkProgressTitle("Replacing in chapter...");
+	walkProgressTitle.SetTranslatable(kFalse);
+	RangeProgressBar walkProgress(walkProgressTitle, 0, 100, kFalse /*showImmediate*/, kFalse /*showCancel*/);
+
+	InterfacePtr<ITextWalkerProgressMonitor> walkMonitor(client, UseDefaultIID());
+	if (walkMonitor != nil)
+		walkMonitor->SetWalkerProgressMonitor(&walkProgress);
+
 	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE CHAPTER -
 	// the same deliberate departure from Adobe's examples that KBSSearchEngine explains at length:
 	// the section's contents are the keyboard-focus hand-off (spellpanel names it outright in
@@ -492,6 +512,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 	if (walker->IsWalking())
 		walker->Halt();
+
+	// Take the bar off the client while it is still alive: the walker holds the client, so the
+	// client outlives this function, and the next chapter would find a pointer to a destroyed bar.
+	if (walkMonitor != nil)
+		walkMonitor->SetWalkerProgressMonitor(nil);
 
 	// The chapter has stopped changing, so now each replaced row is given the line it ended up on.
 	//
@@ -703,8 +728,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	}
 
 	// The progress bar. Book scope only, exactly as the search does it: a one-document replace
-	// is a single step with nothing to cancel between. DisableChildProgressBars keeps the
-	// chapter opens in the resolve pass below from raising bars of their own.
+	// is a single step with nothing to cancel between.
+	//
+	// Child bars are disabled FOR THE RESOLVE PASS ONLY and switched back on before the replacing
+	// starts (see the two calls below). Unlike the search - which opens every chapter before its bar
+	// even exists - the resolve pass runs underneath this bar, so a chapter being reopened here
+	// really would raise a bar of its own. Past that pass the only child left is the one worth
+	// having: the per-chapter walk bar, which subdivides this bar's current step rather than drawing
+	// anything of its own (ProgressBar.h:55-61, 216-227).
 	//
 	// showImmediate = kTrue for the reason the search learned the hard way: with the default
 	// the bar waits out an internal delay, and a fast run beats that delay - so the cancel
@@ -764,6 +795,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		chapter.opened = true;
 		pending.push_back(chapter);
 	}
+
+	// Every chapter is resolved: no more documents will be opened from here on, so let the walk
+	// report its own progress inside each chapter (ReplaceInChapter hands the walker a bar). A
+	// replace is slower per match than a search - each one runs a command - so this is where a big
+	// chapter would otherwise sit at "Chapter 3 / 12" saying nothing for a long time.
+	progressBar.DisableChildProgressBars(kFalse);
 
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
 	// sequence below; this is what lets the PANEL be rolled back with it, so the two cannot end up
