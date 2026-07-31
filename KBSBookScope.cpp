@@ -122,6 +122,41 @@ namespace
 			default:								return "";
 		}
 	}
+
+	/** The open book whose file path is 'bookPath', or nil when none has it. Non-owning - the
+	    book manager keeps the list, so nothing here is released.
+
+	    Paths rather than IBook pointers because one caller is a close notification: the closing
+	    book's IBook is already gone by then, so there is no pointer left to compare.
+
+	    The IsOpen() test is what makes this usable from that notification. Measured 2026-07-27 on
+	    the release build: when kCloseBookCmdBoss is broadcast, the closing book is STILL on
+	    IBookManager's list, so membership alone answers "yes, still open" for the very book that is
+	    closing - which made the guard reject the one case it exists for. IBook::IsOpen is the flag
+	    the close clears. */
+	IBook* FindOpenBookByPath(const PMString& bookPath)
+	{
+		if (bookPath.IsEmpty())
+			return nil;
+
+		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+		if (bookMgr == nil)
+			return nil;
+
+		const int32 bookCount = bookMgr->GetBookCount();
+		for (int32 i = 0; i < bookCount; ++i)
+		{
+			IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
+			if (book == nil)
+				continue;
+			if (!book->IsOpen())
+				continue;
+			SDKFileHelper bookFileHelper(book->GetBookFileSpec());
+			if (bookFileHelper.GetPath() == bookPath)
+				return book;
+		}
+		return nil;
+	}
 }
 
 bool KBSBookScope::IsBookScopeOn()
@@ -446,35 +481,79 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 {
-	if (bookPath.IsEmpty())
+	// The path walk, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which
+	// ActivateBook needs as well - it wants the book itself, not just whether there is one.
+	return FindOpenBookByPath(bookPath) != nil;
+}
+
+bool KBSBookScope::ActivateBook(const PMString& bookPath)
+{
+	IBook* book = FindOpenBookByPath(bookPath);		// non-owning pointer - no release
+	if (book == nil)
 		return false;
 
+	// TWO separate states, and they really are separate: selecting a tab in the book panel does
+	// NOT change IBookManager's current active book, and setting the active book does not move the
+	// tab (measured 2026-07-27; docs/ai-notes/book-panel-active-tab.md). The user asked for both,
+	// so both are set here.
+
+	// 1. The active book - what every book API answers about. Set directly, the way Adobe's own
+	//    AcquireCurrentBook does (source/open/includes/layout/AcquireCurrentBook.h:72,87), which is
+	//    the only worked example in the SDK. kSetCurrentActiveBookCmdBoss exists but has no call
+	//    site anywhere in the SDK, and this is session UI state rather than document data.
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-	if (bookMgr == nil)
-		return false;
+	if (bookMgr != nil)
+		bookMgr->SetCurrentActiveBook(book);
 
-	// Walk the open-book list comparing file paths: the caller is a close notification, and the
-	// path recorded at search time is the only thing left to compare against.
-	//
-	// The IsOpen() test is what makes this usable from a close notification. Measured 2026-07-27
-	// on the release build: when kCloseBookCmdBoss is broadcast, the closing book is STILL on
-	// IBookManager's list, so membership alone answers "yes, still open" for the very book that is
-	// closing - which made this guard reject the one case it exists for. IBook::IsOpen is the flag
-	// the close clears, so a book that is on the list but no longer open is not counted here.
-	const int32 bookCount = bookMgr->GetBookCount();
-	for (int32 i = 0; i < bookCount; ++i)
+	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
+	//    panel is found by walking the list and asking each candidate which book it belongs to -
+	//    the WidgetID is numbered per book at runtime, which is why no name can be used here.
+	if (!Utils<IBookUIUtils>().Exists())
+		return true;	// the active book was still set; the tab is the part we could not do
+
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	if (app == nil)
+		return true;
+	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	if (panelMgr == nil)
+		return true;
+	IDataBase* panelDB = ::GetDataBase(panelMgr);
+	if (panelDB == nil)
+		return true;
+
+	const uint32 panelCount = panelMgr->GetPanelCount();
+	for (uint32 i = 0; i < panelCount; ++i)
 	{
-		IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
-		if (book == nil)
+		UID panelUID;
+		WidgetID panelWidgetID;
+		PMString panelName;
+		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, &panelWidgetID, &panelName))
 			continue;
-		if (!book->IsOpen())
+
+		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
+		if (panelView == nil)
 			continue;
-		SDKFileHelper bookFileHelper(book->GetBookFileSpec());
-		const PMString openBookPath = bookFileHelper.GetPath();
-		if (openBookPath == bookPath)
-			return true;
+
+		const bool isBookPanel = (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
+								 || PanelNameMatchesOpenBook(panelName);
+		if (!isBookPanel)
+			continue;
+
+		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is
+		// precisely the one that is NOT in front yet.
+		IDFile panelBookFile;
+		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
+		SDKFileHelper panelFileHelper(panelBookFile);
+		if (!(panelFileHelper.GetPath() == bookPath))
+			continue;
+
+		// kFalse = do not take the key focus. The keyboard walk calls this while the user is
+		// holding an arrow key on the result tree; handing the focus to the book panel would end
+		// the walk at the first book row.
+		panelMgr->ShowPanelByWidgetID(panelWidgetID, kFalse);
+		break;
 	}
-	return false;
+	return true;
 }
 
 bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,

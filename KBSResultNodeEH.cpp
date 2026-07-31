@@ -7,9 +7,9 @@
 //  Tree row event handler (Task 3): a click on a HIT row jumps to that occurrence. Replaces
 //  IID_IEVENTHANDLER on the result tree's node boss (kKBSResultNodeWidgetBoss). Derives from the
 //  stock TreeNodeEventHandler so ordinary tree behaviour (select, expand/collapse, drag) is kept;
-//  only the button-UP is extended. Every click jumps (fresh or a re-click on the already-selected
-//  row); chapter rows just select / expand. Simplified from KESCL (which split fresh clicks onto a
-//  selection observer).
+//  only the button-UP is extended. EVERY row now has somewhere to go - KBSJump::ActivateNode sorts
+//  out which: a hit row jumps, a chapter row shows its document, the book row activates its book.
+//  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button
 //  going UP, only when the base handler did NOT claim the event, only without Shift / Cmd, and only
@@ -68,8 +68,8 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	const NodeID& node = nodeData->Get();
 	TreeNodePtr<KBSResultNodeID> nodeID(node);
-	if (nodeID == nil || !nodeID->IsHitRow())
-		return result;		// chapter and book rows only select / expand
+	if (nodeID == nil || nodeID->IsRoot())
+		return result;		// the hidden root has nowhere to go
 
 	// The selection lives on the tree, not on the row, so ask upwards for it.
 	InterfacePtr<const IWidgetParent> widgetParent(this, UseDefaultIID());
@@ -80,7 +80,7 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	if (treeController == nil || !treeController->IsSelected(node))
 		return result;
 
-	KBSJump::JumpToHit(nodeID->GetChapter(), nodeID->GetHit());
+	KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 	return result;
 }
 

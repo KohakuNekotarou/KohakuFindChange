@@ -297,6 +297,33 @@ namespace
 		return true;
 	}
 
+	// Make a chapter reachable: reopen it windowless if the user closed it since the search, and
+	// rebind the model so later work uses the live database. Shared by JumpToHit and ShowChapter -
+	// the two differ in what they do AFTER this, not in how they get there.
+	//
+	// Returns false when the chapter cannot be reached at all; the caller has already been told
+	// why through the status line, so it should just return.
+	bool EnsureChapterReachable(int32 chapterIdx, UIDRef& ioDocRef, const IDFile& file)
+	{
+		if (KBSBookScope::IsDocStillOpen(ioDocRef))
+			return true;
+
+		UIDRef reopened;
+		if (!KBSBookScope::ReopenChapterDoc(file, reopened))
+		{
+			// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
+			// nothing at all when clicked reads as a broken panel: the file has been moved,
+			// deleted, renamed, or is open in another application.
+			PMString message("Cannot open that chapter - moved, deleted, or in use?");
+			message.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(message);
+			return false;
+		}
+		ioDocRef = reopened;
+		KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
+		return true;
+	}
+
 } // anonymous namespace
 
 //----------------------------------------------------------------------------------------
@@ -323,24 +350,9 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		return;
 
 	// The chapter may have been closed since the search (the user can close a held window). Bring
-	// it back windowless by file - the stored story UID / positions are persistent in the file, so
-	// the reopened document answers them - and rebind the model so a later jump uses the live DB.
-	if (!KBSBookScope::IsDocStillOpen(docRef))
-	{
-		UIDRef reopened;
-		if (!KBSBookScope::ReopenChapterDoc(file, reopened))
-		{
-			// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
-			// nothing at all when clicked reads as a broken panel, which is what this used to do:
-			// the file has been moved, deleted, renamed, or is open in another application.
-			PMString message("Cannot open that chapter - moved, deleted, or in use?");
-			message.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(message);
-			return;
-		}
-		docRef = reopened;
-		KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
-	}
+	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
+	if (!EnsureChapterReachable(chapterIdx, docRef, file))
+		return;
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -443,6 +455,63 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		}
 		KBSResultTree::ShowStatus(message);
 	}
+}
+
+void KBSJump::ShowChapter(int32 chapterIdx)
+{
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file))
+		return;
+
+	if (!EnsureChapterReachable(chapterIdx, docRef, file))
+		return;
+
+	// Showing a chapter is NOT jumping to a match: the view is left exactly where the user had it
+	// and no marker is raised. The row says "this document", so the answer is that document, not a
+	// place inside it. (KESCL's document rows behave the same way.)
+	if (!EnsureDocFrontmost(docRef))
+	{
+		PMString message("Cannot bring that chapter's window to the front.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return;
+	}
+
+	// Same sweep a jump does: with "Hide Previous Chapter" ON the desk is left showing only where
+	// we landed. The landed-in document is the exception.
+	if (gHidePrevChapterOn)
+		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
+}
+
+void KBSJump::ShowBook()
+{
+	// Which book the results came from. The HELD PATH, not the model's display name: that name is
+	// the file name only, and two books in different folders can share one.
+	PMString bookPath;
+	if (!KBSBookScope::GetHeldBookPath(bookPath) || bookPath.IsEmpty())
+		return;		// a document-scope result has no book row to click in the first place
+
+	// A book closed since the search is NOT reopened. The row records which book was SEARCHED; it
+	// is not a request to open a file. Saying so beats a row that appears to do nothing.
+	if (!KBSBookScope::ActivateBook(bookPath))
+	{
+		PMString message("That book is no longer open.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+	}
+}
+
+void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
+{
+	// One door for every row, so a click and a keyboard walk can never drift apart - the reason
+	// this exists at all is that there are now two callers.
+	if (hitIdx >= 0)
+		JumpToHit(chapterIdx, hitIdx);
+	else if (chapterIdx >= 0)
+		ShowChapter(chapterIdx);
+	else if (chapterIdx == -1)
+		ShowBook();
 }
 
 // End, KBSJump.cpp.

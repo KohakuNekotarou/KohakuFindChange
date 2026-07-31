@@ -25,6 +25,25 @@ namespace KBSJump
 	    left as-is and no marker is shown (the overset "+" locator is Task 4). */
 	void JumpToHit(int32 chapterIdx, int32 hitIdx);
 
+	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if
+	    the user closed it since the search. Does NOT scroll and raises no marker - a chapter row
+	    names a document, not a place inside one. Honours "Hide Previous Chapter". No-op on a bad
+	    index; an unreachable chapter reports through the status line. */
+	void ShowChapter(int32 chapterIdx);
+
+	/** Activate the book the results came from: make it IBookManager's current active book AND
+	    bring its tab to the front in the book panel - two separate things that do not follow each
+	    other. A book that has been closed since the search is NOT reopened; the status line says
+	    so. No-op for a document-scope result, which has no book row. */
+	void ShowBook();
+
+	/** The single door every result row goes through: a hit row jumps, a chapter row shows its
+	    document, the book row activates its book. Called by the row click and by the keyboard
+	    walk, which is why it exists - two callers must not drift apart.
+	    @param chapterIdx the chapter index, or -1 for the book row.
+	    @param hitIdx the hit index, or -1 when the row is not a hit row. */
+	void ActivateNode(int32 chapterIdx, int32 hitIdx);
+
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read by JumpToHit to
 	    decide whether to close other displayed chapters as a jump lands; the flyout drives it. */
 	bool IsHidePreviousChapterOn();

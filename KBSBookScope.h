@@ -85,6 +85,19 @@ namespace KBSBookScope
 	    IBook is already gone by then, so there is no pointer left to compare. */
 	bool IsBookStillOpen(const PMString& bookPath);
 
+	/** Make the book at 'bookPath' the current one in BOTH senses: IBookManager's active book and
+	    the front tab of the book panel. Those are separate states that do not follow each other -
+	    selecting a tab leaves the active book alone and vice versa - so a caller that means "this
+	    book now" has to say both, which is what this does.
+
+	    The tab is brought forward WITHOUT taking the key focus, so a keyboard walk over the result
+	    tree is not interrupted by it.
+
+	    @param bookPath the book's full file path (what GetHeldBookPath hands back).
+	    @return false when no OPEN book has that path - nothing is changed then. A true return means
+	            the active book was set; the tab follows unless the panel could not be resolved. */
+	bool ActivateBook(const PMString& bookPath);
+
 	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
 	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not
 	    make that book active - only touching a chapter inside it does (measured 2026-07-27).
