@@ -410,14 +410,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Check All / Uncheck All: select every stored hit for replacement, or none.
+		// ----- The result rows' right-click context menu (2026-08-01) -----
+		// Popped at the cursor by the row event handler (KBSResultNodeEH::RButtonDn, through
+		// IMenuManager::HandlePopupMenu with this subtree's name). Check All / Uncheck All are its two
+		// items; they sat on the flyout above until this date, where they could only ever mean "every
+		// hit everywhere". Here they mean the row the menu was popped over - the BOOK row for all of
+		// it, a document row for that chapter alone - which is why they moved.
 		kKBSCheckAllActionID,
-		kKBSTargetMenuPath
+		kKBSResultRowMenuName
 		kKBSCheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKBSUncheckAllActionID,
-		kKBSTargetMenuPath
+		kKBSResultRowMenuName
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
@@ -501,8 +506,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Check All / Uncheck All. kCustomEnabling so UpdateActionStates can grey them out when
-		// there are no results to check.
+		// Check All / Uncheck All - the result rows' right-click menu since 2026-08-01 (the MenuDef
+		// above). kCustomEnabling so UpdateActionStates can grey them out when the row the menu was
+		// popped over has nothing left to check; it is also what lets that hook see them at all, and
+		// the hook is where the right-click target is read.
 		kKBSActionComponentBoss,
 		kKBSCheckAllActionID,
 		kKBSCheckAllMenuKey,			// "Check All"

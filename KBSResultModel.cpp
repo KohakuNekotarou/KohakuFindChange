@@ -65,6 +65,21 @@ namespace
 		gRowBackup.push_back(saved);
 	}
 
+	// Which row the result tree's right-click menu was popped over (KBSResultNodeEH stashes it just
+	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
+	// negative values it can hold.
+	int32 gContextMenuChapter = KBSResultModel::kNoContextMenuChapter;
+
+	// Does this row carry a check box? THE one definition of the question, so the commands that set
+	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
+	// a row the model quietly checked but the panel drew no box for would be replaced without ever
+	// having been asked for. Replaced = the text it matched is gone; locked = InDesign offers no way
+	// to change it; an outcome already says why it was left alone.
+	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
+	{
+		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
+	}
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -90,6 +105,9 @@ void KBSResultModel::Clear()
 	gFromBook = false;
 	gBookName.Clear();
 	gSearchMode = -1;
+	// The right-click target is an index into the chapters that just went away - keeping it would let
+	// the next search's Check All reach a chapter the user never right-clicked.
+	gContextMenuChapter = kNoContextMenuChapter;
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)
@@ -413,10 +431,26 @@ void KBSResultModel::SetAllChecked(bool checked)
 		{
 			// The rows that carry no check box are not touched by Check All either - otherwise
 			// the model would hold checked hits the panel shows no box for.
-			if (hits[hi].replaced || hits[hi].isLocked || hits[hi].outcome != kOutcomeNone)
+			if (!RowHasCheckBox(hits[hi]))
 				continue;
 			hits[hi].checked = checked;
 		}
+	}
+}
+
+void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
+{
+	if (gShowingOutcome)
+		return;		// nothing on a report is selectable
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+
+	std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	for (size_t hi = 0; hi < hits.size(); ++hi)
+	{
+		if (!RowHasCheckBox(hits[hi]))
+			continue;
+		hits[hi].checked = checked;
 	}
 }
 
@@ -464,12 +498,38 @@ int32 KBSResultModel::GetCheckableCount()
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			// Has a box: not replaced, not locked, and not already saying why it was left alone.
-			if (!hits[hi].replaced && !hits[hi].isLocked && hits[hi].outcome == kOutcomeNone)
+			if (RowHasCheckBox(hits[hi]))
 				++count;
 		}
 	}
 	return count;
+}
+
+int32 KBSResultModel::GetChapterCheckableCount(int32 chapterIdx)
+{
+	if (gShowingOutcome)
+		return 0;	// every row has lost its box, whichever chapter the menu was popped over
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+
+	int32 count = 0;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	for (size_t hi = 0; hi < hits.size(); ++hi)
+	{
+		if (RowHasCheckBox(hits[hi]))
+			++count;
+	}
+	return count;
+}
+
+void KBSResultModel::SetContextMenuChapter(int32 chapterIdx)
+{
+	gContextMenuChapter = chapterIdx;
+}
+
+int32 KBSResultModel::GetContextMenuChapter()
+{
+	return gContextMenuChapter;
 }
 
 int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)

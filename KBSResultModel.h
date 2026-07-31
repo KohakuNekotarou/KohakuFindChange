@@ -249,10 +249,17 @@ namespace KBSResultModel
 	    2026-07-30 with no callers left - every asker wants the other two flags in the same breath.) */
 	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked);
 
-	/** Select / deselect EVERY hit in every chapter (the flyout's Check All / Uncheck All). Applies
-	    to all stored hits, including those past the panel's display cap - the display cap must not
-	    silently shrink what a replace touches. Replaced and locked hits are skipped. */
+	/** Select / deselect EVERY hit in every chapter - Check All / Uncheck All over the tree's BOOK
+	    row. Applies to all stored hits, including those past the panel's display cap - the display cap
+	    must not silently shrink what a replace touches. Replaced and locked hits are skipped. */
 	void SetAllChecked(bool checked);
+
+	/** Select / deselect every hit in ONE chapter - the same two commands over a DOCUMENT row
+	    (2026-08-01, when they moved off the panel flyout onto the rows' right-click menu). Identical
+	    rules to SetAllChecked, applied to one chapter: every stored hit including those past the
+	    display cap, and the rows that carry no check box are left alone. An index out of range, and a
+	    panel showing a replace's report, are both no-ops. */
+	void SetChapterChecked(int32 chapterIdx, bool checked);
 
 	/** How many hits are selected across all chapters (uncapped) - for the status read-out and for
 	    the replace command's enablement. */
@@ -268,6 +275,27 @@ namespace KBSResultModel
 	    showing a replace's aftermath, or every match landed in locked content - and Check All /
 	    Uncheck All have nothing to act on, so they are greyed out. */
 	int32 GetCheckableCount();
+
+	/** The same count for ONE chapter, which is the range Check All / Uncheck All cover when the
+	    right-click menu was popped over a document row. Zero greys them out there for the same reason
+	    the whole-model count does over the book row: every row in that document has lost its box. */
+	int32 GetChapterCheckableCount(int32 chapterIdx);
+
+	/** Which row the result tree's right-click menu was popped over. KBSResultNodeEH stashes it
+	    immediately before HandlePopupMenu and the Check All / Uncheck All actions read it back - an
+	    action component is handed no widget context of its own. (The pattern is KESCL's
+	    KESCLBatchCheck::SetContextMenuNode, which its "Copy as Text" row menu uses the same way.)
+
+	    Clear() puts it back to kNoContextMenuChapter, so an index taken from one result set can never
+	    name a chapter of the next one; the readers range-check it as well, because a caller that never
+	    went through the menu - a script firing the action - reaches them with whatever is stored. */
+	enum
+	{
+		kContextMenuBookRow		= -1,	// the BOOK row: the commands reach every chapter
+		kNoContextMenuChapter	= -2	// nothing has been right-clicked: they do nothing at all
+	};
+	void SetContextMenuChapter(int32 chapterIdx);
+	int32 GetContextMenuChapter();
 
 	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
 	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is

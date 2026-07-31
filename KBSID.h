@@ -283,6 +283,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 #define kKBSInternalPopupMenuNameKey kKBSStringPrefix	"kKBSInternalPopupMenuNameKey"
 #define kKBSTargetMenuPath kKBSInternalPopupMenuNameKey
 
+// The result rows' right-click context menu (2026-08-01, user request): the popup's internal name.
+// KBSResultNodeEH::RButtonDn pops the MenuDef subtree of this name at the cursor with
+// IMenuManager::HandlePopupMenu - the same machinery as the real Links / Layers panel row menus, and
+// as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
+// plain literal rather than a translated key.
+#define kKBSResultRowMenuName				"KBSRtMenuResultRow"
+
 // The Change Checked confirmation prompt. Its wording lives in the string tables (KBS_enUS.fr /
 // KBS_jaJP.fr) instead of being built from C++ literals, so a Japanese InDesign shows a Japanese
 // prompt - KBS.fr already routes k_jaJP to the jaJP table. The keys carry the plug-in's prefix
@@ -328,10 +335,14 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The replace block sits below the existing toggles, above the About separator (10.0).
 #define kKBSSeparator3MenuItemPosition		3.0
 #define kKBSReplaceCheckedMenuItemPosition	4.0
-#define kKBSCheckAllMenuItemPosition		5.0
-#define kKBSUncheckAllMenuItemPosition		6.0
 #define	kKBSSeparator1MenuItemPosition		10.0
 #define kKBSAboutThisMenuItemPosition		11.0
+
+// Check All / Uncheck All are the two items of the RESULT ROWS' right-click menu (2026-08-01), not
+// of the flyout, so their positions are that menu's own 1 and 2 - they were 5.0 and 6.0 while they
+// sat under Change Checked on the flyout.
+#define kKBSCheckAllMenuItemPosition		1.0
+#define kKBSUncheckAllMenuItemPosition		2.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets (Task 2). Offset from the

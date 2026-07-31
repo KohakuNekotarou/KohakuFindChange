@@ -214,10 +214,25 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSCheckAllActionID:
 		case kKBSUncheckAllActionID:
 		{
-			// Select / deselect every stored hit - including the ones past the panel's display cap
-			// (kKBSDisplayHitLimit), which is why the status line spells the numbers out
-			// afterwards. Named rather than spelled out: this read "500-row" long after it was 5000.
-			KBSResultModel::SetAllChecked(actionID.Get() == kKBSCheckAllActionID);
+			// Both commands live on the result rows' right-click menu (2026-08-01; they were on the
+			// flyout until then), so the row the menu was popped over is what says how far they reach:
+			// the BOOK row means every chapter - the flyout's old behaviour - and a document row means
+			// that chapter alone. KBSResultNodeEH stashed it just before popping the menu.
+			//
+			// Nothing stashed means nobody right-clicked a row: a caller that never went through the
+			// menu - a script firing the action by ID - lands here, and there is no row for it to be
+			// talking about. Do nothing rather than guess at "everything".
+			//
+			// Either way this covers every STORED hit, including the ones past the panel's display cap
+			// (kKBSDisplayHitLimit), which is why the status line spells the numbers out afterwards.
+			const int32 target = KBSResultModel::GetContextMenuChapter();
+			if (target == KBSResultModel::kNoContextMenuChapter)
+				break;
+			const bool check = (actionID.Get() == kKBSCheckAllActionID);
+			if (target == KBSResultModel::kContextMenuBookRow)
+				KBSResultModel::SetAllChecked(check);
+			else
+				KBSResultModel::SetChapterChecked(target, check);
 			// Only what the rows DRAW changed - the tree's shape is untouched - so repaint them in
 			// place instead of rebuilding. One notification per chapter, and the expansion state
 			// survives (a chapter the user collapsed stays collapsed).
@@ -457,7 +472,18 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// action that asks for them, so take each once here instead of per action. The cap is named
 	// rather than spelled out: this comment read "5000" long after the ceiling became 10000.
 	const int32 checkedCount = KBSResultModel::GetCheckedCount();
-	const int32 checkableCount = KBSResultModel::GetCheckableCount();
+
+	// How many rows still carry a check box in the range Check All / Uncheck All would act on. That
+	// range is the row their right-click menu was popped over (2026-08-01), so it is read here rather
+	// than model-wide: over a document whose every hit is locked or already replaced, both commands
+	// are no-ops and go grey - exactly as they do over a book with nothing left anywhere. Taken once
+	// because the two commands ask the same question.
+	const int32 contextChapter = KBSResultModel::GetContextMenuChapter();
+	int32 contextCheckable = 0;
+	if (contextChapter == KBSResultModel::kContextMenuBookRow)
+		contextCheckable = KBSResultModel::GetCheckableCount();
+	else if (contextChapter != KBSResultModel::kNoContextMenuChapter)
+		contextCheckable = KBSResultModel::GetChapterCheckableCount(contextChapter);
 
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
 	{
@@ -513,7 +539,13 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// Nothing to check without results - and nothing to check after a replace either, where
 			// the panel lists what CHANGED and no row has a box left. Both commands would be no-ops
 			// there, so they go grey along with the boxes. Not a toggle - no check mark either way.
-			const bool16 haveCheckable = (checkableCount > 0) ? kTrue : kFalse;
+			//
+			// Measured 2026-08-01: these two are the WHOLE right-click menu, so disabling both does
+			// not grey a menu out - no menu appears at all (an empty popup is not shown). Right-
+			// clicking a row while the panel shows a replace's report therefore does nothing visible,
+			// which the user accepted as the better behaviour. It also proves this hook runs for the
+			// popup menu, which is what lets the enablement follow the right-clicked row at all.
+			const bool16 haveCheckable = (contextCheckable > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
