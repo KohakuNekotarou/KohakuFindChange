@@ -1041,7 +1041,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	outSummary.AppendNumber(totalReplaced);
 	outSummary.Append(" replaced in ");
 	outSummary.AppendNumber(chaptersTouched);
-	outSummary.Append(" chapter(s). Not saved - check them and save yourself.");
+	outSummary.Append(" chapter(s).");
+
+	// Urge a save only when something was actually written. A run where every checked row came back
+	// missing, locked or refused leaves every file exactly as it found it, and "check them and save
+	// yourself" there reads as though something HAD been changed - at the very moment the user is
+	// already wondering what became of their hits.
+	if (totalReplaced > 0)
+		outSummary.Append(" Not saved - check them and save yourself.");
 
 	if (chaptersSkipped > 0)
 	{
