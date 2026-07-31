@@ -86,6 +86,13 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSConfirmUnsavedOneKey,		"章は開かれたまま、未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で戻せます。",
                 kKBSConfirmUnsavedManyKey,		"^1 個の章が開かれたまま、未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で、すべての章が元に戻ります。",
 
+                // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
+                // 件数の行と末尾の未保存の行は上の CAlert 用と共用。新規はこの4つだけ。
+                kKBSGlyphConfirmFindLabelKey,	"検索",
+                kKBSGlyphConfirmChangeLabelKey,	"置換後",
+                kKBSGlyphConfirmArrowKey,		"→",
+                kKBSGlyphConfirmDontShowKey,	"次回から表示しない",
+
               // ----- Error strings
 
                 // ----- Misc strings
