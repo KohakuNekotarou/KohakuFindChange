@@ -264,8 +264,19 @@ bool HasFindQuery()
 // Do_FindGlyph and Do_ReplaceGlyph, the only worked glyph example in the SDK.
 void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 {
-	// Nothing chosen on that side. Committing -1 would only clear what the dialog already holds.
-	if (glyphID == kInvalidGlyphID)
+	// An empty box means different things on the two sides, so they are treated differently.
+	//
+	// FIND side: nothing to look for. The search is stopped before it ever gets here (HasFindQuery
+	// asks IsThereSomethingToFind), so committing -1 would only clear what the dialog already holds.
+	// Leave that side alone.
+	//
+	// REPLACE side: an empty Change To box is a legitimate request - it DELETES every match, exactly
+	// as an empty change string does on the Text tab, and the Find/Change dialog itself allows it
+	// (confirmed against the dialog, 2026-07-31). There the -1 MUST be stated: leaving it unstated
+	// makes the replace command fall back on whatever change glyph was committed last, writing a
+	// glyph the user did not choose and cannot see anywhere on screen. Stating it is what overwrites
+	// that leftover.
+	if (glyphID == kInvalidGlyphID && findSide)
 		return;
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeGlyphIDCmdBoss));
@@ -965,14 +976,12 @@ bool KBSSearchEngine::CommitReplaceGlyph()
 	if (opts->GetSearchMode() != IFindChangeOptions::kGlyphSearch)
 		return true;	// Not a glyph replace - nothing to state, nothing to stop.
 
-	// No glyph in the dialog's Change To box. Say so instead of walking: with nothing committed the
-	// replace command falls back on whatever change glyph was committed last, which is a glyph the
-	// user did not choose on this run and cannot see anywhere on screen.
-	const Text::GlyphID replaceGlyphID = opts->GetReplaceGlyphID();
-	if (replaceGlyphID == kInvalidGlyphID)
-		return false;
-
-	CommitGlyphID(replaceGlyphID, kFalse);	// kFalse = the replace side of the glyph query
+	// An empty Change To box is NOT refused. It means "delete every match" - the same thing an empty
+	// change string means on the Text tab - and that is what the Find/Change dialog does with it.
+	// KBS used to stop the run here, which made the panel strictly less capable than the dialog it
+	// delegates to (user's report 2026-07-31). What the old code was right about is that the empty
+	// box must never be left UNSTATED; CommitGlyphID states it on this side for exactly that reason.
+	CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side of the query
 	return true;
 }
 

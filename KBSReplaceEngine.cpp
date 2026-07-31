@@ -676,12 +676,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	KBSSearchEngine::CommitSearchMode();
 
 	// ...and on the Glyph tab, the glyph that will be WRITTEN. Stated only here, never on the search
-	// path, so a search can never leave a change glyph set behind the user's back. false means the
-	// Change To box is empty: refuse rather than let the command fall back on a glyph from some
-	// earlier run. Also outside the sequence, and before it opens, so nothing has been written yet.
+	// path, so a search can never leave a change glyph set behind the user's back. An EMPTY Change To
+	// box is stated too, not refused - it means "delete every match", the same as an empty change
+	// string on the Text tab. false now means only that the Find/Change settings could not be read at
+	// all. Also outside the sequence, and before it opens, so nothing has been written yet.
 	if (!KBSSearchEngine::CommitReplaceGlyph())
 	{
-		outSummary.Append("No replacement glyph is set on the Glyph tab. Choose the glyph to change to in Edit > Find/Change, then run Change Checked again.");
+		outSummary.Append("Find/Change settings are unavailable - nothing was changed.");
 		return 0;
 	}
 

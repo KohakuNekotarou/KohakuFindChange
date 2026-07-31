@@ -50,6 +50,7 @@
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
+#include "KBSGlyphConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -251,16 +252,22 @@ void KBSActionComponent::DoAbout()
 
 // Name a glyph the way the confirmation prompt has to name it. The Glyph tab's query is a glyph,
 // not a string, so quoting the find / change strings there would describe the wrong thing (and on
-// the change side there is no string at all). The character is shown when the glyph has one - many
-// do not, which is the whole point of that tab - and the ID is always shown, because the ID is what
-// the search and the replace actually run on. Pure data: never translated.
-static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID)
+// the change side there is no string at all). The ID is always shown, because the ID is what the
+// search and the replace actually run on - but an ID alone does not identify a character (a GID
+// belongs to one font file, a CID means a different character under a different ROS), so the font
+// is named beside it whenever it could be resolved. Pure data: never translated.
+static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID, const PMString& fontLabel)
 {
 	if (!str.IsEmpty())
 		str.Append("  ");
 	str.Append("[glyph ");
 	str.AppendNumber(glyphID);
 	str.Append("]");
+	if (!fontLabel.IsEmpty())
+	{
+		str.Append("  ");
+		str.Append(fontLabel);
+	}
 }
 
 /* ConfirmReplace
@@ -282,19 +289,18 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	const bool glyphMode = (mode == IFindChangeOptions::kGlyphSearch);
 
-	// A glyph replace with nothing in the Change To box: say so and do not prompt at all. The engine
-	// refuses this run anyway (KBSSearchEngine::CommitReplaceGlyph), so prompting would be asking the
-	// user to authorise a rewrite that cannot happen - and the prompt below would have to describe it
-	// as "delete every match", which is what an empty change STRING means and not what an empty
-	// change GLYPH means. Two gates on purpose, the same way the other refusals are done here: this
-	// one for the menu, the engine's for a DOM caller that never passes through it.
-	if (glyphMode && opts->GetReplaceGlyphID() == kInvalidGlyphID)
-	{
-		PMString noGlyph("No replacement glyph is set on the Glyph tab - nothing was changed.");
-		noGlyph.SetTranslatable(kFalse);
-		KBSResultTree::ShowStatus(noGlyph);
-		return false;
-	}
+	// A glyph replace with nothing in the Change To box used to be refused here. It is not: an empty
+	// Change To DELETES every match, which is what the Find/Change dialog does with it (confirmed
+	// against the dialog, 2026-07-31), and refusing it made this panel less capable than the dialog
+	// it delegates to. It is still shown to the user before anything is written - the prompt below
+	// simply leaves the "Change to:" line empty, and an empty line after that label is what an empty
+	// box looks like.
+
+	// On the Glyph tab, work out which fonts the two glyphs belong to. A glyph id names nothing
+	// by itself, so the answer is worth having even here, in the plain prompt: it is what turns
+	// "[glyph 7425]" into something the user can check against the Find/Change dialog. Whatever
+	// this resolves is released before every exit below.
+	const bool glyphResolved = glyphMode && KBSGlyphConfirmDialog::Resolve(opts);
 
 	// The prompt is assembled from string-table entries rather than C++ literals, so a Japanese
 	// InDesign asks the question in Japanese (KBS.fr already routes k_jaJP to KBS_jaJP.fr). This is
@@ -322,7 +328,8 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 
 	PMString findStr(opts->GetFindString(mode));
 	if (glyphMode)
-		AppendGlyphDescription(findStr, opts->GetFindGlyphID());
+		AppendGlyphDescription(findStr, opts->GetFindGlyphID(),
+			glyphResolved ? KBSGlyphConfirmDialog::GetFindSide().fFontLabel : PMString());
 	findStr.SetTranslatable(kFalse);
 	// CAlert draws its message through a widget that reads a lone '&' as a keyboard accelerator -
 	// its own check box arrives spelled "&Don't show again". Without this a search for "A&B" is
@@ -345,11 +352,21 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// which the refusal above has already established is there.
 	PMString replaceStr;
 	if (glyphMode)
-		AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID());
+	{
+		// An empty Change To box leaves this line EMPTY - no "[glyph -1]", and no sentence
+		// explaining it either (user's decision, 2026-07-31). The blank after the label is what an
+		// empty box looks like, and it reads the same way in every language.
+		if (opts->GetReplaceGlyphID() != kInvalidGlyphID)
+			AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID(),
+				glyphResolved ? KBSGlyphConfirmDialog::GetChangeSide().fFontLabel : PMString());
+	}
 	else
 		replaceStr = opts->GetReplaceString(mode);
 	replaceStr.SetTranslatable(kFalse);
-	if (replaceStr.IsEmpty())
+	// Text and GREP only: on those tabs the change string is a STRING, and a blank line there could
+	// as easily be a mistake as a deletion, so it is spelled out. The Glyph tab says it with the
+	// blank itself - see above.
+	if (replaceStr.IsEmpty() && !glyphMode)
 	{
 		// An empty change string is a legitimate request - it deletes every match - so it is
 		// spelled out instead of leaving a blank line for the user to interpret.
@@ -401,6 +418,10 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 		kNullString,					// stock "OK"
 		kNullString,					// stock "Cancel"
 		1 /*OK, when the prompt is suppressed*/);
+
+	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
+	KBSGlyphConfirmDialog::ReleaseSides();
+
 	// 1 = OK, 2 = OK + don't show again, 3 = Cancel, 4 = Cancel + don't show again.
 	return answer == 1 || answer == 2;
 }
