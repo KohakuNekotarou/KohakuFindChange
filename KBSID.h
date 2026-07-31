@@ -197,10 +197,9 @@ DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 // book-wide replace back, so a command of our own had nothing left to add. Left commented rather
 // than reused, so an old workspace referring to that ActionID cannot bind to something else.
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 12)
-// TEMPORARY (the "A" experiment): the DoReplaceAll measurement probe. + 12 is deliberately NOT
-// reused - it belonged to the withdrawn "Undo All Replacements" command, and an old workspace
-// referring to that ActionID must not bind to something else. Delete this line with the probe.
-DECLARE_PMID(kActionIDSpace, kKBSReplaceProbeActionID, kKBSPrefix + 13)
+// + 13 was a temporary DoReplaceAll measurement probe (2026-07-31), removed once the experiment
+// was decided. Left commented rather than reused, for the same reason as + 12 above.
+//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 13)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 14)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 16)
@@ -264,8 +263,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 #define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
 #define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
-// TEMPORARY (the "A" experiment) - delete with the probe.
-#define kKBSReplaceProbeMenuKey			kKBSStringPrefix "kKBSReplaceProbeMenuKey"
 
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
@@ -316,9 +313,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 #define kKBSReplaceCheckedMenuItemPosition	4.0
 #define kKBSCheckAllMenuItemPosition		5.0
 #define kKBSUncheckAllMenuItemPosition		6.0
-// TEMPORARY (the "A" experiment): sits right under Change Checked, which is what it is a
-// measurement of. Delete with the probe.
-#define kKBSReplaceProbeMenuItemPosition	4.5
 #define	kKBSSeparator1MenuItemPosition		10.0
 #define kKBSAboutThisMenuItemPosition		11.0
 

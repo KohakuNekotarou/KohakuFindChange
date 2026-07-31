@@ -46,7 +46,6 @@
 #include "KBSBookScope.h"		// the Book Scope toggle's session state
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
-#include "KBSReplaceProbe.h"	// TEMPORARY - the "A" experiment's measurement probe
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -220,22 +219,6 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// survives (a chapter the user collapsed stays collapsed).
 			KBSResultTree::RefreshRows();
 			KBSResultTree::ShowCheckedStatus();
-			break;
-		}
-
-		// TEMPORARY (the "A" experiment): measure DoReplaceAll on one story. Deliberately does NOT
-		// go through ConfirmReplace - the probe puts up a prompt of its own, worded for what it
-		// really does (one story, model untouched, Ctrl+Z to get back).
-		case kKBSReplaceProbeActionID:
-		{
-			if (KBSReplaceEngine::IsReplacing() || KBSSearchEngine::IsSearching())
-				break;
-
-			PMString summary;
-			KBSReplaceProbe::Run(summary);
-			// The tree is NOT rebuilt: the probe leaves the model alone on purpose, so the rows
-			// still describe what the search found.
-			KBSResultTree::ShowStatus(summary);
 			break;
 		}
 
@@ -489,14 +472,6 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// there, so they go grey along with the boxes. Not a toggle - no check mark either way.
 			const bool16 haveCheckable = (checkableCount > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKBSReplaceProbeActionID)
-		{
-			// TEMPORARY (the "A" experiment). Same door as Change Checked: something checked, and a
-			// work list rather than a report to check it on. Delete with the probe.
-			const bool16 canProbe = (checkedCount > 0 && !KBSResultModel::IsShowingReplaceOutcome())
-				? kTrue : kFalse;
-			listToUpdate->SetNthActionState(i, canProbe ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }
