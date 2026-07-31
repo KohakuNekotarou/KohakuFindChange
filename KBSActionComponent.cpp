@@ -38,6 +38,9 @@
 #include "StringUtils.h"		// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
+// Interface includes (cont.):
+#include "IMenuUtils.h"		// InsertAmpersandForDisplay - the find/change strings are the user's
+
 // Project includes:
 #include "KBSID.h"
 #include "KBSSearchEngine.h"
@@ -321,6 +324,11 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	if (glyphMode)
 		AppendGlyphDescription(findStr, opts->GetFindGlyphID());
 	findStr.SetTranslatable(kFalse);
+	// CAlert draws its message through a widget that reads a lone '&' as a keyboard accelerator -
+	// its own check box arrives spelled "&Don't show again". Without this a search for "A&B" is
+	// quoted back as "AB", in the ONE place the user checks what is about to be written (reported
+	// from the running panel, 2026-07-31). Same doubling the tree rows and the status line do.
+	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&findStr);
 	PMString findLine(kKBSConfirmFindKey);
 	findLine.Translate();
 	::ReplaceStringParameters(&findLine, findStr);
@@ -350,6 +358,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 		replaceStr = empty;
 		replaceStr.SetTranslatable(kFalse);
 	}
+	// Same reason as the find string above. Harmless on the "(empty - the matches will be deleted)"
+	// wording that replaces it when Change To is blank: that carries no ampersand to double.
+	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&replaceStr);
 	PMString changeLine(kKBSConfirmChangeToKey);
 	changeLine.Translate();
 	::ReplaceStringParameters(&changeLine, replaceStr);

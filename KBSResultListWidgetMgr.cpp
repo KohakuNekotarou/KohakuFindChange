@@ -522,9 +522,21 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	InterfacePtr<ITextControlData> textData(textView, UseDefaultIID());
 	if (textData == nil)
 		return;
+	// This line names files the user chose - a document's or a book's - and a StaticText takes a
+	// lone '&' as a keyboard accelerator, so "A&B.indd" drew as "AB.indd" with the B underlined
+	// (reported from the panel, 2026-07-31). Doubling each one up is the same thing SetColumnText
+	// above already does for the tree's rows, and what the shipping panels do before handing a
+	// user-entered name to a static text.
+	//
+	// ONLY what is drawn is doubled. gLastStatus above keeps the message exactly as it was written:
+	// app.kbsStatus exists to hand back what the panel said, not how a widget had to spell it, and
+	// a test comparing against a file name must not have to know about this.
+	PMString display(message);
+	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
+
 	// A single-line StaticText does not repaint on SetString alone, so invalidate + force a redraw
 	// (the SDK immediate-StaticText-update rule).
-	textData->SetString(message, kTrue /*invalidate*/, kFalse /*don't notify*/);
+	textData->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	textView->Invalidate();
 	textView->ForceRedraw();
 }
