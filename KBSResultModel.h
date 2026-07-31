@@ -203,6 +203,26 @@ namespace KBSResultModel
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
+	/** The WHOLE result set as one tab-separated block, so a script can read what the panel is
+	    showing. Serves app.kbsResults (KBSScriptProvider.cpp), its only caller.
+
+	    Its reason to exist is the same as app.kbsStatus': verification. The status line gives one
+	    summary sentence, which proves the counts and nothing else - whether the right ROW carries
+	    "missing", whether a locked row lost its check box, whether a page reads "P4(1)ov" - none of
+	    that is in it, and reading it off the screen cannot be automated. This is those same rows in
+	    text.
+
+	    Line 1 is a header, then one line per hit - uncapped, so it includes the hits past the
+	    panel's display limit:
+
+	        #  <book name>  <from book>  <showing outcome>  <chapters>  <total hits>
+	        <chapter idx>  <chapter name>  <hit idx>  <locator>  <accent>  <pre>  <match>  <post>
+	            <checked>  <replaced>  <locked>  <outcome word>
+
+	    Tab, return and backslash inside the text are escaped (\t, \n, \\), so one hit is always
+	    exactly one line with a fixed column count - a match CAN run across a paragraph break. */
+	void DescribeAllRows(PMString& out);
+
 	/** A hit node's display: the page locator and the three line segments to paint. false = index
 	    out of range. @see GetHitRow when the flags are wanted as well. */
 	bool GetHitDisplay(int32 chapterIdx, int32 hitIdx,

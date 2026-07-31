@@ -29,7 +29,8 @@
 /** Property ScriptIDs. */
 enum KBSScriptProperties
 {
-	p_KBSStatus = 'pKBs'	// p=property  K=Kohaku  B=KBS  s=status
+	p_KBSStatus  = 'pKBs',	// p=property  K=Kohaku  B=KBS  s=status
+	p_KBSResults = 'pKBr'	// p=property  K=Kohaku  B=KBS  r=results
 };
 
 #endif // __KBSScriptingDefs_h__

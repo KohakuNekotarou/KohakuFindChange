@@ -16,6 +16,7 @@
 #include "Utils.h"
 
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
+#include <string>		// std::string - DescribeAllRows builds its block in UTF-8 bytes
 
 // Project includes:
 #include "KBSResultModel.h"
@@ -212,6 +213,117 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
 	return true;
+}
+
+namespace
+{
+	// One column's text, with the separators escaped, so a hit holding a tab or a paragraph break
+	// still occupies exactly one line and one column. Escaping walks the UTF-8 BYTES: in UTF-8 no
+	// byte of a multi-byte character can be mistaken for an ASCII one, so this is safe whatever
+	// script the text is written in.
+	void AppendEscapedUTF8(std::string& out, const PMString& s)
+	{
+		const std::string utf8 = s.GetUTF8String();
+		for (std::string::size_type i = 0; i < utf8.size(); ++i)
+		{
+			const char c = utf8[i];
+			if (c == '\t')
+				out += "\\t";
+			else if (c == '\r' || c == '\n')
+				out += "\\n";
+			else if (c == '\\')
+				out += "\\\\";
+			else
+				out += c;
+		}
+	}
+
+	void AppendNumberUTF8(std::string& out, int32 n)
+	{
+		PMString num;
+		num.AppendNumber(n);
+		out += num.GetUTF8String();
+	}
+
+	// The outcome as the WORD the locator shows, not as an enumerator's number: a test then reads
+	// the same vocabulary the user does, and inserting an outcome later cannot silently renumber
+	// what an existing test compares against.
+	const char* OutcomeWord(KBSResultModel::ChangeOutcome outcome)
+	{
+		switch (outcome)
+		{
+			case KBSResultModel::kOutcomeMissing:	return "missing";
+			case KBSResultModel::kOutcomeLocked:	return "locked";
+			case KBSResultModel::kOutcomeRefused:	return "refused";
+			case KBSResultModel::kOutcomeNone:		break;
+		}
+		return "";
+	}
+}
+
+void KBSResultModel::DescribeAllRows(PMString& out)
+{
+	std::string buf;
+
+	// The header: what this result set IS, before any row of it.
+	buf += "#\t";
+	AppendEscapedUTF8(buf, GetBookName());
+	buf += "\t";
+	AppendNumberUTF8(buf, IsFromBook() ? 1 : 0);
+	buf += "\t";
+	AppendNumberUTF8(buf, IsShowingReplaceOutcome() ? 1 : 0);
+	buf += "\t";
+	AppendNumberUTF8(buf, GetChapterCount());
+	buf += "\t";
+	AppendNumberUTF8(buf, GetTotalHitCount());
+
+	const int32 chapters = GetChapterCount();
+	for (int32 ci = 0; ci < chapters; ++ci)
+	{
+		PMString chapterName;
+		int32 chapterHits = 0;
+		if (!GetChapterDisplay(ci, chapterName, chapterHits))
+			continue;
+
+		// Every STORED hit, not GetDisplayHitCount. The display cap is a limit on what the tree
+		// draws; a test that could only see the rows before it would report a pass for the ones it
+		// never looked at.
+		const int32 hits = GetHitCount(ci);
+		for (int32 hi = 0; hi < hits; ++hi)
+		{
+			RowDisplay row;
+			if (!GetHitRow(ci, hi, row))
+				continue;
+
+			buf += "\n";
+			AppendNumberUTF8(buf, ci);
+			buf += "\t";
+			AppendEscapedUTF8(buf, chapterName);
+			buf += "\t";
+			AppendNumberUTF8(buf, hi);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.locator);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.accentFlag);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.preText);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.matchText);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.postText);
+			buf += "\t";
+			AppendNumberUTF8(buf, row.checked ? 1 : 0);
+			buf += "\t";
+			AppendNumberUTF8(buf, row.replaced ? 1 : 0);
+			buf += "\t";
+			AppendNumberUTF8(buf, row.locked ? 1 : 0);
+			buf += "\t";
+			buf += OutcomeWord(row.outcome);
+		}
+	}
+
+	// SetUTF8String marks the string not translatable, which is what this needs - it is data.
+	out.SetUTF8String(buf);
 }
 
 bool KBSResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,

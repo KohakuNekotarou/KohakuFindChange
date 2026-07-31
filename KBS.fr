@@ -806,6 +806,21 @@ resource VersionedScriptElementInfo(1)
 			kNoAttributeClass,					// attribute class ID
 		}
 
+		// The rows behind that sentence. Same reason to exist, one level down: the status line
+		// proves the COUNTS, this proves which ROW carries "missing", which one lost its check box
+		// to a lock, and what page each one says it is on. None of that is on the status line, and
+		// reading it off the screen cannot be automated.
+		Property
+		{
+			kKBSResultsPropertyScriptElement,	// this property's script element ID
+			p_KBSResults,						// ScriptID (KBSScriptingDefs.h)
+			"kbs results",						// name -> app.kbsResults
+			"Every row the Kohaku Search Panel is holding, tab-separated, one hit per line.",
+			StringType,							// type
+			{}									// alternate types
+			kNoAttributeClass,					// attribute class ID
+		}
+
 		// Puts the property ON the application object.
 		//
 		// Object{}, not Parent{}. They are different questions: Object names an EXISTING scripting
@@ -818,6 +833,7 @@ resource VersionedScriptElementInfo(1)
 			{
 				Object{ kApplicationObjectScriptElement },
 				Property{ kKBSStatusPropertyScriptElement, kReadOnly },
+				Property{ kKBSResultsPropertyScriptElement, kReadOnly },
 			}
 		}
 	}

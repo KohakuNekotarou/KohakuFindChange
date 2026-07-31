@@ -43,6 +43,7 @@
 #include "KBSID.h"
 #include "KBSScriptingDefs.h"
 #include "KBSResultTree.h"
+#include "KBSResultModel.h"		// DescribeAllRows - the rows behind the status line
 
 /** Serves this plug-in's scripting additions. One property, on the application object. */
 class KBSScriptProvider : public CScriptProvider
@@ -60,7 +61,7 @@ CREATE_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
 
 ErrorCode KBSScriptProvider::AccessProperty(ScriptID propID, IScriptRequestData* data, IScript* script)
 {
-	if (propID.Get() != p_KBSStatus)
+	if (propID.Get() != p_KBSStatus && propID.Get() != p_KBSResults)
 		return CScriptProvider::AccessProperty(propID, data, script);
 
 	if (data == nil)
@@ -75,11 +76,16 @@ ErrorCode KBSScriptProvider::AccessProperty(ScriptID propID, IScriptRequestData*
 	if (!data->IsPropertyGet())
 		return CScriptProvider::AccessProperty(propID, data, script);
 
-	PMString status;
-	KBSResultTree::GetLastStatus(status);
+	// The status line is one sentence about the last run; the result block is every row behind it.
+	// Both are read the same way and neither can be written, so they share this one handler.
+	PMString value;
+	if (propID.Get() == p_KBSStatus)
+		KBSResultTree::GetLastStatus(value);
+	else
+		KBSResultModel::DescribeAllRows(value);
 
 	ScriptData outputData;
-	outputData.SetWideString(WideString(status));
+	outputData.SetWideString(WideString(value));
 	data->AppendReturnData(script, propID, outputData);
 	return kSuccess;
 }

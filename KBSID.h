@@ -326,6 +326,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 // VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live
 // in KBSScriptingDefs.h.
 DECLARE_PMID(kScriptInfoIDSpace, kKBSStatusPropertyScriptElement, kKBSPrefix + 0)
+DECLARE_PMID(kScriptInfoIDSpace, kKBSResultsPropertyScriptElement, kKBSPrefix + 1)
 
 // Initial data format version numbers
 #define kKBSFirstMajorFormatNumber  RezLong(1)
