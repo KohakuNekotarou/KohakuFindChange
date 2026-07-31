@@ -18,8 +18,9 @@
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
+#include "ICommandSequence.h"		// IAbortableCmdSeq - a cancel has to be stated, not implied
+#include "IDataBase.h"				// IsModified / SetModified - putting the flag back after a cancel
 #include "ITextWalker.h"			// also declares ITextWalkerClient
-#include "ITextWalkerProgressMonitor.h"	// the walker's own progress hook (source/open/interfaces/text)
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
@@ -33,7 +34,7 @@
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "ITextModel.h"				// GetTextChangeCount - "has this story moved since the search?"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "ProgressBar.h"		// TaskProgressBar / SuppressProgressBarDisplay - as the search does it
+#include "ProgressBar.h"		// RangeProgressBar / SuppressProgressBarDisplay - as the search does it
 #include "Utils.h"
 
 #include <map>
@@ -122,22 +123,30 @@ struct PendingChapter
 	// is fixed before the opening starts, and dropping the failures out of the list would leave it
 	// short of its own total and never reaching the end.
 	bool	opened;
+	// Was this chapter already unsaved BEFORE the run touched it? Only asked so that a CANCEL can
+	// put the flag back: AbortCommandSequence restores the text but not the modified flag, so a
+	// cancelled run left every chapter it had reached looking unsaved with nothing to save. (A real
+	// Undo does clear it - the application does that itself - which is what made the difference
+	// visible.) Chapters that were already dirty stay dirty; that was not ours to change.
+	bool	wasModified;
 
-	PendingChapter() : chapterIdx(-1), opened(false) {}
+	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false) {}
 };
 
-// Does this chapter hold at least one checked, not-yet-replaced hit? Asked before the chapter is
-// opened, so a replace never brings up documents it is not going to touch.
-bool ChapterHasChecked(int32 chapterIdx)
+// How many checked, not-yet-replaced hits does this chapter hold? Zero means the chapter is not
+// visited at all, so a replace never brings up documents it is not going to touch. The COUNT (not
+// just "any") is what sizes the progress bar: the run's real unit of work is a hit, not a chapter.
+int32 CountCheckedInChapter(int32 chapterIdx)
 {
+	int32 checkedCount = 0;
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		bool checked = false, replaced = false, locked = false;
 		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
-			return true;
+			++checkedCount;
 	}
-	return false;
+	return checkedCount;
 }
 
 // Is the match the walk just landed on the SAME occurrence this row describes?
@@ -185,8 +194,11 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 //                instead - the same distinction the SEARCH makes with ChapterWalkResult. Without it
 //                such a chapter dropped out of a replace in complete silence, which is exactly what
 //                every other counter here exists to prevent.
+//   progressBar  - the run's bar, sized in HITS. This chapter moves it from progressBase to
+//                  progressBase + (its own checked hits) as it consumes them. nil is allowed.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit,
-	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked)
+	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked,
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
 	outStepLimit = false;
 	outMissing = 0;
@@ -226,6 +238,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	}
 	if (targets.empty())
 		return 0;
+
+	// What the bar counts down from. Every target leaves this set exactly once - replaced, refused,
+	// locked or missing - so "how many have gone" is the honest measure of this chapter's progress,
+	// and it does not care WHY a hit was finished with.
+	const int32 targetsAtStart = static_cast<int32>(targets.size());
 
 	// Which of this chapter's stories still hold EXACTLY the text the search walked.
 	//
@@ -310,25 +327,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		return 0;
 	}
 
-	// Progress from inside this chapter, the same way the search does it: the walker client carries
-	// ITextWalkerProgressMonitor, so it takes a RangeProgressBar (spellpanel's Change All feeds it
-	// the same way, SpellChangeAllObserver.cpp:305-314). It subdivides the chapter bar the caller
-	// holds instead of drawing a dialog of its own - which is why the caller switches child bars
-	// back on once its resolve pass is done.
-	//
-	// showCancel = kFalse deliberately. The bar above owns the cancel button, and here cancelling
-	// means something drastic - the whole run rolls back - so there must be exactly one of them.
-	//
-	// Stack object; the monitor is cleared again after the walk below, because the walker holds the
-	// client and the next chapter would otherwise find a pointer to a destroyed bar.
-	PMString walkProgressTitle("Replacing in chapter...");
-	walkProgressTitle.SetTranslatable(kFalse);
-	RangeProgressBar walkProgress(walkProgressTitle, 0, 100, kFalse /*showImmediate*/, kFalse /*showCancel*/);
-
-	InterfacePtr<ITextWalkerProgressMonitor> walkMonitor(client, UseDefaultIID());
-	if (walkMonitor != nil)
-		walkMonitor->SetWalkerProgressMonitor(&walkProgress);
-
 	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE CHAPTER -
 	// the same deliberate departure from Adobe's examples that KBSSearchEngine explains at length:
 	// the section's contents are the keyboard-focus hand-off (spellpanel names it outright in
@@ -336,11 +334,19 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// The cost is the same too: cancel is only asked between chapters, never inside one.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
-	// A sequence around this chapter's replacements. It NESTS inside the one ReplaceChecked opens
-	// around the whole run and is absorbed by it, so it is not what the user sees on the Undo menu
-	// - the outer sequence carries the name. It is kept because it is what makes a chapter's
-	// replacements commit or roll back together.
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KBS Replace Chapter");
+	// NO SEQUENCE OF ITS OWN HERE - deliberately. ReplaceChecked opens ONE abortable sequence around
+	// the whole run, and the replacements go straight into it.
+	//
+	// There used to be a per-chapter sequence nested inside that one, on the reasoning that nested
+	// sequences are "absorbed by the outer one". That is true of how the Undo MENU reads - only the
+	// outermost is named there - but it is not true of what can still be taken back: closing this
+	// inner sequence settled the chapter, and the outer abort then had nothing left to undo for it.
+	// Cancelling a book replace left every finished chapter replaced while the panel said nothing
+	// had changed (measured 2026-07-31, twice - once through the error-state route, once through
+	// AbortCommandSequence).
+	//
+	// What this gives up: a chapter no longer commits or rolls back as a unit of its own. Nothing
+	// wanted that - the run is all-or-nothing by design, and the outer sequence is what carries it.
 
 	int32 walkIndex = 0;
 	int32 replacedCount = 0;
@@ -378,6 +384,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	while (!targets.empty() && steps < kMaxSteps)
 	{
 		++steps;
+
+		// Move the run's bar to where this chapter has got to - through DoTask, which also pumps the
+		// event queue and is therefore what makes the Cancel button work. A bar driven by SetPosition
+		// alone moved perfectly and could not be cancelled at all (measured 2026-07-31, in both
+		// engines). Advances smaller than a few hits are swallowed, so this does not run the message
+		// loop once per replacement. (spellpanel updates its bar from inside the walk too -
+		// SpellReplaceWalker.cpp:496 - so this is where Adobe puts it as well.)
+		KBSAdvanceProgress(progressBar, ioProgressReported,
+			progressBase + (targetsAtStart - static_cast<int32>(targets.size())));
 
 		// ALWAYS find first: the replace command does not search on its own, it only acts on the
 		// match a find has just made current.
@@ -507,16 +522,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		++walkIndex;
 	}
 
-	if (sequence != nil)
-		CmdUtils::EndCommandSequence(sequence);
-
 	if (walker->IsWalking())
 		walker->Halt();
-
-	// Take the bar off the client while it is still alive: the walker holds the client, so the
-	// client outlives this function, and the next chapter would find a pointer to a destroyed bar.
-	if (walkMonitor != nil)
-		walkMonitor->SetWalkerProgressMonitor(nil);
 
 	// The chapter has stopped changing, so now each replaced row is given the line it ended up on.
 	//
@@ -721,21 +728,31 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// the bar has to be up while the chapters are being opened - that is the slow part when the
 	// user has closed the windows the search was holding.
 	int32 chaptersWithWork = 0;
+	// ...and how many hits in total, which is what the bar is actually sized with. A chapter is a
+	// coarse unit: one chapter of 5000 hits and one of 3 both counted as a single step, so the bar
+	// stood still through the long one. Hits are the work.
+	int32 totalCheckedHits = 0;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
-		if (ChapterHasChecked(ci))
+		const int32 checkedHere = CountCheckedInChapter(ci);
+		if (checkedHere > 0)
+		{
 			++chaptersWithWork;
+			totalCheckedHits += checkedHere;
+		}
 	}
 
 	// The progress bar. Book scope only, exactly as the search does it: a one-document replace
-	// is a single step with nothing to cancel between.
+	// is a single step with nothing to cancel between. DisableChildProgressBars keeps the chapter
+	// opens in the resolve pass below from raising bars of their own.
 	//
-	// Child bars are disabled FOR THE RESOLVE PASS ONLY and switched back on before the replacing
-	// starts (see the two calls below). Unlike the search - which opens every chapter before its bar
-	// even exists - the resolve pass runs underneath this bar, so a chapter being reopened here
-	// really would raise a bar of its own. Past that pass the only child left is the one worth
-	// having: the per-chapter walk bar, which subdivides this bar's current step rather than drawing
-	// anything of its own (ProgressBar.h:55-61, 216-227).
+	// SIZED IN HITS, not chapters, and moved by ReplaceInChapter as it goes (progressBase below).
+	// The walker will not report progress for us: ITextWalkerProgressMonitor is only a place to PARK
+	// a bar - the client's own OnNextPosition is what calls SetPosition on it, and the stock
+	// kFindChangeClientBoss does not (measured 2026-07-31: registered fine, 5270 replacements, zero
+	// calls). spellpanel gets its moving bar because it walks with a client it wrote itself. So KBS
+	// counts its own work, which it can do better than the walker anyway: the number of checked hits
+	// is known before the run starts.
 	//
 	// showImmediate = kTrue for the reason the search learned the hard way: with the default
 	// the bar waits out an internal delay, and a fast run beats that delay - so the cancel
@@ -743,13 +760,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	PMString progressTitle("Replacing...");
 	progressTitle.SetTranslatable(kFalse);
 	const SuppressProgressBarDisplay suppressBar(KBSResultModel::IsFromBook() ? kFalse : kTrue);
-	TaskProgressBar progressBar(progressTitle, chaptersWithWork, kTrue, kTrue);
+	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
 	std::vector<PendingChapter> pending;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
-		if (!ChapterHasChecked(ci))
+		if (CountCheckedInChapter(ci) <= 0)
 			continue;		// nothing selected here - do not even open this chapter
 
 		// Past this line the chapter is one of the chaptersWithWork the bar was sized with, so it
@@ -793,14 +810,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 		chapter.docRef = docRef;
 		chapter.opened = true;
+		// Read BEFORE anything is written to it - that is the whole point of the record.
+		{
+			IDataBase* const chapterDB = docRef.GetDataBase();
+			chapter.wasModified = (chapterDB != nil) && (chapterDB->IsModified() != kFalse);
+		}
 		pending.push_back(chapter);
 	}
-
-	// Every chapter is resolved: no more documents will be opened from here on, so let the walk
-	// report its own progress inside each chapter (ReplaceInChapter hands the walker a bar). A
-	// replace is slower per match than a search - each one runs a command - so this is where a big
-	// chapter would otherwise sit at "Chapter 3 / 12" saying nothing for a long time.
-	progressBar.DisableChildProgressBars(kFalse);
 
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
 	// sequence below; this is what lets the PANEL be rolled back with it, so the two cannot end up
@@ -819,60 +835,84 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The per-chapter sequences inside ReplaceInChapter nest within this one and are absorbed by it
 	// (of nested sequences, only the outermost appears on the Undo menu).
 	//
-	// What this costs: the run is now all-or-nothing. A failure that leaves the global error code
-	// set when this sequence ends rolls back EVERY chapter, not only the one that failed. That is
-	// why RunWalkerCmd clears the error state on both of its failure paths - and why any new exit
-	// path added inside this block must do the same. Nothing in here opens a document or a window
-	// either; both are kept outside, above and below (see the two passes around this block).
-	CmdUtils::SequencePtr seq;
+	// ABORTABLE, and that is the whole point of choosing this kind over a plain SequencePtr.
+	//
+	// A regular sequence decides between commit and rollback ONLY by looking at the global error
+	// code as it ends (ICommandSequence.h:145-147). KBS relied on that: cancel raised the error
+	// state through WasCancelled(kTrue) and the sequence was expected to put the book back. It did
+	// not. Measured 2026-07-31 with the error code printed at both points: it was raised at the
+	// cancel (2) and STILL raised when the sequence closed (2) - and 1622 replacements stayed in the
+	// document anyway, while the panel said "nothing was changed". The error-code route does not
+	// carry a rollback across the several documents a book replace touches; the header only ever
+	// promises "the database", singular.
+	//
+	// So the cancel is now stated outright instead of being implied: AbortCommandSequence below.
+	// That is what Adobe's own Change All does (spellpanel/SpellReplaceWalker.cpp:896-902), and the
+	// header points at this class for exactly this case. It costs performance - the header says to
+	// use it only where necessary - which is why it is here and not around every chapter.
+	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
 	// DELIBERATELY UNNAMED (user's call, 2026-07-28). SetName is what Edit > Undo would say after
 	// the word "Undo"; leaving it unset lets InDesign word the step the way it words its own.
 	// To put the name back: seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
 
+	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
+	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
+	// actually been advanced - DoTask takes a difference, so that has to be carried along.
+	int32 progressBase = 0;
+	int32 progressReported = 0;
+
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
+		// Counted BEFORE the chapter runs: afterwards these hits are marked replaced and would count
+		// as zero, leaving the bar short of its own total.
+		const int32 chapterChecked = CountCheckedInChapter(pending[pi].chapterIdx);
+
 		PMString taskLine;
 		taskLine.SetTranslatable(kFalse);
 		taskLine.Append("Chapter ");
 		taskLine.AppendNumber(static_cast<int32>(pi) + 1);
 		taskLine.Append(" / ");
 		taskLine.AppendNumber(static_cast<int32>(pending.size()));
-		progressBar.SetTaskStatus(taskLine);
 
 		PMString chapterName;
 		int32 chapterHits = 0;
 		KBSResultModel::GetChapterDisplay(pending[pi].chapterIdx, chapterName, chapterHits);
 		chapterName.SetTranslatable(kFalse);
-		progressBar.DoTask(chapterName);
+		taskLine.Append(" - ");
+		taskLine.Append(chapterName);
+		// The chapter's name goes on the status line WITH its number. The POSITION is moved separately
+		// through KBSAdvanceProgress - SetTaskText only writes text.
+		progressBar.SetTaskText(taskLine);
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is looked at HERE ONLY - between chapters. Inside a chapter the walk sits in
-		// a TextWalkerSelections critical section and WasCancelled pumps events, so asking in
-		// there would run UI work in the middle of a text walk.
+		// Cancel is asked here, and answered by the DoTask calls inside the chapter. WasCancelled only
+		// reads a flag; what SETS it is the event queue being pumped, which DoTask does.
 		//
-		// kTrue - the default - raises the global error state, and that IS the mechanism: a
-		// regular command sequence commits when the global error code is kSuccess as it ends,
-		// and otherwise rolls the database back to where it started (ICommandSequence.h). So
-		// cancelling UNDOES the chapters already replaced instead of keeping them.
+		// kFALSE: do NOT raise the global error state. It used to be kTrue, because the error state
+		// was the mechanism - a regular sequence rolls back when it ends with an error standing. It
+		// did not work across a book's several documents (measured 2026-07-31, see the sequence
+		// above), and now that the sequence is aborted outright the error state is not needed. Worse
+		// than not needed: it would still be standing while AbortCommandSequence runs, and would
+		// then fail whatever the application does next.
 		//
-		// That is the user's call (2026-07-28), and it makes cancel mean ONE thing. Keeping the
-		// finished chapters left the book half changed with nothing on screen to say where the
-		// line fell; now stopping is stopping, and the panel goes back to being the search's
-		// results. The cost is that the work done so far is thrown away - breaking off a
+		// Cancelling means ONE thing (user's call, 2026-07-28): the whole run is undone. Keeping the
+		// finished chapters would leave the book half changed with nothing on screen saying where
+		// the line fell. The cost is that the work done so far is thrown away - breaking off a
 		// 900-of-1000 run starts over.
-		//
-		// The panel is put back to match just below, where the error state is cleared as well,
-		// before anything else is asked to run.
-		if (progressBar.WasCancelled(kTrue))
+		if (progressBar.WasCancelled(kFalse))
 		{
 			cancelled = true;
 			break;
 		}
 
 		// A chapter the resolve pass could not open. It is in this list for the bar's sake and for
-		// nothing else - it was counted and named in the summary where the opening failed - so it
-		// takes its step above and is passed over here.
+		// nothing else - it was counted and named in the summary where the opening failed - so its
+		// hits are counted past here and it is skipped.
 		if (!pending[pi].opened)
+		{
+			progressBase += chapterChecked;
 			continue;
+		}
 
 		const int32 ci = pending[pi].chapterIdx;
 		const UIDRef& docRef = pending[pi].docRef;
@@ -882,7 +922,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused, notWalked);
+		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused,
+			notWalked, &progressBar, progressBase, progressReported);
+		progressBase += chapterChecked;
+		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to line
+		// up, or the safety ceiling) must still hand the bar on at the right place.
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 		totalReplaced += replaced;
 		totalMissing += missing;
 		totalLocked += locked;
@@ -913,11 +958,38 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			touched.push_back(docRef);
 	}
 
-	}	// the sequence ends HERE: every chapter's replacements commit together, as one undo step
+	// ASK ONCE MORE, now that the loop is over.
+	//
+	// The test inside the loop sits at the TOP of each pass, so it only ever sees a cancel that
+	// arrived while an EARLIER chapter was running. A cancel pressed during the LAST chapter had no
+	// next pass to be noticed in, and the run finished as though nothing had been asked - which is
+	// exactly what "cancelling works in the first document but not across documents" was (user's
+	// observation, 2026-07-31; a one-chapter book could never be cancelled at all).
+	//
+	// The work is already done by this point, so this changes nothing about what was written - but it
+	// is what decides between committing that work and throwing it away, which is the whole promise
+	// of the button.
+	if (!cancelled && progressBar.WasCancelled(kFalse))
+		cancelled = true;
+
+	// The sequence ends HERE, and HOW it ends is the cancel. Aborting is a statement - "undo
+	// everything this sequence did" - where ending it only offers the changes up and lets the error
+	// state decide. Either way the sequence must not be touched again afterwards
+	// (ICommandSequence.h:153).
+	if (seq != nil)
+	{
+		if (cancelled)
+			CmdUtils::AbortCommandSequence(seq);
+		else
+			CmdUtils::EndCommandSequence(seq);
+		seq = nil;
+	}
+
+	}	// end of the block the sequence lived in
 
 	if (cancelled)
 	{
-		// The sequence has just rolled the text back to where the run found it. The panel recorded
+		// The abort has just rolled the text back to where the run found it. The panel recorded
 		// those replacements as they happened, so it has to shed them too - otherwise it would show
 		// replaced rows sitting over text that is once again the original.
 		//
@@ -925,9 +997,25 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// ready to be run again. No window is opened either - nothing was changed to look at.
 		KBSResultModel::RollBackRows();
 
-		// The error the cancel raised has done its work. Leaving it standing would roll back
-		// whatever command runs next, anywhere in the application.
+		// Belt and braces: the cancel no longer raises the error state, but a command that failed
+		// inside the run might have left one standing, and it must not outlive this function.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
+		// Put the "unsaved" flags back. AbortCommandSequence restores the TEXT but leaves every
+		// database it touched marked modified, so a cancelled run left the chapters asking to be
+		// saved with nothing in them to save. (Undo does clear the flag - the application handles
+		// that itself - which is how the difference showed up.)
+		//
+		// Only for chapters that were clean when the run found them: one the user had already edited
+		// is still edited, and claiming otherwise would risk their work.
+		for (size_t pi = 0; pi < pending.size(); ++pi)
+		{
+			if (!pending[pi].opened || pending[pi].wasModified)
+				continue;
+			IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
+			if (chapterDB != nil)
+				chapterDB->SetModified(kFalse);
+		}
 
 		outSummary.Append("Replace cancelled - nothing was changed.");
 		return 0;
@@ -1015,6 +1103,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append(firstNotWalked);
 		outSummary.Append("\" first) - nothing was written there.");
 	}
+
 	return totalReplaced;
 }
 

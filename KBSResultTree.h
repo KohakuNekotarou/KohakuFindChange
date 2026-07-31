@@ -40,6 +40,11 @@ namespace KBSResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
+	/** The last message ShowStatus was given, whether or not the panel was open to display it.
+	    Kept for the app.kbsStatus script property (KBSScriptProvider.cpp), which is how a script -
+	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */
+	void GetLastStatus(PMString& outMessage);
+
 	/** Write "<checked> / <total> checked." to the panel's status line (and note the display cap
 	    when the result set is bigger than the panel shows). Called after any check change. */
 	void ShowCheckedStatus();

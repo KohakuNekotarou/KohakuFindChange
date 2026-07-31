@@ -50,9 +50,12 @@
 #include "GraphicsID.h"		// IID_IDRWEVTHANDLER - the red-marker draw handler (Task 3)
 #include "AppFrameworkID.h"	// IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl (Task 3)
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
+#include "ScriptInfoTypes.fh"	// Property / Provider - the scripting definitions below
+#include "ScriptingID.h"		// kCoreScriptManagerBoss / kBaseScriptProviderBoss
 
 // Project includes:
 #include "KBSID.h"
+#include "KBSScriptingDefs.h"	// p_KBSStatus - the four-character ID behind app.kbsStatus
 #include "GenericID.h"
 #include "ShuksanID.h"
 #include "TextID.h"
@@ -279,6 +282,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_IK2SERVICEPROVIDER, kBeforeCloseDocSignalRespServiceImpl,
 			IID_IRESPONDER,         kKBSCloseDocResponderImpl,
+		}
+	},
+
+	/*
+	 * Scripting provider: serves app.kbsStatus. Derives from kBaseScriptProviderBoss, which brings
+	 * the machinery that dispatches script requests; all this boss adds is our own handler. The
+	 * property itself is declared in the VersionedScriptElementInfo resource at the end of this file.
+	 */
+	Class
+	{
+		kKBSScriptProviderBoss,
+		kBaseScriptProviderBoss,
+		{
+			IID_ISCRIPTPROVIDER, kKBSScriptProviderImpl,
 		}
 	},
 
@@ -746,6 +763,63 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 			{
 			}
 		),
+	}
+};
+
+
+/*
+ * Scripting: app.kbsStatus - the panel's status line, readable from a script.
+ *
+ * One read-only string property on the application object. What it is for is verification: the
+ * panel reports what a search or a replace did in a single line, and without this the only way to
+ * read that line is to look at the screen. With it, a script - or PowerShell over COM - can run the
+ * command and then read the answer:
+ *
+ *     app.menuActions.itemByName("Search Book").invoke();
+ *     app.kbsStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
+ *
+ * The value lives in the module, not on the widget (KBSResultTree::GetLastStatus), so it answers
+ * with the panel closed as well.
+ *
+ * The four-character ScriptID is allocated in docs/ai-notes/kes-scriptid-registry.md - what an
+ * engine matches on is that code, not the C++ name, so two plug-ins that pick the same four
+ * characters cannot be told apart.
+ */
+resource VersionedScriptElementInfo(1)
+{
+	// Contexts. Declared from the oldest version this could have worked in, which is how the SDK's
+	// own samples do it - a later application still honours it.
+	{
+		kCS2ScriptVersion, kCoreScriptManagerBoss, kWildFS, k_Wild,
+	}
+
+	// Elements
+	{
+		Property
+		{
+			kKBSStatusPropertyScriptElement,	// this property's script element ID
+			p_KBSStatus,						// ScriptID (KBSScriptingDefs.h)
+			"kbs status",						// name -> app.kbsStatus
+			"The last message the Kohaku Search Panel put on its status line.",	// description
+			StringType,							// type
+			{}									// alternate types
+			kNoAttributeClass,					// attribute class ID
+		}
+
+		// Puts the property ON the application object.
+		//
+		// Object{}, not Parent{}. They are different questions: Object names an EXISTING scripting
+		// object to add members to, while Parent hangs a NEW object underneath one (which is what a
+		// plug-in with its own preferences object needs, and what this first tried - the property
+		// then never appeared on app at all). BPI.fr:603-612 is the form being followed here.
+		Provider
+		{
+			kKBSScriptProviderBoss,
+			{
+				Object{ kApplicationObjectScriptElement },
+				Property{ kKBSStatusPropertyScriptElement, kReadOnly },
+			}
+		}
 	}
 };
 

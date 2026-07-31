@@ -233,6 +233,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSScriptProvider.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
@@ -262,6 +263,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSScriptingDefs.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\KBS.fr">

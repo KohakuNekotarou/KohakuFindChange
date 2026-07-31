@@ -24,6 +24,18 @@
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 
+class RangeProgressBar;
+
+/** Move the run's progress bar to an absolute position. ioReported is the position already sent, so
+    that advances too small to be worth a repaint can be swallowed (see the .cpp); pass force = true
+    where the bar must land exactly, such as a chapter boundary.
+
+    NOTE: this does NOT make the run cancellable, and neither does any other way of moving the bar - that
+    was measured both ways on 2026-07-31. WasCancelled has to be ASKED, and asking it only inside the
+    chapter loop misses a cancel pressed during the last chapter. See the ask-once-more test that
+    follows the loop in SearchBook and ReplaceChecked. */
+void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force = false);
+
 namespace KBSSearchEngine
 {
 	/** Resolve the scope from the Book Scope toggle (the active book's chapters when it is ON, the

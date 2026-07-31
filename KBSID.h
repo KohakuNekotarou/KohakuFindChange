@@ -69,7 +69,10 @@ DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKBSPrefix + 8)
 // result row that names a closed document still jumps and still replaces (by reopening it), so the
 // results are retired with their document. Document scope only - see KBSCloseDocResponder.cpp.
 DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 10)
+// Scripting: puts app.kbsStatus on the application object, so the panel's own status line can be
+// read from a script (and therefore over COM). Built for verification - the panel says what a
+// search or a replace did in one line, and until now the only way to read it was to look at it.
+DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 11)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 12)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 13)
@@ -145,6 +148,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 // The panel tab's name: an observer on the panel boss whose only job is to write the current
 // scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKBSPrefix + 13)
+// Scripting: the provider behind app.kbsStatus (see KBSScriptProvider.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)
@@ -314,6 +319,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 // panel's own resource ID (kSDKDefPanelResourceID), like the KESCL report panel's row resources.
 #define kKBSResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKBSResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
+
+// Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
+// VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live
+// in KBSScriptingDefs.h.
+DECLARE_PMID(kScriptInfoIDSpace, kKBSStatusPropertyScriptElement, kKBSPrefix + 0)
 
 // Initial data format version numbers
 #define kKBSFirstMajorFormatNumber  RezLong(1)

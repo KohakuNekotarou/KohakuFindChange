@@ -33,11 +33,11 @@
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
 #include "ITextWalker.h"			// also declares ITextWalkerClient
-#include "ITextWalkerProgressMonitor.h"	// the walker's own progress hook (source/open/interfaces/text)
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "ISession.h"				// GetExecutionContextSession
+#include "IStoryList.h"				// GetUserAccessibleStoryCount - how many stories a walk will visit
 // For naming the page a match sits on (the "P<page>(<n>)" hit-row locator):
 #include "ITextParcelList.h"		// GetParcelContaining - the parcel a position is in
 #include "IParcelList.h"			// GetParcelFrameUID - is that parcel placed in a frame?
@@ -60,7 +60,7 @@
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
-#include "ProgressBar.h"			// TaskProgressBar / SuppressProgressBarDisplay (the book search's progress + cancel)
+#include "ProgressBar.h"			// RangeProgressBar / SuppressProgressBarDisplay (the book search's progress + cancel)
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
@@ -90,6 +90,35 @@ namespace
 // reach it, and that is intended: the panel shows the first kKBSDisplayHitLimit hits and the
 // summary says to narrow the query.
 const int32 kKBSCollectHitLimit = 10000;
+
+// The smallest advance worth reporting to the progress bar. DoTask pumps the event queue, which is
+// what makes Cancel work at all, but it is not free: calling it once per hit would run the message
+// loop thousands of times over a large chapter. Small enough that Cancel still answers promptly.
+const int32 kKBSProgressReportStep = 8;
+
+// (Instrumentation removed: the answer came from the user's own observation - "cancelling works in
+// the first document but not across documents" - which named the fault exactly. See the
+// ask-once-more test after the chapter loop in SearchBook.)
+
+// How finely one story is divided on the progress bar. The search cannot know how many MATCHES a
+// chapter holds until it has found them all, so the bar is measured in STORIES instead - which the
+// document can be asked for up front, for free - and each one is subdivided by how far into its
+// text the walk has got. See CountSearchableStories.
+const int32 kKBSProgressStorySteps = 100;
+
+/** How many stories a walk of this document will visit. Counting them is free: IStoryList keeps the
+    count, so nothing is loaded here (contrast with adding up their lengths, which would have to
+    fetch every story before the search had even started).
+
+    USER-ACCESSIBLE ones only, which is exactly the walk's own population - IStoryList.h:36-39 says
+    internal stories "are not subject to search through find change". */
+int32 CountSearchableStories(const UIDRef& docRef)
+{
+	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
+	if (storyList == nil)
+		return 0;
+	return storyList->GetUserAccessibleStoryCount();
+}
 
 // Why a chapter could not be walked AT ALL - which is a different thing from "walked it and found
 // nothing". Returning zero hits for a chapter that was never actually searched reads as "this
@@ -588,8 +617,13 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // Read-only: the whole walk sits inside a SaveRestoreModifiedState dirty guard, so a windowless
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
 // the user's Find/Change settings verbatim, so the search mode (Text or GREP) is followed.
+//
+// progressBar / progressBase: the run's bar, measured in stories x kKBSProgressStorySteps, and the
+// point on it where this chapter starts. The walk moves it as it goes - a story at a time, each one
+// subdivided by how far into its text the current match sits. nil is allowed.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits,
-	bool& outCapped, ChapterWalkResult& outResult)
+	bool& outCapped, ChapterWalkResult& outResult,
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
 	outResult = kChapterWalked;
 
@@ -670,28 +704,6 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		return;
 	}
 
-	// Let the walk report its own progress INSIDE this chapter. The walker client carries
-	// ITextWalkerProgressMonitor - kFindChangeClientBoss really does have it, checked against a live
-	// object-model dump - and spellpanel's Change All feeds it a RangeProgressBar exactly like this
-	// (SpellChangeAllObserver.cpp:305-314). Without it the caller's bar can only step once per
-	// chapter, so a single large chapter looks frozen.
-	//
-	// The bar does not draw a second dialog: a progress bar declared while another one is already on
-	// the stack SUBDIVIDES the one above it (ProgressBar.h:55-56, 216-227), which is why the caller
-	// no longer calls DisableChildProgressBars. showCancel = kFalse - the chapter bar above already
-	// owns the cancel button, and two of them would be a question about which.
-	//
-	// Stack object. The monitor is cleared again after the walk (see the end of this function): the
-	// walker holds the client, so the client can outlive this scope, and a pointer to a destroyed bar
-	// left on it would be read by the NEXT chapter's walk.
-	PMString walkProgressTitle("Searching chapter...");
-	walkProgressTitle.SetTranslatable(kFalse);
-	RangeProgressBar walkProgress(walkProgressTitle, 0, 100, kFalse /*showImmediate*/, kFalse /*showCancel*/);
-
-	InterfacePtr<ITextWalkerProgressMonitor> walkMonitor(client, UseDefaultIID());
-	if (walkMonitor != nil)
-		walkMonitor->SetWalkerProgressMonitor(&walkProgress);
-
 	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE WALK.
 	//
 	// Adobe's own examples all wrap a SINGLE ProcessCommand instead (SnpFindAndReplace.cpp:788,
@@ -724,6 +736,13 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	TextIndex prevStart = kInvalidTextIndex;
 	TextIndex prevEnd   = kInvalidTextIndex;
 	UID       prevStory = kInvalidUID;
+	// Where the bar stands within this chapter: how many stories the walk has finished, and how long
+	// the one it is in now is. The walk visits a story at a time, so a change of story means the one
+	// before it is done - whatever order the walker chose to take them in.
+	int32 storiesDone = 0;
+	UID progressStory = kInvalidUID;
+	int32 progressStoryLength = 0;
+
 	while (true)
 	{
 		InterfacePtr<ICommand> findCmd(CmdUtils::CreateCommand(kFindTextCmdBoss));
@@ -755,6 +774,35 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		prevStart = start;
 		prevEnd   = end;
 
+		// Move the bar. A story we have not seen before means the one before it is finished; within a
+		// story, the position is how far into its text this match sits. Safe inside the walker's
+		// critical section: this only repaints, unlike WasCancelled, which pumps events and is
+		// therefore asked between chapters only.
+		if (progressBar != nil)
+		{
+			if (story.GetUID() != progressStory)
+			{
+				if (progressStory != kInvalidUID)
+					++storiesDone;
+				progressStory = story.GetUID();
+				// The story is already loaded - the walk is standing in it - so this costs nothing.
+				InterfacePtr<ITextModel> progressModel(story, UseDefaultIID());
+				progressStoryLength = (progressModel != nil) ? progressModel->TotalLength() : 0;
+			}
+
+			// Divide first, so a long story cannot overflow the multiplication. A story shorter than
+			// the number of steps counts as one whole step - it is over before it could be drawn.
+			const int32 charsPerStep = progressStoryLength / kKBSProgressStorySteps;
+			int32 within = (charsPerStep > 0) ? (start / charsPerStep) : kKBSProgressStorySteps;
+			if (within > kKBSProgressStorySteps)
+				within = kKBSProgressStorySteps;
+
+			// Through DoTask, not SetPosition: pumping the event queue here is what lets the user
+			// cancel at all (see KBSAdvanceProgress).
+			KBSAdvanceProgress(progressBar, ioProgressReported,
+				progressBase + storiesDone * kKBSProgressStorySteps + within);
+		}
+
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
 		// result set is capped so a match-everywhere query cannot grow it without bound.
 		if (outHits.size() >= maxHits)
@@ -782,12 +830,6 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 
 	if (walker->IsWalking())
 		walker->Halt();
-
-	// Take the bar off the client BEFORE it goes out of scope on the line below. The walker holds
-	// the client, so the client outlives this function - and the next chapter's walk would find a
-	// pointer to a progress bar that no longer exists.
-	if (walkMonitor != nil)
-		walkMonitor->SetWalkerProgressMonitor(nil);
 }
 
 // Put a chapter's hits in PAGE order and bake the "P<page>(<n>) " locator onto each hit line
@@ -831,6 +873,33 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 }
 
 } // anonymous namespace
+
+void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force)
+{
+	if (bar == nil)
+		return;
+	const int32 delta = target - ioReported;
+	if (delta <= 0)
+		return;
+	if (!force && delta < kKBSProgressReportStep)
+		return;		// too small to be worth pumping the event queue for
+
+	// SetPosition, which takes the absolute position - hence no use for delta beyond the guard above.
+	//
+	// This was measured against DoTask on 2026-07-31, because a run had become impossible to cancel
+	// and this call was the prime suspect. It was not the culprit: the cancel works exactly the same
+	// through SetPosition. The fault was that nothing asked WasCancelled after the LAST chapter (see
+	// the ask-once-more test in SearchBook and ReplaceChecked).
+	//
+	// Both forms are in the SDK, chosen by what the caller is counting: linksui advances a
+	// TaskProgressBar with DoTask because it processes a list of files, while textimportfilter drives
+	// a RangeProgressBar with SetPosition because it is measuring its way through a byte count -
+	// and cancels from it perfectly well (TxtImpFilter.cpp:519-548: SetPosition every 32 reads,
+	// WasCancelled every read). KBS measures its way through hits and stories, so this is the form
+	// that fits.
+	bar->SetPosition(target);
+	ioReported = target;
+}
 
 void KBSSearchEngine::CommitSearchMode()
 {
@@ -1214,22 +1283,53 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// The progress bar. Book scope only: a one-document search is a single step with nothing to
 	// cancel between, so it is suppressed there (SuppressProgressBarDisplay keeps it off screen).
 	//
-	// Child bars are deliberately NOT disabled any more. This used to call
-	// DisableChildProgressBars(kTrue) to keep the windowless chapter opens from raising bars of their
-	// own - but the chapters are all opened by GetBookChapterDocs ABOVE, before this bar exists, so
-	// that call never covered them. What it DID cover is the one child worth having: the per-chapter
-	// walk bar CollectHitsInDoc hands to the text walker, which subdivides this bar's current step
-	// instead of drawing anything of its own (ProgressBar.h:55-61, 216-227 - a disabled child simply
-	// fails to register). Without it a single large chapter looks frozen.
+	// DisableChildProgressBars stops anything the walk runs into from putting up a bar of its own.
+	// NOTE: it does NOT cover the windowless chapter opens, which this comment used to claim: those
+	// all happen in GetBookChapterDocs above, before this bar exists.
+	//
+	// SIZED IN STORIES, not chapters. A chapter is far too coarse a step - one chapter of a hundred
+	// stories and one of two both moved the bar once, so it stood still through the long one. The
+	// story count comes from IStoryList and costs nothing to ask for, and each story is subdivided by
+	// how far into its text the walk has got (CollectHitsInDoc does the moving).
+	//
+	// Why not simply ask the walker how far it is: ITextWalkerProgressMonitor is only a place to PARK
+	// a bar - the CLIENT's own OnNextPosition is what has to call SetPosition on it, and the stock
+	// kFindChangeClientBoss does not (measured 2026-07-31: it registered fine and then never called
+	// once in 5270 matches). spellpanel gets a moving bar there because it walks with a client it
+	// wrote itself. A plug-in using the stock find/change client has to count its own progress.
+	//
+	// DisableChildProgressBars stops anything the walk runs into from putting up a bar of its own.
+	// NOTE: it does NOT cover the windowless chapter opens, which this comment used to claim: those
+	// all happen in GetBookChapterDocs above, before this bar exists.
 	//
 	// showImmediate = kTrue: a book search ALWAYS puts the bar up. The default (kFalse) makes the bar
 	// wait out an internal delay first, and the search beat that delay even at 5000+ hits (measured
 	// 2026-07-27) - so the one thing the bar is really there for, the cancel button, was never on
 	// screen. Better a brief flash on a fast book than a search that cannot be stopped.
+	std::vector<int32> chapterStorySpans;		// bar units per chapter, in the same order as targets
+	chapterStorySpans.reserve(targets.size());
+	int32 progressTotal = 0;
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		// At least one step per chapter, so a chapter with no stories at all still moves the bar.
+		int32 stories = CountSearchableStories(targets[i].docRef);
+		if (stories < 1)
+			stories = 1;
+		const int32 span = stories * kKBSProgressStorySteps;
+		chapterStorySpans.push_back(span);
+		progressTotal += span;
+	}
+
 	PMString progressTitle("Searching book...");
 	progressTitle.SetTranslatable(kFalse);
 	const SuppressProgressBarDisplay suppressBar(fromBook ? kFalse : kTrue);
-	TaskProgressBar progressBar(progressTitle, static_cast<int32>(targets.size()), kTrue, kTrue);
+	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+	progressBar.DisableChildProgressBars(kTrue);
+
+	// Where the bar stands as each chapter starts, and how far it has actually been advanced (DoTask
+	// takes a difference, so the position already reported has to be carried along).
+	int32 progressBase = 0;
+	int32 progressReported = 0;
 
 	int32 total = 0;
 	int32 chaptersWithHits = 0;
@@ -1256,13 +1356,17 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		taskLine.AppendNumber(static_cast<int32>(i) + 1);
 		taskLine.Append(" / ");
 		taskLine.AppendNumber(static_cast<int32>(targets.size()));
-		progressBar.SetTaskStatus(taskLine);
-		progressBar.DoTask(targets[i].shortName);
+		taskLine.Append(" - ");
+		taskLine.Append(targets[i].shortName);
+		// The chapter's name rides on the status line WITH its number. The bar's POSITION is moved
+		// separately, through KBSAdvanceProgress - SetTaskText only writes text.
+		progressBar.SetTaskText(taskLine);
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is looked at HERE ONLY - between chapters. Inside a chapter the walk sits in a
-		// TextWalkerSelections critical section and WasCancelled pumps events, so asking in there
-		// would run UI work in the middle of a text walk; safety wins over the response time. The
-		// cost is that a huge chapter finishes before a press of Cancel takes effect.
+		// Cancel is asked here, and answered by the DoTask calls inside the walk. WasCancelled only
+		// reads a flag; what SETS that flag is the event queue being pumped, which DoTask does and
+		// SetPosition does not - a bar driven by SetPosition alone looked perfect and could not be
+		// cancelled at all (measured 2026-07-31).
 		// kFalse = do NOT raise the global error state: it would outlive the search and fail the
 		// commands that come after it.
 		if (progressBar.WasCancelled(kFalse))
@@ -1283,7 +1387,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		std::vector<KBSResultModel::Hit> hits;
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
-		CollectHitsInDoc(targets[i].docRef, static_cast<size_t>(remaining), hits, docCapped, walkResult);
+		CollectHitsInDoc(targets[i].docRef, static_cast<size_t>(remaining), hits, docCapped, walkResult,
+			&progressBar, progressBase, progressReported);
+
+		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
+		// a chapter whose stories the walk left early still hands the bar on at the right place.
+		progressBase += chapterStorySpans[i];
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
 		if (docCapped)
 			collectionTruncated = true;
 		if (walkResult != kChapterWalked)
@@ -1326,6 +1437,13 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// that hold no hits at all - which the growing tree never could.)
 		KBSResultModel::AppendChapter(chapter);
 	}
+
+	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
+	// pass, so a cancel pressed while the LAST chapter was being walked had no next pass to be seen
+	// in, and the search finished as though the button had never been touched. Same fault as the
+	// replace engine's - see the matching comment there.
+	if (!cancelled && progressBar.WasCancelled(kFalse))
+		cancelled = true;
 
 	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
 	// complete one, and give the chapters back - the results that would have needed them are gone.

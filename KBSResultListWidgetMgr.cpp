@@ -492,8 +492,25 @@ void KBSResultTree::RefreshRows()
 // KBSResultTree::ShowStatus - write the panel's single-line status read-out
 //----------------------------------------------------------------------------------------
 
+// The last thing ShowStatus was given. Kept in the module rather than read back off the widget:
+// the widget is gone whenever the panel is closed, and app.kbsStatus has to answer regardless (a
+// script can run a search with no panel on screen). Also, a StaticText cannot be read back
+// reliably from outside anyway - see the panel-title work.
+static PMString gLastStatus;
+
+void KBSResultTree::GetLastStatus(PMString& outMessage)
+{
+	outMessage = gLastStatus;
+	outMessage.SetTranslatable(kFalse);
+}
+
 void KBSResultTree::ShowStatus(const PMString& message)
 {
+	// Remembered FIRST, before the panel is even looked for: this has to hold whether or not there
+	// is a panel to draw it on.
+	gLastStatus = message;
+	gLastStatus.SetTranslatable(kFalse);
+
 	// Reach the status text through the panel; nil when the panel is closed (do nothing then) - the
 	// same reach Rebuild uses, which is why this lives here rather than in the action component.
 	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
