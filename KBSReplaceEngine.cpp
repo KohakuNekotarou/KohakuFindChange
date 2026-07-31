@@ -34,7 +34,7 @@
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "ITextModel.h"				// GetTextChangeCount - "has this story moved since the search?"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "ProgressBar.h"		// RangeProgressBar / SuppressProgressBarDisplay - as the search does it
+#include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
 #include "Utils.h"
 
 #include <map>
@@ -743,9 +743,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		}
 	}
 
-	// The progress bar. Book scope only, exactly as the search does it: a one-document replace
-	// is a single step with nothing to cancel between. DisableChildProgressBars keeps the chapter
-	// opens in the resolve pass below from raising bars of their own.
+	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request), matching the
+	// search. It used to be book scope only, on the reasoning that a one-document replace is a
+	// single step with nothing to cancel between - but the bar is sized in HITS, not chapters, so a
+	// single document with thousands of them takes just as long and had no way to be stopped.
+	// DisableChildProgressBars keeps the chapter opens in the resolve pass below from raising bars
+	// of their own.
 	//
 	// SIZED IN HITS, not chapters, and moved by ReplaceInChapter as it goes (progressBase below).
 	// The walker will not report progress for us: ITextWalkerProgressMonitor is only a place to PARK
@@ -760,7 +763,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// button, the one thing the bar is really there for, never reaches the screen.
 	PMString progressTitle("Replacing...");
 	progressTitle.SetTranslatable(kFalse);
-	const SuppressProgressBarDisplay suppressBar(KBSResultModel::IsFromBook() ? kFalse : kTrue);
 	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 

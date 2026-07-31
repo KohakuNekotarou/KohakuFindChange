@@ -60,7 +60,7 @@
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
-#include "ProgressBar.h"			// RangeProgressBar / SuppressProgressBarDisplay (the book search's progress + cancel)
+#include "ProgressBar.h"			// RangeProgressBar - the search's progress + cancel (both scopes)
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
@@ -1289,8 +1289,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
-	// The progress bar. Book scope only: a one-document search is a single step with nothing to
-	// cancel between, so it is suppressed there (SuppressProgressBarDisplay keeps it off screen).
+	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request). It used to be book
+	// scope only, on the reasoning that a one-document search is a single step with nothing to
+	// cancel between - but that reasoning was about CHAPTERS, and the bar is sized in stories: a
+	// single document with a lot of them takes just as long and had no way to be stopped.
 	//
 	// DisableChildProgressBars stops anything the walk runs into from putting up a bar of its own.
 	// NOTE: it does NOT cover the windowless chapter opens, which this comment used to claim: those
@@ -1329,9 +1331,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		progressTotal += span;
 	}
 
-	PMString progressTitle("Searching book...");
+	// The title names the scope, because the bar no longer implies it: "Searching book..." when it
+	// really is a book, plain "Searching..." for a single document.
+	PMString progressTitle(fromBook ? "Searching book..." : "Searching...");
 	progressTitle.SetTranslatable(kFalse);
-	const SuppressProgressBarDisplay suppressBar(fromBook ? kFalse : kTrue);
 	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
