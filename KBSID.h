@@ -73,8 +73,12 @@ DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
 // read from a script (and therefore over COM). Built for verification - the panel says what a
 // search or a replace did in one line, and until now the only way to read it was to look at it.
 DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 11)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 12)
+// The Glyph tab's replace confirmation: the dialog itself, and the widget that draws one glyph in
+// the font that defines it. The dialog is the stock kDialogBoss plus our controller (the shape
+// basicdialog and KESCL's offset dialog both use); the glyph widget is a generic panel whose
+// IControlView is ours, built the same way the hit row's colour cell is.
+DECLARE_PMID(kClassIDSpace, kKBSGlyphConfirmDialogBoss, kKBSPrefix + 11)
+DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 13)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 14)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 15)
@@ -160,8 +164,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 12)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 13)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 14)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 15)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 16)
+// The Glyph tab's replace confirmation: its dialog controller and its glyph-drawing view.
+DECLARE_PMID(kImplementationIDSpace, kKBSGlyphConfirmDialogControllerImpl, kKBSPrefix + 15)
+DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 17)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 18)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 19)
@@ -226,16 +231,18 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultHitNodeWidgetID, kKBSPrefix + 5)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 // Replace feature: the hit row's check box (hit rows only).
 DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 8)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 9)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 10)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 11)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 12)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 13)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 14)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 15)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 16)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 17)
+// The Glyph tab's replace confirmation. The two glyph frames are told apart by their WidgetID -
+// that is how KBSGlyphView knows which side it is drawing - so these two are not interchangeable.
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDialogWidgetID, kKBSPrefix + 8)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmCountWidgetID, kKBSPrefix + 9)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindGlyphWidgetID, kKBSPrefix + 10)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeGlyphWidgetID, kKBSPrefix + 11)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindFontWidgetID, kKBSPrefix + 12)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeFontWidgetID, kKBSPrefix + 13)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 14)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmUnsavedWidgetID, kKBSPrefix + 16)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 18)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 19)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 20)
@@ -297,6 +304,14 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 // differ only in singular/plural, which languages that inflect cannot build from one string.
 #define kKBSConfirmUnsavedOneKey	kKBSStringPrefix "kKBSConfirmUnsavedOneKey"
 #define kKBSConfirmUnsavedManyKey	kKBSStringPrefix "kKBSConfirmUnsavedManyKey"
+
+// The Glyph tab's own confirmation, the one that draws the glyphs. The count and the closing line
+// are shared with the plain alert above - the same sentences, on a different screen - so the only
+// new strings are the labels around the two glyph frames.
+#define kKBSGlyphConfirmFindLabelKey	kKBSStringPrefix "kKBSGlyphConfirmFindLabelKey"
+#define kKBSGlyphConfirmChangeLabelKey	kKBSStringPrefix "kKBSGlyphConfirmChangeLabelKey"
+#define kKBSGlyphConfirmArrowKey		kKBSStringPrefix "kKBSGlyphConfirmArrowKey"
+#define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
 
 // Menu item positions:
 

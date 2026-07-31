@@ -64,6 +64,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED. A single undo puts it back.",
                 kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. A single undo puts them all back.",
 
+                // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
+                // The count and the closing line above are shared with it - only these four are new.
+                kKBSGlyphConfirmFindLabelKey,	"Find",
+                kKBSGlyphConfirmChangeLabelKey,	"Change to",
+                kKBSGlyphConfirmArrowKey,		"->",
+                kKBSGlyphConfirmDontShowKey,	"Don't show again",
+
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_enUS,
 

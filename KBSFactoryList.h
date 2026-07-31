@@ -42,3 +42,6 @@ REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
 // Scripting: app.kbsStatus - the panel's status line, readable from a script or over COM.
 REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
+// The Glyph tab's replace confirmation: the dialog's controller and the view that draws one glyph.
+REGISTER_PMINTERFACE(KBSGlyphConfirmDialogController, kKBSGlyphConfirmDialogControllerImpl)
+REGISTER_PMINTERFACE(KBSGlyphView, kKBSGlyphViewImpl)

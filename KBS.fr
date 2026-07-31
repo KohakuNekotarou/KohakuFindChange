@@ -44,6 +44,8 @@
 #include "IControlViewDefs.h"
 #include "SysControlIDs.h"
 #include "Widgets.fh"	// for PalettePanelWidget or DialogBoss
+#include "EveInfo.fh"	// EVE widget types + layout flags - the Glyph tab's confirmation dialog
+#include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the glyph frame's own size
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list (Task 2)
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
@@ -200,6 +202,42 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kCheckBoxWidgetBoss,
 		{
 			IID_IOBSERVER, kKBSResultCheckObserverImpl,
+		}
+	},
+
+	/*
+	 * The Glyph tab's replace confirmation: the stock kDialogBoss plus our controller - the shape
+	 * basicdialog and KESCL's offset dialog both use. No IID_IOBSERVER: the dialog has nothing to
+	 * do while it is open, only on OK.
+	 */
+	Class
+	{
+		kKBSGlyphConfirmDialogBoss,
+		kDialogBoss,
+		{
+			IID_IDIALOGCONTROLLER, kKBSGlyphConfirmDialogControllerImpl,
+		}
+	},
+
+	/*
+	 * One glyph frame of that dialog: a generic panel whose IControlView is our own drawing view,
+	 * exactly how the hit row's colour cell is built. Two instances, told apart by their WidgetID -
+	 * which is how the view knows whether it is drawing the found glyph or the replacement.
+	 */
+	Class
+	{
+		kKBSGlyphViewWidgetBoss,
+		kGenericPanelWidgetBoss,
+		{
+			IID_ICONTROLVIEW, kKBSGlyphViewImpl,
+			// EVE decides a widget's size through its IID_IEVEINFO implementation, and the one
+			// inherited from kGenericPanelWidgetBoss measures a PANEL - from its children. This
+			// frame has no children (it holds a drawing), so that implementation collapsed it to
+			// nothing and the font name sat directly under the label. kFixedSizeEVEInfoImpl is the
+			// implementation for a widget whose size is simply what the resource says.
+			// (No worked example of it exists in the SDK - it is declared in DialogLayoutID.h and
+			// used nowhere - so this is confirmed by running it, not by reading.)
+			IID_IEVEINFO, kFixedSizeEVEInfoImpl,
 		}
 	},
 
@@ -562,6 +600,16 @@ resource LocaleIndex (kKBSResultHitNodeWidgetRsrcID)
 	}
 };
 
+// The Glyph tab's replace confirmation dialog. Its view is not localised - every string it shows
+// comes from the string table, the same way the plain alert's wording does.
+resource LocaleIndex (kSDKDefDialogResourceID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, 	kSDKDefDialogResourceID + index_enUS
+	}
+};
+
 /*  
  * Type definition.
  */
@@ -589,6 +637,29 @@ type KBSColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSColorT
 
 type KBSResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKBSResultCheckWidgetBoss)
 {
+};
+
+/*
+ * The Glyph tab's replace confirmation. "DialogBoss" is the exotic name of what is really a widget;
+ * WidgetEveInfo is what lets the dialog lay itself out with EVE (basicdialog's BscDlg.fr does the
+ * same). The glyph frame inherits EVEGenericPanelWidget, which already carries WidgetEveInfo, so
+ * the frame takes part in that layout while its IControlView is ours.
+ */
+type KBSGlyphConfirmDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKBSGlyphConfirmDialogBoss)
+{
+	WidgetEveInfo;
+};
+
+// A LEAF, not a container: it holds a drawing, not child widgets. That distinction is what decides
+// its size under EVE - a panel widget is measured from its children, so an empty one collapses to
+// nothing (which is exactly what happened when this inherited EVEGenericPanelWidget: the frame
+// vanished and the font name sat directly under the label). The shape here is the one EveInfo.fh
+// uses for its own leaves - see EVEButtonBarWidget: CControlView plus WidgetEveInfo, and no
+// CPanelControlData - so the Frame written in the resource is the size EVE lays out.
+type KBSGlyphViewWidget(kViewRsrcType) : Widget(ClassID = kKBSGlyphViewWidgetBoss)
+{
+	CControlView;
+	WidgetEveInfo;
 };
 
 /*  
@@ -837,6 +908,287 @@ resource VersionedScriptElementInfo(1)
 			}
 		}
 	}
+};
+
+/*
+ * The Glyph tab's replace confirmation.
+ *
+ * What this has that the plain alert cannot have is the two glyphs themselves, drawn in the font
+ * that defines them. On that tab the query IS a glyph, and a glyph drawn as a character would come
+ * out as the STANDARD form - an alternate form shares its Unicode with it - which would be a lie in
+ * the one place the user authorises a rewrite.
+ *
+ * Laid out with EVE: a column of (sentence / the two frames side by side / sentence / check box /
+ * buttons), and each frame is a column of (label / glyph / font name / Unicode). The two lines under
+ * a frame are optional and the controller hides them when there is nothing to say - an alternate
+ * form has no Unicode, and an empty Change To box has no font either.
+ *
+ * Cancel is the DEFAULT button (user's decision, 2026-07-31): Enter must not start a rewrite. The
+ * plain CAlert lost that guard when it gained its "don't show again" box - WarningAlertWithDont-
+ * ShowAgain takes no default-button argument - and a dialog of our own is what gets it back.
+ * EVEDefaultButtonWidget means "the default button", not "the OK button"; linksui's ProblemLinks
+ * dialog likewise gives it a label of its own.
+ */
+resource KBSGlyphConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKBSGlyphConfirmDialogWidgetID,	// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 380, 300)			// Frame (l,t,r,b) - EVE resizes it to fit the children
+	kTrue, kTrue,					// Visible, Enabled
+	kKBSPanelTitleKey,				// Dialog name
+	{
+		// ----- "Change N checked hits?" -----
+		EVEStaticTextWidget
+		(
+			kKBSGlyphConfirmCountWidgetID,	// WidgetId
+			kSysStaticTextPMRsrcId,			// RsrcId
+			kBindNone,						// Frame binding
+			Frame(0, 0, 340, 20)			// Frame (l,t,r,b)
+			kTrue, kTrue, kAlignLeft,		// Visible, Enabled, Alignment
+			kDontEllipsize, kFalse,			// Ellipsize style, Convert ampersands
+			"",								// Text (the controller fills it)
+			0								// Associated control for shortcut focus
+
+			kEVEAlignLeft | kEVELargeSpaceAfter,
+		),
+
+		// ----- the two glyph frames, side by side -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID,		// WidgetId
+			0						// RsrcId
+			0,						// Widget EVE Info
+			kBindNone,				// Frame binding
+			Frame(0, 0, 340, 150)	// Frame
+			kTrue,					// Visible
+			kTrue,					// Enabled
+			kEVEAlignCenter | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow,
+
+			{
+				// --- the glyph being searched for ---
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID,
+					0
+					0,
+					kBindNone,
+					Frame(0, 0, 145, 150)
+					kTrue,
+					kTrue,
+					kEVEAlignCenter |kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVEChildAlignCenter,
+
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kDontEllipsize, kFalse,
+							kKBSGlyphConfirmFindLabelKey,	// "Find"
+							0
+
+							kEVEAlignCenter | kEVESmallSpaceAfter,
+						),
+
+						KBSGlyphViewWidget
+						(
+							kKBSGlyphConfirmFindGlyphWidgetID,
+							kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 72, 72)
+							kTrue, kTrue,
+
+							kEVEAlignCenter | kEVESmallSpaceAfter,
+						),
+
+						EVEStaticTextWidget
+						(
+							kKBSGlyphConfirmFindFontWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kEllipsizeEnd, kFalse,
+							"",								// the controller fills it
+							0
+
+							kEVEAlignCenter | kEVENoSpaceAfter,
+						),
+
+						EVEStaticTextWidget
+						(
+							kKBSGlyphConfirmFindUnicodeWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kDontEllipsize, kFalse,
+							"",								// the controller fills or hides it
+							0
+
+							kEVEAlignCenter | kEVENoSpaceAfter,
+						),
+					}
+				),
+
+				// --- the arrow between them ---
+				EVEStaticTextWidget
+				(
+					kInvalidWidgetID,
+					kSysStaticTextPMRsrcId,
+					kBindNone,
+					Frame(0, 0, 30, 18)
+					kTrue, kTrue, kAlignCenter,
+					kDontEllipsize, kFalse,
+					kKBSGlyphConfirmArrowKey,		// "->"
+					0
+
+					kEVEAlignCenter | kEVELargeSpaceAfter,
+				),
+
+				// --- the glyph that will be written ---
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID,
+					0
+					0,
+					kBindNone,
+					Frame(0, 0, 145, 150)
+					kTrue,
+					kTrue,
+					kEVEAlignCenter |kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVEChildAlignCenter,
+
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kDontEllipsize, kFalse,
+							kKBSGlyphConfirmChangeLabelKey,	// "Change to"
+							0
+
+							kEVEAlignCenter | kEVESmallSpaceAfter,
+						),
+
+						KBSGlyphViewWidget
+						(
+							kKBSGlyphConfirmChangeGlyphWidgetID,
+							kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 72, 72)
+							kTrue, kTrue,
+
+							kEVEAlignCenter | kEVESmallSpaceAfter,
+						),
+
+						EVEStaticTextWidget
+						(
+							kKBSGlyphConfirmChangeFontWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kEllipsizeEnd, kFalse,
+							"",
+							0
+
+							kEVEAlignCenter | kEVENoSpaceAfter,
+						),
+
+						EVEStaticTextWidget
+						(
+							kKBSGlyphConfirmChangeUnicodeWidgetID,
+							kSysStaticTextPMRsrcId,
+							kBindNone,
+							Frame(0, 0, 140, 18)
+							kTrue, kTrue, kAlignCenter,
+							kDontEllipsize, kFalse,
+							"",
+							0
+
+							kEVEAlignCenter | kEVENoSpaceAfter,
+						),
+					}
+				),
+			}
+		),
+
+		// ----- "The chapter is opened and left UNSAVED..." -----
+		EVEStaticTextWidget
+		(
+			kKBSGlyphConfirmUnsavedWidgetID,
+			kSysStaticTextPMRsrcId,
+			kBindNone,
+			Frame(0, 0, 340, 20)
+			kTrue, kTrue, kAlignLeft,
+			kDontEllipsize, kFalse,
+			"",									// the controller fills it
+			0
+
+			kEVEAlignLeft | kEVELargeSpaceAfter,
+		),
+
+		// ----- "Don't show again" -----
+		EVECheckBoxWidget
+		(
+			kKBSGlyphConfirmDontShowWidgetID, kSysCheckBoxPMRsrcId,
+			kBindNone,
+			Frame(0, 0, 220, 20),
+			kTrue, kTrue,
+			kAlignLeft,
+			kKBSGlyphConfirmDontShowKey,		// "Don't show again"
+
+			kEVEAlignLeft | kEVELargeSpaceAfter,
+		),
+
+		// ----- OK / Cancel (Cancel is the default - see the note above) -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID,
+			0
+			0,
+			kBindNone,
+			Frame(0, 0, 200, 24)
+			kTrue,
+			kTrue,
+			kEVEAlignRight | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+
+			{
+				EVEButtonWidget
+				(
+					kOKButtonWidgetID,
+					kSysButtonPMRsrcId,
+					kBindNone,
+					Frame(0, 0, 0, 0)
+					kTrue, kTrue,
+					kSDKDefOKButtonApplicationKey,
+
+					kEVERegularSpaceAfter,
+				),
+
+				EVEDefaultButtonWidget
+				(
+					kCancelButton_WidgetID,
+					kSysButtonPMRsrcId,
+					kBindNone,
+					Frame(0, 0, 0, 0)
+					kTrue, kTrue,
+					kSDKDefCancelButtonApplicationKey,
+
+					kEVERegularSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInColumn | kEVELargeMargin,
 };
 
 #endif // __ODFRC__

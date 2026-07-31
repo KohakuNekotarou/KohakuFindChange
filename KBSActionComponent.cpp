@@ -302,6 +302,17 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// this resolves is released before every exit below.
 	const bool glyphResolved = glyphMode && KBSGlyphConfirmDialog::Resolve(opts);
 
+	// On the Glyph tab, show the glyphs THEMSELVES rather than their numbers. Falls through to the
+	// alert below whenever the fonts could not be resolved - a ROS-group query carries none - so a
+	// confirmation that cannot be drawn is never a reason the replace cannot run.
+	if (glyphResolved)
+	{
+		const bool approved = KBSGlyphConfirmDialog::Ask(checkedCount,
+			KBSResultModel::GetCheckedChapterCount());
+		KBSGlyphConfirmDialog::ReleaseSides();
+		return approved;
+	}
+
 	// The prompt is assembled from string-table entries rather than C++ literals, so a Japanese
 	// InDesign asks the question in Japanese (KBS.fr already routes k_jaJP to KBS_jaJP.fr). This is
 	// the one place where the user authorises a rewrite of their text, so it is the one place worth

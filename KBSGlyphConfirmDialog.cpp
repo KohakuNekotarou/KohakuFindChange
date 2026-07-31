@@ -12,21 +12,36 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IApplication.h"		// the dialog manager hangs off the application
+#include "IControlView.h"		// showing / hiding the two optional lines
+#include "IDialog.h"
+#include "IDialogMgr.h"
+#include "IEVEUtils.h"			// ApplyEveLayout - re-flow once the strings are in
 #include "IFindChangeOptions.h"
 #include "IFontFamily.h"
 #include "IGlyphUtils.h"
+#include "IPanelControlData.h"	// FindWidget - the check box and the optional lines
 #include "IPMFont.h"
+#include "ISession.h"			// GetExecutionContextSession
+#include "IShowAlertRegistryUtils.h"	// the "don't show again" registry, shared with CAlert
 #include "ITextAttrFont.h"		// the font STYLE name  (kTextAttrFontStyleBoss)
 #include "ITextAttrUID.h"		// the font FAMILY uid  (kTextAttrFontUIDBoss)
+#include "ITriStateControlData.h"		// reading the "don't show again" box
 
 // General includes:
 #include "AttributeBossList.h"
+#include "CDialogController.h"
+#include "CoreResTypes.h"		// kViewRsrcType - the dialog's RsrcSpec
+#include "LocaleSetting.h"		// the dialog's RsrcSpec locale
+#include "RsrcSpec.h"
+#include "StringUtils.h"		// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "TextAttrID.h"			// kTextAttrFontUIDBoss / kTextAttrFontStyleBoss
 #include "Utils.h"
 
 #include <stdio.h>				// snprintf - see the U+ formatting below
 
 // Project includes:
+#include "KBSID.h"
 #include "KBSGlyphConfirmDialog.h"
 
 KBSGlyphConfirmDialog::Side	KBSGlyphConfirmDialog::sFind;
@@ -171,6 +186,216 @@ const KBSGlyphConfirmDialog::Side& KBSGlyphConfirmDialog::GetFindSide()
 const KBSGlyphConfirmDialog::Side& KBSGlyphConfirmDialog::GetChangeSide()
 {
 	return sChange;
+}
+
+/* GetSideForWidget
+*/
+const KBSGlyphConfirmDialog::Side* KBSGlyphConfirmDialog::GetSideForWidget(const WidgetID& widgetID)
+{
+	// Two frames, told apart by their id. An absent font means the frame draws empty, which is the
+	// right picture for an empty Change To box - the deletion has no glyph to show.
+	if (widgetID == kKBSGlyphConfirmFindGlyphWidgetID)
+		return sFind.fFont != nil ? &sFind : nil;
+	if (widgetID == kKBSGlyphConfirmChangeGlyphWidgetID)
+		return sChange.fFont != nil ? &sChange : nil;
+	return nil;
+}
+
+/* SetAccepted
+*/
+void KBSGlyphConfirmDialog::SetAccepted(bool accepted)
+{
+	sAccepted = accepted;
+}
+
+/* GetCheckedCount
+*/
+int32 KBSGlyphConfirmDialog::GetCheckedCount()
+{
+	return sCheckedCount;
+}
+
+/* GetChapterCount
+*/
+int32 KBSGlyphConfirmDialog::GetChapterCount()
+{
+	return sChapterCount;
+}
+
+/* Ask
+*/
+bool KBSGlyphConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
+{
+	// Nothing resolved: the caller falls back to the plain alert. The find side is the one that has
+	// to be there - an empty change side is the deletion request and draws as an empty frame.
+	if (sFind.fFont == nil)
+		return false;
+
+	// Suppression is shared with the plain alert on purpose: it is the same question about the same
+	// command, and a user who switched it off does not expect it back because the tab changed.
+	// Suppressed means approved - that is what switching it off asks for.
+	if (!Utils<IShowAlertRegistryUtils>()->GetShouldShow(kKBSReplaceCheckedActionID))
+		return true;
+
+	sCheckedCount = checkedCount;
+	sChapterCount = chapterCount;
+	sAccepted = false;
+
+	InterfacePtr<IApplication> application(GetExecutionContextSession()->QueryApplication());
+	if (application == nil)
+		return false;
+	InterfacePtr<IDialogMgr> dialogMgr(application, UseDefaultIID());
+	if (dialogMgr == nil)
+		return false;
+
+	// Built fresh every time (kDontCacheDialog): the glyphs, the fonts and the counts differ on
+	// every run, so a cached dialog would have to be rewritten from scratch anyway. Not resizable -
+	// two glyph frames and a button row have nothing to gain from it.
+	RsrcSpec dialogSpec(LocaleSetting::GetLocale(), kKBSPluginID, kViewRsrcType,
+		kSDKDefDialogResourceID, kTrue /*initially visible*/);
+	IDialog* dialog = dialogMgr->CreateNewDialog(dialogSpec, IDialog::kMovableModal,
+		IDialogMgr::kAllowMultipleCopies, IDialogMgr::kDontCacheDialog,
+		IDialogMgr::kDontAllowUserResize);
+	if (dialog == nil)
+		return false;
+
+	// Open() waits for the dialog by default, so control returns here only once it is dismissed -
+	// by which time the controller has recorded the answer.
+	dialog->Open();
+
+	return sAccepted;
+}
+
+//----------------------------------------------------------------------------------------
+// KBSGlyphConfirmDialogController - the dialog's own behaviour
+//----------------------------------------------------------------------------------------
+
+/** Implements IDialogController for the Glyph tab's replace confirmation: fills the fields on
+	open, and records the answer on OK. There is nothing to validate - the dialog has no input.
+*/
+class KBSGlyphConfirmDialogController : public CDialogController
+{
+	typedef CDialogController inherited;
+public:
+	/** Constructor.
+		@param boss interface ptr from boss object on which this interface is aggregated.
+	*/
+	KBSGlyphConfirmDialogController(IPMUnknown* boss) : inherited(boss) {}
+	virtual ~KBSGlyphConfirmDialogController() {}
+
+	/** Write the counts, the font names and the Unicode values into the dialog.
+		@param dlgContext active context.
+	*/
+	virtual void InitializeDialogFields(IActiveContext* dlgContext);
+
+	/** Record that the rewrite was approved (OK only - Cancel never reaches here).
+		@param myContext active context.
+		@param widgetId identifies the widget on which to act.
+	*/
+	virtual void ApplyDialogFields(IActiveContext* myContext, const WidgetID& widgetId);
+
+private:
+	/** Show a line when there is something to put on it, hide it when there is not.
+		@param widgetID the line to fill or hide.
+		@param text what it should say; empty means hide.
+	*/
+	void SetOptionalLine(const WidgetID& widgetID, const PMString& text);
+};
+
+CREATE_PMINTERFACE(KBSGlyphConfirmDialogController, kKBSGlyphConfirmDialogControllerImpl)
+
+/* SetOptionalLine
+*/
+void KBSGlyphConfirmDialogController::SetOptionalLine(const WidgetID& widgetID, const PMString& text)
+{
+	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
+	if (panelData == nil)
+		return;
+	IControlView* view = panelData->FindWidget(widgetID);
+	if (view == nil)
+		return;
+
+	if (text.IsEmpty())
+	{
+		// Hidden AND disabled: a widget that is only hidden still takes clicks (the lesson from the
+		// replaced rows' check boxes). Nothing here is clickable, but the pair is the house rule.
+		view->ShowView(kFalse);
+		view->Disable();
+		return;
+	}
+	this->SetTextControlData(widgetID, text);
+	view->ShowView(kTrue);
+	view->Enable();
+}
+
+/* InitializeDialogFields
+*/
+void KBSGlyphConfirmDialogController::InitializeDialogFields(IActiveContext* /*dlgContext*/)
+{
+	// The opening sentence, from the same string-table entries the plain alert uses - the same
+	// question, on a different screen. Each key is translated BEFORE the count goes in: a key only
+	// translates while it is the WHOLE string, and the count is real data, so it is marked
+	// untranslatable first.
+	PMString countStr;
+	countStr.AppendNumber(KBSGlyphConfirmDialog::GetCheckedCount());
+	countStr.SetTranslatable(kFalse);
+	PMString countLine(KBSGlyphConfirmDialog::GetCheckedCount() == 1
+		? kKBSConfirmReplaceOneKey : kKBSConfirmReplaceManyKey);
+	countLine.Translate();
+	::ReplaceStringParameters(&countLine, countStr);
+	countLine.SetTranslatable(kFalse);
+	this->SetTextControlData(kKBSGlyphConfirmCountWidgetID, countLine);
+
+	// The closing sentence, the same way.
+	PMString chapterStr;
+	chapterStr.AppendNumber(KBSGlyphConfirmDialog::GetChapterCount());
+	chapterStr.SetTranslatable(kFalse);
+	PMString unsaved(KBSGlyphConfirmDialog::GetChapterCount() <= 1
+		? kKBSConfirmUnsavedOneKey : kKBSConfirmUnsavedManyKey);
+	unsaved.Translate();
+	::ReplaceStringParameters(&unsaved, chapterStr);
+	unsaved.SetTranslatable(kFalse);
+	this->SetTextControlData(kKBSGlyphConfirmUnsavedWidgetID, unsaved);
+
+	// The four lines under the two frames. All optional, and all for the same reason: an empty
+	// Change To box has no font to name and no Unicode to give, and an ALTERNATE form has no
+	// Unicode either (SnpInsertGlyph.cpp:291-299 records Adobe's own note about that). An empty
+	// line under one frame but not the other reads as a fault, so the line is hidden rather than
+	// blanked. Already marked untranslatable where they were built - they are data.
+	const KBSGlyphConfirmDialog::Side& findSide = KBSGlyphConfirmDialog::GetFindSide();
+	const KBSGlyphConfirmDialog::Side& changeSide = KBSGlyphConfirmDialog::GetChangeSide();
+	this->SetOptionalLine(kKBSGlyphConfirmFindFontWidgetID, findSide.fFontLabel);
+	this->SetOptionalLine(kKBSGlyphConfirmFindUnicodeWidgetID, findSide.fUnicode);
+	this->SetOptionalLine(kKBSGlyphConfirmChangeFontWidgetID, changeSide.fFontLabel);
+	this->SetOptionalLine(kKBSGlyphConfirmChangeUnicodeWidgetID, changeSide.fUnicode);
+
+	// The strings just written are parameterized and translated, so they can be longer than the
+	// resource allowed for, and lines have just been hidden. Re-flow once, at the end - the way
+	// linksui's own dialogs do it.
+	InterfacePtr<IControlView> dialogView(this, UseDefaultIID());
+	if (dialogView != nil)
+		Utils<IEVEUtils>()->ApplyEveLayout(dialogView);
+}
+
+/* ApplyDialogFields
+*/
+void KBSGlyphConfirmDialogController::ApplyDialogFields(IActiveContext* /*myContext*/,
+	const WidgetID& /*widgetId*/)
+{
+	// Only reached on OK - Cancel never gets here, which is exactly the behaviour wanted: the
+	// answer defaults to "no" and only OK turns it into "yes".
+	KBSGlyphConfirmDialog::SetAccepted(true);
+
+	// "Don't show again" is honoured on OK only. CAlert can record it alongside a Cancel (its
+	// return value 4), but doing that here would mean a user who backed out of a rewrite is never
+	// asked about the next one - the opposite of what backing out says.
+	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
+	if (panelData == nil)
+		return;
+	IControlView* box = panelData->FindWidget(kKBSGlyphConfirmDontShowWidgetID);
+	InterfacePtr<ITriStateControlData> state(box, UseDefaultIID());
+	if (state != nil && state->IsSelected())
+		Utils<IShowAlertRegistryUtils>()->DoSetShouldShowCmd(kKBSReplaceCheckedActionID, kFalse);
 }
 
 // End, KBSGlyphConfirmDialog.cpp.
