@@ -377,6 +377,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// TEMPORARY (the "A" experiment): the DoReplaceAll measurement probe. Delete with it.
+		kKBSReplaceProbeActionID,
+		kKBSTargetMenuPath
+		kKBSReplaceProbeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// About this plug-in sub-menu for the popup menu on the panel
 		kKBSPopupAboutThisActionID,
 		kKBSTargetMenuPath
@@ -471,6 +477,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSUncheckAllActionID,
 		kKBSUncheckAllMenuKey,			// "Uncheck All"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// TEMPORARY (the "A" experiment). kCustomEnabling so UpdateActionStates can grey it out
+		// when there is nothing checked to measure with. Delete with the probe.
+		kKBSActionComponentBoss,
+		kKBSReplaceProbeActionID,
+		kKBSReplaceProbeMenuKey,
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

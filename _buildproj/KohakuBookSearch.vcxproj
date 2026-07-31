@@ -227,6 +227,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSJump.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSReplaceProbe.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultCheckObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSStartupShutdown.cpp"/>
@@ -261,6 +262,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSJump.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceProbe.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSScriptingDefs.h"/>
