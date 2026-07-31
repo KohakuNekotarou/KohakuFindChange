@@ -13,7 +13,9 @@
 //  AGMGraphicsContext + StringUtils::PMDrawString / PMDrawStringRGB, the palette font from
 //  IInterfaceFonts, the baseline from IWidgetUtils::GetViewYPosition. convertAmpersand is kFalse
 //  on BOTH the draw and the measure so a literal '&' in the search text is neither underlined
-//  nor dropped. When a line overflows the cell the match is kept at full strength and the context
+//  nor dropped. Selected rows are drawn in the theme's selected-text colours, which a hand-drawn
+//  cell has to ask for itself (a stock StaticText gets all four colours from its .fr and lets the
+//  framework choose) - the same isHilited switch the app's own drawing makes. When a line overflows the cell the match is kept at full strength and the context
 //  is ellipsized around it (the stock rows ellipsize automatically; this custom cell does it by
 //  hand): the leading context loses its HEAD (kEllipsizeBeginning, so the words just before the
 //  match survive with a leading "..."), the trailing context loses its TAIL (kEllipsizeEnd).
@@ -23,9 +25,11 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IControlView.h"		// IsHilited - is this cell's row the selected one?
 #include "IGraphicsPort.h"
 #include "IInterfaceColors.h"	// RealAGMColor, InterfaceColor indices
 #include "IInterfaceFonts.h"	// the palette window font
+#include "IWidgetParent.h"		// QueryParentFor - this cell -> the row widget that carries the hilite
 
 // General includes:
 #include "AGMGraphicsContext.h"
@@ -42,6 +46,31 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSColorTextView.h"
+
+// How far up the widget chain to look for the hilite (see KBSViewOrParentIsHilited). One step is
+// all this panel needs (cell -> row); the extra steps only keep it working if the row ever gains
+// another wrapper.
+static const int32 kKBSHiliteParentSteps = 3;
+
+// True if this view, or a widget above it, is drawn hilited - i.e. this cell belongs to the row the
+// user has selected. The tree applies the hilite to the ROW widget (the base
+// CTreeViewWidgetMgr::ApplyNodeIDToWidget does it, "for hilite selection"), and this cell is one of
+// that row's children, so a cell that only asked itself would never see the selection.
+static bool16 KBSViewOrParentIsHilited(IControlView* view, int32 stepsLeft)
+{
+	if (view == nil)
+		return kFalse;
+	if (view->IsHilited())
+		return kTrue;
+	if (stepsLeft <= 0)
+		return kFalse;
+
+	InterfacePtr<IWidgetParent> parent(view, UseDefaultIID());
+	if (parent == nil)
+		return kFalse;
+	InterfacePtr<IControlView> parentView((IControlView*)parent->QueryParentFor(IID_ICONTROLVIEW));
+	return KBSViewOrParentIsHilited(parentView, stepsLeft - 1);
+}
 
 // Linear blend of two RGB colours (t = 0 -> bg, t = 1 -> fg). Used to fade the context text
 // toward the panel background (the KESCM scrollbar-map trick).
@@ -139,11 +168,23 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const PMReal rightEdge = frame.Right();
 	PMReal x = frame.Left();
 
+	// Is this cell's row the selected one? A self-drawing cell has to answer that itself: a stock
+	// StaticText is handed four colours in the .fr (text / hilite text / background / hilite
+	// background) and lets the framework pick, but drawing by hand means the two hilite colours go
+	// unused unless they are asked for here. The app's own drawing does exactly this switch - see
+	// CRenderingObjectDrawer::DrawRenderObjectUIName ("isHilited ? kInterfaceHighLightText :
+	// kInterfaceTextColor"), MSOStateDDLElementView and cellpanel's TableCellView.
+	const bool16 isHilited = KBSViewOrParentIsHilited(this, kKBSHiliteParentSteps);
+
 	// Colours, entirely from the current theme so KBS matches whatever colours it uses:
-	//   * bg = the panel's background fill (kInterfacePaletteFill)
-	//   * fg = the theme's TEXT colour (kInterfaceTextColor - exactly what InDesign's own panels
-	//          draw text with: black in a light UI, ~0.8 gray in a dark one; it flips with the
-	//          theme, so nothing is hardcoded and nothing vanishes when the UI brightness changes)
+	//   * bg = what this row is painted on - the panel's background fill (kInterfacePaletteFill),
+	//          or the selection fill (kInterfaceHighLight) while the row is selected
+	//   * fg = the theme's TEXT colour for that background (kInterfaceTextColor / its selected
+	//          counterpart kInterfaceHighLightText - exactly what InDesign's own panels draw text
+	//          with: black in a light UI, ~0.8 gray in a dark one; it flips with the theme, so
+	//          nothing is hardcoded and nothing vanishes when the UI brightness changes)
+	// Both have to move together: the context runs are faded TOWARD bg, so leaving bg as the panel
+	// fill on a selected row would fade them toward a colour that is not behind them any more.
 	// The matched text is drawn at the full theme text colour; the context (the "P<page>(<n>)"
 	// locator and the rest of the line) is that same colour faded toward the background, so the
 	// match reads at full strength and the context recedes. Tune kContextTextWeight to taste:
@@ -153,8 +194,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
 	if (colors != nil)
 	{
-		colors->GetRealAGMColor(kInterfacePaletteFill, bg);
-		colors->GetRealAGMColor(kInterfaceTextColor, fg);
+		colors->GetRealAGMColor(isHilited ? kInterfaceHighLight : kInterfacePaletteFill, bg);
+		colors->GetRealAGMColor(isHilited ? kInterfaceHighLightText : kInterfaceTextColor, fg);
 	}
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
 	const RealAGMColor kContextColor = BlendColor(bg, fg, kContextTextWeight);	// faded toward bg
@@ -168,8 +209,14 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// refused). kInterfaceItemHighLight is the theme's own accent - blue-ish in the light UI,
 	// orange in the dark one - so it stands out without a hardcoded colour that would go wrong
 	// in one theme or the other. The theme table has no red, and none is invented here.
+	//
+	// On the SELECTED row the accent is dropped and the word is drawn in the ordinary selected-text
+	// colour: the selection fill is itself an accent colour (blue-ish in the light UI), so accent on
+	// accent is the one combination that can come out unreadable. Nothing is lost by it - the reason
+	// is a WORD ("missing" / "refused"), and the colour only ever emphasised it. It is also the row
+	// the user is already looking at.
 	RealAGMColor accent = fg;
-	if (colors != nil)
+	if (colors != nil && !isHilited)
 		colors->GetRealAGMColor(kInterfaceItemHighLight, accent);
 	const RealAGMColor kAccentColor = accent;
 
@@ -185,11 +232,20 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
 	// keeps that fixed for every row (see KBSResultListWidgetMgr - the check box sits in the margin
 	// rather than pushing its row's text right).
+	// Named rather than passed as bare kFalse, which is how the app's own drawing code writes it
+	// (CRenderingObjectDrawer::DrawRenderObjectUIName). Every call below spells both out instead of
+	// letting the defaults apply, because the defaults in DrawStringUtils.h DISAGREE with each
+	// other: the draw calls default to kFalse but the measure and ellipsize calls default to kTrue.
+	// Taking the defaults would measure a string differently from how it is drawn. '&' has to
+	// survive verbatim here in any case - this is document text, not a menu label.
+	const bool16 kDontConvertAmpersand = kFalse;
+	const bool16 kNoUnderline = kFalse;
+
 	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
 	if (!locator.IsEmpty() && x < rightEdge)
 	{
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kFalse, kFalse);
-		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kFalse).X();
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), locator, fontInfo, kMatchColor, kDontConvertAmpersand, kNoUnderline);
+		x += StringUtils::PMMeasureString(&gc, locator, fontInfo, kDontConvertAmpersand).X();
 	}
 	// Its own run so it can carry its own colour, with the separating space inside it - the
 	// locator is built without this word for exactly that reason (KBSResultModel::BuildHitLocator).
@@ -198,8 +254,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		PMString flagRun(" ");
 		flagRun.SetTranslatable(kFalse);
 		flagRun.Append(flag);
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), flagRun, fontInfo, kAccentColor, kFalse, kFalse);
-		x += StringUtils::PMMeasureString(&gc, flagRun, fontInfo, kFalse).X();
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), flagRun, fontInfo, kAccentColor, kDontConvertAmpersand, kNoUnderline);
+		x += StringUtils::PMMeasureString(&gc, flagRun, fontInfo, kDontConvertAmpersand).X();
 	}
 	if (x > frame.Left())
 		x += kLocatorGap;
@@ -217,13 +273,13 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	{
 		if (s.IsEmpty())
 			return;
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), s, fontInfo, c, kFalse, kFalse);
-		x += StringUtils::PMMeasureString(&gc, s, fontInfo, kFalse).X();
+		StringUtils::PMDrawStringRGB(&gc, PMPoint(x, y), s, fontInfo, c, kDontConvertAmpersand, kNoUnderline);
+		x += StringUtils::PMMeasureString(&gc, s, fontInfo, kDontConvertAmpersand).X();
 	};
 
-	const PMReal preW   = pre.IsEmpty()   ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, pre,   fontInfo, kFalse).X();
-	const PMReal matchW = match.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, match, fontInfo, kFalse).X();
-	const PMReal postW  = post.IsEmpty()  ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, post,  fontInfo, kFalse).X();
+	const PMReal preW   = pre.IsEmpty()   ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, pre,   fontInfo, kDontConvertAmpersand).X();
+	const PMReal matchW = match.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, match, fontInfo, kDontConvertAmpersand).X();
+	const PMReal postW  = post.IsEmpty()  ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, post,  fontInfo, kDontConvertAmpersand).X();
 
 	if (preW + matchW + postW <= availWidth)
 	{
@@ -235,7 +291,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	else if (matchW >= availWidth)
 	{
 		// The match alone overflows the cell: ellipsize the match itself (tail) and drop the context.
-		const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kFalse);
+		const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
 		drawRun(m, kMatchColor);
 	}
 	else
@@ -248,13 +304,13 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		const PMReal rem = availWidth - matchW;
 		PMString preCut = pre;
 		if (!pre.IsEmpty())
-			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kFalse);
-		const PMReal preCutW = preCut.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, preCut, fontInfo, kFalse).X();
+			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kDontConvertAmpersand);
+		const PMReal preCutW = preCut.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, preCut, fontInfo, kDontConvertAmpersand).X();
 
 		const PMReal postBudget = rem - preCutW;
 		PMString postCut;
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
-			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kFalse);
+			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
 
 		drawRun(preCut, kContextColor);
 		drawRun(match, kMatchColor);

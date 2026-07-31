@@ -175,6 +175,15 @@ namespace
 			xRight = xLeft + waxLine->GetLineHeight() * PMReal(0.5);
 		}
 
+		// How tall to make the rectangle: proportions of the line height, measured from the baseline
+		// (the wax run's local y origin), which is the space mLeft / mRight map from.
+		//
+		// WARNING: do NOT "improve" this with IWaxLineShape::GetSelectionLine. That was tried 2026-07-31
+		// and reverted the same day: its documented job is to CONSTRAIN a highlight's height so
+		// adjacent lines do not overlap (IWaxLineHilite.h:53-54 calls it maxTopBottom, "used to
+		// prevent double XOR problems when waxLines are too close together"), not to report this
+		// line's ascent and descent, and its coordinate space is nowhere stated. There is no call
+		// site for it anywhere in the SDK. Measure it on a real document before trusting it.
 		const PMReal h       = waxLine->GetLineHeight();
 		const PMReal ascent  = h * PMReal(0.95);
 		const PMReal descent = h * PMReal(0.2);

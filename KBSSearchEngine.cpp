@@ -42,7 +42,8 @@
 #include "IParcelList.h"			// GetParcelFrameUID - is that parcel placed in a frame?
 #include "ParcelKey.h"				// ParcelKey::IsValid
 #include "IHierarchy.h"				// the parcel frame as a page item
-#include "ILayoutUtils.h"			// GetOwnerPageUID - frame -> page
+#include "ITextUtils.h"				// GetPageUIDRef - the purpose-built textFrame -> page lookup
+#include "ILayoutUtils.h"			// GetOwnerPageUID - frame -> page (the general fallback)
 #include "IPageList.h"				// GetPageString / GetPageIndex - page -> "12" / "A:1"
 // For marking a match that sits on a switched-off layer ("Hidden" on the hit-row locator):
 #include "ILayerUtils.h"			// GetLayerUID - the spread layer a frame sits on
@@ -230,8 +231,9 @@ void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 
 // A frame UID -> its page, named the way the Pages panel names it (section prefix and all). Shared
 // by the visible-match path (the match's own frame) and the overset path (the "+" indicator's
-// frame). false if the frame has no owner page or the page has no name. outPageIndex is the page's
-// plain document order (for sorting; the STRING can be "iv" / "A-1" under a section).
+// frame). false only when neither a page nor a spread can be resolved. outPageIndex is the page's
+// plain document order (for sorting); the STRING follows the section, so it can read "iv" or "A-1",
+// and "PB" for a frame sitting on the pasteboard.
 bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, int32& outPageIndex)
 {
 	outPage.Clear();
@@ -240,17 +242,43 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	if (frameUID == kInvalidUID)
 		return false;
 
-	InterfacePtr<IHierarchy> frameHier(docRef.GetDataBase(), frameUID, UseDefaultIID());
-	if (frameHier == nil)
+	IDataBase* db = docRef.GetDataBase();
+	if (db == nil)
 		return false;
-	const UID pageUID = Utils<ILayoutUtils>()->GetOwnerPageUID(frameHier);
+
+	// ITextUtils::GetPageUIDRef is the purpose-built lookup - its contract is "the page the given
+	// textFrame is on" - and everything that reaches this function IS a text frame, since it comes
+	// from IParcelList::GetParcelFrameUID.
+	UID pageUID = Utils<ITextUtils>()->GetPageUIDRef(UIDRef(db, frameUID)).GetUID();
+
+	// Fall back to the general page-item lookup, which answers for anything in the hierarchy.
+	//
+	// That fallback is also what keeps a PASTEBOARD hit readable, and it is deliberate: a frame that
+	// sits on no page makes GetOwnerPageUID return the SPREAD's UID, and GetPageString takes a
+	// spread UID too and spells it "PB" (IPageList.h:131, "Given a page UID (or spread UID)"). A
+	// match out on the pasteboard should say where it is rather than drop out of the list, so this
+	// does NOT check that the UID is a kPageBoss before using it. (Code that wants real pages only
+	// has to verify with db->GetClass - see KESCM's overset scan, which does exactly that.)
+	if (pageUID == kInvalidUID)
+	{
+		InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
+		if (frameHier == nil)
+			return false;
+		pageUID = Utils<ILayoutUtils>()->GetOwnerPageUID(frameHier);
+	}
 	if (pageUID == kInvalidUID)
 		return false;
 
 	InterfacePtr<IPageList> pageList(docRef, UseDefaultIID());
 	if (pageList == nil)
 		return false;
-	pageList->GetPageString(pageUID, &outPage);	// defaults: section-aware, abbreviated
+
+	// bUseIntegerStyle = kFalse, so the page is spelled the way the Pages panel spells it - in the
+	// style its SECTION uses (iv, A-1) - instead of being forced to arabic numerals. The default is
+	// kTrue (IPageList.h:136: "kTrue == Use arabic numerals in string; kFalse == use the style of
+	// this section (eg iv for 4)"), so taking the default printed "4" for a page the panel calls
+	// "iv". Sorting is unaffected: that uses outPageIndex, which is the plain document order.
+	pageList->GetPageString(pageUID, &outPage, kTrue /*bIncludeSectionName*/, kFalse /*bUseIntegerStyle*/);
 	outPage.SetTranslatable(kFalse);
 	outPageIndex = pageList->GetPageIndex(pageUID);
 	return !outPage.IsEmpty();

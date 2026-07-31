@@ -32,10 +32,14 @@
 #include "ITreeViewHierarchyAdapter.h"	// child count - decides the expander's visibility
 #include "ITreeViewMgr.h"				// ClearTree / ChangeRoot / ExpandNode (the rebuild)
 
+// Interface includes (cont.):
+#include "IMenuUtils.h"					// InsertAmpersandForDisplay - a file name may contain '&'
+
 // General includes:
 #include "CTreeViewWidgetMgr.h"
 #include "CreateObject.h"
 #include "CoreResTypes.h"
+#include "DVPublicUtilities.h"			// dv_utils::SetThemeForView - the theme a new row widget draws in
 #include "LocaleSetting.h"
 #include "PMString.h"
 #include "RsrcSpec.h"
@@ -73,6 +77,11 @@ namespace
 	// the hierarchy. A document search has no book row and no shift, so its tree is unchanged.
 	const PMReal kBookLevelIndent = 8.0;
 
+	// Every row of this tree is this tall - the height both row resources declare in KBS.fr. Stated
+	// here as well because the tree asks for it (GetNodeWidgetHeight), and because it is the fact
+	// that lets Rebuild() promise ChangeRoot a constant widget height.
+	const PMReal kRowHeight = 19.0;
+
 	// Put 'text' into a row's static-text cell. Row widgets are recycled as the tree scrolls, so
 	// every cell is written on every apply. No manual repaint: the tree draws the row right after.
 	void SetColumnText(const InterfacePtr<IPanelControlData>& rowData, const WidgetID& wid, const PMString& text)
@@ -82,9 +91,25 @@ namespace
 		IControlView* cv = rowData->FindWidget(wid);
 		if (cv == nil)
 			return;
+
+		// The label carries a name the user chose - a document's or a book's file name - and this
+		// cell converts ampersands (KBS.fr sets that flag on it, exactly as the layer panel's row
+		// resource does). A lone '&' is then taken as a keyboard accelerator: "A&B.indd" would show
+		// as "AB.indd" with the B underlined. Doubling each one up is what the built-in panels do
+		// before handing a user-entered name to a static text - see SetupLayerWidget in
+		// LayerPanelTreeViewWidgetMgr.cpp, AddWidgetsIfNeeded in LinksUIPanelTreeViewWidgetMgr.cpp,
+		// and the note on IMenuUtils::InsertAmpersandForDisplay itself ("style names, master names,
+		// layer names ... or other user-entered strings").
+		//
+		// The hit rows do NOT come through here: their cell draws itself and asks for no ampersand
+		// conversion at all (KBSColorTextView), which is right - the matched text has to appear
+		// exactly as it stands in the document.
+		PMString display(text);
+		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
+
 		InterfacePtr<ITextControlData> tcd(cv, UseDefaultIID());
 		if (tcd != nil)
-			tcd->SetString(text, kTrue /*invalidate*/, kFalse /*don't notify*/);
+			tcd->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	}
 }
 
@@ -102,14 +127,33 @@ public:
 		RsrcID rsrcID = kKBSResultChapterNodeWidgetRsrcID;
 		if (nodeID != nil && nodeID->IsHitRow())
 			rsrcID = kKBSResultHitNodeWidgetRsrcID;
+
+		// Built the way the layer panel builds its rows (LayerPanelTreeViewWidgetMgr.cpp), in three
+		// steps rather than one CreateObject, because the ORDER is the point:
+		//   1. CreateObjectNoInit - make the boss but do not build its child hierarchy yet.
+		//   2. SetThemeForView(kIDPanelTheme) - tell it that it is going to live in a palette. The
+		//      row is created here, long before the tree hands it to the panel's window, so nothing
+		//      else is going to say which theme it draws in.
+		//   3. DoPostCreate - NOW build the children, with the theme already settled.
+		// Doing it in one CreateObject call leaves the children built first and themed never.
+		//
 		// Both row resources are declared in KBSID.h and defined in KBS.fr, so nil here would mean
 		// this plug-in's own resources did not load - not a case any handling on this side could
 		// improve. It is handed straight back: the tree framework asked for the widget, so it is the
 		// one that decides what to do without one.
-		return (IControlView*)::CreateObject(
+		IPMUnknown* newObject = ::CreateObjectNoInit(
 			::GetDataBase(this),
 			RsrcSpec(LocaleSetting::GetLocale(), kKBSPluginID, kViewRsrcType, rsrcID),
 			IID_ICONTROLVIEW);
+		InterfacePtr<IControlView> view(newObject, UseDefaultIID());
+		if (view != nil)
+		{
+			dv_utils::SetThemeForView(view, dv_utils::kIDPanelTheme);
+			view->DoPostCreate();
+		}
+		// The reference CreateObjectNoInit handed over is the one the caller gets (the InterfacePtr
+		// above holds a second one and releases it here) - the layer panel's ownership exactly.
+		return view;
 	}
 
 	virtual WidgetID GetWidgetTypeForNode(const NodeID& node) const
@@ -120,24 +164,48 @@ public:
 		return kKBSResultChapterNodeWidgetID;
 	}
 
+	// The tree asks how big a row is rather than measuring one, so answer both questions the way
+	// the built-in panels do (LayerPanelTreeViewWidgetMgr / LinksUIPanelTreeViewWidgetMgr each
+	// implement both). Every row here is one fixed height, and every row is as wide as the tree -
+	// this list has no horizontal scroll bar and no columns to add up.
+	virtual PMReal GetNodeWidgetHeight(const NodeID& /*node*/) const
+	{
+		return kRowHeight;
+	}
+
+	virtual PMReal GetNodeWidgetWidth(const NodeID& /*node*/) const
+	{
+		return this->GetTreeViewWidth();
+	}
+
 	virtual bool16 ApplyNodeIDToWidget(const NodeID& node, IControlView* widget, int32 message = 0) const
 	{
+		// The base class FIRST, and it MUST stay first for this panel.
+		//
+		// It is not only the selection highlight. With the V2 option flags set it also runs
+		// ApplyIndentToWidget, which REWRITES the frame.Left of this row's child widgets
+		// (CTreeViewWidgetMgr.cpp:207-221 and :234-252), plus HideExpanderIfNotExpandable and
+		// ApplyDataToWidget. This panel switches the framework indent off and positions every row's
+		// content itself, so our frames have to be applied ON TOP of whatever the base class did.
+		//
+		// The shipping panels (LayerPanelTreeViewWidgetMgr, LinksUIPanelTreeViewWidgetMgr) call it
+		// last, and that was copied here on 2026-07-31 - it silently undid this file's indent and
+		// pulled the hit rows' content back to the left margin (seen on screen the same day, then
+		// reverted). Their order works because they let the framework place the row content; ours
+		// does not. The paneltreeview sample - which this tree is modelled on - calls it first.
 		CTreeViewWidgetMgr::ApplyNodeIDToWidget(node, widget);
 
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
-		if (nodeID == nil)
-			return kTrue;
-
 		InterfacePtr<IPanelControlData> rowData(widget, UseDefaultIID());
-		if (rowData == nil)
-			return kTrue;
-
-		if (nodeID->IsHitRow())
-			this->ApplyHitRow(nodeID, widget, rowData);
-		else if (nodeID->IsBookRow())
-			this->ApplyBookRow(node, widget, rowData);
-		else
-			this->ApplyChapterRow(nodeID, node, widget, rowData);
+		if (nodeID != nil && rowData != nil)
+		{
+			if (nodeID->IsHitRow())
+				this->ApplyHitRow(nodeID, widget, rowData);
+			else if (nodeID->IsBookRow())
+				this->ApplyBookRow(node, widget, rowData);
+			else
+				this->ApplyChapterRow(nodeID, node, widget, rowData);
+		}
 		return kTrue;
 	}
 

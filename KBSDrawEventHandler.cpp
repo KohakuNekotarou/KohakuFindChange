@@ -146,6 +146,13 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 		return kFalse;
 
 	// Screen only: never draw when printing.
+	//
+	// Print preview (IShape::kPreviewMode) is deliberately NOT excluded here, and that is a departure
+	// from how the app draws its own screen-only marks: DynamicSpellCheckAdornment (the dynamic spell
+	// check squiggle) tests kPrinting and kPreviewMode together, in its Draw and again in its
+	// GetIsActive. The marker is a navigation aid rather than a mark on the artwork, so it should
+	// stay visible while previewing (user's call, 2026-07-31). Do not "fix" this to match the
+	// adornments. Overprint Preview is a different flag and IS excluded, just below.
 	if ((ded->flags & IShape::kPrinting) != 0)
 		return kFalse;
 
@@ -263,7 +270,10 @@ public:
 	virtual ServiceID GetServiceID() { return kDrawEventService; }
 	virtual bool16 IsDefaultServiceProvider() { return kFalse; }
 	virtual InstancePerX GetInstantiationPolicy() { return IK2ServiceProvider::kInstancePerSession; }
-	virtual void GetName(PMString* pName) { pName->SetKey("KBSDrawEventSrvc\0"); }
+	// SetCString, not SetKey: this is an internal service name that never reaches the UI, so it must
+	// not be handed to the string table as a translation key (MotionPathDrawService, the app's own
+	// draw-event service, spells it this way; the SDK sample uses SetKey).
+	virtual void GetName(PMString* pName) { pName->SetCString("KBSDrawEventSrvc\0"); }
 	virtual IPlugIn::ThreadingPolicy GetThreadingPolicy() const { return IPlugIn::kMainThreadOnly; }
 };
 
