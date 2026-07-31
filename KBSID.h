@@ -167,7 +167,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 // The Glyph tab's replace confirmation: its dialog controller and its glyph-drawing view.
 DECLARE_PMID(kImplementationIDSpace, kKBSGlyphConfirmDialogControllerImpl, kKBSPrefix + 15)
 DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 17)
+// The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
+// they land on, so a book search's closed chapters do not hide their hits from the keyboard.
+DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 18)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 19)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 20)

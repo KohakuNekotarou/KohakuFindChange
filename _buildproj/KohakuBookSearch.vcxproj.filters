@@ -57,6 +57,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultTreeEH.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSStartupShutdown.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

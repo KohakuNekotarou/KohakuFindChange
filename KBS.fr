@@ -159,6 +159,12 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ITREEVIEWHIERARCHYADAPTER, kKBSResultListAdapterImpl,
 			IID_ITREEVIEWWIDGETMGR, kKBSResultListWidgetMgrImpl,
+			/* Extends the stock handler so the up / down arrows OPEN the row they land on and run
+			   that row's action - see KBSResultTreeEH.cpp. A book search comes up with every
+			   chapter closed, and the stock keys walk visible rows only.
+			   NOTE: this line alone does not create the handler. Implementations are made on first
+			   QueryInterface, and the one that asks is KBSResultNodeEH's key-focus hand-off. */
+			IID_IEVENTHANDLER, kKBSResultTreeEHImpl,
 		}
 	},
 

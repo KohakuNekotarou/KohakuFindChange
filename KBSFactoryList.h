@@ -31,6 +31,9 @@ REGISTER_PMINTERFACE(KBSDrawEventSrvc, kKBSDrawEventSrvcImpl)
 REGISTER_PMINTERFACE(KBSDrawEventHandler, kKBSDrawEventHandlerImpl)
 REGISTER_PMINTERFACE(KBSMarkerExpiryTask, kKBSMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
+// The result LIST's own handler: up / down arrows that open the row they land on. A boss in the
+// .fr naming an implementation that is not registered here takes InDesign down at load time.
+REGISTER_PMINTERFACE(KBSResultTreeEH, kKBSResultTreeEHImpl)
 REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
