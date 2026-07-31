@@ -33,6 +33,7 @@
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
 #include "ITextWalker.h"			// also declares ITextWalkerClient
+#include "ITextWalkerProgressMonitor.h"	// the walker's own progress hook (source/open/interfaces/text)
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
@@ -137,6 +138,33 @@ void AppendUnsearchableNote(PMString& outSummary, int32 count, const PMString& f
 	PMString why(ChapterWalkResultText(reason));
 	why.SetTranslatable(kFalse);
 	outSummary.Append(why);
+	outSummary.Append(").");
+}
+
+/** Name the chapters the book could not even hand over as documents, and what the book says about
+    them. A DIFFERENT failure from AppendUnsearchableNote's: there the document was open and the
+    WALK did not run, here there is no document at all (the file is gone, or somebody else has it).
+    Appends nothing when every chapter opened, so the ordinary summary is unchanged. */
+void AppendUnopenableNote(PMString& outSummary, const std::vector<KBSBookScope::SkippedChapter>& skipped)
+{
+	if (skipped.empty())
+		return;
+
+	outSummary.Append(" ");
+	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
+	outSummary.Append(" chapter(s) could not be opened (");
+	// The chapter name is user data and the reason is the book's own short word - neither is a
+	// translation key. Only the first is named; the count says how many there were.
+	PMString name(skipped[0].name);
+	name.SetTranslatable(kFalse);
+	outSummary.Append(name);
+	if (!skipped[0].reason.IsEmpty())
+	{
+		outSummary.Append(": ");
+		PMString why(skipped[0].reason);
+		why.SetTranslatable(kFalse);
+		outSummary.Append(why);
+	}
 	outSummary.Append(").");
 }
 
@@ -642,7 +670,42 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		return;
 	}
 
-	// Required critical section around text-walker selection changes.
+	// Let the walk report its own progress INSIDE this chapter. The walker client carries
+	// ITextWalkerProgressMonitor - kFindChangeClientBoss really does have it, checked against a live
+	// object-model dump - and spellpanel's Change All feeds it a RangeProgressBar exactly like this
+	// (SpellChangeAllObserver.cpp:305-314). Without it the caller's bar can only step once per
+	// chapter, so a single large chapter looks frozen.
+	//
+	// The bar does not draw a second dialog: a progress bar declared while another one is already on
+	// the stack SUBDIVIDES the one above it (ProgressBar.h:55-56, 216-227), which is why the caller
+	// no longer calls DisableChildProgressBars. showCancel = kFalse - the chapter bar above already
+	// owns the cancel button, and two of them would be a question about which.
+	//
+	// Stack object. The monitor is cleared again after the walk (see the end of this function): the
+	// walker holds the client, so the client can outlive this scope, and a pointer to a destroyed bar
+	// left on it would be read by the NEXT chapter's walk.
+	PMString walkProgressTitle("Searching chapter...");
+	walkProgressTitle.SetTranslatable(kFalse);
+	RangeProgressBar walkProgress(walkProgressTitle, 0, 100, kFalse /*showImmediate*/, kFalse /*showCancel*/);
+
+	InterfacePtr<ITextWalkerProgressMonitor> walkMonitor(client, UseDefaultIID());
+	if (walkMonitor != nil)
+		walkMonitor->SetWalkerProgressMonitor(&walkProgress);
+
+	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE WALK.
+	//
+	// Adobe's own examples all wrap a SINGLE ProcessCommand instead (SnpFindAndReplace.cpp:788,
+	// spellpanel's SpellSkipObserver.cpp:532-537 and SpellChangeAllObserver.cpp:317). That shape is
+	// right for what they do - one Find Next per key press - and wrong here, because of what the
+	// section actually contains: spellpanel says outright that SaveKeyboardEventHandler
+	// (SpellCheckWalker.cpp:85-141) "is the same code as EnterWalkerSelections_CriticalSection", and
+	// that code takes the keyboard focus away (RelinquishKeyFocus) and gives it back on the way out
+	// (AcquireKeyFocus + SelectRange on an edit box). Entering and leaving it per match would run
+	// that dance thousands of times in one search.
+	//
+	// The price of holding it: UI work must not be pumped inside it, which is why the progress bar's
+	// cancel is only asked between chapters (see SearchBook). Do not "correct" this to the one-command
+	// shape without measuring both. (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
 	// What each of this document's frames answers about the hits inside it - see FrameFacts. Scoped
@@ -719,6 +782,12 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 
 	if (walker->IsWalking())
 		walker->Halt();
+
+	// Take the bar off the client BEFORE it goes out of scope on the line below. The walker holds
+	// the client, so the client outlives this function - and the next chapter's walk would find a
+	// pointer to a progress bar that no longer exists.
+	if (walkMonitor != nil)
+		walkMonitor->SetWalkerProgressMonitor(nil);
 }
 
 // Put a chapter's hits in PAGE order and bake the "P<page>(<n>) " locator onto each hit line
@@ -1089,6 +1158,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// one document behind the user's back.
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
+	// Chapters the book could not hand over at all. Declared out here so the summary can name them
+	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
+	// they are the only thing that explains what happened.
+	std::vector<KBSBookScope::SkippedChapter> unopenable;
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
 	if (fromBook)
 	{
@@ -1097,9 +1170,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			outSummary.Append("Book Scope is on, but no book is open.");
 			return 0;
 		}
-		if (!KBSBookScope::GetBookChapterDocs(targets, bookName) || targets.empty())
+		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
 		{
 			outSummary.Append("The active book has no openable chapters.");
+			AppendUnopenableNote(outSummary, unopenable);
 			return 0;
 		}
 	}
@@ -1139,7 +1213,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
 	// The progress bar. Book scope only: a one-document search is a single step with nothing to
 	// cancel between, so it is suppressed there (SuppressProgressBarDisplay keeps it off screen).
-	// DisableChildProgressBars keeps the windowless chapter opens from raising bars of their own.
+	//
+	// Child bars are deliberately NOT disabled any more. This used to call
+	// DisableChildProgressBars(kTrue) to keep the windowless chapter opens from raising bars of their
+	// own - but the chapters are all opened by GetBookChapterDocs ABOVE, before this bar exists, so
+	// that call never covered them. What it DID cover is the one child worth having: the per-chapter
+	// walk bar CollectHitsInDoc hands to the text walker, which subdivides this bar's current step
+	// instead of drawing anything of its own (ProgressBar.h:55-61, 216-227 - a disabled child simply
+	// fails to register). Without it a single large chapter looks frozen.
 	//
 	// showImmediate = kTrue: a book search ALWAYS puts the bar up. The default (kFalse) makes the bar
 	// wait out an internal delay first, and the search beat that delay even at 5000+ hits (measured
@@ -1149,7 +1230,6 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	progressTitle.SetTranslatable(kFalse);
 	const SuppressProgressBarDisplay suppressBar(fromBook ? kFalse : kTrue);
 	TaskProgressBar progressBar(progressTitle, static_cast<int32>(targets.size()), kTrue, kTrue);
-	progressBar.DisableChildProgressBars(kTrue);
 
 	int32 total = 0;
 	int32 chaptersWithHits = 0;
@@ -1282,6 +1362,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		}
 		// "No matches" is a lie if a chapter was skipped rather than searched - say so here too.
 		AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
+		AppendUnopenableNote(outSummary, unopenable);
 		return 0;
 	}
 
@@ -1331,6 +1412,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	}
 
 	AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
+	AppendUnopenableNote(outSummary, unopenable);
 	return total;
 }
 

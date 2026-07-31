@@ -8,6 +8,7 @@
 /I "..\..\..\source\public\interfaces\graphics"
 /I "..\..\..\source\public\libs\widgetbin\includes"
 /I "..\..\..\source\open\includes\widgets"
+/I "..\..\..\source\open\interfaces\text"
 /I "..\..\..\source\public\interfaces\workgroup"
 /I "..\..\..\source\public\interfaces\interactive"
 /I "..\..\..\source\public\interfaces\interactive\ui"

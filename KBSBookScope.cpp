@@ -31,8 +31,10 @@
 #include "IDocumentUtils.h"
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
+#include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "ISession.h"
+#include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
 // General includes:
 #include "ErrorUtils.h"			// PMSetGlobalErrorCode - a failed Open must not poison later commands
@@ -103,6 +105,23 @@ namespace
 		}
 		return false;
 	}
+
+	/** The book's own word for a chapter's state, for the "could not be opened" report. Empty for
+	    a chapter the book considers fine - then the failure is something the book does not track
+	    (a lock file, permissions) and there is nothing honest to add. Not translatable: these are
+	    short internal words, in English like the rest of this panel's status line. */
+	const char* BookContentStatusText(BookContentStatus::State state)
+	{
+		switch (state)
+		{
+			case BookContentStatus::kDocMising:		return "file is missing";	// (sic - the SDK spells it this way)
+			case BookContentStatus::kDocOutofDate:	return "out of date";
+			case BookContentStatus::kDocInUse:		return "in use elsewhere";
+			case BookContentStatus::kDocOpen:		return "already open";
+			case BookContentStatus::kDocNormal:		return "";
+			default:								return "";
+		}
+	}
 }
 
 bool KBSBookScope::IsBookScopeOn()
@@ -153,6 +172,14 @@ void KBSBookScope::ReleaseHeldDocs()
 	// current notification / idle tick has unwound; kSuppressUI + the search-time dirty guard =
 	// no save prompt. Skip chapters the user closed already (a dead UIDRef must not reach the
 	// close machinery).
+	//
+	// WHY NOT the book API's own IBookUtils::CloseDocumentsInBook(OriginallyCloseDocInfo&), which
+	// is the documented partner of the OpenOneDocument this list came from: it takes no UI flag and
+	// no command mode, so it closes IMMEDIATELY and with whatever UI it likes. KESCL called it here
+	// and CRASHED (2026-07-17) - the toggle it ran from was a widget notification, and closing a
+	// document in the middle of one is the wrong context. That helper is written for InDesign's own
+	// TOC / index commands, which run from a command, not from a notification. Do not "improve"
+	// this back to it. (docs/ai-notes/book-api.md)
 	for (int32 i = 0; i < static_cast<int32>(held.size()); ++i)
 	{
 		if (!IsDocStillOpen(held[i]))
@@ -245,10 +272,26 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	if (cmd == nil)
 		return false;
 	cmd->SetItemList(UIDList(docRef));
+
+	// The command's data interface, taken BEFORE processing so the result can be read back off it
+	// afterwards. Nothing is set on it - the defaults are what a chapter window should get.
+	InterfacePtr<IOpenLayoutPresentationCmdData> openData(cmd, IID_IOPENLAYOUTCMDDATA);
+
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a failed open must not poison later commands
 		return false;
+	}
+
+	// Did a window actually appear? SDKLayoutHelper::OpenLayoutWindow (the SDK's own recipe for this
+	// command) does not stop at the return code: it reads GetResultingPresentation() and checks an
+	// IWindow comes out of it, because "the command succeeded" and "there is a window" are two
+	// different statements. Saying so here matters - the caller reports this chapter as shown.
+	if (openData != nil)
+	{
+		InterfacePtr<IWindow> window(openData->GetResultingPresentation(), UseDefaultIID());
+		if (window == nil)
+			return false;
 	}
 
 	// It has a window now, so it is no longer part of the windowless reopen cache - dropping it
@@ -434,10 +477,13 @@ bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 	return false;
 }
 
-bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName)
+bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
+	std::vector<SkippedChapter>* outSkipped)
 {
 	outDocs.clear();
 	outBookName.Clear();
+	if (outSkipped != nil)
+		outSkipped->clear();
 
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
 	if (bookMgr == nil)
@@ -503,6 +549,17 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 		// navigation uses to reopen the chapter if the user closes it.
 		content->GetIDFile(chapter.file);
 
+		// The chapter's file name for the read-out, built BEFORE the open: a chapter that cannot be
+		// opened still has to be named in the report. Via the UTF-16 buffer (AppendW), so a Japanese
+		// chapter name survives - the PMString(char*) conversions do not.
+		chapter.shortName.SetTranslatable(kFalse);
+		{
+			WideString shortName = content->GetShortName();
+			const UTF16TextChar* buf = shortName.GrabUTF16Buffer(nil);
+			if (buf != nil)
+				chapter.shortName.AppendW(buf);
+		}
+
 		// Open the chapter without a layout window AND with the UI suppressed, or reuse it when
 		// the user already has it open.
 		//
@@ -519,18 +576,62 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 		// it can invalidate a docRef this list is still holding - and the chapters are released
 		// together by ReleaseHeldDocs.
 		UIDRef docRef;
-		if (!KBSBookScope::ReopenChapterDoc(chapter.file, docRef))
-			continue;
+
+		// Is it already open? Ask the book API first, by CONTENT UID - the purpose-built question
+		// (IBookUtils.h:119-127), and the one that can answer "it is open but its plug-ins are
+		// missing". bShowAlert = kFalse keeps it silent, which is the whole reason this plug-in
+		// stopped using OpenOneDocument.
+		//
+		// The returned IDocument* is treated as NON-OWNING and is never released: nothing in the
+		// IBookUtils / IBookManager family that hands out interface pointers is a Query (the SDK's
+		// marker for "you own this"), and Adobe's own AcquireCurrentBook.h holds
+		// IBookManager::GetCurrentActiveBook() the same way without ever releasing it.
+		//
+		// If this answers nil for a document that IS open, nothing breaks: ReopenChapterDoc below
+		// asks the same question a second way (IsSourceDocumentAlreadyOpen) and rebinds to the
+		// user's copy. So the fallback covers the case where this API does not behave as read.
+		IDFile openSysFile;
+		bool16 isMissingPlugins = kFalse;
+		IDocument* alreadyOpenDoc = Utils<IBookUtils>()->FindDocFromContentUID(
+			bookDB, contentUID, openSysFile, isMissingPlugins, kFalse /*bShowAlert*/);
+		if (alreadyOpenDoc != nil)
+		{
+			// The user's (or an earlier search's) own copy. NOT held: closing a document somebody
+			// else opened would surprise them - the same rule ReopenChapterDoc follows.
+			docRef = ::GetUIDRef(alreadyOpenDoc);
+		}
+		else if (!KBSBookScope::ReopenChapterDoc(chapter.file, docRef))
+		{
+			docRef = UIDRef::gNull;
+		}
+
 		if (docRef == UIDRef::gNull)
+		{
+			// Report it instead of dropping it. A chapter that is simply absent from the list reads
+			// exactly like a chapter with no matches, and the book API knows the real reason:
+			// GetBookContentStatus answers missing / out of date / in use / open (IBookUtils.h:113-117).
+			if (outSkipped != nil)
+			{
+				SkippedChapter skipped;
+				skipped.name = chapter.shortName;
+				skipped.name.SetTranslatable(kFalse);
+				skipped.reason = PMString(BookContentStatusText(
+					Utils<IBookUtils>()->GetBookContentStatus(content)));
+				skipped.reason.SetTranslatable(kFalse);
+				// The status can be kDocNormal for a chapter that still would not open (a lock file,
+				// a permissions problem). Missing plug-in data is the other thing the lookup above
+				// can tell us, and it is worth more than "normal".
+				if (skipped.reason.IsEmpty() && isMissingPlugins)
+				{
+					skipped.reason = PMString("missing plug-in data");
+					skipped.reason.SetTranslatable(kFalse);
+				}
+				outSkipped->push_back(skipped);
+			}
 			continue;
+		}
+
 		chapter.docRef = docRef;
-		// The chapter's file name for the read-out. Via the UTF-16 buffer (AppendW), so a
-		// Japanese chapter name survives - the PMString(char*) conversions do not.
-		WideString shortName = content->GetShortName();
-		chapter.shortName.SetTranslatable(kFalse);
-		const UTF16TextChar* buf = shortName.GrabUTF16Buffer(nil);
-		if (buf != nil)
-			chapter.shortName.AppendW(buf);
 		outDocs.push_back(chapter);
 	}
 

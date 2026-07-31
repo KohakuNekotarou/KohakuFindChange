@@ -50,15 +50,26 @@ namespace KBSBookScope
 	    opened, listed or held. */
 	bool HasActiveBook();
 
+	/** A chapter that could NOT be turned into a searchable document, and why. Reported rather
+	    than dropped: a chapter missing from the list is indistinguishable from a chapter that
+	    simply held no matches, and there is no way for the user to see through that. */
+	struct SkippedChapter
+	{
+		PMString	name;		// the chapter's short name (its file name)
+		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
+	};
+
 	/** List the active book's chapters as open documents, in book order. Chapters that are not
 	    open are opened windowless here (and remembered, so ReleaseHeldDocs can close them
-	    again); chapters already open are used as they are. Chapters whose document cannot be
-	    opened (missing file, in use elsewhere) are skipped.
+	    again); chapters already open are used as they are.
 
 	    @param outDocs      the chapters as (document, file name) pairs; empty on failure.
 	    @param outBookName  the active book's title, for status messages.
+	    @param outSkipped   optional: chapters that could not be opened, each with the book's own
+	                        reason. Pass nil to ignore them (they are still left out of outDocs).
 	    @return true when there is an active book with at least one openable chapter. */
-	bool GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName);
+	bool GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
+		std::vector<SkippedChapter>* outSkipped = nil);
 
 	/** Is this document still in the session's open-document list? Compares list entries
 	    against the UIDRef without dereferencing its (possibly dead) database. */

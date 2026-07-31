@@ -309,7 +309,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		return 0;
 	}
 
-	// Required critical section around text-walker selection changes.
+	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE CHAPTER -
+	// the same deliberate departure from Adobe's examples that KBSSearchEngine explains at length:
+	// the section's contents are the keyboard-focus hand-off (spellpanel names it outright in
+	// SpellCheckWalker.cpp:85), so entering it per match would run that dance once per replacement.
+	// The cost is the same too: cancel is only asked between chapters, never inside one.
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
 	// A sequence around this chapter's replacements. It NESTS inside the one ReplaceChecked opens
