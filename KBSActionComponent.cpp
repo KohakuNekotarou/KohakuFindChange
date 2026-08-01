@@ -423,33 +423,27 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	::ReplaceStringParameters(&unsaved, chapterStr);
 	msg.Append(unsaved);
 
-	PMString title(kKBSPanelTitleKey);
-	title.Translate();
-
-	// A "Don't show again" check box, the way the built-in warnings have one (user's request,
-	// 2026-07-28). The state lives in the application's alert registry under this command's action
-	// ID, so it survives a restart and comes back with Preferences > General > Reset All Warning
-	// Dialogs - the same switch that revives every other suppressed InDesign warning.
+	// A plain modal alert, so that CANCEL can be the default button: this starts a destructive
+	// rewrite, and a stray Enter must not be what starts it.
 	//
-	// returnValueIfHidden = 1 (OK): once the prompt has been switched off, Change Checked runs
-	// straight away, which is what switching it off asks for.
-	//
-	// What this costs: unlike ModalAlert, this call takes no default-button argument, so Cancel can
-	// no longer be made the default. The check box was worth more to the user than that guard.
-	const int16 answer = CAlert::WarningAlertWithDontShowAgain(msg,
-		kKBSReplaceCheckedActionID,		// passed straight through, as linksui does
-		kTrue,							// show a Cancel button
-		CAlert::eWarningIcon,
-		title,
-		kNullString,					// stock "OK"
-		kNullString,					// stock "Cancel"
-		1 /*OK, when the prompt is suppressed*/);
+	// It carried a "Don't show again" check box from 2026-07-28 until 2026-08-01. That box wrote to
+	// the application's alert registry, and the trade turned out to be a bad one: ticking it removed
+	// the confirmation permanently and silently (it comes back only through Preferences > General >
+	// Reset All Warning Dialogs, which nobody thinks to look for), and the call that draws the box
+	// takes no default-button argument, so OK had to be the default for as long as it existed. A
+	// suppressible prompt in front of a destructive action was worth less than a default of Cancel.
+	const int16 answer = CAlert::ModalAlert(msg,
+		kOKString,
+		kCancelString,
+		kNullString,					// no third button
+		2,								// Cancel is the default
+		CAlert::eWarningIcon);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
 	KBSGlyphConfirmDialog::ReleaseSides();
 
-	// 1 = OK, 2 = OK + don't show again, 3 = Cancel, 4 = Cancel + don't show again.
-	return answer == 1 || answer == 2;
+	// 1 = OK, 2 = Cancel.
+	return answer == 1;
 }
 
 /* UpdateActionStates

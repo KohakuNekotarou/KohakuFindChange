@@ -23,10 +23,8 @@
 #include "IPanelControlData.h"	// FindWidget - the check box and the optional lines
 #include "IPMFont.h"
 #include "ISession.h"			// GetExecutionContextSession
-#include "IShowAlertRegistryUtils.h"	// the "don't show again" registry, shared with CAlert
 #include "ITextAttrFont.h"		// the font STYLE name  (kTextAttrFontStyleBoss)
 #include "ITextAttrUID.h"		// the font FAMILY uid  (kTextAttrFontUIDBoss)
-#include "ITriStateControlData.h"		// reading the "don't show again" box
 
 // General includes:
 #include "AttributeBossList.h"
@@ -231,12 +229,9 @@ bool KBSGlyphConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
 	if (sFind.fFont == nil)
 		return false;
 
-	// Suppression is shared with the plain alert on purpose: it is the same question about the same
-	// command, and a user who switched it off does not expect it back because the tab changed.
-	// Suppressed means approved - that is what switching it off asks for.
-	if (!Utils<IShowAlertRegistryUtils>()->GetShouldShow(kKBSReplaceCheckedActionID))
-		return true;
-
+	// There is no way to switch this prompt off any more (2026-08-01). It used to share the plain
+	// alert's suppression flag, but a confirmation in front of a destructive rewrite is not worth
+	// having if a single tick can remove it for good - see KBSActionComponent's alert.
 	sCheckedCount = checkedCount;
 	sChapterCount = chapterCount;
 	sAccepted = false;
@@ -385,17 +380,6 @@ void KBSGlyphConfirmDialogController::ApplyDialogFields(IActiveContext* /*myCont
 	// Only reached on OK - Cancel never gets here, which is exactly the behaviour wanted: the
 	// answer defaults to "no" and only OK turns it into "yes".
 	KBSGlyphConfirmDialog::SetAccepted(true);
-
-	// "Don't show again" is honoured on OK only. CAlert can record it alongside a Cancel (its
-	// return value 4), but doing that here would mean a user who backed out of a rewrite is never
-	// asked about the next one - the opposite of what backing out says.
-	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
-	if (panelData == nil)
-		return;
-	IControlView* box = panelData->FindWidget(kKBSGlyphConfirmDontShowWidgetID);
-	InterfacePtr<ITriStateControlData> state(box, UseDefaultIID());
-	if (state != nil && state->IsSelected())
-		Utils<IShowAlertRegistryUtils>()->DoSetShouldShowCmd(kKBSReplaceCheckedActionID, kFalse);
 }
 
 // End, KBSGlyphConfirmDialog.cpp.

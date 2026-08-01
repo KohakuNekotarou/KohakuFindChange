@@ -1148,18 +1148,10 @@ resource KBSGlyphConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
-		// ----- "Don't show again" -----
-		EVECheckBoxWidget
-		(
-			kKBSGlyphConfirmDontShowWidgetID, kSysCheckBoxPMRsrcId,
-			kBindNone,
-			Frame(0, 0, 220, 20),
-			kTrue, kTrue,
-			kAlignLeft,
-			kKBSGlyphConfirmDontShowKey,		// "Don't show again"
-
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
+		// A "Don't show again" check box stood here from 2026-07-28 to 2026-08-01. It was removed
+		// because ticking it suppressed the confirmation for a DESTRUCTIVE rewrite permanently and
+		// almost invisibly - the only way back is Preferences > General > Reset All Warning Dialogs.
+		// See the alert in KBSActionComponent.cpp for the full reasoning.
 
 		// ----- OK / Cancel (Cancel is the default - see the note above) -----
 		EVEGenericPanelWidget
