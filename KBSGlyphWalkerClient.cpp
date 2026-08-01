@@ -155,8 +155,12 @@ int32 SearchSegment(ITextModel* model, TextIndex start, TextIndex end)
 
 		TextIndex foundStart = kInvalidTextIndex;
 		TextIndex foundEnd = kInvalidTextIndex;
+		// 0, not kAnyNotDefGlyphID. The sentinel is the broken one - it takes InDesign down on a
+		// document with a table AND on one that is merely overset, which was proved through the DOM
+		// (same engine) 2 times out of 2 each. A font's notdef id is nearly always 0, and through
+		// the DOM that value survived both documents. See KBSGlyphScanEngine.cpp for the full note.
 		const bool16 hit = Utils<IFindChangeUtils>()->SearchForGlyph(
-			model, options, kAnyNotDefGlyphID, pos, end, foundStart, foundEnd);
+			model, options, 0, pos, end, foundStart, foundEnd);
 
 		char line[160];
 		::sprintf_s(line, sizeof(line), "      returned found=%d start=%d end=%d",

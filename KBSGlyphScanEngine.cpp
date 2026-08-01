@@ -80,6 +80,7 @@
 #include "KBSGlyphWalkerClient.h"	// KBSGlyphWalkerData - what the walk saw
 #include "KBSID.h"					// kKBSGlyphWalkerClientBoss
 #include "KBSResultTree.h"		// ShowStatus - also what app.kbsStatus reads back
+#include "KBSSearchEngine.h"	// SearchBook - the real scan runs through KBS's own search path
 
 #include <cstdio>				// ***** TEMPORARY: crash tracing, removed once the cause is known
 #include <cstring>				// ***** TEMPORARY: strcat_s, for the character dump
@@ -123,6 +124,32 @@ const int32 kMaxReportedPerStory = 12;
 
 // How many stories to report. Same reason.
 const int32 kMaxReportedStories = 6;
+
+// ***** WHICH GLYPH ID TO SEARCH FOR (measurement, 2026-08-01 round 3) *****
+// kAnyNotDefGlyphID (-2) is the "any notdef, whatever the font" sentinel, and it is the one that
+// kills InDesign. That was proved twice over through the DOM, which reaches the same engine:
+//
+//   app.findGlyphPreferences.glyphID = -2;  doc.findGlyph();
+//     - on a document holding a TABLE      -> process gone (2 of 2 attempts)
+//     - on a document that is merely OVERSET, no table at all -> process gone (2 of 2)
+//
+// 0 is the notdef glyph id of very nearly every font. Through the DOM it SURVIVED both of those
+// documents, and on the table document it returned exactly the 7 hits the official preflight
+// profile reports - story and index included. IFindChangeUtils.h:59-60 explains the split: the
+// sentinel (and a font's own notdef id) make the search read the WAX, anything else makes it read
+// the TEXT. Only the wax path is broken.
+//
+// This build asks whether the same holds for the C++ entry point, which the DOM measurement cannot
+// answer on its own.
+const Text::GlyphID kScanGlyphID = 0;
+
+// Whether to cut the table anchors out of the searched ranges.
+//
+// With -2 this was mandatory: one anchor index inside the range was fatal. With 0 the DOM needed no
+// such care - a single findGlyph() call covered a whole document, table and footnotes and all - so
+// this build deliberately searches each thread block in ONE call and finds out whether the C++ side
+// agrees. If it does, the anchor-collecting machinery below can be deleted outright.
+const bool kSplitAroundAnchors = false;
 
 /** A half-open [start, end) range of text: either one of the story's thread blocks, or one run of
     consecutive notdef glyphs. */
@@ -295,7 +322,7 @@ int32 SearchRange(ITextModel* model, const char* label, TextIndex rangeStart,
 		TextIndex foundStart = kInvalidTextIndex;
 		TextIndex foundEnd = kInvalidTextIndex;
 		const bool16 found = fcUtils->SearchForGlyph(
-			model, options, kAnyNotDefGlyphID, pos, rangeEndExclusive, foundStart, foundEnd);
+			model, options, kScanGlyphID, pos, rangeEndExclusive, foundStart, foundEnd);
 
 		TraceNum("    returned found/start", found ? 1 : 0, foundStart);
 		if (!found)
@@ -356,16 +383,27 @@ int32 ReportOneStory(ITextModel* model, PMString& out)
 		TraceNum("  == block / anchors in it", static_cast<int32>(bi),
 				 static_cast<int32>(anchors.size()));
 
-		// The stretches BETWEEN the anchors, each searched on its own. segEnd goes in unchanged:
-		// findEnd is EXCLUSIVE (see the note above SearchRange).
-		TextIndex segStart = blockStart;
-		for (size_t a = 0; a <= anchors.size(); ++a)
+		if (!kSplitAroundAnchors)
 		{
-			const TextIndex segEnd = (a < anchors.size()) ? anchors[a] : blockEnd;	// exclusive
-			if (segEnd > segStart)
-				hits += SearchRange(model, "seg", segStart, segEnd, out);
-			if (a < anchors.size())
-				segStart = anchors[a] + 1;
+			// ONE call for the whole block, anchors included. This is the measurement: with glyph
+			// id 0 the DOM covered an entire document - table anchor and all - in a single call.
+			// If the anchor is still fatal here, the trace stops on this line and says so.
+			TraceNum("  == WHOLE BLOCK in one call, anchors NOT skipped", blockStart, blockEnd);
+			hits += SearchRange(model, "whole", blockStart, blockEnd, out);
+		}
+		else
+		{
+			// The stretches BETWEEN the anchors, each searched on its own. segEnd goes in unchanged:
+			// findEnd is EXCLUSIVE (see the note above SearchRange).
+			TextIndex segStart = blockStart;
+			for (size_t a = 0; a <= anchors.size(); ++a)
+			{
+				const TextIndex segEnd = (a < anchors.size()) ? anchors[a] : blockEnd;	// exclusive
+				if (segEnd > segStart)
+					hits += SearchRange(model, "seg", segStart, segEnd, out);
+				if (a < anchors.size())
+					segStart = anchors[a] + 1;
+			}
 		}
 	}
 
@@ -478,7 +516,15 @@ void KBSGlyphScanEngine::Run()
 // The walker-driven version
 //========================================================================================
 
-void KBSGlyphScanEngine::RunWithWalker()
+namespace
+{
+
+// ***** ROUND 2 - kept only so the two can be compared. This is NOT what the menu runs now. *****
+// A walk driven by OUR OWN client, which then called SearchForGlyph itself on each range the walker
+// offered. That is a hybrid, and it is the wrong half that decides: the walker supplies the ranges,
+// but the search is still the all-at-once entry point, so it died on the range holding a table
+// anchor - the walker hands that range over unchanged.
+void RunRound2WalkerScan()
 {
 	TraceReset();
 	Trace("=== WALKER-DRIVEN SCAN ===");
@@ -596,6 +642,50 @@ void KBSGlyphScanEngine::RunWithWalker()
 		out.Append(" [Walk returned false]");
 
 	KBSResultTree::ShowStatus(out);
+}
+
+// Flip to true to run the round-2 measurement above instead of the real scan.
+const bool kUseRound2WalkerScan = false;
+
+}	// anonymous namespace
+
+//========================================================================================
+// ROUND 3: the OFFICIAL find/change engine, reached through KBS's own search path
+//========================================================================================
+
+void KBSGlyphScanEngine::RunWithWalker()
+{
+	if (kUseRound2WalkerScan)
+	{
+		RunRound2WalkerScan();
+		return;
+	}
+
+	// ***** Why this is the right way in, and the earlier two were not. *****
+	//
+	// The user settled it on 2026-08-01 by hand: with the Find/Change dialog on the Glyph tab and
+	// -2 typed into ID: GID/CID, pressing Find Next repeatedly walked the WHOLE of the very document
+	// that had taken InDesign down twice under measurement - table included, hits inside the table
+	// cells found - without a stumble.
+	//
+	// So kAnyNotDefGlyphID is not broken. What is broken is handing the search a story's ENTIRE
+	// range in one call:
+	//
+	//   IFindChangeUtils::SearchForGlyph over a whole story  -> dies on a table anchor
+	//   DOM doc.findGlyph() (returns every match at once)    -> dies (2 of 2, table AND overset)
+	//   the official engine walking under a TEXT WALKER      -> fine
+	//
+	// The walker cuts a story into thread blocks - body, footnotes, each table cell - so the range
+	// carrying the anchor is never the range being searched. That is the same mechanism already
+	// known to be why KBS's ordinary searches survive tables.
+	//
+	// KBS walks that way for every search it runs, so the scan needs no engine of its own: it is the
+	// existing search with one value replaced. Scope resolution, chapter opening, the five options,
+	// the progress bar, cancel, the result tree and the jumps all come along unchanged.
+	PMString summary;
+	summary.SetTranslatable(kFalse);
+	KBSSearchEngine::SearchBook(summary, kAnyNotDefGlyphID);
+	KBSResultTree::ShowStatus(summary);
 }
 
 // End, KBSGlyphScanEngine.cpp.

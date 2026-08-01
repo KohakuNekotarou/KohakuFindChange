@@ -23,6 +23,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
+#include "CTextEnum.h"			// Text::GlyphID / kInvalidGlyphID - the missing-glyph scan's override
 
 class RangeProgressBar;
 
@@ -46,8 +47,12 @@ namespace KBSSearchEngine
 	    extracted, so nothing needs them held; Task 3 will hold them for the row jumps instead).
 
 	    @param outSummary  a ready-to-show status line for the panel.
+	    @param overrideFindGlyph  normally kInvalidGlyphID, which means "walk the user's own query"
+	           and is what every existing caller gets. Anything else replaces the FIND GLYPH for this
+	           one walk - kAnyNotDefGlyphID makes it a missing-glyph (notdef) scan. Nothing else about
+	           the walk changes: same scope, same five options, same result model, same progress bar.
 	    @return the total number of matches across the scope. */
-	int32 SearchBook(PMString& outSummary);
+	int32 SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
 
 	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
 	    command could otherwise be dispatched INTO a running search. The panel's actions ask this
@@ -78,9 +83,14 @@ namespace KBSSearchEngine
 	    mode with no glyph and the panel found nothing at all (user, 2026-07-30). The CHANGE glyph is
 	    deliberately NOT stated here - see CommitReplaceGlyph.
 
+	    @param overrideFindGlyph  normally kInvalidGlyphID: state the glyph the dialog holds, which is
+	           what every existing caller wants. Anything else is stated INSTEAD of it, for callers
+	           that supply their own glyph query - the missing-glyph scan passes kAnyNotDefGlyphID.
+	           Only meaningful while the Glyph tab is the mode in force.
+
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
 	          command inside the replace sequence would become part of that undo step. */
-	void CommitSearchMode();
+	void CommitSearchMode(Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
 
 	/** State the glyph a Glyph-tab replace will WRITE, by re-committing the one the user already has
 	    in the dialog's Change To box. Call it immediately after CommitSearchMode on the replace path

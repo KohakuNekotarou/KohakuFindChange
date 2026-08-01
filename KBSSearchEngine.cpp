@@ -912,7 +912,7 @@ void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, 
 	ioReported = target;
 }
 
-void KBSSearchEngine::CommitSearchMode()
+void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
@@ -931,8 +931,15 @@ void KBSSearchEngine::CommitSearchMode()
 	// Read the glyph BEFORE the mode is committed. Committing a mode is a declaration, and there is
 	// no promise anywhere that it leaves that mode's other settings untouched - so take the value
 	// while it is certainly still there and hand it back afterwards.
+	//
+	// A caller that brought its own glyph wins over the dialog's. That is how the missing-glyph scan
+	// runs: it hands over kAnyNotDefGlyphID, which the engine reads as "any notdef, whatever font
+	// this run of text is in". Every other caller passes kInvalidGlyphID and gets the old behaviour
+	// exactly - the dialog's own glyph, stated back to the engine unchanged.
 	const Text::GlyphID findGlyphID =
-		(mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID;
+		(overrideFindGlyph != kInvalidGlyphID)
+			? overrideFindGlyph
+			: ((mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID);
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
 	if (cmd == nil)
@@ -1151,7 +1158,7 @@ void KBSSearchEngine::CopyMatchText(const UIDRef& storyRef, TextIndex start, Tex
 	outMatch.SetTranslatable(kFalse);
 }
 
-int32 KBSSearchEngine::SearchBook(PMString& outSummary)
+int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph)
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
@@ -1208,7 +1215,20 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		return 0;
 	}
 
-	if (!HasFindQuery())
+	// A caller with its own glyph query - the missing-glyph scan - has nothing on the dialog that
+	// could be missing, so HasFindQuery is the wrong question for it. What it does need is the GLYPH
+	// TAB: the engine walks in the mode last committed, and a notdef sentinel is a glyph query.
+	// Switching the tab on the user's behalf would change a setting they can see and did not touch,
+	// so this says what to do and stops instead.
+	if (overrideFindGlyph != kInvalidGlyphID)
+	{
+		if (tab != IFindChangeOptions::kGlyphSearch)
+		{
+			outSummary.Append("Set Edit > Find/Change to the Glyph tab first, then run this again.");
+			return 0;
+		}
+	}
+	else if (!HasFindQuery())
 	{
 		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
 		// query on another tab is no help and saying so avoids a hunt. The Glyph tab is worded for
@@ -1228,7 +1248,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
 	// search driven from this panel ran as plain Text whatever tab was on screen. See
 	// KBSSearchEngine::CommitSearchMode.
-	KBSSearchEngine::CommitSearchMode();
+	KBSSearchEngine::CommitSearchMode(overrideFindGlyph);
 
 	// Resolve the scope from the Book Scope toggle. NO implicit fallback: ON means the book and
 	// nothing else, OFF means the front document and nothing else - so the status line can always
