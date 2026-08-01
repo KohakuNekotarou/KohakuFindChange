@@ -884,7 +884,7 @@ resource VersionedScriptElementInfo(1)
 			kKBSStatusPropertyScriptElement,	// this property's script element ID
 			p_KBSStatus,						// ScriptID (KBSScriptingDefs.h)
 			"kbs status",						// name -> app.kbsStatus
-			"The last message the Kohaku Search Panel put on its status line.",	// description
+			"The last message the Kohaku Find/Change panel put on its status line.",	// description
 			StringType,							// type
 			{}									// alternate types
 			kNoAttributeClass,					// attribute class ID
@@ -899,7 +899,7 @@ resource VersionedScriptElementInfo(1)
 			kKBSResultsPropertyScriptElement,	// this property's script element ID
 			p_KBSResults,						// ScriptID (KBSScriptingDefs.h)
 			"kbs results",						// name -> app.kbsResults
-			"Every row the Kohaku Search Panel is holding, tab-separated, one hit per line.",
+			"Every row the Kohaku Find/Change panel is holding, tab-separated, one hit per line.",
 			StringType,							// type
 			{}									// alternate types
 			kNoAttributeClass,					// attribute class ID

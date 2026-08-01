@@ -5,9 +5,8 @@
 //  KohakuBookSearch (KBS)
 //
 //  The panel's TAB carries the search scope, so which of the two searches the flyout is about to
-//  run can be read without opening it: "Kohaku Search Panel - Book" while Book Scope is ON,
-//  "- Doc" while it is OFF. The words are the flyout's own Search Book / Search Document,
-//  shortened only where a narrow tab would truncate them.
+//  run can be read without opening it: "Kohaku Find/Change - Book" while Book Scope is ON,
+//  "- Document" while it is OFF. The words are the flyout's own Search Book / Search Document.
 //
 //========================================================================================
 

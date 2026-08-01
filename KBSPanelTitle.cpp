@@ -77,9 +77,10 @@ void KBSPanelTitle::Update()
 	// mangling a non-ASCII literal in a BOM-less .cpp would bring.
 	PMString title(kKBSPlainPanelName);
 	title.Append(" - ");
-	// "Doc", not "Document": a tab is narrow and truncates, and the pair only has to be told apart
-	// from each other.
-	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : "Doc");
+	// The whole word, not the "Doc" this used to say (user's call 2026-08-01). A tab is narrow and
+	// truncates, which is why it was shortened in the first place, but the name in front of it lost
+	// a word in the same rename and can carry the longer one now.
+	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : "Document");
 	// A palette label is a candidate translation key like any other UI string, so an untranslated
 	// name would be swapped for whatever the string table happens to hold under it.
 	title.SetTranslatable(kFalse);

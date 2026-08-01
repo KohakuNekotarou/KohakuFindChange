@@ -1,6 +1,10 @@
-# Kohaku Search Panel (KBS)
+# Kohaku Find/Change (KBS)
 
-> **On the name**: the display name is **Kohaku Search Panel**. The `.pln` file name, the VS project
+> **On the name**: the display name is **Kohaku Find/Change**, after InDesign's own Find/Change. The
+> slash is only ever a string table VALUE, never part of a menu path — those are delimited with `:`
+> (`SDKDef.h`, `kSDKDefDelimitMenuPath`) and are built from prefix-number keys, not from the display
+> name — so it cannot split a path. A `:` or a bare `&` in the name would not be safe; a `/` is.
+> The `.pln` file name, the VS project
 > and the code prefix stay `KohakuBookSearch` / `KBS` — the same way KESCL kept its old prefix after
 > being renamed — so the build output is `KohakuBookSearch.pln`. (The SDK's stock `TargetName` would
 > make that `KohakuBookSearch.sdk.pln`; KBS overrides it in all four configurations, as KESCM does,
@@ -14,7 +18,7 @@ results in a tree panel you can jump from and replace out of.
 
 - **Takes the scope from the `Book Scope` flyout toggle**: off (the default) searches the front
   document, on searches every chapter of the book. The search command names the scope it will use
-  (`Search Document` / `Search Book`) and the panel's own tab carries it (`… - Doc` / `… - Book`).
+  (`Search Document` / `Search Book`) and the panel's own tab carries it (`… - Document` / `… - Book`).
   With the toggle on and no book open it says so instead of quietly searching one document.
 - **Which book**: the one whose tab is frontmost in the Book panel — selecting a tab switches the
   panel but does not make that book "active", so asking for the active book would silently target
@@ -149,4 +153,4 @@ Version **1.0.0**. Built as a vertical-slice progression (skeleton → book sear
 jump → polish → checked replace → progress bars → stale-hit handling), verified on the real
 application at each step.
 
-Prefix `0x205698`. Menu: `Plug-Ins ▸ Kohaku Plug-Ins ▸ Kohaku Search Panel`.
+Prefix `0x205698`. Menu: `Plug-Ins ▸ KohakuNekotarou ▸ Kohaku Find/Change`.

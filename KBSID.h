@@ -33,7 +33,7 @@
 
 // Plug-in:
 #define kKBSPluginName	"KohakuBookSearch"			// Internal name: the ID system, the .rc InternalName, and the output .pln file name. NEVER change it - a rename would orphan every existing document's plug-in reference.
-#define kKBSDisplayName	"Kohaku Search Panel"		// Display name: the About menu item, the About box, the panel and its tab, and the .rc FileDescription. THE one definition - both string tables put it under kKBSPanelTitleKey and KBSPanelTitle.cpp restores the tab from it, so the copies cannot drift apart.
+#define kKBSDisplayName	"Kohaku Find/Change"		// Display name: the About menu item, the About box, the panel and its tab, and the .rc FileDescription. THE one definition - both string tables put it under kKBSPanelTitleKey and KBSPanelTitle.cpp restores the tab from it, so the copies cannot drift apart. The slash is safe here and ONLY here: menu paths are delimited with ":" (SDKDef.h kSDKDefDelimitMenuPath) and this string is a string table VALUE, never a path segment - the paths above are built from kKBSPanelTitleKey and friends, which are prefix-number keys. Do not put a ":" or a bare "&" in it.
 #define kKBSPrefixNumber	0x205698 		// Unique prefix number for this plug-in(*Must* be obtained from Adobe Developer Support).
 #define kKBSVersion		"1.0.0"						// Version of this plug-in. Shows up in three places: the About box, the .rc FileVersion, and the PluginVersion resource. First Adobe Exchange submission = 1.0.0 (2026-07-30). Was kSDKDefPluginVersionString, the SDK template's own version, which said nothing about this plug-in.
 
