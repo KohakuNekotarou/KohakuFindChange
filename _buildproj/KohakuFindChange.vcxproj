@@ -218,6 +218,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSActionComponent.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultModel.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultListWidgetMgr.cpp"/>
@@ -255,6 +256,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSFactoryList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookScope.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSResultModel.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSColorTextView.h"/>

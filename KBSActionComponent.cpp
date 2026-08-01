@@ -51,6 +51,7 @@
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
 #include "KBSGlyphConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
+#include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -150,12 +151,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSFindMissingGlyphsActionID:
 		{
 			// Scan the same scope for notdef glyphs - the boxes InDesign draws where a font has no
-			// glyph for a character. The scanner is written in the next task; this stub is here so
-			// the .fr plumbing (ActionDef, MenuDef, both string tables) can be verified on its own,
-			// before any scanning logic exists to confuse a failure with.
-			PMString msg("Find Missing Glyphs: not implemented yet.");
-			msg.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(msg);
+			// glyph for a character. The engine puts its own summary on the status line, so there
+			// is nothing to report from here.
+			KBSGlyphScanEngine::Run();
 			break;
 		}
 

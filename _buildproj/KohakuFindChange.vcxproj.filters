@@ -24,6 +24,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultModel.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -105,6 +108,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSResultModel.h">
