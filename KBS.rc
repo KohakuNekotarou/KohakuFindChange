@@ -48,11 +48,12 @@ BEGIN
             VALUE "InternalName", kKBSPluginName, "\0"
             VALUE "LegalCopyright", kShortCopyRightStr, "\0"
 
-            // The build's actual output name. The SDK's stock TargetName appends ".sdk"; KBS
-            // overrides it in all four configurations (as KESCM does) so the file is plainly
-            // KohakuBookSearch.pln - which is what kKBSPluginName means everywhere else too: the
-            // .pln on disk, this InternalName, and the ID system. Verified on the built .pln.
-            VALUE "OriginalFilename", kKBSPluginName ".pln\0"
+            // The build's actual output name, which is deliberately NOT the InternalName above:
+            // the file on disk follows the display name (KohakuFindChange.pln) while
+            // kKBSPluginName stays at the original KohakuBookSearch so nothing in the ID system
+            // moves. The SDK's stock TargetName would append ".sdk"; KBS overrides it in all four
+            // configurations, as KESCM does. kKBSFileName must match the vcxproj TargetName.
+            VALUE "OriginalFilename", kKBSFileName ".pln\0"
             VALUE "ProductName", "Adobe InDesign\0"
             VALUE "ProductVersion", kVersionNumberStr, "\0"
             VALUE "Copyright", kVersionCopyRightStr, "\0"

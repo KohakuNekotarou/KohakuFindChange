@@ -96,7 +96,11 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
               // ----- Error strings
 
                 // ----- Misc strings
-                kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n" kSDKDefCopyrightStandardValue "\n\n" kSDKDefPartnersStandardValue_jaJP,
+                kKBSAboutBoxStringKey,			kKBSDisplayName "、version " kKBSVersion "\n\n"
+                	"Adobe InDesign C++ SDK プラグイン。\n"
+                	"InDesign 標準の検索/置換ダイアログで設定したクエリを使い、前面のドキュメント、またはアクティブなブック（.indb）の全章を一度に検索して、ヒットをツリーに一覧します。行をクリックするとその場所へジャンプし、チェックした行だけを置換できます。\n\n"
+                	"本プラグインは KohakuNekotarou が、Anthropic の AI Claude（Claude Code）と協働して設計・実装しました。\n\n"
+                	"ソース: " kKBSRepoURL,
 
         }
 

@@ -19,7 +19,7 @@
       </ProjectConfiguration>
    </ItemGroup>
    <PropertyGroup Label="Globals">
-      <ProjectName>KohakuBookSearch</ProjectName>
+      <ProjectName>KohakuFindChange</ProjectName>
       <ProjectGuid>{DD125A1E-99DD-4D59-B001-DEB4D37D34C5}</ProjectGuid>
       <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
    </PropertyGroup>
@@ -62,13 +62,13 @@
    <PropertyGroup>
       <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
       <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\debug\sdk\</OutDir>
-      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\objD\KohakuBookSearch\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\objD\KohakuFindChange\</IntDir>
       <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\debugx64\sdk\</OutDir>
-      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\objDx64\KohakuBookSearch\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\objDx64\KohakuFindChange\</IntDir>
       <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\release\sdk\</OutDir>
-      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\objR\KohakuBookSearch\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\objR\KohakuFindChange\</IntDir>
       <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\releasex64\sdk\</OutDir>
-      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\objRx64\KohakuBookSearch\</IntDir>
+      <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\objRx64\KohakuFindChange\</IntDir>
       <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectName)</TargetName>
       <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectName)</TargetName>
       <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectName)</TargetName>
@@ -83,12 +83,12 @@
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <MkTypLibCompatible>true</MkTypLibCompatible>
          <TargetEnvironment>Win32</TargetEnvironment>
-         <TypeLibraryName>$(IntDir)KohakuBookSearch.tlb</TypeLibraryName>
+         <TypeLibraryName>$(IntDir)KohakuFindChange.tlb</TypeLibraryName>
          <HeaderFileName/>
       </Midl>
       <ClCompile>
-         <AdditionalOptions>/vmg @"KohakuBookSearchcpp.rsp"</AdditionalOptions>
-         <PrecompiledHeaderOutputFile>$(IntDir)KohakuBookSearch.pch</PrecompiledHeaderOutputFile>
+         <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
+         <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
@@ -104,8 +104,8 @@
       <Link>
          <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objd\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objd\Public.lib; $(ID_SDK_DIR)\build\win\objd\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objd\DV_WidgetBin.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-         <ProgramDatabaseFile>..\debug\sdk\KohakuBookSearch.pdb</ProgramDatabaseFile>
-         <ImportLibrary>$(LIB_DIR)\KohakuBookSearch/KohakuBookSearch.lib</ImportLibrary>
+         <ProgramDatabaseFile>..\debug\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
+         <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
       </Link>
       <PostBuildEvent>
          <Command>restore_res.cmd "$(IntDir)"  KBS</Command>
@@ -116,15 +116,15 @@
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <MkTypLibCompatible>true</MkTypLibCompatible>
          <TargetEnvironment>X64</TargetEnvironment>
-         <TypeLibraryName>$(IntDir)KohakuBookSearch.tlb</TypeLibraryName>
+         <TypeLibraryName>$(IntDir)KohakuFindChange.tlb</TypeLibraryName>
          <HeaderFileName/>
       </Midl>
       <ClCompile>
-         <AdditionalOptions>/vmg @"KohakuBookSearchcpp.rsp"</AdditionalOptions>
+         <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
-         <PrecompiledHeaderOutputFile>$(IntDir)KohakuBookSearch.pch</PrecompiledHeaderOutputFile>
+         <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
          <ObjectFileName>$(IntDir)</ObjectFileName>
       </ClCompile>
       <ResourceCompile>
@@ -137,8 +137,8 @@
       <Link>
          <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objdx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objdx64\Public.lib; $(ID_SDK_DIR)\build\win\objdx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objdx64\DV_WidgetBin.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-         <ProgramDatabaseFile>..\debugx64\sdk\KohakuBookSearch.pdb</ProgramDatabaseFile>
-         <ImportLibrary>$(LIB_DIR)\KohakuBookSearch/KohakuBookSearch.lib</ImportLibrary>
+         <ProgramDatabaseFile>..\debugx64\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
+         <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
       </Link>
       <PostBuildEvent>
          <Command>restore_res.cmd "$(IntDir)"  KBS</Command>
@@ -149,16 +149,16 @@
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <MkTypLibCompatible>true</MkTypLibCompatible>
          <TargetEnvironment>Win32</TargetEnvironment>
-         <TypeLibraryName>$(IntDir)KohakuBookSearch.tlb</TypeLibraryName>
+         <TypeLibraryName>$(IntDir)KohakuFindChange.tlb</TypeLibraryName>
          <HeaderFileName/>
       </Midl>
       <ClCompile>
-         <AdditionalOptions>/vmg @"KohakuBookSearchcpp.rsp"</AdditionalOptions>
+         <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
-         <PrecompiledHeaderOutputFile>$(IntDir)KohakuBookSearch.pch</PrecompiledHeaderOutputFile>
+         <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
          <ObjectFileName>$(IntDir)</ObjectFileName>
       </ClCompile>
       <ResourceCompile>
@@ -172,8 +172,8 @@
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
          <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objr\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objr\Public.lib; $(ID_SDK_DIR)\build\win\objr\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objr\DV_WidgetBin.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-         <ProgramDatabaseFile>..\release\sdk\KohakuBookSearch.pdb</ProgramDatabaseFile>
-         <ImportLibrary>$(LIB_DIR)\KohakuBookSearch/KohakuBookSearch.lib</ImportLibrary>
+         <ProgramDatabaseFile>..\release\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
+         <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
       </Link>
       <PostBuildEvent>
          <Command>restore_res.cmd "$(IntDir)"  KBS</Command>
@@ -184,16 +184,16 @@
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <MkTypLibCompatible>true</MkTypLibCompatible>
          <TargetEnvironment>X64</TargetEnvironment>
-         <TypeLibraryName>$(IntDir)KohakuBookSearch.tlb</TypeLibraryName>
+         <TypeLibraryName>$(IntDir)KohakuFindChange.tlb</TypeLibraryName>
          <HeaderFileName/>
       </Midl>
       <ClCompile>
-         <AdditionalOptions>/vmg @"KohakuBookSearchcpp.rsp"</AdditionalOptions>
+         <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
          <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
-         <PrecompiledHeaderOutputFile>$(IntDir)KohakuBookSearch.pch</PrecompiledHeaderOutputFile>
+         <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
          <ObjectFileName>$(IntDir)</ObjectFileName>
       </ClCompile>
       <ResourceCompile>
@@ -207,8 +207,8 @@
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
          <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objrx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objrx64\Public.lib; $(ID_SDK_DIR)\build\win\objrx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objrx64\DV_WidgetBin.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
-         <ProgramDatabaseFile>..\releasex64\sdk\KohakuBookSearch.pdb</ProgramDatabaseFile>
-         <ImportLibrary>$(LIB_DIR)\KohakuBookSearch/KohakuBookSearch.lib</ImportLibrary>
+         <ProgramDatabaseFile>..\releasex64\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
+         <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
       </Link>
       <PostBuildEvent>
          <Command>restore_res.cmd "$(IntDir)"  KBS</Command>
@@ -273,22 +273,22 @@
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\KBS.fr">
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS" @"KohakuBookSearchodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS" @"KohakuBookSearchodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS" @"KohakuBookSearchodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS" @"KohakuBookSearchodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
