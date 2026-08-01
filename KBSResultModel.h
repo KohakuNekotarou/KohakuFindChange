@@ -135,6 +135,26 @@ namespace KBSResultModel
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
 
+	/** What KIND of results the model is holding.
+
+	    A missing-glyph scan is a REPORT, not a work list: there is nothing about it to replace, so
+	    no row offers a check box and Change Checked has nothing to act on.
+
+	    Deliberately NOT folded into IsShowingReplaceOutcome, which states something else entirely -
+	    "these rows are the aftermath of a replace". Two different statements behind one flag cannot
+	    be changed independently afterwards.
+
+	    Cleared by Clear() back to kResultFindChange, so - like SetFromBook - it has to be set AFTER
+	    the model is cleared, not before. */
+	enum ResultKind
+	{
+		kResultFindChange = 0,	// hits from the user's own Find/Change query (the original feature)
+		kResultMissingGlyph		// findings from a notdef scan
+	};
+
+	void SetResultKind(ResultKind kind);
+	ResultKind GetResultKind();
+
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
 	    Recorded beside SetFromBook, and cleared by Clear().

@@ -28,6 +28,9 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
+	// Find/Change hits, or a missing-glyph scan's findings? See KBSResultModel::SetResultKind.
+	KBSResultModel::ResultKind gResultKind = KBSResultModel::kResultFindChange;
+
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
@@ -77,6 +80,11 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
+		// A scan reports; it does not offer work. Asked first because it is a property of the
+		// RESULT SET, not of the row: no row of a scan carries a box, whatever that row holds.
+		if (gResultKind == KBSResultModel::kResultMissingGlyph)
+			return false;
+
 		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
 	}
 
@@ -103,6 +111,7 @@ void KBSResultModel::Clear()
 	gChapters.clear();
 	gShowingOutcome = false;
 	gFromBook = false;
+	gResultKind = kResultFindChange;
 	gBookName.Clear();
 	gSearchMode = -1;
 	// The right-click target is an index into the chapters that just went away - keeping it would let
@@ -118,6 +127,16 @@ void KBSResultModel::SetFromBook(bool fromBook)
 bool KBSResultModel::IsFromBook()
 {
 	return gFromBook;
+}
+
+void KBSResultModel::SetResultKind(ResultKind kind)
+{
+	gResultKind = kind;
+}
+
+KBSResultModel::ResultKind KBSResultModel::GetResultKind()
+{
+	return gResultKind;
 }
 
 void KBSResultModel::SetSearchMode(int32 mode)

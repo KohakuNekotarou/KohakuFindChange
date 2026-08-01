@@ -24,6 +24,9 @@
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "CTextEnum.h"			// Text::GlyphID / kInvalidGlyphID - the missing-glyph scan's override
+#include "KBSResultModel.h"		// Hit - the borrowed hit builders below fill one
+
+#include <vector>
 
 class RangeProgressBar;
 
@@ -167,6 +170,38 @@ namespace KBSSearchEngine
 	    row's text from the range the replace command reports back. */
 	void SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
 		PMString& outPre, PMString& outMatch, PMString& outPost);
+
+	//------------------------------------------------------------------------------------
+	// For a caller that finds its ranges some other way than by walking the user's query.
+	//
+	// The missing-glyph scan reads the COMPOSED result (wax) rather than running a Find/Change
+	// query, but its rows have to look and behave exactly like search rows: the same page locator,
+	// the same hidden / locked flags, the same overset handling, the same three drawn segments,
+	// the same page ordering. All of that is already here, so the scan BORROWS it instead of
+	// growing a second copy that could drift away from this one.
+	//
+	// !! Nothing in the search or replace path was changed to make these possible - they are pure
+	//   entry points onto helpers the search itself already calls.
+	//------------------------------------------------------------------------------------
+
+	/** Opaque per-document scratch for BuildHitForRange. It remembers the per-FRAME answers (which
+	    page, layer switched off, locked), each of which climbs a structure of its own and would
+	    otherwise be recomputed for every hit in the same frame. One per document; hand it back with
+	    DeleteHitCache. */
+	struct HitCache;
+	HitCache* NewHitCache();
+	void DeleteHitCache(HitCache* cache);
+
+	/** Fill one Hit from a range the caller already found: the jump anchors, the page (naming the
+	    "+" indicator's page when the range is overset), the hidden / locked flags, and the line
+	    split into its three drawn segments. Only a LOCKED range touches 'checked' (forces false). */
+	void BuildHitForRange(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
+		HitCache* cache, KBSResultModel::Hit& outHit);
+
+	/** Put one chapter's hits in page order and bake each row's locator on (the within-page ordinal
+	    appears only when a page holds more than one). Call once per chapter, after every hit is
+	    built. */
+	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
 
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? Three questions,
 	    all of which must answer yes:

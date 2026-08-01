@@ -885,6 +885,42 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 
 } // anonymous namespace
 
+//========================================================================================
+// Entry points for callers that find their ranges some other way than by walking a query.
+//
+// !! Nothing above this line was changed to make these possible. They only open up the helpers
+//   the search itself already calls, so a borrowed hit and a searched hit cannot drift apart.
+//   (The missing-glyph scan reads the composed wax; see KBSGlyphScanEngine.)
+//========================================================================================
+
+struct KBSSearchEngine::HitCache
+{
+	FrameFactsCache frames;
+};
+
+KBSSearchEngine::HitCache* KBSSearchEngine::NewHitCache()
+{
+	return new HitCache;
+}
+
+void KBSSearchEngine::DeleteHitCache(HitCache* cache)
+{
+	delete cache;
+}
+
+void KBSSearchEngine::BuildHitForRange(const UIDRef& docRef, const UIDRef& storyRef,
+	TextIndex start, TextIndex end, HitCache* cache, KBSResultModel::Hit& outHit)
+{
+	if (cache == nil)
+		return;
+	BuildHit(docRef, storyRef, start, end, cache->frames, outHit);
+}
+
+void KBSSearchEngine::FinalizeHits(std::vector<KBSResultModel::Hit>& hits)
+{
+	FinalizeChapterHits(hits);
+}
+
 void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force)
 {
 	if (bar == nil)

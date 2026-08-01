@@ -561,7 +561,13 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// The Find/Change strings are deliberately NOT tested here - the confirmation prompt
 			// shows them, so an empty change string (a valid "delete the matches" request) still
 			// reaches the user instead of being greyed out unexplained.
-			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::IsShowingReplaceOutcome())
+			//
+			// A missing-glyph scan is a report as well: none of it can be replaced, and its rows
+			// carry no check boxes (RowHasCheckBox), so checkedCount would already be 0. Stated all
+			// the same - for the same reason IsShowingReplaceOutcome is stated - so the rule does
+			// not rest on a count that a later change might make non-zero.
+			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::IsShowingReplaceOutcome()
+				&& KBSResultModel::GetResultKind() == KBSResultModel::kResultFindChange)
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
