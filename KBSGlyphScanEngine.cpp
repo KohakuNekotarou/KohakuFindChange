@@ -9,42 +9,80 @@
 //  ***** MEASUREMENT BUILD (Task 2 of the plan) *****
 //  IFindChangeUtils::SearchForGlyph has ZERO callers anywhere in the SDK, so before any real
 //  scanning logic is built on top of it, this walks the front document and reports what the API
-//  actually does onto the status line. What is being measured:
-//    1. does a run of consecutive notdefs come back as ONE hit, or one hit per character?
-//    2. does passing nil for the "not used" options argument work?
-//    3. does 0..TotalLength() really reach table-cell and footnote story threads?
-//       (TotalLength vs GetPrimaryStoryThreadSpan is printed per story so the answer is visible)
-//    4. are the returned indices character counts or UTF-16 units?
+//  actually does. Already established by the earlier runs (see the trace file):
+//    - the options argument is NOT optional despite the header saying "not used"
+//    - a block's exclusive End must have 1 taken off before it is passed as findEnd
+//    - consecutive notdefs come back one character at a time
+//    - body text and footnote threads work perfectly
+//    - a story holding a TABLE stopped dead
+//
+//  ***** WHAT THE MEASUREMENTS SETTLED (2026-08-01) *****
+//  The earlier conclusion - "a story with a table cannot be searched, whatever range is used" - was
+//  wrong, and so was its replacement. Both were fixed by holding the document constant and varying
+//  only the range. What is actually true:
+//
+//    1. findEnd is EXCLUSIVE. A block whose notdef sits at 12 answers nothing to (12, 12) and
+//       hands back 12 to (12, 13). The old note that "the ceiling is TotalLength() - 1" was reading
+//       that backwards: the ceiling is real, but what it keeps out is the story's final,
+//       uneditable carriage return.
+//    2. A TABLE ANCHOR (kTextChar_Table, TextChar.h:58) inside the range is fatal - ONE index is
+//       enough. "A lone anchor at 0..0 is safe" was an artefact of reading the end as inclusive:
+//       with an exclusive end that range is empty and never looked at the anchor.
+//    3. Everything else is fine: cell blocks, footnote blocks, ranges spanning thread boundaries,
+//       and the footnote reference marker (0x0004).
+//
+//  So the scan collects the anchor indices first and searches only the stretches BETWEEN them.
+//  A table occupies its primary story thread as a single anchor character, with the cells' text in
+//  a thread block of its own, so skipping the anchor costs nothing - it is where a table hangs, not
+//  a character that can come out as a box.
+//
+//  Every block's leading characters are still dumped to the trace before any searching starts, so
+//  the character sitting at each index can be named rather than guessed at.
 //
 //========================================================================================
 
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IComposeScanner.h"	// CopyText - reads the characters an index actually holds
 #include "IDocument.h"			// GetName
 #include "IFindChangeOptions.h"	// SearchForGlyph needs a real one - see the call site
 #include "IFindChangeUtils.h"	// SearchForGlyph / kAnyNotDefGlyphID
+#include "IK2ServiceProvider.h"	// the text walker service - RunWithWalker
+#include "IK2ServiceRegistry.h"
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves doc scope
+#include "ISession.h"			// GetExecutionContextSession - where the service registry lives
 #include "IStoryList.h"			// the document's stories
 #include "ITextModel.h"			// TotalLength / GetPrimaryStoryThreadSpan
 #include "ITextStoryThreadDict.h"		// GetThreadBlockTextRange - one thread's own range
 #include "ITextStoryThreadDictHier.h"	// NextUID - walk the story's threads (tables) in order
+#include "ITextWalker.h"				// RunWithWalker - also declares ITextWalkerClient
+#include "ITextWalkerProgressMonitor.h"	// where the walk's RangeProgressBar is parked
+#include "ITextWalkerScope.h"
+#include "IWalkerScopeFactoryUtils.h"	// QueryDocumentWalkerScope
 
 // General includes:
-#include "CreateObject.h"		// ::CreateObject - the options object is made, not queried
+#include "CreateObject.h"		// ::CreateObject / ::CreateObject2 - the walker client is made
 #include "IDataBase.h"
 #include "PMString.h"
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
-#include "TextWalkerServiceProviderID.h"	// kNonSession_FindChangeOptionsBoss
+#include "ProgressBar.h"		// RangeProgressBar - the walk's progress + cancel
+#include "TextChar.h"			// kTextChar_Table / kTextChar_TableContinued - the table anchor
+#include "TextWalkerServiceProviderID.h"	// kNonSession_FindChangeOptionsBoss / kTextWalkerService
 #include "Utils.h"
+#include "WalkerScopeOptions.h"	// what the walk is allowed to visit
+#include "WideString.h"			// GrabUTF16Buffer - the same way KBSSearchEngine reads text
 
 #include <vector>
 
 // Project includes:
 #include "KBSGlyphScanEngine.h"
+#include "KBSGlyphWalkerClient.h"	// KBSGlyphWalkerData - what the walk saw
+#include "KBSID.h"					// kKBSGlyphWalkerClientBoss
 #include "KBSResultTree.h"		// ShowStatus - also what app.kbsStatus reads back
 
 #include <cstdio>				// ***** TEMPORARY: crash tracing, removed once the cause is known
+#include <cstring>				// ***** TEMPORARY: strcat_s, for the character dump
 
 namespace
 {
@@ -86,8 +124,6 @@ const int32 kMaxReportedPerStory = 12;
 // How many stories to report. Same reason.
 const int32 kMaxReportedStories = 6;
 
-/** Append "[start-end]" for every notdef SearchForGlyph hands back in this story, up to the cap.
-    @return the total number of hits (which can exceed what was appended). */
 /** A half-open [start, end) range of text: either one of the story's thread blocks, or one run of
     consecutive notdef glyphs. */
 struct GlyphRun
@@ -133,43 +169,106 @@ void CollectThreadRanges(ITextModel* model, std::vector<GlyphRun>& out)
 	}
 }
 
-int32 ReportOneStory(ITextModel* model, PMString& out)
+/** Dump the UTF-16 units at the head of [start, end) into the trace, so the character sitting AT an
+    index can be named rather than guessed at. What this is looking for is kTextChar_Table
+    (TextChar.h:58): a table occupies its primary story thread as ONE anchor character, and the
+    cells' text lives in a thread block of its own further along. Nothing here can hang, so it is
+    done for every block before any searching starts. */
+void TraceRangeChars(ITextModel* model, TextIndex start, TextIndex end)
 {
-	const TextIndex total = model->TotalLength();
-	const TextIndex primary = model->GetPrimaryStoryThreadSpan();
+	const int32 kMaxDumped = 24;	// one trace line's worth - enough to name the head of a block
 
-	// ***** ONE THREAD BLOCK AT A TIME - never across a boundary. *****
-	// Measured 2026-08-01: a story of body text + footnote (blocks 0-20 and 20-27) tolerated a
-	// single 0..26 call, but a story holding only a table (blocks 0-2 and 2-13) hung even at 0..1.
-	// The walker-based search never had this problem because the walker hands the searcher one
-	// focus at a time; passing a raw 0..TotalLength() range is asking SearchForGlyph to do work
-	// the walker normally does for it.
-	std::vector<GlyphRun> blocks;
-	CollectThreadRanges(model, blocks);
-	TraceNum("  thread blocks / total", static_cast<int32>(blocks.size()), total);
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (scanner == nil)
+	{
+		Trace("    chars: no compose scanner");
+		return;
+	}
 
+	int32 len = static_cast<int32>(end - start);
+	if (len <= 0)
+		return;
+	if (len > kMaxDumped)
+		len = kMaxDumped;
+
+	WideString text;
+	scanner->CopyText(start, len, &text);
+
+	int32 n = 0;
+	const UTF16TextChar* buf = text.GrabUTF16Buffer(&n);
+	if (buf == nil || n <= 0)
+	{
+		Trace("    chars: empty");
+		return;
+	}
+
+	char line[640];
+	::strcpy_s(line, sizeof(line), "    chars ");
+	for (int32 i = 0; i < n && i < kMaxDumped; ++i)
+	{
+		char one[32];
+		::sprintf_s(one, sizeof(one), "%d:%04X ", static_cast<int>(start + i),
+					static_cast<unsigned int>(buf[i]));
+		::strcat_s(line, sizeof(line), one);
+	}
+	Trace(line);
+}
+
+/** Every index in [start, end) that holds a table anchor. */
+void CollectTableAnchors(ITextModel* model, TextIndex start, TextIndex end,
+						 std::vector<TextIndex>& out)
+{
+	const int32 kMaxScanned = 4000;		// this is a measurement, not the shipped scan
+
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (scanner == nil)
+		return;
+
+	int32 len = static_cast<int32>(end - start);
+	if (len <= 0)
+		return;
+	if (len > kMaxScanned)
+		len = kMaxScanned;
+
+	WideString text;
+	scanner->CopyText(start, len, &text);
+
+	int32 n = 0;
+	const UTF16TextChar* buf = text.GrabUTF16Buffer(&n);
+	if (buf == nil)
+		return;
+
+	for (int32 i = 0; i < n; ++i)
+	{
+		if (buf[i] == kTextChar_Table || buf[i] == kTextChar_TableContinued)
+			out.push_back(start + i);
+	}
+}
+
+/** Run SearchForGlyph across one range and append every notdef it hands back to 'out'.
+
+    findEnd is EXCLUSIVE (measured 2026-08-01 - see the note in ReportOneStory), so a thread block's
+    End goes in unchanged. The caller must already have kept every table anchor out of the range.
+
+    @return how many notdefs were found. */
+int32 SearchRange(ITextModel* model, const char* label, TextIndex rangeStart,
+				  TextIndex rangeEndExclusive, PMString& out)
+{
 	int32 hits = 0;
-	for (size_t b = 0; b < blocks.size(); ++b)
+	TextIndex pos = rangeStart;
+	while (pos < rangeEndExclusive)
 	{
-	const TextIndex blockStart = blocks[b].start;
-	const TextIndex blockEnd = blocks[b].end;
-	TraceNum("  BLOCK start/end", blockStart, blockEnd);
-
-	TextIndex pos = blockStart;
-	while (pos < blockEnd)
-	{
-		TextIndex foundStart = kInvalidTextIndex;
-		TextIndex foundEnd = kInvalidTextIndex;
-
-		TraceNum("  about to SearchForGlyph pos/end", pos, blockEnd);
+		char head[128];
+		::sprintf_s(head, sizeof(head), "    %s SearchForGlyph %d..%d", label,
+					static_cast<int>(pos), static_cast<int>(rangeEndExclusive));
+		Trace(head);
 
 		Utils<IFindChangeUtils> fcUtils;
 		if (fcUtils == nil)
 		{
-			Trace("  !! Utils<IFindChangeUtils> is NIL");
+			Trace("    !! Utils<IFindChangeUtils> is NIL");
 			break;
 		}
-		Trace("  utils ok");
 
 		// ***** The options argument is NOT optional, whatever the header says. *****
 		// IFindChangeUtils.h:64 calls it "not used", and passing nil took InDesign down on the
@@ -189,19 +288,16 @@ int32 ReportOneStory(ITextModel* model, PMString& out)
 			::CreateObject(kNonSession_FindChangeOptionsBoss, IID_IFINDCHANGEOPTIONS)));
 		if (options == nil)
 		{
-			Trace("  !! CreateObject(kNonSession_FindChangeOptionsBoss) returned NIL");
+			Trace("    !! CreateObject(kNonSession_FindChangeOptionsBoss) returned NIL");
 			break;
 		}
-		Trace("  options created");
 
-		// The block's End is EXCLUSIVE (it equals the next block's Start, and the last block's End
-		// equals TotalLength()), so the last index this call may look at is End-1. Passing End
-		// itself is what took InDesign down on the very first run.
-		const TextIndex searchEnd = (blockEnd > blockStart) ? (blockEnd - 1) : blockStart;
+		TextIndex foundStart = kInvalidTextIndex;
+		TextIndex foundEnd = kInvalidTextIndex;
 		const bool16 found = fcUtils->SearchForGlyph(
-			model, options, kAnyNotDefGlyphID, pos, searchEnd, foundStart, foundEnd);
+			model, options, kAnyNotDefGlyphID, pos, rangeEndExclusive, foundStart, foundEnd);
 
-		TraceNum("  returned, found/start", found ? 1 : 0, foundStart);
+		TraceNum("    returned found/start", found ? 1 : 0, foundStart);
 		if (!found)
 			break;
 
@@ -220,7 +316,65 @@ int32 ReportOneStory(ITextModel* model, PMString& out)
 		// real possibility rather than a theoretical one.
 		pos = (foundEnd > pos) ? foundEnd : (pos + 1);
 	}
-	}	// next thread block
+	return hits;
+}
+
+int32 ReportOneStory(ITextModel* model, PMString& out)
+{
+	std::vector<GlyphRun> blocks;
+	CollectThreadRanges(model, blocks);
+	TraceNum("  thread blocks / total", static_cast<int32>(blocks.size()), model->TotalLength());
+
+	// Name every block's characters first. None of this can hang, so however the run ends, the
+	// trace always says what was sitting at each index.
+	for (size_t b = 0; b < blocks.size(); ++b)
+	{
+		TraceNum("  BLOCK start/end", blocks[b].start, blocks[b].end);
+		TraceRangeChars(model, blocks[b].start, blocks[b].end);
+	}
+
+	std::vector<TextIndex> allAnchors;
+	for (size_t b = 0; b < blocks.size(); ++b)
+		CollectTableAnchors(model, blocks[b].start, blocks[b].end, allAnchors);
+	TraceNum("  table anchors in story", static_cast<int32>(allAnchors.size()), 0);
+
+	int32 hits = 0;
+
+	// ***** Steps A and B: every block BACK TO FRONT, with the table anchors cut out. *****
+	// Back to front because a table's cell block always follows the primary block it is anchored
+	// in, and the primary block is where the previous run died - taking the cells first puts their
+	// answer on disk before anything known to be risky is attempted.
+	// Within a block the anchor indices are skipped, so what gets searched here is only text that
+	// is certainly not a table anchor.
+	for (size_t bi = blocks.size(); bi-- > 0; )
+	{
+		const TextIndex blockStart = blocks[bi].start;
+		const TextIndex blockEnd = blocks[bi].end;		// EXCLUSIVE
+
+		std::vector<TextIndex> anchors;
+		CollectTableAnchors(model, blockStart, blockEnd, anchors);
+		TraceNum("  == block / anchors in it", static_cast<int32>(bi),
+				 static_cast<int32>(anchors.size()));
+
+		// The stretches BETWEEN the anchors, each searched on its own. segEnd goes in unchanged:
+		// findEnd is EXCLUSIVE (see the note above SearchRange).
+		TextIndex segStart = blockStart;
+		for (size_t a = 0; a <= anchors.size(); ++a)
+		{
+			const TextIndex segEnd = (a < anchors.size()) ? anchors[a] : blockEnd;	// exclusive
+			if (segEnd > segStart)
+				hits += SearchRange(model, "seg", segStart, segEnd, out);
+			if (a < anchors.size())
+				segStart = anchors[a] + 1;
+		}
+	}
+
+	// The anchors themselves are never searched. Two runs were spent proving they must not be:
+	// searching one on its own looked safe at first (0..0), but that was an empty range under an
+	// exclusive end - the moment a real anchor index was actually examined, InDesign died.
+	// Nothing is lost by skipping them: an anchor is where a table hangs, not a character that can
+	// come out as a box.
+
 	return hits;
 }
 
@@ -316,6 +470,130 @@ void KBSGlyphScanEngine::Run()
 
 	out.Append("| total ");
 	out.AppendNumber(grandTotal);
+
+	KBSResultTree::ShowStatus(out);
+}
+
+//========================================================================================
+// The walker-driven version
+//========================================================================================
+
+void KBSGlyphScanEngine::RunWithWalker()
+{
+	TraceReset();
+	Trace("=== WALKER-DRIVEN SCAN ===");
+
+	PMString out;
+	out.SetTranslatable(kFalse);
+
+	IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
+	if (doc == nil)
+	{
+		out.Append("Glyph scan (walker): no open document.");
+		KBSResultTree::ShowStatus(out);
+		return;
+	}
+	const UIDRef docRef = ::GetUIDRef(doc);
+
+	// The walker comes out of the session's service registry - the same three steps
+	// KBSSearchEngine takes for the find/change walk (KBSSearchEngine.cpp:666-684).
+	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IK2ServiceProvider> provider(
+		(registry != nil)
+			? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss)
+			: nil);
+	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
+	if (walker == nil)
+	{
+		Trace("!! no text walker service");
+		out.Append("Glyph scan (walker): no text walker service.");
+		KBSResultTree::ShowStatus(out);
+		return;
+	}
+
+	// Always start a fresh walk from the top.
+	if (walker->IsWalking())
+		walker->Halt();
+
+	// EVERY switch left at its default kTrue. The glyph scan deliberately ignores the five
+	// Find/Change scope options and looks everywhere (design section 2), so nothing is read off the
+	// dialog here - which is the one place this differs from
+	// KBSSearchEngine::GetKBSWalkerScopeOptions.
+	WalkerScopeOptions scopeOptions;
+
+	InterfacePtr<ITextWalkerScope> scope(
+		Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
+	if (scope == nil)
+	{
+		Trace("!! QueryDocumentWalkerScope returned NIL");
+		out.Append("Glyph scan (walker): no walker scope for this document.");
+		KBSResultTree::ShowStatus(out);
+		return;
+	}
+
+	// Our own client instead of the stock kFindChangeClientBoss - see KBSGlyphWalkerClient.h.
+	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(
+		::CreateObject2<ITextWalkerClient>(kKBSGlyphWalkerClientBoss)));
+	if (client == nil)
+	{
+		Trace("!! CreateObject2(kKBSGlyphWalkerClientBoss) returned NIL");
+		out.Append("Glyph scan (walker): could not create the walker client.");
+		KBSResultTree::ShowStatus(out);
+		return;
+	}
+
+	// nil find/change options. There is no query to run here - the client asks each range about its
+	// glyphs - and LinguisticTestMenu.cpp:1221 initialises a walker with nil the same way. Handing
+	// over the session's options instead would tie this scan to whichever tab the user's
+	// Find/Change dialog happens to be on.
+	walker->Initialize(client, scope, nil, nil);
+
+	// !! Deliberately NO TextWalkerSelections_CriticalSection, unlike KBSSearchEngine.
+	// What that section does is take the keyboard focus away and hand it back (spellpanel says so
+	// outright - SpellCheckWalker.cpp:85-141 "same code as
+	// TextWalkerSelectionUtils::EnterWalkerSelections_CriticalSection"). It is there because a
+	// find/change walk MOVES THE SELECTION onto each match. This scan selects nothing and writes
+	// nothing, and holding the section would cost the very thing the walk is here to gain: with it
+	// held, UI events cannot be pumped, so the bar's Cancel could never be heard. HyphenateStoryCmd
+	// (LinguisticTestMenu.cpp:1192-1225) drives a walk without it either.
+
+	KBSGlyphWalkerData::Reset();
+
+	PMString taskText("Scanning for missing glyphs...");
+	taskText.SetTranslatable(kFalse);
+	// showImmediate = kTrue so the bar is visibly there even on a small document; showCancel is
+	// kTrue by default (ProgressBar.h:208).
+	RangeProgressBar bar(taskText, 0, 100, kTrue);
+
+	// The monitor is only a parking space - the CLIENT is what moves the bar (see the .h).
+	InterfacePtr<ITextWalkerProgressMonitor> monitor(client, UseDefaultIID());
+	if (monitor != nil)
+		monitor->SetWalkerProgressMonitor(&bar);
+
+	Trace("about to Walk()");
+	const bool16 walked = walker->Walk();
+	Trace(walked ? "Walk() returned kTrue" : "Walk() returned kFalse");
+
+	// Unhook the bar BEFORE it goes out of scope: the walker holds on to the client, so a bar left
+	// parked there would be a dangling pointer on an object that outlives this function.
+	if (monitor != nil)
+		monitor->SetWalkerProgressMonitor(nil);
+
+	if (walker->IsWalking())
+		walker->Halt();
+
+	out.Append("walker: stories ");
+	out.AppendNumber(KBSGlyphWalkerData::GetStoryCount());
+	out.Append(", ranges ");
+	out.AppendNumber(KBSGlyphWalkerData::GetRangeCount());
+	out.Append(" (anchor inside: ");
+	out.AppendNumber(KBSGlyphWalkerData::GetRangesWithAnchor());
+	out.Append("), notdef ");
+	out.AppendNumber(KBSGlyphWalkerData::GetHitCount());
+	out.Append(" ");
+	out.Append(KBSGlyphWalkerData::GetDigest());
+	if (!walked)
+		out.Append(" [Walk returned false]");
 
 	KBSResultTree::ShowStatus(out);
 }

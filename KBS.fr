@@ -61,6 +61,10 @@
 #include "GenericID.h"
 #include "ShuksanID.h"
 #include "TextID.h"
+// IID_ITEXTWALKERCLIENT / IID_ITEXTWALKERPROGRESSMONITOR and the STOCK monitor implementation
+// (kTextWalkerProgressMonitorImpl) the glyph scan's walker client aggregates - see KBS.fr's
+// kKBSGlyphWalkerClientBoss below and SpellPanelClass.fr:548-557, which builds its client the same way.
+#include "TextWalkerServiceProviderID.h"
 
 
 #ifdef __ODFRC__
@@ -248,6 +252,29 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The missing-glyph scan's own TEXT WALKER CLIENT (the walker-driven variant of the scan).
+	 *
+	 * A find/change walk uses the stock kFindChangeClientBoss, because the find/change command
+	 * drives it. A notdef scan has no query to run and therefore no command to drive it, so the
+	 * walk is driven directly (ITextWalker::Walk) - and Walk calls back into a CLIENT, which has
+	 * to be one that answers the question being asked. See KBSGlyphWalkerClient.h.
+	 *
+	 * The progress monitor beside it is ADOBE'S, not ours: ITextWalkerProgressMonitor is only a
+	 * place to park a RangeProgressBar, so the stock implementation is all that is needed and
+	 * writing one would be duplicating it. This pairing is exactly how the spell panel builds its
+	 * own replace client (SpellPanelClass.fr:548-557).
+	 */
+	Class
+	{
+		kKBSGlyphWalkerClientBoss,
+		kInvalidClass,
+		{
+			IID_ITEXTWALKERCLIENT,			kKBSGlyphWalkerClientImpl,
+			IID_ITEXTWALKERPROGRESSMONITOR,	kTextWalkerProgressMonitorImpl,
+		}
+	},
+
+	/*
 	 * Draw-event-handler service boss (Task 3): registers kDrawEventService (via IK2ServiceProvider)
 	 * so the sibling IDrwEvtHandler is hooked into the draw-event dispatcher at startup; it draws
 	 * the translucent red marker rectangle around a jumped-to hit.
@@ -388,6 +415,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSFindMissingGlyphsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// The same scan, driven by a text walker. Directly under the one above so the pair reads
+		// as the one experiment it is.
+		kKBSFindMissingGlyphsWalkerActionID,
+		kKBSTargetMenuPath
+		kKBSFindMissingGlyphsWalkerMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Separator between the search command and the toggles.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
@@ -490,6 +524,16 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSFindMissingGlyphsActionID,
 		kKBSFindMissingGlyphsMenuKey,	// "Find Missing Glyphs"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// The walker-driven variant. Same flags as the scan above for the same reasons.
+		kKBSActionComponentBoss,
+		kKBSFindMissingGlyphsWalkerActionID,
+		kKBSFindMissingGlyphsWalkerMenuKey,	// "Find Missing Glyphs (Walker)"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

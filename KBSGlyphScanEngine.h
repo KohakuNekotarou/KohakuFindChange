@@ -25,6 +25,19 @@ namespace KBSGlyphScanEngine
 
 	    Changes NOTHING in the document: no command, no command sequence, nothing to undo. */
 	void Run();
+
+	/** The same scan driven by a TEXT WALKER instead of by walking the stories directly.
+
+	    Two versions exist on purpose. The direct one above reaches the text through IStoryList and
+	    splits its ranges around table anchors, because a raw SearchForGlyph call dies on a range
+	    that contains one. This one hands the job to ITextWalker - the thing that already knows how
+	    to break a story into thread blocks, take footnotes in and out of scope and leave master
+	    pages alone - and asks whether the ranges it offers avoid that trap by themselves.
+
+	    It also gets a progress bar the direct scan cannot have: a bar inside a walk has to be moved
+	    by the walker CLIENT, and the stock find/change client never moves it. See
+	    KBSGlyphWalkerClient.h. */
+	void RunWithWalker();
 }
 
 #endif // __KBSGlyphScanEngine_h__

@@ -81,7 +81,10 @@ DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
 // IControlView is ours, built the same way the hit row's colour cell is.
 DECLARE_PMID(kClassIDSpace, kKBSGlyphConfirmDialogBoss, kKBSPrefix + 11)
 DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 13)
+// The missing-glyph scan's own text-walker client. Carries the stock progress-monitor
+// implementation beside our own client, which is how the spell panel's replace client is built
+// (SpellPanelClass.fr:548-557) - the monitor is Adobe's, only the client is ours.
+DECLARE_PMID(kClassIDSpace, kKBSGlyphWalkerClientBoss, kKBSPrefix + 13)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 14)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 15)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 16)
@@ -172,7 +175,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
 // The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
 // they land on, so a book search's closed chapters do not hide their hits from the keyboard.
 DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 18)
+// The missing-glyph scan's text-walker client (the walker-driven scan).
+DECLARE_PMID(kImplementationIDSpace, kKBSGlyphWalkerClientImpl, kKBSPrefix + 18)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 19)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 20)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 21)
@@ -212,7 +216,10 @@ DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 // Find Missing Glyphs: scan the scope for notdef glyphs (2026-08-01). + 12 and + 13 are burnt
 // numbers (see above), so this is the first genuinely unused one.
 DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
+// The same scan driven by a text walker instead of by walking the stories directly. A second menu
+// item rather than a switch on the first, so the two can be run one after the other on the same
+// document and their answers compared.
+DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsWalkerActionID, kKBSPrefix + 15)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 16)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 17)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 18)
@@ -271,6 +278,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
 // "Find Missing Glyphs": scan for notdef glyphs rather than for the Find/Change query.
 #define kKBSFindMissingGlyphsMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsMenuKey"
+// The walker-driven variant of the same scan.
+#define kKBSFindMissingGlyphsWalkerMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsWalkerMenuKey"
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
@@ -339,6 +348,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The glyph scan is the search command's sibling, so it sits directly under it - above the scope
 // toggle's separator (1.3), which keeps the two "run something" commands together.
 #define kKBSFindMissingGlyphsMenuItemPosition	1.1
+// The walker-driven scan sits directly under the direct one, so the pair reads as one experiment.
+#define kKBSFindMissingGlyphsWalkerMenuItemPosition	1.2
 #define kKBSHidePrevChapterMenuItemPosition	2.0
 
 // The replace block sits below the existing toggles, above the About separator (10.0).
