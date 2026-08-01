@@ -209,7 +209,9 @@ DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 // + 13 was a temporary DoReplaceAll measurement probe (2026-07-31), removed once the experiment
 // was decided. Left commented rather than reused, for the same reason as + 12 above.
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 13)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 14)
+// Find Missing Glyphs: scan the scope for notdef glyphs (2026-08-01). + 12 and + 13 are burnt
+// numbers (see above), so this is the first genuinely unused one.
+DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 16)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 17)
@@ -267,6 +269,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 
 // Menu item keys:
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
+// "Find Missing Glyphs": scan for notdef glyphs rather than for the Find/Change query.
+#define kKBSFindMissingGlyphsMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsMenuKey"
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
@@ -332,6 +336,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 #define kKBSBookScopeMenuItemPosition		1.6
 
 #define kKBSSearchBookMenuItemPosition		1.0
+// The glyph scan is the search command's sibling, so it sits directly under it - above the scope
+// toggle's separator (1.3), which keeps the two "run something" commands together.
+#define kKBSFindMissingGlyphsMenuItemPosition	1.1
 #define kKBSHidePrevChapterMenuItemPosition	2.0
 
 // The replace block sits below the existing toggles, above the About separator (10.0).

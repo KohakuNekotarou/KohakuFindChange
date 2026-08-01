@@ -147,6 +147,18 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSFindMissingGlyphsActionID:
+		{
+			// Scan the same scope for notdef glyphs - the boxes InDesign draws where a font has no
+			// glyph for a character. The scanner is written in the next task; this stub is here so
+			// the .fr plumbing (ActionDef, MenuDef, both string tables) can be verified on its own,
+			// before any scanning logic exists to confuse a failure with.
+			PMString msg("Find Missing Glyphs: not implemented yet.");
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+			break;
+		}
+
 		case kKBSScopeBookActionID:
 		{
 			// Toggle the search scope: the whole active book, or just the front document. Just the
@@ -491,6 +503,18 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			PMString name(KBSBookScope::IsBookScopeOn() ? "Search Book" : "Search Document");
 			name.SetTranslatable(kFalse);
 			listToUpdate->SetNthActionName(i, name);
+			listToUpdate->SetNthActionState(i, kEnabledAction);
+		}
+		else if (action == kKBSFindMissingGlyphsActionID)
+		{
+			// Always live, for the same reasons the search command above is: it runs over the same
+			// scope, and a book scan works with no document window open. Nothing about the current
+			// RESULTS decides whether a scan may run - it starts from the document, not from them.
+			//
+			// It has to be said explicitly all the same: kCustomEnabling means this method owns the
+			// state, and an action this loop never names stays DISABLED. (Found on the real
+			// application - the item appeared in the flyout but invoke() answered "Action is not
+			// enabled".)
 			listToUpdate->SetNthActionState(i, kEnabledAction);
 		}
 		else if (action == kKBSScopeBookActionID)

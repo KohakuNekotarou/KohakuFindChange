@@ -380,6 +380,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Find Missing Glyphs: scan the same scope for notdef glyphs (the boxes InDesign draws when
+		// a font has no glyph for a character). Sits under the search command because the two are
+		// siblings - both run something over the current scope.
+		kKBSFindMissingGlyphsActionID,
+		kKBSTargetMenuPath
+		kKBSFindMissingGlyphsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Separator between the search command and the toggles.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
@@ -469,6 +477,19 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// The glyph scan. Same flags as the search command above, and for the same reasons: it runs
+		// over the same scope, so it must stay live while a book is open with no document window
+		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
+		// one place that decides whether either command can run.
+		kKBSActionComponentBoss,
+		kKBSFindMissingGlyphsActionID,
+		kKBSFindMissingGlyphsMenuKey,	// "Find Missing Glyphs"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
