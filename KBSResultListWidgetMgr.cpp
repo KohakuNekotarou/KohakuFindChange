@@ -4,15 +4,20 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  ITreeViewWidgetMgr for the result tree. Two node kinds:
+//  ITreeViewWidgetMgr for the result tree. Two ROW SHAPES, three node kinds:
 //
-//    * CHAPTER rows (from kKBSResultChapterNodeWidgetRsrcID): the chapter's name and its hit
-//      count, "<name>  (N)", in a stock InfoStaticText after the expander arrow's zone. The
-//      expander is hidden on a chapter with no hits (never happens - only chapters with hits are
-//      in the model - but the guard mirrors KESCL's).
+//    * BRANCH rows (from kKBSResultChapterNodeWidgetRsrcID): an expander arrow and a label. The
+//      BOOK row, the CHAPTER rows ("<name>  (N)") and the FONT rows ("<font>  (N)") are all this
+//      one shape, at three different indents - so the font level needed no resource of its own.
+//      The expander is hidden on a row with no children (never happens - only chapters with hits
+//      are in the model - but the guard mirrors KESCL's).
 //    * HIT rows (from kKBSResultHitNodeWidgetRsrcID): one match's line, drawn by the custom
 //      colour cell (KBSColorTextView) with the matched part highlighted. No expander (a leaf);
-//      indented one more zone than the chapter row.
+//      indented past its branch row.
+//
+//  The FONT rows (2026-08-02) appear only under a chapter whose hits name fonts - a missing-glyph
+//  scan. A Find/Change chapter has no groups and its hits hang off it directly, which is the tree
+//  KBS has always drawn.
 //
 //  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget (the framework
 //  indent is unused, as in KESCL). This file also hosts KBSResultTree::Rebuild (the tree lives
@@ -76,6 +81,12 @@ namespace
 	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
 	// the hierarchy. A document search has no book row and no shift, so its tree is unchanged.
 	const PMReal kBookLevelIndent = 8.0;
+	// A FONT row sits between a document and its hits when the results name fonts, and its children
+	// step right by this much. The same 8px the book level uses, and for the same reason: half an
+	// expander zone is enough to read the hierarchy, and this panel's width has been fought over
+	// once already (see kHitExtraIndent). A chapter with no font rows gets no shift at all, so a
+	// Find/Change result is laid out exactly as it was.
+	const PMReal kFontLevelIndent = 8.0;
 
 	// Every row of this tree is this tall - the height both row resources declare in KBS.fr. Stated
 	// here as well because the tree asks for it (GetNodeWidgetHeight), and because it is the fact
@@ -203,6 +214,8 @@ public:
 				this->ApplyHitRow(nodeID, widget, rowData);
 			else if (nodeID->IsBookRow())
 				this->ApplyBookRow(node, widget, rowData);
+			else if (nodeID->IsFontRow())
+				this->ApplyFontRow(nodeID, node, widget, rowData);
 			else
 				this->ApplyChapterRow(nodeID, node, widget, rowData);
 		}
@@ -217,6 +230,8 @@ public:
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
+		if (nodeID != nil && nodeID->IsFontRow())
+			return PMReal(kFontLevelIndent);
 		return 0.0;
 	}
 
@@ -226,6 +241,15 @@ private:
 	PMReal LevelShift() const
 	{
 		return KBSResultModel::IsFromBook() ? kBookLevelIndent : PMReal(0.0);
+	}
+
+	// How far right this chapter's HIT rows sit because of the font level: one step when the chapter
+	// has font rows above them, nothing when it has not. Asked per chapter, from the same count the
+	// hierarchy adapter uses to decide whether to build those rows at all, so the indent can never
+	// disagree with the tree.
+	PMReal FontShift(int32 chapterIdx) const
+	{
+		return (KBSResultModel::GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
 	}
 
 	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
@@ -320,6 +344,41 @@ private:
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
 
+	// A FONT row: which font had no glyph for this text, and how many rows sit under it. The same
+	// shape as a document row - an expander and a label - so it shares the branch layout and the
+	// chapter row's resource, one step further right.
+	void ApplyFontRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
+		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+	{
+		PMString name;
+		int32 fullCount = 0;
+		if (!KBSResultModel::GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
+			return;
+		const int32 shownCount =
+			KBSResultModel::GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
+
+		// "<font>  (N)", or "<font>  (shown / total)" for the one group the display cap splits -
+		// the document row's rule, applied unchanged. The count is ROWS, not glyphs: a run of boxes
+		// side by side is one row, so the two numbers differ, and every number in this tree means
+		// "how many rows are under me" (user's call 2026-08-02). The status line is where the glyph
+		// count is said.
+		PMString label(name);
+		label.SetTranslatable(kFalse);
+		label.Append("  (");
+		if (shownCount < fullCount)
+		{
+			label.AppendNumber(shownCount);
+			label.Append(" / ");
+			label.AppendNumber(fullCount);
+		}
+		else
+		{
+			label.AppendNumber(fullCount);
+		}
+		label.Append(")");
+		this->LayOutBranchRow(node, widget, rowData, this->LevelShift() + kFontLevelIndent, label);
+	}
+
 	// A hit row: the match's line into the custom colour cell (three segments), no expander,
 	// indented one zone deeper than the chapter row.
 	void ApplyHitRow(const TreeNodePtr<KBSResultNodeID>& nodeID, IControlView* widget,
@@ -348,7 +407,8 @@ private:
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
-		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent + this->LevelShift();
+		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent
+			+ this->LevelShift() + this->FontShift(nodeID->GetChapter());
 
 		// The check box. A row with nothing to select loses it completely; the space it would have
 		// taken is left empty rather than reclaimed, so the locators stay in one column (see the
@@ -405,8 +465,7 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText,
-					row.fontName);
+				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText);
 			cell->Invalidate();
 		}
 	}
@@ -479,14 +538,23 @@ void KBSResultTree::RefreshRows()
 	if (treeMgr == nil)
 		return;
 
-	// One notification per CHAPTER with childrenChangedAlso = kTrue: the framework refreshes that
-	// chapter's hit rows itself, so a 3000-row result costs a handful of calls rather than 3000.
-	// Only the rows that actually have widgets (the visible ones) do any drawing; the rest pick the
-	// model up when they scroll into view. The row heights do not change here, which is what
-	// NodeChanged requires.
+	// One notification per BRANCH row with childrenChangedAlso = kTrue: the framework refreshes that
+	// row's children itself, so a 3000-row result costs a handful of calls rather than 3000. Only
+	// the rows that actually have widgets (the visible ones) do any drawing; the rest pick the model
+	// up when they scroll into view. The row heights do not change here, which is what NodeChanged
+	// requires.
+	//
+	// The chapter AND each of its font rows, because childrenChangedAlso reaches a node's children -
+	// and with the font level the hit rows are GRANDchildren. A chapter has a few fonts, not a few
+	// thousand, so this stays a handful of calls.
 	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
 	for (int32 c = 0; c < chapters; ++c)
+	{
 		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
+		const int32 fonts = KBSResultModel::GetDisplayFontCount(c);
+		for (int32 f = 0; f < fonts; ++f)
+			treeMgr->NodeChanged(KBSResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);
+	}
 }
 
 //----------------------------------------------------------------------------------------

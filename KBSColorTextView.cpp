@@ -96,25 +96,23 @@ public:
 	virtual ~KBSRowData() {}
 
 	virtual void SetSegments(const PMString& locator, const PMString& flag, const PMString& pre,
-		const PMString& match, const PMString& post, const PMString& fontName)
+		const PMString& match, const PMString& post)
 	{
 		fLocator = locator; fLocator.SetTranslatable(kFalse);
 		fFlag = flag; fFlag.SetTranslatable(kFalse);
 		fPre = pre;   fPre.SetTranslatable(kFalse);
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
-		fFontName = fontName; fFontName.SetTranslatable(kFalse);
 	}
 
 	virtual void GetSegments(PMString& outLocator, PMString& outFlag, PMString& outPre,
-		PMString& outMatch, PMString& outPost, PMString& outFontName) const
+		PMString& outMatch, PMString& outPost) const
 	{
 		outLocator = fLocator;
 		outFlag = fFlag;
 		outPre = fPre;
 		outMatch = fMatch;
 		outPost = fPost;
-		outFontName = fFontName;
 	}
 
 private:
@@ -123,7 +121,6 @@ private:
 	PMString fPre;
 	PMString fMatch;
 	PMString fPost;
-	PMString fFontName;
 };
 
 CREATE_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
@@ -157,8 +154,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (data == nil)
 		return;
 
-	PMString locator, flag, pre, match, post, fontName;
-	data->GetSegments(locator, flag, pre, match, post, fontName);
+	PMString locator, flag, pre, match, post;
+	data->GetSegments(locator, flag, pre, match, post);
 
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
@@ -267,35 +264,11 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// neither underlined nor dropped. If the whole line fits it is drawn as-is; when it overflows
 	// the match is kept at full strength and the context is ellipsized around it. The matched run
 	// is the full theme text colour; the context runs are faded.
-	// The font name is drawn RIGHT-ALIGNED against the cell's edge, so it forms a column of its own
-	// that the eye can run down. Only a missing-glyph scan fills it - on a Find/Change row it is
-	// empty and nothing below costs anything.
 	//
-	// Its width is taken out BEFORE the line is laid out, and capped at a third of what is left, so
-	// the line always keeps the majority of the cell: the text is what is being read, the font is
-	// only why it went wrong. When even that third is too little the NAME is what gets ellipsized.
-	PMString fontCut;
-	PMReal fontReserve(0.0);
-	const PMReal kFontGap(12.0);
-	if (!fontName.IsEmpty() && x < rightEdge)
-	{
-		const PMReal fontBudget = (rightEdge - x) * PMReal(0.34);
-		fontCut = StringUtils::PMEllipsizeString(&gc, fontBudget, fontName, fontInfo, kEllipsizeEnd,
-			nil, kDontConvertAmpersand);
-		if (!fontCut.IsEmpty())
-			fontReserve = StringUtils::PMMeasureString(&gc, fontCut, fontInfo, kDontConvertAmpersand).X()
-				+ kFontGap;
-	}
-
-	// Drawn now rather than after the line, because the line's own drawing advances x past it.
-	if (!fontCut.IsEmpty())
-	{
-		const PMReal fontW = StringUtils::PMMeasureString(&gc, fontCut, fontInfo, kDontConvertAmpersand).X();
-		StringUtils::PMDrawStringRGB(&gc, PMPoint(rightEdge - fontW, y), fontCut, fontInfo,
-			kContextColor, kDontConvertAmpersand, kNoUnderline);
-	}
-
-	const PMReal availWidth = rightEdge - x - fontReserve;
+	// A missing-glyph row used to give up to a third of this width to the FONT NAME, drawn
+	// right-aligned. The tree names the font on the row ABOVE the group now (2026-08-02), so the
+	// whole cell goes back to the line.
+	const PMReal availWidth = rightEdge - x;
 	if (availWidth <= PMReal(0.0))
 		return;		// the locator consumed the cell; no room left for the line
 
