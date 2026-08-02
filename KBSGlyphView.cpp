@@ -26,7 +26,7 @@
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSGlyphConfirmDialog.h"
+#include "KBSReplaceConfirmDialog.h"
 #include "KBSGlyphView.h"
 
 // Linear blend of two RGB colours (t = 0 -> a, t = 1 -> b). The frame is drawn part-way between
@@ -91,8 +91,8 @@ void KBSGlyphView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 
 	// An absent side is a valid state and stays an empty frame: it is what an empty Change To box -
 	// "delete every match" - looks like.
-	const KBSGlyphConfirmDialog::Side* side =
-		KBSGlyphConfirmDialog::GetSideForWidget(this->GetWidgetID());
+	const KBSReplaceConfirmDialog::Side* side =
+		KBSReplaceConfirmDialog::GetSideForWidget(this->GetWidgetID());
 	if (side == nil || side->fFont == nil)
 		return;
 

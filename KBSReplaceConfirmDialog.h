@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The Glyph tab's replace confirmation. On that tab the query is a GLYPH, not a string, so
-//  the prompt has to show the glyph itself - drawn in the font that defines it, because a
+//  The replace confirmation. On the Glyph tab the query is a GLYPH, not a string, so the
+//  prompt has to show the glyph itself - drawn in the font that defines it, because a
 //  glyph id means nothing on its own: an alternate form shares its Unicode with the standard
 //  form, a GID is specific to one font file, and a CID means a different character under a
 //  different ROS. Adobe says as much in the shape of its own API - IGlyphUtils takes the font
@@ -22,8 +22,8 @@
 //
 //========================================================================================
 
-#ifndef __KBSGlyphConfirmDialog_h__
-#define __KBSGlyphConfirmDialog_h__
+#ifndef __KBSReplaceConfirmDialog_h__
+#define __KBSReplaceConfirmDialog_h__
 
 #include "CTextEnum.h"		// Text::GlyphID, kInvalidGlyphID
 #include "PMString.h"
@@ -34,8 +34,8 @@ class IDataBase;
 class IFindChangeOptions;
 class IPMFont;
 
-/** The Glyph tab's replace confirmation - see the file header. */
-class KBSGlyphConfirmDialog
+/** The replace confirmation - see the file header. */
+class KBSReplaceConfirmDialog
 {
 public:
 	/** One side of the prompt: what is searched for, or what will be written.
@@ -117,6 +117,6 @@ private:
 		IDataBase* db, Side& outSide);
 };
 
-#endif // __KBSGlyphConfirmDialog_h__
+#endif // __KBSReplaceConfirmDialog_h__
 
-// End, KBSGlyphConfirmDialog.h.
+// End, KBSReplaceConfirmDialog.h.

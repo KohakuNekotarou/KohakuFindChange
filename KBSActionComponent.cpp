@@ -50,7 +50,7 @@
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
-#include "KBSGlyphConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
+#include "KBSReplaceConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
 #include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
 #include "KBSOversetScanEngine.h"	// Find Overset
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
@@ -345,16 +345,16 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// by itself, so the answer is worth having even here, in the plain prompt: it is what turns
 	// "[glyph 7425]" into something the user can check against the Find/Change dialog. Whatever
 	// this resolves is released before every exit below.
-	const bool glyphResolved = glyphMode && KBSGlyphConfirmDialog::Resolve(opts);
+	const bool glyphResolved = glyphMode && KBSReplaceConfirmDialog::Resolve(opts);
 
 	// On the Glyph tab, show the glyphs THEMSELVES rather than their numbers. Falls through to the
 	// alert below whenever the fonts could not be resolved - a ROS-group query carries none - so a
 	// confirmation that cannot be drawn is never a reason the replace cannot run.
 	if (glyphResolved)
 	{
-		const bool approved = KBSGlyphConfirmDialog::Ask(checkedCount,
+		const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount,
 			KBSResultModel::GetCheckedChapterCount());
-		KBSGlyphConfirmDialog::ReleaseSides();
+		KBSReplaceConfirmDialog::ReleaseSides();
 		return approved;
 	}
 
@@ -385,7 +385,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	PMString findStr(opts->GetFindString(mode));
 	if (glyphMode)
 		AppendGlyphDescription(findStr, opts->GetFindGlyphID(),
-			glyphResolved ? KBSGlyphConfirmDialog::GetFindSide().fFontLabel : PMString());
+			glyphResolved ? KBSReplaceConfirmDialog::GetFindSide().fFontLabel : PMString());
 	findStr.SetTranslatable(kFalse);
 	// CAlert draws its message through a widget that reads a lone '&' as a keyboard accelerator -
 	// its own check box arrives spelled "&Don't show again". Without this a search for "A&B" is
@@ -414,7 +414,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 		// empty box looks like, and it reads the same way in every language.
 		if (opts->GetReplaceGlyphID() != kInvalidGlyphID)
 			AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID(),
-				glyphResolved ? KBSGlyphConfirmDialog::GetChangeSide().fFontLabel : PMString());
+				glyphResolved ? KBSReplaceConfirmDialog::GetChangeSide().fFontLabel : PMString());
 	}
 	else
 		replaceStr = opts->GetReplaceString(mode);
@@ -470,7 +470,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 		CAlert::eWarningIcon);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
-	KBSGlyphConfirmDialog::ReleaseSides();
+	KBSReplaceConfirmDialog::ReleaseSides();
 
 	// 1 = OK, 2 = Cancel.
 	return answer == 1;

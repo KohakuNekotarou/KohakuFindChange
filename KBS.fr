@@ -238,10 +238,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSGlyphConfirmDialogBoss,
+		kKBSReplaceConfirmDialogBoss,
 		kDialogBoss,
 		{
-			IID_IDIALOGCONTROLLER, kKBSGlyphConfirmDialogControllerImpl,
+			IID_IDIALOGCONTROLLER, kKBSReplaceConfirmDialogControllerImpl,
 		}
 	},
 
@@ -753,7 +753,7 @@ resource PNGA(kKBSPaletteIconResID) "KohakuFindChangeTab.png"
  * same). The glyph frame inherits EVEGenericPanelWidget, which already carries WidgetEveInfo, so
  * the frame takes part in that layout while its IControlView is ours.
  */
-type KBSGlyphConfirmDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKBSGlyphConfirmDialogBoss)
+type KBSReplaceConfirmDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKBSReplaceConfirmDialogBoss)
 {
 	WidgetEveInfo;
 };
@@ -1095,10 +1095,10 @@ resource VersionedScriptElementInfo(1)
  * EVEDefaultButtonWidget means "the default button", not "the OK button"; linksui's ProblemLinks
  * dialog likewise gives it a label of its own.
  */
-resource KBSGlyphConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
+resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 {
 	__FILE__, __LINE__,
-	kKBSGlyphConfirmDialogWidgetID,	// WidgetID
+	kKBSReplaceConfirmDialogWidgetID,	// WidgetID
 	kPMRsrcID_None,					// RsrcID
 	kBindNone,						// Binding
 	Frame(0, 0, 380, 300)			// Frame (l,t,r,b) - EVE resizes it to fit the children
@@ -1108,7 +1108,7 @@ resource KBSGlyphConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 		// ----- "Change N checked hits?" -----
 		EVEStaticTextWidget
 		(
-			kKBSGlyphConfirmCountWidgetID,	// WidgetId
+			kKBSReplaceConfirmCountWidgetID,	// WidgetId
 			kSysStaticTextPMRsrcId,			// RsrcId
 			kBindNone,						// Frame binding
 			Frame(0, 0, 340, 20)			// Frame (l,t,r,b)
@@ -1289,7 +1289,7 @@ resource KBSGlyphConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 		// ----- "The chapter is opened and left UNSAVED..." -----
 		EVEStaticTextWidget
 		(
-			kKBSGlyphConfirmUnsavedWidgetID,
+			kKBSReplaceConfirmUnsavedWidgetID,
 			kSysStaticTextPMRsrcId,
 			kBindNone,
 			Frame(0, 0, 340, 20)

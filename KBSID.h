@@ -79,7 +79,7 @@ DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
 // the font that defines it. The dialog is the stock kDialogBoss plus our controller (the shape
 // basicdialog and KESCL's offset dialog both use); the glyph widget is a generic panel whose
 // IControlView is ours, built the same way the hit row's colour cell is.
-DECLARE_PMID(kClassIDSpace, kKBSGlyphConfirmDialogBoss, kKBSPrefix + 11)
+DECLARE_PMID(kClassIDSpace, kKBSReplaceConfirmDialogBoss, kKBSPrefix + 11)
 DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
 // +13 was the missing-glyph scan's own text-walker client, from the measurement phase. Removed on
 // 2026-08-02 with the -2 route it existed to drive: the scan reads the composed wax and needs no
@@ -167,7 +167,7 @@ DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 // invitation to hand out an id twice. Removed rather than corrected - the live declarations are
 // the record of what is spent.)
 // The Glyph tab's replace confirmation: its dialog controller and its glyph-drawing view.
-DECLARE_PMID(kImplementationIDSpace, kKBSGlyphConfirmDialogControllerImpl, kKBSPrefix + 15)
+DECLARE_PMID(kImplementationIDSpace, kKBSReplaceConfirmDialogControllerImpl, kKBSPrefix + 15)
 DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
 // The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
 // they land on, so a book search's closed chapters do not hide their hits from the keyboard.
@@ -249,19 +249,19 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
 // The Glyph tab's replace confirmation. The two glyph frames are told apart by their WidgetID -
 // that is how KBSGlyphView knows which side it is drawing - so these two are not interchangeable.
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDialogWidgetID, kKBSPrefix + 8)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmCountWidgetID, kKBSPrefix + 9)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDialogWidgetID, kKBSPrefix + 8)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCountWidgetID, kKBSPrefix + 9)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindGlyphWidgetID, kKBSPrefix + 10)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeGlyphWidgetID, kKBSPrefix + 11)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindFontWidgetID, kKBSPrefix + 12)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeFontWidgetID, kKBSPrefix + 13)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 14)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmUnsavedWidgetID, kKBSPrefix + 16)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmUnsavedWidgetID, kKBSPrefix + 16)
 // UNUSED since 2026-08-01 - the "Don't show again" box it named is no longer in the dialog. Like
 // the string key beside it (kKBSGlyphConfirmDontShowKey), it is kept rather than freed: a widget id
 // that once shipped stays spent, so a saved workspace referring to it cannot bind to something else.
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The panel's illustrations, stacked at ONE frame to the right of the status message - exactly one
 // is visible and enabled at a time (KBSPanelIcon picks, and it is the ONLY place that knows which
 // state each belongs to). Adding another is one id here, one resource below, one row in kIcons.

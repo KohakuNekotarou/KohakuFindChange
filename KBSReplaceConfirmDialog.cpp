@@ -4,7 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  See KBSGlyphConfirmDialog.h. This file holds the resolution half - reading the two glyphs
+//  See KBSReplaceConfirmDialog.h. This file holds the resolution half - reading the two glyphs
 //  and their fonts out of the Find/Change settings. The dialog half arrives with the dialog.
 //
 //========================================================================================
@@ -40,17 +40,17 @@
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSGlyphConfirmDialog.h"
+#include "KBSReplaceConfirmDialog.h"
 
-KBSGlyphConfirmDialog::Side	KBSGlyphConfirmDialog::sFind;
-KBSGlyphConfirmDialog::Side	KBSGlyphConfirmDialog::sChange;
-bool						KBSGlyphConfirmDialog::sAccepted = false;
-int32						KBSGlyphConfirmDialog::sCheckedCount = 0;
-int32						KBSGlyphConfirmDialog::sChapterCount = 0;
+KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
+KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
+bool						KBSReplaceConfirmDialog::sAccepted = false;
+int32						KBSReplaceConfirmDialog::sCheckedCount = 0;
+int32						KBSReplaceConfirmDialog::sChapterCount = 0;
 
 /* ResolveSide
 */
-bool KBSGlyphConfirmDialog::ResolveSide(Text::GlyphID glyphID, const AttributeBossList* list,
+bool KBSReplaceConfirmDialog::ResolveSide(Text::GlyphID glyphID, const AttributeBossList* list,
 	IDataBase* db, Side& outSide)
 {
 	outSide = Side();
@@ -131,17 +131,17 @@ bool KBSGlyphConfirmDialog::ResolveSide(Text::GlyphID glyphID, const AttributeBo
 
 /* Resolve
 */
-bool KBSGlyphConfirmDialog::Resolve(IFindChangeOptions* opts)
+bool KBSReplaceConfirmDialog::Resolve(IFindChangeOptions* opts)
 {
-	KBSGlyphConfirmDialog::ReleaseSides();
+	KBSReplaceConfirmDialog::ReleaseSides();
 
 	if (opts == nil)
 		return false;
 
 	IDataBase* const db = opts->GetUIDAttrDB();
-	const bool okFind = KBSGlyphConfirmDialog::ResolveSide(opts->GetFindGlyphID(),
+	const bool okFind = KBSReplaceConfirmDialog::ResolveSide(opts->GetFindGlyphID(),
 		opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch), db, sFind);
-	const bool okChange = KBSGlyphConfirmDialog::ResolveSide(opts->GetReplaceGlyphID(),
+	const bool okChange = KBSReplaceConfirmDialog::ResolveSide(opts->GetReplaceGlyphID(),
 		opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch), db, sChange);
 
 	// The FIND side must resolve - without it there is nothing to show at all.
@@ -154,7 +154,7 @@ bool KBSGlyphConfirmDialog::Resolve(IFindChangeOptions* opts)
 	const bool changeIsEmpty = (opts->GetReplaceGlyphID() == kInvalidGlyphID);
 	if (!okFind || (!okChange && !changeIsEmpty))
 	{
-		KBSGlyphConfirmDialog::ReleaseSides();
+		KBSReplaceConfirmDialog::ReleaseSides();
 		return false;
 	}
 	return true;
@@ -162,7 +162,7 @@ bool KBSGlyphConfirmDialog::Resolve(IFindChangeOptions* opts)
 
 /* ReleaseSides
 */
-void KBSGlyphConfirmDialog::ReleaseSides()
+void KBSReplaceConfirmDialog::ReleaseSides()
 {
 	if (sFind.fFont != nil)
 		sFind.fFont->Release();
@@ -174,21 +174,21 @@ void KBSGlyphConfirmDialog::ReleaseSides()
 
 /* GetFindSide
 */
-const KBSGlyphConfirmDialog::Side& KBSGlyphConfirmDialog::GetFindSide()
+const KBSReplaceConfirmDialog::Side& KBSReplaceConfirmDialog::GetFindSide()
 {
 	return sFind;
 }
 
 /* GetChangeSide
 */
-const KBSGlyphConfirmDialog::Side& KBSGlyphConfirmDialog::GetChangeSide()
+const KBSReplaceConfirmDialog::Side& KBSReplaceConfirmDialog::GetChangeSide()
 {
 	return sChange;
 }
 
 /* GetSideForWidget
 */
-const KBSGlyphConfirmDialog::Side* KBSGlyphConfirmDialog::GetSideForWidget(const WidgetID& widgetID)
+const KBSReplaceConfirmDialog::Side* KBSReplaceConfirmDialog::GetSideForWidget(const WidgetID& widgetID)
 {
 	// Two frames, told apart by their id. An absent font means the frame draws empty, which is the
 	// right picture for an empty Change To box - the deletion has no glyph to show.
@@ -201,28 +201,28 @@ const KBSGlyphConfirmDialog::Side* KBSGlyphConfirmDialog::GetSideForWidget(const
 
 /* SetAccepted
 */
-void KBSGlyphConfirmDialog::SetAccepted(bool accepted)
+void KBSReplaceConfirmDialog::SetAccepted(bool accepted)
 {
 	sAccepted = accepted;
 }
 
 /* GetCheckedCount
 */
-int32 KBSGlyphConfirmDialog::GetCheckedCount()
+int32 KBSReplaceConfirmDialog::GetCheckedCount()
 {
 	return sCheckedCount;
 }
 
 /* GetChapterCount
 */
-int32 KBSGlyphConfirmDialog::GetChapterCount()
+int32 KBSReplaceConfirmDialog::GetChapterCount()
 {
 	return sChapterCount;
 }
 
 /* Ask
 */
-bool KBSGlyphConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
+bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
 {
 	// Nothing resolved: the caller falls back to the plain alert. The find side is the one that has
 	// to be there - an empty change side is the deletion request and draws as an empty frame.
@@ -262,21 +262,21 @@ bool KBSGlyphConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
 }
 
 //----------------------------------------------------------------------------------------
-// KBSGlyphConfirmDialogController - the dialog's own behaviour
+// KBSReplaceConfirmDialogController - the dialog's own behaviour
 //----------------------------------------------------------------------------------------
 
 /** Implements IDialogController for the Glyph tab's replace confirmation: fills the fields on
 	open, and records the answer on OK. There is nothing to validate - the dialog has no input.
 */
-class KBSGlyphConfirmDialogController : public CDialogController
+class KBSReplaceConfirmDialogController : public CDialogController
 {
 	typedef CDialogController inherited;
 public:
 	/** Constructor.
 		@param boss interface ptr from boss object on which this interface is aggregated.
 	*/
-	KBSGlyphConfirmDialogController(IPMUnknown* boss) : inherited(boss) {}
-	virtual ~KBSGlyphConfirmDialogController() {}
+	KBSReplaceConfirmDialogController(IPMUnknown* boss) : inherited(boss) {}
+	virtual ~KBSReplaceConfirmDialogController() {}
 
 	/** Write the counts, the font names and the Unicode values into the dialog.
 		@param dlgContext active context.
@@ -297,11 +297,11 @@ private:
 	void SetOptionalLine(const WidgetID& widgetID, const PMString& text);
 };
 
-CREATE_PMINTERFACE(KBSGlyphConfirmDialogController, kKBSGlyphConfirmDialogControllerImpl)
+CREATE_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialogControllerImpl)
 
 /* SetOptionalLine
 */
-void KBSGlyphConfirmDialogController::SetOptionalLine(const WidgetID& widgetID, const PMString& text)
+void KBSReplaceConfirmDialogController::SetOptionalLine(const WidgetID& widgetID, const PMString& text)
 {
 	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
 	if (panelData == nil)
@@ -325,40 +325,40 @@ void KBSGlyphConfirmDialogController::SetOptionalLine(const WidgetID& widgetID, 
 
 /* InitializeDialogFields
 */
-void KBSGlyphConfirmDialogController::InitializeDialogFields(IActiveContext* /*dlgContext*/)
+void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /*dlgContext*/)
 {
 	// The opening sentence, from the same string-table entries the plain alert uses - the same
 	// question, on a different screen. Each key is translated BEFORE the count goes in: a key only
 	// translates while it is the WHOLE string, and the count is real data, so it is marked
 	// untranslatable first.
 	PMString countStr;
-	countStr.AppendNumber(KBSGlyphConfirmDialog::GetCheckedCount());
+	countStr.AppendNumber(KBSReplaceConfirmDialog::GetCheckedCount());
 	countStr.SetTranslatable(kFalse);
-	PMString countLine(KBSGlyphConfirmDialog::GetCheckedCount() == 1
+	PMString countLine(KBSReplaceConfirmDialog::GetCheckedCount() == 1
 		? kKBSConfirmReplaceOneKey : kKBSConfirmReplaceManyKey);
 	countLine.Translate();
 	::ReplaceStringParameters(&countLine, countStr);
 	countLine.SetTranslatable(kFalse);
-	this->SetTextControlData(kKBSGlyphConfirmCountWidgetID, countLine);
+	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID, countLine);
 
 	// The closing sentence, the same way.
 	PMString chapterStr;
-	chapterStr.AppendNumber(KBSGlyphConfirmDialog::GetChapterCount());
+	chapterStr.AppendNumber(KBSReplaceConfirmDialog::GetChapterCount());
 	chapterStr.SetTranslatable(kFalse);
-	PMString unsaved(KBSGlyphConfirmDialog::GetChapterCount() <= 1
+	PMString unsaved(KBSReplaceConfirmDialog::GetChapterCount() <= 1
 		? kKBSConfirmUnsavedOneKey : kKBSConfirmUnsavedManyKey);
 	unsaved.Translate();
 	::ReplaceStringParameters(&unsaved, chapterStr);
 	unsaved.SetTranslatable(kFalse);
-	this->SetTextControlData(kKBSGlyphConfirmUnsavedWidgetID, unsaved);
+	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID, unsaved);
 
 	// The four lines under the two frames. All optional, and all for the same reason: an empty
 	// Change To box has no font to name and no Unicode to give, and an ALTERNATE form has no
 	// Unicode either (SnpInsertGlyph.cpp:291-299 records Adobe's own note about that). An empty
 	// line under one frame but not the other reads as a fault, so the line is hidden rather than
 	// blanked. Already marked untranslatable where they were built - they are data.
-	const KBSGlyphConfirmDialog::Side& findSide = KBSGlyphConfirmDialog::GetFindSide();
-	const KBSGlyphConfirmDialog::Side& changeSide = KBSGlyphConfirmDialog::GetChangeSide();
+	const KBSReplaceConfirmDialog::Side& findSide = KBSReplaceConfirmDialog::GetFindSide();
+	const KBSReplaceConfirmDialog::Side& changeSide = KBSReplaceConfirmDialog::GetChangeSide();
 	this->SetOptionalLine(kKBSGlyphConfirmFindFontWidgetID, findSide.fFontLabel);
 	this->SetOptionalLine(kKBSGlyphConfirmFindUnicodeWidgetID, findSide.fUnicode);
 	this->SetOptionalLine(kKBSGlyphConfirmChangeFontWidgetID, changeSide.fFontLabel);
@@ -374,12 +374,12 @@ void KBSGlyphConfirmDialogController::InitializeDialogFields(IActiveContext* /*d
 
 /* ApplyDialogFields
 */
-void KBSGlyphConfirmDialogController::ApplyDialogFields(IActiveContext* /*myContext*/,
+void KBSReplaceConfirmDialogController::ApplyDialogFields(IActiveContext* /*myContext*/,
 	const WidgetID& /*widgetId*/)
 {
 	// Only reached on OK - Cancel never gets here, which is exactly the behaviour wanted: the
 	// answer defaults to "no" and only OK turns it into "yes".
-	KBSGlyphConfirmDialog::SetAccepted(true);
+	KBSReplaceConfirmDialog::SetAccepted(true);
 }
 
-// End, KBSGlyphConfirmDialog.cpp.
+// End, KBSReplaceConfirmDialog.cpp.

@@ -11,7 +11,7 @@
 //  standard form its Unicode would map back to.
 //
 //  Which of the two glyphs it draws is decided by its own WidgetID (see
-//  KBSGlyphConfirmDialog::GetSideForWidget) - the prompt has exactly two frames, so a data
+//  KBSReplaceConfirmDialog::GetSideForWidget) - the prompt has exactly two frames, so a data
 //  interface of its own would be one indirection for nothing.
 //
 //  An EMPTY frame is a valid state: an empty Change To box means "delete every match", and a
