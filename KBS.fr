@@ -408,6 +408,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSFindMissingGlyphsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Find Overset: list the text that did not fit. The third sibling of the two above - all
+		// three run something over the current scope.
+		kKBSFindOversetActionID,
+		kKBSTargetMenuPath
+		kKBSFindOversetMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Separator between the search command and the toggles.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
@@ -510,6 +517,19 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSFindMissingGlyphsActionID,
 		kKBSFindMissingGlyphsMenuKey,	// "Find Missing Glyphs"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// The overset scan. Same flags as the two commands above, and for the same reasons: it runs
+		// over the same scope, so it must stay live while a book is open with no document window
+		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
+		// one place that decides whether it can run.
+		kKBSActionComponentBoss,
+		kKBSFindOversetActionID,
+		kKBSFindOversetMenuKey,			// "Find Overset"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

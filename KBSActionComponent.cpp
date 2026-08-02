@@ -52,6 +52,7 @@
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
 #include "KBSGlyphConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
 #include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
+#include "KBSOversetScanEngine.h"	// Find Overset
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -154,6 +155,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// glyph for a character. The engine puts its own summary on the status line, so there
 			// is nothing to report from here.
 			KBSGlyphScanEngine::Run();
+			break;
+		}
+
+		case kKBSFindOversetActionID:
+		{
+			// List the text that did not fit, over the same scope. The engine puts its own summary
+			// on the status line, so there is nothing to report from here.
+			KBSOversetScanEngine::Run();
 			break;
 		}
 
@@ -513,6 +522,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// state, and an action this loop never names stays DISABLED. (Found on the real
 			// application - the item appeared in the flyout but invoke() answered "Action is not
 			// enabled".)
+			listToUpdate->SetNthActionState(i, kEnabledAction);
+		}
+		else if (action == kKBSFindOversetActionID)
+		{
+			// Always live, for the same reasons the two commands above are: it runs over the same
+			// scope, and a book scan works with no document window open. Nothing about the current
+			// RESULTS decides whether a scan may run - it starts from the document, not from them.
+			//
+			// Named here explicitly for the same reason as the glyph scan: kCustomEnabling means
+			// this method owns the state, and an action this loop never names stays DISABLED.
 			listToUpdate->SetNthActionState(i, kEnabledAction);
 		}
 		else if (action == kKBSScopeBookActionID)

@@ -221,7 +221,9 @@ DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
 // overset text, by every route there is, so it must not be reachable at all. Like the numbers above
 // it is NOT reused - an id that once shipped stays spent.
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 16)
+// Find Overset: list the text that did not fit (2026-08-02). + 15 is a burnt number (see above),
+// so this is the first genuinely unused one.
+DECLARE_PMID(kActionIDSpace, kKBSFindOversetActionID, kKBSPrefix + 16)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 17)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 18)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 19)
@@ -282,6 +284,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// somethin
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
 // "Find Missing Glyphs": scan for notdef glyphs rather than for the Find/Change query.
 #define kKBSFindMissingGlyphsMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsMenuKey"
+// "Find Overset": list the text that did not fit rather than searching for anything.
+#define kKBSFindOversetMenuKey			kKBSStringPrefix "kKBSFindOversetMenuKey"
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
@@ -350,6 +354,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// somethin
 // The glyph scan is the search command's sibling, so it sits directly under it - above the scope
 // toggle's separator (1.3), which keeps the two "run something" commands together.
 #define kKBSFindMissingGlyphsMenuItemPosition	1.1
+// The overset scan is the third "run something over the scope" command, so it follows the other two
+// and still sits above the scope toggle's separator (1.3).
+#define kKBSFindOversetMenuItemPosition		1.2
 #define kKBSHidePrevChapterMenuItemPosition	2.0
 
 // The replace block sits below the existing toggles, above the About separator (10.0).
