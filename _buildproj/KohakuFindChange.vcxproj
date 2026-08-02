@@ -238,6 +238,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSScriptProvider.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphConfirmDialog.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSIconTip.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>

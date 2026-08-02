@@ -13,13 +13,29 @@
 // Interface includes:
 #include "IApplication.h"		// QueryPanelManager
 #include "IControlView.h"		// a panel IS a control view - what GetPanelFromWidgetID hands back
+#include "IPanelControlData.h"	// FindWidget - reaching the illustration inside the panel
 #include "IPanelMgr.h"			// GetPanelFromWidgetID / GetPaletteRefContainingPanel
 #include "ISession.h"
+#include "ISubject.h"			// AttachObserver / DetachObserver on the illustration
+#include "ITriStateControlData.h"	// the protocol a button announces its click on
 
 // General includes:
 #include "CObserver.h"			// the panel-boss observer that writes the tab on show
 #include "PaletteRefUtils.h"	// SetPaletteLabel - the tab's own label
 #include "PMString.h"
+
+// The plug-in's home page is opened through InDesign's own hyperlink plumbing rather than any OS
+// call of ours. GoToURL is PUBLIC_DECL, so no boss and no IID are needed to reach it.
+//
+// !! It is declared HERE rather than by including URLUtils.h, because that header is wrong: it puts
+//   GoToURL in "namespace URLUtils", while the exported symbol is
+//   "?GoToURL@GoToURLUtils@@YAXAEBVPMString@@F@Z" = GoToURLUtils::GoToURL(const PMString&, bool16).
+//   Including the header compiles and then fails to link. KESCM carries the same declaration for
+//   the same reason (KESCMActionComponent.cpp).
+namespace GoToURLUtils
+{
+	PUBLIC_DECL void GoToURL(const PMString& goToURL, bool16 isAGoURL);
+}
 
 // Project includes:
 #include "KBSID.h"
@@ -96,21 +112,78 @@ void KBSPanelTitle::Restore()
 	SetTabLabel(title);
 }
 
-/** Observer on kKBSPanelWidgetBoss. Its only job is the tab: the panel's widgets are built fresh
-    every time it is shown, and a palette is only laid out while it is visible - so opening the
-    panel is the moment the scope has to be written onto the tab. Without this the tab reads the
-    plain name until the user happens to toggle the scope or run a search.
+namespace
+{
 
-    Nothing is subscribed to, so Update is never called. */
+/** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
+    Silently does nothing when the widget is not there, which is the ordinary state while the panel
+    is being torn down. */
+void AttachToWidget(IPMUnknown* panelBoss, IObserver* observer, const WidgetID& widgetID, bool attach)
+{
+	InterfacePtr<IPanelControlData> panelData(panelBoss, UseDefaultIID());
+	if (panelData == nil)
+		return;
+
+	IControlView* view = panelData->FindWidget(widgetID);
+	if (view == nil)
+		return;
+
+	InterfacePtr<ISubject> subject(view, UseDefaultIID());
+	if (subject == nil)
+		return;
+
+	if (attach)
+		subject->AttachObserver(observer, ITriStateControlData::kDefaultIID);
+	else
+		subject->DetachObserver(observer, ITriStateControlData::kDefaultIID);
+}
+
+}
+
+/** Observer on kKBSPanelWidgetBoss. Two jobs, both tied to the panel being shown:
+
+      * The TAB's name. The panel's widgets are built fresh every time it is shown, and a palette is
+        only laid out while it is visible - so opening the panel is the moment the scope has to be
+        written onto the tab. Without this the tab reads the plain name until the user happens to
+        toggle the scope or run a search.
+
+      * The ILLUSTRATION's click. The picture beside the message opens the plug-in's home page (the
+        URL its tooltip shows). A button announces a click to whoever is listening on
+        ITriStateControlData, and this observer - already on the panel boss, already living exactly
+        as long as the widgets do - is who listens. */
 class KBSPanelObserver : public CObserver
 {
 public:
 	KBSPanelObserver(IPMUnknown* boss) : CObserver(boss) {}
 	virtual ~KBSPanelObserver() {}
 
-	virtual void AutoAttach() { KBSPanelTitle::Update(); }
-	virtual void AutoDetach() {}
-	virtual void Update(const ClassID& /*theChange*/, ISubject* /*theSubject*/, const PMIID& /*protocol*/, void* /*changedBy*/) {}
+	virtual void AutoAttach()
+	{
+		KBSPanelTitle::Update();
+		AttachToWidget(this, this, kKBSIconWidgetID, true);
+	}
+
+	virtual void AutoDetach()
+	{
+		AttachToWidget(this, this, kKBSIconWidgetID, false);
+	}
+
+	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& /*protocol*/, void* /*changedBy*/)
+	{
+		// kTrueStateMessage is the button going down; anything else here is not a click.
+		if (theChange != kTrueStateMessage || theSubject == nil)
+			return;
+
+		InterfacePtr<IControlView> view(theSubject, UseDefaultIID());
+		if (view == nil || view->GetWidgetID() != kKBSIconWidgetID)
+			return;
+
+		// Nothing in the document is touched - this is a request to the OS to open a browser - so
+		// there is no command and nothing to undo.
+		PMString url(kKBSRepoURL);
+		url.SetTranslatable(kFalse);
+		GoToURLUtils::GoToURL(url, kFalse);
+	}
 };
 
 CREATE_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)

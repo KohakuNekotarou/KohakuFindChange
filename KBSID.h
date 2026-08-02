@@ -85,7 +85,10 @@ DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
 // 2026-08-02 with the -2 route it existed to drive: the scan reads the composed wax and needs no
 // walker at all. NOT reused - a class id that once shipped stays spent.
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 13)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 14)
+// The panel's illustration: the system rollover icon button plus a tooltip of its own, so hovering
+// it says where clicking it goes. Same shape as kLinksUIButtonBoss in open/components/linksui, and
+// as KESCM's kKESCMIconWidgetBoss - which is where the panel this copies got it from.
+DECLARE_PMID(kClassIDSpace, kKBSIconWidgetBoss, kKBSPrefix + 14)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 15)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 16)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 17)
@@ -159,16 +162,10 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKBSPrefix + 13)
 // Scripting: the provider behind app.kbsStatus (see KBSScriptProvider.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 5)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 6)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 7)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 8)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 9)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 10)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 11)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 12)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 13)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 14)
+// (A commented block claiming + 5 ... + 14 were free sat here until 2026-08-02. It was left over
+// from the template and every one of those numbers is taken by the lines just above, so it was an
+// invitation to hand out an id twice. Removed rather than corrected - the live declarations are
+// the record of what is spent.)
 // The Glyph tab's replace confirmation: its dialog controller and its glyph-drawing view.
 DECLARE_PMID(kImplementationIDSpace, kKBSGlyphConfirmDialogControllerImpl, kKBSPrefix + 15)
 DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
@@ -178,7 +175,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
 // +18 was the missing-glyph scan's text-walker client implementation - removed 2026-08-02 with the
 // boss it implemented (see kKBSPrefix + 13 above). NOT reused.
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 18)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 19)
+// The panel illustration's tooltip: hovering the icon shows the URL clicking it opens, so the
+// picture is not a mystery button (see KBSIconTip.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSIconTipImpl, kKBSPrefix + 19)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 20)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 21)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 22)
@@ -258,7 +257,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 1
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmUnsavedWidgetID, kKBSPrefix + 16)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 18)
+// The panel's illustration, sitting to the right of the status message.
+DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 19)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 20)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 21)
@@ -367,6 +367,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 // panel's own resource ID (kSDKDefPanelResourceID), like the KESCL report panel's row resources.
 #define kKBSResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKBSResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
+
+// PNG resource ID for the panel's illustration. Its own number space (PNGA/PNGR), so it does not
+// have to dodge the view resource ids above. 1001 is where KESCM and KESCL start theirs.
+#define kKBSIconResID	1001
 
 // Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
 // VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live

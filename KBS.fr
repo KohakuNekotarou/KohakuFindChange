@@ -54,6 +54,7 @@
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
 #include "ScriptInfoTypes.fh"	// Property / Provider - the scripting definitions below
 #include "ScriptingID.h"		// kCoreScriptManagerBoss / kBaseScriptProviderBoss
+#include "TipsID.h"			// IID_ITIP - the tooltip on the panel's illustration
 
 // Project includes:
 #include "KBSID.h"
@@ -146,6 +147,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 * the scope has to be (re)written the moment the panel appears. See KBSPanelTitle.cpp.
 			 */
 			IID_IOBSERVER, kKBSPanelObserverImpl,
+		}
+	},
+
+	/*
+	 * The panel's illustration: the system rollover icon button plus a tooltip of our own, so
+	 * hovering the picture says where clicking it goes. Nothing else is added - the click itself is
+	 * heard by the panel's observer, which is already there for the tab name.
+	 *
+	 * Same shape as kLinksUIButtonBoss in open/components/linksui, and as KESCM's
+	 * kKESCMIconWidgetBoss - which is where this panel's layout comes from.
+	 */
+	Class
+	{
+		kKBSIconWidgetBoss,
+		kRollOverIconButtonBoss,
+		{
+			IID_ITIP, kKBSIconTipImpl,
 		}
 	},
 
@@ -677,6 +695,27 @@ type KBSResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKBSResultCh
 };
 
 /*
+ * The panel's illustration. KBSIconWidget rather than the plain RollOverIconButtonWidget so that it
+ * comes up on kKBSIconWidgetBoss and therefore carries IID_ITIP (the tooltip naming the URL).
+ */
+type KBSIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKBSIconWidgetBoss)
+{
+};
+
+/*
+ * The illustration's artwork, compiled into the plug-in. The same image is given to the normal
+ * (PNGA) and rollover (PNGR) states: the picture is a link, not a control that changes state, so
+ * there is no second look for it to take. KESCM does the same with its status icon.
+ *
+ * !! Replacing the .png alone does NOT reach a build - the build watches the .fr's timestamp, not
+ *   the image's, so the icon compile step is skipped and the old artwork is linked again (the
+ *   .pln's own date still moves, which is what makes this hard to spot). Touch this file after
+ *   swapping the picture.
+ */
+resource PNGA(kKBSIconResID) "Kohakuneko_OFF32.png"
+resource PNGR(kKBSIconResID) "Kohakuneko_OFF32.png"
+
+/*
  * The Glyph tab's replace confirmation. "DialogBoss" is the exotic name of what is really a widget;
  * WidgetEveInfo is what lets the dialog lay itself out with EVE (basicdialog's BscDlg.fr does the
  * same). The glyph frame inherits EVEGenericPanelWidget, which already carries WidgetEveInfo, so
@@ -739,18 +778,51 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 	kFalse,								// Draw dropshadow
 	kKBSPanelTitleKey,					// Panel name
 	{
-		// Status read-out at the top: the search summary (total hits / chapters). Bound to the
-		// top edge so it stays put as the panel resizes.
-		StaticTextWidget
+		// Status read-out at the top: the search summary (total hits / chapters, or a scan's own
+		// tally). THREE LINES and wrapping, not one line ellipsized (user's call 2026-08-02): the
+		// summaries outgrew a single line some time ago - a scan appends "Text in overset cannot be
+		// checked.", a book search can append the names of chapters it could not open - and the end
+		// of the sentence was the part being thrown away. Bound left/right/top so it widens with
+		// the panel and stays put vertically.
+		StaticMultiLineTextWidget
 		(
 			kKBSStaticTextWidgetID,			 // WidgetId
-			kSysStaticTextPMRsrcId,			 // RsrcId
+			kPMRsrcID_None,					 // RsrcId
 			kBindLeft | kBindRight | kBindTop, // Frame binding
-			Frame(5, 6, 295, 23),			 // Frame: left, top, right, bottom.
+			Frame(5, 6, 256, 58),			 // Frame: left, top, right, bottom (3 lines at ~17px)
 			kTrue, kTrue,					 // Visible, Enabled
-			kAlignLeft, kEllipsizeEnd, kTrue // Alignment, ellipsize style, convert ampersands
-			kKBSStaticTextKey,				// Initial text.
-			0								// No associated widget
+			// StaticTextAttributes: alignment, ellipsize style, convert ampersands. kDontEllipsize
+			// because a wrapping box has somewhere to put the rest of the sentence - the whole point
+			// of the change - and a "..." would throw it away again on the last line.
+			kAlignLeft, kDontEllipsize, kTrue,
+			// StaticMultiLineTextAttr: scroll bar widget, font, pixels between lines, inset.
+			// No scroll bar: three lines are the budget, and one that appeared would sit on top of
+			// the illustration. The rest are KESCM's values for the same kind of box.
+			kInvalidWidgetID,
+			kPaletteWindowFontId,
+			4,
+			2, 0,
+			kKBSStaticTextKey				// Initial text.
+		),
+
+		/* The panel's illustration, to the right of the message: hover it for the plug-in's home
+		 * page, click it to go there (KBSIconTip supplies the tip text, the panel's own observer
+		 * hears the click). Bound RIGHT so it keeps its place beside the message as the panel is
+		 * resized - KESCM binds its own to the top alone, but that panel does not resize the way
+		 * this one does.
+		 *
+		 * 32x32, sitting on the BOTTOM of the message block (top 26 = 58 - 32), which is where
+		 * KESCM puts its own: a picture hanging off the top of a part-empty message box reads as
+		 * detached from it.
+		 */
+		KBSIconWidget
+		(
+			kKBSIconWidgetID,
+			kKBSIconResID, kKBSPluginID,
+			kBindRight | kBindTop,
+			Frame(260, 26, 292, 58),		// 4px clear of the text, 8px in from the panel's edge
+			kTrue, kTrue,
+			kADBEIconSuiteButtonType,
 		),
 
 		// Result tree: chapter -> hit rows, filling the rest of the panel and bound to all four
@@ -760,7 +832,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		(
 			kKBSResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindAll,						// Frame binding: grow with the panel
-			Frame(4, 26, 296, 356),			// Frame (below the status line to the panel's edges)
+			Frame(4, 61, 296, 356),			// Frame (below the message block to the panel's edges)
 			kTrue, kTrue,					// Visible, Enabled
 			kTrue,							// EraseBeforeDraw
 			kInterfacePaletteFill,			// InterfaceColor
