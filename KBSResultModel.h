@@ -68,11 +68,21 @@ namespace KBSResultModel
 								// Layers" is on, and then the text is composed and jumpable but
 								// draws nothing, so the row has to say why the page looks empty.
 
-		PMString	fontName;	// the font that had no glyph for this text, drawn at the END of the
-								// row. Empty for a Find/Change hit: only a glyph scan fills it,
-								// because there the font IS the answer - a box almost always means
-								// "this font does not have this character", and the fix is to apply
-								// one that does.
+		PMString	fontName;	// the font that had no glyph for this text. Empty for a Find/Change
+								// hit: only a glyph scan fills it, because there the font IS the
+								// answer - a box almost always means "this font does not have this
+								// character", and the fix is to apply one that does.
+								//
+								// It is the tree's FONT LEVEL that says it now, not the row: the
+								// name was drawn at the end of every row until 2026-08-02, when the
+								// hits were grouped under it instead (see FontGroup).
+
+		int32		fontGroup;	// which of its chapter's fontGroups this hit belongs to, and where it
+		int32		fontGroupPos;	// sits inside that group. Both -1 when the chapter has no groups
+								// at all - a Find/Change result names no font, and its tree stays
+								// the three levels it has always had. Filled by AppendChapter; the
+								// tree reads them to answer "who is my parent" and "which child am
+								// I" without searching.
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
@@ -110,24 +120,43 @@ namespace KBSResultModel
 		// Change Checked a whole-document rewrite one keystroke away. Ticking is now something the
 		// user does on purpose - and cheap to do, since the right-click menu gained Check All per
 		// document and per book on 2026-08-01, which is what made the old default unnecessary.
-		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), storyUID(kInvalidUID),
+		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
+				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
 				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0),
 				storyChangeCount(0) {}
 	};
 
+	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
+
+	    The tree has a font level because a box means "this font has no glyph for this character",
+	    so the font IS the unit a fix applies to - the official preflight rule offers "Apply a font
+	    that has the glyph" for exactly the same reason.
+
+	    hitIndices index the chapter's own hits vector, ASCENDING, which is what lets the display cap
+	    be applied to a group with a lower_bound rather than a scan. */
+	struct FontGroup
+	{
+		PMString			fontName;	// as the user sees it in the font menu (family + style)
+		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
+	};
+
 	/** One chapter that holds at least one hit. */
 	struct Chapter
 	{
-		PMString			name;	// the chapter's display name (its file name)
-		UIDRef				docRef;	// current binding (Task 3 jump / reopen)
-		IDFile				file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
-		std::vector<Hit>	hits;
+		PMString				name;	// the chapter's display name (its file name)
+		UIDRef					docRef;	// current binding (Task 3 jump / reopen)
+		IDFile					file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
+		std::vector<Hit>		hits;
+		std::vector<FontGroup>	fontGroups;	// empty = this chapter has NO font level (Find/Change)
 	};
 
 	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
 	    then appends each chapter as it finishes. Only chapters with >=1 hit should be appended (empty
 	    branches are never shown).
+
+	    This is also where the chapter's FONT GROUPS are built, from the hits' own fontName - so a
+	    caller fills in nothing but the hits, and no result can reach the tree ungrouped.
 	    (A SetResults that swapped the whole vector in at once sat beside this until 2026-07-30, by
 	    which time nothing called it: two entry points for filling the same model, one of them also
 	    resetting the report flag, was a difference waiting to be tripped over.) */
@@ -211,6 +240,36 @@ namespace KBSResultModel
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
 
+	/** How many FONT rows this chapter shows - the groups that still have a displayed hit under the
+	    panel's cap. ZERO means this chapter has no font level at all, which is how the tree knows to
+	    hang the hits off the chapter itself: a Find/Change result names no font.
+
+	    The groups that lose everything to the cap are the LAST ones (they are in first-appearance
+	    order, and the cap keeps a prefix of the chapter's hits), so the displayed groups are the
+	    first N - which is why GetNthChild can ask for one by position. */
+	int32 GetDisplayFontCount(int32 chapterIdx);
+
+	/** How many hits are DISPLAYED under one font group - its share of the chapter's own display
+	    cap. 0 for an index out of range, and for a group the cap cut off entirely. */
+	int32 GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx);
+
+	/** A font node's display: the font's name and its FULL hit count (uncapped, so the row can say
+	    "shown / total" the way a chapter row does). A group whose font could not be named answers
+	    "(unknown font)" rather than an empty label. false = index out of range. */
+	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
+
+	/** The 'nth' hit of one font group, as an index into the CHAPTER's hits - the translation the
+	    tree needs, since a node names its hit by the chapter-wide index throughout. -1 = out of
+	    range. */
+	int32 GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth);
+
+	/** Which font group a hit belongs to, and where it sits inside that group: the tree's "who is my
+	    parent" and "which child am I". -1 for an index out of range, and for a chapter with no
+	    groups - which is the same answer, and means the same thing to the tree: hang off the
+	    chapter. */
+	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
+	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
+
 	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
 	struct RowDisplay
 	{
@@ -250,7 +309,7 @@ namespace KBSResultModel
 
 	        #  <book name>  <from book>  <showing outcome>  <chapters>  <total hits>
 	        <chapter idx>  <chapter name>  <hit idx>  <locator>  <accent>  <pre>  <match>  <post>
-	            <checked>  <replaced>  <locked>  <outcome word>
+	            <font name>  <checked>  <replaced>  <locked>  <outcome word>  <font group>
 
 	    Tab, return and backslash inside the text are escaped (\t, \n, \\), so one hit is always
 	    exactly one line with a fixed column count - a match CAN run across a paragraph break. */

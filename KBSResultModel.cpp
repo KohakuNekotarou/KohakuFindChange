@@ -15,6 +15,7 @@
 // General includes:
 #include "Utils.h"
 
+#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 #include <string>		// std::string - DescribeAllRows builds its block in UTF-8 bytes
 
@@ -88,6 +89,75 @@ namespace
 		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
 	}
 
+	// Group a chapter's hits by the font that had no glyph for them - the tree's font level.
+	//
+	// A chapter is grouped only when at least one of its hits NAMES a font: a Find/Change result
+	// names none, and its tree stays the three levels it has always had. The question is asked of the
+	// HITS rather than of gResultKind on purpose - SetResultKind happens to run before the chapters
+	// are appended today (KBSGlyphScanEngine.cpp:505-512), and a rule resting on that order is a rule
+	// that breaks silently the day the order changes.
+	//
+	// Once a chapter IS grouped, EVERY hit joins a group - including one whose font name came back
+	// empty, which gets a group of its own rather than being left without a parent. A hit with no
+	// parent is a hit that vanishes from the tree; a row reading "(unknown font)" is one the user can
+	// still see and click.
+	void BuildFontGroups(KBSResultModel::Chapter& chapter)
+	{
+		chapter.fontGroups.clear();
+
+		bool anyFont = false;
+		for (size_t i = 0; i < chapter.hits.size(); ++i)
+		{
+			if (!chapter.hits[i].fontName.IsEmpty())
+			{
+				anyFont = true;
+				break;
+			}
+		}
+
+		if (!anyFont)
+		{
+			for (size_t i = 0; i < chapter.hits.size(); ++i)
+			{
+				chapter.hits[i].fontGroup = -1;
+				chapter.hits[i].fontGroupPos = -1;
+			}
+			return;
+		}
+
+		// The hits arrive in PAGE order, so walking them in order leaves the groups in
+		// first-appearance order - which is the order the panel shows them in (user's call
+		// 2026-08-02). The linear search over the groups runs over a handful of entries: a document
+		// broken in dozens of different fonts is not a case worth carrying a map for.
+		for (size_t i = 0; i < chapter.hits.size(); ++i)
+		{
+			KBSResultModel::Hit& hit = chapter.hits[i];
+
+			int32 found = -1;
+			for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
+			{
+				if (chapter.fontGroups[g].fontName.Compare(kTrue, hit.fontName) == 0)
+				{
+					found = static_cast<int32>(g);
+					break;
+				}
+			}
+			if (found < 0)
+			{
+				KBSResultModel::FontGroup group;
+				group.fontName = hit.fontName;
+				group.fontName.SetTranslatable(kFalse);
+				chapter.fontGroups.push_back(group);
+				found = static_cast<int32>(chapter.fontGroups.size()) - 1;
+			}
+
+			KBSResultModel::FontGroup& group = chapter.fontGroups[found];
+			hit.fontGroup = found;
+			hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
+			group.hitIndices.push_back(static_cast<int32>(i));
+		}
+	}
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -104,6 +174,9 @@ namespace
 void KBSResultModel::AppendChapter(const Chapter& chapter)
 {
 	gChapters.push_back(chapter);
+	// Grouped on the way in, on the copy the model owns - the argument is const, and the groups index
+	// the hits they are built from, so they have to be built where those hits are going to live.
+	BuildFontGroups(gChapters.back());
 }
 
 void KBSResultModel::Clear()
@@ -230,6 +303,86 @@ bool KBSResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 	outName.SetTranslatable(kFalse);
 	outHitCount = static_cast<int32>(c.hits.size());
 	return true;
+}
+
+int32 KBSResultModel::GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+	const Chapter& c = gChapters[chapterIdx];
+	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
+		return 0;
+
+	// The chapter's own share of the cap, then this group's share of that. hitIndices is ascending,
+	// so the count is simply where the cap falls inside it.
+	const int32 shown = GetDisplayHitCount(chapterIdx);
+	const std::vector<int32>& idx = c.fontGroups[fontIdx].hitIndices;
+	return static_cast<int32>(std::lower_bound(idx.begin(), idx.end(), shown) - idx.begin());
+}
+
+int32 KBSResultModel::GetDisplayFontCount(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+	const Chapter& c = gChapters[chapterIdx];
+
+	int32 shownGroups = 0;
+	for (int32 g = 0; g < static_cast<int32>(c.fontGroups.size()); ++g)
+	{
+		if (GetDisplayFontHitCount(chapterIdx, g) > 0)
+			++shownGroups;
+	}
+	return shownGroups;
+}
+
+bool KBSResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
+		return false;
+
+	const FontGroup& group = c.fontGroups[fontIdx];
+	outName = group.fontName;
+	if (outName.IsEmpty())
+		outName = "(unknown font)";		// the font could not be named - see BuildFontGroups
+	outName.SetTranslatable(kFalse);
+	outHitCount = static_cast<int32>(group.hitIndices.size());
+	return true;
+}
+
+int32 KBSResultModel::GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return -1;
+	const Chapter& c = gChapters[chapterIdx];
+	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
+		return -1;
+	const std::vector<int32>& idx = c.fontGroups[fontIdx].hitIndices;
+	if (nth < 0 || nth >= static_cast<int32>(idx.size()))
+		return -1;
+	return idx[nth];
+}
+
+int32 KBSResultModel::GetHitFontGroup(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return -1;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return -1;
+	return c.hits[hitIdx].fontGroup;
+}
+
+int32 KBSResultModel::GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return -1;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return -1;
+	return c.hits[hitIdx].fontGroupPos;
 }
 
 bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
@@ -359,6 +512,11 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 			AppendNumberUTF8(buf, row.locked ? 1 : 0);
 			buf += "\t";
 			buf += OutcomeWord(row.outcome);
+			buf += "\t";
+			// Which FONT row of the tree this hit hangs under (-1 = this chapter has no font level).
+			// The row already carries the font's NAME, so this adds one thing the name cannot prove:
+			// that the grouping and its order are what the panel is actually drawing.
+			AppendNumberUTF8(buf, GetHitFontGroup(ci, hi));
 		}
 	}
 
