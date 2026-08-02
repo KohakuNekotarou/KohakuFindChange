@@ -27,13 +27,17 @@ neither of which InDesign reports anywhere but preflight.
   panel but does not make that book "active", so asking for the active book would silently target
   the wrong one. Falls back to the active book when the Book panel is iconised or closed.
 - In book scope, chapters that are closed are opened **windowless and with the UI suppressed**
-  (read-only walk, dirty-guarded so a chapter never comes out modified) and are **kept open** so row
-  jumps and a repeat run do not pay for the load again. They are released when a different book is
-  used, when that book is closed, or at shutdown. A chapter that cannot be opened is **named in the
-  summary with the book's own reason**, never quietly dropped.
+  (read-only walk, dirty-guarded so a chapter never comes out modified) — **one at a time, and closed
+  again the moment that chapter has been walked**. A run therefore holds at most one chapter of its
+  own and leaves nothing open behind it, so no `.indd` stays locked. Chapters you had open yourself
+  are never touched. What that costs is a document load the first time you click a row into a chapter
+  (rows carry their chapter's file, so the jump reopens it); what it buys is that searching a
+  twenty-chapter book no longer leaves twenty hidden documents in the session. A chapter that cannot
+  be opened is **named in the summary with the book's own reason**, never quietly dropped.
 - **A modal progress bar with a Cancel button** covers every run, in both scopes, showing
-  `Chapter n / N` over the chapter's name. It is sized in stories (or, for a replace, in hits) rather
-  than in chapters, so it keeps moving through a long one. Cancel is honoured between chapters —
+  `Chapter n / N` over the chapter's name. Every chapter gets an equal slice of the bar — a chapter's
+  size cannot be asked for before it is opened — and the search subdivides its own slice by story, so
+  it keeps moving through a long chapter. (A replace is still sized in hits.) Cancel is honoured between chapters —
   asking inside one would run UI work in the middle of a text walk — so a single huge chapter
   finishes first.
 - Only one run at a time: while any of the three is going, the whole flyout is greyed out, and a
@@ -190,9 +194,10 @@ nothing on them to rewrite.
 
 - **Close the searched document** and a document-scope result set is retired at once (a row naming a
   closed document would still jump, and `Change Checked` would still reopen it to write in it).
-- **Close the book** and a book-scope result set is retired, and the chapters KBS opened windowless
-  are closed with it — leaving them open would keep their `.indd` files locked for the rest of the
-  session. Neither happens while a run is going: the question is deferred until it finishes.
+- **Close the book** and a book-scope result set is retired, and any chapter KBS still has open for it
+  is closed with it — leaving one open would keep its `.indd` locked for the rest of the session. (A
+  run closes its own chapters as it goes, so what this catches is a chapter a row jump or a replace
+  reopened.) Neither happens while a run is going: the question is deferred until it finishes.
 - A book chapter you close yourself is *not* dropped from the results: it carries its file, so KBS
   reopens it when a jump or a replace needs it. Nothing is written blind — the same-occurrence test
   above still has to pass.

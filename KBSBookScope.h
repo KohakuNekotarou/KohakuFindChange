@@ -4,15 +4,21 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Book-wide search scope. Turns the active book (IBookManager::GetCurrentActiveBook) into a
-//  list of searchable chapter documents. Chapters that are not open are opened WITHOUT a
-//  layout window - the same windowless open InDesign's own TOC/index-across-book machinery
-//  uses (Utils<IBookUtils>::OpenOneDocument) - and stay held open until ReleaseHeldDocs.
+//  Book-wide search scope. Turns the book the book panel is showing into a list of searchable
+//  chapter documents. Chapters that are not open are opened WITHOUT a layout window and with the
+//  UI suppressed - ONE AT A TIME. A run opens a chapter when its turn comes (OpenChapterDoc) and
+//  hands it straight back once it has been walked (ReleaseHeldDoc), so a book run of any size
+//  holds at most one chapter of its own and locks at most one .indd.
 //
-//  Ported from KESCL's KESCLBookScope (KESCL is left untouched). This Step-1 subset keeps only
-//  what a count needs: enumerate the book's chapters, hold the ones we opened, and release
-//  them afterwards. The jump-time reopen/early-close machinery arrives with the result panel.
-//  KBS always searches the active book, so KESCL's "Search book" toggle is dropped here.
+//  Chapters the user already had open are never held and never closed.
+//
+//  What stays held BETWEEN runs is only what a jump or a replace reopened, which is why
+//  ReleaseHeldDocs (all of them) still exists: a jump means the user is looking at that chapter,
+//  so it is kept until the results are let go (ReleaseSearchedBook), the book is closed, or the
+//  application quits.
+//
+//  Ported from KESCL's KESCLBookScope (KESCL is left untouched). KBS always searches the book the
+//  panel is showing, so KESCL's "Search book" toggle is dropped here.
 //
 //========================================================================================
 
@@ -66,18 +72,6 @@ namespace KBSBookScope
 		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
 	};
 
-	/** List the active book's chapters as open documents, in book order. Chapters that are not
-	    open are opened windowless here (and remembered, so ReleaseHeldDocs can close them
-	    again); chapters already open are used as they are.
-
-	    @param outDocs      the chapters as (document, file name) pairs; empty on failure.
-	    @param outBookName  the active book's title, for status messages.
-	    @param outSkipped   optional: chapters that could not be opened, each with the book's own
-	                        reason. Pass nil to ignore them (they are still left out of outDocs).
-	    @return true when there is an active book with at least one openable chapter. */
-	bool GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
-		std::vector<SkippedChapter>* outSkipped = nil);
-
 	/** List the active book's chapters WITHOUT opening anything. Each entry comes back with its
 	    file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
 	    in. Also resolves WHICH book the run is against (see GetSearchedBookPath) and releases
@@ -96,7 +90,7 @@ namespace KBSBookScope
 	    @return true when ioChapter.docRef is usable. */
 	bool OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChapter>* outSkipped);
 
-	/** Name the chapters GetBookChapterDocs could not hand over, and what the book says about them,
+	/** Name the chapters OpenChapterDoc could not hand over, and what the book says about them,
 	    appending to a status line. Reported rather than dropped: a chapter missing from the list is
 	    indistinguishable from a chapter that simply held no findings, and nothing on screen would
 	    let the user tell them apart.

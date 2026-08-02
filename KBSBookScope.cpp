@@ -837,29 +837,4 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 	return false;
 }
 
-bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
-	std::vector<SkippedChapter>* outSkipped)
-{
-	// TRANSITIONAL: the engines are being moved to the one-chapter-at-a-time form
-	// (ListBookChapters + OpenChapterDoc + ReleaseHeldDoc). This keeps the old all-at-once shape
-	// working meanwhile, built out of the new pieces so there is only one open path to maintain.
-	if (outSkipped != nil)
-		outSkipped->clear();
-
-	std::vector<ChapterDoc> listed;
-	if (!ListBookChapters(listed, outBookName))
-	{
-		outDocs.clear();
-		return false;
-	}
-
-	outDocs.clear();
-	for (size_t i = 0; i < listed.size(); ++i)
-	{
-		if (OpenChapterDoc(listed[i], outSkipped))
-			outDocs.push_back(listed[i]);
-	}
-	return !outDocs.empty();
-}
-
 // End, KBSBookScope.cpp.
