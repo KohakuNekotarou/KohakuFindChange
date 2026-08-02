@@ -73,6 +73,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSGlyphConfirmArrowKey,		"->",
                 kKBSGlyphConfirmDontShowKey,	"Don't show again",
 
+                // ----- "Save after replace" (the box, and what it does besides saving)
+                kKBSSaveAfterReplaceKey,		"Save each chapter after replace",
+                kKBSSaveAfterReplaceNoteKey,	"Chapters KBS opened are closed after saving when Hide Previous Chapter is on.",
+
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n"
                 	"Adobe InDesign C++ SDK Plug-In.\n"

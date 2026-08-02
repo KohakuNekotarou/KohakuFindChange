@@ -95,6 +95,10 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSGlyphConfirmArrowKey,		"→",
                 kKBSGlyphConfirmDontShowKey,	"次回から表示しない",
 
+                // ----- "Save after replace" (the box, and what it does besides saving)
+                kKBSSaveAfterReplaceKey,		"置換後保存",
+                kKBSSaveAfterReplaceNoteKey,	"Hide Previous Chapter が ON のとき、KBS が開いた章は保存後に閉じます。",
+
               // ----- Error strings
 
                 // ----- Misc strings

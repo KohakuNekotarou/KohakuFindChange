@@ -95,8 +95,10 @@ public:
 		    Find/Change dialog, not from this panel, so this is the only place the user sees what is
 		    about to be written - and how many hits will change. An empty change string is spelled
 		    out: deleting the matches is a legitimate request, but never a surprise.
+		    @param outSaveAfterReplace OUT: did the user tick "save after replace"? Only written when
+		           they approve; false is the every-time default.
 		    @return true to go ahead. */
-		bool ConfirmReplace(int32 checkedCount);
+		bool ConfirmReplace(int32 checkedCount, bool& outSaveAfterReplace);
 		
 
 
@@ -231,10 +233,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSResultTree::ShowStatus(nothing);
 				break;
 			}
-			if (!this->ConfirmReplace(checkedCount))
+			// false unless the user ticks the box, and it starts false on every run - the prompt
+			// draws the box off and nothing remembers it.
+			bool saveAfterReplace = false;
+			if (!this->ConfirmReplace(checkedCount, saveAfterReplace))
 				break;
 
 			PMString summary;
+			(void)saveAfterReplace;		// wired to the engine in the next step
 			KBSReplaceEngine::ReplaceChecked(summary);
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
 			KBSResultTree::ShowStatus(summary);
@@ -317,7 +323,7 @@ static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID, const P
 
 /* ConfirmReplace
 */
-bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
+bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterReplace)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
@@ -461,7 +467,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// glyphs when they resolved, the assembled sentences when they did not.
 	PMString glyphLayout;
 	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount, chapterCount,
-		glyphResolved ? glyphLayout : msg);
+		glyphResolved ? glyphLayout : msg, outSaveAfterReplace);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
 	KBSReplaceConfirmDialog::ReleaseSides();

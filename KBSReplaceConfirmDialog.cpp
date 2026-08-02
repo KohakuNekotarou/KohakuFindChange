@@ -25,6 +25,7 @@
 #include "ISession.h"			// GetExecutionContextSession
 #include "ITextAttrFont.h"		// the font STYLE name  (kTextAttrFontStyleBoss)
 #include "ITextAttrUID.h"		// the font FAMILY uid  (kTextAttrFontUIDBoss)
+#include "ITriStateControlData.h"	// reading the "save after replace" box on OK
 
 // General includes:
 #include "AttributeBossList.h"
@@ -48,6 +49,7 @@ bool						KBSReplaceConfirmDialog::sAccepted = false;
 int32						KBSReplaceConfirmDialog::sCheckedCount = 0;
 int32						KBSReplaceConfirmDialog::sChapterCount = 0;
 PMString					KBSReplaceConfirmDialog::sMessage;
+bool						KBSReplaceConfirmDialog::sSaveAfterReplace = false;
 
 /* ResolveSide
 */
@@ -200,6 +202,13 @@ const KBSReplaceConfirmDialog::Side* KBSReplaceConfirmDialog::GetSideForWidget(c
 	return nil;
 }
 
+/* SetSaveAfterReplace
+*/
+void KBSReplaceConfirmDialog::SetSaveAfterReplace(bool save)
+{
+	sSaveAfterReplace = save;
+}
+
 /* SetAccepted
 */
 void KBSReplaceConfirmDialog::SetAccepted(bool accepted)
@@ -230,7 +239,8 @@ const PMString& KBSReplaceConfirmDialog::GetMessage()
 
 /* Ask
 */
-bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const PMString& message)
+bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const PMString& message,
+	bool& outSaveAfterReplace)
 {
 	// The glyph layout needs a resolved find side to draw - an empty CHANGE side is the deletion
 	// request and draws as an empty frame, but with nothing on the find side there is no prompt.
@@ -249,6 +259,10 @@ bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const 
 	sMessage = message;
 	sMessage.SetTranslatable(kFalse);
 	sAccepted = false;
+	// OFF every time. Nothing writes this to the widget on open and nothing remembers it between
+	// runs: the box overwrites the user's files, so it is asked per run rather than configured
+	// once (user's call, 2026-08-02).
+	sSaveAfterReplace = false;
 
 	InterfacePtr<IApplication> application(GetExecutionContextSession()->QueryApplication());
 	if (application == nil)
@@ -272,6 +286,9 @@ bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const 
 	// by which time the controller has recorded the answer.
 	dialog->Open();
 
+	// Both answers come back the same way: only ApplyDialogFields - which Cancel never reaches -
+	// writes either of them.
+	outSaveAfterReplace = sSaveAfterReplace;
 	return sAccepted;
 }
 
@@ -446,8 +463,11 @@ void KBSReplaceConfirmDialogController::ApplyDialogFields(IActiveContext* /*myCo
 	const WidgetID& /*widgetId*/)
 {
 	// Only reached on OK - Cancel never gets here, which is exactly the behaviour wanted: the
-	// answer defaults to "no" and only OK turns it into "yes".
+	// answer defaults to "no" and only OK turns it into "yes". The check box is read on the same
+	// terms: a run that was not approved cannot have asked for a save either.
 	KBSReplaceConfirmDialog::SetAccepted(true);
+	KBSReplaceConfirmDialog::SetSaveAfterReplace(
+		this->GetTriStateControlData(kKBSReplaceConfirmSaveWidgetID) == ITriStateControlData::kSelected);
 }
 
 // End, KBSReplaceConfirmDialog.cpp.

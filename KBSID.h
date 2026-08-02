@@ -274,8 +274,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // rather than child by child, so EVE closes the gap they leave.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmMessageWidgetID, kKBSPrefix + 21)
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 22)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 23)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 24)
+// The "save after replace" box and the line under it. Session-free: the box is drawn OFF every
+// time the prompt opens (user's call, 2026-08-02) because it overwrites the user's files, and a
+// setting that remembers is a setting that gets forgotten about.
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveWidgetID, kKBSPrefix + 23)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 25)
 
 
@@ -353,6 +356,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 
 // Reset All Warning Dialogs). Left in place, with its entry in both string tables, so that putting
 // the box back is a resource change rather than a translation round; nothing reads it today.
 #define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
+
+// The "save after replace" box and its note. Translated for the same reason the rest of this
+// prompt is: this is where the user authorises a rewrite of their text, and now also where they
+// authorise OVERWRITING the files it lives in. The status line that reports what happened stays
+// English, like every other status line here.
+#define kKBSSaveAfterReplaceKey			kKBSStringPrefix "kKBSSaveAfterReplaceKey"
+#define kKBSSaveAfterReplaceNoteKey		kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
 
 // Menu item positions:
 

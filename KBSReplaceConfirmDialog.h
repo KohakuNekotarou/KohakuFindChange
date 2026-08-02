@@ -95,12 +95,19 @@ public:
 		@param checkedCount how many hits will be rewritten (the opening sentence, glyph layout).
 		@param chapterCount how many documents will be written to (the closing sentence, glyph).
 		@param message      the whole prompt, for the Text / GREP layout. Empty = glyph layout.
+		@param outSaveAfterReplace OUT: was the "save after replace" box ticked? Written only when
+		                    the user approves - a Cancel leaves the caller's own value alone.
 		@return true when the user approved the rewrite.
 	*/
-	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message);
+	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message,
+		bool& outSaveAfterReplace);
 
 	/** The controller's way back: OK sets it, Ask() reads it. */
 	static void SetAccepted(bool accepted);
+
+	/** The controller's way back for the check box: OK reads the box and states it here. Never
+		called on Cancel, which is what leaves the answer at its every-time default of false. */
+	static void SetSaveAfterReplace(bool save);
 
 	/** What the controller was told to show. Read by InitializeDialogFields. */
 	static int32 GetCheckedCount();
@@ -119,6 +126,7 @@ private:
 	static int32	sCheckedCount;
 	static int32	sChapterCount;
 	static PMString	sMessage;
+	static bool		sSaveAfterReplace;
 
 	/** Fill one side from one attribute list.
 		@param glyphID the glyph the caller already read off the options.
