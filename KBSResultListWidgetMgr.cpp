@@ -405,7 +405,8 @@ private:
 			// draws the row right after.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText);
+				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText,
+					row.fontName);
 			cell->Invalidate();
 		}
 	}

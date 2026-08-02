@@ -245,6 +245,7 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.preText = h.preText;
 	out.matchText = h.matchText;
 	out.postText = h.postText;
+	out.fontName = h.fontName;
 	out.checked = h.checked;
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
@@ -348,6 +349,8 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 			AppendEscapedUTF8(buf, row.matchText);
 			buf += "\t";
 			AppendEscapedUTF8(buf, row.postText);
+			buf += "\t";
+			AppendEscapedUTF8(buf, row.fontName);
 			buf += "\t";
 			AppendNumberUTF8(buf, row.checked ? 1 : 0);
 			buf += "\t";

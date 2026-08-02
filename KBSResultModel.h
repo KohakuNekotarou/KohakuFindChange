@@ -68,6 +68,12 @@ namespace KBSResultModel
 								// Layers" is on, and then the text is composed and jumpable but
 								// draws nothing, so the row has to say why the page looks empty.
 
+		PMString	fontName;	// the font that had no glyph for this text, drawn at the END of the
+								// row. Empty for a Find/Change hit: only a glyph scan fills it,
+								// because there the font IS the answer - a box almost always means
+								// "this font does not have this character", and the fix is to apply
+								// one that does.
+
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
 		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
@@ -79,8 +85,9 @@ namespace KBSResultModel
 		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
 		// them up with these numbers.
 		int32		walkOrder;
-		bool		checked;	// selected for replacement (a fresh search checks every hit it is
-								// allowed to replace - see isLocked)
+		bool		checked;	// selected for replacement. A fresh search leaves every row UNticked
+								// (see the constructor); ticking is the user's own act, through the
+								// row, or Check All from the right-click menu.
 		bool		replaced;	// already replaced in this result set - not selectable any more
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
@@ -98,9 +105,14 @@ namespace KBSResultModel
 								// can take the whole story's hits on trust instead of re-reading
 								// the text under each one. See KBSReplaceEngine.
 
+		// checked starts FALSE (changed 2026-08-02, user's request, for every mode - Text, GREP and
+		// Glyph alike). A fresh search used to tick every row it was allowed to replace, which made
+		// Change Checked a whole-document rewrite one keystroke away. Ticking is now something the
+		// user does on purpose - and cheap to do, since the right-click menu gained Check All per
+		// document and per book on 2026-08-01, which is what made the old default unnecessary.
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
-				walkOrder(-1), checked(true), replaced(false), outcome(kOutcomeNone), pageOrdinal(0),
+				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0),
 				storyChangeCount(0) {}
 	};
 
@@ -207,6 +219,7 @@ namespace KBSResultModel
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
 		PMString		postText;
+		PMString		fontName;	// drawn at the row's right edge; empty on a Find/Change row
 		bool			checked;
 		bool			replaced;
 		bool			locked;

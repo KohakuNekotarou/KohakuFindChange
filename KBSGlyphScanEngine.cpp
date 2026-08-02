@@ -349,6 +349,13 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 			hit.checked = false;		// a scan is a report, not a work list: no row is selectable
 			KBSSearchEngine::BuildHitForRange(docRef, storyRef, runs[r].start, runs[r].end,
 				cache, hit);
+
+			// The font that had no glyph for this text - the answer to "why is this a box", and the
+			// thing the fix has to change. Kept RAW: the row is drawn with convertAmpersand off, so
+			// an '&' in a font name has to survive verbatim, and app.kbsResults reports it as it is.
+			hit.fontName = runs[r].fontName;
+			hit.fontName.SetTranslatable(kFalse);
+
 			outChapter.hits.push_back(hit);
 
 			// Counted separately from the rows, because consecutive boxes are deliberately merged
