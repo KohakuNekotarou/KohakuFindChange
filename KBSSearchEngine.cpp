@@ -170,32 +170,13 @@ void AppendUnsearchableNote(PMString& outSummary, int32 count, const PMString& f
 	outSummary.Append(").");
 }
 
-/** Name the chapters the book could not even hand over as documents, and what the book says about
-    them. A DIFFERENT failure from AppendUnsearchableNote's: there the document was open and the
-    WALK did not run, here there is no document at all (the file is gone, or somebody else has it).
-    Appends nothing when every chapter opened, so the ordinary summary is unchanged. */
-void AppendUnopenableNote(PMString& outSummary, const std::vector<KBSBookScope::SkippedChapter>& skipped)
-{
-	if (skipped.empty())
-		return;
-
-	outSummary.Append(" ");
-	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
-	outSummary.Append(" chapter(s) could not be opened (");
-	// The chapter name is user data and the reason is the book's own short word - neither is a
-	// translation key. Only the first is named; the count says how many there were.
-	PMString name(skipped[0].name);
-	name.SetTranslatable(kFalse);
-	outSummary.Append(name);
-	if (!skipped[0].reason.IsEmpty())
-	{
-		outSummary.Append(": ");
-		PMString why(skipped[0].reason);
-		why.SetTranslatable(kFalse);
-		outSummary.Append(why);
-	}
-	outSummary.Append(").");
-}
+// (A local AppendUnopenableNote sat here until 2026-08-02. The glyph scan had grown its own copy of
+// the same sentence, and the two had already drifted: this one named only the first chapter, used
+// one leading space, and did not double up ampersands - so a chapter called "A&B.indd" drew as
+// "AB.indd" with the B underlined, the same fault fixed elsewhere on 2026-07-31. Both are gone;
+// KBSBookScope::AppendUnopenableNote is the one sentence now. It is a DIFFERENT failure from
+// AppendUnsearchableNote's above: there the document was open and the WALK did not run, here there
+// is no document at all.)
 
 // A search is running. The progress bar pumps events while it is up, so without this a menu command
 // could be dispatched INTO the running search. The panel's actions read it through IsSearching().
@@ -1307,7 +1288,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
 		{
 			outSummary.Append("The active book has no openable chapters.");
-			AppendUnopenableNote(outSummary, unopenable);
+			KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 			return 0;
 		}
 	}
@@ -1553,7 +1534,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		}
 		// "No matches" is a lie if a chapter was skipped rather than searched - say so here too.
 		AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
-		AppendUnopenableNote(outSummary, unopenable);
+		KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 		return 0;
 	}
 
@@ -1603,7 +1584,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	}
 
 	AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
-	AppendUnopenableNote(outSummary, unopenable);
+	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 	return total;
 }
 

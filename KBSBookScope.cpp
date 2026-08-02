@@ -32,6 +32,7 @@
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
+#include "IMenuUtils.h"			// InsertAmpersandForDisplay - a chapter name may contain '&'
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "ISession.h"
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
@@ -398,6 +399,39 @@ bool KBSBookScope::HasActiveBook()
 	if (bookMgr == nil)
 		return false;
 	return bookMgr->GetCurrentActiveBook() != nil;	// non-owning pointer - no release
+}
+
+void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
+	const std::vector<KBSBookScope::SkippedChapter>& skipped)
+{
+	if (skipped.empty())
+		return;
+
+	outSummary.Append("  ");
+	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
+	outSummary.Append(" chapter(s) could not be opened (");
+	for (size_t i = 0; i < skipped.size(); ++i)
+	{
+		if (i > 0)
+			outSummary.Append(", ");
+		if (i >= 3)								// a status line stays short, even at three lines
+		{
+			outSummary.Append("...");
+			break;
+		}
+		PMString name(skipped[i].name);
+		name.SetTranslatable(kFalse);
+		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&name);	// this string gets DRAWN
+		outSummary.Append(name);
+		if (!skipped[i].reason.IsEmpty())
+		{
+			outSummary.Append(": ");
+			PMString reason(skipped[i].reason);
+			reason.SetTranslatable(kFalse);
+			outSummary.Append(reason);
+		}
+	}
+	outSummary.Append(").");
 }
 
 bool KBSBookScope::GetHeldBookPath(PMString& outPath)

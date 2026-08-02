@@ -442,43 +442,6 @@ int32 CountScannableStories(const UIDRef& docRef)
 	return storyList->GetUserAccessibleStoryCount();
 }
 
-/** Name the chapters the book could not hand over as documents at all, and what the book says about
-    them. Reported rather than dropped: a chapter missing from the list is indistinguishable from a
-    chapter that simply held no boxes, and nothing on screen would let the user tell them apart.
-    Appends nothing when every chapter opened. */
-void AppendUnopenableNote(PMString& outSummary,
-	const std::vector<KBSBookScope::SkippedChapter>& skipped)
-{
-	if (skipped.empty())
-		return;
-
-	outSummary.Append("  ");
-	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
-	outSummary.Append(" chapter(s) could not be opened (");
-	for (size_t i = 0; i < skipped.size(); ++i)
-	{
-		if (i > 0)
-			outSummary.Append(", ");
-		if (i >= 3)								// a status line is one line
-		{
-			outSummary.Append("...");
-			break;
-		}
-		PMString name(skipped[i].name);
-		name.SetTranslatable(kFalse);
-		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&name);	// this string gets DRAWN
-		outSummary.Append(name);
-		if (!skipped[i].reason.IsEmpty())
-		{
-			outSummary.Append(": ");
-			PMString reason(skipped[i].reason);
-			reason.SetTranslatable(kFalse);
-			outSummary.Append(reason);
-		}
-	}
-	outSummary.Append(").");
-}
-
 /** The status line: how many boxes, in how many places, and whether anything could not be looked at.
 
     The two numbers are different questions, and both matter. Consecutive boxes are deliberately
@@ -539,7 +502,7 @@ void KBSGlyphScanEngine::Run()
 		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
 		{
 			summary.Append("The active book has no openable chapters.");
-			AppendUnopenableNote(summary, unopenable);
+			KBSBookScope::AppendUnopenableNote(summary, unopenable);
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}
@@ -662,7 +625,7 @@ void KBSGlyphScanEngine::Run()
 	KBSResultTree::Rebuild();
 
 	BuildSummary(glyphTotal, rowTotal, hasOverset, summary);
-	AppendUnopenableNote(summary, unopenable);
+	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
 }
 

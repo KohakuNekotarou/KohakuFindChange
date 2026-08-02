@@ -71,6 +71,19 @@ namespace KBSBookScope
 	bool GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
 		std::vector<SkippedChapter>* outSkipped = nil);
 
+	/** Name the chapters GetBookChapterDocs could not hand over, and what the book says about them,
+	    appending to a status line. Reported rather than dropped: a chapter missing from the list is
+	    indistinguishable from a chapter that simply held no findings, and nothing on screen would
+	    let the user tell them apart.
+
+	    Appends nothing when every chapter opened. At most three are named and the rest become
+	    "..." - a status line stays short even at three lines.
+
+	    It lives beside SkippedChapter rather than in whichever engine happens to need it: the two
+	    scans and the search all end their summary the same way, and one sentence written twice is
+	    one sentence that gets corrected once. */
+	void AppendUnopenableNote(PMString& outSummary, const std::vector<SkippedChapter>& skipped);
+
 	/** Is this document still in the session's open-document list? Compares list entries
 	    against the UIDRef without dereferencing its (possibly dead) database. */
 	bool IsDocStillOpen(const UIDRef& docRef);
