@@ -233,6 +233,47 @@ void KBSBookScope::ReleaseHeldDocs()
 	}
 }
 
+void KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
+{
+	if (docRef == UIDRef::gNull)
+		return;
+
+	// Ours to close? A chapter the user already had open is not on this list and must stay. That
+	// test lives HERE rather than at every call site: a run walks its chapters without caring who
+	// opened which, and hands every one of them back the same way.
+	int32 heldIndex = -1;
+	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	{
+		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
+		{
+			heldIndex = i;
+			break;
+		}
+	}
+	if (heldIndex < 0)
+		return;
+
+	// Off the list FIRST, so a re-entrant call cannot schedule the same close twice.
+	gHeldDocInfo.fCurrentOpenedDocumentList.erase(
+		gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
+
+	// The same close ReleaseHeldDocs uses, one document at a time: kSchedule defers it until the
+	// current notification / idle tick has unwound, and kSuppressUI plus the run's dirty guard
+	// (IDataBase::SaveRestoreModifiedState, which wraps every walk) means no save prompt. Skip a
+	// chapter the user closed already - a dead UIDRef must not reach the close machinery.
+	//
+	// Do NOT "improve" this to IBookUtils::CloseDocumentsInBook: it takes no UI flag and no command
+	// mode, closes immediately, and crashed KESCL in 2026-07-17 when called from a notification.
+	// See the longer note on ReleaseHeldDocs.
+	if (!IsDocStillOpen(docRef))
+		return;
+	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
+	if (docFileHandler == nil)
+		return;
+	if (docFileHandler->CanClose(docRef))
+		docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+}
+
 void KBSBookScope::ReleaseSearchedBook()
 {
 	// Both halves, always together. Letting the path go without the chapters would strand them:
@@ -609,13 +650,10 @@ bool KBSBookScope::ActivateBook(const PMString& bookPath)
 	return true;
 }
 
-bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
-	std::vector<SkippedChapter>* outSkipped)
+bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName)
 {
 	outDocs.clear();
 	outBookName.Clear();
-	if (outSkipped != nil)
-		outSkipped->clear();
 
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
 	if (bookMgr == nil)
@@ -676,13 +714,17 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 			continue;
 
 		ChapterDoc chapter;
-		// The chapter's .indd. Read FIRST, because the open below goes by file. It is also what
-		// navigation uses to reopen the chapter if the user closes it.
+		// The chapter's entry in the book. OpenChapterDoc needs it to ask the book API about this
+		// chapter by the purpose-built question rather than by file name.
+		chapter.contentUID = contentUID;
+
+		// The chapter's .indd. It is what OpenChapterDoc opens by, and what navigation uses to
+		// reopen the chapter after it has been closed.
 		content->GetIDFile(chapter.file);
 
-		// The chapter's file name for the read-out, built BEFORE the open: a chapter that cannot be
-		// opened still has to be named in the report. Via the UTF-16 buffer (AppendW), so a Japanese
-		// chapter name survives - the PMString(char*) conversions do not.
+		// The chapter's file name for the read-out, built HERE rather than at open time: a chapter
+		// that cannot be opened still has to be named in the report. Via the UTF-16 buffer
+		// (AppendW), so a Japanese chapter name survives - the PMString(char*) conversions do not.
 		chapter.shortName.SetTranslatable(kFalse);
 		{
 			WideString shortName = content->GetShortName();
@@ -691,81 +733,132 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 				chapter.shortName.AppendW(buf);
 		}
 
-		// Open the chapter without a layout window AND with the UI suppressed, or reuse it when
-		// the user already has it open.
-		//
-		// Why not IBookUtils::OpenOneDocument, which this used to call: that API takes no
-		// UI-suppression flag (IBookUtils.h:341). A chapter that raises ANY alert while opening -
-		// a missing font, a missing link, a document last saved by another version - therefore put
-		// an alert on screen, failed to open, and was skipped here without a word. The panel then
-		// showed the book minus that chapter, which is indistinguishable from a chapter that
-		// simply held no matches. ReopenChapterDoc is the windowless + kSuppressUI open the jump
-		// path already used, so both paths now open a chapter the same way.
-		//
-		// What is given up: OpenOneDocument also watched the open-database ceiling and would close
-		// an already-opened chapter to stay under it. That behaviour is a poor fit here anyway -
-		// it can invalidate a docRef this list is still holding - and the chapters are released
-		// together by ReleaseHeldDocs.
-		UIDRef docRef;
-
-		// Is it already open? Ask the book API first, by CONTENT UID - the purpose-built question
-		// (IBookUtils.h:119-127), and the one that can answer "it is open but its plug-ins are
-		// missing". bShowAlert = kFalse keeps it silent, which is the whole reason this plug-in
-		// stopped using OpenOneDocument.
-		//
-		// The returned IDocument* is treated as NON-OWNING and is never released: nothing in the
-		// IBookUtils / IBookManager family that hands out interface pointers is a Query (the SDK's
-		// marker for "you own this"), and Adobe's own AcquireCurrentBook.h holds
-		// IBookManager::GetCurrentActiveBook() the same way without ever releasing it.
-		//
-		// If this answers nil for a document that IS open, nothing breaks: ReopenChapterDoc below
-		// asks the same question a second way (IsSourceDocumentAlreadyOpen) and rebinds to the
-		// user's copy. So the fallback covers the case where this API does not behave as read.
-		IDFile openSysFile;
-		bool16 isMissingPlugins = kFalse;
-		IDocument* alreadyOpenDoc = Utils<IBookUtils>()->FindDocFromContentUID(
-			bookDB, contentUID, openSysFile, isMissingPlugins, kFalse /*bShowAlert*/);
-		if (alreadyOpenDoc != nil)
-		{
-			// The user's (or an earlier search's) own copy. NOT held: closing a document somebody
-			// else opened would surprise them - the same rule ReopenChapterDoc follows.
-			docRef = ::GetUIDRef(alreadyOpenDoc);
-		}
-		else if (!KBSBookScope::ReopenChapterDoc(chapter.file, docRef))
-		{
-			docRef = UIDRef::gNull;
-		}
-
-		if (docRef == UIDRef::gNull)
-		{
-			// Report it instead of dropping it. A chapter that is simply absent from the list reads
-			// exactly like a chapter with no matches, and the book API knows the real reason:
-			// GetBookContentStatus answers missing / out of date / in use / open (IBookUtils.h:113-117).
-			if (outSkipped != nil)
-			{
-				SkippedChapter skipped;
-				skipped.name = chapter.shortName;
-				skipped.name.SetTranslatable(kFalse);
-				skipped.reason = PMString(BookContentStatusText(
-					Utils<IBookUtils>()->GetBookContentStatus(content)));
-				skipped.reason.SetTranslatable(kFalse);
-				// The status can be kDocNormal for a chapter that still would not open (a lock file,
-				// a permissions problem). Missing plug-in data is the other thing the lookup above
-				// can tell us, and it is worth more than "normal".
-				if (skipped.reason.IsEmpty() && isMissingPlugins)
-				{
-					skipped.reason = PMString("missing plug-in data");
-					skipped.reason.SetTranslatable(kFalse);
-				}
-				outSkipped->push_back(skipped);
-			}
-			continue;
-		}
-
-		chapter.docRef = docRef;
+		// docRef is left null: nothing is opened here. The run opens each chapter when its turn
+		// comes (OpenChapterDoc) and hands it back as soon as it has walked it (ReleaseHeldDoc).
 		outDocs.push_back(chapter);
 	}
 
+	return !outDocs.empty();
+}
+
+bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChapter>* outSkipped)
+{
+	ioChapter.docRef = UIDRef::gNull;
+
+	// The book this chapter belongs to, found again by path rather than carried along in a static:
+	// a book pointer parked between calls goes stale the moment the user closes the book, and a run
+	// pumps events through its progress bar. Looking it up costs one walk of a handful of books.
+	//
+	// A nil answer here is not fatal - it only costs the two things that need the book itself (the
+	// already-open lookup by content UID, and the reason text for a chapter that will not open).
+	// The open below goes by FILE and works either way.
+	IBook* book = FindOpenBookByPath(gSearchedBookPath);
+	IDataBase* bookDB = (book != nil) ? ::GetDataBase(book) : nil;
+	bool16 isMissingPlugins = kFalse;
+
+	// Is it already open? Ask the book API first, by CONTENT UID - the purpose-built question
+	// (IBookUtils.h:119-127), and the one that can answer "it is open but its plug-ins are
+	// missing". bShowAlert = kFalse keeps it silent, which is the whole reason this plug-in
+	// stopped using OpenOneDocument.
+	//
+	// The returned IDocument* is treated as NON-OWNING and is never released: nothing in the
+	// IBookUtils / IBookManager family that hands out interface pointers is a Query (the SDK's
+	// marker for "you own this"), and Adobe's own AcquireCurrentBook.h holds
+	// IBookManager::GetCurrentActiveBook() the same way without ever releasing it.
+	//
+	// If this answers nil for a document that IS open, nothing breaks: ReopenChapterDoc below
+	// asks the same question a second way (IsSourceDocumentAlreadyOpen) and rebinds to the
+	// user's copy. So the fallback covers the case where this API does not behave as read.
+	if (bookDB != nil && ioChapter.contentUID != kInvalidUID)
+	{
+		IDFile openSysFile;
+		IDocument* alreadyOpenDoc = Utils<IBookUtils>()->FindDocFromContentUID(
+			bookDB, ioChapter.contentUID, openSysFile, isMissingPlugins, kFalse /*bShowAlert*/);
+		if (alreadyOpenDoc != nil)
+		{
+			// The user's (or an earlier run's) own copy. NOT held: closing a document somebody
+			// else opened would surprise them - the same rule ReopenChapterDoc follows, and the
+			// reason ReleaseHeldDoc can be called on every chapter without checking who opened it.
+			ioChapter.docRef = ::GetUIDRef(alreadyOpenDoc);
+			return true;
+		}
+	}
+
+	// Open it without a layout window AND with the UI suppressed.
+	//
+	// Why not IBookUtils::OpenOneDocument, which this used to call: that API takes no
+	// UI-suppression flag (IBookUtils.h:341). A chapter that raises ANY alert while opening -
+	// a missing font, a missing link, a document last saved by another version - therefore put
+	// an alert on screen, failed to open, and was skipped without a word. The panel then showed
+	// the book minus that chapter, which is indistinguishable from a chapter that simply held no
+	// matches. ReopenChapterDoc is the windowless + kSuppressUI open the jump path already used,
+	// so both paths open a chapter the same way.
+	//
+	// What is given up: OpenOneDocument also watched the open-database ceiling and would close an
+	// already-opened chapter to stay under it. That is a poor fit here - it can invalidate a docRef
+	// somebody is still holding - and it matters far less now that a run holds one chapter at a time.
+	UIDRef docRef;
+	if (ReopenChapterDoc(ioChapter.file, docRef) && docRef != UIDRef::gNull)
+	{
+		ioChapter.docRef = docRef;
+		return true;
+	}
+
+	// Report it instead of dropping it. A chapter that is simply absent from the list reads
+	// exactly like a chapter with no matches, and the book API knows the real reason:
+	// GetBookContentStatus answers missing / out of date / in use / open (IBookUtils.h:113-117).
+	if (outSkipped != nil)
+	{
+		SkippedChapter skipped;
+		skipped.name = ioChapter.shortName;
+		skipped.name.SetTranslatable(kFalse);
+
+		if (bookDB != nil && ioChapter.contentUID != kInvalidUID)
+		{
+			InterfacePtr<IBookContent> content(bookDB, ioChapter.contentUID, UseDefaultIID());
+			if (content != nil)
+			{
+				skipped.reason = PMString(BookContentStatusText(
+					Utils<IBookUtils>()->GetBookContentStatus(content)));
+				skipped.reason.SetTranslatable(kFalse);
+			}
+		}
+
+		// The status can be kDocNormal for a chapter that still would not open (a lock file,
+		// a permissions problem). Missing plug-in data is the other thing the lookup above
+		// can tell us, and it is worth more than "normal".
+		if (skipped.reason.IsEmpty() && isMissingPlugins)
+		{
+			skipped.reason = PMString("missing plug-in data");
+			skipped.reason.SetTranslatable(kFalse);
+		}
+		outSkipped->push_back(skipped);
+	}
+	return false;
+}
+
+bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
+	std::vector<SkippedChapter>* outSkipped)
+{
+	// TRANSITIONAL: the engines are being moved to the one-chapter-at-a-time form
+	// (ListBookChapters + OpenChapterDoc + ReleaseHeldDoc). This keeps the old all-at-once shape
+	// working meanwhile, built out of the new pieces so there is only one open path to maintain.
+	if (outSkipped != nil)
+		outSkipped->clear();
+
+	std::vector<ChapterDoc> listed;
+	if (!ListBookChapters(listed, outBookName))
+	{
+		outDocs.clear();
+		return false;
+	}
+
+	outDocs.clear();
+	for (size_t i = 0; i < listed.size(); ++i)
+	{
+		if (OpenChapterDoc(listed[i], outSkipped))
+			outDocs.push_back(listed[i]);
+	}
 	return !outDocs.empty();
 }
 

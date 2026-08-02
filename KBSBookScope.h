@@ -28,12 +28,19 @@
 namespace KBSBookScope
 {
 	/** One searchable document: a book chapter (shortName = its file name for the read-out;
-	    file = the chapter's .indd so a closed chapter can be reopened later). */
+	    file = the chapter's .indd so a closed chapter can be reopened later; contentUID = its
+	    entry in the book, which OpenChapterDoc needs to ask the book API about it).
+
+	    docRef is null until the chapter is opened. A document-scope target is built by hand with
+	    docRef already set and contentUID left invalid - that is what tells the engines apart. */
 	struct ChapterDoc
 	{
 		UIDRef		docRef;
 		PMString	shortName;
 		IDFile		file;
+		UID			contentUID;
+
+		ChapterDoc() : contentUID(kInvalidUID) {}
 	};
 
 	/** Is the search scope the whole book (ON) or just the front document (OFF)? Session state
@@ -70,6 +77,24 @@ namespace KBSBookScope
 	    @return true when there is an active book with at least one openable chapter. */
 	bool GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString& outBookName,
 		std::vector<SkippedChapter>* outSkipped = nil);
+
+	/** List the active book's chapters WITHOUT opening anything. Each entry comes back with its
+	    file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
+	    in. Also resolves WHICH book the run is against (see GetSearchedBookPath) and releases
+	    chapters still held for a different one.
+
+	    @return true when a book was resolved and it has at least one chapter. Note that this says
+	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
+	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName);
+
+	/** Open ONE listed chapter: reuse the user's copy when they already have it open (and do not
+	    hold it), otherwise open it windowless + UI-suppressed and hold it, so ReleaseHeldDoc can
+	    close it again. Fills ioChapter.docRef.
+
+	    @param outSkipped optional: on false, the chapter's name and the book's own reason for it
+	                      are APPENDED to this list. Pass nil to drop the reason.
+	    @return true when ioChapter.docRef is usable. */
+	bool OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChapter>* outSkipped);
 
 	/** Name the chapters GetBookChapterDocs could not hand over, and what the book says about them,
 	    appending to a status line. Reported rather than dropped: a chapter missing from the list is
@@ -143,6 +168,12 @@ namespace KBSBookScope
 	    (IDocFileHandler::kSchedule + kSuppressUI), so this is safe to call from inside a
 	    search or a notification. */
 	void ReleaseHeldDocs();
+
+	/** Close THIS chapter, if KBS is the one who opened it. A chapter the user already had open is
+	    not held and is left alone, so a run can hand back every chapter it walked without keeping
+	    track of who opened which. Scheduled + UI-suppressed exactly like ReleaseHeldDocs, so it is
+	    safe to call from inside a run. */
+	void ReleaseHeldDoc(const UIDRef& docRef);
 
 	/** Reopen a chapter by its file (Task 3 jump): if the user reopened it themselves, rebind to
 	    THEIR open copy (and do not hold it); otherwise open it windowless + UI-suppressed and hold
