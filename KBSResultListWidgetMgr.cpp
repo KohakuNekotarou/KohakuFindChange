@@ -400,9 +400,16 @@ private:
 		//              the safety ceiling cut short, or one that could not be opened. It is a
 		//              property of the panel rather than of the row, which is why it is still a
 		//              second question.
+		//   scan     - a missing-glyph scan REPORTS; there is nothing on it to replace (user's
+		//              decision, 2026-08-02, after weighing a font-only replace and turning it down).
+		//              The model has always said so - RowHasCheckBox turns the whole result kind away,
+		//              so Check All and Change Checked have never reached these rows - but the box was
+		//              still being DRAWN here and could still be clicked, which promised an action
+		//              nothing was going to carry out. Same question, asked in both places now.
 		const bool noCheckBox = row.replaced || row.locked
 			|| row.outcome != KBSResultModel::kOutcomeNone
-			|| KBSResultModel::IsShowingReplaceOutcome();
+			|| KBSResultModel::IsShowingReplaceOutcome()
+			|| KBSResultModel::GetResultKind() == KBSResultModel::kResultMissingGlyph;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
