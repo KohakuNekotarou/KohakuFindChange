@@ -58,6 +58,7 @@
 #include "IFindChangeUtils.h"	// kAnyNotDefGlyphID - RunWithWalker only
 #include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
+#include "IMenuUtils.h"			// InsertAmpersandForDisplay - '&' doubles in anything DRAWN
 #include "IPMFont.h"			// GetNotDefinedGlyph / AppendFamilyName / AppendStyleName
 #include "IStoryList.h"			// the document's stories
 #include "ITextModel.h"			// QueryStrand
@@ -75,6 +76,7 @@
 #include "PMString.h"
 #include "ParcelKey.h"			// ParcelKey::IsValid - the overset test on a wax line
 #include "PersistUtils.h"		// ::GetUIDRef
+#include "ProgressBar.h"		// RangeProgressBar - the scan's progress + cancel
 #include "TextID.h"				// kFrameListBoss / IID_IWAXSTRAND - which strand holds the wax
 #include "Utils.h"
 
@@ -82,6 +84,7 @@
 #include <vector>
 
 // Project includes:
+#include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
 #include "KBSGlyphScanEngine.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
@@ -363,6 +366,55 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	return static_cast<int32>(outChapter.hits.size());
 }
 
+/** How many stories a scan of this document will visit - the progress bar's unit.
+
+    Free to ask for: IStoryList keeps the count, so nothing is loaded here. USER-ACCESSIBLE only,
+    which is exactly the population the scan walks. */
+int32 CountScannableStories(const UIDRef& docRef)
+{
+	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
+	if (storyList == nil)
+		return 0;
+	return storyList->GetUserAccessibleStoryCount();
+}
+
+/** Name the chapters the book could not hand over as documents at all, and what the book says about
+    them. Reported rather than dropped: a chapter missing from the list is indistinguishable from a
+    chapter that simply held no boxes, and nothing on screen would let the user tell them apart.
+    Appends nothing when every chapter opened. */
+void AppendUnopenableNote(PMString& outSummary,
+	const std::vector<KBSBookScope::SkippedChapter>& skipped)
+{
+	if (skipped.empty())
+		return;
+
+	outSummary.Append("  ");
+	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
+	outSummary.Append(" chapter(s) could not be opened (");
+	for (size_t i = 0; i < skipped.size(); ++i)
+	{
+		if (i > 0)
+			outSummary.Append(", ");
+		if (i >= 3)								// a status line is one line
+		{
+			outSummary.Append("...");
+			break;
+		}
+		PMString name(skipped[i].name);
+		name.SetTranslatable(kFalse);
+		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&name);	// this string gets DRAWN
+		outSummary.Append(name);
+		if (!skipped[i].reason.IsEmpty())
+		{
+			outSummary.Append(": ");
+			PMString reason(skipped[i].reason);
+			reason.SetTranslatable(kFalse);
+			outSummary.Append(reason);
+		}
+	}
+	outSummary.Append(").");
+}
+
 /** The status line: how many boxes, in how many places, and whether anything could not be looked at.
 
     The two numbers are different questions, and both matter. Consecutive boxes are deliberately
@@ -403,41 +455,149 @@ void KBSGlyphScanEngine::Run()
 	PMString summary;
 	summary.SetTranslatable(kFalse);
 
-	IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
-	if (doc == nil)
+	// ----- the scope, resolved exactly the way a search resolves it -----
+	// Book Scope ON means the whole book and nothing else; OFF means the front document and nothing
+	// else. Never a silent fallback between them, so the status line can always say what was looked
+	// at and a missing book is reported rather than quietly scanning one document instead.
+	std::vector<KBSBookScope::ChapterDoc> targets;
+	PMString bookName;
+	std::vector<KBSBookScope::SkippedChapter> unopenable;
+	const bool fromBook = KBSBookScope::IsBookScopeOn();
+
+	if (fromBook)
 	{
+		if (!KBSBookScope::HasActiveBook())
+		{
+			summary.Append("Book Scope is on, but no book is open.");
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
+		{
+			summary.Append("The active book has no openable chapters.");
+			AppendUnopenableNote(summary, unopenable);
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+	}
+	else
+	{
+		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
+		if (doc == nil)
+		{
+			summary.Append("No document to scan.");
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+		KBSBookScope::ChapterDoc single;
+		single.docRef = ::GetUIDRef(doc);
+		doc->GetName(single.shortName);
+		single.shortName.SetTranslatable(kFalse);
+		targets.push_back(single);
+	}
+
+	KBSResultModel::Clear();
+
+	// All three AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
+	// takes the check boxes off every row and greys Change Checked out - a scan is a report, not a
+	// work list.
+	KBSResultModel::SetResultKind(KBSResultModel::kResultMissingGlyph);
+	KBSResultModel::SetFromBook(fromBook);
+	KBSResultModel::SetBookName(bookName);
+
+	// ----- the progress bar, sized in STORIES -----
+	// A chapter is far too coarse a step: one chapter of a hundred stories and one of two would each
+	// move the bar once, so it would stand still through the long one. Story counts are free to ask
+	// for (IStoryList keeps the count). Shown for both scopes, since a single document with many
+	// stories takes just as long as a short book and equally needs a way out.
+	std::vector<int32> chapterSpans;
+	chapterSpans.reserve(targets.size());
+	int32 progressTotal = 0;
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		int32 stories = CountScannableStories(targets[i].docRef);
+		if (stories < 1)
+			stories = 1;		// so a chapter with no stories still moves the bar
+		chapterSpans.push_back(stories);
+		progressTotal += stories;
+	}
+
+	PMString progressTitle(fromBook ? "Scanning book for missing glyphs..."
+									: "Scanning for missing glyphs...");
+	progressTitle.SetTranslatable(kFalse);
+	// showImmediate = kTrue: put the bar up at once rather than waiting out its internal delay, or
+	// the one thing it is really there for - Cancel - is never on screen for a fast scan.
+	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+
+	int32 progressBase = 0;
+	int32 progressReported = 0;
+
+	bool hasOverset = false;
+	bool cancelled = false;
+	int32 glyphTotal = 0;
+	int32 rowTotal = 0;
+
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		PMString taskLine;
+		taskLine.SetTranslatable(kFalse);
+		taskLine.Append("Chapter ");
+		taskLine.AppendNumber(static_cast<int32>(i) + 1);
+		taskLine.Append(" / ");
+		taskLine.AppendNumber(static_cast<int32>(targets.size()));
+		taskLine.Append(" - ");
+		taskLine.Append(targets[i].shortName);
+		progressBar.SetTaskText(taskLine);
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		// kFalse = do not raise the global error state, which would outlive the scan and fail the
+		// commands that come after it.
+		if (progressBar.WasCancelled(kFalse))
+		{
+			cancelled = true;
+			break;
+		}
+
+		KBSResultModel::Chapter chapter;
+		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
+		int32 chapterGlyphs = 0;
+		const int32 rows = ScanOneDocument(targets[i].docRef, targets[i].shortName, chapter,
+			hasOverset, chapterGlyphs);
+
+		progressBase += chapterSpans[i];
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		if (rows > 0)
+		{
+			KBSResultModel::AppendChapter(chapter);		// only chapters with findings go in
+			rowTotal += rows;
+			glyphTotal += chapterGlyphs;
+		}
+	}
+
+	// ***** Ask ONE more time, outside the loop. *****
+	// Asking only inside it misses a cancel pressed during the LAST chapter, because no further
+	// round comes to hear it - and on a one-chapter book that meant Cancel never worked at all.
+	// (The same fault was found and fixed in the search and the replace on 2026-07-31.)
+	if (!cancelled && progressBar.WasCancelled(kFalse))
+		cancelled = true;
+
+	if (cancelled)
+	{
+		// Throw the half-finished list away rather than leave a partial one looking complete, and
+		// give the chapters back. ReleaseHeldDocs schedules its closes, so it is safe from in here.
 		KBSResultModel::Clear();
+		KBSBookScope::ReleaseHeldDocs();
 		KBSResultTree::Rebuild();
-		summary.Append("No document to scan.");
+		summary.Append("Scan cancelled.");
 		KBSResultTree::ShowStatus(summary);
 		return;
 	}
 
-	PMString docName;
-	docName.SetTranslatable(kFalse);
-	doc->GetName(docName);
-
-	KBSResultModel::Clear();
-
-	// AFTER Clear(), which puts this back to kResultFindChange. It is what takes the check boxes
-	// off every row and greys Change Checked out - a scan is a report, not a work list.
-	KBSResultModel::SetResultKind(KBSResultModel::kResultMissingGlyph);
-
-	KBSResultModel::Chapter chapter;
-	bool hasOverset = false;
-	int32 glyphCount = 0;
-	const int32 hits = ScanOneDocument(::GetUIDRef(doc), docName, chapter, hasOverset, glyphCount);
-
-	// Only chapters with at least one hit go in - an empty branch is never shown.
-	if (hits > 0)
-		KBSResultModel::AppendChapter(chapter);
-
-	// Document scope. Set AFTER Clear(), which puts it back to false.
-	KBSResultModel::SetFromBook(false);
-
 	KBSResultTree::Rebuild();
 
-	BuildSummary(glyphCount, hits, hasOverset, summary);
+	BuildSummary(glyphTotal, rowTotal, hasOverset, summary);
+	AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
 }
 
