@@ -47,6 +47,7 @@ KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
 bool						KBSReplaceConfirmDialog::sAccepted = false;
 int32						KBSReplaceConfirmDialog::sCheckedCount = 0;
 int32						KBSReplaceConfirmDialog::sChapterCount = 0;
+PMString					KBSReplaceConfirmDialog::sMessage;
 
 /* ResolveSide
 */
@@ -220,20 +221,33 @@ int32 KBSReplaceConfirmDialog::GetChapterCount()
 	return sChapterCount;
 }
 
+/* GetMessage
+*/
+const PMString& KBSReplaceConfirmDialog::GetMessage()
+{
+	return sMessage;
+}
+
 /* Ask
 */
-bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount)
+bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const PMString& message)
 {
-	// Nothing resolved: the caller falls back to the plain alert. The find side is the one that has
-	// to be there - an empty change side is the deletion request and draws as an empty frame.
-	if (sFind.fFont == nil)
+	// The glyph layout needs a resolved find side to draw - an empty CHANGE side is the deletion
+	// request and draws as an empty frame, but with nothing on the find side there is no prompt.
+	// The Text / GREP layout needs nothing but its string, which is also what the caller falls
+	// back to when the fonts could not be resolved.
+	if (message.IsEmpty() && sFind.fFont == nil)
 		return false;
 
 	// There is no way to switch this prompt off any more (2026-08-01). It used to share the plain
 	// alert's suppression flag, but a confirmation in front of a destructive rewrite is not worth
-	// having if a single tick can remove it for good - see KBSActionComponent's alert.
+	// having if a single tick can remove it for good.
 	sCheckedCount = checkedCount;
 	sChapterCount = chapterCount;
+	// Already assembled AND translated by the caller: what arrives here is finished text, and a
+	// key only translates while it is the WHOLE string anyway.
+	sMessage = message;
+	sMessage.SetTranslatable(kFalse);
 	sAccepted = false;
 
 	InterfacePtr<IApplication> application(GetExecutionContextSession()->QueryApplication());
@@ -295,6 +309,16 @@ private:
 		@param text what it should say; empty means hide.
 	*/
 	void SetOptionalLine(const WidgetID& widgetID, const PMString& text);
+
+	/** Show or hide one of the two layouts' widgets, disabling whatever it hides.
+		@param widgetID the widget to show or hide.
+		@param show true to show it.
+	*/
+	void ShowOrHide(const WidgetID& widgetID, bool show);
+
+	/** Fill the glyph layout: the two counts and the four optional lines under the frames. Only
+		called when there is no message to show instead. */
+	void FillGlyphLayout();
 };
 
 CREATE_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialogControllerImpl)
@@ -323,12 +347,63 @@ void KBSReplaceConfirmDialogController::SetOptionalLine(const WidgetID& widgetID
 	view->Enable();
 }
 
+/* ShowOrHide
+*/
+void KBSReplaceConfirmDialogController::ShowOrHide(const WidgetID& widgetID, bool show)
+{
+	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
+	if (panelData == nil)
+		return;
+	IControlView* view = panelData->FindWidget(widgetID);
+	if (view == nil)
+		return;
+
+	// Hidden AND disabled, always as a pair - see SetOptionalLine.
+	view->ShowView(show ? kTrue : kFalse);
+	if (show)
+		view->Enable();
+	else
+		view->Disable();
+}
+
 /* InitializeDialogFields
 */
 void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /*dlgContext*/)
 {
-	// The opening sentence, from the same string-table entries the plain alert uses - the same
-	// question, on a different screen. Each key is translated BEFORE the count goes in: a key only
+	// ONE resource, two layouts. Which one is showing is decided here and nowhere else: a message
+	// means Text or GREP (the whole prompt in one wrapped block), no message means Glyph (the two
+	// frames). Whichever is not showing is hidden AND disabled - see ShowOrHide.
+	const PMString& message = KBSReplaceConfirmDialog::GetMessage();
+	const bool textLayout = !message.IsEmpty();
+
+	this->ShowOrHide(kKBSReplaceConfirmMessageWidgetID, textLayout);
+	this->ShowOrHide(kKBSReplaceConfirmGlyphBlockWidgetID, !textLayout);
+	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, !textLayout);
+	this->ShowOrHide(kKBSReplaceConfirmUnsavedWidgetID, !textLayout);
+
+	if (textLayout)
+	{
+		// The whole prompt, assembled by the caller. Nothing to parameterise or translate here: it
+		// arrived finished, which is what keeps the wording identical to what the plain alert drew.
+		this->SetTextControlData(kKBSReplaceConfirmMessageWidgetID, message);
+	}
+	else
+		this->FillGlyphLayout();
+
+	// The strings just written are parameterized and translated, so they can be longer than the
+	// resource allowed for, and widgets have just been hidden. Re-flow once, at the end - the way
+	// linksui's own dialogs do it.
+	InterfacePtr<IControlView> dialogView(this, UseDefaultIID());
+	if (dialogView != nil)
+		Utils<IEVEUtils>()->ApplyEveLayout(dialogView);
+}
+
+/* FillGlyphLayout
+*/
+void KBSReplaceConfirmDialogController::FillGlyphLayout()
+{
+	// The opening sentence, from the same string-table entries the message above is built from - the
+	// same question, laid out differently. Each key is translated BEFORE the count goes in: a key only
 	// translates while it is the WHOLE string, and the count is real data, so it is marked
 	// untranslatable first.
 	PMString countStr;
@@ -363,13 +438,6 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 	this->SetOptionalLine(kKBSGlyphConfirmFindUnicodeWidgetID, findSide.fUnicode);
 	this->SetOptionalLine(kKBSGlyphConfirmChangeFontWidgetID, changeSide.fFontLabel);
 	this->SetOptionalLine(kKBSGlyphConfirmChangeUnicodeWidgetID, changeSide.fUnicode);
-
-	// The strings just written are parameterized and translated, so they can be longer than the
-	// resource allowed for, and lines have just been hidden. Re-flow once, at the end - the way
-	// linksui's own dialogs do it.
-	InterfacePtr<IControlView> dialogView(this, UseDefaultIID());
-	if (dialogView != nil)
-		Utils<IEVEUtils>()->ApplyEveLayout(dialogView);
 }
 
 /* ApplyDialogFields

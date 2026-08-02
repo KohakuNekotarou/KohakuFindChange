@@ -268,8 +268,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDontShowWidgetID, kKBSPrefix + 17
 DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)		// nothing run yet
 DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// something has been run
 DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and it was a replace
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 21)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 22)
+// The replace confirmation's two layouts. The dialog is ONE resource that shows one of them: Text
+// and GREP put the whole prompt into a single wrapped block (the same sentences the plain alert
+// used to draw), and Glyph shows the two glyph frames instead. The frames are hidden as a BLOCK
+// rather than child by child, so EVE closes the gap they leave.
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmMessageWidgetID, kKBSPrefix + 21)
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 22)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 23)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 24)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 25)

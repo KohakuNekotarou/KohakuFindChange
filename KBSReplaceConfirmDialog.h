@@ -17,8 +17,13 @@
 //    - Ask() puts them on screen and answers whether the user approved the rewrite.
 //
 //  When the fonts cannot be resolved - a ROS-group query carries no font at all - Resolve()
-//  returns false and KBSActionComponent falls back to the CAlert it has always used. A
-//  confirmation that cannot be drawn must never become a reason the replace cannot run.
+//  returns false and the caller asks with the Text / GREP layout instead, which needs nothing
+//  but its string. A confirmation that cannot be DRAWN must never become a reason the replace
+//  cannot RUN.
+//
+//  Text and GREP asked through CAlert::ModalAlert until 2026-08-02. That alert cannot carry a
+//  check box with a label of our own - the SDK offers "Don't show again" and "Apply to All",
+//  both fixed wording (CAlert.h:185,209) - and "save after replace" had to go somewhere.
 //
 //========================================================================================
 
@@ -79,16 +84,20 @@ public:
 
 	/** Put the prompt on screen and wait for the answer.
 
-		Call Resolve() first: this returns false without opening anything when the fonts are
-		not in hand. Suppression is honoured through the SAME alert id the plain CAlert uses
-		(kKBSReplaceCheckedActionID), so a user who has already switched the confirmation off
-		is not asked again just because the tab changed.
+		TWO LAYOUTS, ONE RESOURCE. Pass an EMPTY message to get the glyph layout - call Resolve()
+		first, and check that it succeeded. Pass the assembled prompt to get the Text / GREP one,
+		where that string IS the prompt: it arrives finished, and nothing here adds to it.
 
-		@param checkedCount how many hits will be rewritten (the opening sentence).
-		@param chapterCount how many documents will be written to (the closing sentence).
+		There is no way to switch this prompt off. It used to share the plain alert's suppression
+		flag, but a confirmation in front of a destructive rewrite is not worth having if a single
+		tick can remove it for good.
+
+		@param checkedCount how many hits will be rewritten (the opening sentence, glyph layout).
+		@param chapterCount how many documents will be written to (the closing sentence, glyph).
+		@param message      the whole prompt, for the Text / GREP layout. Empty = glyph layout.
 		@return true when the user approved the rewrite.
 	*/
-	static bool Ask(int32 checkedCount, int32 chapterCount);
+	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message);
 
 	/** The controller's way back: OK sets it, Ask() reads it. */
 	static void SetAccepted(bool accepted);
@@ -99,12 +108,17 @@ public:
 	/** @see GetCheckedCount */
 	static int32 GetChapterCount();
 
+	/** The Text / GREP prompt, or EMPTY for the glyph layout - which is also how the controller
+		tells the two apart. @see GetCheckedCount */
+	static const PMString& GetMessage();
+
 private:
 	static Side		sFind;
 	static Side		sChange;
 	static bool		sAccepted;
 	static int32	sCheckedCount;
 	static int32	sChapterCount;
+	static PMString	sMessage;
 
 	/** Fill one side from one attribute list.
 		@param glyphID the glyph the caller already read off the options.

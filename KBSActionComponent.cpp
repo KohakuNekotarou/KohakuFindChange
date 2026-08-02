@@ -347,16 +347,11 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// this resolves is released before every exit below.
 	const bool glyphResolved = glyphMode && KBSReplaceConfirmDialog::Resolve(opts);
 
-	// On the Glyph tab, show the glyphs THEMSELVES rather than their numbers. Falls through to the
-	// alert below whenever the fonts could not be resolved - a ROS-group query carries none - so a
-	// confirmation that cannot be drawn is never a reason the replace cannot run.
-	if (glyphResolved)
-	{
-		const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount,
-			KBSResultModel::GetCheckedChapterCount());
-		KBSReplaceConfirmDialog::ReleaseSides();
-		return approved;
-	}
+	// On the Glyph tab, show the glyphs THEMSELVES rather than their numbers - but the choice of
+	// layout is made at the single call at the bottom of this function, not here, so the message
+	// below is assembled either way. It is what the glyph layout falls back to when the fonts
+	// could not be resolved (a ROS-group query carries none), and a confirmation that cannot be
+	// DRAWN is never a reason the replace cannot RUN.
 
 	// The prompt is assembled from string-table entries rather than C++ literals, so a Japanese
 	// InDesign asks the question in Japanese (KBS.fr already routes k_jaJP to KBS_jaJP.fr). This is
@@ -453,27 +448,25 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	::ReplaceStringParameters(&unsaved, chapterStr);
 	msg.Append(unsaved);
 
-	// A plain modal alert, so that CANCEL can be the default button: this starts a destructive
-	// rewrite, and a stray Enter must not be what starts it.
+	// ONE prompt for every tab (2026-08-02). It used to be CAlert::ModalAlert here and the glyph
+	// dialog above; both are the same dialog now, because an alert cannot carry a check box with a
+	// label of our own - the SDK offers "Don't show again" and "Apply to All", both fixed wording
+	// (CAlert.h:185,209) - and the "save after replace" box had to go somewhere.
 	//
-	// It carried a "Don't show again" check box from 2026-07-28 until 2026-08-01. That box wrote to
-	// the application's alert registry, and the trade turned out to be a bad one: ticking it removed
-	// the confirmation permanently and silently (it comes back only through Preferences > General >
-	// Reset All Warning Dialogs, which nobody thinks to look for), and the call that draws the box
-	// takes no default-button argument, so OK had to be the default for as long as it existed. A
-	// suppressible prompt in front of a destructive action was worth less than a default of Cancel.
-	const int16 answer = CAlert::ModalAlert(msg,
-		kOKString,
-		kCancelString,
-		kNullString,					// no third button
-		2,								// Cancel is the default
-		CAlert::eWarningIcon);
+	// Keeping CANCEL as the default button was the other reason. This starts a destructive rewrite
+	// and a stray Enter must not be what starts it; WarningAlertWithDontShowAgain, the one alert
+	// that draws a box at all, takes no default-button argument.
+	//
+	// An empty message asks with the GLYPH layout, so this is where the two part company: the
+	// glyphs when they resolved, the assembled sentences when they did not.
+	PMString glyphLayout;
+	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount, chapterCount,
+		glyphResolved ? glyphLayout : msg);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
 	KBSReplaceConfirmDialog::ReleaseSides();
 
-	// 1 = OK, 2 = Cancel.
-	return answer == 1;
+	return approved;
 }
 
 /* UpdateActionStates

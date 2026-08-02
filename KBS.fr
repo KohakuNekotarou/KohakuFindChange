@@ -1120,10 +1120,12 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
-		// ----- the two glyph frames, side by side -----
+		// ----- the two glyph frames, side by side (Glyph tab only) -----
+		// Named as a BLOCK so the Text / GREP layout can hide the whole thing in one call; hiding
+		// the children one by one leaves EVE holding the row's height.
 		EVEGenericPanelWidget
 		(
-			kInvalidWidgetID,		// WidgetId
+			kKBSReplaceConfirmGlyphBlockWidgetID,	// WidgetId
 			0						// RsrcId
 			0,						// Widget EVE Info
 			kBindNone,				// Frame binding
@@ -1284,6 +1286,28 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 					}
 				),
 			}
+		),
+
+		// ----- Text / GREP: the whole prompt in one wrapped block -----
+		// The same sentences the plain alert drew, assembled by KBSActionComponent and handed over
+		// whole. ONE widget rather than a line each: the find and change strings are the user's own
+		// and can be any length, and a wrapped block is what the alert gave them. Modelled on
+		// linksui's ProblemLinksDialog, which is where the button arrangement below came from too.
+		EVEStaticMultiLineTextWidget
+		(
+			kKBSReplaceConfirmMessageWidgetID, kSysStaticTextPMRsrcId,	// WidgetId, RsrcId
+			kBindNone,
+			Frame(0, 0, 340, 120)			// Frame (l,t,r,b) - EVE grows it to fit the text
+			kTrue, kTrue, kAlignLeft,		// Visible, Enabled, Alignment
+			kDontEllipsize, kTrue,			// Ellipsize style, Convert ampersands
+			// StaticMultiLineTextAttr
+			0,								// fScrollBarWidgetID
+			kDialogWindowFontId;			// fFontID
+			3,								// fNumPixelsBetweenLines
+			0, 0,							// fInset
+			"",								// Text (the controller fills it)
+
+			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
 		// ----- "The chapter is opened and left UNSAVED..." -----
