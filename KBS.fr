@@ -394,7 +394,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSeparator1MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Search Book: run the book-wide search using the current Find/Change settings.
+		// Find in Document / Find in Book: run the search over the current scope using the settings
+		// in InDesign's own Find/Change dialog. Drawn under whichever of the two names the scope
+		// calls for (see the action definition below).
 		kKBSSearchBookActionID,
 		kKBSTargetMenuPath
 		kKBSSearchBookMenuItemPosition,
@@ -495,12 +497,14 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// The search command. kCustomEnabling is what lets UpdateActionStates rename it to
-		// "Search Book" / "Search Document" as the Book Scope toggle flips; without it that hook
+		// "Find in Book" / "Find in Document" as the Book Scope toggle flips; without it that hook
 		// is never called for this action.
 		// NOT kDisableIfNoFrontDocument: a book search runs off IBookManager's active book and opens
 		// its chapters windowless, so "a book is open but no document window is" is a normal, working
 		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
 		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
+		// "There is nothing to run on" IS answered, but in UpdateActionStates, where the question can
+		// be put to the CURRENT scope (KBSBookScope::HasScopeTarget).
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
@@ -513,7 +517,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		// The glyph scan. Same flags as the search command above, and for the same reasons: it runs
 		// over the same scope, so it must stay live while a book is open with no document window
 		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
-		// one place that decides whether either command can run.
+		// one place that decides whether either command can run - including whether the current
+		// scope has anything to run on at all.
 		kKBSActionComponentBoss,
 		kKBSFindMissingGlyphsActionID,
 		kKBSFindMissingGlyphsMenuKey,	// "Find Missing Glyphs"
@@ -526,7 +531,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		// The overset scan. Same flags as the two commands above, and for the same reasons: it runs
 		// over the same scope, so it must stay live while a book is open with no document window
 		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
-		// one place that decides whether it can run.
+		// one place that decides whether it can run - including whether the current scope has
+		// anything to run on at all.
 		kKBSActionComponentBoss,
 		kKBSFindOversetActionID,
 		kKBSFindOversetMenuKey,			// "Find Overset"
@@ -1012,8 +1018,15 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
  * read that line is to look at the screen. With it, a script - or PowerShell over COM - can run the
  * command and then read the answer:
  *
- *     app.menuActions.itemByName("Search Book").invoke();
+ *     app.menuActions.itemByName("Search").invoke();
  *     app.kbsStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
+ *
+ * !! WHICH NAME finds this action MOVES (measured 2026-08-02). itemByName matches the name the
+ *   action currently CARRIES, and UpdateActionStates renames it - so "Search", the resource name, is
+ *   only good until the flyout is first drawn (or until any script reads .enabled, which runs the
+ *   same hook); after that the action answers to "Find in Document" or "Find in Book", whichever the
+ *   scope last called for, and "Search" answers isValid = false. A script that has to reach it
+ *   reliably tries all three and takes the one that is valid.
  *
  * The value lives in the module, not on the widget (KBSResultTree::GetLastStatus), so it answers
  * with the panel closed as well.

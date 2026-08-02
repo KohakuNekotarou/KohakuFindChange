@@ -29,6 +29,7 @@
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
 #include "IDocumentPresentation.h"	// the predicate typedef / presentation handle
 #include "IDocumentUtils.h"
+#include "ILayoutUIUtils.h"		// GetFrontDocument - the document-scope half of HasScopeTarget
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
@@ -459,6 +460,21 @@ bool KBSBookScope::HasActiveBook()
 	if (bookMgr == nil)
 		return false;
 	return bookMgr->GetCurrentActiveBook() != nil;	// non-owning pointer - no release
+}
+
+bool KBSBookScope::HasScopeTarget()
+{
+	// The same two questions the engines ask when they resolve their scope (KBSSearchEngine.cpp,
+	// and the two scans beside it), asked here so the menu can go grey BEFORE a run that would only
+	// report that there was nothing to run on.
+	if (IsBookScopeOn())
+		return HasActiveBook();
+
+	// GetFrontDocument, not "is any document open": a book search opens its chapters WINDOWLESS and
+	// this is the document-scope branch, where the front layout window is exactly what gets searched.
+	// A chapter one of our own runs is holding open therefore does not count as a target, which is
+	// what we want.
+	return Utils<ILayoutUIUtils>()->GetFrontDocument() != nil;
 }
 
 void KBSBookScope::AppendUnopenableNote(PMString& outSummary,

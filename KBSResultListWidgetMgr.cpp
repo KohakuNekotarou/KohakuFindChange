@@ -613,6 +613,77 @@ void KBSResultTree::GetLastStatus(PMString& outMessage)
 	outMessage.SetTranslatable(kFalse);
 }
 
+namespace
+{
+
+/** Draw 'message' on the panel's status read-out. Does nothing when the panel is closed, which is an
+    ordinary state. Shared by ShowStatus and by the restore below, so both spell the message the same
+    way; only ShowStatus decides what the message IS.
+
+    @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
+                       there is nothing on screen to force yet, and this runs mid-construction. */
+void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
+{
+	// Reach the status text through the panel; nil when the panel is closed (do nothing then) - the
+	// same reach Rebuild uses, which is why this lives here rather than in the action component.
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
+	if (panelData == nil)
+		return;
+	IControlView* textView = panelData->FindWidget(kKBSStaticTextWidgetID);
+	if (textView == nil)
+		return;
+	InterfacePtr<ITextControlData> textData(textView, UseDefaultIID());
+	if (textData == nil)
+		return;
+
+	// This line names files the user chose - a document's or a book's - and a StaticText takes a
+	// lone '&' as a keyboard accelerator, so "A&B.indd" drew as "AB.indd" with the B underlined
+	// (reported from the panel, 2026-07-31). Doubling each one up is the same thing SetColumnText
+	// above already does for the tree's rows, and what the shipping panels do before handing a
+	// user-entered name to a static text.
+	//
+	// ONLY what is drawn is doubled. gLastStatus keeps the message exactly as it was written:
+	// app.kbsStatus exists to hand back what the panel said, not how a widget had to spell it, and
+	// a test comparing against a file name must not have to know about this.
+	PMString display(message);
+	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
+
+	// A single-line StaticText does not repaint on SetString alone, so invalidate + force a redraw
+	// (the SDK immediate-StaticText-update rule).
+	textData->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
+	textView->Invalidate();
+	if (forceRedraw)
+		textView->ForceRedraw();
+}
+
+}	// anonymous namespace
+
+void KBSResultTree::RestoreStatusOnPanelShow()
+{
+	// Widget strings are PERSISTED IN THE WORKSPACE. A panel that is rebuilt - on every show, and
+	// once more when InDesign is launched - comes back carrying whatever this line last said,
+	// including a message from a session that ended days ago, while the results it described are
+	// long gone (reported 2026-08-02: "the previous message is still there after a restart"). The
+	// .fr's initial text is only ever used the very first time the panel is built.
+	//
+	// So the panel's show is where the line has to be written, exactly as the tab's name and the
+	// illustration already are: whatever is written here outranks the persisted value.
+	if (!gLastStatus.IsEmpty())
+	{
+		// Something ran in THIS session: put its message back. This also restores the line when the
+		// panel is closed and reopened mid-session, which used to lose it.
+		WriteStatusWidget(gLastStatus, kFalse /*still being built*/);
+		return;
+	}
+
+	// Nothing has run since launch, so the line says what a freshly installed panel says. Taken from
+	// the string table rather than spelled out here, so it cannot drift from the .fr's own initial
+	// text - which would show as the old wording flashing up for the instant before this runs.
+	PMString initial(kKBSStaticTextKey);
+	initial.Translate();
+	WriteStatusWidget(initial, kFalse /*still being built*/);
+}
+
 void KBSResultTree::ShowStatus(const PMString& message)
 {
 	// Remembered FIRST, before the panel is even looked for: this has to hold whether or not there
@@ -627,34 +698,9 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	// closed, like everything else below.
 	KBSPanelIcon::Update();
 
-	// Reach the status text through the panel; nil when the panel is closed (do nothing then) - the
-	// same reach Rebuild uses, which is why this lives here rather than in the action component.
-	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
-	if (panelData == nil)
-		return;
-	IControlView* textView = panelData->FindWidget(kKBSStaticTextWidgetID);
-	if (textView == nil)
-		return;
-	InterfacePtr<ITextControlData> textData(textView, UseDefaultIID());
-	if (textData == nil)
-		return;
-	// This line names files the user chose - a document's or a book's - and a StaticText takes a
-	// lone '&' as a keyboard accelerator, so "A&B.indd" drew as "AB.indd" with the B underlined
-	// (reported from the panel, 2026-07-31). Doubling each one up is the same thing SetColumnText
-	// above already does for the tree's rows, and what the shipping panels do before handing a
-	// user-entered name to a static text.
-	//
-	// ONLY what is drawn is doubled. gLastStatus above keeps the message exactly as it was written:
-	// app.kbsStatus exists to hand back what the panel said, not how a widget had to spell it, and
-	// a test comparing against a file name must not have to know about this.
-	PMString display(message);
-	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
-
-	// A single-line StaticText does not repaint on SetString alone, so invalidate + force a redraw
-	// (the SDK immediate-StaticText-update rule).
-	textData->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
-	textView->Invalidate();
-	textView->ForceRedraw();
+	// The panel is on screen and this is a report of something that just happened, so it is drawn
+	// immediately (the restore path above is the one that must not force a redraw).
+	WriteStatusWidget(message, kTrue /*force the redraw*/);
 }
 
 //----------------------------------------------------------------------------------------

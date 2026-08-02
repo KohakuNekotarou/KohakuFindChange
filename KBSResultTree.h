@@ -43,6 +43,19 @@ namespace KBSResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
+	/** Put the status read-out back to what THIS session last had on it - or, when nothing has run
+	    since launch, to the .fr's own initial text. Called from the panel's AutoAttach, and only
+	    from there.
+
+	    Why it is needed: a widget's string is persisted in the WORKSPACE, so a rebuilt panel comes
+	    back carrying the last message of whatever session wrote it, including yesterday's - while
+	    the results it describes are gone. The panel's show is the one moment that can outrank the
+	    persisted value, the same moment the tab's name and the illustration are written at.
+
+	    Does NOT touch what GetLastStatus answers: restoring a line is not the panel reporting
+	    something. Safe to call when the panel is closed (does nothing then). */
+	void RestoreStatusOnPanelShow();
+
 	/** The last message ShowStatus was given, whether or not the panel was open to display it.
 	    Kept for the app.kbsStatus script property (KBSScriptProvider.cpp), which is how a script -
 	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */

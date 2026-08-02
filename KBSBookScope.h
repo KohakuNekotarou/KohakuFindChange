@@ -63,6 +63,19 @@ namespace KBSBookScope
 	    opened, listed or held. */
 	bool HasActiveBook();
 
+	/** Is there anything for the CURRENT scope to run on - the active book while Book Scope is ON,
+	    a front document while it is OFF? Asked by the menu's enablement (KBSActionComponent's
+	    UpdateActionStates) so the three commands that start a run go grey when there is nothing to
+	    run them against, rather than starting and reporting "No open document to search."
+
+	    It asks exactly what the engines ask when they resolve their own scope - HasActiveBook() and
+	    ILayoutUIUtils::GetFrontDocument() - so the grey state and the run cannot disagree. Cheap
+	    enough for a menu hook: neither call opens, lists or holds anything.
+
+	    NOT a substitute for the engines' own checks. This answers for the menu; a script reaching
+	    an action directly still meets the engine's guard. */
+	bool HasScopeTarget();
+
 	/** A chapter that could NOT be turned into a searchable document, and why. Reported rather
 	    than dropped: a chapter missing from the list is indistinguishable from a chapter that
 	    simply held no matches, and there is no way for the user to see through that. */

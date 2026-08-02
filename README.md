@@ -20,9 +20,12 @@ neither of which InDesign reports anywhere but preflight.
 ## The scope, shared by all three commands
 
 - **The `Book Scope` flyout toggle**: off (the default) means the front document, on means every
-  chapter of the book. Never a silent fallback between them — with the toggle on and no book open it
-  says so rather than quietly searching one document. The search command names the scope it will use
-  (`Search Document` / `Search Book`) and the panel's tab carries it (`… - Document` / `… - Book`).
+  chapter of the book. Never a silent fallback between them. The search command names the scope it
+  will use (`Find in Document` / `Find in Book`) and the panel's tab carries it
+  (`… - Document` / `… - Book`).
+- **Nothing to run on, nothing to click**: with no front document in document scope — or no book open
+  in book scope — all three commands are **greyed out**, rather than starting and reporting that
+  there was nothing to search. The name still says which scope they would have used.
 - **Which book**: the one whose tab is frontmost in the Book panel — selecting a tab switches the
   panel but does not make that book "active", so asking for the active book would silently target
   the wrong one. Falls back to the active book when the Book panel is iconised or closed.

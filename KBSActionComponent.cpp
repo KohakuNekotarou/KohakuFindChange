@@ -504,6 +504,18 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// than model-wide: over a document whose every hit is locked or already replaced, both commands
 	// are no-ops and go grey - exactly as they do over a book with nothing left anywhere. Taken once
 	// because the two commands ask the same question.
+	// Is there anything for the current scope to run on at all - the active book while Book Scope is
+	// ON, a front document while it is OFF? The three commands that START a run share the answer, so
+	// it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
+	// ask, so a command that is offered can always run and one that cannot is visibly grey rather
+	// than reporting "No open document to search." after the fact (user's call 2026-08-02).
+	//
+	// It is asked HERE rather than declared in the .fr as kDisableIfNoFrontDocument for two reasons
+	// that are written out beside the action definitions: that flag would grey the commands out with
+	// a book open and no document window - the state a book run is FOR - and it skips this hook, so
+	// the search command would also lose the name that carries the scope.
+	const bool16 haveTarget = KBSBookScope::HasScopeTarget() ? kTrue : kFalse;
+
 	const int32 contextChapter = KBSResultModel::GetContextMenuChapter();
 	int32 contextCheckable = 0;
 	if (contextChapter == KBSResultModel::kContextMenuBookRow)
@@ -518,34 +530,44 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		if (action == kKBSSearchBookActionID)
 		{
 			// The command's own name carries the scope, so it is visible BEFORE running it:
-			// "Search Book" while Book Scope is ON, "Search Document" while it is OFF. No check
+			// "Find in Book" while Book Scope is ON, "Find in Document" while it is OFF. No check
 			// mark - this is the KESCL Start/Stop pattern (a name swap, not a state mark).
-			PMString name(KBSBookScope::IsBookScopeOn() ? "Search Book" : "Search Document");
+			//
+			// FIND, not "Search" (2026-08-02): Adobe's verb for this is Find - the dialog this
+			// command takes its query from is Find/Change, its buttons are Find Next and Change All -
+			// while "Search" is the label on that dialog's SCOPE popup ("Search: Document"). The old
+			// name mixed the two, and did not match the two commands under it either (Find Missing
+			// Glyphs, Find Overset). The action's resource name stays "Search": that is the handle a
+			// script reaches this by (app.menuActions.itemByName("Search")), and it is never what the
+			// user sees, because this line has always renamed it before the menu is drawn.
+			PMString name(KBSBookScope::IsBookScopeOn() ? "Find in Book" : "Find in Document");
 			name.SetTranslatable(kFalse);
 			listToUpdate->SetNthActionName(i, name);
-			listToUpdate->SetNthActionState(i, kEnabledAction);
+			// The name is written whether or not it can run, so a greyed-out item still says which
+			// scope it would have used.
+			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSFindMissingGlyphsActionID)
 		{
-			// Always live, for the same reasons the search command above is: it runs over the same
-			// scope, and a book scan works with no document window open. Nothing about the current
-			// RESULTS decides whether a scan may run - it starts from the document, not from them.
+			// The same one question the search command above asks, because it runs over the same
+			// scope: something to scan, or grey. Nothing about the current RESULTS decides whether a
+			// scan may run - it starts from the document, not from them.
 			//
-			// It has to be said explicitly all the same: kCustomEnabling means this method owns the
+			// It has to be said explicitly either way: kCustomEnabling means this method owns the
 			// state, and an action this loop never names stays DISABLED. (Found on the real
 			// application - the item appeared in the flyout but invoke() answered "Action is not
 			// enabled".)
-			listToUpdate->SetNthActionState(i, kEnabledAction);
+			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSFindOversetActionID)
 		{
-			// Always live, for the same reasons the two commands above are: it runs over the same
-			// scope, and a book scan works with no document window open. Nothing about the current
-			// RESULTS decides whether a scan may run - it starts from the document, not from them.
+			// The same one question the two commands above ask, because it runs over the same scope:
+			// something to scan, or grey. Nothing about the current RESULTS decides whether a scan
+			// may run - it starts from the document, not from them.
 			//
 			// Named here explicitly for the same reason as the glyph scan: kCustomEnabling means
 			// this method owns the state, and an action this loop never names stays DISABLED.
-			listToUpdate->SetNthActionState(i, kEnabledAction);
+			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSScopeBookActionID)
 		{

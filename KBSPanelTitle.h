@@ -6,7 +6,7 @@
 //
 //  The panel's TAB carries the search scope, so which of the two searches the flyout is about to
 //  run can be read without opening it: "Kohaku Find/Change - Book" while Book Scope is ON,
-//  "- Document" while it is OFF. The words are the flyout's own Search Book / Search Document.
+//  "- Document" while it is OFF. The words are the flyout's own Find in Book / Find in Document.
 //
 //========================================================================================
 

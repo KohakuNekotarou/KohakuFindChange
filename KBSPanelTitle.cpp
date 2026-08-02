@@ -42,6 +42,7 @@ namespace GoToURLUtils
 #include "KBSBookScope.h"		// IsBookScopeOn - the only input to the name
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelTitle.h"
+#include "KBSResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
 
 namespace
 {
@@ -141,12 +142,16 @@ void AttachToWidget(IPMUnknown* panelBoss, IObserver* observer, const WidgetID& 
 
 }
 
-/** Observer on kKBSPanelWidgetBoss. Two jobs, both tied to the panel being shown:
+/** Observer on kKBSPanelWidgetBoss. Three jobs, all tied to the panel being shown:
 
       * The TAB's name. The panel's widgets are built fresh every time it is shown, and a palette is
         only laid out while it is visible - so opening the panel is the moment the scope has to be
         written onto the tab. Without this the tab reads the plain name until the user happens to
         toggle the scope or run a search.
+
+      * The STATUS LINE. Every read-out on a panel has to be written here, because a widget's string
+        is persisted in the workspace: left alone, the line comes back reading whatever the last
+        session put there. See KBSResultTree::RestoreStatusOnPanelShow.
 
       * The ILLUSTRATION's click. The picture beside the message opens the plug-in's home page (the
         URL its tooltip shows). A button announces a click to whoever is listening on
@@ -165,6 +170,12 @@ public:
 		// The widgets are built fresh every time the panel is shown, so the picture that belongs on
 		// screen has to be written on NOW - the .fr's visible flags are only a starting point.
 		KBSPanelIcon::Update();
+
+		// ...and for the same reason, so does the message. The .fr's initial text is used the first
+		// time the panel is ever built and never again: after that the widget carries whatever the
+		// workspace remembers, which after a restart is a message about results that no longer
+		// exist (reported 2026-08-02).
+		KBSResultTree::RestoreStatusOnPanelShow();
 
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
 			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), true);
