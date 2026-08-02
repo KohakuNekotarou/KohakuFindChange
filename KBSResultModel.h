@@ -207,11 +207,22 @@ namespace KBSResultModel
 	enum ResultKind
 	{
 		kResultFindChange = 0,	// hits from the user's own Find/Change query (the original feature)
-		kResultMissingGlyph		// findings from a notdef scan
+		kResultMissingGlyph,	// findings from a notdef scan
+		kResultOverset			// findings from an overset scan
 	};
 
 	void SetResultKind(ResultKind kind);
 	ResultKind GetResultKind();
+
+	/** Is the model holding a REPORT rather than a work list? A scan finds something to look at;
+	    it does not offer anything to change. So no row of one carries a check box, and the column
+	    those boxes would have stood in is narrowed to half (KBSResultListWidgetMgr).
+
+	    ONE question in ONE place. The model side (RowHasCheckBox) and the drawing side (ApplyHitRow)
+	    each used to name kResultMissingGlyph themselves, which meant a second scan kind had to be
+	    remembered in two files - and a row whose box the model refuses but the panel still draws is
+	    a row that promises an action nothing carries out. */
+	bool IsReportOnlyKind();
 
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.

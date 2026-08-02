@@ -87,7 +87,7 @@ namespace
 	{
 		// A scan reports; it does not offer work. Asked first because it is a property of the
 		// RESULT SET, not of the row: no row of a scan carries a box, whatever that row holds.
-		if (gResultKind == KBSResultModel::kResultMissingGlyph)
+		if (KBSResultModel::IsReportOnlyKind())
 			return false;
 
 		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
@@ -221,6 +221,15 @@ bool KBSResultModel::IsFromBook()
 void KBSResultModel::SetResultKind(ResultKind kind)
 {
 	gResultKind = kind;
+}
+
+bool KBSResultModel::IsReportOnlyKind()
+{
+	// Every kind EXCEPT the Find/Change query, which is the one that offers work. Written as the
+	// list of scans rather than as "not kResultFindChange" so that adding a kind is a decision
+	// rather than a default: a new kind that DOES offer work would otherwise quietly lose its
+	// check boxes here.
+	return gResultKind == kResultMissingGlyph || gResultKind == kResultOverset;
 }
 
 KBSResultModel::ResultKind KBSResultModel::GetResultKind()
