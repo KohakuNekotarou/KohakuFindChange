@@ -112,6 +112,12 @@ struct ScanningFlagGuard
 // loop; this is a backstop so a defect could never hang the application.
 const int32 kMaxWaxLines = 200000;
 
+// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice: chapters are
+// opened one at a time now and closed again straight after, so there is no moment at which the scan
+// could add up all their story counts. This scan only moves the bar at chapter boundaries anyway,
+// so an equal slice costs nothing but the weighting between a long chapter and a short one.
+const int32 kKBSChapterProgressSpan = 1;
+
 /** One notdef glyph: where it sits, and the font that had no glyph for it. */
 struct NotdefGlyph
 {
@@ -443,18 +449,6 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	return static_cast<int32>(outChapter.hits.size());
 }
 
-/** How many stories a scan of this document will visit - the progress bar's unit.
-
-    Free to ask for: IStoryList keeps the count, so nothing is loaded here. USER-ACCESSIBLE only,
-    which is exactly the population the scan walks. */
-int32 CountScannableStories(const UIDRef& docRef)
-{
-	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
-	if (storyList == nil)
-		return 0;
-	return storyList->GetUserAccessibleStoryCount();
-}
-
 /** The status line: how many boxes, in how many places, and whether anything could not be looked at.
 
     The two numbers are different questions, and both matter. Consecutive boxes are deliberately
@@ -526,10 +520,12 @@ void KBSGlyphScanEngine::Run()
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}
-		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
+		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
+		// handed straight back once it has been scanned. Whether a chapter can actually be opened
+		// is not known yet - the summary reports the ones that could not, after the scan.
+		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
-			summary.Append("The active book has no openable chapters.");
-			KBSBookScope::AppendUnopenableNote(summary, unopenable);
+			summary.Append("The active book has no chapters.");
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}
@@ -561,22 +557,14 @@ void KBSGlyphScanEngine::Run()
 	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
 	KBSResultModel::SetBookName(bookName);
 
-	// ----- the progress bar, sized in STORIES -----
-	// A chapter is far too coarse a step: one chapter of a hundred stories and one of two would each
-	// move the bar once, so it would stand still through the long one. Story counts are free to ask
-	// for (IStoryList keeps the count). Shown for both scopes, since a single document with many
-	// stories takes just as long as a short book and equally needs a way out.
-	std::vector<int32> chapterSpans;
-	chapterSpans.reserve(targets.size());
-	int32 progressTotal = 0;
-	for (size_t i = 0; i < targets.size(); ++i)
-	{
-		int32 stories = CountScannableStories(targets[i].docRef);
-		if (stories < 1)
-			stories = 1;		// so a chapter with no stories still moves the bar
-		chapterSpans.push_back(stories);
-		progressTotal += stories;
-	}
+	// ----- the progress bar: one step per chapter -----
+	// It used to be sized in STORIES, to weight a hundred-story chapter above a two-story one. Two
+	// things ended that: the scan only ever moves the bar at chapter boundaries (ScanOneDocument
+	// does not report from inside), so the weighting bought nothing but a smoother-looking crawl,
+	// and story counts are no longer knowable up front - chapters are opened one at a time now.
+	// Shown for both scopes, since a single document takes just as long as a short book and equally
+	// needs a way out.
+	const int32 progressTotal = static_cast<int32>(targets.size()) * kKBSChapterProgressSpan;
 
 	PMString progressTitle(fromBook ? "Scanning book for missing glyphs..."
 									: "Scanning for missing glyphs...");
@@ -618,13 +606,29 @@ void KBSGlyphScanEngine::Run()
 			break;
 		}
 
+		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
+		// which is already open and never ours to close.
+		if (fromBook && targets[i].docRef == UIDRef::gNull)
+		{
+			if (!KBSBookScope::OpenChapterDoc(targets[i], &unopenable))
+			{
+				// The reason is recorded; AppendUnopenableNote names it in the summary. Hand the
+				// bar on all the same, so a book whose chapters will not open still fills it.
+				progressBase += kKBSChapterProgressSpan;
+				KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+				continue;
+			}
+		}
+
+		const UIDRef chapterDocRef = targets[i].docRef;
+
 		KBSResultModel::Chapter chapter;
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
 		int32 chapterGlyphs = 0;
-		const int32 rows = ScanOneDocument(targets[i].docRef, targets[i].shortName, chapter,
+		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter,
 			hasOverset, chapterGlyphs);
 
-		progressBase += chapterSpans[i];
+		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		if (rows > 0)
@@ -633,6 +637,12 @@ void KBSGlyphScanEngine::Run()
 			rowTotal += rows;
 			glyphTotal += chapterGlyphs;
 		}
+
+		// ***** Hand the chapter back. ***** The scan is over and its rows are plain data - UIDs and
+		// text indices, which survive the document being closed. A jump reopens what it needs
+		// through ReopenChapterDoc. Only chapters KBS opened are closed: ReleaseHeldDoc checks the
+		// held list itself, so one the user already had open passes through untouched.
+		KBSBookScope::ReleaseHeldDoc(chapterDocRef);
 	}
 
 	// ***** Ask ONE more time, outside the loop. *****
