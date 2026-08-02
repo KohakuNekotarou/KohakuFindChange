@@ -228,21 +228,41 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		KBSSearchEngine::BuildHitForRange(docRef, places[p].storyRef,
 			places[p].start, previewEnd, cache, hit);
 
-		if (hit.pageString.IsEmpty())
+		// Is there a PAGE to point at? pageIndex is the page's plain document order, and it stays
+		// -1 when there is none. The page STRING is no use for this: a frame on the pasteboard has
+		// no page, but the lookup falls back to the spread and GetPageString spells that "PB", so
+		// the string is non-empty for exactly the case being excluded here (measured 2026-08-02 -
+		// the first run listed the pasteboard frame as "PPBov").
+		if (hit.pageIndex < 0)
 		{
 			++outOffPage;
 			continue;
 		}
 
-		// The kind and the size, written over the line's leading text. BuildHitForRange filled
-		// preText with whatever DID fit on that line; what a reader wants first is which kind of
-		// overflow this is and how much of it there is. Written afterwards for the same reason the
-		// glyph scan writes its font name afterwards - so BuildHitForRange stays untouched.
-		PMString lead(places[p].inCell ? "Table cell (" : "Frame (");
-		lead.SetTranslatable(kFalse);
-		lead.AppendNumber(places[p].count);
-		lead.Append(")  ");
-		hit.preText = lead;
+		// What KIND of overflow this is and HOW MUCH of it there is, put where the cell protects it.
+		//
+		// ***** It goes in matchText, not in preText. ***** The cell keeps the MATCH at full
+		// strength and ellipsizes the context around it, and the leading context loses its HEAD
+		// (KBSColorTextView: kEllipsizeBeginning, so the words just before a match survive). That is
+		// right for a search hit and wrong here: written into preText, "Frame (370)" was the first
+		// thing thrown away and the row read "...70)" (measured 2026-08-02). It is also the truer
+		// place for it - an overset row has no "match", and the size IS the finding.
+		//
+		// The text that did not fit follows as trailing context, faded, which is what it is: a peek,
+		// not the answer. Written afterwards for the same reason the glyph scan writes its font name
+		// afterwards - so BuildHitForRange stays untouched.
+		PMString kindAndSize(places[p].inCell ? "Table cell (" : "Frame (");
+		kindAndSize.SetTranslatable(kFalse);
+		kindAndSize.AppendNumber(places[p].count);
+		kindAndSize.Append(")");
+
+		PMString peek("  ");
+		peek.SetTranslatable(kFalse);
+		peek.Append(hit.matchText);		// what BuildHitForRange read out of the overset range
+
+		hit.preText.Clear();
+		hit.matchText = kindAndSize;
+		hit.postText = peek;
 
 		// LEFT EMPTY on purpose: the tree builds its font level out of this, and an overset finding
 		// has no font to group by - so the tree stays the three levels it has always had.
