@@ -378,6 +378,16 @@ void KBSOversetScanEngine::Run()
 	std::vector<KBSBookScope::SkippedChapter> unopenable;
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
 
+	// The previous run's results go FIRST, before the book is resolved - the order the search uses.
+	//
+	// ***** It HAS to be before. ***** ListBookChapters below records which book this run is against
+	// (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so doing this afterwards wipes
+	// the record the run has just made. The book watcher then has no book to ask about, and closing
+	// that book leaves its results sitting on the panel. Measured 2026-08-02, with these two lines
+	// below the scope block: the scan worked, and closing the book did nothing at all.
+	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
+
 	if (fromBook)
 	{
 		if (!KBSBookScope::HasActiveBook())
@@ -411,9 +421,6 @@ void KBSOversetScanEngine::Run()
 		single.shortName.SetTranslatable(kFalse);
 		targets.push_back(single);
 	}
-
-	KBSResultModel::Clear();
-	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
 
 	// All four AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
 	// takes the check boxes off every row and narrows the column they stood in - a scan is a
