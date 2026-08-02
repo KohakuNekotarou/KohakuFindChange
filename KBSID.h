@@ -368,9 +368,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)
 #define kKBSResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKBSResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
 
-// PNG resource ID for the panel's illustration. Its own number space (PNGA/PNGR), so it does not
-// have to dodge the view resource ids above. 1001 is where KESCM and KESCL start theirs.
-#define kKBSIconResID	1001
+// PNG resource IDs. Their own number space (PNGA/PNGR), so they do not have to dodge the view
+// resource ids above. 1001 is where KESCM and KESCL start theirs.
+#define kKBSIconResID			1001	// the illustration beside the panel's message
+#define kKBSPaletteIconResID	1002	// the small dock-tab icon, shown when the panel is collapsed
 
 // Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
 // VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live

@@ -716,6 +716,14 @@ resource PNGA(kKBSIconResID) "Kohakuneko_OFF32.png"
 resource PNGR(kKBSIconResID) "Kohakuneko_OFF32.png"
 
 /*
+ * The small dock-tab icon, shown in place of the tab's name once the panel is collapsed to its
+ * narrowest. Named by the PanelList entry above (kKBSPaletteIconResID, kKBSPluginID), which is
+ * where a palette is told which picture is its own - it is NOT a widget, so there is no Frame and
+ * no rollover state to give it.
+ */
+resource PNGA(kKBSPaletteIconResID) "KohakuFindChangeTab.png"
+
+/*
  * The Glyph tab's replace confirmation. "DialogBoss" is the exotic name of what is really a widget;
  * WidgetEveInfo is what lets the dialog lay itself out with EVE (basicdialog's BscDlg.fr does the
  * same). The glyph frame inherits EVEGenericPanelWidget, which already carries WidgetEveInfo, so
@@ -752,7 +760,7 @@ resource PanelList (kSDKDefPanelResourceID)
 		"",							// panelName empty: placed via altMenu below (Plug-Ins menu, not Window) - like KESCL/KESCM.
 		kKBSPanelPluginsMenuPath,	// Plug-Ins > KohakuNekotarou > KohakuBookSearch
 		kKBSPanelPluginsMenuPosition,	// Alternate menu position
-		0,0,						// Rsrc ID, Plugin ID for a PNG icon resource to use for this palette
+		kKBSPaletteIconResID, kKBSPluginID,	// PNG icon for the collapsed dock tab
 		c_Panel
 	}
 };
