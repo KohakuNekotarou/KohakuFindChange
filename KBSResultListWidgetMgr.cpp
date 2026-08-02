@@ -77,15 +77,16 @@ namespace
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
-	// What that same column shrinks to when the result kind carries no check box on ANY row - any
-	// scan, so the missing-glyph one and the overset one alike (KBSResultModel::IsReportOnlyKind is
-	// the one place that decides). Half a check zone, so the hit rows land 8px right of the row
-	// above them: the step the book and font levels already use, which makes the whole tree one even
-	// staircase (user's call 2026-08-02 - "make it a nice staircase, shifted left by the check").
+	// What that same column shrinks to when NO row of the list carries a check box: either scan
+	// (missing-glyph, overset) and a replace's report alike - see everyRowLostBox in ApplyHitRow,
+	// which is the one place that decides. Half a check zone, so the hit rows land 8px right of the
+	// row above them: the step the book and font levels already use, which makes the whole tree one
+	// even staircase (user's call 2026-08-02 - "make it a nice staircase, shifted left by the
+	// check"; the report was brought into line the same day, for the same reason).
 	// Half rather than all of it: giving back the full 16px would line the hit rows up with their
 	// font row's LABEL, leaving no step at all between a branch and the rows under it. The full
-	// zone is still kept for a Find/Change result, where some rows have a box and some do not and
-	// the locators have to stay in one column (see ApplyHitRow).
+	// zone is still kept for a Find/Change WORK LIST, where some rows have a box and some do not
+	// and the locators have to stay in one column (see ApplyHitRow).
 	const PMReal kScanCheckZone = 8.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
@@ -420,15 +421,21 @@ private:
 		//              clicked, which promised an action nothing was going to carry out. Same
 		//              question, asked in both places now.
 		//
-		// The scan is asked as its own question first because it says something the others do not:
-		// it is a property of the WHOLE list rather than of this row, so the column in front of the
-		// locators can be narrowed for every row at once (see the cell's frame below). The rest are
-		// per-row - a Find/Change result mixes rows that have a box with rows that lost one.
-		const bool scanOnly = KBSResultModel::IsReportOnlyKind();
+		// Asked as its own question first because it says something the per-row tests cannot: NO row
+		// in this list has a box, which is a property of the WHOLE list. That is what makes it safe
+		// to narrow the column in front of the locators for every row at once (see the cell's frame
+		// below) - nothing is left ragged, because there is nothing left to line up with.
+		//
+		// Two ways it happens, and they are asked separately because they are different facts: a
+		// SCAN reports rather than offers work (no row of that kind ever had a box), and a replace's
+		// REPORT is what is left after every row lost its box at once. A Find/Change work list is
+		// the case that has to keep the full zone: it mixes rows that have a box with rows that do
+		// not, and those locators have to stay in one column.
+		const bool everyRowLostBox = KBSResultModel::IsReportOnlyKind()
+			|| KBSResultModel::IsShowingReplaceOutcome();
 		const bool noCheckBox = row.replaced || row.locked
 			|| row.outcome != KBSResultModel::kOutcomeNone
-			|| KBSResultModel::IsShowingReplaceOutcome()
-			|| scanOnly;
+			|| everyRowLostBox;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
@@ -484,12 +491,13 @@ private:
 			// once a search turned up a lot of locked hits (user's call 2026-07-28, from a screen
 			// shot). A column that does not move is worth more than the width.
 			//
-			// A missing-glyph scan is the one case where the column can move, because it moves for
-			// every row: no row of that kind has ever had a box, so nothing is left ragged. There
-			// it keeps half the zone (kScanCheckZone) instead of all of it, which steps the hit
-			// rows off their font row by the same 8px the levels above use rather than sinking them
-			// a full check box deeper than anything else in the tree.
-			frame.Left(xStart + (scanOnly ? kScanCheckZone : kCheckZone));
+			// A list where NO row has a box is the case where the column can move, because it moves
+			// for every row at once and nothing is left ragged: a scan (no row of that kind has ever
+			// had one) and a replace's report (every row lost its box together). There it keeps half
+			// the zone (kScanCheckZone) instead of all of it, which steps the hit rows off the row
+			// above by the same 8px the levels use rather than sinking them a full check box deeper
+			// than anything else in the tree.
+			frame.Left(xStart + (everyRowLostBox ? kScanCheckZone : kCheckZone));
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
