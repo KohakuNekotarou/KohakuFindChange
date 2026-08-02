@@ -51,7 +51,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
 
                 // ----- Panel/dialog strings
                 kKBSPanelTitleKey,				kKBSDisplayName,
-                kKBSStaticTextKey,				kKBSDisplayName,
+                // The message line as a freshly opened panel shows it - the plug-in has no search
+                // box of its own, so the first thing to say is where the query is typed. It is not
+                // only the .fr's initial value: KBSResultTree::RestoreStatusOnPanelShow reads this
+                // same key whenever the panel is shown with nothing run this session, which is why
+                // the wording cannot be spelled out in the code as well. Naming the DOCUMENT command
+                // is always right here, because Book Scope starts OFF at every launch.
+                kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find in Document from this panel's menu.",
 
                 // ----- Change Checked confirmation prompt
                 // ^1 takes real data (a count, the user's find / change string), which is marked

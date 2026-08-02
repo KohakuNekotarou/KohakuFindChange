@@ -189,7 +189,11 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// locator and the rest of the line) is that same colour faded toward the background, so the
 	// match reads at full strength and the context recedes. Tune kContextTextWeight to taste:
 	// 0 = fully the background (invisible), 1 = the full text colour (no fade).
-	const PMReal kContextTextWeight(0.50);
+	//
+	// 0.65 rather than the 0.50 it shipped with (user's call 2026-08-02, "blend it into the
+	// background a little less"): half and half made the surrounding line harder to read than it
+	// needed to be, and the match still stands out at this weight.
+	const PMReal kContextTextWeight(0.65);
 	RealAGMColor bg(0.5, 0.5, 0.5), fg(0.0, 0.0, 0.0);	// sane fallbacks if the query fails
 	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
 	if (colors != nil)
