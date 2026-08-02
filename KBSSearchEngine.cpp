@@ -101,11 +101,19 @@ const int32 kKBSProgressReportStep = 8;
 // the first document but not across documents" - which named the fault exactly. See the
 // ask-once-more test after the chapter loop in SearchBook.)
 
-// How finely one story is divided on the progress bar. The search cannot know how many MATCHES a
-// chapter holds until it has found them all, so the bar is measured in STORIES instead - which the
-// document can be asked for up front, for free - and each one is subdivided by how far into its
-// text the walk has got. See CountSearchableStories.
-const int32 kKBSProgressStorySteps = 100;
+// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice, because the
+// run no longer knows how big a chapter is before it opens it: chapters are opened one at a time
+// now and closed again straight after, so there is no all-chapters-open moment in which to add up
+// their story counts.
+//
+// Within a chapter the slice is still divided by STORIES - the search cannot know how many MATCHES
+// a chapter holds until it has found them all, but a document that IS open can be asked for its
+// story count for free, and each story is then subdivided by how far into its text the walk has
+// got (CollectHitsInDoc does the moving; see CountSearchableStories).
+//
+// Large enough that a chapter with many stories still gets whole steps per story (a 500-story
+// chapter gets 20 apiece); small enough that a 100-chapter book stays far inside int32.
+const int32 kKBSChapterProgressSpan = 10000;
 
 /** How many stories a walk of this document will visit. Counting them is free: IStoryList keeps the
     count, so nothing is loaded here (contrast with adding up their lengths, which would have to
@@ -611,12 +619,15 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
 // the user's Find/Change settings verbatim, so the search mode (Text or GREP) is followed.
 //
-// progressBar / progressBase: the run's bar, measured in stories x kKBSProgressStorySteps, and the
-// point on it where this chapter starts. The walk moves it as it goes - a story at a time, each one
-// subdivided by how far into its text the current match sits. nil is allowed.
+// progressBar / progressBase: the run's bar and the point on it where this chapter starts.
+// chapterSpan / storiesInDoc: how much of the bar this chapter owns, and how many stories to divide
+// that slice between - asked by the caller once the chapter is open, since a chapter's size is not
+// knowable before then. The walk moves the bar as it goes: a story at a time, each one subdivided
+// by how far into its text the current match sits. nil is allowed for the bar.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
-	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
+	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
+	int32& ioProgressReported)
 {
 	outResult = kChapterWalked;
 
@@ -783,17 +794,29 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 				progressStoryLength = (progressModel != nil) ? progressModel->TotalLength() : 0;
 			}
 
+			// This chapter's slice, cut into one piece per story.
+			int32 stepsPerStory = (storiesInDoc > 0) ? (chapterSpan / storiesInDoc) : chapterSpan;
+			if (stepsPerStory < 1)
+				stepsPerStory = 1;		// more stories than the slice has steps - crawl by ones
+
 			// Divide first, so a long story cannot overflow the multiplication. A story shorter than
 			// the number of steps counts as one whole step - it is over before it could be drawn.
-			const int32 charsPerStep = progressStoryLength / kKBSProgressStorySteps;
-			int32 within = (charsPerStep > 0) ? (start / charsPerStep) : kKBSProgressStorySteps;
-			if (within > kKBSProgressStorySteps)
-				within = kKBSProgressStorySteps;
+			const int32 charsPerStep = progressStoryLength / stepsPerStory;
+			int32 within = (charsPerStep > 0) ? (start / charsPerStep) : stepsPerStory;
+			if (within > stepsPerStory)
+				within = stepsPerStory;
+
+			// Never past this chapter's own slice: with stepsPerStory rounded up (the < 1 guard)
+			// the arithmetic can overshoot, and a bar that runs into the next chapter's slice
+			// jumps backwards when that chapter starts.
+			int32 position = progressBase + storiesDone * stepsPerStory + within;
+			const int32 chapterEnd = progressBase + chapterSpan;
+			if (position > chapterEnd)
+				position = chapterEnd;
 
 			// Through DoTask, not SetPosition: pumping the event queue here is what lets the user
 			// cancel at all (see KBSAdvanceProgress).
-			KBSAdvanceProgress(progressBar, ioProgressReported,
-				progressBase + storiesDone * kKBSProgressStorySteps + within);
+			KBSAdvanceProgress(progressBar, ioProgressReported, position);
 		}
 
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
@@ -1296,10 +1319,13 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 			outSummary.Append("Book Scope is on, but no book is open.");
 			return 0;
 		}
-		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
+		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
+		// handed straight back once it has been walked, so a book search never holds more than one
+		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
+		// summary reports the ones that could not, after the walk.
+		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
-			outSummary.Append("The active book has no openable chapters.");
-			KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
+			outSummary.Append("The active book has no chapters.");
 			return 0;
 		}
 	}
@@ -1348,13 +1374,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// single document with a lot of them takes just as long and had no way to be stopped.
 	//
 	// DisableChildProgressBars stops anything the walk runs into from putting up a bar of its own.
-	// NOTE: it does NOT cover the windowless chapter opens, which this comment used to claim: those
-	// all happen in GetBookChapterDocs above, before this bar exists.
+	// Since 2026-08-02 that covers the windowless chapter opens as well: chapters are opened inside
+	// the loop below, not before this bar exists.
 	//
-	// SIZED IN STORIES, not chapters. A chapter is far too coarse a step - one chapter of a hundred
-	// stories and one of two both moved the bar once, so it stood still through the long one. The
-	// story count comes from IStoryList and costs nothing to ask for, and each story is subdivided by
-	// how far into its text the walk has got (CollectHitsInDoc does the moving).
+	// EQUAL SLICES PER CHAPTER, subdivided by stories inside each one. The slices have to be equal
+	// because a chapter's size cannot be asked for before it is opened, and chapters are opened one
+	// at a time now. Within a chapter the story count comes from IStoryList and costs nothing, and
+	// each story is subdivided by how far into its text the walk has got (CollectHitsInDoc does the
+	// moving) - which is what keeps the bar alive through a chapter of a hundred stories.
 	//
 	// Why not simply ask the walker how far it is: ITextWalkerProgressMonitor is only a place to PARK
 	// a bar - the CLIENT's own OnNextPosition is what has to call SetPosition on it, and the stock
@@ -1366,19 +1393,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// wait out an internal delay first, and the search beat that delay even at 5000+ hits (measured
 	// 2026-07-27) - so the one thing the bar is really there for, the cancel button, was never on
 	// screen. Better a brief flash on a fast book than a search that cannot be stopped.
-	std::vector<int32> chapterStorySpans;		// bar units per chapter, in the same order as targets
-	chapterStorySpans.reserve(targets.size());
-	int32 progressTotal = 0;
-	for (size_t i = 0; i < targets.size(); ++i)
-	{
-		// At least one step per chapter, so a chapter with no stories at all still moves the bar.
-		int32 stories = CountSearchableStories(targets[i].docRef);
-		if (stories < 1)
-			stories = 1;
-		const int32 span = stories * kKBSProgressStorySteps;
-		chapterStorySpans.push_back(span);
-		progressTotal += span;
-	}
+	const int32 progressTotal = static_cast<int32>(targets.size()) * kKBSChapterProgressSpan;
 
 	// The title names the scope, because the bar no longer implies it: "Searching book..." when it
 	// really is a book, plain "Searching..." for a single document.
@@ -1445,16 +1460,48 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 			break;
 		}
 
+		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
+		// which is already open and never ours to close.
+		if (fromBook && targets[i].docRef == UIDRef::gNull)
+		{
+			if (!KBSBookScope::OpenChapterDoc(targets[i], &unopenable))
+			{
+				// The reason is recorded; AppendUnopenableNote names it in the summary. Hand the
+				// bar on all the same, so a book whose chapters will not open still fills it.
+				progressBase += kKBSChapterProgressSpan;
+				KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+				continue;
+			}
+		}
+
+		const UIDRef chapterDocRef = targets[i].docRef;
+
+		// Now that it is open, ask how many stories this chapter's slice of the bar has to be
+		// divided between. At least one, so a chapter with no stories at all still moves the bar.
+		int32 storiesInDoc = CountSearchableStories(chapterDocRef);
+		if (storiesInDoc < 1)
+			storiesInDoc = 1;
+
 		std::vector<KBSResultModel::Hit> hits;
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
-		CollectHitsInDoc(targets[i].docRef, static_cast<size_t>(remaining), hits, docCapped, walkResult,
-			&progressBar, progressBase, progressReported);
+		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), hits, docCapped, walkResult,
+			&progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc, progressReported);
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
-		progressBase += chapterStorySpans[i];
+		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		// ***** Hand the chapter back HERE, before any of the continues below can skip it. *****
+		// The walk is over and what it produced is plain data - UIDs and text indices, which survive
+		// the document being closed (measured 2026-07-17). A jump or a replace that needs this
+		// chapter later reopens it through ReopenChapterDoc, the path that already existed for
+		// chapters the user closed by hand.
+		//
+		// Only chapters KBS opened are closed: ReleaseHeldDoc checks the held list itself, so one
+		// the user already had open passes through untouched.
+		KBSBookScope::ReleaseHeldDoc(chapterDocRef);
 
 		if (docCapped)
 			collectionTruncated = true;
@@ -1519,9 +1566,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		return 0;
 	}
 
-	// Task 3: the windowless chapters stay HELD so a hit-row jump can reach them without a
-	// document load. They are released only when a DIFFERENT book is searched (KBSBookScope's
-	// book-switch guard) or at shutdown - a same-book re-search reuses them.
+	// Every chapter KBS opened has already been handed back inside the loop - a book search leaves
+	// nothing of its own open, and no .indd locked. The rows carry their chapter's file, so a jump
+	// or a replace reopens whatever it needs (KBSJump::EnsureChapterReachable and the replace
+	// engine's own reopen). What that costs is a document load on the first click into a chapter;
+	// what it buys is that searching a book no longer leaves twenty hidden documents behind.
 
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
 	if (total == 0)
