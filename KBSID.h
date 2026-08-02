@@ -81,10 +81,10 @@ DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
 // IControlView is ours, built the same way the hit row's colour cell is.
 DECLARE_PMID(kClassIDSpace, kKBSGlyphConfirmDialogBoss, kKBSPrefix + 11)
 DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
-// The missing-glyph scan's own text-walker client. Carries the stock progress-monitor
-// implementation beside our own client, which is how the spell panel's replace client is built
-// (SpellPanelClass.fr:548-557) - the monitor is Adobe's, only the client is ours.
-DECLARE_PMID(kClassIDSpace, kKBSGlyphWalkerClientBoss, kKBSPrefix + 13)
+// +13 was the missing-glyph scan's own text-walker client, from the measurement phase. Removed on
+// 2026-08-02 with the -2 route it existed to drive: the scan reads the composed wax and needs no
+// walker at all. NOT reused - a class id that once shipped stays spent.
+//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 13)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 14)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 15)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 16)
@@ -175,8 +175,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
 // The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
 // they land on, so a book search's closed chapters do not hide their hits from the keyboard.
 DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
-// The missing-glyph scan's text-walker client (the walker-driven scan).
-DECLARE_PMID(kImplementationIDSpace, kKBSGlyphWalkerClientImpl, kKBSPrefix + 18)
+// +18 was the missing-glyph scan's text-walker client implementation - removed 2026-08-02 with the
+// boss it implemented (see kKBSPrefix + 13 above). NOT reused.
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 18)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 19)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 20)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 21)

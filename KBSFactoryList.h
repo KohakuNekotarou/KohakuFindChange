@@ -48,6 +48,3 @@ REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
 // The Glyph tab's replace confirmation: the dialog's controller and the view that draws one glyph.
 REGISTER_PMINTERFACE(KBSGlyphConfirmDialogController, kKBSGlyphConfirmDialogControllerImpl)
 REGISTER_PMINTERFACE(KBSGlyphView, kKBSGlyphViewImpl)
-// The missing-glyph scan's own text-walker client (the walker-driven scan). A boss in the .fr
-// naming an implementation that is not registered here takes InDesign down at load time.
-REGISTER_PMINTERFACE(KBSGlyphWalkerClient, kKBSGlyphWalkerClientImpl)

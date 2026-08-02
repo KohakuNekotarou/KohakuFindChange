@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="15.0">
    <ItemGroup Label="ProjectConfigurations">
       <ProjectConfiguration Include="Debug|Win32">
@@ -219,7 +219,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphWalkerClient.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultModel.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSResultListWidgetMgr.cpp"/>
@@ -258,7 +257,6 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookScope.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphScanEngine.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphWalkerClient.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSResultModel.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSColorTextView.h"/>

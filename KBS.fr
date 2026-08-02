@@ -61,9 +61,7 @@
 #include "GenericID.h"
 #include "ShuksanID.h"
 #include "TextID.h"
-// IID_ITEXTWALKERCLIENT / IID_ITEXTWALKERPROGRESSMONITOR and the STOCK monitor implementation
-// (kTextWalkerProgressMonitorImpl) the glyph scan's walker client aggregates - see KBS.fr's
-// kKBSGlyphWalkerClientBoss below and SpellPanelClass.fr:548-557, which builds its client the same way.
+// kFindChangeClientBoss and the walker service ids the search walks with.
 #include "TextWalkerServiceProviderID.h"
 
 
@@ -248,29 +246,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			// (No worked example of it exists in the SDK - it is declared in DialogLayoutID.h and
 			// used nowhere - so this is confirmed by running it, not by reading.)
 			IID_IEVEINFO, kFixedSizeEVEInfoImpl,
-		}
-	},
-
-	/*
-	 * The missing-glyph scan's own TEXT WALKER CLIENT (the walker-driven variant of the scan).
-	 *
-	 * A find/change walk uses the stock kFindChangeClientBoss, because the find/change command
-	 * drives it. A notdef scan has no query to run and therefore no command to drive it, so the
-	 * walk is driven directly (ITextWalker::Walk) - and Walk calls back into a CLIENT, which has
-	 * to be one that answers the question being asked. See KBSGlyphWalkerClient.h.
-	 *
-	 * The progress monitor beside it is ADOBE'S, not ours: ITextWalkerProgressMonitor is only a
-	 * place to park a RangeProgressBar, so the stock implementation is all that is needed and
-	 * writing one would be duplicating it. This pairing is exactly how the spell panel builds its
-	 * own replace client (SpellPanelClass.fr:548-557).
-	 */
-	Class
-	{
-		kKBSGlyphWalkerClientBoss,
-		kInvalidClass,
-		{
-			IID_ITEXTWALKERCLIENT,			kKBSGlyphWalkerClientImpl,
-			IID_ITEXTWALKERPROGRESSMONITOR,	kTextWalkerProgressMonitorImpl,
 		}
 	},
 
