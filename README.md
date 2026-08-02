@@ -131,10 +131,12 @@ nothing on them to rewrite.
   change string is allowed — it deletes the matches — and the prompt spells that out rather than
   showing a blank line. **This prompt is translated** (the panel, its menu and its status line stay
   English, echoing Find/Change's wording).
-- On the **Glyph tab** the confirmation is a dialog that **draws the two glyphs themselves**, in the
-  fonts that define them, with each font's name and Unicode value under it. A glyph id names nothing
-  by itself, and an alternate form drawn as a character would come out as the standard form it
-  shares its Unicode with.
+- On the **Glyph tab** that same prompt **draws the two glyphs themselves** instead of quoting
+  strings, in the fonts that define them, with each font's name and Unicode value under it. A glyph
+  id names nothing by itself, and an alternate form drawn as a character would come out as the
+  standard form it shares its Unicode with. (If the fonts cannot be resolved — a ROS-group query
+  carries none — it falls back to quoting, so a confirmation that cannot be *drawn* is never a
+  reason the replace cannot *run*.)
 - **`Check All` / `Uncheck All` are on the result rows' right-click menu**, and reach exactly the row
   they were popped over: the **book row** means every chapter, a **document row** means that chapter
   alone. They cover **every stored hit**, including any beyond the rows the panel displays, so the
@@ -148,7 +150,20 @@ nothing on them to rewrite.
   the run are marked clean again. The price is that finished chapters are thrown away too: breaking
   off a 900-of-1000 run starts over.
 - Chapters that received a replacement are **opened in a window and left unsaved** — overwriting
-  your files stays your decision.
+  your files stays your decision. The confirmation offers **`Save each chapter after replace`** when
+  you want it done for you. It starts **off every time**: a replace overwrites files, so it is asked
+  per run rather than remembered anywhere. With it ticked, every document a replacement landed in is
+  saved once the whole run is committed — the one in front, a chapter you had open, and a chapter KBS
+  opened by itself, all alike. Documents nothing landed in are never touched: if one of those is
+  dirty, that edit is somebody else's.
+- With **`Hide Previous Chapter`** on as well, the chapters KBS opened windowless are **closed again**
+  after they are saved, so the desk is left the way the run found it (and no window is opened just to
+  be shut a moment later). Documents you had open yourself are never closed. Rows still jump — a
+  closed chapter is reopened on the way.
+- A chapter that **cannot be written** — read-only, or a document that has never been saved at all —
+  is named in the status line, and **nothing is closed** in that case. The sweep closes with the UI
+  suppressed and does not look at the unsaved flag, so closing after a failed save would throw the
+  very replacements away.
 - **A checked hit that is not replaced is always counted and named**, never allowed to make the
   total quietly come up short. Four ways that happens: `lock` (locked content — InDesign can search
   it but offers no way to change it, so KBS follows), `missing` (the text is no longer where the
