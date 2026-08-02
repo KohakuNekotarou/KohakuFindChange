@@ -76,6 +76,15 @@ namespace
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
+	// What that same column shrinks to when the result kind carries no check box on ANY row - a
+	// missing-glyph scan. Half a check zone, so the hit rows land 8px right of the font row above
+	// them: the step the book and font levels already use, which makes the whole tree one even
+	// staircase (user's call 2026-08-02 - "make it a nice staircase, shifted left by the check").
+	// Half rather than all of it: giving back the full 16px would line the hit rows up with their
+	// font row's LABEL, leaving no step at all between a branch and the rows under it. The full
+	// zone is still kept for a Find/Change result, where some rows have a box and some do not and
+	// the locators have to stay in one column (see ApplyHitRow).
+	const PMReal kScanCheckZone = 8.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
 	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
@@ -406,10 +415,16 @@ private:
 		//              so Check All and Change Checked have never reached these rows - but the box was
 		//              still being DRAWN here and could still be clicked, which promised an action
 		//              nothing was going to carry out. Same question, asked in both places now.
+		//
+		// The scan is asked as its own question first because it says something the others do not:
+		// it is a property of the WHOLE list rather than of this row, so the column in front of the
+		// locators can be narrowed for every row at once (see the cell's frame below). The rest are
+		// per-row - a Find/Change result mixes rows that have a box with rows that lost one.
+		const bool scanOnly = (KBSResultModel::GetResultKind() == KBSResultModel::kResultMissingGlyph);
 		const bool noCheckBox = row.replaced || row.locked
 			|| row.outcome != KBSResultModel::kOutcomeNone
 			|| KBSResultModel::IsShowingReplaceOutcome()
-			|| KBSResultModel::GetResultKind() == KBSResultModel::kResultMissingGlyph;
+			|| scanOnly;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
@@ -464,7 +479,13 @@ private:
 			// The rows without a box used to reclaim those 16px, which read as a ragged left edge
 			// once a search turned up a lot of locked hits (user's call 2026-07-28, from a screen
 			// shot). A column that does not move is worth more than the width.
-			frame.Left(xStart + kCheckZone);
+			//
+			// A missing-glyph scan is the one case where the column can move, because it moves for
+			// every row: no row of that kind has ever had a box, so nothing is left ragged. There
+			// it keeps half the zone (kScanCheckZone) instead of all of it, which steps the hit
+			// rows off their font row by the same 8px the levels above use rather than sinking them
+			// a full check box deeper than anything else in the tree.
+			frame.Left(xStart + (scanOnly ? kScanCheckZone : kCheckZone));
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
