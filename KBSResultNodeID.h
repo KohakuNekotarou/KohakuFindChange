@@ -22,7 +22,7 @@
 //  the unit Check All reaches. Only a missing-glyph scan names fonts - a Find/Change result names
 //  none, its chapters have no groups, and its tree is the three levels it has always had.
 //
-//  ★ hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
+//  ***** hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
 //  way, and this level is a way of DISPLAYING those hits, not a renumbering of them.
 //

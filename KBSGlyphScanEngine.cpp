@@ -54,6 +54,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IComposeScanner.h"	// CopyText - reading the character between two boxes
 #include "IDocument.h"			// GetName - the chapter row's display name
 #include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
@@ -76,8 +77,10 @@
 #include "ParcelKey.h"			// ParcelKey::IsValid - the overset test on a wax line
 #include "PersistUtils.h"		// ::GetUIDRef
 #include "ProgressBar.h"		// RangeProgressBar - the scan's progress + cancel
+#include "TextChar.h"			// kTextChar_CR / kTextChar_LF - the only breaks a row may cross
 #include "TextID.h"				// kFrameListBoss / IID_IWAXSTRAND - which strand holds the wax
 #include "Utils.h"
+#include "WideString.h"			// the gap's characters come back in one
 
 #include <algorithm>
 #include <vector>
@@ -112,8 +115,11 @@ struct NotdefRun
 	TextIndex	start;
 	TextIndex	end;		// EXCLUSIVE
 	PMString	fontName;
+	int32		glyphs;		// how many BOXES this run holds - not the same as end - start, because a
+							// run may swallow one line break (see MergeIntoRuns), and that character
+							// is not a box. The summary counts these.
 
-	NotdefRun() : start(kInvalidTextIndex), end(kInvalidTextIndex) {}
+	NotdefRun() : start(kInvalidTextIndex), end(kInvalidTextIndex), glyphs(0) {}
 };
 
 bool ByPosition(const NotdefGlyph& a, const NotdefGlyph& b)
@@ -257,6 +263,34 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	}
 }
 
+/** Is the single character at 'pos' a line break that a row is allowed to swallow?
+
+    Exactly two characters qualify, because exactly two are STORED in the text:
+      kTextChar_CR (0x000D) - the paragraph terminator
+      kTextChar_LF (0x000A) - a forced line break (Shift+Enter)
+
+    A column, frame or page break is NOT a character of its own: it is a paragraph attribute
+    (kStartParagraphPropertyScriptElement), so the story holds a plain CR for it and this covers it
+    without naming it. TextChar.h:496 states that the 0xE00B-series break characters "are used only
+    by Find/Change, and are not stored in a document", so there is nothing else to test for.
+
+    Everything else ends the run and must: a space has a glyph of its own, a table anchor (0x0016)
+    is a boundary a row must never cross, and an inline graphic (0xFFFC) is not text at all. */
+bool IsCrossableBreak(IComposeScanner* scanner, TextIndex pos)
+{
+	if (scanner == nil)
+		return false;
+
+	WideString gap;
+	scanner->CopyText(pos, 1, &gap);
+
+	int32 n = 0;
+	const UTF16TextChar* buf = gap.GrabUTF16Buffer(&n);
+	if (buf == nil || n != 1)
+		return false;
+	return buf[0] == kTextChar_CR || buf[0] == kTextChar_LF;
+}
+
 /** Sort the collected glyphs and merge neighbours into the runs that become rows.
 
     ***** The sort is not tidiness. IWaxGlyphIterator.h:151-156 warns that the text indices "may not be
@@ -265,13 +299,27 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
     judged once the positions are in order, and the same index can arrive more than once.
 
     A run is broken by a gap OR by a change of font: two boxes side by side in two different fonts
-    are two different problems, and the row names the font. */
-void MergeIntoRuns(std::vector<NotdefGlyph>& found, std::vector<NotdefRun>& out)
+    are two different problems, and the row names the font.
+
+    ONE line break may sit inside a run (2026-08-02, user's call): a stretch of text that a font
+    cannot set does not stop being one problem because it wrapped onto a new paragraph, and the fix
+    - applying a font to the range - wants to reach all of it in one go. Only a SINGLE break is
+    crossed: two in a row mean an empty paragraph between the boxes, which is a different place.
+
+    ***** The row's DISPLAYED text is still cut at the paragraph that holds its start
+    (KBSSearchEngine::SplitLineAroundMatch trims a range that runs past its paragraph), so a row
+    that crosses a break shows the boxes before it and not the ones after. The COUNT and the RANGE
+    both cover the whole run, so the summary and any fix are unaffected. */
+void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vector<NotdefRun>& out)
 {
 	if (found.empty())
 		return;
 
 	std::sort(found.begin(), found.end(), ByPosition);
+
+	// One scanner for the whole story rather than one per gap - it is only asked anything when two
+	// boxes are exactly one character apart, which is rare, but the query itself is not free.
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 
 	for (size_t i = 0; i < found.size(); ++i)
 	{
@@ -282,9 +330,15 @@ void MergeIntoRuns(std::vector<NotdefGlyph>& found, std::vector<NotdefRun>& out)
 			NotdefRun& last = out.back();
 			if (g.pos < last.end)
 				continue;		// this character was already taken (several glyphs, one character)
-			if (g.pos == last.end && last.fontName.Compare(kTrue, g.fontName) == 0)
+			if (last.fontName.Compare(kTrue, g.fontName) == 0
+				&& (g.pos == last.end
+					|| (g.pos == last.end + 1 && IsCrossableBreak(scanner, last.end))))
 			{
-				last.end = g.pos + 1;		// neighbour in the same font - keep it on one row
+				// Neighbour in the same font, or one line break away from it - keep it on one row.
+				// The break itself is taken INTO the range, which is what lets a font be applied to
+				// the whole stretch in one call. It is NOT counted as a box.
+				last.end = g.pos + 1;
+				++last.glyphs;
 				continue;
 			}
 		}
@@ -293,6 +347,7 @@ void MergeIntoRuns(std::vector<NotdefGlyph>& found, std::vector<NotdefRun>& out)
 		run.start = g.pos;
 		run.end = g.pos + 1;
 		run.fontName = g.fontName;
+		run.glyphs = 1;
 		out.push_back(run);
 	}
 }
@@ -341,7 +396,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		ScanStoryWax(model, found, outHasOverset);
 
 		std::vector<NotdefRun> runs;
-		MergeIntoRuns(found, runs);
+		MergeIntoRuns(model, found, runs);
 
 		for (size_t r = 0; r < runs.size(); ++r)
 		{
@@ -361,7 +416,10 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 			// Counted separately from the rows, because consecutive boxes are deliberately merged
 			// into ONE row: a document with 45 boxes in two stretches makes two rows, and saying
 			// "2 missing glyphs" about it would be a lie.
-			outGlyphCount += static_cast<int32>(runs[r].end - runs[r].start);
+			//
+			// The run's own tally, NOT its length: a run may swallow one line break, and that
+			// character is not a box.
+			outGlyphCount += runs[r].glyphs;
 		}
 	}
 
