@@ -59,10 +59,15 @@ namespace
 	// this record to stay under the open-database cap.
 	OriginallyCloseDocInfo gHeldDocInfo;
 
-	// Which book the held chapters belong to (its full file path). A search against a DIFFERENT
-	// book first closes the previous book's held chapters, so switching books never piles up
-	// hidden documents from every book visited.
-	PMString gHeldBookPath;
+	// Which book the RESULTS on the panel came from (its full file path). NOT "which book we hold
+	// chapters for": since 2026-08-02 every run closes each chapter as soon as it is done with it,
+	// so the held list is empty most of the time while a full result set is still on screen.
+	//
+	// Two things read this and both are about the RESULTS, not about open documents:
+	//   * KBSBookWatch - "the book these results name has been closed, retire them"
+	//   * KBSJump::ShowBook - "the book row was clicked, bring that book forward"
+	// Let go through ReleaseSearchedBook, which every KBSResultModel::Clear() is paired with.
+	PMString gSearchedBookPath;
 
 	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
 	// gBookSearchOn: OFF searches the front document, ON the whole active book.
@@ -191,18 +196,18 @@ bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 
 void KBSBookScope::ReleaseHeldDocs()
 {
+	// NOTE: the searched-book path is NOT cleared here. Closing the chapters says nothing about
+	// which book the panel is showing - and since every run closes its chapters as it goes, doing
+	// so would blank the path while a full result set is still up (which broke both readers named
+	// on gSearchedBookPath).
 	if (gHeldDocInfo.fCurrentOpenedDocumentList.size() == 0)
-	{
-		gHeldBookPath.Clear();
 		return;
-	}
 
 	// Take the list first, so a re-entrant call finds it already empty instead of scheduling
 	// the closes twice.
 	K2Vector<UIDRef> held;
 	held = gHeldDocInfo.fCurrentOpenedDocumentList;
 	gHeldDocInfo.Clear();
-	gHeldBookPath.Clear();
 
 	// Close each chapter through the stock document close. kSchedule defers each close until the
 	// current notification / idle tick has unwound; kSuppressUI + the search-time dirty guard =
@@ -228,12 +233,26 @@ void KBSBookScope::ReleaseHeldDocs()
 	}
 }
 
+void KBSBookScope::ReleaseSearchedBook()
+{
+	// Both halves, always together. Letting the path go without the chapters would strand them:
+	// nothing else remembers which book they belong to, so the book watcher - whose only question
+	// is "is OUR book still open" - would have no book left to ask about, and they would keep their
+	// .indd files locked for the rest of the session.
+	//
+	// This is the second of the two holes KBSBookWatch's header records (a book run followed by a
+	// DOCUMENT-scope run). Closing the chapters here fixes it at the moment the results are dropped,
+	// rather than leaving it for a book close that may never come.
+	ReleaseHeldDocs();
+	gSearchedBookPath.Clear();
+}
+
 void KBSBookScope::ShutdownCleanup()
 {
 	// State only, no closing, no UI: this runs while InDesign is tearing down. Clear() releases
 	// the vector's storage too, so the static destructor at DLL unload finds nothing to do.
 	gHeldDocInfo.Clear();
-	gHeldBookPath.Clear();
+	gSearchedBookPath.Clear();
 	gBookScopeOn = false;
 }
 
@@ -434,10 +453,10 @@ void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
 	outSummary.Append(").");
 }
 
-bool KBSBookScope::GetHeldBookPath(PMString& outPath)
+bool KBSBookScope::GetSearchedBookPath(PMString& outPath)
 {
-	outPath = gHeldBookPath;
-	return !gHeldBookPath.IsEmpty();
+	outPath = gSearchedBookPath;
+	return !gSearchedBookPath.IsEmpty();
 }
 
 bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
@@ -632,15 +651,14 @@ bool KBSBookScope::GetBookChapterDocs(std::vector<ChapterDoc>& outDocs, PMString
 	if (bookDB == nil)
 		return false;
 
-	// A different book than the chapters we hold were opened for? Close those first, then
-	// remember the new book as the held one.
+	// A different book than the one the last run held chapters for? Close those first. Chapters
+	// are normally closed as each run finishes with them, so this only ever finds chapters a JUMP
+	// reopened - which belong to the old book and have no reason to stay.
 	SDKFileHelper bookFileHelper(book->GetBookFileSpec());
 	const PMString bookPath = bookFileHelper.GetPath();
-	if (!(gHeldBookPath == bookPath))
-	{
+	if (!(gSearchedBookPath == bookPath))
 		ReleaseHeldDocs();
-		gHeldBookPath = bookPath;
-	}
+	gSearchedBookPath = bookPath;
 
 	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
 	if (contentMgr == nil)

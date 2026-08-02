@@ -1200,6 +1200,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	const SearchingFlagGuard searchingGuard;
 
 	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
 
 	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
 	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
@@ -1511,7 +1512,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	if (cancelled)
 	{
 		KBSResultModel::Clear();
-		KBSBookScope::ReleaseHeldDocs();
+		KBSBookScope::ReleaseSearchedBook();	// closes the chapters AND forgets the book
 		outSummary.Clear();
 		outSummary.SetTranslatable(kFalse);
 		outSummary.Append("Search cancelled.");

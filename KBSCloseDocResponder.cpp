@@ -42,6 +42,7 @@
 #include "CResponder.h"
 
 // Project includes:
+#include "KBSBookScope.h"		// ReleaseSearchedBook - paired with every result Clear()
 #include "KBSID.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
@@ -118,7 +119,13 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 
 	// Back to empty. Rebuild draws the now-empty model, and the status line says why the rows
 	// went - a panel that empties itself without a word reads as a crash.
+	//
+	// ReleaseSearchedBook alongside, without exception: a document-scope result set has no book
+	// behind it, so this call finds nothing to do every time it runs. It is here so that "every
+	// KBSResultModel::Clear() is paired with one" stays a rule with no exceptions to remember -
+	// the next person to add a Clear() elsewhere should not have to work out whether theirs counts.
 	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();
 	KBSResultTree::Rebuild();
 
 	PMString cleared("Results cleared - the document was closed.");

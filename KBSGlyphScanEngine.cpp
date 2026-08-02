@@ -551,6 +551,7 @@ void KBSGlyphScanEngine::Run()
 	}
 
 	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
 
 	// All three AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
 	// takes the check boxes off every row and greys Change Checked out - a scan is a report, not a
@@ -644,9 +645,9 @@ void KBSGlyphScanEngine::Run()
 	if (cancelled)
 	{
 		// Throw the half-finished list away rather than leave a partial one looking complete, and
-		// give the chapters back. ReleaseHeldDocs schedules its closes, so it is safe from in here.
+		// give the chapters back. The closes are scheduled, so it is safe from in here.
 		KBSResultModel::Clear();
-		KBSBookScope::ReleaseHeldDocs();
+		KBSBookScope::ReleaseSearchedBook();	// closes the chapters AND forgets the book
 		KBSResultTree::Rebuild();
 		summary.Append("Scan cancelled.");
 		KBSResultTree::ShowStatus(summary);

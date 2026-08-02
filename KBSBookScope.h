@@ -88,10 +88,24 @@ namespace KBSBookScope
 	    against the UIDRef without dereferencing its (possibly dead) database. */
 	bool IsDocStillOpen(const UIDRef& docRef);
 
-	/** The full file path of the book the held chapters were opened for - i.e. the book the last
-	    book search ran against. false (and an empty string) when nothing is held.
-	    NOTE: ReleaseHeldDocs clears it, so read this BEFORE releasing. */
-	bool GetHeldBookPath(PMString& outPath);
+	/** The full file path of the book the results on the panel came from. false (and an empty
+	    string) when the panel is not showing a book's results.
+
+	    Set when a run resolves its book; cleared by ReleaseSearchedBook. ReleaseHeldDocs does NOT
+	    touch it - closing chapters and showing results are separate facts, and since every run
+	    closes its chapters as it goes, tying the two together blanked this while a full result
+	    set was still on screen. */
+	bool GetSearchedBookPath(PMString& outPath);
+
+	/** Let go of the book the results came from: forget the path AND close whatever chapters are
+	    still held for it. Pair this with every KBSResultModel::Clear().
+
+	    The two halves are one operation on purpose. Nothing else remembers which book a held
+	    chapter belongs to, so a path dropped on its own strands them with their .indd files locked
+	    (see KBSBookWatch's header on the two cases where that used to happen). Held chapters at
+	    this point are only ever ones a jump or a replace reopened - a run closes its own as it
+	    goes - so this is "the results are gone, and so is the reason those chapters were open". */
+	void ReleaseSearchedBook();
 
 	/** Is a book with this full file path still in the session's open-book list? Compares paths
 	    rather than IBook pointers because the caller is a close notification: the closed book's
@@ -106,7 +120,7 @@ namespace KBSBookScope
 	    The tab is brought forward WITHOUT taking the key focus, so a keyboard walk over the result
 	    tree is not interrupted by it.
 
-	    @param bookPath the book's full file path (what GetHeldBookPath hands back).
+	    @param bookPath the book's full file path (what GetSearchedBookPath hands back).
 	    @return false when no OPEN book has that path - nothing is changed then. A true return means
 	            the active book was set; the tab follows unless the panel could not be resolved. */
 	bool ActivateBook(const PMString& bookPath);

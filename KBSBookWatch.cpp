@@ -31,20 +31,27 @@
 //  It does not say WHICH book closed (the subject is the session; theChange and protocol are
 //  identical every time), and it does not need to, because the only question ever asked is:
 //
-//      is the book whose chapters we are HOLDING still open?
+//      is the book our results came from still open?
 //
 //  That question is the whole design. It needs no notion of which book closed and no two-step
 //  state: a spurious cue simply finds the book still open and does nothing, and a book that
 //  disappears by any route at all is caught by the next cue.
 //
-//  It is asked about the HELD CHAPTERS, not about the result set. Asking it about the results (which
-//  is what this did until 2026-07-30) let two cases through, and in both of them the chapters stayed
-//  open with their files locked for the rest of the session:
-//    * a book search that found NOTHING still holds the chapters it opened to look - but there is no
-//      result set, so the old "are there results?" gate returned early;
-//    * a book search followed by a DOCUMENT-scope search - the held chapters are still ours, but
-//      IsFromBook() is false by then, so the old gate returned early as well.
-//  Nothing held means this plug-in has no stake in any book closing, which is the honest gate.
+//  It is asked about the SEARCHED BOOK (KBSBookScope::GetSearchedBookPath), NOT about the result
+//  set. Asking it about the result set - which is what this did until 2026-07-30 - let two cases
+//  through, and in both of them chapters stayed open with their files locked for the rest of the
+//  session:
+//    * a book search that found NOTHING - no result set, so an "are there results?" gate returned
+//      early while the chapters it opened to look were still held;
+//    * a book search followed by a DOCUMENT-scope search - IsFromBook() is false by then, so that
+//      gate returned early as well.
+//  The searched-book path survives both. It is set whenever a run resolves a book, whatever that
+//  run goes on to find, and the only way to let it go is ReleaseSearchedBook - which closes the
+//  held chapters in the same breath. So when this gate is false there is nothing of ours left open.
+//
+//  (Until 2026-08-02 the gate asked about the HELD CHAPTERS. That was honest while a book run kept
+//  every chapter it opened; now a run closes each chapter as soon as it has walked it, so the held
+//  list is empty almost always and a gate on it would never have armed the timer at all.)
 //
 //  THE ONE THAT DID NOT WORK - kept here so it is not tried again (2026-07-28)
 //
@@ -133,16 +140,16 @@ void RetireBookResultsIfGone()
 	if (KBSRunGuard::IsAnyRunning())
 		return;
 
-	// Which book are we holding chapters for? Read the path BEFORE releasing anything -
-	// ReleaseHeldDocs clears it. Nothing held = nothing to give back and no book of ours to ask
-	// about, which is the one honest early exit here (see the file header on why this is asked about
-	// the held chapters rather than about the result set).
-	PMString heldBookPath;
-	if (!KBSBookScope::GetHeldBookPath(heldBookPath))
+	// Which book are the results from? Read the path BEFORE releasing anything -
+	// ReleaseSearchedBook clears it. No searched book = nothing of ours is open and nothing on the
+	// panel names a book, which is the one honest early exit here (see the file header on why this
+	// is asked about the searched book rather than about the result set or the held chapters).
+	PMString searchedBookPath;
+	if (!KBSBookScope::GetSearchedBookPath(searchedBookPath))
 		return;
 
 	// The ordinary case for most cues: our book is fine, this was about some other book.
-	if (KBSBookScope::IsBookStillOpen(heldBookPath))
+	if (KBSBookScope::IsBookStillOpen(searchedBookPath))
 		return;
 
 	// Is the panel still showing THAT book's results? Decided before anything is released, because
@@ -161,7 +168,8 @@ void RetireBookResultsIfGone()
 	// The chapters go back FIRST, and unconditionally: leaving them open would strand hidden
 	// documents - with their .indd files locked - belonging to a book nobody has open any more. The
 	// closes are scheduled (IDocFileHandler::kSchedule), so doing this from a notification is safe.
-	KBSBookScope::ReleaseHeldDocs();
+	// ReleaseSearchedBook does the path as well, so the model's Clear below needs no second call.
+	KBSBookScope::ReleaseSearchedBook();
 
 	// The panel is only touched when it was showing this book's results. Anything else on screen
 	// (a document-scope search, or nothing at all) is not ours to wipe.
@@ -253,13 +261,12 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	if (theChange != kCloseBookCmdBoss)
 		return;
 
-	// Nothing held? Then no book closing is any of our business - there are no windowless chapters to
-	// give back, and a result set with no held chapters behind it cannot be a book's. This is the
-	// same gate the deferred question uses, kept here so a cue that will do nothing does not even
-	// arm the timer. (It used to ask whether the results came from a book, which missed the two cases
-	// named in the file header and left chapters open with their files locked.)
-	PMString heldBookPath;
-	if (!KBSBookScope::GetHeldBookPath(heldBookPath))
+	// No searched book? Then no book closing is any of our business - nothing of ours is open and
+	// nothing on the panel names a book. This is the same gate the deferred question uses, kept here
+	// so a cue that will do nothing does not even arm the timer. (See the file header for why the
+	// question is not "are there results?" and no longer "do we hold chapters?".)
+	PMString searchedBookPath;
+	if (!KBSBookScope::GetSearchedBookPath(searchedBookPath))
 		return;
 
 	// Ask one beat later: at this instant the closing book still looks completely open.

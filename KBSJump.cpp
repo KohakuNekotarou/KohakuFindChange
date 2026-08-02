@@ -492,10 +492,10 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 
 void KBSJump::ShowBook()
 {
-	// Which book the results came from. The HELD PATH, not the model's display name: that name is
-	// the file name only, and two books in different folders can share one.
+	// Which book the results came from. The SEARCHED PATH, not the model's display name: that name
+	// is the file name only, and two books in different folders can share one.
 	PMString bookPath;
-	if (!KBSBookScope::GetHeldBookPath(bookPath) || bookPath.IsEmpty())
+	if (!KBSBookScope::GetSearchedBookPath(bookPath) || bookPath.IsEmpty())
 		return;		// a document-scope result has no book row to click in the first place
 
 	// A book closed since the search is NOT reopened. The row records which book was SEARCHED; it
