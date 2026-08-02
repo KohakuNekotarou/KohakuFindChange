@@ -40,7 +40,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // ----- Command strings
                 kKBSSearchBookMenuKey,			"Search",
                 kKBSFindMissingGlyphsMenuKey,	"Find Missing Glyphs",
-                kKBSFindMissingGlyphsWalkerMenuKey,	"Find Missing Glyphs (Walker)",
                 kKBSBookScopeMenuKey,			"Book Scope",
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
                 kKBSReplaceCheckedMenuKey,		"Change Checked",

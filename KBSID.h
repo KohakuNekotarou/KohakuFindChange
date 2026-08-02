@@ -216,10 +216,11 @@ DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 // Find Missing Glyphs: scan the scope for notdef glyphs (2026-08-01). + 12 and + 13 are burnt
 // numbers (see above), so this is the first genuinely unused one.
 DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
-// The same scan driven by a text walker instead of by walking the stories directly. A second menu
-// item rather than a switch on the first, so the two can be run one after the other on the same
-// document and their answers compared.
-DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsWalkerActionID, kKBSPrefix + 15)
+// +15 was a second menu item that ran the same scan through the official find/change engine with
+// kAnyNotDefGlyphID. Removed on 2026-08-02: that route takes InDesign down on any document holding
+// overset text, by every route there is, so it must not be reachable at all. Like the numbers above
+// it is NOT reused - an id that once shipped stays spent.
+//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 16)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 17)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 18)
@@ -278,8 +279,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
 // "Find Missing Glyphs": scan for notdef glyphs rather than for the Find/Change query.
 #define kKBSFindMissingGlyphsMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsMenuKey"
-// The walker-driven variant of the same scan.
-#define kKBSFindMissingGlyphsWalkerMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsWalkerMenuKey"
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
@@ -348,8 +347,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The glyph scan is the search command's sibling, so it sits directly under it - above the scope
 // toggle's separator (1.3), which keeps the two "run something" commands together.
 #define kKBSFindMissingGlyphsMenuItemPosition	1.1
-// The walker-driven scan sits directly under the direct one, so the pair reads as one experiment.
-#define kKBSFindMissingGlyphsWalkerMenuItemPosition	1.2
 #define kKBSHidePrevChapterMenuItemPosition	2.0
 
 // The replace block sits below the existing toggles, above the About separator (10.0).

@@ -415,13 +415,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSFindMissingGlyphsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// The same scan, driven by a text walker. Directly under the one above so the pair reads
-		// as the one experiment it is.
-		kKBSFindMissingGlyphsWalkerActionID,
-		kKBSTargetMenuPath
-		kKBSFindMissingGlyphsWalkerMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Separator between the search command and the toggles.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
@@ -530,15 +523,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// The walker-driven variant. Same flags as the scan above for the same reasons.
-		kKBSActionComponentBoss,
-		kKBSFindMissingGlyphsWalkerActionID,
-		kKBSFindMissingGlyphsWalkerMenuKey,	// "Find Missing Glyphs (Walker)"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
 
 		kKBSActionComponentBoss,
 		kKBSScopeBookActionID,

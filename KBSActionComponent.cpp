@@ -157,15 +157,6 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKBSFindMissingGlyphsWalkerActionID:
-		{
-			// The same scan with a TEXT WALKER driving it instead of the direct story walk. Kept as
-			// a separate command so both can be run over one document and their answers compared -
-			// see KBSGlyphScanEngine::RunWithWalker.
-			KBSGlyphScanEngine::RunWithWalker();
-			break;
-		}
-
 		case kKBSScopeBookActionID:
 		{
 			// Toggle the search scope: the whole active book, or just the front document. Just the
@@ -522,12 +513,6 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// state, and an action this loop never names stays DISABLED. (Found on the real
 			// application - the item appeared in the flyout but invoke() answered "Action is not
 			// enabled".)
-			listToUpdate->SetNthActionState(i, kEnabledAction);
-		}
-		else if (action == kKBSFindMissingGlyphsWalkerActionID)
-		{
-			// Same reasoning as the scan above - and the same trap: kCustomEnabling means an action
-			// this loop never names stays DISABLED, however visible its menu item looks.
 			listToUpdate->SetNthActionState(i, kEnabledAction);
 		}
 		else if (action == kKBSScopeBookActionID)

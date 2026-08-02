@@ -55,7 +55,6 @@
 
 // Interface includes:
 #include "IDocument.h"			// GetName - the chapter row's display name
-#include "IFindChangeUtils.h"	// kAnyNotDefGlyphID - RunWithWalker only
 #include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
 #include "IMenuUtils.h"			// InsertAmpersandForDisplay - '&' doubles in anything DRAWN
@@ -598,22 +597,6 @@ void KBSGlyphScanEngine::Run()
 
 	BuildSummary(glyphTotal, rowTotal, hasOverset, summary);
 	AppendUnopenableNote(summary, unopenable);
-	KBSResultTree::ShowStatus(summary);
-}
-
-//========================================================================================
-// The -2 route, kept only until the wax scan has been signed off on the real application.
-//
-// !! DO NOT SHIP THIS. glyphID = -2 takes InDesign down on any document holding overset text, by
-//   every route there is (see the header comment). It is here so the two can be run over the same
-//   document during testing, and it goes when the menu item that calls it goes.
-//========================================================================================
-
-void KBSGlyphScanEngine::RunWithWalker()
-{
-	PMString summary;
-	summary.SetTranslatable(kFalse);
-	KBSSearchEngine::SearchBook(summary, kAnyNotDefGlyphID);
 	KBSResultTree::ShowStatus(summary);
 }
 
