@@ -176,6 +176,23 @@ namespace KBSResultModel
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
 
+	/** Has a command been RUN since the results were last discarded?
+
+	    NOT the same question as "are there any hits": a search that found nothing has still been
+	    run, and the panel is reporting its answer. And not the same as "is the status line empty"
+	    either - the close responders put a message on that line while discarding everything.
+
+	    What it is for is the panel's ILLUSTRATION, which changes once the user has asked for
+	    something (KBSPanelIcon). Cleared by Clear(), so a document or book closing - which throws
+	    the results away - puts the panel back to the picture it started with. Set AFTER Clear(),
+	    like SetFromBook.
+
+	    It is its own flag rather than a second meaning hung on SetFromBook, for the reason stated
+	    over SetResultKind below: two statements behind one flag cannot be changed independently
+	    afterwards. */
+	void NoteRun();
+	bool HasRun();
+
 	/** What KIND of results the model is holding.
 
 	    A missing-glyph scan is a REPORT, not a work list: there is nothing about it to replace, so

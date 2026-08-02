@@ -40,6 +40,7 @@ namespace GoToURLUtils
 // Project includes:
 #include "KBSID.h"
 #include "KBSBookScope.h"		// IsBookScopeOn - the only input to the name
+#include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelTitle.h"
 
 namespace
@@ -160,12 +161,19 @@ public:
 	virtual void AutoAttach()
 	{
 		KBSPanelTitle::Update();
-		AttachToWidget(this, this, kKBSIconWidgetID, true);
+
+		// The widgets are built fresh every time the panel is shown, so the picture that belongs on
+		// screen has to be written on NOW - the .fr's visible flags are only a starting point.
+		KBSPanelIcon::Update();
+
+		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
+			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), true);
 	}
 
 	virtual void AutoDetach()
 	{
-		AttachToWidget(this, this, kKBSIconWidgetID, false);
+		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
+			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), false);
 	}
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& /*protocol*/, void* /*changedBy*/)
@@ -174,8 +182,10 @@ public:
 		if (theChange != kTrueStateMessage || theSubject == nil)
 			return;
 
+		// Any of the illustrations - they are alternatives showing the same picture's worth of
+		// information, and all of them lead to the same place.
 		InterfacePtr<IControlView> view(theSubject, UseDefaultIID());
-		if (view == nil || view->GetWidgetID() != kKBSIconWidgetID)
+		if (view == nil || !KBSPanelIcon::IsIconWidget(view->GetWidgetID()))
 			return;
 
 		// Nothing in the document is touched - this is a request to the OS to open a browser - so

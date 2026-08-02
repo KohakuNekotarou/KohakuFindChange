@@ -567,6 +567,7 @@ void KBSGlyphScanEngine::Run()
 	// work list.
 	KBSResultModel::SetResultKind(KBSResultModel::kResultMissingGlyph);
 	KBSResultModel::SetFromBook(fromBook);
+	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
 	KBSResultModel::SetBookName(bookName);
 
 	// ----- the progress bar, sized in STORIES -----

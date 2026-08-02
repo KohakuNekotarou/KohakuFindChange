@@ -57,6 +57,7 @@
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
+#include "KBSPanelIcon.h"		// the illustration follows the status line
 
 namespace
 {
@@ -607,6 +608,13 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	// is a panel to draw it on.
 	gLastStatus = message;
 	gLastStatus.SetTranslatable(kFalse);
+
+	// The illustration follows the same moments this line does, so it is settled here rather than at
+	// every call site. Both directions run through here: an engine reports what it found (the model
+	// says a run happened, so the searching cat), and a close responder reports that the results
+	// went (it cleared the model first, so the plain one comes back). Does nothing when the panel is
+	// closed, like everything else below.
+	KBSPanelIcon::Update();
 
 	// Reach the status text through the panel; nil when the panel is closed (do nothing then) - the
 	// same reach Rebuild uses, which is why this lives here rather than in the action component.

@@ -257,9 +257,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 1
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmUnsavedWidgetID, kKBSPrefix + 16)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
-// The panel's illustration, sitting to the right of the status message.
-DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 19)
+// The panel's illustrations, stacked at ONE frame to the right of the status message - exactly one
+// is visible and enabled at a time (KBSPanelIcon picks). A third picture, for the aftermath of a
+// replace, is expected here later; adding it means one id, one resource, one row in kIcons.
+DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)		// nothing run yet
+DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// something has been run
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 20)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 21)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 22)
@@ -370,8 +372,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)
 
 // PNG resource IDs. Their own number space (PNGA/PNGR), so they do not have to dodge the view
 // resource ids above. 1001 is where KESCM and KESCL start theirs.
-#define kKBSIconResID			1001	// the illustration beside the panel's message
+#define kKBSIconResID			1001	// the illustration shown before anything has been run
 #define kKBSPaletteIconResID	1002	// the small dock-tab icon, shown when the panel is collapsed
+#define kKBSIconFoundResID		1003	// the illustration shown once something HAS been run
 
 // Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
 // VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live

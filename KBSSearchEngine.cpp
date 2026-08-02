@@ -1332,6 +1332,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// Book Scope afterwards.
 	KBSResultModel::SetFromBook(fromBook);
 
+	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
+	// the two lines around it because it survives finding nothing: a search that returned no hits
+	// has still been run.
+	KBSResultModel::NoteRun();
+
 	// ...and WHICH book, for the tree's book row. Empty for a document search, which has no book
 	// row at all. This is the panel's permanent answer to "what am I looking at": a status line is
 	// one line, gets truncated, and is overwritten by the next message.

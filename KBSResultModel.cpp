@@ -43,6 +43,10 @@ namespace
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
 
+	// Has a command been run since the results were last discarded? See KBSResultModel::NoteRun.
+	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
+	bool gHasRun = false;
+
 	// One row copied aside before a replace changed it. See KBSResultModel::BeginRowBackup.
 	struct BackedUpRow
 	{
@@ -190,11 +194,23 @@ void KBSResultModel::Clear()
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	gContextMenuChapter = kNoContextMenuChapter;
+	// Discarding the results puts the panel back to the state it started in, illustration included.
+	gHasRun = false;
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)
 {
 	gFromBook = fromBook;
+}
+
+void KBSResultModel::NoteRun()
+{
+	gHasRun = true;
+}
+
+bool KBSResultModel::HasRun()
+{
+	return gHasRun;
 }
 
 bool KBSResultModel::IsFromBook()
