@@ -20,6 +20,7 @@
 #include "IK2ServiceRegistry.h"
 #include "ICommandSequence.h"		// IAbortableCmdSeq - a cancel has to be stated, not implied
 #include "IDataBase.h"				// IsModified / SetModified - putting the flag back after a cancel
+#include "IDocumentCommands.h"		// Save - the facade the product's own code saves through
 #include "ITextWalker.h"			// also declares ITextWalkerClient
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
@@ -47,6 +48,7 @@
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
+#include "KBSJump.h"			// IsHidePreviousChapterOn - whether the saved chapters go away again
 
 namespace
 {
@@ -148,6 +150,20 @@ int32 CountCheckedInChapter(int32 chapterIdx)
 			++checkedCount;
 	}
 	return checkedCount;
+}
+
+// Which pending chapter is this document? The save loop walks the documents a replacement landed
+// in, and the NAME to put in a message lives in the model, which is indexed by chapter - so one
+// has to be turned into the other. Linear over a list with one entry per chapter that had work,
+// which is a handful even for a big book.
+int32 ChapterIndexForDoc(const std::vector<PendingChapter>& pending, const UIDRef& docRef)
+{
+	for (size_t i = 0; i < pending.size(); ++i)
+	{
+		if (pending[i].opened && pending[i].docRef == docRef)
+			return pending[i].chapterIdx;
+	}
+	return -1;
 }
 
 // Is the match the walk just landed on the SAME occurrence this row describes?
@@ -598,7 +614,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 } // anonymous namespace
 
-int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
+int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterReplace)
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
@@ -1029,14 +1045,83 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	}
 	KBSResultModel::ForgetRowBackup();
 
+	// Save what was actually written to, now that the sequence is CLOSED. Deliberately outside it:
+	// a save cannot be undone, so it has no business inside an abortable sequence - and an error
+	// left standing when a sequence ends rolls every chapter back, which is the last thing a failed
+	// save should be able to cause.
+	//
+	// EVERY document a replacement landed in, whoever opened it. The box says "save after replace",
+	// so what was replaced is what gets saved: the document in front, a chapter the user had open,
+	// and a chapter KBS opened windowless are all the same here. (Only the CLOSING below asks who
+	// opened what, because overwriting is the job that was asked for and tidying up is not.) A
+	// chapter that came back all-locked or all-missing holds nothing of ours; if it is dirty, that
+	// is the user's own edit and not ours to write out.
+	int32 chaptersSaved = 0;
+	int32 chaptersNotSaved = 0;
+	PMString firstNotSaved;
+	firstNotSaved.SetTranslatable(kFalse);
+	bool haveFirstNotSaved = false;
+
+	if (saveAfterReplace)
+	{
+		for (size_t i = 0; i < touched.size(); ++i)
+		{
+			// kSuppressUI: most of these are open WITHOUT a window, and a save prompt on one of them
+			// would be a modal dialog with nothing behind it. A document that has never been saved
+			// has no file to write to and fails here - reported below, not asked about.
+			const ErrorCode saveErr = Utils<IDocumentCommands>()->Save(touched[i], kSuppressUI);
+			// An error left standing outlives this call and fails whatever the application does
+			// next. Cleared per document so one unwritable file cannot take the rest with it.
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			if (saveErr == kSuccess)
+			{
+				++chaptersSaved;
+				continue;
+			}
+			++chaptersNotSaved;
+			if (!haveFirstNotSaved)
+			{
+				// Named from the model rather than from the file: the model's name is the one the
+				// user just read in the panel.
+				const int32 savedCi = ChapterIndexForDoc(pending, touched[i]);
+				if (savedCi >= 0)
+				{
+					int32 notSavedHits = 0;
+					KBSResultModel::GetChapterDisplay(savedCi, firstNotSaved, notSavedHits);
+					firstNotSaved.SetTranslatable(kFalse);
+				}
+				haveFirstNotSaved = true;
+			}
+		}
+	}
+
 	// Windows are opened AFTER the sequence, never from inside it - the other half of the pair the
 	// resolve pass above makes: no document and no window is opened while the sequence is standing.
 	// Measured 2026-07-28: a kOpenLayoutCmdBoss processed between two chapters' replacements
 	// discarded the undo history of the chapters already done - their text stayed replaced with
 	// nothing left to undo it with. Opening the windows once everything is committed keeps that
 	// command clear of the replacements.
-	for (size_t i = 0; i < touched.size(); ++i)
-		KBSBookScope::ShowChapterWindow(touched[i]);
+	//
+	// SKIPPED when the run is about to close these chapters again: opening a window only to shut it
+	// is a flicker and a wait, and nothing gets looked at in between.
+	const bool willClose = saveAfterReplace && chaptersNotSaved == 0
+		&& KBSJump::IsHidePreviousChapterOn();
+	if (!willClose)
+	{
+		for (size_t i = 0; i < touched.size(); ++i)
+			KBSBookScope::ShowChapterWindow(touched[i]);
+	}
+
+	// Put the desk back the way the run found it: the chapters KBS opened WITHOUT a window go away
+	// again. Only ours - ReleaseHeldDocs never touches a document the user already had open, and it
+	// holds nothing at all when the scope was a single document.
+	//
+	// ***** Only when EVERY save succeeded. ***** ReleaseHeldDocs closes with kSuppressUI and does
+	// NOT look at the dirty flag (unlike CloseDisplayedDocsIfClean), so a chapter that failed to
+	// save would have its replacements thrown away without a word. There is no way to drop one
+	// chapter from the held list, so the whole sweep waits.
+	if (willClose)
+		KBSBookScope::ReleaseHeldDocs();
 
 	// The panel now becomes a REPORT of what the replace did: the rows it changed, and the rows it
 	// was asked about and left alone, each saying why on its locator. The rows the user had
@@ -1050,12 +1135,39 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	outSummary.AppendNumber(chaptersTouched);
 	outSummary.Append(" chapter(s).");
 
-	// Urge a save only when something was actually written. A run where every checked row came back
-	// missing, locked or refused leaves every file exactly as it found it, and "check them and save
-	// yourself" there reads as though something HAD been changed - at the very moment the user is
-	// already wondering what became of their hits.
-	if (totalReplaced > 0)
+	// Urge a save only when something was actually written AND the run did not do it itself. A run
+	// where every checked row came back missing, locked or refused leaves every file exactly as it
+	// found it, and "check them and save yourself" there reads as though something HAD been changed
+	// - at the very moment the user is already wondering what became of their hits.
+	if (totalReplaced > 0 && !saveAfterReplace)
 		outSummary.Append(" Not saved - check them and save yourself.");
+
+	if (chaptersSaved > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(chaptersSaved);
+		outSummary.Append(" chapter(s) saved.");
+	}
+
+	// A file that could not be written is the one outcome here the user has to act on, so it is
+	// named and the reason is guessed out loud. Two ways this happens: the file is read-only, or the
+	// document has never been saved at all - no file to write to, and the prompt that would ask for
+	// one is suppressed on purpose.
+	if (chaptersNotSaved > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(chaptersNotSaved);
+		outSummary.Append(" chapter(s) could not be saved (\"");
+		outSummary.Append(firstNotSaved);
+		outSummary.Append("\" first) - read-only or never saved?");
+	}
+
+	// Say that the desk was cleared - and, more importantly, say when it was NOT. A user who ticked
+	// the box expecting the chapters to go away has to be told why they are still there.
+	if (willClose)
+		outSummary.Append(" Chapters KBS opened were closed.");
+	else if (saveAfterReplace && chaptersNotSaved > 0 && KBSJump::IsHidePreviousChapterOn())
+		outSummary.Append(" Nothing was closed - a chapter could not be saved.");
 
 	if (chaptersSkipped > 0)
 	{

@@ -240,8 +240,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 
 			PMString summary;
-			(void)saveAfterReplace;		// wired to the engine in the next step
-			KBSReplaceEngine::ReplaceChecked(summary);
+			KBSReplaceEngine::ReplaceChecked(summary, saveAfterReplace);
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
 			KBSResultTree::ShowStatus(summary);
 			break;

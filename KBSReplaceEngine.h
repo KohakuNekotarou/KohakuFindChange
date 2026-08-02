@@ -62,14 +62,21 @@ namespace KBSReplaceEngine
 	        them; the summary names the chapter instead. A walk that simply ran to the end of the
 	        chapter without the hit coming up is a different thing - those rows say missing.
 
-	    Chapters are left MODIFIED AND UNSAVED: overwriting the user's files is their decision.
+	    Chapters are left MODIFIED AND UNSAVED unless saveAfterReplace says otherwise: overwriting
+	    the user's files is their decision, which is why it is asked for on the confirmation and
+	    never remembered between runs.
 
 	    Refuses to run at all while another replace is up (see IsReplacing), and while the panel is
 	    showing a replace's report rather than a work list.
 
 	    @param outSummary OUT a ready-to-show status line (counts, chapters that did not line up).
+	    @param saveAfterReplace save every document a replacement actually landed in, once the whole
+	           run is committed - whoever opened it. Documents that took no replacement are left
+	           alone: nothing of ours is in them, so a dirty flag there is somebody else's edit.
+	           With "Hide Previous Chapter" on, the chapters KBS opened windowless are then closed
+	           again, but only if every save succeeded (see the release call).
 	    @return the number of hits actually replaced (0 on any early exit). */
-	int32 ReplaceChecked(PMString& outSummary);
+	int32 ReplaceChecked(PMString& outSummary, bool saveAfterReplace);
 
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
