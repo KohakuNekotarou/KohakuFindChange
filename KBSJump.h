@@ -20,9 +20,10 @@
 namespace KBSJump
 {
 	/** Jump to hit 'hitIdx' of chapter 'chapterIdx' in KBSResultModel: front its document, scroll
-	    to the match, raise the marker. Does not select. No-op on a bad index or an unreachable
-	    chapter (missing / locked file). An overset match has no on-page location, so the view is
-	    left as-is and no marker is shown (the overset "+" locator is Task 4). */
+	    to the match, raise the marker. Does not select. No-op on a bad index; an unreachable chapter
+	    (missing / locked file) reports through the status line. An overset match has no on-page
+	    location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is
+	    raised - those pixels belong to the indicator, not to the text. */
 	void JumpToHit(int32 chapterIdx, int32 hitIdx);
 
 	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if

@@ -45,6 +45,7 @@
 #include "KBSID.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
+#include "KBSRunGuard.h"		// never retire results out from under a run of ours
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -67,6 +68,14 @@ CREATE_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
 void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 {
 	if (signalMgr == nil)
+		return;
+
+	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
+	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
+	// release, the Hide Previous Chapter sweep) can land here from inside one. The run puts its own
+	// results up when it finishes, so nothing stale survives being skipped here. Same rule as the
+	// book-close watcher's, asked the same way (KBSRunGuard).
+	if (KBSRunGuard::IsAnyRunning())
 		return;
 
 	// Book results survive a chapter closing - see the file header.

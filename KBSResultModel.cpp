@@ -232,6 +232,14 @@ bool KBSResultModel::IsReportOnlyKind()
 	return gResultKind == kResultMissingGlyph || gResultKind == kResultOverset;
 }
 
+bool KBSResultModel::MatchTextIsLiveText()
+{
+	// Named the ONE kind that departs from it, not "is a scan": the glyph scan is every bit as much
+	// a report, and its rows DO hold the story's own characters - so folding this into
+	// IsReportOnlyKind would silently switch off a check that works there.
+	return gResultKind != kResultOverset;
+}
+
 KBSResultModel::ResultKind KBSResultModel::GetResultKind()
 {
 	return gResultKind;
@@ -597,12 +605,11 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
 		return;
 	Hit& h = c.hits[hitIdx];
-	if (h.replaced)
-		return;		// already done: it cannot come back into the selection
-	if (h.isLocked)
-		return;		// locked content cannot be changed at all - the row has no box to click either
-	if (h.outcome != kOutcomeNone)
-		return;		// it already says why it was left alone
+	// The same question the panel asks before it draws a box, asked here so the model can never hold
+	// a checked hit that no row offered. It covers the report kinds too - a scan has nothing to
+	// replace - which the per-row tests below cannot say anything about.
+	if (!RowHasCheckBox(h))
+		return;
 	if (gShowingOutcome)
 		return;		// the panel is a report right now, not a work list
 	h.checked = checked;

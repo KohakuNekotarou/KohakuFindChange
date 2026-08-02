@@ -58,7 +58,6 @@
 #include "IDocument.h"			// GetName - the chapter row's display name
 #include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
-#include "IMenuUtils.h"			// InsertAmpersandForDisplay - '&' doubles in anything DRAWN
 #include "IPMFont.h"			// GetNotDefinedGlyph / AppendFamilyName / AppendStyleName
 #include "IStoryList.h"			// the document's stories
 #include "ITextModel.h"			// QueryStrand
@@ -90,10 +89,24 @@
 #include "KBSGlyphScanEngine.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
-#include "KBSSearchEngine.h"	// the borrowed hit builders, and SearchBook for RunWithWalker
+#include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
+#include "KBSSearchEngine.h"	// the borrowed hit builders (BuildHitForRange / FinalizeHits)
 
 namespace
 {
+
+// A scan is running. Its progress bar pumps events, so without this a menu command could be
+// dispatched INTO the running scan - and a second run clears the model this one is filling, or
+// hands back the chapters it is walking. Read through KBSRunGuard::IsAnyRunning.
+bool gScanning = false;
+
+// Raise gScanning for the length of a scan, whichever way Run() returns - and it returns from
+// several places. Modelled on KBSSearchEngine's SearchingFlagGuard.
+struct ScanningFlagGuard
+{
+	ScanningFlagGuard()		{ gScanning = true; }
+	~ScanningFlagGuard()	{ gScanning = false; }
+};
 
 // How many wax lines to walk before giving up on a story. Nothing here is known to be able to
 // loop; this is a backstop so a defect could never hang the application.
@@ -482,6 +495,20 @@ void KBSGlyphScanEngine::Run()
 	PMString summary;
 	summary.SetTranslatable(kFalse);
 
+	// Last-resort re-entry stop, ahead of everything else. The panel's actions grey themselves out
+	// while any run is up, but every one of those runs puts up a MODAL PROGRESS BAR THAT PUMPS
+	// EVENTS, so a command can still find its way in here - through a script firing the action by
+	// ID, if nothing else. Asked about EVERY run, not just another scan: what makes this dangerous
+	// is two DIFFERENT runs, one of which hands back the chapters the other is walking. See
+	// KBSRunGuard.
+	if (KBSRunGuard::IsAnyRunning())
+	{
+		summary.Append(KBSRunGuard::BusyMessage());
+		KBSResultTree::ShowStatus(summary);
+		return;
+	}
+	const ScanningFlagGuard scanningGuard;
+
 	// ----- the scope, resolved exactly the way a search resolves it -----
 	// Book Scope ON means the whole book and nothing else; OFF means the front document and nothing
 	// else. Never a silent fallback between them, so the status line can always say what was looked
@@ -556,6 +583,10 @@ void KBSGlyphScanEngine::Run()
 	// showImmediate = kTrue: put the bar up at once rather than waiting out its internal delay, or
 	// the one thing it is really there for - Cancel - is never on screen for a fast scan.
 	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+	// Reading the wax can make a damaged frame recompose, and a recompose is entitled to raise a bar
+	// of its own - which would sit on top of this one and take the Cancel button with it. The search
+	// and the replace both say this; the scans did not.
+	progressBar.DisableChildProgressBars(kTrue);
 
 	int32 progressBase = 0;
 	int32 progressReported = 0;
@@ -627,6 +658,11 @@ void KBSGlyphScanEngine::Run()
 	BuildSummary(glyphTotal, rowTotal, hasOverset, summary);
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
+}
+
+bool KBSGlyphScanEngine::IsScanning()
+{
+	return gScanning;
 }
 
 // End, KBSGlyphScanEngine.cpp.

@@ -23,8 +23,16 @@ namespace KBSOversetScanEngine
 	/** Scan the current scope for overset text and fill KBSResultModel with what was found.
 	    Puts its own summary on the panel's status line (so app.kbsStatus can be read back).
 
-	    Changes NOTHING in the document: no command, no command sequence, nothing to undo. */
+	    Changes NOTHING in the document: no command, no command sequence, nothing to undo.
+
+	    Refuses to run while any other KBS run is up - see KBSRunGuard. */
 	void Run();
+
+	/** Is an overset scan running right now? Same reasoning as the glyph scan's own IsScanning -
+	    the modal progress bar pumps events, so a command can be dispatched into this run, and
+	    anything that hands the held chapters back underneath it leaves this loop holding a dead
+	    IDataBase. Asked through KBSRunGuard::IsAnyRunning. */
+	bool IsScanning();
 }
 
 #endif // __KBSOversetScanEngine_h__

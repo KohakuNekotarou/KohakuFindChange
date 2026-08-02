@@ -370,10 +370,16 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// The story and position arms of the test are trivially satisfied here (we are asking ABOUT the
 	// stored position, and this side has replaced nothing, so the delta is zero). What does the work
 	// is the text.
+	//
+	// ***** Asked only of a row whose match IS story text. ***** An overset finding carries the
+	// scan's own words there - "Frame (370)" - so the comparison could never agree, and every click
+	// on one was answering a jump that had just landed correctly with "Not found - the text is no
+	// longer where the search left it" and stamping the row 'missing' (2026-08-02).
 	PMString storedLocator, storedPre, storedMatch, storedPost;
 	KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, storedLocator, storedPre, storedMatch, storedPost);
-	const bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
-		storyRef, start, end, storyUID, start, storedMatch, 0);
+	const bool sameOccurrence = !KBSResultModel::MatchTextIsLiveText()
+		|| KBSSearchEngine::MatchIsSameOccurrence(
+			storyRef, start, end, storyUID, start, storedMatch, 0);
 
 	const bool overset = IsTextIndexOverset(storyRef, start);
 

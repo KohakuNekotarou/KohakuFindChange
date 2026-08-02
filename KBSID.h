@@ -258,13 +258,16 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeFontWidgetID, kKBSPrefix + 13
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 14)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmUnsavedWidgetID, kKBSPrefix + 16)
+// UNUSED since 2026-08-01 - the "Don't show again" box it named is no longer in the dialog. Like
+// the string key beside it (kKBSGlyphConfirmDontShowKey), it is kept rather than freed: a widget id
+// that once shipped stays spent, so a saved workspace referring to it cannot bind to something else.
 DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The panel's illustrations, stacked at ONE frame to the right of the status message - exactly one
-// is visible and enabled at a time (KBSPanelIcon picks). A third picture, for the aftermath of a
-// replace, is expected here later; adding it means one id, one resource, one row in kIcons.
+// is visible and enabled at a time (KBSPanelIcon picks, and it is the ONLY place that knows which
+// state each belongs to). Adding another is one id here, one resource below, one row in kIcons.
 DECLARE_PMID(kWidgetIDSpace, kKBSIconWidgetID, kKBSPrefix + 18)		// nothing run yet
 DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// something has been run
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 20)
+DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and it was a replace
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 21)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 22)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 23)
@@ -341,6 +344,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// somethin
 #define kKBSGlyphConfirmFindLabelKey	kKBSStringPrefix "kKBSGlyphConfirmFindLabelKey"
 #define kKBSGlyphConfirmChangeLabelKey	kKBSStringPrefix "kKBSGlyphConfirmChangeLabelKey"
 #define kKBSGlyphConfirmArrowKey		kKBSStringPrefix "kKBSGlyphConfirmArrowKey"
+// UNUSED since 2026-08-01, when the "Don't show again" box came off both confirmations (it made a
+// destructive rewrite suppressible with one tick, and the only way back is Preferences > General >
+// Reset All Warning Dialogs). Left in place, with its entry in both string tables, so that putting
+// the box back is a resource change rather than a translation round; nothing reads it today.
 #define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
 
 // Menu item positions:
@@ -382,6 +389,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconFoundWidgetID, kKBSPrefix + 19)	// somethin
 #define kKBSIconResID			1001	// the illustration shown before anything has been run
 #define kKBSPaletteIconResID	1002	// the small dock-tab icon, shown when the panel is collapsed
 #define kKBSIconFoundResID		1003	// the illustration shown once something HAS been run
+#define kKBSIconChangedResID	1004	// ...and the one shown once a replace has written something
 
 // Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
 // VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live

@@ -224,6 +224,19 @@ namespace KBSResultModel
 	    a row that promises an action nothing carries out. */
 	bool IsReportOnlyKind();
 
+	/** Is a hit's matchText the text that is REALLY at its position in the story?
+
+	    True for everything the search and the glyph scan produce - both take the row's three
+	    segments straight out of the story - and false for an overset finding, where
+	    KBSOversetScanEngine writes what it found ("Frame (370)") into matchText instead, because the
+	    colour cell keeps the match at full strength and ellipsizes the context around it.
+
+	    Asked by anything that compares a stored row against the document. KBSJump does it on every
+	    click, to notice that an edit has moved the text out from under a row; over an overset row
+	    that comparison could only ever fail, and it was announcing "Not found" and marking the row
+	    'missing' on a jump that had just worked perfectly. */
+	bool MatchTextIsLiveText();
+
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
 	    Recorded beside SetFromBook, and cleared by Clear().
@@ -357,10 +370,12 @@ namespace KBSResultModel
 	    time, later jumps must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
-	/** Select / deselect one hit for replacement. Ignored for a hit that cannot be replaced: one
-	    that was already replaced (the text it matched is gone) or one that is locked (InDesign
-	    offers no way to change locked content). Those rows carry no check box either, so this is a
-	    backstop rather than the first line of defence. */
+	/** Select / deselect one hit for replacement. Ignored for anything the panel draws no check box
+	    on - a hit already replaced (the text it matched is gone), a locked one (InDesign offers no
+	    way to change locked content), one that already says why it was left alone, and every row of
+	    a scan (a report has nothing to replace). It asks that question the same way the panel does,
+	    so the model can never hold a checked hit that no row offered; it is a backstop rather than
+	    the first line of defence, since those rows carry no box to click in the first place. */
 	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
 
 	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this

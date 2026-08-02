@@ -44,6 +44,7 @@
 // Project includes:
 #include "KBSReplaceEngine.h"
 #include "KBSResultModel.h"
+#include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
 
@@ -612,6 +613,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append("A replace is already running.");
 		return 0;
 	}
+	// ...and the same door for anything ELSE of ours - a search, or either scan. Asked separately so
+	// each keeps the message that is actually true. It matters more here than anywhere: this run
+	// holds an open command sequence, and a scan cancelled underneath it hands back the very
+	// chapters being written to (see KBSRunGuard).
+	if (KBSRunGuard::IsAnyRunning())
+	{
+		outSummary.Append(KBSRunGuard::BusyMessage());
+		return 0;
+	}
 	const ReplacingFlagGuard replacingGuard;
 
 	const int32 chapterCount = KBSResultModel::GetChapterCount();
@@ -725,23 +735,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The reopen belongs on the same side of the fence for the same reason. Doing it here also
 	// means a chapter that cannot be opened at all is counted before anything has been written,
 	// instead of interrupting a run that is already half committed.
-	// How many chapters the run has to work through. Counted BEFORE anything is opened, because
-	// the bar has to be up while the chapters are being opened - that is the slow part when the
-	// user has closed the windows the search was holding.
-	int32 chaptersWithWork = 0;
-	// ...and how many hits in total, which is what the bar is actually sized with. A chapter is a
-	// coarse unit: one chapter of 5000 hits and one of 3 both counted as a single step, so the bar
-	// stood still through the long one. Hits are the work.
+	// How much work the run has to get through - what the bar is sized with. Counted BEFORE anything
+	// is opened, because the bar has to be up while the chapters are being opened: that is the slow
+	// part when the user has closed the windows the search was holding.
+	//
+	// HITS, not chapters. A chapter is a coarse unit: one chapter of 5000 hits and one of 3 both
+	// counted as a single step, so the bar stood still through the long one. Hits are the work.
+	// (A chapter count was taken alongside this until 2026-08-02 and never read - the bar is sized
+	// in hits, and the chapters that hold them are counted again as they are resolved, below.)
 	int32 totalCheckedHits = 0;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
-	{
-		const int32 checkedHere = CountCheckedInChapter(ci);
-		if (checkedHere > 0)
-		{
-			++chaptersWithWork;
-			totalCheckedHits += checkedHere;
-		}
-	}
+		totalCheckedHits += CountCheckedInChapter(ci);
 
 	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request), matching the
 	// search. It used to be book scope only, on the reasoning that a one-document replace is a

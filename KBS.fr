@@ -736,6 +736,8 @@ resource PNGA(kKBSIconResID) "Kohakuneko_OFF32.png"
 resource PNGR(kKBSIconResID) "Kohakuneko_OFF32.png"
 resource PNGA(kKBSIconFoundResID) "KohakuFind32.png"
 resource PNGR(kKBSIconFoundResID) "KohakuFind32.png"
+resource PNGA(kKBSIconChangedResID) "KohakuChange32.png"
+resource PNGR(kKBSIconChangedResID) "KohakuChange32.png"
 
 /*
  * The small dock-tab icon, shown in place of the tab's name once the panel is collapsed to its
@@ -845,10 +847,10 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * KESCM puts its own: a picture hanging off the top of a part-empty message box reads as
 		 * detached from it.
 		 *
-		 * TWO of them, STACKED at one frame: the panel shows the plain cat until something has been
-		 * run and the searching cat afterwards. KBSPanelIcon owns which - it is the only place that
-		 * names them, so a third picture (one for the aftermath of a replace is expected) is a
-		 * widget here and a row there. The one below comes up HIDDEN; KBSPanelIcon writes the real
+		 * THREE of them, STACKED at one frame: the plain cat until something has been run, the
+		 * searching cat once it has, and the changing cat once a replace has written something.
+		 * KBSPanelIcon owns which - it is the only place that names them, so a fourth picture is a
+		 * widget here and a row there. All but the first come up HIDDEN; KBSPanelIcon writes the real
 		 * answer when the panel appears, because these widgets are rebuilt on every show and a
 		 * default written here would otherwise outrank the actual state.
 		 */
@@ -867,6 +869,15 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKBSIconFoundResID, kKBSPluginID,
 			kBindRight | kBindTop,
 			Frame(260, 26, 292, 58),		// SAME frame as the one above - they are alternatives
+			kFalse, kTrue,
+			kADBEIconSuiteButtonType,
+		),
+		KBSIconWidget
+		(
+			kKBSIconChangedWidgetID,
+			kKBSIconChangedResID, kKBSPluginID,
+			kBindRight | kBindTop,
+			Frame(260, 26, 292, 58),		// SAME frame again
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),

@@ -50,10 +50,16 @@ namespace KBSSearchEngine
 	    extracted, so nothing needs them held; Task 3 will hold them for the row jumps instead).
 
 	    @param outSummary  a ready-to-show status line for the panel.
-	    @param overrideFindGlyph  normally kInvalidGlyphID, which means "walk the user's own query"
-	           and is what every existing caller gets. Anything else replaces the FIND GLYPH for this
-	           one walk - kAnyNotDefGlyphID makes it a missing-glyph (notdef) scan. Nothing else about
-	           the walk changes: same scope, same five options, same result model, same progress bar.
+	    @param overrideFindGlyph  normally kInvalidGlyphID, which means "walk the user's own query".
+	           Anything else replaces the FIND GLYPH for this one walk, nothing else about it
+	           changing: same scope, same five options, same result model, same progress bar.
+	           !! NO CALLER PASSES ANYTHING ELSE TODAY. It was built for the missing-glyph scan, which
+	           drove it with kAnyNotDefGlyphID until 2026-08-02 - that route reads the composed wax
+	           now (KBSGlyphScanEngine) because the find/change one takes InDesign down on any
+	           document holding overset text. Kept rather than removed because it is the whole of
+	           what a caller with its own glyph query needs, and removing it would take the matching
+	           argument on CommitSearchMode with it; do not read the presence of the parameter as
+	           evidence that something uses it.
 	    @return the total number of matches across the scope. */
 	int32 SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
 

@@ -55,10 +55,24 @@
 #include "KBSOversetScanEngine.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
+#include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the borrowed hit builders
 
 namespace
 {
+
+// A scan is running. Its progress bar pumps events, so without this a menu command could be
+// dispatched INTO the running scan - and a second run clears the model this one is filling, or
+// hands back the chapters it is walking. Read through KBSRunGuard::IsAnyRunning.
+bool gScanning = false;
+
+// Raise gScanning for the length of a scan, whichever way Run() returns. The glyph scan's own
+// guard, and KBSSearchEngine's before it.
+struct ScanningFlagGuard
+{
+	ScanningFlagGuard()		{ gScanning = true; }
+	~ScanningFlagGuard()	{ gScanning = false; }
+};
 
 // How much of the overset text a row shows. Overset runs to hundreds of characters - the official
 // preflight reported 370 for one frame in the test document - and handing the whole range to
@@ -110,10 +124,12 @@ bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32&
 
 /** Collect every cell of every table in this story that is overset ON ITS OWN.
 
-    ITableModelList is documented to list a story's tables but does not promise that a table inside
-    a CELL is among them, so the walk is written to reach those either way: a cell's own tables are
-    walked as well, and a repeat visit cannot double-count because a cell thread is only ever
-    recorded once (the model's iterator visits anchor cells, one per thread). */
+    ITableModelList is documented to list a story's tables without promising that a table inside a
+    CELL is among them - so it was measured rather than assumed (2026-08-02,
+    work/kbs-selftest/overset-shapes.indd): it hands back the NESTED tables too. The
+    "Table cell (121)" finding that matches the official preflight comes from a table inside a cell,
+    and no recursion is written here. ***** Do not add one. ***** Walking a cell's own tables as
+    well would visit those threads a second time and report every nested cell twice. */
 void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>& out)
 {
 	InterfacePtr<ITableModelList> tableList(storyRef, UseDefaultIID());
@@ -300,7 +316,11 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 
 	if (places == 0)
 	{
-		out.Append("No overset text.");
+		// ***** Which sentence depends on whether the one below it is coming. ***** "No overset
+		// text." followed by "1 not on a page." is the panel contradicting itself in two sentences:
+		// the scan DID find overflow, it just had no row to offer for it. Only the pasteboard case
+		// can produce it, which is why the plain wording survived the first measurements.
+		out.Append(offPage > 0 ? "No overset text on a page." : "No overset text.");
 	}
 	else
 	{
@@ -339,6 +359,19 @@ void KBSOversetScanEngine::Run()
 {
 	PMString summary;
 	summary.SetTranslatable(kFalse);
+
+	// Last-resort re-entry stop, ahead of everything else - the same door the glyph scan has, and
+	// for the same reason: every KBS run puts up a MODAL PROGRESS BAR THAT PUMPS EVENTS, so a
+	// command can be dispatched into this one (a script firing the action by ID reaches here
+	// whatever the menu says). Asked about EVERY run, because the damage needs two DIFFERENT ones -
+	// the inner run hands back the chapters this loop is walking. See KBSRunGuard.
+	if (KBSRunGuard::IsAnyRunning())
+	{
+		summary.Append(KBSRunGuard::BusyMessage());
+		KBSResultTree::ShowStatus(summary);
+		return;
+	}
+	const ScanningFlagGuard scanningGuard;
 
 	// ----- the scope, resolved exactly the way a search resolves it -----
 	// Book Scope ON means the whole book and nothing else; OFF means the front document and nothing
@@ -412,6 +445,10 @@ void KBSOversetScanEngine::Run()
 	// showImmediate = kTrue: put the bar up at once rather than waiting out its internal delay, or
 	// the one thing it is really there for - Cancel - is never on screen for a fast scan.
 	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+	// Asking a thread whether it is overset can make it compose, and a compose is entitled to raise
+	// a bar of its own - which would sit on top of this one and take the Cancel button with it. The
+	// search and the replace both say this; the scans did not.
+	progressBar.DisableChildProgressBars(kTrue);
 
 	int32 progressBase = 0;
 	int32 progressReported = 0;
@@ -482,6 +519,11 @@ void KBSOversetScanEngine::Run()
 		bookName, offPage, summary);
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
+}
+
+bool KBSOversetScanEngine::IsScanning()
+{
+	return gScanning;
 }
 
 // End, KBSOversetScanEngine.cpp.

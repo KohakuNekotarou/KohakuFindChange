@@ -53,6 +53,7 @@
 #include "KBSGlyphConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
 #include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
 #include "KBSOversetScanEngine.h"	// Find Overset
+#include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -134,8 +135,11 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Search the active book (or the front document) with the user's current Find/Change
 			// query. The engine fills KBSResultModel with the hits (grouped by chapter) behind a
 			// modal progress bar; the tree is drawn here, once, when it returns.
-			if (KBSSearchEngine::IsSearching())
-				break;		// already running - the bar pumps events, so this can be reached
+			//
+			// No re-entry test here any more: the ENGINE has one (and so does every other run of
+			// ours), and it puts a reason on the status line where this one silently did nothing.
+			// A command reaching here while a run is up - the bar pumps events, so it can - now
+			// says why instead of looking broken. See KBSRunGuard.
 
 			// Before the search rather than after: the progress bar is modal, and the tab stays in
 			// view behind it. This is also what puts the name back when the panel has been closed
@@ -188,11 +192,18 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSReplaceCheckedActionID:
 		{
-			// Already running, reached through the events its own progress bar pumps. The engine
-			// stops this a second time on its own, but not before the confirmation prompt would
-			// have gone up over a replace that is already under way.
-			if (KBSReplaceEngine::IsReplacing())
+			// Another run of ours is already up, reached through the events its progress bar pumps.
+			// The engine turns this away as well - but not before the confirmation prompt would
+			// have gone up over a run that is already under way, which is the whole reason the test
+			// is here too. Asked about EVERY run rather than only another replace: a scan cancelled
+			// underneath this one hands back the chapters it is about to write to (see KBSRunGuard).
+			if (KBSRunGuard::IsAnyRunning())
+			{
+				PMString busy(KBSRunGuard::BusyMessage());
+				busy.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(busy);
 				break;
+			}
 
 			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
 			// this command out in that state (see UpdateActionStates), but a caller that never went
@@ -469,11 +480,15 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 */
 void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
-	// A search or a replace is running behind its modal progress bar. The bar pumps events, so this
-	// list can be asked for its states from inside the run: lock everything until it returns. The
-	// replace needs it at least as much as the search - it works with a command sequence standing
-	// open, and a second run started underneath would Halt() the first one's walker mid-walk.
-	if (KBSSearchEngine::IsSearching() || KBSReplaceEngine::IsReplacing())
+	// A run of ours is standing behind its modal progress bar. The bar pumps events, so this list
+	// can be asked for its states from inside the run: lock everything until it returns.
+	//
+	// ALL FOUR runs, through KBSRunGuard - it used to name only the search and the replace, which
+	// left both scans able to start a second run on top of themselves and on top of each other. The
+	// replace needs it at least as much as the search (it works with a command sequence standing
+	// open, and a second walk underneath would Halt() its walker mid-walk), and a scan needs it
+	// because a run cancelled underneath it closes the very chapters it is walking.
+	if (KBSRunGuard::IsAnyRunning())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
 			listToUpdate->SetNthActionState(i, kDisabled_Unselected);

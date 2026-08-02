@@ -35,13 +35,26 @@ namespace
 const WidgetID kIcons[] =
 {
 	kKBSIconWidgetID,		// nothing has been run yet
-	kKBSIconFoundWidgetID	// something has
+	kKBSIconFoundWidgetID,	// something has
+	kKBSIconChangedWidgetID	// ...and it was a replace
 };
 const int32 kIconCount = static_cast<int32>(sizeof(kIcons) / sizeof(kIcons[0]));
 
 /** Which picture belongs on screen right now. */
 WidgetID Choose()
 {
+	// ***** The more specific state is asked FIRST. ***** A replace has also been RUN, so testing
+	// HasRun ahead of this would answer the searching cat every time and the changing one would
+	// never reach the screen - which is what the ordering note over kIcons is about.
+	//
+	// IsShowingReplaceOutcome is the very flag that takes the check boxes off every row: it says
+	// "these rows are what a replace did", which is precisely when the picture should say so too. A
+	// replace asked for nothing never sets it (KeepCheckedRows leaves the results alone), and
+	// Clear() puts it back down - so a fresh search, or a document closing, restores the picture
+	// below without this needing to know about either.
+	if (KBSResultModel::IsShowingReplaceOutcome())
+		return kKBSIconChangedWidgetID;
+
 	// One question, asked of the model rather than of the status line: the close responders put a
 	// message on that line ("Results cleared - the document was closed.") while throwing the
 	// results away, so an empty-or-not test on the text would leave the panel showing the wrong

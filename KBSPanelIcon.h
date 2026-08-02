@@ -7,10 +7,11 @@
 //  The panel's illustration - which of the stacked pictures is showing. They occupy ONE frame in
 //  KBS.fr, and exactly one of them is visible and enabled at a time.
 //
-//  Adding another picture (one for the aftermath of a replace is expected) is three lines: an id
-//  and a resource in KBSID.h, a widget in KBS.fr, and a row in this file's table. Nothing else in
-//  the plug-in names the pictures - the panel's observer asks IsIconWidget rather than testing an
-//  id of its own.
+//  There are three: before anything has been run, once something HAS been run, and once a replace
+//  has written something. Adding a fourth is three lines - an id and a resource in KBSID.h, a
+//  widget in KBS.fr, and a row in this file's table - plus the test that picks it, which goes in
+//  Choose() with the more specific state FIRST. Nothing else in the plug-in names the pictures:
+//  the panel's observer asks IsIconWidget rather than testing an id of its own.
 //
 //========================================================================================
 

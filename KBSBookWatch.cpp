@@ -103,7 +103,7 @@
 #include "KBSBookWatch.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
-#include "KBSSearchEngine.h"	// IsSearching - never retire results out from under a running walk
+#include "KBSRunGuard.h"		// never retire results out from under ANY run of ours
 
 namespace
 {
@@ -121,12 +121,16 @@ ICallbackTimer* gRetireTimer = nil;
     says nothing - when the book is still there, because this runs on every book context change. */
 void RetireBookResultsIfGone()
 {
-	// NEVER while a search is running. This clears the result model and hands the held chapters
-	// back, and the search is walking exactly those chapters - the book progress bar pumps events
-	// while it is up, so an idle callback CAN land in the middle of a walk. (Reachable in practice:
-	// close a book, then start a search inside the wait below.) The caller re-arms, so the cue is
-	// deferred rather than dropped, and the book will still be gone when it is finally asked.
-	if (KBSSearchEngine::IsSearching())
+	// NEVER while ANY run of ours is going. This clears the result model and hands the held chapters
+	// back, and every run is walking exactly those chapters - their progress bars pump events while
+	// they are up, so an idle callback CAN land in the middle of one. (Reachable in practice: close
+	// a book, then start a run inside the wait below.) The caller re-arms, so the cue is deferred
+	// rather than dropped, and the book will still be gone when it is finally asked.
+	//
+	// This asked only about the SEARCH until 2026-08-02, which left the replace and both scans
+	// unguarded - and the replace is the worst of them to interrupt, since it holds an open command
+	// sequence over the documents this would close. See KBSRunGuard.
+	if (KBSRunGuard::IsAnyRunning())
 		return;
 
 	// Which book are we holding chapters for? Read the path BEFORE releasing anything -
@@ -183,10 +187,10 @@ void RetireBookResultsIfGone()
     (KESCMTracker.cpp, KESCMHudTimerProc): the timer is released in ONE place, and it is not here. */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
-	// A search is walking the very chapters this would hand back - wait it out. A POSITIVE return
-	// value is "call me again in this many milliseconds", so the cue is deferred rather than
+	// A run of ours is walking the very chapters this would hand back - wait it out. A POSITIVE
+	// return value is "call me again in this many milliseconds", so the cue is deferred rather than
 	// dropped, and it re-arms without calling StartTimer from inside the callback.
-	if (KBSSearchEngine::IsSearching())
+	if (KBSRunGuard::IsAnyRunning())
 		return kKBSBookRetireDelayMs;
 
 	RetireBookResultsIfGone();

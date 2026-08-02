@@ -4,11 +4,13 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Result tree rebuild entry point. Called after KBSResultModel has been filled by a search:
-//  reloads the panel's tree widget from the model and expands every chapter so the hit rows are
-//  visible (expanding also PRIMES each chapter's expander arrow so it is actually drawn - the
-//  tree framework draws no arrow for a node whose children were never materialized). No-op when
-//  the panel is closed. Implemented in KBSResultListWidgetMgr.cpp (it lives with the tree).
+//  Result tree rebuild entry point. Called after KBSResultModel has been filled by a search or a
+//  scan: reloads the panel's tree widget from the model. What it opens depends on the scope - a
+//  BOOK result opens the book row and leaves the chapters closed (a book-wide run can fill the
+//  panel with one chapter's hits and bury the fact that others matched), a single document opens
+//  its one chapter. No priming is needed to get the expander arrows drawn: this panel draws them
+//  itself, from the hierarchy adapter's child count. No-op when the panel is closed. Implemented
+//  in KBSResultListWidgetMgr.cpp (it lives with the tree).
 //
 //========================================================================================
 
@@ -19,8 +21,9 @@
 
 namespace KBSResultTree
 {
-	/** (Re)load the panel's result tree from KBSResultModel and expand every chapter. Safe to
-	    call when the panel is closed (does nothing then). */
+	/** (Re)load the panel's result tree from KBSResultModel. A book result comes up with the book
+	    row open and its chapters closed; a document result comes up with its one chapter open. Safe
+	    to call when the panel is closed (does nothing then). */
 	void Rebuild();
 
 	/** Repaint the existing rows from the model WITHOUT rebuilding the tree. For changes that touch

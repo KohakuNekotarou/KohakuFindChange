@@ -77,6 +77,7 @@
 #include "KBSSearchEngine.h"
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
+#include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 
 namespace
@@ -577,7 +578,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, frameFacts);
 			if (oversetFacts.hasPage)
 			{
-				matchFrameUID = loc.frameUID;	// the "+" indicator's frame decides the layer here
+				matchFrameUID = loc.frameUID;	// kept in step; the FACTS below are what every field is read from
 				facts = &oversetFacts;
 			}
 		}
@@ -597,7 +598,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// offering one that would quietly do nothing.
 	outHit.isLocked = facts->isLocked;
 	if (outHit.isLocked)
-		outHit.checked = false;		// a fresh search checks every hit it is ALLOWED to replace
+		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 
 	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
 	// row exactly the same way from the range the replace command hands back.
@@ -1187,6 +1188,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		outSummary.Append("A search is already running.");
 		return 0;
 	}
+	// ...and the same door for anything ELSE of ours that is running - a replace, or either scan.
+	// Asked separately from the line above so each keeps the message that is actually true: what
+	// makes a re-entrant call dangerous is two DIFFERENT runs, one of which hands back the chapters
+	// the other is walking (see KBSRunGuard).
+	if (KBSRunGuard::IsAnyRunning())
+	{
+		outSummary.Append(KBSRunGuard::BusyMessage());
+		return 0;
+	}
 	const SearchingFlagGuard searchingGuard;
 
 	KBSResultModel::Clear();
@@ -1350,10 +1360,6 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// kFindChangeClientBoss does not (measured 2026-07-31: it registered fine and then never called
 	// once in 5270 matches). spellpanel gets a moving bar there because it walks with a client it
 	// wrote itself. A plug-in using the stock find/change client has to count its own progress.
-	//
-	// DisableChildProgressBars stops anything the walk runs into from putting up a bar of its own.
-	// NOTE: it does NOT cover the windowless chapter opens, which this comment used to claim: those
-	// all happen in GetBookChapterDocs above, before this bar exists.
 	//
 	// showImmediate = kTrue: a book search ALWAYS puts the bar up. The default (kFalse) makes the bar
 	// wait out an internal delay first, and the search beat that delay even at 5000+ hits (measured

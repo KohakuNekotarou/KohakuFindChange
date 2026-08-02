@@ -77,9 +77,10 @@ namespace
 	// The hit row's check box occupies this much at the start of the row's content, and the
 	// colour cell starts after it.
 	const PMReal kCheckZone = 16.0;
-	// What that same column shrinks to when the result kind carries no check box on ANY row - a
-	// missing-glyph scan. Half a check zone, so the hit rows land 8px right of the font row above
-	// them: the step the book and font levels already use, which makes the whole tree one even
+	// What that same column shrinks to when the result kind carries no check box on ANY row - any
+	// scan, so the missing-glyph one and the overset one alike (KBSResultModel::IsReportOnlyKind is
+	// the one place that decides). Half a check zone, so the hit rows land 8px right of the row
+	// above them: the step the book and font levels already use, which makes the whole tree one even
 	// staircase (user's call 2026-08-02 - "make it a nice staircase, shifted left by the check").
 	// Half rather than all of it: giving back the full 16px would line the hit rows up with their
 	// font row's LABEL, leaving no step at all between a branch and the rows under it. The full
