@@ -80,6 +80,12 @@ struct ScanningFlagGuard
 // draws one line. 60 is comfortably more than a row can show.
 const int32 kOversetPreviewChars = 60;
 
+// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice: chapters are
+// opened one at a time now and closed again straight after, so there is no moment at which the scan
+// could add up all their story counts. This scan only moves the bar at chapter boundaries anyway,
+// so an equal slice costs nothing but the weighting between a long chapter and a short one.
+const int32 kKBSChapterProgressSpan = 1;
+
 /** One place where text did not fit. */
 struct OversetPlace
 {
@@ -293,16 +299,6 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	return static_cast<int32>(outChapter.hits.size());
 }
 
-/** How many stories a scan of this document will visit - the progress bar's unit. Free to ask for:
-    IStoryList keeps the count, so nothing is loaded here. */
-int32 CountScannableStories(const UIDRef& docRef)
-{
-	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
-	if (storyList == nil)
-		return 0;
-	return storyList->GetUserAccessibleStoryCount();
-}
-
 /** The status line: how many places, over how many chapters, and how many could not be pointed at.
 
     The two numbers are separate questions and are NOT added up: the first is how many rows are in
@@ -390,10 +386,12 @@ void KBSOversetScanEngine::Run()
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}
-		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
+		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
+		// handed straight back once it has been scanned. Whether a chapter can actually be opened
+		// is not known yet - the summary reports the ones that could not, after the scan.
+		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
-			summary.Append("The active book has no openable chapters.");
-			KBSBookScope::AppendUnopenableNote(summary, unopenable);
+			summary.Append("The active book has no chapters.");
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}
@@ -425,20 +423,12 @@ void KBSOversetScanEngine::Run()
 	KBSResultModel::SetBookName(bookName);
 	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
 
-	// ----- the progress bar, sized in STORIES -----
-	// A chapter is far too coarse a step: one chapter of a hundred stories and one of two would each
-	// move the bar once, so it would stand still through the long one.
-	std::vector<int32> chapterSpans;
-	chapterSpans.reserve(targets.size());
-	int32 progressTotal = 0;
-	for (size_t i = 0; i < targets.size(); ++i)
-	{
-		int32 stories = CountScannableStories(targets[i].docRef);
-		if (stories < 1)
-			stories = 1;		// so a chapter with no stories still moves the bar
-		chapterSpans.push_back(stories);
-		progressTotal += stories;
-	}
+	// ----- the progress bar: one step per chapter -----
+	// It used to be sized in STORIES, to weight a hundred-story chapter above a two-story one. Two
+	// things ended that: the scan only ever moves the bar at chapter boundaries (ScanOneDocument
+	// does not report from inside), so the weighting bought nothing but a smoother-looking crawl,
+	// and story counts are no longer knowable up front - chapters are opened one at a time now.
+	const int32 progressTotal = static_cast<int32>(targets.size()) * kKBSChapterProgressSpan;
 
 	PMString progressTitle(fromBook ? "Scanning book for overset text..."
 									: "Scanning for overset text...");
@@ -480,11 +470,27 @@ void KBSOversetScanEngine::Run()
 			break;
 		}
 
+		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
+		// which is already open and never ours to close.
+		if (fromBook && targets[i].docRef == UIDRef::gNull)
+		{
+			if (!KBSBookScope::OpenChapterDoc(targets[i], &unopenable))
+			{
+				// The reason is recorded; AppendUnopenableNote names it in the summary. Hand the
+				// bar on all the same, so a book whose chapters will not open still fills it.
+				progressBase += kKBSChapterProgressSpan;
+				KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+				continue;
+			}
+		}
+
+		const UIDRef chapterDocRef = targets[i].docRef;
+
 		KBSResultModel::Chapter chapter;
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
-		const int32 rows = ScanOneDocument(targets[i].docRef, targets[i].shortName, chapter, offPage);
+		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter, offPage);
 
-		progressBase += chapterSpans[i];
+		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		if (rows > 0)
@@ -493,6 +499,12 @@ void KBSOversetScanEngine::Run()
 			rowTotal += rows;
 			++chaptersWithHits;
 		}
+
+		// ***** Hand the chapter back. ***** The scan is over and its rows are plain data - UIDs and
+		// text indices, which survive the document being closed. A jump reopens what it needs
+		// through ReopenChapterDoc. Only chapters KBS opened are closed: ReleaseHeldDoc checks the
+		// held list itself, so one the user already had open passes through untouched.
+		KBSBookScope::ReleaseHeldDoc(chapterDocRef);
 	}
 
 	// ***** Ask ONE more time, outside the loop. *****
