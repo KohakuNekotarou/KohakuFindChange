@@ -240,6 +240,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
@@ -274,6 +275,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphConfirmDialog.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\KBS.fr">

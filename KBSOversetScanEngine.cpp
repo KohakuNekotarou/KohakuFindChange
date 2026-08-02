@@ -1,0 +1,467 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuBookSearch (KBS)
+//
+//  The overset scanner. See KBSOversetScanEngine.h for the contract.
+//
+//  Two kinds of overflow are looked for, and they need different questions:
+//
+//    * a FRAME's thread - the red "+". ITextUtils::IsOverset answers it from the frame list.
+//    * a TABLE CELL on its own - the red dot. A cell holds no frame list, so the frame's answer
+//      says nothing about it; the cell's own thread has to be asked. Every table in the story is
+//      walked, and any table found inside a cell is walked too, so a nested cell is reached.
+//
+//  Where the overflow starts and how much of it there is both come from ITextParcelList, which is
+//  the only interface that knows: GetIsOverset fills in the first overset TextIndex, and
+//  GetFirstOversetTextIndex hands back the thread's last index beside it.
+//
+//  Everything the ROW needs after that is borrowed from KBSSearchEngine - the page locator (which
+//  names the page the "+" sits on when the range itself is overset, exactly what is wanted here),
+//  the hidden and locked flags, the three drawn segments and the page ordering. Nothing in the
+//  search or the glyph scan was changed to make this possible.
+//
+//========================================================================================
+
+#include "VCPlugInHeaders.h"
+
+// Interface includes:
+#include "IDocument.h"			// GetName - the chapter row's display name
+#include "IFrameList.h"			// the argument ITextUtils::IsOverset takes
+#include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
+#include "IStoryList.h"			// the document's stories
+#include "ITableModel.h"		// const_iterator / GetGridID - one visit per cell thread
+#include "ITableModelList.h"	// every table in a story (deprecated but current - SnpIterTableStories)
+#include "ITextModel.h"			// QueryFrameList / QueryTextParcelList
+#include "ITextParcelList.h"	// GetIsOverset / GetFirstOversetTextIndex - the whole answer
+#include "ITextStoryThread.h"	// GetTextStart - a cell thread's first TextIndex
+#include "ITextStoryThreadDict.h"	// QueryThread(gridID) - the dictionary lives on the table model
+#include "ITextUtils.h"			// IsOverset
+
+// General includes:
+#include "IDataBase.h"			// SaveRestoreModifiedState
+#include "PMString.h"
+#include "PersistUtils.h"		// ::GetUIDRef
+#include "ProgressBar.h"		// RangeProgressBar - the scan's progress + cancel
+#include "TableTypes.h"			// GridAddress / GridID
+#include "TextID.h"				// kTextStoryBoss - the boss ITableModelList sits on
+#include "Utils.h"
+
+#include <vector>
+
+// Project includes:
+#include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
+#include "KBSOversetScanEngine.h"
+#include "KBSResultModel.h"
+#include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
+#include "KBSSearchEngine.h"	// the borrowed hit builders
+
+namespace
+{
+
+// How much of the overset text a row shows. Overset runs to hundreds of characters - the official
+// preflight reported 370 for one frame in the test document - and handing the whole range to
+// BuildHitForRange would put all of it in the model and in app.kbsResults, when the row only ever
+// draws one line. 60 is comfortably more than a row can show.
+const int32 kOversetPreviewChars = 60;
+
+/** One place where text did not fit. */
+struct OversetPlace
+{
+	UIDRef		storyRef;
+	TextIndex	start;		// the first character that did not fit
+	int32		count;		// how many characters did not fit
+	bool		inCell;		// true = a table cell overflowing on its own, false = a frame's thread
+
+	OversetPlace() : start(0), count(0), inCell(false) {}
+};
+
+/** Ask the thread containing 'pos' whether it is overset, and if so where the overflow starts and
+    how much of it there is.
+
+    ***** GetIsOverset is the only judgement that works for a table cell. ***** The obvious test -
+    GetParcelFrameUID(GetLastParcelKey()) == kInvalidUID - misses every one of them: a cell's parcel
+    IS placed, so its frame UID is valid, while the cell still overflows (ITextParcelList.h:705-713,
+    and KESCM measured exactly that on 2026-07-24). */
+bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32& outCount)
+{
+	if (model == nil)
+		return false;
+
+	InterfacePtr<ITextParcelList> tpl(model->QueryTextParcelList(pos));
+	if (tpl == nil)
+		return false;
+
+	TextIndex first = kInvalidTextIndex;
+	if (!tpl->GetIsOverset(&first) || first == kInvalidTextIndex)
+		return false;
+
+	TextIndex threadLast = kInvalidTextIndex;
+	tpl->GetFirstOversetTextIndex(&threadLast);
+
+	// The last CR is not overset - a thread counts as overset when anything OTHER than that final
+	// CR failed to compose - so it is not counted either. A count of at least one, because getting
+	// here means something did not fit.
+	outStart = first;
+	outCount = (threadLast > first) ? static_cast<int32>(threadLast - first) : 1;
+	return true;
+}
+
+/** Collect every cell of every table in this story that is overset ON ITS OWN.
+
+    ITableModelList is documented to list a story's tables but does not promise that a table inside
+    a CELL is among them, so the walk is written to reach those either way: a cell's own tables are
+    walked as well, and a repeat visit cannot double-count because a cell thread is only ever
+    recorded once (the model's iterator visits anchor cells, one per thread). */
+void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>& out)
+{
+	InterfacePtr<ITableModelList> tableList(storyRef, UseDefaultIID());
+	if (tableList == nil)
+		return;
+
+	const int32 tableCount = tableList->GetModelCount();
+	for (int32 t = 0; t < tableCount; ++t)
+	{
+		InterfacePtr<ITableModel> table(tableList->QueryNthModel(t));
+		if (table == nil)
+			continue;
+
+		// The dictionary that maps a cell to its own text thread lives on the table model itself.
+		InterfacePtr<ITextStoryThreadDict> dict(table, UseDefaultIID());
+		if (dict == nil)
+			continue;
+
+		// The model's own iterator visits ANCHOR cells - a merged cell comes past once, not once
+		// per grid square it covers - which is exactly one visit per thread.
+		for (ITableModel::const_iterator it(table->begin()), last(table->end()); it != last; ++it)
+		{
+			const GridAddress ga = *it;
+			const GridID gridID = table->GetGridID(ga);
+
+			InterfacePtr<ITextStoryThread> thread(dict->QueryThread(gridID));
+			if (thread == nil)
+				continue;
+
+			int32 span = 0;
+			const TextIndex cellPos = thread->GetTextStart(&span);
+
+			TextIndex start = 0;
+			int32 count = 0;
+			if (!ThreadOverset(model, cellPos, start, count))
+				continue;
+
+			OversetPlace place;
+			place.storyRef = storyRef;
+			place.start = start;
+			place.count = count;
+			place.inCell = true;
+			out.push_back(place);
+		}
+	}
+}
+
+/** Scan one document and turn every overset place into a result row.
+
+    @param outOffPage  incremented for a place whose "+" sits on no page - a frame on the
+                       pasteboard. Those are counted but not listed: a row that cannot be jumped to
+                       is worse than a number, and the official preflight does not report them at
+                       all (measured 2026-08-02), so saying how many there were is already more
+                       than InDesign itself offers.
+    @return how many ROWS the chapter got. */
+int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
+	KBSResultModel::Chapter& outChapter, int32& outOffPage)
+{
+	outChapter.name = chapterName;
+	outChapter.docRef = docRef;
+
+	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
+	if (storyList == nil)
+		return 0;
+
+	// Reading must not dirty the document: asking a thread about its composition can make it
+	// compose, and a document that came up clean - a chapter this scan opened windowless, say - has
+	// to go back clean or the user is asked to save something they never touched.
+	IDataBase::SaveRestoreModifiedState dirtyGuard(docRef.GetDataBase());
+
+	std::vector<OversetPlace> places;
+
+	// User accessible only - the population the search and the glyph scan walk. IStoryList.h:38-42
+	// states internal stories are not subject to find/change, so reporting them would name places
+	// the rest of the panel never looks at.
+	const int32 storyCount = storyList->GetUserAccessibleStoryCount();
+	for (int32 i = 0; i < storyCount; ++i)
+	{
+		const UIDRef storyRef = storyList->GetNthUserAccessibleStoryUID(i);
+		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+		if (model == nil)
+			continue;
+
+		// (1) the thread the frames carry - the red "+".
+		InterfacePtr<IFrameList> frameList(model->QueryFrameList());
+		if (frameList != nil && Utils<ITextUtils>()->IsOverset(frameList))
+		{
+			TextIndex start = 0;
+			int32 count = 0;
+			if (ThreadOverset(model, 0, start, count))
+			{
+				OversetPlace place;
+				place.storyRef = storyRef;
+				place.start = start;
+				place.count = count;
+				place.inCell = false;
+				places.push_back(place);
+			}
+		}
+
+		// (2) cells overflowing on their own - the red dot. Nested tables included.
+		CollectOversetCells(storyRef, model, places);
+	}
+
+	KBSSearchEngine::HitCache* cache = KBSSearchEngine::NewHitCache();
+	for (size_t p = 0; p < places.size(); ++p)
+	{
+		KBSResultModel::Hit hit;
+		hit.checked = false;		// a scan is a report, not a work list: no row is selectable
+
+		const TextIndex previewEnd = places[p].start + kOversetPreviewChars;
+		KBSSearchEngine::BuildHitForRange(docRef, places[p].storyRef,
+			places[p].start, previewEnd, cache, hit);
+
+		if (hit.pageString.IsEmpty())
+		{
+			++outOffPage;
+			continue;
+		}
+
+		// The kind and the size, written over the line's leading text. BuildHitForRange filled
+		// preText with whatever DID fit on that line; what a reader wants first is which kind of
+		// overflow this is and how much of it there is. Written afterwards for the same reason the
+		// glyph scan writes its font name afterwards - so BuildHitForRange stays untouched.
+		PMString lead(places[p].inCell ? "Table cell (" : "Frame (");
+		lead.SetTranslatable(kFalse);
+		lead.AppendNumber(places[p].count);
+		lead.Append(")  ");
+		hit.preText = lead;
+
+		// LEFT EMPTY on purpose: the tree builds its font level out of this, and an overset finding
+		// has no font to group by - so the tree stays the three levels it has always had.
+		hit.fontName.Clear();
+
+		outChapter.hits.push_back(hit);
+	}
+	KBSSearchEngine::DeleteHitCache(cache);
+
+	// Page order, and the "ovP<page>(<n>)" locator on every row - the same pass the search runs.
+	KBSSearchEngine::FinalizeHits(outChapter.hits);
+	return static_cast<int32>(outChapter.hits.size());
+}
+
+/** How many stories a scan of this document will visit - the progress bar's unit. Free to ask for:
+    IStoryList keeps the count, so nothing is loaded here. */
+int32 CountScannableStories(const UIDRef& docRef)
+{
+	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
+	if (storyList == nil)
+		return 0;
+	return storyList->GetUserAccessibleStoryCount();
+}
+
+/** The status line: how many places, over how many chapters, and how many could not be pointed at.
+
+    The two numbers are separate questions and are NOT added up: the first is how many rows are in
+    the list, the second is how many places were left out of it. A total would appear nowhere on
+    screen and could not be checked against anything. */
+void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool fromBook,
+	const PMString& bookName, int32 offPage, PMString& out)
+{
+	out.Clear();
+	out.SetTranslatable(kFalse);
+
+	if (places == 0)
+	{
+		out.Append("No overset text.");
+	}
+	else
+	{
+		out.AppendNumber(places);
+		out.Append(places == 1 ? " overset place" : " overset places");
+		if (fromBook)
+		{
+			out.Append(" in ");
+			out.AppendNumber(chaptersWithHits);
+			out.Append(" of ");
+			out.AppendNumber(chapterTotal);
+			out.Append(chapterTotal == 1 ? " chapter" : " chapters");
+			if (!bookName.IsEmpty())
+			{
+				PMString name(bookName);
+				name.SetTranslatable(kFalse);
+				out.Append(" - book \"");
+				out.Append(name);
+				out.Append("\"");
+			}
+		}
+		out.Append(".");
+	}
+
+	if (offPage > 0)
+	{
+		out.Append("  ");
+		out.AppendNumber(offPage);
+		out.Append(" not on a page.");
+	}
+}
+
+}	// anonymous namespace
+
+void KBSOversetScanEngine::Run()
+{
+	PMString summary;
+	summary.SetTranslatable(kFalse);
+
+	// ----- the scope, resolved exactly the way a search resolves it -----
+	// Book Scope ON means the whole book and nothing else; OFF means the front document and nothing
+	// else. Never a silent fallback between them, so the status line can always say what was looked
+	// at and a missing book is reported rather than quietly scanning one document instead.
+	std::vector<KBSBookScope::ChapterDoc> targets;
+	PMString bookName;
+	std::vector<KBSBookScope::SkippedChapter> unopenable;
+	const bool fromBook = KBSBookScope::IsBookScopeOn();
+
+	if (fromBook)
+	{
+		if (!KBSBookScope::HasActiveBook())
+		{
+			summary.Append("Book Scope is on, but no book is open.");
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+		if (!KBSBookScope::GetBookChapterDocs(targets, bookName, &unopenable) || targets.empty())
+		{
+			summary.Append("The active book has no openable chapters.");
+			KBSBookScope::AppendUnopenableNote(summary, unopenable);
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+	}
+	else
+	{
+		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
+		if (doc == nil)
+		{
+			summary.Append("No document to scan.");
+			KBSResultTree::ShowStatus(summary);
+			return;
+		}
+		KBSBookScope::ChapterDoc single;
+		single.docRef = ::GetUIDRef(doc);
+		doc->GetName(single.shortName);
+		single.shortName.SetTranslatable(kFalse);
+		targets.push_back(single);
+	}
+
+	KBSResultModel::Clear();
+
+	// All four AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
+	// takes the check boxes off every row and narrows the column they stood in - a scan is a
+	// report, not a work list.
+	KBSResultModel::SetResultKind(KBSResultModel::kResultOverset);
+	KBSResultModel::SetFromBook(fromBook);
+	KBSResultModel::SetBookName(bookName);
+	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
+
+	// ----- the progress bar, sized in STORIES -----
+	// A chapter is far too coarse a step: one chapter of a hundred stories and one of two would each
+	// move the bar once, so it would stand still through the long one.
+	std::vector<int32> chapterSpans;
+	chapterSpans.reserve(targets.size());
+	int32 progressTotal = 0;
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		int32 stories = CountScannableStories(targets[i].docRef);
+		if (stories < 1)
+			stories = 1;		// so a chapter with no stories still moves the bar
+		chapterSpans.push_back(stories);
+		progressTotal += stories;
+	}
+
+	PMString progressTitle(fromBook ? "Scanning book for overset text..."
+									: "Scanning for overset text...");
+	progressTitle.SetTranslatable(kFalse);
+	// showImmediate = kTrue: put the bar up at once rather than waiting out its internal delay, or
+	// the one thing it is really there for - Cancel - is never on screen for a fast scan.
+	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+
+	int32 progressBase = 0;
+	int32 progressReported = 0;
+
+	bool cancelled = false;
+	int32 rowTotal = 0;
+	int32 offPage = 0;
+	int32 chaptersWithHits = 0;
+
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		PMString taskLine;
+		taskLine.SetTranslatable(kFalse);
+		taskLine.Append("Chapter ");
+		taskLine.AppendNumber(static_cast<int32>(i) + 1);
+		taskLine.Append(" / ");
+		taskLine.AppendNumber(static_cast<int32>(targets.size()));
+		taskLine.Append(" - ");
+		taskLine.Append(targets[i].shortName);
+		progressBar.SetTaskText(taskLine);
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		// kFalse = do not raise the global error state, which would outlive the scan and fail the
+		// commands that come after it.
+		if (progressBar.WasCancelled(kFalse))
+		{
+			cancelled = true;
+			break;
+		}
+
+		KBSResultModel::Chapter chapter;
+		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
+		const int32 rows = ScanOneDocument(targets[i].docRef, targets[i].shortName, chapter, offPage);
+
+		progressBase += chapterSpans[i];
+		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		if (rows > 0)
+		{
+			KBSResultModel::AppendChapter(chapter);		// only chapters with findings go in
+			rowTotal += rows;
+			++chaptersWithHits;
+		}
+	}
+
+	// ***** Ask ONE more time, outside the loop. *****
+	// Asking only inside it misses a cancel pressed during the LAST chapter, because no further
+	// round comes to hear it - and on a one-chapter book that means Cancel never works at all.
+	// (The same fault was found and fixed in the search, the replace and the glyph scan.)
+	if (!cancelled && progressBar.WasCancelled(kFalse))
+		cancelled = true;
+
+	if (cancelled)
+	{
+		// Throw the half-finished list away rather than leave a partial one looking complete, and
+		// give the chapters back. ReleaseHeldDocs schedules its closes, so it is safe from in here.
+		KBSResultModel::Clear();
+		KBSBookScope::ReleaseHeldDocs();
+		KBSResultTree::Rebuild();
+		summary.Append("Scan cancelled.");
+		KBSResultTree::ShowStatus(summary);
+		return;
+	}
+
+	KBSResultTree::Rebuild();
+
+	BuildSummary(rowTotal, chaptersWithHits, static_cast<int32>(targets.size()), fromBook,
+		bookName, offPage, summary);
+	KBSBookScope::AppendUnopenableNote(summary, unopenable);
+	KBSResultTree::ShowStatus(summary);
+}
+
+// End, KBSOversetScanEngine.cpp.
