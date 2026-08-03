@@ -355,21 +355,27 @@ static void AppendOneAttribute(const AttributeBossList* attrs, int32 n, IDataBas
 	}
 }
 
-// How much format detail the prompt is willing to carry. The prompt is a question, not a report:
+// How much format detail the PROMPT is willing to carry. The prompt is a question, not a report:
 // past this the reader is skimming rather than checking, and the line's job is to let them recognise
 // the settings they made. Whole pieces only, and what was left out is SAID (" + ...") rather than
 // silently cut - a truncated list that does not admit it reads as "this is everything".
+//
+// The saved report carries no limit at all (user's decision, 2026-08-04) - it is read later and
+// matched against a document, so there is nothing to gain by cutting it. See DescribeFormatSetting's
+// `limited` argument, which is the only thing this number is reached through.
 static const int32 kKBSFormatDetailLimit = 100;
 
 // Append one piece unless it would take the line past that limit. The first piece always goes in:
 // a single long description is still better than nothing at all.
 //
+// @param limited false to take every piece however long the line becomes - the caller is writing a
+//        record rather than asking a question, and then this can never answer false.
 // @return false when the piece was left out, which is the caller's cue to stop and say "...".
-static bool AppendWithinLimit(PMString& out, const PMString& piece)
+static bool AppendWithinLimit(PMString& out, const PMString& piece, bool limited)
 {
 	if (piece.IsEmpty())
 		return true;			// nothing to add, and nothing was dropped either
-	if (!out.IsEmpty() && (out.CharCount() + piece.CharCount()) > kKBSFormatDetailLimit)
+	if (limited && !out.IsEmpty() && (out.CharCount() + piece.CharCount()) > kKBSFormatDetailLimit)
 		return false;
 	out.Append(piece);
 	return true;
@@ -401,7 +407,8 @@ static void AppendStyleName(IDataBase* db, const UID& style, const char* label, 
 // The two public wrappers are defined further down, OUTSIDE this file's anonymous namespace - a
 // KBSSearchEngine:: definition is not allowed in here (C2888).
 
-// The Glyph tab's query as one readable line: "Glyph 1234 (Kozuka Mincho Pr6N  Regular) U+845B".
+// One side of the Glyph tab's query as a readable line: "Glyph 1234 (Kozuka Mincho Pr6N  Regular)
+// U+845B".
 //
 // The Glyph tab has no find STRING - its query is a glyph id plus the font that id belongs to, and an
 // id on its own names nothing (glyph 1234 is a different character in every font). So the font is
@@ -412,14 +419,18 @@ static void AppendStyleName(IDataBase* db, const UID& style, const char* label, 
 // owns and releases later. This wants a string and nothing else, so it takes its own face and lets it
 // go in the same breath. Every step is allowed to fail - a query that cannot be described in full is
 // described as far as it goes, because this line is a caption, not a control.
-PMString DescribeGlyphQuery(IFindChangeOptions* opts)
+//
+// @param findSide true for the glyph being looked for, false for the one that replaces it. An empty
+//        Change To box - a legitimate request that deletes every match - has no glyph and comes back
+//        EMPTY, which is the caller's cue to write no line at all rather than "Glyph -1".
+PMString DescribeGlyphQuery(IFindChangeOptions* opts, bool findSide)
 {
 	PMString description;
 	description.SetTranslatable(kFalse);
 	if (opts == nil)
 		return description;
 
-	const Text::GlyphID glyphID = opts->GetFindGlyphID();
+	const Text::GlyphID glyphID = findSide ? opts->GetFindGlyphID() : opts->GetReplaceGlyphID();
 	if (glyphID == kInvalidGlyphID)
 		return description;
 
@@ -427,8 +438,13 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts)
 	description.AppendNumber(static_cast<int32>(glyphID));
 
 	IDataBase* const db = opts->GetUIDAttrDB();
-	const AttributeBossList* const attrs =
-		opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch);
+	// Each side keeps its own font: the glyph being replaced is in the font it was found in, and the
+	// one written in its place is in whatever font the Change To box was set from. kFalse on the
+	// change side because KBS never writes to the user's Find/Change settings, and the default of
+	// this call is to CREATE the list when it does not exist (IFindChangeOptions.h:506).
+	const AttributeBossList* const attrs = findSide
+		? opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch)
+		: opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch, kFalse);
 	if (db == nil || attrs == nil)
 		return description;
 
@@ -477,6 +493,24 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts)
 	return description;
 }
 
+// ...and WHAT that format is, in parentheses after it: "Find Format (size: 14 pt + Paragraph style:
+// Body)". The same detail the replace prompt shows, from the same call - but written IN FULL, because
+// this one goes into a file (user's decision, 2026-08-04: "the export, with no character limit").
+//
+// Empty means the settings said nothing about themselves, NOT that no format is set - that question
+// was answered by HasFormatSet before this is reached (KBSSearchEngine.h). Then the bare pane name
+// stands on its own, which is what this line said in full until 2026-08-04.
+static void AppendFormatDetail(PMString& into, bool findSide)
+{
+	const PMString detail(KBSSearchEngine::DescribeFormatSetting(findSide, false /*limited*/));
+	if (detail.IsEmpty())
+		return;
+
+	into.Append(" (");
+	into.Append(detail);
+	into.Append(")");
+}
+
 // What the user asked for, as the one line the saved report's heading shows: the query and the tab it
 // was typed on, e.g. "cat  (Text)". Recorded ON THE RESULTS at search time - see
 // KBSResultModel::SetQueryText for why it must not be read back off the dialog afterwards.
@@ -491,7 +525,7 @@ PMString DescribeCurrentQuery()
 
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	if (mode == IFindChangeOptions::kGlyphSearch)
-		description = DescribeGlyphQuery(opts);
+		description = DescribeGlyphQuery(opts, true /*findSide*/);
 	else
 	{
 		description.Append(opts->GetFindString(mode));
@@ -500,12 +534,8 @@ PMString DescribeCurrentQuery()
 		// alone - which the find box is empty for - captions itself with nothing at all, and the
 		// saved report's heading reads "Query:  (Text)". "cat  + Find Format" when both are set.
 		//
-		// WHAT is set is not named: TextAttrID.h declares 222 attribute bosses and the SDK has no
-		// ClassID-to-name call (see HasFormatSet above, which the replace prompt shares). The name
-		// used is the dialog's own name for that pane, so it points at where the detail can be read.
-		//
-		// NOT translated, unlike the replace prompt: this line goes on the status line and into the
-		// saved report, and those stay English throughout the panel.
+		// NOT translated, unlike the replace prompt: this line goes into the saved report, and the
+		// report is English throughout, like the panel it reports on.
 		//
 		// Not on the Glyph tab either - its attribute list holds the QUERY's own font, so the note
 		// would be on every glyph search, saying nothing. DescribeGlyphQuery states that font.
@@ -518,6 +548,7 @@ PMString DescribeCurrentQuery()
 			if (!description.IsEmpty())
 				description.Append("  + ");
 			description.Append("Find Format");
+			AppendFormatDetail(description, true /*findSide*/);
 		}
 	}
 
@@ -1419,7 +1450,7 @@ static void AppendAttributeSignature(const AttributeBossList* attrs, int32 n, PM
 	}
 }
 
-PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
+PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
 {
 	PMString out;
 	// Everything appended below is DATA - either InDesign's own description of a setting or a style
@@ -1444,6 +1475,7 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
 	//
 	// Each piece is built on its own first, so that one that would take the line past
 	// kKBSFormatDetailLimit can be left out WHOLE rather than cut in the middle of a word.
+	// (With limited false nothing is ever left out, and `dropped` stays false throughout.)
 	bool dropped = false;
 	if (attrs != nil)
 	{
@@ -1453,7 +1485,7 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
 			PMString piece;
 			piece.SetTranslatable(kFalse);
 			AppendOneAttribute(attrs, i, db, piece, !out.IsEmpty());
-			dropped = !AppendWithinLimit(out, piece);
+			dropped = !AppendWithinLimit(out, piece, limited);
 		}
 	}
 
@@ -1466,7 +1498,7 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
 		AppendStyleName(db, findSide ? opts->GetFindParaStyle(db, mode)
 									 : opts->GetChangeParaStyle(db, mode, kFalse),
 						"Paragraph style", piece, !out.IsEmpty());
-		dropped = !AppendWithinLimit(out, piece);
+		dropped = !AppendWithinLimit(out, piece, limited);
 	}
 	if (!dropped)
 	{
@@ -1475,7 +1507,7 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
 		AppendStyleName(db, findSide ? opts->GetFindCharStyle(db, mode)
 									 : opts->GetChangeCharStyle(db, mode, kFalse),
 						"Character style", piece, !out.IsEmpty());
-		dropped = !AppendWithinLimit(out, piece);
+		dropped = !AppendWithinLimit(out, piece, limited);
 	}
 
 	// Say that something was left out. Silently cutting the list would read as "this is everything"
@@ -1492,6 +1524,45 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
 
 	out.SetTranslatable(kFalse);
 	return out;
+}
+
+PMString KBSSearchEngine::DescribeCurrentChange()
+{
+	PMString description;
+	description.SetTranslatable(kFalse);
+
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return description;
+
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+
+	// The Glyph tab replaces one glyph with another - there is no change STRING at all - so the whole
+	// line is the glyph, stated the same way the find side is. An empty Change To box gives an empty
+	// line here, and the report leaves the heading out rather than writing "Glyph -1".
+	if (mode == IFindChangeOptions::kGlyphSearch)
+		return DescribeGlyphQuery(opts, false /*findSide*/);
+
+	description.Append(opts->GetReplaceString(mode));
+
+	// "dog  + Change Format (size: 20 pt)", or "Change Format (...)" alone when the box is empty and
+	// only the formatting changes. Asked through HasFormatSet for the same reason the find side is:
+	// a paragraph or character style is a format the attribute list does not carry.
+	if (HasFormatSet(opts, mode, false /*findSide*/))
+	{
+		if (!description.IsEmpty())
+			description.Append("  + ");
+		description.Append("Change Format");
+		AppendFormatDetail(description, false /*findSide*/);
+	}
+
+	// ***** NO "the matches will be deleted" HERE. ***** An empty Change To with no Change Format
+	// does delete every match, and the prompt says so - but the prompt is ASKING, and this is a
+	// record of what was set. The rows themselves are where a reader sees what became of the text.
+	//
+	// No tab name either: the Query: line directly above this one in the report has already said it.
+	description.SetTranslatable(kFalse);
+	return description;
 }
 
 bool KBSSearchEngine::HasFindFormatSet()

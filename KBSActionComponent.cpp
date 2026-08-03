@@ -525,7 +525,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	// on every glyph prompt, saying nothing. That tab states its query by DRAWING the glyphs.
 	if (!glyphMode && KBSSearchEngine::HasFindFormatSet())
 		AppendFormatNote(findStr, kKBSConfirmFindFormatKey,
-			KBSSearchEngine::DescribeFormatSetting(true /*findSide*/));
+			KBSSearchEngine::DescribeFormatSetting(true /*findSide*/, true /*limited*/));
 	PMString findLine(kKBSConfirmFindKey);
 	findLine.Translate();
 	SpaceIfEmpty(findStr);
@@ -578,7 +578,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	// "dog  + Change Format", or "Change Format" on its own when the box is empty.
 	if (changeHasFormat)
 		AppendFormatNote(replaceStr, kKBSConfirmChangeFormatKey,
-			KBSSearchEngine::DescribeFormatSetting(false /*findSide*/));
+			KBSSearchEngine::DescribeFormatSetting(false /*findSide*/, true /*limited*/));
 	PMString changeLine(kKBSConfirmChangeToKey);
 	changeLine.Translate();
 	SpaceIfEmpty(replaceStr);

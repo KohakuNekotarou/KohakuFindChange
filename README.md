@@ -209,7 +209,7 @@ nothing on them to rewrite.
 one line per hit, ready to paste into a spreadsheet. It is greyed out while there is nothing to save.
 
     Kohaku Find/Change
-    Query: cat  (Text)
+    Query: cat  + Find Format (size: 14 pt + Paragraph style: Body)  (Text)
     Book: savetest.indb
     Summary: 9 hit(s) in 3 of 3 chapter(s) - book "savetest.indb".
     Rows: 9
@@ -224,6 +224,14 @@ one line per hit, ready to paste into a spreadsheet. It is greyed out while ther
   `Find Overset`, or `Kohaku Find/Change (after Change Checked)`), the query with the tab it was typed
   on, the book or document, and **the panel's own summary line verbatim** — so the file can never
   contradict what the panel said.
+- **A format set in the Find/Change dialog is spelled out**, in InDesign's own words for it —
+  `Find Format (size: 14 pt + Paragraph style: Body)` — and **in full, however long it runs**. (The
+  confirmation prompt shortens the same text to keep the alert readable; the file does not, because it
+  is read later and matched against a document.)
+- **After `Change Checked` the heading also carries a `Change:` line** naming what was written —
+  `Change: dog  + Change Format (size: 20 pt)`. It is recorded when the replace runs, so retyping the
+  Change To box afterwards cannot change what the file says. A report of a plain search has no
+  `Change:` line: nothing has been written yet.
 - **`<Page>` is the page number alone** so a spreadsheet can sort on it; the `ov` / `hidden` / `lock` /
   `missing` / `refused` / `replaced` flags are in `<Flags>`, spelled exactly as the panel's locator
   spells them. `<No>` is the within-page ordinal (empty when the page holds a single row), and

@@ -150,8 +150,35 @@ namespace KBSSearchEngine
 	    principle - when every attribute declines to describe itself. Callers must treat empty as
 	    "say nothing extra", never as "no format set" (that question is HasFindFormatSet's).
 
-	    @param findSide true for Find Format, false for Change Format. */
-	PMString DescribeFormatSetting(bool findSide);
+	    @param findSide true for Find Format, false for Change Format.
+	    @param limited  true to stop at kKBSFormatDetailLimit characters and say " + ..." for the
+	           rest, false to write every setting however long the line becomes.
+
+	           ***** WHICH ONE A CALLER WANTS FOLLOWS FROM WHAT IT IS WRITING. ***** The replace
+	           prompt is a QUESTION - the reader is recognising the settings they made, and a
+	           paragraph of them in an alert helps nobody - so it limits. The saved report is a
+	           RECORD, read later and matched against a document, so it does not (user's decision,
+	           2026-08-04: "the export, with no character limit"). */
+	PMString DescribeFormatSetting(bool findSide, bool limited);
+
+	/** What is in the Change To box, as the one line the saved report's "Change:" heading shows -
+	    the replace string plus its Change Format, or the Glyph tab's replacement glyph.
+
+	    The change side's counterpart to the query line KBSResultModel::SetQueryText holds, and it
+	    carries no tab name: the Query: line directly above it in the report has already said which
+	    tab this was.
+
+	    ***** RECORD IT WHEN THE REPLACE RUNS, NOT WHEN THE REPORT IS SAVED. ***** The user is free
+	    to retype Change To the moment the replace returns, and a report that read the dialog at save
+	    time would name a replacement these rows never took (the same rule, and the same reason, as
+	    SetQueryText). KBSReplaceEngine records it on the way in, after CommitReplaceGlyph - the
+	    Glyph tab's change glyph is not on the options until that has run.
+
+	    Comes back EMPTY when the settings cannot be read, and on the Glyph tab when Change To holds
+	    no glyph. An empty Change To on Text/GREP gives an empty string, which is honest: the report
+	    states what was set, and does not explain that an empty box deletes the matches - that
+	    sentence belongs to the prompt, where the user is being ASKED. */
+	PMString DescribeCurrentChange();
 
 	/** EVERYTHING the current Find/Change settings would drive a walk BY, as one opaque string:
 	    the tab, the query itself, and every switch that decides WHICH matches come back -

@@ -42,6 +42,10 @@ namespace
 	// The query the results were found with, as one ready-made line. See KBSResultModel::SetQueryText.
 	PMString gQueryText;
 
+	// What the replace that produced this aftermath was told to write. Empty until a replace runs -
+	// see KBSResultModel::SetChangeText.
+	PMString gChangeText;
+
 	// The whole of what those results were WALKED by - query plus every switch that decides the match
 	// set - as one opaque key. See KBSResultModel::SetWalkSignature.
 	PMString gWalkSignature;
@@ -199,6 +203,7 @@ void KBSResultModel::Clear()
 	gBookName.Clear();
 	gSearchMode = -1;
 	gQueryText.Clear();
+	gChangeText.Clear();
 	gWalkSignature.Clear();
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
@@ -275,6 +280,19 @@ PMString KBSResultModel::GetQueryText()
 	PMString query(gQueryText);
 	query.SetTranslatable(kFalse);
 	return query;
+}
+
+void KBSResultModel::SetChangeText(const PMString& change)
+{
+	gChangeText = change;
+	gChangeText.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetChangeText()
+{
+	PMString change(gChangeText);
+	change.SetTranslatable(kFalse);
+	return change;
 }
 
 void KBSResultModel::SetWalkSignature(const PMString& signature)
@@ -696,6 +714,19 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 	{
 		buf += "\nQuery: ";
 		AppendFlattenedUTF8(buf, gQueryText);
+	}
+
+	// ...and what was WRITTEN, on the aftermath of a replace only. A report of a search names what was
+	// looked for and nothing else: the Change To box may hold anything at all at that point, and
+	// naming it would read as something that has already been done (user's decision, 2026-08-04).
+	//
+	// Asked of IsShowingReplaceOutcome rather than of the string alone, so that the line follows the
+	// same flag every other "this is a replace's report" decision in this plug-in follows - the file
+	// name (KBSReportSave::ActionNamePart) and the panel's own illustration among them.
+	if (gResultKind == kResultFindChange && IsShowingReplaceOutcome() && !gChangeText.IsEmpty())
+	{
+		buf += "\nChange: ";
+		AppendFlattenedUTF8(buf, gChangeText);
 	}
 
 	// What was run over. A book search names the book; a document search names its one chapter.

@@ -290,6 +290,22 @@ namespace KBSResultModel
 	void SetQueryText(const PMString& query);
 	PMString GetQueryText();
 
+	/** What the replace was told to WRITE, as one ready-made line - the change string plus its Change
+	    Format, or the Glyph tab's replacement glyph. See KBSSearchEngine::DescribeCurrentChange.
+
+	    The change side's counterpart to SetQueryText, and recorded by the same rule: the REPLACE
+	    records it on its way in, because the user is free to retype Change To the moment it returns
+	    and a report that read the dialog at save time would name a replacement these rows never took.
+
+	    ***** WRITTEN INTO THE REPORT ONLY WHILE IsShowingReplaceOutcome IS ON. ***** A search that
+	    has not been replaced yet leaves it empty, and that is the point (user's decision,
+	    2026-08-04): a "Change:" line in the report of a plain search would name something that has
+	    not happened, which reads as something that has.
+
+	    Cleared by Clear(), so it can never outlive the results it describes. */
+	void SetChangeText(const PMString& change);
+	PMString GetChangeText();
+
 	/** EVERYTHING a walk is driven by, as one opaque comparable string: the query itself plus every
 	    Find/Change switch that decides which matches come back (see
 	    KBSSearchEngine::BuildWalkSignature for the list).
@@ -429,15 +445,20 @@ namespace KBSResultModel
 	    a column-heading row, then ONE LINE PER HIT - tab separated, uncapped (every stored hit,
 	    including those past the panel's display limit).
 
-	        Kohaku Find/Change
-	        Query: cat  (Text)
+	        Kohaku Find/Change (after Change Checked)
+	        Query: cat  + Find Format (size: 14 pt + Paragraph style: Body)  (Text)
+	        Change: dog  + Change Format (size: 20 pt)
 	        Book: savetest.indb
-	        Summary: 9 hit(s) in 3 of 3 chapter(s)
+	        Summary: 9 replaced in 3 of 3 chapter(s)
 	        Rows: 9
 
 	        <Document>  <Page>  <Text>  <Font>  <Flags>
 	        ch1.indd    1       ...the cat sat on the...
 	        ch1.indd    2       ...three cats...                    lock
+
+	    The format detail in those two lines is written IN FULL, however long it runs (user's
+	    decision, 2026-08-04) - the replace prompt is the one that shortens it. "Change:" appears on
+	    the aftermath of a replace only; see SetChangeText.
 
 	    NOT DescribeAllRows in another dress, though they read the same rows. That one is the machine
 	    port behind app.kbsResults: it escapes tabs and newlines to "\t" / "\n" so a script can split

@@ -1240,6 +1240,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		return 0;
 	}
 
+	// ***** WHAT THIS RUN WAS TOLD TO WRITE, RECORDED BEFORE IT WRITES ANY OF IT. ***** The heading of
+	// the file "Save Results..." produces names it, and the user can retype Change To the moment this
+	// returns - so reading the dialog at save time would put a replacement in the report that these
+	// rows never took. Same rule, same reason, as the query line the search records (SetQueryText).
+	//
+	// Here rather than earlier because CommitReplaceGlyph has just stated the Glyph tab's change glyph
+	// on the options: before that call, the change side of a glyph replace is not there to be read.
+	// Still outside every command sequence, and past all the doors above, so nothing that gets this
+	// far is recorded without running.
+	KBSResultModel::SetChangeText(KBSSearchEngine::DescribeCurrentChange());
+
 	// The whole account of this run - every counter the summary reads, in one structure. It used to
 	// be seventeen locals here. They were gathered up when a SECOND way through this function
 	// arrived (the chapter-at-a-time path, 2026-08-03): both have to hand the same account to the
