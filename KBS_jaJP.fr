@@ -75,7 +75,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
 
                 // ----- Panel/dialog strings
                 kKBSPanelTitleKey,				kKBSDisplayName,
-                kKBSStaticTextKey,				"編集 > 検索と置換 で検索する文字を入力し、このパネルのメニューから Find in Document を実行してください。",
+                kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find in Document from this panel's menu.",
 
                 // ----- Change Checked confirmation prompt
                 // The panel, its menu and its status line stay English on purpose (they echo the

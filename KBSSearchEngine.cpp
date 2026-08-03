@@ -1762,6 +1762,16 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 
 	AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
 	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
+
+	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - they moved
+	// off the panel flyout on 2026-08-01, because a flyout has no row to ask about and those two have
+	// to know whether they mean the whole book or one chapter. Nothing on screen said so, which left
+	// the one command that turns a result list into a work list undiscoverable (user's request,
+	// 2026-08-03).
+	//
+	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
+	// truncates its tail when it has to.
+	outSummary.Append(" Right-click the book or a document row for a menu.");
 	return total;
 }
 
