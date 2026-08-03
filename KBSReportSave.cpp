@@ -237,9 +237,12 @@ void KBSResultTree::SaveResultsAsText()
 			bytes += *it;
 	}
 
+	// The stream comes back OPEN - IPMStream.h:359-365 states that Open "gets called for you by the
+	// StreamUtils functions" - so it is asked for its state straight away, the way the SDK's own
+	// writer does (SnipRunScriptProvider.cpp:488), rather than after the bytes have gone in.
 	InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(
 		chooser.GetIDFile(), kOpenOut | kOpenTrunc, 'TEXT', 'CWIE'));
-	if (stream == nil)
+	if (stream == nil || stream->GetStreamState() != kStreamStateGood)
 	{
 		ShowStatus("Could not create the file. Is the folder writable?");
 		return;

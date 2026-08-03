@@ -57,6 +57,7 @@
 #include "IComposeScanner.h"	// CopyText - reading the character between two boxes
 #include "IDocument.h"			// GetName - the chapter row's display name
 #include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
+#include "IFrameListComposer.h"	// RecomposeThruLastFrame - compose what is stale before reading it
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
 #include "IPMFont.h"			// GetNotDefinedGlyph / AppendFamilyName / AppendStyleName
 #include "IStoryList.h"			// the document's stories
@@ -191,7 +192,7 @@ void AppendFontDisplayName(IPMFont* font, IWaxRenderData* render, PMString& out)
     A run whose FONT IS MISSING is skipped rather than reported. That text is drawn in a substitute
     face, which InDesign marks with a pink highlight; it is a different problem, and this scan is
     about boxes (design section 2). */
-void CollectNotdefsOnLine(IWaxLine* line, std::vector<NotdefGlyph>& out)
+void CollectNotdefsOnLine(const IWaxLine* line, std::vector<NotdefGlyph>& out)
 {
 	K2::scoped_ptr<IWaxGlyphIterator> git(line->QueryWaxGlyphIterator(kFalse));
 	if (git == nil)
@@ -255,19 +256,55 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	// and a story placed nowhere at all has no lines to look at. GetWasOversetValid comes first -
 	// the state is persisted, so it can be there without meaning anything yet (:149).
 	InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
-	if (frameList != nil && frameList->GetWasOversetValid() && frameList->GetWasOverset())
-		outHasOverset = true;
+	if (frameList != nil)
+	{
+		if (frameList->GetWasOversetValid() && frameList->GetWasOverset())
+			outHasOverset = true;
 
-	K2::scoped_ptr<IWaxIterator> waxIter(waxStrand->NewWaxIterator());
+		// ***** Compose what is out of date BEFORE reading it. *****
+		// The wax is the composer's last answer. A story edited since it last composed can hand
+		// back glyphs that are no longer on the page - a box the user has already fixed, or none
+		// where one has just appeared - so the scan would report the document as it used to be.
+		// This is the official route (SnpInspectTextModel.cpp:724-733: ask the frame list for a
+		// damaged index, then RecomposeThruLastFrame) and the one KBSJump.cpp:143-149 already takes
+		// before reading this very wax. The two scans were the only readers that skipped it.
+		if (frameList->GetFirstDamagedFrameIndex() != -1)
+		{
+			InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
+			if (composer != nil)
+				composer->RecomposeThruLastFrame();
+		}
+	}
+
+	// READ-ONLY iterator: this walk never changes a wax line nor applies one, which is exactly the
+	// case IWaxStrand.h:100-106 describes ("code that draws") and offers an optimisation for. The
+	// product code reads the wax this way (PrivateSpellingUtils.cpp:371, 579). The sample
+	// SnpEstimateTextDepth.cpp:208 uses the plain iterator instead - two ways of spelling it - and
+	// the product code is the one followed here.
+	K2::scoped_ptr<const IWaxIterator> waxIter(waxStrand->NewReadOnlyWaxIterator());
 	if (waxIter == nil)
 		return;
 
 	int32 lines = 0;
 	int32 offset = 0;
-	IWaxLine* line = waxIter->GetFirstWaxLine(0, &offset);
+	const IWaxLine* line = waxIter->GetFirstWaxLine(0, &offset);
 	while (line != nil && lines < kMaxWaxLines)
 	{
 		++lines;
+
+		// A line the composer has thrown away, which the strand can still hand over. Reading one is
+		// what bug fix 538392 was about, and the product code tests for it before touching a line
+		// (PrivateSpellingUtils.cpp:387-389).
+		//
+		// Its companion test there - IsDamaged - is deliberately NOT copied. That code is DRAWING:
+		// a damaged line will be redrawn anyway, so skipping it costs nothing. This scan has just
+		// composed the frame list above and wants every line it can get; skipping damaged ones
+		// would silently drop text from the report.
+		if (line->IsDestroyed())
+		{
+			line = waxIter->GetNextWaxLine();
+			continue;
+		}
 
 		// An overset line (IWaxLine.h:68: no valid parcel key). Measured 2026-08-02: these carry no
 		// glyphs whatsoever, and asking IFrameListComposer to compose the whole frame list adds

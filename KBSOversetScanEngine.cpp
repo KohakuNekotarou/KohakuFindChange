@@ -29,14 +29,15 @@
 // Interface includes:
 #include "IDocument.h"			// GetName - the chapter row's display name
 #include "IFrameList.h"			// the argument ITextUtils::IsOverset takes
+#include "IFrameListComposer.h"	// RecomposeThruLastFrame - compose what is stale before asking
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
 #include "IStoryList.h"			// the document's stories
 #include "ITableModel.h"		// const_iterator / GetGridID - one visit per cell thread
-#include "ITableModelList.h"	// every table in a story (deprecated but current - SnpIterTableStories)
 #include "ITextModel.h"			// QueryFrameList / QueryTextParcelList
 #include "ITextParcelList.h"	// GetIsOverset / GetFirstOversetTextIndex - the whole answer
 #include "ITextStoryThread.h"	// GetTextStart - a cell thread's first TextIndex
-#include "ITextStoryThreadDict.h"	// QueryThread(gridID) - the dictionary lives on the table model
+#include "ITextStoryThreadDict.h"		// QueryThread(gridID) - one dictionary per table
+#include "ITextStoryThreadDictHier.h"	// NextUID - every dictionary in the story, flattened
 #include "ITextUtils.h"			// IsOverset
 
 // General includes:
@@ -44,7 +45,7 @@
 #include "PMString.h"
 #include "PersistUtils.h"		// ::GetUIDRef
 #include "ProgressBar.h"		// RangeProgressBar - the scan's progress + cancel
-#include "TableTypes.h"			// GridAddress / GridID
+#include "TableTypes.h"			// GridID - the key a cell's thread is filed under
 #include "TextID.h"				// kTextStoryBoss - the boss ITableModelList sits on
 #include "Utils.h"
 
@@ -130,36 +131,52 @@ bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32&
 
 /** Collect every cell of every table in this story that is overset ON ITS OWN.
 
-    ITableModelList is documented to list a story's tables without promising that a table inside a
-    CELL is among them - so it was measured rather than assumed (2026-08-02,
-    work/kbs-selftest/overset-shapes.indd): it hands back the NESTED tables too. The
-    "Table cell (121)" finding that matches the official preflight comes from a table inside a cell,
-    and no recursion is written here. ***** Do not add one. ***** Walking a cell's own tables as
+    ***** The tables are reached through the thread-dictionary hierarchy, not through
+    ITableModelList. ***** Both work, and the SDK is explicit about which is which: the snippet that
+    uses ITableModelList calls it "an older way" and points at this one -
+    "See SnpIterTableUseDictHier::IterateAllTablesInDocument() for a better technique"
+    (SnpIterTableStories.cpp:68-70, :151-154). The walk below is SnpIterTableUseDictHier.cpp:147-199.
+
+    What that buys here is the nested table. ITextStoryThreadDictHier::NextUID FLATTENS the
+    hierarchy (ITextStoryThreadDictHier.h:63-66), so a table anchored inside a CELL arrives in the
+    same sequence as a top-level one - by contract, where the old route left it as something this
+    plug-in had measured (2026-08-02, work/kbs-selftest/overset-shapes.indd) and had to trust. The
+    "Table cell (121)" finding that matches the official preflight is one of those nested cells.
+
+    ***** Still no recursion. ***** The sequence is already flat; walking a cell's own tables as
     well would visit those threads a second time and report every nested cell twice. */
 void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>& out)
 {
-	InterfacePtr<ITableModelList> tableList(storyRef, UseDefaultIID());
-	if (tableList == nil)
+	// Aggregated on kTextStoryBoss, and it owns one ITextStoryThreadDict per table
+	// (SnpIterTableUseDictHier.cpp:154-163).
+	InterfacePtr<ITextStoryThreadDictHier> dictHier(model, UseDefaultIID());
+	if (dictHier == nil)
 		return;
 
-	const int32 tableCount = tableList->GetModelCount();
-	for (int32 t = 0; t < tableCount; ++t)
+	IDataBase* const db = ::GetDataBase(dictHier);
+
+	// Starts at the story's own UID - kTextStoryBoss carries a dictionary of its own, the primary
+	// story thread - which then falls out below for having no ITableModel.
+	for (UID nextUID = ::GetUIDRef(dictHier).GetUID();
+		 nextUID != kInvalidUID;
+		 nextUID = dictHier->NextUID(nextUID))
 	{
-		InterfacePtr<ITableModel> table(tableList->QueryNthModel(t));
-		if (table == nil)
+		InterfacePtr<ITextStoryThreadDict> dict(db, nextUID, UseDefaultIID());
+		if (dict == nil)
 			continue;
 
-		// The dictionary that maps a cell to its own text thread lives on the table model itself.
-		InterfacePtr<ITextStoryThreadDict> dict(table, UseDefaultIID());
-		if (dict == nil)
+		// Is this dictionary a TABLE's? kTableModelBoss carries the dictionary and an ITableModel
+		// together; kTextStoryBoss carries the dictionary without one, and that is how the primary
+		// story thread is told apart (SnpIterTableUseDictHier.cpp:219-225).
+		InterfacePtr<ITableModel> table(dict, UseDefaultIID());
+		if (table == nil)
 			continue;
 
 		// The model's own iterator visits ANCHOR cells - a merged cell comes past once, not once
 		// per grid square it covers - which is exactly one visit per thread.
 		for (ITableModel::const_iterator it(table->begin()), last(table->end()); it != last; ++it)
 		{
-			const GridAddress ga = *it;
-			const GridID gridID = table->GetGridID(ga);
+			const GridID gridID = table->GetGridID(*it);
 
 			InterfacePtr<ITextStoryThread> thread(dict->QueryThread(gridID));
 			if (thread == nil)
@@ -219,8 +236,22 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		if (model == nil)
 			continue;
 
-		// (1) the thread the frames carry - the red "+".
+		// ***** (0) Compose what is out of date BEFORE asking. *****
+		// Overset is a COMPOSITION result - both answers below are the composer's last word - so a
+		// story edited since it last composed can report overflow the user has already fixed, or
+		// stay silent about overflow that has just appeared. Official route:
+		// SnpInspectTextModel.cpp:724-733 (damaged index, then RecomposeThruLastFrame); the same
+		// three lines KBSJump.cpp:143-149 runs before reading this story's wax. Composing the frame
+		// list settles the tables in it too, so the cell pass below reads a settled story as well.
 		InterfacePtr<IFrameList> frameList(model->QueryFrameList());
+		if (frameList != nil && frameList->GetFirstDamagedFrameIndex() != -1)
+		{
+			InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
+			if (composer != nil)
+				composer->RecomposeThruLastFrame();
+		}
+
+		// (1) the thread the frames carry - the red "+".
 		if (frameList != nil && Utils<ITextUtils>()->IsOverset(frameList))
 		{
 			TextIndex start = 0;
