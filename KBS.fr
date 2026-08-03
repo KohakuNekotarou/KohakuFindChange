@@ -469,6 +469,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// "How to Use...": the plug-in's operating reference, in a scrollable dialog (KBSHowTo.cpp).
+		// Between the separator and About, where KESCM puts its own.
+		kKBSHowToActionID,
+		kKBSTargetMenuPath
+		kKBSHowToMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// About this plug-in sub-menu for the popup menu on the panel
 		kKBSPopupAboutThisActionID,
 		kKBSTargetMenuPath
@@ -612,6 +619,22 @@ resource ActionDef (kSDKDefActionResourceID)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// "How to Use...". NO kCustomEnabling, unlike every command above it: this one has nothing
+		// to be enabled against. It reads a text - no document, no result set, no selection - so it
+		// stays live with nothing loaded, which is exactly when a first-time user reaches for it.
+		//
+		// It IS still caught by the blanket disable at the top of UpdateActionStates while a run is
+		// going. That path is unreachable rather than wrong: the run's progress bar is modal, so the
+		// flyout cannot be opened to see it (measured on the running panel, 2026-08-03).
+		kKBSActionComponentBoss,
+		kKBSHowToActionID,
+		kKBSHowToMenuKey,				// "How to Use..."
+		kOtherActionArea,
+		kNormalAction,
+		kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 

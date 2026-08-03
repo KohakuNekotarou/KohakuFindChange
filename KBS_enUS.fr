@@ -47,6 +47,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
                 kKBSSaveResultsMenuKey,			"Save Results...",
+                // The operating reference. English in both tables, like the rest of the flyout.
+                kKBSHowToMenuKey,				"How to Use...",
 
                 // ----- Window strings
 
@@ -70,6 +72,11 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmFindKey,				"Find: ^1",
                 kKBSConfirmChangeToKey,			"Change to: ^1",
                 kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
+                // The Find/Change dialog's own names for its two format panes. Shown when a format
+                // is set: "cat  + Find Format", or alone when the box beside it is empty (a search
+                // by format with nothing typed - which the dialog allows and KBS now runs).
+                kKBSConfirmFindFormatKey,		"Find Format",
+                kKBSConfirmChangeFormatKey,		"Change Format",
                 // Both start with the condition, because the box below can make them false: a run
                 // that saves writes every chapter to disk and closes the ones this plug-in opened,
                 // and no undo puts a saved file back. The box is ticked AFTER this text is drawn,

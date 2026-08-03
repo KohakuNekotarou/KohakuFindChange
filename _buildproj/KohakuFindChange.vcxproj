@@ -243,6 +243,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSRunGuard.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSHowTo.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
@@ -279,6 +280,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSRunGuard.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSHowTo.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\KBS.fr">

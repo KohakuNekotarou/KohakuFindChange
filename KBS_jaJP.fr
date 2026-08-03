@@ -70,6 +70,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
                 kKBSSaveResultsMenuKey,			"Save Results...",
+                kKBSHowToMenuKey,				"How to Use...",
 
                 // ----- Window strings
 
@@ -86,6 +87,8 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSConfirmFindKey,				"検索文字列: ^1",
                 kKBSConfirmChangeToKey,			"置換文字列: ^1",
                 kKBSConfirmEmptyReplaceKey,		"（空欄：一致した箇所は削除されます）",
+                kKBSConfirmFindFormatKey,		"検索形式",
+                kKBSConfirmChangeFormatKey,		"置換形式",
                 kKBSConfirmUnsavedOneKey,		"下のチェックを入れない場合、章は開かれたまま未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で戻せます。",
                 kKBSConfirmUnsavedManyKey,		"下のチェックを入れない場合、^1 個の章が開かれたまま未保存の状態で残ります。取り消し（Undo）は Ctrl+Z 一回で、すべての章が元に戻ります。",
 

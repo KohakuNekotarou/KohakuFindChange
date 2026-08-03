@@ -116,6 +116,43 @@ namespace KBSSearchEngine
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
 	bool CommitReplaceGlyph();
 
+	/** Is anything set in the dialog's Find Format / Change Format pane, for the tab in force?
+
+	    Used to caption a search by formatting alone ("Find Format" where the query would otherwise be
+	    blank) and to keep the replace prompt from telling the user that an empty Change To box will
+	    DELETE their matches when a Change Format is set and only the formatting will change.
+
+	    ***** TWO PLACES HOLD A FORMAT AND ONLY ONE OF THEM IS A LIST. ***** Counting
+	    AttributeBossList alone misses paragraph and character STYLES, which IFindChangeOptions keeps
+	    in fields of their own (GetFindParaStyle / GetFindCharStyle and the change-side pair).
+	    Measured 2026-08-04: a paragraph style in Find Format left CountBosses at 0 while a point size
+	    put one in, so the prompt printed "Find: ^1" and "(empty - the matches will be deleted)" for
+	    exactly the query this was supposed to describe. Both are asked here, so no caller has to
+	    remember the split.
+
+	    Takes no arguments on purpose: every caller wants the tab in force, and asking for it here
+	    keeps IFindChangeOptions.h out of this header. Says false when the settings cannot be read. */
+	bool HasFindFormatSet();
+	bool HasChangeFormatSet();
+
+	/** WHAT is set in one side of the format pane, in InDesign's own words -
+	    "size: 14 pt + leading: 24 pt + Paragraph style: Body".
+
+	    The " + " between entries is the Style Options "Settings" line's own separator, and it comes
+	    from the attributes themselves rather than from this call (measured 2026-08-04).
+
+	    The attributes describe THEMSELVES: IAttrReport::AppendDescription is the call that builds
+	    the Settings text in Style Options and the "+" override tooltip, so the wording and the
+	    language are the ones the user already sees. Paragraph and character styles are added
+	    separately (they are not attributes) and are named by their FULL path, group included.
+
+	    Comes back EMPTY when nothing is set, when the settings cannot be read, or - possible in
+	    principle - when every attribute declines to describe itself. Callers must treat empty as
+	    "say nothing extra", never as "no format set" (that question is HasFindFormatSet's).
+
+	    @param findSide true for Find Format, false for Change Format. */
+	PMString DescribeFormatSetting(bool findSide);
+
 	/** EVERYTHING the current Find/Change settings would drive a walk BY, as one opaque string:
 	    the tab, the query itself, and every switch that decides WHICH matches come back -
 	    case / whole word / kana / width, and the five scope switches GetKBSWalkerScopeOptions reads.

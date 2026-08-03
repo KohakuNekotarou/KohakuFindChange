@@ -72,6 +72,10 @@
 #include "ITextAttrClassID.h"
 
 // General includes:
+#include "IAttrReport.h"			// AppendDescription - a text attribute states itself, in the user's language
+#include "IObjectModel.h"			// GetIDName - the receiver for an attribute that states nothing
+#include "IStyleInfo.h"				// a paragraph / character style's own name
+#include "IStyleGroupHierarchy.h"	// ...and its FULL path, group names included
 #include "AttributeBossList.h"		// the find attributes the Glyph tab's query carries
 #include "TextAttrID.h"				// kTextAttrFontUIDBoss / kTextAttrFontStyleBoss
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
@@ -88,6 +92,7 @@
 #include "WideString.h"
 
 #include <vector>
+#include <string>					// the leading-separator test in DescribeFormatSetting
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <stdio.h>					// snprintf - the U+ formatting in DescribeGlyphQuery
@@ -102,14 +107,10 @@
 namespace
 {
 
-// The whole-search safety ceiling: the collector stops after this many hits across ALL chapters,
-// so a huge or match-everywhere query cannot pile up an unbounded result set. Kept deliberately
-// conservative - a small multiple of the panel display cap - so memory stays tiny and the search
-// stays fast. Unlike the panel display cap (KBSResultModel::kKBSDisplayHitLimit) this bounds the
-// RESULT SET itself, so hitting it caps a future export too. A common word in a large book can
-// reach it, and that is intended: the panel shows the first kKBSDisplayHitLimit hits and the
-// summary says to narrow the query.
-const int32 kKBSCollectHitLimit = 10000;
+// The whole-run safety ceiling lived here until 2026-08-03. It moved to KBSResultModel.h
+// (kKBSCollectHitLimit, beside the display cap) when the two scans were given the same ceiling -
+// three commands reading one number, in the header they all already include. Read the contract
+// there; this file uses it in SearchBook.
 
 // The smallest advance worth reporting to the progress bar. Moving the bar is what makes Cancel
 // work at all, but it is not free: doing it once per hit would repaint and run the message loop
@@ -250,22 +251,155 @@ bool HasFindQuery()
 		return false;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
-	// The Glyph tab's query is NOT a find string - it is a glyph ID plus the font it belongs to, so
-	// asking whether the find string is empty answers the wrong question there. (It happened to give
-	// a usable answer only because picking a glyph whose character exists also leaves that character
-	// in the find string; pick a glyph that has no character of its own and the string stays empty.)
+	// ***** ASK THE OPTIONS, NEVER THE FIND STRING. *****
+	// IFindChangeOptions.h:684-699 says this interface "is in a unique position to know whether
+	// there is adequate information defined on it to allow searching for 'something'", and spells
+	// out what that replaced: code that used to ask whether the find string was longer than zero
+	// "OR there was a special character or paragraph format to search for". Both halves matter here.
 	//
-	// So ask the options themselves. IFindChangeOptions.h says this interface "is in a unique
-	// position to know whether there is adequate information defined on it to allow searching for
-	// something" - which for a glyph means the ID and its font attributes, held in the attribute
-	// database the options carry (GetUIDAttrDB).
-	if (mode == IFindChangeOptions::kGlyphSearch)
-		return opts->IsThereSomethingToFind(opts->GetUIDAttrDB(), mode) != kFalse;
-
-	// The find-what for the mode the user is actually in (Text vs GREP each have their own).
-	const WideString& findText = opts->GetFindString(mode);
-	return !findText.empty();
+	// TWO tabs need the format half, for different reasons:
+	//   - Glyph: its query is NOT a find string at all - it is a glyph ID plus the font it belongs
+	//     to, held in the attribute database (GetUIDAttrDB). Asking about the find string happened
+	//     to give a usable answer only because picking a glyph whose character exists also leaves
+	//     that character in the box; pick one with no character of its own and the string is empty.
+	//   - Text / GREP: FIND FORMAT alone is a legitimate query - "every place carrying this
+	//     paragraph style" - with the find box deliberately empty. The dialog allows it, and KBS
+	//     runs the same kFindTextCmdBoss the dialog does, so the walk handles it; only this door
+	//     was shut. It used to ask !GetFindString(mode).empty() here, which turned that away.
+	//
+	// (Until 2026-08-03 the Glyph tab asked this and Text / GREP asked the find string - one
+	// function answering the same question two ways. The format-only search was what that cost.)
+	return opts->IsThereSomethingToFind(opts->GetUIDAttrDB(), mode) != kFalse;
 }
+
+// Is anything set in one side of the dialog's format pane? See the header for what this is for; what
+// follows is why it has to look in two places.
+//
+// ***** A FORMAT IS NOT ALWAYS IN THE ATTRIBUTE LIST. ***** Most conditions are - a point size, a
+// colour, a language - and AttributeBossList::CountBosses finds those. Paragraph and character
+// STYLES are not: IFindChangeOptions carries them in fields of their own, reached through
+// GetFindParaStyle / GetFindCharStyle (and the change-side pair, which take allowCreation).
+//
+// Measured 2026-08-04 on the running application, which is how the split came to light: searching by
+// a paragraph style alone RAN (IsThereSomethingToFind says yes to it) and returned the right rows,
+// while the list this used to count was still empty - so the replace prompt captioned that very
+// search "Find: ^1" and promised to DELETE the matches it was only going to restyle.
+//
+// WHAT IS NOT ASKED: which style, or which attributes. Naming two conditions out of the 222 in
+// TextAttrID.h invites the reading that those are the only two set (user's decision, 2026-08-03), so
+// every caller says "Find Format" and points at the pane.
+static bool HasFormatSet(IFindChangeOptions* opts, IFindChangeOptions::SearchMode mode, bool findSide)
+{
+	if (opts == nil)
+		return false;
+
+	IDataBase* const db = opts->GetUIDAttrDB();
+
+	// allowCreation = kFalse on the change side: the default is kTrue and would CREATE what it hands
+	// back. This is a read, and a prompt must not write to the user's settings.
+	const AttributeBossList* const attrs = findSide
+		? opts->GetFindAttributeBossList(db, mode)
+		: opts->GetChangeAttributeBossList(db, mode, kFalse);
+	if (attrs != nil && attrs->CountBosses() > 0)
+		return true;
+
+	const UID paraStyle = findSide ? opts->GetFindParaStyle(db, mode)
+								   : opts->GetChangeParaStyle(db, mode, kFalse);
+	const UID charStyle = findSide ? opts->GetFindCharStyle(db, mode)
+								   : opts->GetChangeCharStyle(db, mode, kFalse);
+	return paraStyle != kInvalidUID || charStyle != kInvalidUID;
+}
+
+// ***** AN ATTRIBUTE STATES ITSELF. *****
+//
+// IAttrReport::AppendDescription is the call that builds the "Settings" text in the Style Options
+// dialog and the tooltip behind the "+" beside an overridden style name (IAttrReport.h:122-133).
+// What comes back is therefore the wording InDesign ALREADY shows this user, in this user's
+// language - nothing here has to know what the 222 attribute bosses in TextAttrID.h are, and the
+// note that used to stand in this file ("the SDK offers no way to turn a ClassID into a readable
+// name") was asking the wrong object: the attributes name themselves.
+//
+// THREE TIERS, copied from SnpInspectTextStyles::reportAttribute, because an attribute is allowed
+// to say nothing at all:
+//   1. AppendDescription
+//   2. it appended nothing -> the boss's internal name (IObjectModel::GetIDName)
+//   3. no name registered  -> the hex ClassID, so the line is never silently empty
+static void AppendOneAttribute(const AttributeBossList* attrs, int32 n, IDataBase* db,
+							   PMString& out, bool needSeparator)
+{
+	const int32 lengthBefore = out.CharCount();
+
+	InterfacePtr<const IAttrReport> report(static_cast<const IAttrReport*>(
+		attrs->QueryBossN(n, IAttrReport::kDefaultIID)));
+	if (report != nil)
+		report->AppendDescription(&out, db, attrs);
+
+	if (out.CharCount() != lengthBefore)
+		return;			// it spoke for itself, separator included - see DescribeFormatSetting
+
+	// Neither receiver below brings a separator, so this is the one place that adds one. It is asked
+	// for rather than worked out from `out`, which is a piece being built on its own, not the list.
+	if (needSeparator)
+		out.Append(" + ");
+
+	const ClassID cls = attrs->GetClassN(n);
+	InterfacePtr<IObjectModel> objectModel(GetExecutionContextSession(), UseDefaultIID());
+	const char* const name = (objectModel != nil) ? objectModel->GetIDName(kClassIDSpace, cls.Get()) : nil;
+	if (name != nil)
+		out.Append(name);
+	else
+	{
+		char buf[24];
+		snprintf(buf, sizeof(buf), "0x%x", static_cast<unsigned int>(cls.Get()));
+		out.Append(buf);
+	}
+}
+
+// How much format detail the prompt is willing to carry. The prompt is a question, not a report:
+// past this the reader is skimming rather than checking, and the line's job is to let them recognise
+// the settings they made. Whole pieces only, and what was left out is SAID (" + ...") rather than
+// silently cut - a truncated list that does not admit it reads as "this is everything".
+static const int32 kKBSFormatDetailLimit = 100;
+
+// Append one piece unless it would take the line past that limit. The first piece always goes in:
+// a single long description is still better than nothing at all.
+//
+// @return false when the piece was left out, which is the caller's cue to stop and say "...".
+static bool AppendWithinLimit(PMString& out, const PMString& piece)
+{
+	if (piece.IsEmpty())
+		return true;			// nothing to add, and nothing was dropped either
+	if (!out.IsEmpty() && (out.CharCount() + piece.CharCount()) > kKBSFormatDetailLimit)
+		return false;
+	out.Append(piece);
+	return true;
+}
+
+// A style set in the format pane. Not in the attribute list above - styles are not text attributes
+// (see HasFormatSet) - so they are named separately, and by their FULL path: a style inside a group
+// loses the group from IStyleInfo::GetName, and two groups may hold the same style name
+// (SnpManipulateTextStyle reads GetFullPath everywhere for that reason).
+static void AppendStyleName(IDataBase* db, const UID& style, const char* label, PMString& out,
+							bool needSeparator)
+{
+	if (db == nil || style == kInvalidUID)
+		return;
+	InterfacePtr<IStyleInfo> info(db, style, UseDefaultIID());
+	if (info == nil)
+		return;
+
+	// Same separator the attributes use, so one list reads as one list.
+	if (needSeparator)
+		out.Append(" + ");
+	out.Append(label);
+	out.Append(": ");
+
+	InterfacePtr<IStyleGroupHierarchy> hierarchy(db, style, UseDefaultIID());
+	out.Append((hierarchy != nil) ? hierarchy->GetFullPath() : info->GetName());
+}
+
+// The two public wrappers are defined further down, OUTSIDE this file's anonymous namespace - a
+// KBSSearchEngine:: definition is not allowed in here (C2888).
 
 // The Glyph tab's query as one readable line: "Glyph 1234 (Kozuka Mincho Pr6N  Regular) U+845B".
 //
@@ -359,7 +493,33 @@ PMString DescribeCurrentQuery()
 	if (mode == IFindChangeOptions::kGlyphSearch)
 		description = DescribeGlyphQuery(opts);
 	else
+	{
 		description.Append(opts->GetFindString(mode));
+
+		// ***** FIND FORMAT IS PART OF WHAT WAS ASKED FOR. ***** Without this a search by format
+		// alone - which the find box is empty for - captions itself with nothing at all, and the
+		// saved report's heading reads "Query:  (Text)". "cat  + Find Format" when both are set.
+		//
+		// WHAT is set is not named: TextAttrID.h declares 222 attribute bosses and the SDK has no
+		// ClassID-to-name call (see HasFormatSet above, which the replace prompt shares). The name
+		// used is the dialog's own name for that pane, so it points at where the detail can be read.
+		//
+		// NOT translated, unlike the replace prompt: this line goes on the status line and into the
+		// saved report, and those stay English throughout the panel.
+		//
+		// Not on the Glyph tab either - its attribute list holds the QUERY's own font, so the note
+		// would be on every glyph search, saying nothing. DescribeGlyphQuery states that font.
+		//
+		// Asked through HasFormatSet rather than by counting the attribute list here: a paragraph or
+		// character style is a format the list does not carry (2026-08-04), and this caption is the
+		// one the format-only search exists for.
+		if (HasFormatSet(opts, mode, true /*findSide*/))
+		{
+			if (!description.IsEmpty())
+				description.Append("  + ");
+			description.Append("Find Format");
+		}
+	}
 
 	// The tab's own name, after the query, so the file says which of the two find strings this was
 	// (Text and GREP each have their own, and the same characters mean different things on them).
@@ -1259,6 +1419,93 @@ static void AppendAttributeSignature(const AttributeBossList* attrs, int32 n, PM
 	}
 }
 
+PMString KBSSearchEngine::DescribeFormatSetting(bool findSide)
+{
+	PMString out;
+	// Everything appended below is DATA - either InDesign's own description of a setting or a style
+	// the user named - so it must never be looked up in a string table.
+	out.SetTranslatable(kFalse);
+
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return out;
+
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	IDataBase* const db = opts->GetUIDAttrDB();
+
+	const AttributeBossList* const attrs = findSide
+		? opts->GetFindAttributeBossList(db, mode)
+		: opts->GetChangeAttributeBossList(db, mode, kFalse);	// kFalse: read, never create
+	// ***** THE SEPARATOR BELONGS TO THE ATTRIBUTE, NOT TO THIS LIST. *****
+	// AppendDescription writes " + size: 14 pt" - separator IN FRONT - because that is how the
+	// Settings line in Style Options reads: "+ size: 14 pt + leading: 24 pt". So nothing is added
+	// between entries here, and the first one arrives carrying a stray separator, dropped below.
+	// (Measured 2026-08-04: adding ", " here as well produced "Find Format ( + size: 14 pt)".)
+	//
+	// Each piece is built on its own first, so that one that would take the line past
+	// kKBSFormatDetailLimit can be left out WHOLE rather than cut in the middle of a word.
+	bool dropped = false;
+	if (attrs != nil)
+	{
+		const int32 count = attrs->CountBosses();
+		for (int32 i = 0; i < count && !dropped; ++i)
+		{
+			PMString piece;
+			piece.SetTranslatable(kFalse);
+			AppendOneAttribute(attrs, i, db, piece, !out.IsEmpty());
+			dropped = !AppendWithinLimit(out, piece);
+		}
+	}
+
+	// The styles last, and still under the limit: they are the two conditions a user is most likely
+	// to have set on purpose, but a line that runs off the dialog helps nobody.
+	if (!dropped)
+	{
+		PMString piece;
+		piece.SetTranslatable(kFalse);
+		AppendStyleName(db, findSide ? opts->GetFindParaStyle(db, mode)
+									 : opts->GetChangeParaStyle(db, mode, kFalse),
+						"Paragraph style", piece, !out.IsEmpty());
+		dropped = !AppendWithinLimit(out, piece);
+	}
+	if (!dropped)
+	{
+		PMString piece;
+		piece.SetTranslatable(kFalse);
+		AppendStyleName(db, findSide ? opts->GetFindCharStyle(db, mode)
+									 : opts->GetChangeCharStyle(db, mode, kFalse),
+						"Character style", piece, !out.IsEmpty());
+		dropped = !AppendWithinLimit(out, piece);
+	}
+
+	// Say that something was left out. Silently cutting the list would read as "this is everything"
+	// (user's decision, 2026-08-04) - the same reason the scans announce their own display cap.
+	if (dropped)
+		out.Append(" + ...");
+
+	// Drop the leading separator the first attribute brought with it. Asked of the platform string
+	// because " + " is ASCII wherever the description itself is translated; a description that does
+	// NOT start with it is left exactly as it came.
+	const std::string platform(out.GetPlatformString());
+	if (platform.compare(0, 3, " + ") == 0)
+		out.Remove(0, 3);
+
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+bool KBSSearchEngine::HasFindFormatSet()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	return (opts != nil) && HasFormatSet(opts, opts->GetSearchMode(), true /*findSide*/);
+}
+
+bool KBSSearchEngine::HasChangeFormatSet()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	return (opts != nil) && HasFormatSet(opts, opts->GetSearchMode(), false /*findSide*/);
+}
+
 void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 {
 	outSignature.Clear();
@@ -1315,7 +1562,8 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 	// The dialog's format pane and, on the Glyph tab, the query's own font. The list is walked in
 	// order and its LENGTH goes in first, so an added or removed condition is a difference even when
 	// none of the values can be read (see AppendAttributeSignature).
-	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(opts->GetUIDAttrDB(), mode);
+	IDataBase* const db = opts->GetUIDAttrDB();
+	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, mode);
 	outSignature.Append(" n");
 	outSignature.AppendNumber(attrs != nil ? attrs->CountBosses() : 0);
 	if (attrs != nil)
@@ -1324,6 +1572,16 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		for (int32 i = 0; i < attrCount; ++i)
 			AppendAttributeSignature(attrs, i, outSignature);
 	}
+
+	// ...and the two conditions that list does NOT carry. A paragraph or character style set in the
+	// format pane sits in a field of its own (see HasFormatSet), so without these a query that
+	// differs only by "Find Format = Style A" versus "Style B" would carry an IDENTICAL signature
+	// and the door that refuses a changed query would let it straight through. The UIDs go in raw:
+	// this string is compared, never read.
+	outSignature.Append(" s");
+	outSignature.AppendNumber(static_cast<int32>(opts->GetFindParaStyle(db, mode).Get()));
+	outSignature.Append("/");
+	outSignature.AppendNumber(static_cast<int32>(opts->GetFindCharStyle(db, mode).Get()));
 
 	outSignature.SetTranslatable(kFalse);
 }
@@ -1792,7 +2050,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 
 		// Room left under the whole-search safety ceiling; once it is gone, stop walking further
 		// chapters too (the result set is full).
-		const int32 remaining = kKBSCollectHitLimit - total;
+		const int32 remaining = KBSResultModel::kKBSCollectHitLimit - total;
 		if (remaining <= 0)
 		{
 			collectionTruncated = true;
@@ -1967,7 +2225,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	if (collectionTruncated)
 	{
 		outSummary.Append(" Stopped at the ");
-		outSummary.AppendNumber(kKBSCollectHitLimit);
+		outSummary.AppendNumber(KBSResultModel::kKBSCollectHitLimit);
 		outSummary.Append(" safety limit - narrow your search. Showing first ");
 		outSummary.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
 		outSummary.Append(" in the panel.");

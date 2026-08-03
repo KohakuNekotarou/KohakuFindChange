@@ -54,6 +54,7 @@
 #include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
 #include "KBSOversetScanEngine.h"	// Find Overset
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
+#include "KBSHowTo.h"			// "How to Use..." - the operating reference
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -129,6 +130,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSAboutActionID:
 		{
 			this->DoAbout();
+			break;
+		}
+
+		case kKBSHowToActionID:
+		{
+			// The whole reference, in a scrollable dialog. Everything about it - which language,
+			// the ScriptUI window, the CAlert fallback - is in KBSHowTo.cpp; nothing to decide here.
+			KBSHowTo::Show();
 			break;
 		}
 
@@ -384,6 +393,58 @@ static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID, const P
 	}
 }
 
+// "Is anything set in the format pane?" now lives in KBSSearchEngine (HasFindFormatSet /
+// HasChangeFormatSet) - the search's own caption asks the same question, and the two answers must
+// not drift apart. It also looks in one more place than the version that used to sit here: a
+// paragraph or character STYLE is not in the attribute list this counted, which is what made the
+// prompt print "Find: ^1" and threaten to delete matches it was only going to restyle (2026-08-04).
+//
+// WHAT is set is still not named - see the note on HasFormatSet in KBSSearchEngine.cpp.
+
+// ***** ReplaceStringParameters LEAVES ^1 STANDING WHEN THE STRING IS EMPTY. ***** The header says
+// the parameter "may be empty"; what the prompt actually printed for a format-only search was the
+// literal "Find: ^1" (measured 2026-08-04). Both sides of this prompt can legitimately be empty - a
+// search by formatting alone, and a Glyph-tab replace with an empty Change To box, where the blank
+// after the label IS the message - so an empty side is handed over as a single space.
+static void SpaceIfEmpty(PMString& str)
+{
+	if (str.IsEmpty())
+	{
+		str = PMString(" ");
+		str.SetTranslatable(kFalse);
+	}
+}
+
+// Append the dialog's name for the format pane to one side of the prompt, as the user asked it to
+// read: "cat  + Find Format" when both are set, "Find Format" on its own when the box is empty.
+// Translated - this prompt is the one place KBS translates (see the note in ConfirmReplace).
+static void AppendFormatNote(PMString& str, const char* formatKey, const PMString& detail)
+{
+	PMString note(formatKey);
+	note.Translate();
+	if (str.IsEmpty())
+		str = note;
+	else
+	{
+		str.Append("  + ");
+		str.Append(note);
+	}
+	// ...and WHAT is set, in InDesign's own words (KBSSearchEngine::DescribeFormatSetting). Empty
+	// means "nothing extra to say" - never "nothing is set", which is HasFindFormatSet's answer and
+	// was decided before this line is reached.
+	//
+	// NOTE: this goes on AFTER InsertAmpersandForDisplay has doubled the user's own strings, so an
+	// '&' inside a style or swatch name would be eaten by the alert's accelerator handling. Worth
+	// doubling here too if this detail is kept.
+	if (!detail.IsEmpty())
+	{
+		str.Append(" (");
+		str.Append(detail);
+		str.Append(")");
+	}
+	str.SetTranslatable(kFalse);
+}
+
 /* ConfirmReplace
 */
 bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterReplace)
@@ -456,8 +517,18 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	// quoted back as "AB", in the ONE place the user checks what is about to be written (reported
 	// from the running panel, 2026-07-31). Same doubling the tree rows and the status line do.
 	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&findStr);
+	// Find Format, appended AFTER the ampersand doubling: that guards the USER's string, and what
+	// goes on here is ours (it carries no ampersand to double).
+	//
+	// Not on the Glyph tab. Its attribute list is where the QUERY's own font and style live - the
+	// glyph id names nothing without them - so the list is never empty there and the note would be
+	// on every glyph prompt, saying nothing. That tab states its query by DRAWING the glyphs.
+	if (!glyphMode && KBSSearchEngine::HasFindFormatSet())
+		AppendFormatNote(findStr, kKBSConfirmFindFormatKey,
+			KBSSearchEngine::DescribeFormatSetting(true /*findSide*/));
 	PMString findLine(kKBSConfirmFindKey);
 	findLine.Translate();
+	SpaceIfEmpty(findStr);
 	::ReplaceStringParameters(&findLine, findStr);
 	msg.Append(findLine);
 	// The dialog's own name for the mode, untranslated everywhere. Named for Glyph as well as GREP:
@@ -483,10 +554,16 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	else
 		replaceStr = opts->GetReplaceString(mode);
 	replaceStr.SetTranslatable(kFalse);
+	// ***** AN EMPTY CHANGE BOX MEANS TWO DIFFERENT THINGS. ***** With no Change Format set it
+	// DELETES every match; with one set it changes the FORMAT and leaves the text alone. Saying
+	// "the matches will be deleted" about the second is the prompt telling the user the opposite of
+	// what is about to happen, so the format is asked about first.
+	const bool changeHasFormat = !glyphMode && KBSSearchEngine::HasChangeFormatSet();
+
 	// Text and GREP only: on those tabs the change string is a STRING, and a blank line there could
 	// as easily be a mistake as a deletion, so it is spelled out. The Glyph tab says it with the
 	// blank itself - see above.
-	if (replaceStr.IsEmpty() && !glyphMode)
+	if (replaceStr.IsEmpty() && !glyphMode && !changeHasFormat)
 	{
 		// An empty change string is a legitimate request - it deletes every match - so it is
 		// spelled out instead of leaving a blank line for the user to interpret.
@@ -498,8 +575,13 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	// Same reason as the find string above. Harmless on the "(empty - the matches will be deleted)"
 	// wording that replaces it when Change To is blank: that carries no ampersand to double.
 	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&replaceStr);
+	// "dog  + Change Format", or "Change Format" on its own when the box is empty.
+	if (changeHasFormat)
+		AppendFormatNote(replaceStr, kKBSConfirmChangeFormatKey,
+			KBSSearchEngine::DescribeFormatSetting(false /*findSide*/));
 	PMString changeLine(kKBSConfirmChangeToKey);
 	changeLine.Translate();
+	SpaceIfEmpty(replaceStr);
 	::ReplaceStringParameters(&changeLine, replaceStr);
 	msg.Append(changeLine);
 	msg.Append(kLineSeparatorString);

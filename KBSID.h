@@ -227,7 +227,10 @@ DECLARE_PMID(kActionIDSpace, kKBSFindOversetActionID, kKBSPrefix + 16)
 // "Save Results...": write the result set to a tab-separated text file (2026-08-03). + 12, + 13 and
 // + 15 are burnt numbers (see above), so this is the first genuinely unused one.
 DECLARE_PMID(kActionIDSpace, kKBSSaveResultsActionID, kKBSPrefix + 17)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 18)
+// "How to Use..." on the flyout: the plug-in's operating reference, shown in a scrollable dialog
+// (KBSHowTo.cpp). Deliberately NOT greyed out by anything - it is the one item that has to stay
+// readable when nothing is loaded and while a run is going, which is when it is most wanted.
+DECLARE_PMID(kActionIDSpace, kKBSHowToActionID, kKBSPrefix + 18)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 19)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 20)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 21)
@@ -308,6 +311,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // "Save Results...": write what the panel is showing to a text file. The trailing "..." is the
 // platform convention for a command that opens a dialog before it does anything.
 #define kKBSSaveResultsMenuKey			kKBSStringPrefix "kKBSSaveResultsMenuKey"
+// "How to Use...": the operating reference. English in both string tables, like the rest of the
+// flyout - only the replace prompts are translated (see kKBSConfirmReplaceOneKey). The BODY of the
+// reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single string at
+// about 3.1KB and this text is several times that.
+#define kKBSHowToMenuKey				kKBSStringPrefix "kKBSHowToMenuKey"
 
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
@@ -339,8 +347,17 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 #define kKBSConfirmFindKey			kKBSStringPrefix "kKBSConfirmFindKey"
 #define kKBSConfirmChangeToKey		kKBSStringPrefix "kKBSConfirmChangeToKey"
 // Shown in place of the change string when it is empty - which is a legitimate request (delete
-// every match), not a mistake, so it is spelled out rather than left blank.
+// every match), not a mistake, so it is spelled out rather than left blank. NOT used when a Change
+// Format is set: there an empty box changes the FORMAT and leaves the text alone, and this wording
+// would state the opposite of what happens.
 #define kKBSConfirmEmptyReplaceKey	kKBSStringPrefix "kKBSConfirmEmptyReplaceKey"
+// The dialog's own name for its format pane, appended to whichever side has one set: "cat  + Find
+// Format", or on its own when the box beside it is empty. WHAT is set is not named - TextAttrID.h
+// declares 222 attribute bosses and the SDK has no ClassID-to-name call - so the prompt points at
+// the pane and the user reads the detail where they set it. See HasFormatSet in
+// KBSActionComponent.cpp for why naming even the two styles was turned down.
+#define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
+#define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
 // The closing line, split by how many chapters will be written to. The whole replace is ONE undo
 // step however many chapters it touches - KBSReplaceEngine wraps the entire run in a single command
 // sequence, which is what lets one Ctrl+Z put all of it back. (Until 2026-07-28 this said "one undo
@@ -397,6 +414,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // document - everything above it produces or changes them, this one takes them away with you.
 #define kKBSSaveResultsMenuItemPosition		5.0
 #define	kKBSSeparator1MenuItemPosition		10.0
+// "How to Use..." sits between the separator and About, the placement KESCM uses (its own is
+// Sep2 9.95 / How to Use 10 / About 12). No separator of its own: another rule right above About
+// would draw two dividers with a single item between them.
+#define kKBSHowToMenuItemPosition			10.5
 #define kKBSAboutThisMenuItemPosition		11.0
 
 // Check All / Uncheck All are the two items of the RESULT ROWS' right-click menu (2026-08-01), not

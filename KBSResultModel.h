@@ -34,6 +34,20 @@ namespace KBSResultModel
 	    the tree display is capped, to keep a huge result set from flooding the panel. */
 	const int32 kKBSDisplayHitLimit = 5000;
 
+	/** The whole-RUN safety ceiling: a run stops collecting after this many hit rows across every
+	    chapter, so no query or document can pile up an unbounded result set. Unlike the display cap
+	    above this bounds the RESULT SET itself, so reaching it caps a later export too; the run says
+	    so in its summary rather than coming back quietly short.
+
+	    Shared by all three commands since 2026-08-03. It lived in KBSSearchEngine.cpp until then and
+	    the two scans had no ceiling at all, on the reasoning that a document's faults should all be
+	    named - which leaves the scans able to collect without bound on a document whose faults run
+	    into the tens of thousands (a book of overset table cells reaches it). Counted in ROWS, the
+	    same unit the display cap uses. NOT in glyphs: the glyph scan merges consecutive boxes into
+	    one row ("55 missing glyphs in 6 places"), so counting glyphs would cut a run short while it
+	    still had almost no rows to show. */
+	const int32 kKBSCollectHitLimit = 10000;
+
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
 	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */
 	enum ChangeOutcome

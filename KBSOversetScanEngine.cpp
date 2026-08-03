@@ -207,9 +207,14 @@ void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
                        is worse than a number, and the official preflight does not report them at
                        all (measured 2026-08-02), so saying how many there were is already more
                        than InDesign itself offers.
+    @param maxRows       stop collecting once this chapter holds this many rows - what is left of
+                         the run's whole-run ceiling (KBSResultModel::kKBSCollectHitLimit).
+    @param outHitCeiling set when collecting stopped because of maxRows rather than because the
+                         document ran out, so the summary can say the list is not the whole story.
     @return how many ROWS the chapter got. */
 int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
-	KBSResultModel::Chapter& outChapter, int32& outOffPage)
+	KBSResultModel::Chapter& outChapter, int32& outOffPage,
+	int32 maxRows, bool& outHitCeiling)
 {
 	outChapter.name = chapterName;
 	outChapter.docRef = docRef;
@@ -274,6 +279,14 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	KBSSearchEngine::HitCache* cache = KBSSearchEngine::NewHitCache();
 	for (size_t p = 0; p < places.size(); ++p)
 	{
+		// The whole-run ceiling, asked against the ROWS built so far - not against p. A place whose
+		// "+" sits on no page is counted and skipped below, so the two numbers are not the same.
+		if (static_cast<int32>(outChapter.hits.size()) >= maxRows)
+		{
+			outHitCeiling = true;
+			break;
+		}
+
 		KBSResultModel::Hit hit;
 		hit.checked = false;		// a scan is a report, not a work list: no row is selectable
 
@@ -336,7 +349,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
     the list, the second is how many places were left out of it. A total would appear nowhere on
     screen and could not be checked against anything. */
 void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool fromBook,
-	const PMString& bookName, int32 offPage, PMString& out)
+	const PMString& bookName, int32 offPage, bool truncated, PMString& out)
 {
 	out.Clear();
 	out.SetTranslatable(kFalse);
@@ -377,6 +390,24 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 		out.Append("  ");
 		out.AppendNumber(offPage);
 		out.Append(" not on a page.");
+	}
+
+	// ***** THE LIST IS NOT THE WHOLE STORY - SAY SO. ***** A scan reads as "here is every place
+	// text did not fit", so one that stopped early has to admit it. The search says "narrow your
+	// search" here; a scan has no query to narrow, so it only states the fact.
+	if (truncated)
+	{
+		out.Append("  Stopped at the ");
+		out.AppendNumber(KBSResultModel::kKBSCollectHitLimit);
+		out.Append(" safety limit.");
+	}
+	// A separate number and a separate sentence: rows past the display cap ARE collected and DO
+	// reach Save Results, they are simply not drawn.
+	if (places > KBSResultModel::kKBSDisplayHitLimit)
+	{
+		out.Append("  Showing first ");
+		out.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
+		out.Append(" in the panel.");
 	}
 }
 
@@ -497,6 +528,9 @@ void KBSOversetScanEngine::Run()
 	int32 progressReported = 0;
 
 	bool cancelled = false;
+	// Set when the run stopped collecting at the whole-run ceiling rather than at the end of the
+	// book. NOT the same as cancelled: what was collected is kept and reported.
+	bool collectionTruncated = false;
 	int32 rowTotal = 0;
 	int32 offPage = 0;
 	int32 chaptersWithHits = 0;
@@ -522,6 +556,16 @@ void KBSOversetScanEngine::Run()
 			break;
 		}
 
+		// ***** Room left under the whole-run ceiling. ***** Asked BEFORE the chapter is opened:
+		// with the list already full, opening one more chapter would cost a document load to
+		// produce rows that are thrown away.
+		const int32 remaining = KBSResultModel::kKBSCollectHitLimit - rowTotal;
+		if (remaining <= 0)
+		{
+			collectionTruncated = true;
+			break;
+		}
+
 		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
 		// which is already open and never ours to close.
 		if (fromBook && targets[i].docRef == UIDRef::gNull)
@@ -540,7 +584,8 @@ void KBSOversetScanEngine::Run()
 
 		KBSResultModel::Chapter chapter;
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
-		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter, offPage);
+		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter, offPage,
+			remaining, collectionTruncated);
 
 		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
@@ -581,7 +626,7 @@ void KBSOversetScanEngine::Run()
 	KBSResultTree::Rebuild();
 
 	BuildSummary(rowTotal, chaptersWithHits, static_cast<int32>(targets.size()), fromBook,
-		bookName, offPage, summary);
+		bookName, offPage, collectionTruncated, summary);
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
 }

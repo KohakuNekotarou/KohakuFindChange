@@ -409,9 +409,16 @@ void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vect
 }
 
 /** Scan one document and build the chapter that goes into the result model.
+
+    @param maxRows        stop collecting once this chapter holds this many rows - what is left of
+                          the run's whole-run ceiling (KBSResultModel::kKBSCollectHitLimit).
+    @param outHitCeiling  set when collecting stopped because of maxRows rather than because the
+                          document ran out. The summary has to say so: a report that comes back
+                          short without a word reads as "this is everything wrong with the book".
     @return how many rows were produced. */
 int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
-	KBSResultModel::Chapter& outChapter, bool& outHasOverset, int32& outGlyphCount)
+	KBSResultModel::Chapter& outChapter, bool& outHasOverset, int32& outGlyphCount,
+	int32 maxRows, bool& outHitCeiling)
 {
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -456,6 +463,16 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 
 		for (size_t r = 0; r < runs.size(); ++r)
 		{
+			// The whole-run ceiling, asked here because this is where a row comes into existence.
+			// Stopping mid-story is deliberate: the alternative is to finish "just this story",
+			// which on the very document the ceiling exists for (one whose every character is a
+			// box) is exactly the unbounded case being guarded against.
+			if (static_cast<int32>(outChapter.hits.size()) >= maxRows)
+			{
+				outHitCeiling = true;
+				break;
+			}
+
 			KBSResultModel::Hit hit;
 			hit.checked = false;		// a scan is a report, not a work list: no row is selectable
 			KBSSearchEngine::BuildHitForRange(docRef, storyRef, runs[r].start, runs[r].end,
@@ -477,6 +494,11 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 			// character is not a box.
 			outGlyphCount += runs[r].glyphs;
 		}
+
+		// Full: the remaining stories are not walked either. Reading them would cost the time of a
+		// full scan to produce rows that are thrown away.
+		if (outHitCeiling)
+			break;
 	}
 
 	KBSSearchEngine::DeleteHitCache(cache);
@@ -491,7 +513,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
     The two numbers are different questions, and both matter. Consecutive boxes are deliberately
     merged into ONE row (design section 2), so a story with 45 solid boxes in two stretches makes
     two rows - and reporting "2 missing glyphs" about it would simply be wrong. */
-void BuildSummary(int32 glyphs, int32 places, bool hasOverset, PMString& out)
+void BuildSummary(int32 glyphs, int32 places, bool hasOverset, bool truncated, PMString& out)
 {
 	out.Clear();
 	out.SetTranslatable(kFalse);
@@ -517,6 +539,26 @@ void BuildSummary(int32 glyphs, int32 places, bool hasOverset, PMString& out)
 	// worse than one that found nothing.
 	if (hasOverset)
 		out.Append("  Text in overset cannot be checked.");
+
+	// ***** THE LIST IS NOT THE WHOLE STORY - SAY SO. ***** A scan reads as "here is everything
+	// wrong with this book", so one that stopped early has to admit it or it misreports the
+	// document. The search says "narrow your search" at this point; a scan has no query to narrow,
+	// so it only states the fact.
+	if (truncated)
+	{
+		out.Append("  Stopped at the ");
+		out.AppendNumber(KBSResultModel::kKBSCollectHitLimit);
+		out.Append(" safety limit.");
+	}
+	// The display cap is a separate number and a separate sentence: the rows beyond it ARE collected
+	// and DO reach Save Results, they are simply not drawn. The search has said this since it was
+	// written; the scans never did, so a scan of more than 5000 places quietly showed 5000.
+	if (places > KBSResultModel::kKBSDisplayHitLimit)
+	{
+		out.Append("  Showing first ");
+		out.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
+		out.Append(" in the panel.");
+	}
 }
 
 }	// anonymous namespace
@@ -640,6 +682,10 @@ void KBSGlyphScanEngine::Run()
 
 	bool hasOverset = false;
 	bool cancelled = false;
+	// Set when the run stopped collecting at the whole-run ceiling rather than at the end of the
+	// book. NOT the same as cancelled: what was collected is kept and reported, with a line saying
+	// the list is not the whole story.
+	bool collectionTruncated = false;
 	int32 glyphTotal = 0;
 	int32 rowTotal = 0;
 
@@ -664,6 +710,16 @@ void KBSGlyphScanEngine::Run()
 			break;
 		}
 
+		// ***** Room left under the whole-run ceiling. ***** Asked BEFORE the chapter is opened:
+		// with the list already full, opening one more chapter would cost a document load to
+		// produce rows that are thrown away.
+		const int32 remaining = KBSResultModel::kKBSCollectHitLimit - rowTotal;
+		if (remaining <= 0)
+		{
+			collectionTruncated = true;
+			break;
+		}
+
 		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
 		// which is already open and never ours to close.
 		if (fromBook && targets[i].docRef == UIDRef::gNull)
@@ -684,7 +740,7 @@ void KBSGlyphScanEngine::Run()
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
 		int32 chapterGlyphs = 0;
 		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter,
-			hasOverset, chapterGlyphs);
+			hasOverset, chapterGlyphs, remaining, collectionTruncated);
 
 		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
@@ -724,7 +780,7 @@ void KBSGlyphScanEngine::Run()
 
 	KBSResultTree::Rebuild();
 
-	BuildSummary(glyphTotal, rowTotal, hasOverset, summary);
+	BuildSummary(glyphTotal, rowTotal, hasOverset, collectionTruncated, summary);
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSResultTree::ShowStatus(summary);
 }
