@@ -64,6 +64,17 @@ namespace KBSResultTree
 	/** Write "<checked> / <total> checked." to the panel's status line (and note the display cap
 	    when the result set is bigger than the panel shows). Called after any check change. */
 	void ShowCheckedStatus();
+
+	/** "Save Results..." on the panel's flyout: write the current result set to a tab-separated text
+	    file the user picks. Implemented in KBSReportSave.cpp.
+
+	    Lives with the tree for the same reason ShowStatus does - it is the panel reporting what it is
+	    showing - and it reads the status line back to put it in the file's heading, which is the one
+	    thing about the report that only the panel knows.
+
+	    Says nothing when it works: the file is where the user put it. Only the failures reach the
+	    status line, and a cancelled chooser does nothing at all. */
+	void SaveResultsAsText();
 }
 
 #endif // __KBSResultTree_h__
