@@ -60,6 +60,16 @@
 #include "IPMFont.h"				// the face, for that lookup
 #include "ITextAttrFont.h"			// the font STYLE name  (kTextAttrFontStyleBoss)
 #include "ITextAttrUID.h"			// the font FAMILY uid  (kTextAttrFontUIDBoss)
+// The value-carrying bases a text attribute can be built on. BuildWalkSignature asks every FIND
+// attribute for all of them, because that list is where Find Format lives and AttributeBossList
+// offers no generic way to read a value (its operator== is private) - see AppendAttributeSignature.
+#include "ITextAttrString.h"
+#include "ITextAttrWideString.h"
+#include "ITextAttrInt32.h"
+#include "ITextAttrInt16.h"
+#include "ITextAttrRealNumber.h"
+#include "ITextAttrBoolean.h"
+#include "ITextAttrClassID.h"
 
 // General includes:
 #include "AttributeBossList.h"		// the find attributes the Glyph tab's query carries
@@ -101,9 +111,9 @@ namespace
 // summary says to narrow the query.
 const int32 kKBSCollectHitLimit = 10000;
 
-// The smallest advance worth reporting to the progress bar. DoTask pumps the event queue, which is
-// what makes Cancel work at all, but it is not free: calling it once per hit would run the message
-// loop thousands of times over a large chapter. Small enough that Cancel still answers promptly.
+// The smallest advance worth reporting to the progress bar. Moving the bar is what makes Cancel
+// work at all, but it is not free: doing it once per hit would repaint and run the message loop
+// thousands of times over a large chapter. Small enough that Cancel still answers promptly.
 const int32 kKBSProgressReportStep = 8;
 
 // (Instrumentation removed: the answer came from the user's own observation - "cancelling works in
@@ -844,10 +854,11 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	// to this walk, so it can never outlive the state it describes.
 	FrameFactsCache frameFacts;
 
-	// Each story's text-change counter as the search finds it. Stamped onto every hit, so the
-	// replace can ask "has one character moved in this story since?" instead of re-reading the text
-	// under each row. Read once per STORY: the finder does not write, so it cannot move on us.
-	std::map<UID, uint32> storyStamps;
+	// (A per-story ITextModel::GetTextChangeCount was collected here until 2026-08-03 and stamped
+	// onto every hit, so the replace could skip its same-occurrence test for a story nobody had
+	// edited. That fast path is gone - it was skipping the POSITION test as well, which is what let a
+	// query retyped between the search and the replace rewrite the wrong occurrences. See the note
+	// over MatchStillStandsHere in KBSReplaceEngine.cpp.)
 
 	// Walk the whole document. Each ProcessCommand advances the walker to the next match ("find
 	// next"), so we keep going until no more hits. prev* is a safety net: if the finder ever hands
@@ -930,8 +941,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			if (position > chapterEnd)
 				position = chapterEnd;
 
-			// Through DoTask, not SetPosition: pumping the event queue here is what lets the user
-			// cancel at all (see KBSAdvanceProgress).
+			// Moving the bar from inside the walk is what keeps the Cancel button answering at all -
+			// see KBSAdvanceProgress, which also explains why this is SetPosition and not the DoTask
+			// this comment used to name (RangeProgressBar has no DoTask; that is TaskProgressBar's).
 			KBSAdvanceProgress(progressBar, ioProgressReported, position);
 		}
 
@@ -943,17 +955,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			break;
 		}
 
-		std::map<UID, uint32>::const_iterator stamp = storyStamps.find(story.GetUID());
-		if (stamp == storyStamps.end())
-		{
-			InterfacePtr<ITextModel> storyModel(story, UseDefaultIID());
-			const uint32 count = (storyModel != nil) ? storyModel->GetTextChangeCount() : 0;
-			stamp = storyStamps.insert(std::make_pair(story.GetUID(), count)).first;
-		}
-
 		KBSResultModel::Hit hit;
 		BuildHit(docRef, story, start, end, frameFacts, hit);
-		hit.storyChangeCount = stamp->second;
 		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
 		// into page order. The replace pass re-walks the chapter and matches on this number.
 		hit.walkOrder = static_cast<int32>(outHits.size());
@@ -1054,8 +1057,15 @@ void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, 
 
 	// SetPosition, which takes the absolute position - hence no use for delta beyond the guard above.
 	//
-	// This was measured against DoTask on 2026-07-31, because a run had become impossible to cancel
-	// and this call was the prime suspect. It was not the culprit: the cancel works exactly the same
+	// ***** THIS IS THE ONLY CALL THAT MOVES ANY OF KBS'S BARS, AND IT IS SetPosition. *****
+	// Said that plainly because it was not: several comments around the engines claimed the bar was
+	// driven by DoTask and that SetPosition could not be cancelled from. Neither is true, and one of
+	// them is not even reachable - DoTask belongs to TaskProgressBar (ProgressBar.h:186), while every
+	// KBS bar is a RangeProgressBar, which does not have it. Do not "restore" DoTask here; it would
+	// mean changing the bar's type and with it the meaning of every position this file computes.
+	//
+	// It WAS measured against DoTask on 2026-07-31, because a run had become impossible to cancel and
+	// this call was the prime suspect. It was not the culprit: the cancel works exactly the same
 	// through SetPosition. The fault was that nothing asked WasCancelled after the LAST chapter (see
 	// the ask-once-more test in SearchBook and ReplaceChecked).
 	//
@@ -1147,6 +1157,175 @@ bool KBSSearchEngine::CommitReplaceGlyph()
 	// box must never be left UNSTATED; CommitGlyphID states it on this side for exactly that reason.
 	CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side of the query
 	return true;
+}
+
+// One find ATTRIBUTE, as far as the SDK will let it be read from outside: its class, and then
+// whatever a small set of generic value interfaces answers for it.
+//
+// This is where Find Format lives - the paragraph style, character style, font, size, colour and the
+// rest that the dialog's format pane sets - and on the Glyph tab it is also where the font family and
+// style of the query itself are kept. Every one of them changes WHICH matches a walk returns, so a
+// signature that ignored them would call two different queries the same.
+//
+// ***** WHY IT IS PROBED RATHER THAN COMPARED. ***** AttributeBossList keeps operator== and
+// operator!= PRIVATE (AttributeBossList.h:251-252), so two lists cannot be compared, and there is no
+// generic "give me this attribute's value" call either - only CountBosses / GetClassN / QueryBossN.
+// The nine interfaces below are the value-carrying bases the text attributes are built on, and
+// asking each attribute for all of them costs nine QueryInterfaces on a list that holds a handful of
+// entries at most, once per run.
+//
+// ***** AND WHY IT IS ALLOWED TO BE INCOMPLETE. ***** An attribute that answers none of them
+// contributes its CLASS and nothing else, so "this format condition was added or removed" is always
+// seen while "same condition, different value" may not be. That is survivable because this signature
+// is not what keeps the replace correct - the per-hit same-occurrence test is
+// (KBSReplaceEngine::MatchStillStandsHere, which runs for every row with no fast path past it).
+// What this buys is the MESSAGE: "search again" instead of a run that comes back all-missing.
+static void AppendAttributeSignature(const AttributeBossList* attrs, int32 n, PMString& out)
+{
+	out.Append(" a");
+	out.AppendNumber(static_cast<int32>(attrs->GetClassN(n).Get()));
+
+	// A UID: an applied paragraph or character style, a font family, a swatch. THE one that matters
+	// most here - "style A -> style B" is a format change that shows up nowhere else.
+	InterfacePtr<const ITextAttrUID> uidAttr(static_cast<const ITextAttrUID*>(
+		attrs->QueryBossN(n, ITextAttrUID::kDefaultIID)));
+	if (uidAttr != nil)
+	{
+		out.Append("=u");
+		out.AppendNumber(static_cast<int32>(uidAttr->GetUIDData().Get()));
+	}
+
+	InterfacePtr<const ITextAttrFont> fontAttr(static_cast<const ITextAttrFont*>(
+		attrs->QueryBossN(n, ITextAttrFont::kDefaultIID)));
+	if (fontAttr != nil)
+	{
+		out.Append("=f");
+		out.Append(fontAttr->GetFontName());
+	}
+
+	InterfacePtr<const ITextAttrString> strAttr(static_cast<const ITextAttrString*>(
+		attrs->QueryBossN(n, ITextAttrString::kDefaultIID)));
+	if (strAttr != nil)
+	{
+		out.Append("=s");
+		out.Append(strAttr->GetString());
+	}
+
+	InterfacePtr<const ITextAttrWideString> wideAttr(static_cast<const ITextAttrWideString*>(
+		attrs->QueryBossN(n, ITextAttrWideString::kDefaultIID)));
+	if (wideAttr != nil)
+	{
+		out.Append("=w");
+		out.Append(PMString(wideAttr->GetString()));
+	}
+
+	InterfacePtr<const ITextAttrInt32> i32Attr(static_cast<const ITextAttrInt32*>(
+		attrs->QueryBossN(n, ITextAttrInt32::kDefaultIID)));
+	if (i32Attr != nil)
+	{
+		out.Append("=i");
+		out.AppendNumber(static_cast<int32>(i32Attr->Get()));
+	}
+
+	InterfacePtr<const ITextAttrInt16> i16Attr(static_cast<const ITextAttrInt16*>(
+		attrs->QueryBossN(n, ITextAttrInt16::kDefaultIID)));
+	if (i16Attr != nil)
+	{
+		out.Append("=h");
+		out.AppendNumber(static_cast<int32>(i16Attr->Get()));
+	}
+
+	// Scaled and truncated rather than formatted: this is a fingerprint, not a read-out, and
+	// PMString has no plain "append a PMReal" that does not also decide how to round it.
+	InterfacePtr<const ITextAttrRealNumber> realAttr(static_cast<const ITextAttrRealNumber*>(
+		attrs->QueryBossN(n, ITextAttrRealNumber::kDefaultIID)));
+	if (realAttr != nil)
+	{
+		out.Append("=r");
+		out.AppendNumber(static_cast<int32>(ToDouble(realAttr->Get()) * 1000.0));
+	}
+
+	InterfacePtr<const ITextAttrBoolean> boolAttr(static_cast<const ITextAttrBoolean*>(
+		attrs->QueryBossN(n, ITextAttrBoolean::kDefaultIID)));
+	if (boolAttr != nil)
+		out.Append(boolAttr->GetFlag() ? "=b1" : "=b0");
+
+	InterfacePtr<const ITextAttrClassID> classAttr(static_cast<const ITextAttrClassID*>(
+		attrs->QueryBossN(n, ITextAttrClassID::kDefaultIID)));
+	if (classAttr != nil)
+	{
+		out.Append("=c");
+		out.AppendNumber(static_cast<int32>(classAttr->GetClassData().Get()));
+	}
+}
+
+void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
+{
+	outSignature.Clear();
+	outSignature.SetTranslatable(kFalse);
+
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;		// empty = "cannot tell" - see the header on why that must not read as "different"
+
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	outSignature.Append("m");
+	outSignature.AppendNumber(static_cast<int32>(mode));
+
+	// ----- WHAT is being looked for -----
+	if (mode == IFindChangeOptions::kGlyphSearch)
+	{
+		// The Glyph tab has no find STRING: its query is a glyph id plus the font that id belongs to.
+		// Only the ID is read here - the FONT is two attributes in the list below, and goes in with
+		// the rest of them rather than being named twice.
+		outSignature.Append(" g");
+		outSignature.AppendNumber(static_cast<int32>(opts->GetFindGlyphID()));
+	}
+	else
+	{
+		// Text and GREP keep SEPARATE find strings, so this is asked for the mode in force - the same
+		// way HasFindQuery and DescribeCurrentQuery ask it.
+		outSignature.Append(" q");
+		outSignature.Append(opts->GetFindString(mode));
+	}
+
+	// ----- the switches that decide WHICH occurrences of it come back -----
+	// The four matching options first, then the five scope switches GetKBSWalkerScopeOptions reads.
+	// Every one of them changes the match SET, and therefore the walk order the stored hits are
+	// numbered by. (Kana and width sensitivity are CJK-only in the dialog, but they are asked for
+	// unconditionally: an option that is not on screen can still be set, and a signature that only
+	// covers what the current UI shows is a signature with a hole in it.)
+	const bool16 switches[] =
+	{
+		opts->GetCaseSensitive(mode),
+		opts->GetEntireWord(mode),
+		opts->GetKanaSensitive(mode),
+		opts->GetWidthSensitive(mode),
+		opts->GetIncludeMasterPages(mode),
+		opts->GetIncludeLockedLayersForFind(mode),
+		opts->GetIncludeHiddenLayers(mode),
+		opts->GetIncludeLockedStoriesForFind(mode),
+		opts->GetIncludeFootnotes(mode),
+	};
+	outSignature.Append(" o");
+	for (size_t i = 0; i < sizeof(switches) / sizeof(switches[0]); ++i)
+		outSignature.Append(switches[i] ? "1" : "0");
+
+	// ----- and FIND FORMAT, which is a search condition like any other -----
+	// The dialog's format pane and, on the Glyph tab, the query's own font. The list is walked in
+	// order and its LENGTH goes in first, so an added or removed condition is a difference even when
+	// none of the values can be read (see AppendAttributeSignature).
+	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(opts->GetUIDAttrDB(), mode);
+	outSignature.Append(" n");
+	outSignature.AppendNumber(attrs != nil ? attrs->CountBosses() : 0);
+	if (attrs != nil)
+	{
+		const int32 attrCount = attrs->CountBosses();
+		for (int32 i = 0; i < attrCount; ++i)
+			AppendAttributeSignature(attrs, i, outSignature);
+	}
+
+	outSignature.SetTranslatable(kFalse);
 }
 
 void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
@@ -1338,8 +1517,18 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	}
 	const SearchingFlagGuard searchingGuard;
 
-	KBSResultModel::Clear();
-	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
+	// ***** EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED. *****
+	// A run that is turned away has to leave the panel exactly as it found it. The Clear() further
+	// down used to sit up here, which meant "No search text set on the Text tab." also threw away the
+	// results of the search before it - a command that did nothing but destroy the previous answer
+	// (found 2026-08-03 in the defect audit). Nothing between here and the commit point writes to the
+	// model, the book scope, or the Find/Change settings.
+	//
+	// Why the Clear() was ever this high: ListBookChapters records which book the run is against
+	// (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so clearing AFTER the book is
+	// resolved wipes the record the run has just made (measured 2026-08-02). That constraint is about
+	// ListBookChapters, not about these checks - so the commit point simply moved down to just above
+	// it, and the checks moved above the commit point.
 
 	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
 	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
@@ -1411,30 +1600,45 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		return 0;
 	}
 
+	// Is there anything for the CURRENT scope to run on? Asked HERE, ahead of the commit point, so a
+	// run with no target leaves the previous results on the panel. NO implicit fallback: ON means the
+	// book and nothing else, OFF means the front document and nothing else - so the status line can
+	// always state exactly what was searched, and a missing book is reported instead of quietly
+	// searching one document behind the user's back.
+	//
+	// The same two questions KBSBookScope::HasScopeTarget asks for the menu's grey state; asked
+	// separately here because each one has its own sentence to say.
+	const bool fromBook = KBSBookScope::IsBookScopeOn();
+	if (fromBook && !KBSBookScope::HasActiveBook())
+	{
+		outSummary.Append("Book Scope is on, but no book is open.");
+		return 0;
+	}
+	if (!fromBook && Utils<ILayoutUIUtils>()->GetFrontDocument() == nil)
+	{
+		outSummary.Append("No open document to search.");
+		return 0;
+	}
+
+	// ***** THE COMMIT POINT. ***** Past this line the run owns the panel: the old results are gone
+	// whatever happens next.
+	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
+
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
 	// search driven from this panel ran as plain Text whatever tab was on screen. See
 	// KBSSearchEngine::CommitSearchMode.
 	KBSSearchEngine::CommitSearchMode(overrideFindGlyph);
 
-	// Resolve the scope from the Book Scope toggle. NO implicit fallback: ON means the book and
-	// nothing else, OFF means the front document and nothing else - so the status line can always
-	// state exactly what was searched, and a missing book is reported instead of quietly searching
-	// one document behind the user's back.
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
 	// Chapters the book could not hand over at all. Declared out here so the summary can name them
 	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
 	// they are the only thing that explains what happened.
 	std::vector<KBSBookScope::SkippedChapter> unopenable;
-	const bool fromBook = KBSBookScope::IsBookScopeOn();
 	if (fromBook)
 	{
-		if (!KBSBookScope::HasActiveBook())
-		{
-			outSummary.Append("Book Scope is on, but no book is open.");
-			return 0;
-		}
 		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
 		// handed straight back once it has been walked, so a book search never holds more than one
 		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
@@ -1447,6 +1651,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	}
 	else
 	{
+		// Re-read rather than carried down from the check above: a command has been processed since
+		// (CommitSearchMode), and a pointer to the front document is not ours to assume survived it.
 		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (doc == nil)
 		{
@@ -1486,6 +1692,18 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// user is free to retype the query the moment this search returns.
 	KBSResultModel::SetQueryText(DescribeCurrentQuery());
 
+	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
+	// which matches come back. The line above is a caption; this one is a key, and Change Checked
+	// compares it before it re-walks. The tab alone is not enough: retyping the find string, or
+	// turning Include Footnotes off, changes the match set without changing the tab, and the walk
+	// order the hits below are numbered by would then point at other occurrences entirely.
+	// See KBSSearchEngine::BuildWalkSignature.
+	{
+		PMString walkSignature;
+		KBSSearchEngine::BuildWalkSignature(walkSignature);
+		KBSResultModel::SetWalkSignature(walkSignature);
+	}
+
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
@@ -1523,8 +1741,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
-	// Where the bar stands as each chapter starts, and how far it has actually been advanced (DoTask
-	// takes a difference, so the position already reported has to be carried along).
+	// Where the bar stands as each chapter starts, and how far it has actually been advanced (that
+	// second number is what lets KBSAdvanceProgress swallow an advance too small to repaint for, so
+	// it has to be carried along rather than recomputed).
 	int32 progressBase = 0;
 	int32 progressReported = 0;
 
@@ -1560,10 +1779,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		progressBar.SetTaskText(taskLine);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is asked here, and answered by the DoTask calls inside the walk. WasCancelled only
-		// reads a flag; what SETS that flag is the event queue being pumped, which DoTask does and
-		// SetPosition does not - a bar driven by SetPosition alone looked perfect and could not be
-		// cancelled at all (measured 2026-07-31).
+		// Cancel is asked here, and answered by the bar being moved from inside the walk
+		// (KBSAdvanceProgress). WasCancelled only reads a flag; something has to have given the
+		// button a chance to set it.
 		// kFalse = do NOT raise the global error state: it would outlive the search and fail the
 		// commands that come after it.
 		if (progressBar.WasCancelled(kFalse))

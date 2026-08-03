@@ -94,6 +94,37 @@ namespace KBSReplaceEngine
 	    @return the number of hits actually replaced (0 on any early exit). */
 	int32 ReplaceChecked(PMString& outSummary, bool saveAfterReplace);
 
+	/** Do the current Find/Change settings still describe the search the panel's results came from?
+
+	    Three questions, most specific first:
+	      1. the TAB - clicking another one returns another set of matches;
+	      2. whether that tab is one this panel walks at all (Object and Colour are not);
+	      3. the QUERY and every switch that decides which occurrences come back - the find string,
+	         case / whole word / kana / width, the five scope switches, and FIND FORMAT (a paragraph
+	         style, a font, a colour). See KBSSearchEngine::BuildWalkSignature.
+
+	    Why it has to be asked at all: Change Checked RE-WALKS each chapter and lines the Nth match of
+	    that walk up with the hit whose walkOrder is N, and the walker is handed the LIVE
+	    IFindChangeOptions - so a query edited between the search and the replace makes the Nth match a
+	    different occurrence entirely.
+
+	    ***** IT IS NOT WHAT KEEPS THE REPLACE CORRECT. ***** That is the per-hit same-occurrence test,
+	    which runs for every row with nothing allowed past it. This door exists so the user is told
+	    WHY, instead of watching a whole run come back "not found".
+
+	    ***** TWO SIDE EFFECTS, both deliberate. ***** It STATES the tab (KBSSearchEngine::
+	    CommitSearchMode - the walk needs that whatever the answer is, and the comparison has to be
+	    taken on the same side of that command as the search took it), and on answer 3 it CLEARS THE
+	    RESULTS: they describe a query the dialog no longer holds, so keeping them up would only
+	    invite another attempt. Answers 1 and 2 leave them alone - a tab is one click to put back.
+	    A caller that gets true back should redraw the tree.
+
+	    Call it OUTSIDE any command sequence: it processes a command of its own.
+
+	    @param outSummary OUT the reason, ready for the status line. Cleared first.
+	    @return true when the run must NOT go ahead. */
+	bool RefuseChangedQuery(PMString& outSummary);
+
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
 	    search guards against with KBSSearchEngine::IsSearching, and a worse one here: the run holds

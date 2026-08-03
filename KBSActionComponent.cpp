@@ -233,6 +233,31 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSResultTree::ShowStatus(nothing);
 				break;
 			}
+			// Do the Find/Change settings still describe these rows - the tab, and the query with
+			// every option that decides the match set? Asked HERE, ahead of the prompt, for the same
+			// reason the report test above is: the prompt asks the user to authorise a rewrite, and
+			// asking for that and then declining on the far side of it is the one thing a
+			// confirmation must not do. (It was doing exactly that when this door first landed, an
+			// hour before this line: the prompt went up, OK was pressed, and the engine then said the
+			// query had changed.)
+			//
+			// The engine keeps the same door for a caller that never came through this menu, and
+			// asking twice is safe - see KBSReplaceEngine::RefuseChangedQuery, which states the tab
+			// by writing back the value it just read.
+			//
+			// ***** It can CLEAR the results (only when the query itself moved), so the tree is
+			// redrawn here. ***** Nothing else on this path does: the ordinary route redraws after
+			// ReplaceChecked returns, and this exit never reaches it.
+			{
+				PMString queryMoved;
+				if (KBSReplaceEngine::RefuseChangedQuery(queryMoved))
+				{
+					KBSResultTree::Rebuild();
+					KBSResultTree::ShowStatus(queryMoved);
+					break;
+				}
+			}
+
 			// false unless the user ticks the box, and it starts false on every run - the prompt
 			// draws the box off and nothing remembers it.
 			bool saveAfterReplace = false;

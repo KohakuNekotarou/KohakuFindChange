@@ -42,6 +42,10 @@ namespace
 	// The query the results were found with, as one ready-made line. See KBSResultModel::SetQueryText.
 	PMString gQueryText;
 
+	// The whole of what those results were WALKED by - query plus every switch that decides the match
+	// set - as one opaque key. See KBSResultModel::SetWalkSignature.
+	PMString gWalkSignature;
+
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
@@ -195,6 +199,7 @@ void KBSResultModel::Clear()
 	gBookName.Clear();
 	gSearchMode = -1;
 	gQueryText.Clear();
+	gWalkSignature.Clear();
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	gContextMenuChapter = kNoContextMenuChapter;
@@ -272,6 +277,19 @@ PMString KBSResultModel::GetQueryText()
 	return query;
 }
 
+void KBSResultModel::SetWalkSignature(const PMString& signature)
+{
+	gWalkSignature = signature;
+	gWalkSignature.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetWalkSignature()
+{
+	PMString signature(gWalkSignature);
+	signature.SetTranslatable(kFalse);
+	return signature;
+}
+
 void KBSResultModel::SetBookName(const PMString& name)
 {
 	gBookName = name;
@@ -291,10 +309,11 @@ void KBSResultModel::ShutdownCleanup()
 	// destructor at DLL unload finds nothing left to do (the KESCL ShutdownCleanup rule).
 	gChapters = std::vector<Chapter>();
 
-	// The two static PMStrings, emptied for the same reason the vectors are: nothing of ours should
+	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
 	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
 	gBookName.Clear();
 	gQueryText.Clear();
+	gWalkSignature.Clear();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
 	// one would leave copies behind, and these hold PMStrings like the chapters do.
@@ -977,18 +996,8 @@ bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& ou
 	return true;
 }
 
-bool KBSResultModel::GetHitStoryStamp(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
-	uint32& outChangeCount)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	outStoryUID = c.hits[hitIdx].storyUID;
-	outChangeCount = c.hits[hitIdx].storyChangeCount;
-	return true;
-}
+// (GetHitAnchor and GetHitStoryStamp were defined here until 2026-08-03 - see the note where they
+// were declared in KBSResultModel.h.)
 
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	TextIndex newStart, TextIndex newEnd)

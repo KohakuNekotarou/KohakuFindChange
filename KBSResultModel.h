@@ -101,6 +101,11 @@ namespace KBSResultModel
 		bool		replaced;	// already replaced in this result set - not selectable any more
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
+		// (uint32 storyChangeCount stood here - ITextModel::GetTextChangeCount for this hit's story as
+		// the search left it, so the replace could take an unedited story on trust and skip the
+		// same-occurrence test. Removed 2026-08-03 with the fast path it fed: it was skipping the
+		// POSITION test too, and a query retyped between the search and the replace then rewrote
+		// occurrences the user had never seen.)
 		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
 								// Kept OUT of locator so the cell can paint it separately; built by
 								// BuildHitLocator alongside it. Only "missing" earns it - the other
@@ -123,8 +128,7 @@ namespace KBSResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
-				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0),
-				storyChangeCount(0) {}
+				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
 	};
 
 	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
@@ -277,6 +281,28 @@ namespace KBSResultModel
 	    Empty for a scan - neither scan has a query - and empty until the first search of a session. */
 	void SetQueryText(const PMString& query);
 	PMString GetQueryText();
+
+	/** EVERYTHING a walk is driven by, as one opaque comparable string: the query itself plus every
+	    Find/Change switch that decides which matches come back (see
+	    KBSSearchEngine::BuildWalkSignature for the list).
+
+	    Not the same thing as GetQueryText, and deliberately a second field rather than a richer
+	    version of it: that one is a CAPTION - it is written into the saved report's heading and has
+	    to stay readable - while this one is a KEY, compared for equality and never shown.
+
+	    Why the replace needs it. Change Checked RE-WALKS each chapter and lines the Nth match of that
+	    walk up with the hit whose walkOrder is N. That only holds while the walk returns the same
+	    matches in the same order, which needs the query AND its options to be what they were when the
+	    search ran - and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61), so
+	    whatever the dialog holds at replace time is what it walks by.
+
+	    Comparing the TAB alone (SetSearchMode) is not enough: retyping the find string, or turning
+	    Include Footnotes off, changes the match set without changing the tab.
+
+	    Empty until the first search of a session, and empty for a scan - neither has a query.
+	    Cleared by Clear(), so it can never outlive the results it describes. */
+	void SetWalkSignature(const PMString& signature);
+	PMString GetWalkSignature();
 
 	/** The name of the book these results came from - shown on the tree's BOOK row, which is how
 	    the panel says which book was searched. Set beside SetFromBook; the file NAME only, because
@@ -511,10 +537,12 @@ namespace KBSResultModel
 	bool GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
 		PMString& outMatch);
 
-	/** A hit's story, and the change count that story carried when the search read it. The replace
-	    asks this once per story before it writes anything, to find out which stories it can take on
-	    trust. @see Hit::storyChangeCount. false = index out of range. */
-	bool GetHitStoryStamp(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, uint32& outChangeCount);
+	// (GetHitAnchor and GetHitStoryStamp stood here. Both served the replace's trusted-story fast
+	// path, which skipped the same-occurrence test for a story nobody had edited - and skipped its
+	// POSITION half with it, so a query retyped between the search and the replace rewrote
+	// occurrences the user had never seen. The fast path was removed on 2026-08-03 rather than
+	// repaired; the test now runs for every row, so neither getter has a caller. See the note over
+	// MatchStillStandsHere in KBSReplaceEngine.cpp.)
 
 	/** Turn the result set into a REPORT of what the replace did. Keeps every row the replace was
 	    asked about - the ones it changed, and the ones it left alone with the reason on the

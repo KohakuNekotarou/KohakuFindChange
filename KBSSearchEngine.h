@@ -116,6 +116,28 @@ namespace KBSSearchEngine
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
 	bool CommitReplaceGlyph();
 
+	/** EVERYTHING the current Find/Change settings would drive a walk BY, as one opaque string:
+	    the tab, the query itself, and every switch that decides WHICH matches come back -
+	    case / whole word / kana / width, and the five scope switches GetKBSWalkerScopeOptions reads.
+	    Recorded on the results at search time (KBSResultModel::SetWalkSignature) and compared before
+	    Change Checked re-walks.
+
+	    Why it has to exist: the replace lines the Nth match of its re-walk up with the hit whose
+	    walkOrder is N, and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61) -
+	    so a query edited between the search and the replace makes the walk return a DIFFERENT set of
+	    matches, in which the Nth one is a different occurrence entirely. Comparing the tab alone does
+	    not see that: retyping the find string, or turning Include Footnotes off, changes the match set
+	    without changing the tab.
+
+	    fSearchBackwards is deliberately left out - KBS always walks forward, whatever the dialog says
+	    - and so is everything on the CHANGE side, which decides what gets written rather than what
+	    gets found.
+
+	    Comes back EMPTY when the settings cannot be read at all, which every caller has to treat as
+	    "cannot tell" rather than as "different": refusing a replace because a query could not be
+	    described would be a new way to fail. */
+	void BuildWalkSignature(PMString& outSignature);
+
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
 	    with exactly the options the search that produced the hits used, or the walk order those

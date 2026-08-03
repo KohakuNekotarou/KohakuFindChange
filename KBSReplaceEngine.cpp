@@ -33,7 +33,8 @@
 #include "CmdUtils.h"				// commands and command sequences
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
-#include "ITextModel.h"				// GetTextChangeCount - "has this story moved since the search?"
+// (ITextModel.h was here for GetTextChangeCount, which fed the trusted-story fast path. Removed
+// 2026-08-03 with that path - see the note over MatchStillStandsHere.)
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
 #include "Utils.h"
@@ -243,6 +244,35 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 		expectStory, expectStart, storedMatch, posDelta);
 }
 
+// ***** THERE IS NO FAST PATH PAST THIS TEST, AND THERE MUST NOT BE ONE. *****
+//
+// One stood here from the speed-up work until 2026-08-03: every story was asked for
+// ITextModel::GetTextChangeCount at the start of the chapter, and a story whose count still matched
+// what the search recorded was "trusted" - its rows skipped this test entirely.
+//
+// The reasoning was that an unmoved story returns the very same matches in the very same order. It
+// is true of the DOCUMENT and says nothing about the QUERY: the walker is handed the live
+// IFindChangeOptions (ITextWalker.h:58-61), so a find string retyped between the search and the
+// replace makes the walk return a different set of matches - and with the test skipped, nothing
+// compared the position the walk had landed on against the position the row named. The change
+// string went over occurrences the user had never seen, while the panel reported the ORIGINAL rows
+// as replaced. (There was a second way in, too: the walk index counts matches across the WHOLE
+// chapter, so a story with no checked hits gaining one shifts every later index by one, and the
+// shifted match can land in a story that is itself untouched and therefore trusted.)
+//
+// It was removed rather than repaired (user's call, 2026-08-03: "safer is better"). Repairing it
+// would have meant proving that every Find/Change setting which changes the match set is accounted
+// for before the run starts - and Find Format cannot be: AttributeBossList keeps operator== private
+// and offers no generic way to read an attribute's VALUE, so "paragraph style A -> paragraph style
+// B" is not a difference this plug-in can see from outside. Running the test always needs no such
+// proof: whatever changed, the position or the text stops lining up and the row is reported instead
+// of written.
+//
+// What it costs: one FindSurroundingParagraph plus a copy of the MATCHED CHARACTERS ONLY (see
+// KBSSearchEngine::CopyMatchText - the paragraph is looked up for its end and never copied), once
+// per checked hit. The speed-up it replaces was one of six added on 2026-07-29 whose effect was
+// never measured, so nothing measurable was given up.
+
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
 //                are when the walk simply runs out of matches - but these rows were never looked
@@ -279,9 +309,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	std::map<int32, int32> rowByWalkOrder;
 	std::set<int32> targets;
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	// story -> the text-change counter the search recorded for it. Collected for the CHECKED hits
-	// only: a story nothing is going to be written to needs no trust decision.
-	std::map<UID, uint32> searchStamps;
 
 	for (int32 i = 0; i < hitCount; ++i)
 	{
@@ -291,18 +318,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		rowByWalkOrder[walkOrder] = i;
 		bool checked = false, replaced = false, locked = false;
 		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
-		{
 			targets.insert(walkOrder);
-
-			// The counter that story carried when the search read it, kept per story.
-			UID stampStory = kInvalidUID;
-			uint32 stampCount = 0;
-			if (KBSResultModel::GetHitStoryStamp(chapterIdx, i, stampStory, stampCount)
-				&& stampStory != kInvalidUID)
-			{
-				searchStamps.insert(std::make_pair(stampStory, stampCount));
-			}
-		}
 	}
 	if (targets.empty())
 		return 0;
@@ -311,29 +327,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// locked or missing - so "how many have gone" is the honest measure of this chapter's progress,
 	// and it does not care WHY a hit was finished with.
 	const int32 targetsAtStart = static_cast<int32>(targets.size());
-
-	// Which of this chapter's stories still hold EXACTLY the text the search walked.
-	//
-	// ITextModel keeps a counter it bumps on every character inserted, removed or replaced
-	// (ITextModel.h:158-163). If it reads the same now as it did during the search, not one
-	// character has moved, so the re-walk below returns the very same matches in the very same
-	// order - which is all the walk order needs to be trustworthy. Every row in such a story can
-	// then be replaced without reading the text under it first, which is what the same-occurrence
-	// test spends its time doing.
-	//
-	// Read HERE, before a single character is written: our own replacements bump the counter too,
-	// so the baseline has to be taken while the chapter is still untouched.
-	//
-	// A story that cannot be reached, or was left out of the stamps, simply is not trusted - the
-	// per-hit test runs for it as before. Every way this can be wrong points the same way: towards
-	// checking more, never towards writing something unchecked.
-	std::map<UID, bool> trustedStories;
-	for (std::map<UID, uint32>::const_iterator s = searchStamps.begin(); s != searchStamps.end(); ++s)
-	{
-		InterfacePtr<ITextModel> storyModel(docRef.GetDataBase(), s->first, UseDefaultIID());
-		trustedStories[s->first] =
-			(storyModel != nil) && (storyModel->GetTextChangeCount() == s->second);
-	}
 
 	// NO IDataBase::SaveRestoreModifiedState here. The search wraps its walk in one because it
 	// must leave a windowless chapter unmodified; a replace is meant to leave the document
@@ -453,12 +446,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	{
 		++steps;
 
-		// Move the run's bar to where this chapter has got to - through DoTask, which also pumps the
-		// event queue and is therefore what makes the Cancel button work. A bar driven by SetPosition
-		// alone moved perfectly and could not be cancelled at all (measured 2026-07-31, in both
-		// engines). Advances smaller than a few hits are swallowed, so this does not run the message
-		// loop once per replacement. (spellpanel updates its bar from inside the walk too -
-		// SpellReplaceWalker.cpp:496 - so this is where Adobe puts it as well.)
+		// Move the run's bar to where this chapter has got to. Moving it from inside the walk is what
+		// makes the Cancel button answer at all; advances smaller than a few hits are swallowed, so
+		// this does not run the message loop once per replacement. (spellpanel updates its bar from
+		// inside the walk too - SpellReplaceWalker.cpp:496 - so this is where Adobe puts it as well.)
+		// The call itself is SetPosition, not the DoTask this comment used to name - see
+		// KBSAdvanceProgress, which is the one place any KBS bar is moved.
 		KBSAdvanceProgress(progressBar, ioProgressReported,
 			progressBase + (targetsAtStart - static_cast<int32>(targets.size())));
 
@@ -526,20 +519,13 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 				continue;
 			}
 
-			// Last check before anything is written: is this the same occurrence the row
-			// describes - same story, same place, same text? A checked row whose text has moved or
-			// changed underneath is left alone and counted, never rewritten.
+			// ***** THE last check before anything is written: is this the same occurrence the row
+			// describes - same story, same place, same text? ***** A checked row whose text has moved
+			// or changed underneath is left alone and counted, never rewritten.
 			//
-			// Skipped outright for a story whose change counter has not moved since the search: it
-			// holds the same characters in the same order, so there is nothing for the test to
-			// find. That is the ordinary case - search, then replace - and it takes the test's cost
-			// off every row at once. See trustedStories above.
-			bool trusted = false;
-			{
-				const std::map<UID, bool>::const_iterator t = trustedStories.find(storyUID);
-				trusted = (t != trustedStories.end()) && t->second;
-			}
-			if (hitIdx < 0 || (!trusted && !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta)))
+			// Asked of EVERY row, with nothing allowed past it - see the note over
+			// MatchStillStandsHere for the fast path that used to sit here and what it cost.
+			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
 			{
 				++outMissing;
 				if (hitIdx >= 0)
@@ -731,8 +717,8 @@ void ReplaceChapterByChapter(RunTotals& io)
 		progressBar.SetTaskText(taskLine);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is asked at the TOP of each chapter, and answered by the DoTask calls inside the one
-		// that is running. A chapter that has started therefore finishes and is saved - which is what
+		// Cancel is asked at the TOP of each chapter, and answered by the bar being moved inside the
+		// one that is running. A chapter that has started therefore finishes and is saved - which is what
 		// keeps the state describable: every chapter this run touched is either untouched or
 		// replaced-and-saved, never half done.
 		//
@@ -1067,6 +1053,109 @@ void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummar
 
 } // anonymous namespace
 
+bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+
+	// ----- (1) the TAB the results were searched with -----
+	// Every chapter is RE-WALKED below, and a walk in another mode returns another set of matches -
+	// so the stored walk orders would line up with occurrences the user never saw. Asked first
+	// because it is the most specific thing that can be said, and because it does NOT cost the
+	// results: a tab is one click to put back.
+	const int32 searchedMode = KBSResultModel::GetSearchMode();
+	{
+		InterfacePtr<IFindChangeOptions> modeOpts(QuerySessionPreferences<IFindChangeOptions>());
+		const int32 currentMode = (modeOpts != nil) ? static_cast<int32>(modeOpts->GetSearchMode()) : -1;
+		if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
+		{
+			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran - search again before replacing.");
+			return true;
+		}
+	}
+
+	// ----- (2) whether that tab is one this panel can walk at all -----
+	// Anything else searches by attribute through a walker of its own and never produced these rows
+	// in the first place, so there is nothing here to rewrite.
+	if (searchedMode >= 0
+		&& searchedMode != IFindChangeOptions::kTextSearch
+		&& searchedMode != IFindChangeOptions::kGrepSearch
+		&& searchedMode != IFindChangeOptions::kGlyphSearch)
+	{
+		outSummary.Append("These results did not come from the Text, GREP or Glyph tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
+		return true;
+	}
+
+	// State the tab, exactly as the search does. A walk runs in the mode last COMMITTED, not the one
+	// IFindChangeOptions reports, so without this a replace ran as plain Text whatever tab was on
+	// screen - which is how a Glyph-tab search came to be overwritten with the TEXT tab's change
+	// string. See KBSSearchEngine::CommitSearchMode.
+	//
+	// It writes back the value it just read, so calling it here AND from a caller that asks this
+	// question twice changes nothing: it states the mode, it does not choose one.
+	//
+	// ***** IT HAS TO HAPPEN BEFORE THE COMPARISON BELOW, and that is not a detail. ***** The search
+	// records its signature after committing the mode too (KBSSearchEngine::SearchBook). Committing a
+	// mode is a declaration and, as CommitSearchMode's own comment says, "there is no promise anywhere
+	// that it leaves that mode's other settings untouched" - so a signature taken on one side of that
+	// command and compared against one taken on the other side could differ with nothing having
+	// changed, and would then refuse every replace there is. Both are taken on the same side.
+	//
+	// Deliberately OUTSIDE any command sequence: this processes a command of its own, and a
+	// session-setting command inside the replace's sequence would become part of its undo step. Every
+	// caller of this function asks before opening one.
+	KBSSearchEngine::CommitSearchMode();
+
+	// ----- (3) the QUERY itself, which the tab does not cover -----
+	//
+	// The tab test catches "the user clicked another tab". It does not catch the far more ordinary
+	// thing: the find string retyped, Case Sensitive ticked, a paragraph style put in Find Format,
+	// Include Footnotes turned off - each of which leaves the tab alone and changes WHICH matches a
+	// walk returns.
+	//
+	// That matters because the Nth match of the re-walk is lined up with the hit whose walkOrder is
+	// N. A different match set makes the Nth match a different occurrence, and the walker is handed
+	// the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so what it walks by is whatever the dialog
+	// holds RIGHT NOW, not what it held when these rows were found.
+	//
+	// The per-hit same-occurrence test used to be the backstop for this ("Nothing wrong is written -
+	// the same-occurrence test refuses each one", KBSResultModel.h). It stopped being one when the
+	// trusted-story fast path arrived: a story nobody had edited was taken on trust and the test
+	// skipped outright, so a retyped query wrote the change string over occurrences the user had
+	// never seen while the panel reported the ORIGINAL rows as replaced (found 2026-08-03 in the
+	// defect audit). That fast path is gone, so the test is the backstop again - and this door is
+	// what says WHY, because a whole run coming back "37 hit(s) not found" would be true and useless.
+	//
+	// An EMPTY signature on either side means it could not be described, not that it differs -
+	// results from before this field existed answer empty too - so only two known-different
+	// signatures refuse.
+	//
+	// ***** AND THE RESULTS GO. ***** (User's call, 2026-08-03.) Every other refusal in this plug-in
+	// leaves the panel exactly as it found it - that is the rule the search's own refusals were moved
+	// above their Clear() to obey on the same day - and this one is deliberately the exception. The
+	// difference is what the rows would go on saying: a run turned away for any other reason leaves a
+	// list that is still TRUE, while these rows describe a query the dialog no longer holds, so
+	// leaving them up invites the user to try again against a list that cannot be acted on. Clearing
+	// says plainly that the search has to be re-run, which is the only way forward anyway.
+	{
+		const PMString walkedSignature = KBSResultModel::GetWalkSignature();
+		PMString currentSignature;
+		KBSSearchEngine::BuildWalkSignature(currentSignature);
+		if (!walkedSignature.IsEmpty() && !currentSignature.IsEmpty()
+			&& walkedSignature != currentSignature)
+		{
+			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
+			// nothing here touches the panel.
+			KBSResultModel::Clear();
+			KBSBookScope::ReleaseSearchedBook();
+			outSummary.Append("The Find/Change query has changed since this search ran, so these results no longer describe it - they have been cleared. Search again.");
+			return true;
+		}
+	}
+
+	return false;
+}
+
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterReplace)
 {
 	outSummary.Clear();
@@ -1118,41 +1207,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		return 0;
 	}
 
-	// The Find/Change tab has to be the one the SEARCH ran in. Every chapter below is RE-WALKED, and a
-	// walk in another mode returns another set of matches - so the stored walk orders would line up
-	// with occurrences the user never saw. Nothing wrong would be written (MatchIsSameOccurrence
-	// refuses each one), but the entire run would come back "missing" with nothing on screen to
-	// explain why. Better to say it before anything is opened.
-	{
-		const int32 searchedMode = KBSResultModel::GetSearchMode();
-		InterfacePtr<IFindChangeOptions> modeOpts(QuerySessionPreferences<IFindChangeOptions>());
-		const int32 currentMode = (modeOpts != nil) ? static_cast<int32>(modeOpts->GetSearchMode()) : -1;
-		if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
-		{
-			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran - search again before replacing.");
-			return 0;
-		}
-
-		// The three tabs this panel walks. Anything else searches by attribute through a walker of its
-		// own and never produced these rows in the first place, so there is nothing here to rewrite.
-		if (searchedMode >= 0
-			&& searchedMode != IFindChangeOptions::kTextSearch
-			&& searchedMode != IFindChangeOptions::kGrepSearch
-			&& searchedMode != IFindChangeOptions::kGlyphSearch)
-		{
-			outSummary.Append("These results did not come from the Text, GREP or Glyph tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
-			return 0;
-		}
-	}
-
-	// State the tab before anything is walked, exactly as the search does. A walk runs in the mode
-	// last COMMITTED, not the one IFindChangeOptions reports, so without this a replace ran as plain
-	// Text whatever tab was on screen - which is how a Glyph-tab search came to be overwritten with
-	// the TEXT tab's change string. See KBSSearchEngine::CommitSearchMode.
+	// Do the Find/Change settings still describe the search these rows came from - the tab, and the
+	// query with every option that decides the match set? This also STATES the tab
+	// (CommitSearchMode), which the walk below needs whatever the answer is.
 	//
-	// Deliberately here, OUTSIDE the command sequence opened further down: this processes a command of
-	// its own, and a session-setting command inside that sequence would become part of the undo step.
-	KBSSearchEngine::CommitSearchMode();
+	// The menu asks the same question before it puts the confirmation prompt up
+	// (KBSActionComponent::DoAction), so this is the same door on the far side of it, for a caller
+	// that never went through the menu. Asking twice costs one command that writes back the value it
+	// just read; not asking here would leave a script route with no door at all.
+	if (KBSReplaceEngine::RefuseChangedQuery(outSummary))
+		return 0;
 
 	// ...and on the Glyph tab, the glyph that will be WRITTEN. Stated only here, never on the search
 	// path, so a search can never leave a change glyph set behind the user's back. An EMPTY Change To
@@ -1355,7 +1419,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 
 	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
 	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
-	// actually been advanced - DoTask takes a difference, so that has to be carried along.
+	// actually been advanced - what lets KBSAdvanceProgress swallow an advance too small to repaint
+	// for - so it has to be carried along rather than recomputed.
 	int32 progressBase = 0;
 	int32 progressReported = 0;
 
@@ -1383,8 +1448,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		progressBar.SetTaskText(taskLine);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is asked here, and answered by the DoTask calls inside the chapter. WasCancelled only
-		// reads a flag; what SETS it is the event queue being pumped, which DoTask does.
+		// Cancel is asked here, and answered by the bar being moved inside the chapter
+		// (KBSAdvanceProgress). WasCancelled only reads a flag; something has to have given the
+		// button a chance to set it.
 		//
 		// kFALSE: do NOT raise the global error state. It used to be kTrue, because the error state
 		// was the mechanism - a regular sequence rolls back when it ends with an error standing. It

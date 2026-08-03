@@ -71,6 +71,26 @@ namespace
 	// (CloseDisplayedDocsIfClean) is stateless, so flipping it mid-session is safe.
 	bool gHidePrevChapterOn = true;
 
+	/** May the "close everything else" sweep run for the results now on the panel?
+
+	    TWO conditions, and the second one used to be missing. The toggle says whether the user wants
+	    it; IsFromBook says whether it means anything - the sweep is about CHAPTERS, and a
+	    document-scope result set has none.
+
+	    Without the second test a document-scope jump closed every other clean document the user had
+	    open, and there was no way to stop it: the menu item greys itself out in document scope
+	    (KBSActionComponent::UpdateActionStates says so in as many words), so the toggle could not
+	    even be reached to be turned off (found 2026-08-03 in the defect audit). The menu and the
+	    behaviour now answer the same question.
+
+	    Asked of the RESULTS rather than of the live Book Scope toggle, for the reason the model
+	    records that flag at all: flipping the scope after a search must not change how the results
+	    already on screen behave. */
+	bool ShouldHidePreviousChapter()
+	{
+		return gHidePrevChapterOn && KBSResultModel::IsFromBook();
+	}
+
 	//------------------------------------------------------------------------------------
 	// Move-to-location helpers (ported from KESCLFindInDoc)
 	//------------------------------------------------------------------------------------
@@ -397,8 +417,9 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	}
 
 	// The tour has moved: with "Hide Previous Chapter" ON, every other displayed clean document is
-	// closed again (scheduled). The landed-in document is the exception.
-	if (gHidePrevChapterOn)
+	// closed again (scheduled). The landed-in document is the exception. Book results only - see
+	// ShouldHidePreviousChapter.
+	if (ShouldHidePreviousChapter())
 		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
 
 	// A visible match scrolls to its wax rectangle AND gets a red marker rectangle. An overset match
@@ -485,8 +506,9 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 	}
 
 	// Same sweep a jump does: with "Hide Previous Chapter" ON the desk is left showing only where
-	// we landed. The landed-in document is the exception.
-	if (gHidePrevChapterOn)
+	// we landed. The landed-in document is the exception. Book results only - see
+	// ShouldHidePreviousChapter.
+	if (ShouldHidePreviousChapter())
 		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
 }
 

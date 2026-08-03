@@ -409,24 +409,36 @@ void KBSOversetScanEngine::Run()
 	std::vector<KBSBookScope::SkippedChapter> unopenable;
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
 
-	// The previous run's results go FIRST, before the book is resolved - the order the search uses.
+	// ***** IS THERE ANYTHING TO SCAN? ASKED BEFORE THE MODEL IS TOUCHED. *****
+	// A run that is turned away has to leave the panel exactly as it found it. These two tests used
+	// to sit BELOW the Clear() just under them, so "Book Scope is on, but no book is open." also
+	// threw away whatever the panel was showing (found 2026-08-03 in the defect audit).
+	if (fromBook && !KBSBookScope::HasActiveBook())
+	{
+		summary.Append("Book Scope is on, but no book is open.");
+		KBSResultTree::ShowStatus(summary);
+		return;
+	}
+	if (!fromBook && Utils<ILayoutUIUtils>()->GetFrontDocument() == nil)
+	{
+		summary.Append("No document to scan.");
+		KBSResultTree::ShowStatus(summary);
+		return;
+	}
+
+	// ***** THE COMMIT POINT. ***** The previous run's results go here, before the book is resolved -
+	// the order the search uses.
 	//
-	// ***** It HAS to be before. ***** ListBookChapters below records which book this run is against
-	// (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so doing this afterwards wipes
-	// the record the run has just made. The book watcher then has no book to ask about, and closing
-	// that book leaves its results sitting on the panel. Measured 2026-08-02, with these two lines
-	// below the scope block: the scan worked, and closing the book did nothing at all.
+	// ***** It HAS to be before that. ***** ListBookChapters below records which book this run is
+	// against (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so doing this
+	// afterwards wipes the record the run has just made. The book watcher then has no book to ask
+	// about, and closing that book leaves its results sitting on the panel. Measured 2026-08-02, with
+	// these two lines below the scope block: the scan worked, and closing the book did nothing at all.
 	KBSResultModel::Clear();
 	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
 
 	if (fromBook)
 	{
-		if (!KBSBookScope::HasActiveBook())
-		{
-			summary.Append("Book Scope is on, but no book is open.");
-			KBSResultTree::ShowStatus(summary);
-			return;
-		}
 		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
 		// handed straight back once it has been scanned. Whether a chapter can actually be opened
 		// is not known yet - the summary reports the ones that could not, after the scan.
@@ -439,6 +451,8 @@ void KBSOversetScanEngine::Run()
 	}
 	else
 	{
+		// Re-read rather than carried down from the test above: nothing between them is meant to
+		// disturb it, but a front-document pointer is not ours to assume survived anything.
 		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (doc == nil)
 		{

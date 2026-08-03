@@ -33,7 +33,9 @@
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
-#include "IMenuUtils.h"			// InsertAmpersandForDisplay - a chapter name may contain '&'
+// (IMenuUtils.h was here for InsertAmpersandForDisplay until 2026-08-03. The status line doubles
+// its own ampersands for the whole message, so doubling a chapter name here as well ran it twice -
+// see AppendUnopenableNote.)
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "ISession.h"
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
@@ -495,9 +497,19 @@ void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
 			outSummary.Append("...");
 			break;
 		}
+		// RAW, with its ampersands as the user typed them. What this builds is a STATUS LINE, and the
+		// one place that draws one doubles the ampersands of the WHOLE line on its way to the widget
+		// (KBSResultListWidgetMgr's WriteStatusWidget, since 2026-07-31). Doubling the name here as
+		// well ran that twice: "A&B.indd" went to "A&&B.indd" and then to "A&&&&B.indd", which a
+		// StaticText draws as "A&&B.indd" - and the extra one also reached app.kbsStatus and the
+		// saved report's Summary line, which are supposed to hold the message verbatim
+		// (found 2026-08-03 in the defect audit).
+		//
+		// The sibling sentence in the search engine (AppendUnsearchableNote) never doubled, and was
+		// right not to. Anything that starts drawing this string WITHOUT going through the status
+		// line has to do its own doubling, exactly as the tree's rows do (SetColumnText).
 		PMString name(skipped[i].name);
 		name.SetTranslatable(kFalse);
-		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&name);	// this string gets DRAWN
 		outSummary.Append(name);
 		if (!skipped[i].reason.IsEmpty())
 		{

@@ -46,7 +46,13 @@ namespace KBSJump
 	void ActivateNode(int32 chapterIdx, int32 hitIdx);
 
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read by JumpToHit to
-	    decide whether to close other displayed chapters as a jump lands; the flyout drives it. */
+	    decide whether to close other displayed chapters as a jump lands; the flyout drives it.
+
+	    @note This is the TOGGLE, not the decision. The sweep also needs the results to have come from
+	          a BOOK - it is about chapters, and the menu greys the toggle out in document scope for
+	          exactly that reason - so the jump asks ShouldHidePreviousChapter, which tests both.
+	          Reading this alone is what closed the user's other documents on a document-scope jump,
+	          with a toggle they could not reach to switch off (2026-08-03). */
 	bool IsHidePreviousChapterOn();
 	void ToggleHidePreviousChapter();
 }
