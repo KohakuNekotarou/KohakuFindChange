@@ -592,9 +592,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// end - true whatever the change string's length. Reading it later is also no more work than
 	// reading it early, being the same one read per replaced row.
 	//
-	// Reading, not writing, so it belongs outside the command sequence that has just ended. A run
-	// the user cancels does reach this point, and reads text that is about to be rolled back - but
-	// the rows are rolled back with it (KBSResultModel::RollBackRows), so nothing of it survives.
+	// Reading, not writing, so it needs no command sequence of its own - and it opens none. It runs
+	// INSIDE whichever sequence the caller has standing (there is no per-chapter sequence any more -
+	// see the note above the walk), which costs nothing, because not one step of it is a command.
+	// A run the user cancels does reach this point, and reads text that is about to be rolled back -
+	// but the rows are rolled back with it (KBSResultModel::RollBackRows), so nothing of it survives.
 	if (!replacedRows.empty())
 	{
 		IDataBase* const db = docRef.GetDataBase();
@@ -807,25 +809,6 @@ void ReplaceChapterByChapter(RunTotals& io)
 			const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused,
 				notWalked, &progressBar, progressBase, progressReported);
 
-			io.missing += missing;
-			io.locked += locked;
-			io.refused += refused;
-			if (stepLimit)
-				++io.chaptersStepLimited;
-			if (notWalked)
-			{
-				// The walk never started here, so no row of this chapter carries a reason - the
-				// chapter itself has to be named.
-				++io.chaptersNotWalked;
-				if (!io.haveFirstNotWalked)
-				{
-					int32 notWalkedHits = 0;
-					KBSResultModel::GetChapterDisplay(ci, io.firstNotWalked, notWalkedHits);
-					io.firstNotWalked.SetTranslatable(kFalse);
-					io.haveFirstNotWalked = true;
-				}
-			}
-
 			// An error standing when a sequence ends rolls that sequence back. On this path there is
 			// a LATER sequence to poison as well, so the state is settled here either way.
 			if (seq != nil)
@@ -841,11 +824,34 @@ void ReplaceChapterByChapter(RunTotals& io)
 			}
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
+			// ***** EVERY count this chapter produced is taken only once its sequence has COMMITTED.
+			// ***** An abort puts the text back, and RollBackRows below puts the rows back with it -
+			// so a summary still saying "3 hit(s) not found" would be describing rows that no longer
+			// carry the word, the sentence and the panel telling different stories about one run.
+			// (The counters were added before the abort was known, until 2026-08-03.)
 			if (!aborted)
 			{
 				io.replaced += replaced;
 				if (replaced > 0)
 					++io.chaptersTouched;
+				io.missing += missing;
+				io.locked += locked;
+				io.refused += refused;
+				if (stepLimit)
+					++io.chaptersStepLimited;
+				if (notWalked)
+				{
+					// The walk never started here, so no row of this chapter carries a reason - the
+					// chapter itself has to be named.
+					++io.chaptersNotWalked;
+					if (!io.haveFirstNotWalked)
+					{
+						int32 notWalkedHits = 0;
+						KBSResultModel::GetChapterDisplay(ci, io.firstNotWalked, notWalkedHits);
+						io.firstNotWalked.SetTranslatable(kFalse);
+						io.haveFirstNotWalked = true;
+					}
+				}
 			}
 		}
 
@@ -883,8 +889,13 @@ void ReplaceChapterByChapter(RunTotals& io)
 			// its undo. "Hide Previous Chapter" is NOT consulted; that toggle is about jumping, and
 			// a run that saves has no reason to hold anything (user, 2026-08-03, matching the same
 			// decision made for the search on 2026-08-02).
-			KBSBookScope::ReleaseHeldDoc(docRef);
-			io.chaptersClosed = true;
+			//
+			// The ANSWER decides whether the summary may say chapters were closed. A run over the
+			// front document, or over chapters the user already had open, closes nothing at all -
+			// and used to report "Chapters this plug-in opened were closed." all the same, which is
+			// a sentence about something that did not happen.
+			if (KBSBookScope::ReleaseHeldDoc(docRef))
+				io.chaptersClosed = true;
 			continue;
 		}
 

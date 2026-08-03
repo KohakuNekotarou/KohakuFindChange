@@ -12,10 +12,13 @@
 //
 //  Chapters the user already had open are never held and never closed.
 //
-//  What stays held BETWEEN runs is only what a jump or a replace reopened, which is why
-//  ReleaseHeldDocs (all of them) still exists: a jump means the user is looking at that chapter,
-//  so it is kept until the results are let go (ReleaseSearchedBook), the book is closed, or the
-//  application quits.
+//  A chapter that ends up with a WINDOW stops being held at that moment (ForgetHeldDoc), whoever
+//  opened it and whatever is in it: the user can see it, so it is theirs. What stays held BETWEEN
+//  runs is therefore only what was reopened windowless and never shown - a jump whose window could
+//  not be raised, a replace whose chapter took none - which ReleaseHeldDocs hands back when the
+//  results are let go (ReleaseSearchedBook), the book is closed, or the application quits. Those
+//  closes are UI-suppressed, so a chapter with unsaved work in it is kept as well (see
+//  ReleaseHeldDocs).
 //
 //  Ported from KESCL's KESCLBookScope (KESCL is left untouched). KBS always searches the book the
 //  panel is showing, so KESCL's "Search book" toggle is dropped here.
@@ -173,14 +176,45 @@ namespace KBSBookScope
 	/** Close the chapters this module opened (the originally-closed ones only). Chapters the
 	    user already had open are never touched. The closes are SCHEDULED
 	    (IDocFileHandler::kSchedule + kSuppressUI), so this is safe to call from inside a
-	    search or a notification. */
+	    search or a notification.
+
+	    ***** A chapter holding UNSAVED CHANGES IS KEPT, not closed. ***** These closes are
+	    UI-suppressed, and IDocFileHandler::Close only offers to save "if uiFlags allow"
+	    (IDocFileHandler.h:97-101) - so closing a modified chapter throws that modification away
+	    without a word. It is reachable in ordinary use: a jump opens a chapter and gives it a
+	    window, the user replaces in it without ticking "save after replace" (or simply types in
+	    it), and the next run would hand it back with the work still in it. A kept chapter stays ON
+	    the held list, so a later call closes it once it has been saved. This is the distinction
+	    CloseDisplayedDocsIfClean has always made - it skips a dirty document for exactly this
+	    reason - now made here as well. */
 	void ReleaseHeldDocs();
 
-	/** Close THIS chapter, if KBS is the one who opened it. A chapter the user already had open is
-	    not held and is left alone, so a run can hand back every chapter it walked without keeping
-	    track of who opened which. Scheduled + UI-suppressed exactly like ReleaseHeldDocs, so it is
-	    safe to call from inside a run. */
-	void ReleaseHeldDoc(const UIDRef& docRef);
+	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
+	    chapter the user already had open is not held and is left alone, so a run can hand back every
+	    chapter it walked without keeping track of who opened which. Scheduled + UI-suppressed exactly
+	    like ReleaseHeldDocs, so it is safe to call from inside a run - and, like it, it refuses to
+	    close a chapter with unsaved work in it.
+
+	    @return true when the chapter was actually handed back. false when it was not ours, when it
+	            is no longer open, or when it holds unsaved changes. A caller that REPORTS having
+	            closed chapters has to read this rather than assume: "nothing of ours was open" and
+	            "we closed what was" are different facts, and only this can tell them apart. */
+	bool ReleaseHeldDoc(const UIDRef& docRef);
+
+	/** Stop holding this chapter WITHOUT closing it: it has a WINDOW now, so it is the user's and no
+	    longer something a run may hand back.
+
+	    A run opens its chapters windowless and closes them again - that is what the held list is
+	    for. A chapter that gains a window leaves that arrangement: it got one because the user asked
+	    to be taken there (a jump, a document row) or because a replace landed in it, and closing it
+	    afterwards would take away a window they are working in, along with anything they have typed
+	    or replaced into it since (user, 2026-08-03: "a document the user opened by jumping should
+	    not be closed, even if nothing was replaced in it").
+
+	    Called from wherever a held chapter is given a window: ShowChapterWindow after a replace, and
+	    KBSJump when a jump brings one to the front. Does nothing when the chapter is not held, so it
+	    is safe to call on any document. */
+	void ForgetHeldDoc(const UIDRef& docRef);
 
 	/** Reopen a chapter by its file (Task 3 jump): if the user reopened it themselves, rebind to
 	    THEIR open copy (and do not hold it); otherwise open it windowless + UI-suppressed and hold

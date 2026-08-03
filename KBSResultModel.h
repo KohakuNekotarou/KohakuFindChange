@@ -113,12 +113,6 @@ namespace KBSResultModel
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
-		uint32	storyChangeCount;	// ITextModel::GetTextChangeCount for this hit's story, AS THE
-								// SEARCH LEFT IT. The model bumps that counter on every character
-								// inserted, removed or replaced, so a replace pass that finds it
-								// unchanged knows the story holds exactly the text it walked - and
-								// can take the whole story's hits on trust instead of re-reading
-								// the text under each one. See KBSReplaceEngine.
 
 		// checked starts FALSE (changed 2026-08-02, user's request, for every mode - Text, GREP and
 		// Glyph alike). A fresh search used to tick every row it was allowed to replace, which made

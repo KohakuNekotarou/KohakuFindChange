@@ -143,6 +143,23 @@ namespace
 	    IBookManager's list, so membership alone answers "yes, still open" for the very book that is
 	    closing - which made the guard reject the one case it exists for. IBook::IsOpen is the flag
 	    the close clears. */
+	/** Is there work in this document that closing it would throw away?
+
+	    Asked before every one of this module's UI-SUPPRESSED closes. IDocFileHandler::Close only
+	    offers to save "if uiFlags allow" (IDocFileHandler.h:97-101), so a modified document closed
+	    with kSuppressUI loses what is in it silently - no prompt, no undo, no file on disk. The
+	    hide-previous-chapter sweep has always asked this (CloseDisplayedDocsIfClean); the held-chapter
+	    releases did not, which is what let a replace that the user chose NOT to save disappear when
+	    the next run reclaimed the chapter it was in.
+
+	    A document with no database reads as "nothing to lose": there is no modification flag to
+	    consult, and refusing to close on that basis would strand the chapter for the session. */
+	bool HasUnsavedChanges(const UIDRef& docRef)
+	{
+		IDataBase* db = docRef.GetDataBase();
+		return (db != nil) && (db->IsModified() != kFalse);
+	}
+
 	IBook* FindOpenBookByPath(const PMString& bookPath)
 	{
 		if (bookPath.IsEmpty())
@@ -228,6 +245,17 @@ void KBSBookScope::ReleaseHeldDocs()
 	{
 		if (!IsDocStillOpen(held[i]))
 			continue;
+
+		// ***** Unsaved work in it? Then it is not ours to close. ***** Put it BACK on the held
+		// list: it is still a chapter this plug-in opened, so once it has been saved a later call
+		// hands it back like any other. Leaving it off the list instead would mean nothing ever
+		// closes it again. See HasUnsavedChanges for what closing it would cost.
+		if (HasUnsavedChanges(held[i]))
+		{
+			gHeldDocInfo.fCurrentOpenedDocumentList.push_back(held[i]);
+			continue;
+		}
+
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(held[i]));
 		if (docFileHandler == nil)
 			continue;
@@ -236,10 +264,10 @@ void KBSBookScope::ReleaseHeldDocs()
 	}
 }
 
-void KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
+bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
 {
 	if (docRef == UIDRef::gNull)
-		return;
+		return false;
 
 	// Ours to close? A chapter the user already had open is not on this list and must stay. That
 	// test lives HERE rather than at every call site: a run walks its chapters without caring who
@@ -254,7 +282,14 @@ void KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
 		}
 	}
 	if (heldIndex < 0)
-		return;
+		return false;
+
+	// ***** Unsaved work in it? Then it is not ours to close. ***** Asked BEFORE it comes off the
+	// list, so it stays held and a later call can hand it back once it has been saved. Reached when
+	// a chapter this plug-in opened has been written to and not saved - a replace run without "save
+	// after replace", or the user typing in a chapter a jump opened for them. See HasUnsavedChanges.
+	if (HasUnsavedChanges(docRef))
+		return false;
 
 	// Off the list FIRST, so a re-entrant call cannot schedule the same close twice.
 	gHeldDocInfo.fCurrentOpenedDocumentList.erase(
@@ -269,12 +304,14 @@ void KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
 	// mode, closes immediately, and crashed KESCL in 2026-07-17 when called from a notification.
 	// See the longer note on ReleaseHeldDocs.
 	if (!IsDocStillOpen(docRef))
-		return;
+		return false;
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
 	if (docFileHandler == nil)
-		return;
-	if (docFileHandler->CanClose(docRef))
-		docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+		return false;
+	if (!docFileHandler->CanClose(docRef))
+		return false;
+	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+	return true;
 }
 
 void KBSBookScope::ReleaseSearchedBook()
@@ -395,16 +432,24 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 
 	// It has a window now, so it is no longer part of the windowless reopen cache - dropping it
 	// keeps a later ReleaseHeldDocs from closing a window the user is looking at.
-	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	KBSBookScope::ForgetHeldDoc(docRef);
+	return true;
+}
+
+void KBSBookScope::ForgetHeldDoc(const UIDRef& docRef)
+{
+	if (docRef == UIDRef::gNull)
+		return;
+
+	// Backwards, and every match rather than the first: the same shape CloseDisplayedDocsIfClean
+	// uses. Nothing should ever put one document on this list twice, and a function whose whole job
+	// is "this is not ours any more" should not be the place that discovers otherwise.
+	for (int32 i = static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()) - 1; i >= 0; --i)
 	{
 		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
-		{
 			gHeldDocInfo.fCurrentOpenedDocumentList.erase(
 				gHeldDocInfo.fCurrentOpenedDocumentList.begin() + i);
-			break;
-		}
 	}
-	return true;
 }
 
 void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)

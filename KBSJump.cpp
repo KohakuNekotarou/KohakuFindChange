@@ -236,11 +236,17 @@ namespace
 	// window opened here; a background-tab window is activated. The zoom the user was looking at
 	// travels along (zoom first, scroll second). Returns false when no window could be produced or
 	// the activation did not take (the caller then reports without scrolling).
+	//
+	// ***** On success the chapter STOPS BEING HELD (KBSBookScope::ForgetHeldDoc). ***** See the
+	// note beside that call at the foot of this function.
 	bool EnsureDocFrontmost(const UIDRef& docRef)
 	{
 		IDocument* front = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (front != nil && ::GetUIDRef(front) == docRef)
+		{
+			KBSBookScope::ForgetHeldDoc(docRef);	// already in front and visible - see below
 			return true;
+		}
 
 		IDataBase* db = docRef.GetDataBase();
 		if (db == nil)
@@ -314,6 +320,21 @@ namespace
 				}
 			}
 		}
+
+		// ***** THE CHAPTER IS THE USER'S FROM HERE ON: STOP HOLDING IT. *****
+		//
+		// A jump reaches a closed chapter by reopening it WINDOWLESS (EnsureChapterReachable ->
+		// ReopenChapterDoc), which puts it on the held list - the list of chapters a run is entitled
+		// to hand back by closing them, with the UI suppressed. It has a window now and the user is
+		// looking at it, so that entitlement is over: the next run would otherwise close a window
+		// they are working in, and take with it whatever they have typed or replaced into it since
+		// (user, 2026-08-03: "a document the user opened by jumping should not be closed, even if
+		// nothing was replaced in it").
+		//
+		// KBSBookScope::ShowChapterWindow has always said this about the window IT opens after a
+		// replace. This is the same statement about the window a JUMP opens - the case that was
+		// missing, and the one that reaches the user first.
+		KBSBookScope::ForgetHeldDoc(docRef);
 		return true;
 	}
 
