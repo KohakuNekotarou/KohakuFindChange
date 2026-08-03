@@ -239,6 +239,36 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (!this->ConfirmReplace(checkedCount, saveAfterReplace))
 				break;
 
+			// ***** Ticking that box is the one choice here that nothing can take back. *****
+			// A replace is undoable and a cancelled run rolls itself back - but a SAVED file is on
+			// disk, and neither Ctrl+Z nor the progress bar's Cancel puts it back. It also changes
+			// what Cancel MEANS: a saving run stops where it stands and leaves the chapters it
+			// finished saved, where a run that does not save puts the whole book back.
+			//
+			// So it is asked once more, on its own, with CANCEL as the default button - a stray
+			// Enter must not be what overwrites the user's files.
+			//
+			// Translated like the confirmation it follows: this is the moment the user authorises
+			// overwriting their files, and the rule in this plug-in is that the prompts before a
+			// rewrite are translated while the panel and its status line stay English.
+			//
+			// ***** No Translate() and no SetTranslatable() here. ***** ModalAlert translates
+			// everything it is handed, including the message (CAlert.h:99-100), so the key goes
+			// through as it stands.
+			//
+			// CAlert::SetShowAlerts(kFalse) - what a script running with NEVER_INTERACT does -
+			// makes ModalAlert return the DEFAULT button (CAlert.h:220-222). That is Cancel here,
+			// so an unattended script does not overwrite anything. Safe way round.
+			if (saveAfterReplace)
+			{
+				PMString warning(kKBSSaveAfterReplaceWarningKey);
+				const int16 answer = CAlert::ModalAlert(warning,
+					kOKString, kCancelString, kNullString,
+					2 /*Cancel is the default*/, CAlert::eWarningIcon);
+				if (answer != 1)
+					break;
+			}
+
 			PMString summary;
 			KBSReplaceEngine::ReplaceChecked(summary, saveAfterReplace);
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade

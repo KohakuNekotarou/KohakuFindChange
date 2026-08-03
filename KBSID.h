@@ -368,6 +368,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // English, like every other status line here.
 #define kKBSSaveAfterReplaceKey			kKBSStringPrefix "kKBSSaveAfterReplaceKey"
 #define kKBSSaveAfterReplaceNoteKey		kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
+// The warning that goes up when the box IS ticked. Saving is the one thing this plug-in does that
+// nothing can take back - not an undo, and not the progress bar's Cancel - so it is said once more,
+// on its own, after the rewrite has already been approved, and with Cancel as the default button.
+#define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
 
 // Menu item positions:
 

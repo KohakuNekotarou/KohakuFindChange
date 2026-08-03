@@ -353,6 +353,15 @@ private:
 			label.AppendNumber(fullCount);
 		}
 		label.Append(")");
+
+		// A replace that was cancelled before reaching this chapter says so here. Its rows are still
+		// ticked - they were asked for and never got their turn - and a ticked row on its own reads
+		// exactly like a chapter nothing was done to, which is the confusion this removes (user's
+		// report, 2026-08-03). English like the rest of the panel; the prompts are what get
+		// translated here, not the read-out.
+		if (KBSResultModel::IsChapterNotReached(nodeID->GetChapter()))
+			label.Append("   cancelled");
+
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
 

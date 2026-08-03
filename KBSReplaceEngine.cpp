@@ -742,6 +742,21 @@ void ReplaceChapterByChapter(RunTotals& io)
 		if (progressBar.WasCancelled(kFalse))
 		{
 			io.cancelled = true;
+
+			// This chapter and every one after it was never visited. Say so on the chapter ROW:
+			// their hits keep their checks (they were asked for and their turn never came), and a
+			// ticked row on its own is indistinguishable from a chapter that simply had nothing
+			// done to it - which is exactly what was confusing on screen (user's report,
+			// 2026-08-03). Only chapters that HAD work are marked; one with nothing checked was
+			// never going to be visited anyway.
+			//
+			// A chapter that is already done has no checked hits left (they were cleared as they
+			// were replaced), so this cannot reach backwards over the finished ones.
+			for (int32 rest = ci; rest < chapterCount; ++rest)
+			{
+				if (CountCheckedInChapter(rest) > 0)
+					KBSResultModel::SetChapterNotReached(rest);
+			}
 			break;
 		}
 

@@ -80,9 +80,12 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSGlyphConfirmArrowKey,		"->",
                 kKBSGlyphConfirmDontShowKey,	"Don't show again",
 
-                // ----- "Save after replace" (the box, and what it does besides saving)
+                // ----- "Save after replace" (the box, what it does besides saving, and the warning)
                 kKBSSaveAfterReplaceKey,		"Save each chapter after replace",
-                kKBSSaveAfterReplaceNoteKey,	"Chapters KBS opened are closed after saving when Hide Previous Chapter is on.",
+                kKBSSaveAfterReplaceNoteKey,	"Chapters are opened one at a time and closed again after saving.",
+                // No quotation marks around the box's name: no string in this table escapes a
+                // double quote, and the resource compiler is not worth finding out about here.
+                kKBSSaveAfterReplaceWarningKey,	"Save each chapter after replace is ticked." kLineSeparatorString kLineSeparatorString "Documents are saved as their replacements are done, and the ones this plug-in opened are then closed. Cancelling part-way through does not put a saved file back." kLineSeparatorString kLineSeparatorString "Continue?",
 
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n"
