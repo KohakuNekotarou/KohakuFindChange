@@ -166,6 +166,63 @@ int32 ChapterIndexForDoc(const std::vector<PendingChapter>& pending, const UIDRe
 	return -1;
 }
 
+// Everything a run has to say about itself, in one place. It used to be seventeen locals in
+// ReplaceChecked, which was workable while there was one way through that function; there are two
+// now (all-at-once and chapter-at-a-time), and they have to hand the same account back to the same
+// summary builder.
+//
+// Counters only - no decisions. Which of them get filled in is the running path's business, and
+// BuildSummary says nothing about a counter that stayed zero.
+struct RunTotals
+{
+	int32	replaced;			// hits actually rewritten
+	int32	chaptersTouched;	// chapters at least one replacement landed in
+	int32	chaptersSkipped;	// could not be opened at all
+	int32	chaptersStepLimited;// the re-walk hit the safety ceiling
+	int32	chaptersNotWalked;	// opened, but the text walker would not run on them
+	int32	missing;			// checked hits whose text is no longer where the row says
+	int32	locked;				// checked hits on a locked layer or in a locked story
+	int32	refused;			// the replace command was asked and said no
+	int32	chaptersSaved;
+	int32	chaptersNotSaved;
+
+	// The FIRST name in each of the three lists that name one. Kept with a flag of its own rather
+	// than testing IsEmpty(): a chapter whose name is empty would otherwise never count as the
+	// first, and every later one would overwrite it.
+	PMString	firstSkipped;
+	PMString	firstNotWalked;
+	PMString	firstNotSaved;
+	bool		haveFirstSkipped;
+	bool		haveFirstNotWalked;
+	bool		haveFirstNotSaved;
+
+	// The user stopped the run from the progress bar. What that MEANS depends on which path was
+	// running - see BuildSummary.
+	bool		cancelled;
+
+	// Were the chapters this plug-in opened handed back? The summary has to say so - and, more
+	// importantly, has to say when they were NOT, since a user who ticked the box expects them gone.
+	bool		chaptersClosed;
+
+	// Chapters the run wants to leave on screen. The all-at-once path fills this with every chapter
+	// it replaced in (unless it is about to close them); the chapter-at-a-time path fills it with
+	// the ones whose SAVE failed, since those are the only ones it does not close. Opened after all
+	// the replacing is over, never between chapters - see the note where they are consumed.
+	std::vector<UIDRef>	windowsToOpen;
+
+	RunTotals()
+		: replaced(0), chaptersTouched(0), chaptersSkipped(0), chaptersStepLimited(0),
+		  chaptersNotWalked(0), missing(0), locked(0), refused(0),
+		  chaptersSaved(0), chaptersNotSaved(0),
+		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstNotSaved(false),
+		  cancelled(false), chaptersClosed(false)
+	{
+		firstSkipped.SetTranslatable(kFalse);
+		firstNotWalked.SetTranslatable(kFalse);
+		firstNotSaved.SetTranslatable(kFalse);
+	}
+};
+
 // Is the match the walk just landed on the SAME occurrence this row describes?
 //
 // The walk order alone cannot tell "the Nth match" apart from "a DIFFERENT Nth match". An edit
@@ -612,6 +669,127 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	return replacedCount;
 }
 
+// The status line, from the counters alone.
+//
+// Split out from ReplaceChecked when a second way through the run arrived (the chapter-at-a-time
+// path): both paths end here, so the wording is written once and cannot drift apart. It reads
+// RunTotals and nothing else - no document, no model, no session state - which is what makes that
+// possible.
+//
+// Every checked hit that was not replaced is named here rather than being allowed to make the total
+// quietly come up short. That rule is what most of these branches exist for.
+void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummary)
+{
+	if (t.cancelled)
+	{
+		// The whole run was rolled back - the text through the aborted sequence, and the panel with
+		// it - so there is nothing to account for.
+		outSummary.Append("Replace cancelled - nothing was changed.");
+		return;
+	}
+
+	// The count leads, so it survives the narrow status field's tail truncation.
+	outSummary.AppendNumber(t.replaced);
+	outSummary.Append(" replaced in ");
+	outSummary.AppendNumber(t.chaptersTouched);
+	outSummary.Append(" chapter(s).");
+
+	// Urge a save only when something was actually written AND the run did not do it itself. A run
+	// where every checked row came back missing, locked or refused leaves every file exactly as it
+	// found it, and "check them and save yourself" there reads as though something HAD been changed
+	// - at the very moment the user is already wondering what became of their hits.
+	if (t.replaced > 0 && !saveAfterReplace)
+		outSummary.Append(" Not saved - check them and save yourself.");
+
+	if (t.chaptersSaved > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersSaved);
+		outSummary.Append(" chapter(s) saved.");
+	}
+
+	// A file that could not be written is the one outcome here the user has to act on, so it is
+	// named and the reason is guessed out loud. Two ways this happens: the file is read-only, or the
+	// document has never been saved at all - no file to write to, and the prompt that would ask for
+	// one is suppressed on purpose.
+	if (t.chaptersNotSaved > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersNotSaved);
+		outSummary.Append(" chapter(s) could not be saved (\"");
+		outSummary.Append(t.firstNotSaved);
+		outSummary.Append("\" first) - read-only or never saved?");
+	}
+
+	// Say that the desk was cleared - and, more importantly, say when it was NOT. A user who ticked
+	// the box expecting the chapters to go away has to be told why they are still there.
+	if (t.chaptersClosed)
+		outSummary.Append(" Chapters KBS opened were closed.");
+	else if (saveAfterReplace && t.chaptersNotSaved > 0 && KBSJump::IsHidePreviousChapterOn())
+		outSummary.Append(" Nothing was closed - a chapter could not be saved.");
+
+	if (t.chaptersSkipped > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersSkipped);
+		outSummary.Append(" chapter(s) could not be opened (\"");
+		outSummary.Append(t.firstSkipped);
+		outSummary.Append("\" first) - moved, deleted, or in use?");
+	}
+
+	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
+	// failure to line up - the row came up exactly where it was expected, the TEXT there had
+	// changed - so it is reported on its own terms.
+	if (t.missing > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.missing);
+		outSummary.Append(" hit(s) not found - the text is no longer where the search left it.");
+	}
+
+	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
+	// Find/Change searches those when asked to and then refuses to change them ("Search Only"), and
+	// this reports the same outcome rather than letting the count quietly come up short.
+	if (t.locked > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.locked);
+		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
+	}
+
+	// Checked rows the replace command itself would not run on. The one entry in this list that is
+	// a real failure rather than a deliberate decline, so it is worded as one - and reported at all,
+	// which is the point: the alternative is a replaced total that comes up short in silence.
+	if (t.refused > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.refused);
+		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
+	}
+
+	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying
+	// "edited since the search?" here would send the user looking for the wrong thing.
+	if (t.chaptersStepLimited > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersStepLimited);
+		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
+	}
+
+	// Chapters the text walker would not run on at all. Unlike every case above, nothing on their
+	// rows explains it - the walk never got far enough to say anything about a single one - so the
+	// chapter is named here instead. The SEARCH reports the same failure the same way; without this
+	// the replace passed over such a chapter without a word.
+	if (t.chaptersNotWalked > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersNotWalked);
+		outSummary.Append(" chapter(s) could not be searched (\"");
+		outSummary.Append(t.firstNotWalked);
+		outSummary.Append("\" first) - nothing was written there.");
+	}
+}
+
 } // anonymous namespace
 
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterReplace)
@@ -712,31 +890,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		return 0;
 	}
 
-	int32 totalReplaced = 0;
-	int32 chaptersTouched = 0;
-	int32 chaptersSkipped = 0;
-	int32 chaptersStepLimited = 0;
-	int32 totalMissing = 0;
-	int32 totalLocked = 0;
-	int32 totalRefused = 0;
-	PMString firstSkipped;
-	firstSkipped.SetTranslatable(kFalse);
-	// A separate flag rather than firstSkipped.IsEmpty(): a chapter whose name is empty would
-	// otherwise never count as "the first one", and every later chapter would overwrite it.
-	bool haveFirstSkipped = false;
-
-	// Chapters that opened fine but could not be WALKED (see ReplaceInChapter's outNotWalked). Kept
-	// apart from chaptersSkipped because the cause is different and so is the fix: one is a file
-	// problem, the other is the text walker refusing this document.
-	int32 chaptersNotWalked = 0;
-	PMString firstNotWalked;
-	firstNotWalked.SetTranslatable(kFalse);
-	bool haveFirstNotWalked = false;
-
-	// Set when the user stops the run from the progress bar. Cancelling gives back the document as
-	// it was: the command sequence rolls the text back, and the result model is rolled back with
-	// it, so the panel returns to being the search's results. Nothing is half done.
-	bool cancelled = false;
+	// The whole account of this run - every counter the summary reads, in one structure. It used to
+	// be seventeen locals here. They were gathered up when a SECOND way through this function
+	// arrived (the chapter-at-a-time path, 2026-08-03): both have to hand the same account to the
+	// same summary builder, and a counter that lives in only one of them is a sentence the other
+	// silently cannot say.
+	//
+	// totals.cancelled is set when the user stops the run from the progress bar. On THIS path that
+	// means the document is given back as it was: the command sequence rolls the text back, and the
+	// result model is rolled back with it, so the panel returns to being the search's results.
+	// Nothing is half done.
+	RunTotals totals;
 
 	// Chapters that took a replacement, and so want a window afterwards. Collected rather than
 	// opened on the spot - see the comment on the loop that consumes this, below.
@@ -814,13 +978,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 			UIDRef reopened;
 			if (!KBSBookScope::ReopenChapterDoc(file, reopened))
 			{
-				++chaptersSkipped;
-				if (!haveFirstSkipped)
+				++totals.chaptersSkipped;
+				if (!totals.haveFirstSkipped)
 				{
 					int32 chapterHits = 0;
-					KBSResultModel::GetChapterDisplay(ci, firstSkipped, chapterHits);
-					firstSkipped.SetTranslatable(kFalse);
-					haveFirstSkipped = true;
+					KBSResultModel::GetChapterDisplay(ci, totals.firstSkipped, chapterHits);
+					totals.firstSkipped.SetTranslatable(kFalse);
+					totals.haveFirstSkipped = true;
 				}
 				// Moved, deleted, or in use: counted and named just above, and kept in the list
 				// unopened so the bar still takes its step for it.
@@ -924,7 +1088,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		// 900-of-1000 run starts over.
 		if (progressBar.WasCancelled(kFalse))
 		{
-			cancelled = true;
+			totals.cancelled = true;
 			break;
 		}
 
@@ -951,25 +1115,25 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to line
 		// up, or the safety ceiling) must still hand the bar on at the right place.
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
-		totalReplaced += replaced;
-		totalMissing += missing;
-		totalLocked += locked;
-		totalRefused += refused;
+		totals.replaced += replaced;
+		totals.missing += missing;
+		totals.locked += locked;
+		totals.refused += refused;
 		if (replaced > 0)
-			++chaptersTouched;
+			++totals.chaptersTouched;
 		if (stepLimit)
-			++chaptersStepLimited;
+			++totals.chaptersStepLimited;
 		if (notWalked)
 		{
 			// The walk never started here, so no row of this chapter carries a reason - the chapter
 			// itself has to be named, the way the resolve pass names one it could not open.
-			++chaptersNotWalked;
-			if (!haveFirstNotWalked)
+			++totals.chaptersNotWalked;
+			if (!totals.haveFirstNotWalked)
 			{
 				int32 notWalkedHits = 0;
-				KBSResultModel::GetChapterDisplay(ci, firstNotWalked, notWalkedHits);
-				firstNotWalked.SetTranslatable(kFalse);
-				haveFirstNotWalked = true;
+				KBSResultModel::GetChapterDisplay(ci, totals.firstNotWalked, notWalkedHits);
+				totals.firstNotWalked.SetTranslatable(kFalse);
+				totals.haveFirstNotWalked = true;
 			}
 		}
 
@@ -992,8 +1156,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	// The work is already done by this point, so this changes nothing about what was written - but it
 	// is what decides between committing that work and throwing it away, which is the whole promise
 	// of the button.
-	if (!cancelled && progressBar.WasCancelled(kFalse))
-		cancelled = true;
+	if (!totals.cancelled && progressBar.WasCancelled(kFalse))
+		totals.cancelled = true;
 
 	// The sequence ends HERE, and HOW it ends is the cancel. Aborting is a statement - "undo
 	// everything this sequence did" - where ending it only offers the changes up and lets the error
@@ -1001,7 +1165,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	// (ICommandSequence.h:153).
 	if (seq != nil)
 	{
-		if (cancelled)
+		if (totals.cancelled)
 			CmdUtils::AbortCommandSequence(seq);
 		else
 			CmdUtils::EndCommandSequence(seq);
@@ -1010,7 +1174,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 
 	}	// end of the block the sequence lived in
 
-	if (cancelled)
+	if (totals.cancelled)
 	{
 		// The abort has just rolled the text back to where the run found it. The panel recorded
 		// those replacements as they happened, so it has to shed them too - otherwise it would show
@@ -1040,7 +1204,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 				chapterDB->SetModified(kFalse);
 		}
 
-		outSummary.Append("Replace cancelled - nothing was changed.");
+		// The panel is back to being the search's results, so there is no report to turn it into -
+		// KeepCheckedRows is deliberately NOT called on this exit. The wording is left to
+		// BuildSummary, which is the only place that knows what a cancel means on each path.
+		BuildSummary(totals, saveAfterReplace, outSummary);
 		return 0;
 	}
 	KBSResultModel::ForgetRowBackup();
@@ -1056,12 +1223,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	// opened what, because overwriting is the job that was asked for and tidying up is not.) A
 	// chapter that came back all-locked or all-missing holds nothing of ours; if it is dirty, that
 	// is the user's own edit and not ours to write out.
-	int32 chaptersSaved = 0;
-	int32 chaptersNotSaved = 0;
-	PMString firstNotSaved;
-	firstNotSaved.SetTranslatable(kFalse);
-	bool haveFirstNotSaved = false;
-
 	if (saveAfterReplace)
 	{
 		for (size_t i = 0; i < touched.size(); ++i)
@@ -1075,11 +1236,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 			if (saveErr == kSuccess)
 			{
-				++chaptersSaved;
+				++totals.chaptersSaved;
 				continue;
 			}
-			++chaptersNotSaved;
-			if (!haveFirstNotSaved)
+			++totals.chaptersNotSaved;
+			if (!totals.haveFirstNotSaved)
 			{
 				// Named from the model rather than from the file: the model's name is the one the
 				// user just read in the panel.
@@ -1087,10 +1248,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 				if (savedCi >= 0)
 				{
 					int32 notSavedHits = 0;
-					KBSResultModel::GetChapterDisplay(savedCi, firstNotSaved, notSavedHits);
-					firstNotSaved.SetTranslatable(kFalse);
+					KBSResultModel::GetChapterDisplay(savedCi, totals.firstNotSaved, notSavedHits);
+					totals.firstNotSaved.SetTranslatable(kFalse);
 				}
-				haveFirstNotSaved = true;
+				totals.haveFirstNotSaved = true;
 			}
 		}
 	}
@@ -1104,7 +1265,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	//
 	// SKIPPED when the run is about to close these chapters again: opening a window only to shut it
 	// is a flicker and a wait, and nothing gets looked at in between.
-	const bool willClose = saveAfterReplace && chaptersNotSaved == 0
+	const bool willClose = saveAfterReplace && totals.chaptersNotSaved == 0
 		&& KBSJump::IsHidePreviousChapterOn();
 	if (!willClose)
 	{
@@ -1122,6 +1283,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	// chapter from the held list, so the whole sweep waits.
 	if (willClose)
 		KBSBookScope::ReleaseHeldDocs();
+	totals.chaptersClosed = willClose;
 
 	// The panel now becomes a REPORT of what the replace did: the rows it changed, and the rows it
 	// was asked about and left alone, each saying why on its locator. The rows the user had
@@ -1129,108 +1291,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 	// nothing at all leaves the results exactly as they were.
 	KBSResultModel::KeepCheckedRows();
 
-	// The count leads, so it survives the narrow status field's tail truncation.
-	outSummary.AppendNumber(totalReplaced);
-	outSummary.Append(" replaced in ");
-	outSummary.AppendNumber(chaptersTouched);
-	outSummary.Append(" chapter(s).");
-
-	// Urge a save only when something was actually written AND the run did not do it itself. A run
-	// where every checked row came back missing, locked or refused leaves every file exactly as it
-	// found it, and "check them and save yourself" there reads as though something HAD been changed
-	// - at the very moment the user is already wondering what became of their hits.
-	if (totalReplaced > 0 && !saveAfterReplace)
-		outSummary.Append(" Not saved - check them and save yourself.");
-
-	if (chaptersSaved > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(chaptersSaved);
-		outSummary.Append(" chapter(s) saved.");
-	}
-
-	// A file that could not be written is the one outcome here the user has to act on, so it is
-	// named and the reason is guessed out loud. Two ways this happens: the file is read-only, or the
-	// document has never been saved at all - no file to write to, and the prompt that would ask for
-	// one is suppressed on purpose.
-	if (chaptersNotSaved > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(chaptersNotSaved);
-		outSummary.Append(" chapter(s) could not be saved (\"");
-		outSummary.Append(firstNotSaved);
-		outSummary.Append("\" first) - read-only or never saved?");
-	}
-
-	// Say that the desk was cleared - and, more importantly, say when it was NOT. A user who ticked
-	// the box expecting the chapters to go away has to be told why they are still there.
-	if (willClose)
-		outSummary.Append(" Chapters KBS opened were closed.");
-	else if (saveAfterReplace && chaptersNotSaved > 0 && KBSJump::IsHidePreviousChapterOn())
-		outSummary.Append(" Nothing was closed - a chapter could not be saved.");
-
-	if (chaptersSkipped > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(chaptersSkipped);
-		outSummary.Append(" chapter(s) could not be opened (\"");
-		outSummary.Append(firstSkipped);
-		outSummary.Append("\" first) - moved, deleted, or in use?");
-	}
-
-	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
-	// failure to line up - the row came up exactly where it was expected, the TEXT there had
-	// changed - so it is reported on its own terms.
-	if (totalMissing > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(totalMissing);
-		outSummary.Append(" hit(s) not found - the text is no longer where the search left it.");
-	}
-
-	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
-	// Find/Change searches those when asked to and then refuses to change them ("Search Only"), and
-	// this reports the same outcome rather than letting the count quietly come up short.
-	if (totalLocked > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(totalLocked);
-		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
-	}
-
-	// Checked rows the replace command itself would not run on. The one entry in this list that is
-	// a real failure rather than a deliberate decline, so it is worded as one - and reported at all,
-	// which is the point: the alternative is a replaced total that comes up short in silence.
-	if (totalRefused > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(totalRefused);
-		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
-	}
-
-	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying
-	// "edited since the search?" here would send the user looking for the wrong thing.
-	if (chaptersStepLimited > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(chaptersStepLimited);
-		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
-	}
-
-	// Chapters the text walker would not run on at all. Unlike every case above, nothing on their
-	// rows explains it - the walk never got far enough to say anything about a single one - so the
-	// chapter is named here instead. The SEARCH reports the same failure the same way; without this
-	// the replace passed over such a chapter without a word.
-	if (chaptersNotWalked > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(chaptersNotWalked);
-		outSummary.Append(" chapter(s) could not be searched (\"");
-		outSummary.Append(firstNotWalked);
-		outSummary.Append("\" first) - nothing was written there.");
-	}
-
-	return totalReplaced;
+	BuildSummary(totals, saveAfterReplace, outSummary);
+	return totals.replaced;
 }
 
 bool KBSReplaceEngine::IsReplacing()
