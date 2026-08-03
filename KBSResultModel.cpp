@@ -693,7 +693,7 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 
 	// ----- The table -----
 	buf += "\n\n";
-	buf += "<Document>\t<Page>\t<Text>\t<Font>\t<Flags>";
+	buf += "<Document>\t<Page>\t<No>\t<Text>\t<Font>\t<Flags>";
 
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
 	{
@@ -712,6 +712,14 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 			// letters in a number column do not.
 			if (hit.pageIndex >= 0)
 				AppendFlattenedUTF8(buf, hit.pageString);
+			buf += "\t";
+			// Which hit this is ON ITS PAGE - the "(2)" the panel's locator carries. Without it several
+			// matches in one paragraph write IDENTICAL lines (measured on the first real save, three
+			// matches deep in one paragraph), and the file cannot be lined up against the panel at all.
+			// Its own column rather than part of the page, so the page still sorts as a number. 0 means
+			// the row does not show one - the cell is left empty rather than writing a zero.
+			if (hit.pageOrdinal > 0)
+				AppendNumberUTF8(buf, hit.pageOrdinal);
 			buf += "\t";
 			// The line as the panel draws it: the three segments joined back together. (An overset
 			// finding has its report - "Frame (370)" - in the match segment, so this writes that.)

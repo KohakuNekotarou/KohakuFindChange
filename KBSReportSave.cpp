@@ -24,6 +24,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IFindChangeOptions.h"	// the SearchMode values the results were recorded with
 #include "IPMStream.h"
 
 // General includes:
@@ -85,9 +86,10 @@ std::wstring SanitizeForFileName(const std::wstring& part)
 	return out;
 }
 
-// What was asked for, as a file-name part. A scan has no query, so it says which scan it was -
-// otherwise two scans of the same book would suggest the same name.
-std::wstring QueryNamePart()
+// What was DONE, and it leads the file name (user's call, 2026-08-03): "FindText", "FindGrep",
+// "ChangeText", "MissingGlyphs", "Overset". A folder of these then sorts by the thing that tells them
+// apart, and "which of these was the GREP one" is answerable without opening any of them.
+std::wstring ActionNamePart()
 {
 	switch (KBSResultModel::GetResultKind())
 	{
@@ -98,23 +100,38 @@ std::wstring QueryNamePart()
 			return std::wstring(L"Overset");
 
 		case KBSResultModel::kResultFindChange:
-		{
-			// The recorded query carries its tab in brackets ("cat  (Text)"), which is heading text,
-			// not name text: cut it back to the query itself.
-			std::wstring query = ToWide(KBSResultModel::GetQueryText());
-			const size_t bracket = query.find(L"  (");
-			if (bracket != std::wstring::npos)
-				query.erase(bracket);
-			return query;
-		}
+			break;
 	}
-	return std::wstring();
+
+	// Find or Change: a replace's aftermath is a report of what was CHANGED, which is a different
+	// thing to have saved than the search that found it.
+	std::wstring name(KBSResultModel::IsShowingReplaceOutcome() ? L"Change" : L"Find");
+
+	// ...and the tab it ran on. Taken from the mode recorded ON THE RESULTS, not from the dialog: the
+	// user can switch tabs between the search and the save. Spelled "Grep" rather than the dialog's
+	// "GREP" because this is a file name, not a label.
+	switch (KBSResultModel::GetSearchMode())
+	{
+		case IFindChangeOptions::kGrepSearch:	name += L"Grep";	break;
+		case IFindChangeOptions::kGlyphSearch:	name += L"Glyph";	break;
+		default:								name += L"Text";	break;
+	}
+	return name;
 }
 
-// The suggested file name, built from what the results describe:
-// "KohakuFindChangeReport_<book or document>_<query>.txt", e.g.
-// "KohakuFindChangeReport_savetest_KOHAKU.txt". The scope's extension is dropped ("ch1.indd" ->
-// "ch1"); empty parts are skipped, so a bare "KohakuFindChangeReport.txt" is the worst case.
+// The suggested file name (user's call, 2026-08-03):
+//
+//     KohakuFindChangeReport_<book or document>_<what was done>.txt
+//
+// e.g. "KohakuFindChangeReport_ch1_FindText.txt", "KohakuFindChangeReport_savetest_FindGrep.txt",
+// "KohakuFindChangeReport_glyphbook_MissingGlyphs.txt".
+//
+// The plug-in's own stem leads, so these files are recognisable wherever they end up; then what was
+// searched, since that is what the user is working ON; then what was done to it, which tells two
+// saves of the same document apart. The query itself is NOT in the name - it can be anything at all,
+// including a GREP pattern made of punctuation - and the heading inside the file names it exactly.
+// The scope's extension is dropped ("ch1.indd" -> "ch1"), and a part that cannot be named is skipped,
+// so a bare "KohakuFindChangeReport.txt" is the worst case.
 PMString BuildSuggestedFileName()
 {
 	// What was run over.
@@ -136,10 +153,10 @@ PMString BuildSuggestedFileName()
 	if (dot != std::wstring::npos && dot > 0)
 		scope.erase(dot);
 
-	const std::wstring what = QueryNamePart();
+	const std::wstring action = ActionNamePart();
 
 	std::wstring name(L"KohakuFindChangeReport");
-	const std::wstring* const parts[] = { &scope, &what };
+	const std::wstring* const parts[] = { &scope, &action };
 	for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); ++i)
 	{
 		if (parts[i]->empty())
