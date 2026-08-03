@@ -1199,15 +1199,40 @@ int32 KBSResultModel::KeepCheckedRows()
 			// than copied - a Hit carries six PMStrings.
 			Hit hit = std::move(hits[hi]);
 
-			// Rebuild the locator WITHOUT the within-page ordinal. That ordinal counted a hit's
-			// place among the matches on its page; once the rows that were left alone are gone the
-			// numbers are full of gaps (P1(1), P1(3)) and say nothing true, so the page alone is
-			// what the row shows. Everything about the shape lives in BuildHitLocator now.
-			hit.pageOrdinal = 0;
-			BuildHitLocator(hit);
 			keep.push_back(std::move(hit));
 		}
 		hits.swap(keep);
+
+		// RENUMBER the within-page ordinals over what is left, so the rows read "the first
+		// replacement on this page, the second, the third" (2026-08-03, user's call).
+		//
+		// The ordinal was CLEARED here until then, on the reasoning that thinning the list leaves the
+		// search's numbers full of gaps - which left every row on a page reading a bare "P1", saying
+		// nothing at all about which of them it was. Keeping the search's numbers was tried in
+		// between; the user asked for the count to follow the REPLACEMENTS rather than the matches
+		// they came from, which is this.
+		//
+		// Same rule and same shape as the search's own numbering (KBSSearchEngine::FinalizeChapterHits):
+		// contiguous runs of equal pageIndex are one page, and a page holding ONE row shows no ordinal
+		// at all, since there is nothing to tell apart. Thinning preserves the page order the search
+		// sorted into, so one pass over each run does it.
+		size_t runStart = 0;
+		while (runStart < hits.size())
+		{
+			size_t runEnd = runStart;
+			while (runEnd < hits.size() && hits[runEnd].pageIndex == hits[runStart].pageIndex)
+				++runEnd;
+			const int32 runCount = static_cast<int32>(runEnd - runStart);
+
+			for (size_t k = runStart; k < runEnd; ++k)
+			{
+				hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
+				// Rebuilt here rather than as each row was kept: the flags may have changed too, and
+				// this is the one pass that has the final ordinal to bake in.
+				BuildHitLocator(hits[k]);
+			}
+			runStart = runEnd;
+		}
 	}
 
 	// ...then drop the chapters left with nothing.
