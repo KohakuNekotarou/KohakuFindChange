@@ -69,6 +69,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
+                kKBSSaveResultsMenuKey,			"Save Results...",
 
                 // ----- Window strings
 

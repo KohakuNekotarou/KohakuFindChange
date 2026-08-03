@@ -224,7 +224,9 @@ DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
 // Find Overset: list the text that did not fit (2026-08-02). + 15 is a burnt number (see above),
 // so this is the first genuinely unused one.
 DECLARE_PMID(kActionIDSpace, kKBSFindOversetActionID, kKBSPrefix + 16)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 17)
+// "Save Results...": write the result set to a tab-separated text file (2026-08-03). + 12, + 13 and
+// + 15 are burnt numbers (see above), so this is the first genuinely unused one.
+DECLARE_PMID(kActionIDSpace, kKBSSaveResultsActionID, kKBSPrefix + 17)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 18)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 19)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 20)
@@ -303,6 +305,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 #define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
 #define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
+// "Save Results...": write what the panel is showing to a text file. The trailing "..." is the
+// platform convention for a command that opens a dialog before it does anything.
+#define kKBSSaveResultsMenuKey			kKBSStringPrefix "kKBSSaveResultsMenuKey"
 
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
@@ -383,6 +388,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // The replace block sits below the existing toggles, above the About separator (10.0).
 #define kKBSSeparator3MenuItemPosition		3.0
 #define kKBSReplaceCheckedMenuItemPosition	4.0
+// Save Results... sits under the replace command, above the About separator (10.0). It belongs at the
+// bottom of the block because it is the one command that acts on the RESULTS rather than on the
+// document - everything above it produces or changes them, this one takes them away with you.
+#define kKBSSaveResultsMenuItemPosition		5.0
 #define	kKBSSeparator1MenuItemPosition		10.0
 #define kKBSAboutThisMenuItemPosition		11.0
 

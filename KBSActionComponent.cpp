@@ -246,6 +246,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSSaveResultsActionID:
+		{
+			// Write the current result set to a text file. Everything - the busy test, the empty test,
+			// the chooser, the encoding - is in KBSResultTree::SaveResultsAsText, which is where the
+			// panel's own file-facing work lives; nothing to report from here.
+			KBSResultTree::SaveResultsAsText();
+			break;
+		}
+
 		case kKBSCheckAllActionID:
 		case kKBSUncheckAllActionID:
 		{
@@ -609,6 +618,18 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KBSResultModel::GetResultKind() == KBSResultModel::kResultFindChange)
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSSaveResultsActionID)
+		{
+			// Nothing to write without results. Asked of the STORED count rather than the displayed
+			// one: the file carries every hit, including those past the panel's display cap, so a
+			// result set that is mostly cap is still worth writing.
+			//
+			// Nothing else is asked. Unlike the three commands above it, this one does not run over the
+			// document - it writes down what already happened - so an empty desk does not stop it, and
+			// neither does a replace's aftermath, which is exactly the list a user wants to keep.
+			listToUpdate->SetNthActionState(i,
+				(KBSResultModel::GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
 		{

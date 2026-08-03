@@ -447,6 +447,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Save Results...: write the current result set to a tab-separated text file.
+		kKBSSaveResultsActionID,
+		kKBSTargetMenuPath
+		kKBSSaveResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- The result rows' right-click context menu (2026-08-01) -----
 		// Popped at the cursor by the row event handler (KBSResultNodeEH::RButtonDn, through
 		// IMenuManager::HandlePopupMenu with this subtree's name). Check All / Uncheck All are its two
@@ -568,6 +574,19 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSReplaceCheckedActionID,
 		kKBSReplaceCheckedMenuKey,		// "Change Checked"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Save Results.... kCustomEnabling so UpdateActionStates can grey it out while there are no
+		// results to write - the same flag every other command here needs. No kDisableIfNoFrontDocument:
+		// what it writes is the RESULT SET, which outlives the document window that produced it (a book
+		// run leaves no window open at all).
+		kKBSActionComponentBoss,
+		kKBSSaveResultsActionID,
+		kKBSSaveResultsMenuKey,			// "Save Results..."
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
