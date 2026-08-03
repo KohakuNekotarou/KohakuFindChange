@@ -1717,6 +1717,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 
 	// The one-line summary. The hit count leads, so it stays visible even when the narrow
 	// single-line status field truncates the tail.
+	//
+	// ***** No name here. ***** The book and the document are the first two rows of the tree
+	// directly below this line, so repeating them costs room in a field that truncates and says
+	// nothing the eye has not already got (user's call, 2026-08-03). The "no matches" wording DOES
+	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(total);
 	outSummary.Append(" hit(s)");
 	if (fromBook)
@@ -1730,15 +1735,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		outSummary.Append(chapStr);
 		outSummary.Append(" of ");
 		outSummary.Append(totalChapStr);
-		outSummary.Append(" chapter(s) - book \"");
-		outSummary.Append(bookName);
-		outSummary.Append("\".");
+		outSummary.Append(" chapter(s).");
 	}
 	else
 	{
-		outSummary.Append(" - document \"");
-		outSummary.Append(targets[0].shortName);
-		outSummary.Append("\".");
+		outSummary.Append(".");
 	}
 
 	// Two separate caps can bite:
