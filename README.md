@@ -188,10 +188,45 @@ nothing on them to rewrite.
   emphasised the way a match is), the rows it was asked about and left alone with the reason on the
   locator, and the locked rows that account for a search turning up more than the replace was
   allowed to touch. The rows you had unticked are dropped, and so are chapters left with nothing.
-  No row on a report offers a check box, and the locator drops the within-page ordinal (`P1`, not
-  `P1(3)`) because with the untouched hits gone the numbering would only be gaps. Rows still jump.
+  No row on a report offers a check box. The within-page ordinal is **renumbered over what is left**,
+  so a page reads "the first replacement, the second, the third" (`P1(1)`, `P1(2)`) rather than
+  carrying the search's numbering with gaps where the unticked rows were. Rows still jump.
 - **Undoing a replacement does not un-do the panel** — the report still describes what was replaced
   until you run the search again.
+
+## Saving the results
+
+**`Save Results...`** in the flyout writes what the panel is holding to a tab-separated text file —
+one line per hit, ready to paste into a spreadsheet. It is greyed out while there is nothing to save.
+
+    Kohaku Find/Change
+    Query: cat  (Text)
+    Book: savetest.indb
+    Summary: 9 hit(s) in 3 of 3 chapter(s) - book "savetest.indb".
+    Rows: 9
+
+    <Document>  <Page>  <No>  <Text>              <Font>  <Flags>
+    ch1.indd    1       1     ...the cat sat...
+    ch1.indd    2             ...another cat...           lock
+
+- **Every stored hit is written**, including those past the panel's 5000-row display limit, so `Rows:`
+  can be larger than what is on screen.
+- The heading names the command that produced the rows (`Kohaku Find/Change`, `Find Missing Glyphs`,
+  `Find Overset`, or `Kohaku Find/Change (after Change Checked)`), the query with the tab it was typed
+  on, the book or document, and **the panel's own summary line verbatim** — so the file can never
+  contradict what the panel said.
+- **`<Page>` is the page number alone** so a spreadsheet can sort on it; the `ov` / `hidden` / `lock` /
+  `missing` / `refused` / `replaced` flags are in `<Flags>`, spelled exactly as the panel's locator
+  spells them. `<No>` is the within-page ordinal (empty when the page holds a single row), and
+  `<Font>` is filled in by the glyph scan only.
+- **Tabs and line breaks inside the text are flattened to a single space** — a match can run across a
+  paragraph break, and a real newline in a cell would split the row.
+- **UTF-8 with a BOM and CRLF ends**, so Notepad and Excel both open Japanese text correctly.
+- The suggested name is `KohakuFindChangeReport_<document or book>_<what was done>.txt` —
+  `KohakuFindChangeReport_ch1_FindText.txt`, `..._savetest_FindGrep.txt`,
+  `..._glyphbook_MissingGlyphs.txt`, `..._ch1_ChangeText.txt`.
+- A save that worked says nothing (the file is where you put it) and a cancelled chooser does nothing
+  at all; only a write that failed reaches the status line.
 
 ## Results going stale
 
