@@ -70,8 +70,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmFindKey,				"Find: ^1",
                 kKBSConfirmChangeToKey,			"Change to: ^1",
                 kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
-                kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED. A single undo puts it back.",
-                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED. A single undo puts them all back.",
+                // Both start with the condition, because the box below can make them false: a run
+                // that saves writes every chapter to disk and closes the ones this plug-in opened,
+                // and no undo puts a saved file back. The box is ticked AFTER this text is drawn,
+                // so it cannot be rewritten at that moment - stating the condition up front is what
+                // keeps the dialog honest either way.
+                kKBSConfirmUnsavedOneKey,		"Unless you tick the box below, the chapter is opened and left UNSAVED - a single undo puts it back.",
+                kKBSConfirmUnsavedManyKey,		"Unless you tick the box below, the ^1 chapters are opened and left UNSAVED - a single undo puts them all back.",
 
                 // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
                 // The count and the closing line above are shared with it - only these four are new.
