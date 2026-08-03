@@ -54,8 +54,16 @@
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 #include "ILockPosition.h"			// IsPageItemLocked - Object > Lock on the frame itself
+// For naming the Glyph tab's query in the saved report ("Glyph 1234 (Kozuka Mincho Pr6N  Regular)"):
+#include "IFontFamily.h"			// family UID -> the family's display name, and its faces
+#include "IGlyphUtils.h"			// GetUnicodeForGlyphID
+#include "IPMFont.h"				// the face, for that lookup
+#include "ITextAttrFont.h"			// the font STYLE name  (kTextAttrFontStyleBoss)
+#include "ITextAttrUID.h"			// the font FAMILY uid  (kTextAttrFontUIDBoss)
 
 // General includes:
+#include "AttributeBossList.h"		// the find attributes the Glyph tab's query carries
+#include "TextAttrID.h"				// kTextAttrFontUIDBoss / kTextAttrFontStyleBoss
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "WalkerScopeOptions.h"
@@ -72,6 +80,7 @@
 #include <vector>
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
+#include <stdio.h>					// snprintf - the U+ formatting in DescribeGlyphQuery
 
 // Project includes:
 #include "KBSSearchEngine.h"
@@ -246,6 +255,113 @@ bool HasFindQuery()
 	// The find-what for the mode the user is actually in (Text vs GREP each have their own).
 	const WideString& findText = opts->GetFindString(mode);
 	return !findText.empty();
+}
+
+// The Glyph tab's query as one readable line: "Glyph 1234 (Kozuka Mincho Pr6N  Regular) U+845B".
+//
+// The Glyph tab has no find STRING - its query is a glyph id plus the font that id belongs to, and an
+// id on its own names nothing (glyph 1234 is a different character in every font). So the font is
+// looked up the same way the replace confirmation does it (KBSReplaceConfirmDialog::ResolveSide): the
+// family is a UID into the options' attribute database, the style is a name beside it.
+//
+// Resolve() itself is deliberately NOT reused: it parks the resolved faces in statics that the dialog
+// owns and releases later. This wants a string and nothing else, so it takes its own face and lets it
+// go in the same breath. Every step is allowed to fail - a query that cannot be described in full is
+// described as far as it goes, because this line is a caption, not a control.
+PMString DescribeGlyphQuery(IFindChangeOptions* opts)
+{
+	PMString description;
+	description.SetTranslatable(kFalse);
+	if (opts == nil)
+		return description;
+
+	const Text::GlyphID glyphID = opts->GetFindGlyphID();
+	if (glyphID == kInvalidGlyphID)
+		return description;
+
+	description.Append("Glyph ");
+	description.AppendNumber(static_cast<int32>(glyphID));
+
+	IDataBase* const db = opts->GetUIDAttrDB();
+	const AttributeBossList* const attrs =
+		opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch);
+	if (db == nil || attrs == nil)
+		return description;
+
+	InterfacePtr<const ITextAttrUID> familyAttr(static_cast<const ITextAttrUID*>(
+		attrs->QueryByClassID(kTextAttrFontUIDBoss, ITextAttrUID::kDefaultIID)));
+	if (familyAttr == nil || familyAttr->Get() == kInvalidUID)
+		return description;
+
+	PMString styleName;
+	InterfacePtr<const ITextAttrFont> styleAttr(static_cast<const ITextAttrFont*>(
+		attrs->QueryByClassID(kTextAttrFontStyleBoss, ITextAttrFont::kDefaultIID)));
+	if (styleAttr != nil)
+		styleName = styleAttr->GetFontName();
+
+	InterfacePtr<IFontFamily> family(db, familyAttr->Get(), UseDefaultIID());
+	if (family == nil)
+		return description;
+
+	description.Append(" (");
+	description.Append(family->GetFamilyName());
+	if (!styleName.IsEmpty())
+	{
+		description.Append("  ");
+		description.Append(styleName);
+	}
+	description.Append(")");
+
+	// The Unicode is a bonus: an ALTERNATE form has none to give, and writing U+0000 there would be a
+	// lie. QueryFace hands back a reference this function owns - release it before returning.
+	IPMFont* const font = family->QueryFace(styleName);
+	if (font != nil)
+	{
+		if (font->GetFontStatus() == IPMFont::kFontInstalled)
+		{
+			const UTF32TextChar ch = Utils<IGlyphUtils>()->GetUnicodeForGlyphID(font, glyphID);
+			if (ch.GetValue() != 0)
+			{
+				char buf[16];
+				snprintf(buf, sizeof(buf), " U+%04X", static_cast<unsigned int>(ch.GetValue()));
+				description.Append(buf);
+			}
+		}
+		font->Release();
+	}
+
+	return description;
+}
+
+// What the user asked for, as the one line the saved report's heading shows: the query and the tab it
+// was typed on, e.g. "cat  (Text)". Recorded ON THE RESULTS at search time - see
+// KBSResultModel::SetQueryText for why it must not be read back off the dialog afterwards.
+PMString DescribeCurrentQuery()
+{
+	PMString description;
+	description.SetTranslatable(kFalse);
+
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return description;
+
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	if (mode == IFindChangeOptions::kGlyphSearch)
+		description = DescribeGlyphQuery(opts);
+	else
+		description.Append(opts->GetFindString(mode));
+
+	// The tab's own name, after the query, so the file says which of the two find strings this was
+	// (Text and GREP each have their own, and the same characters mean different things on them).
+	const char* const tabName = SearchModeName(static_cast<int32>(mode));
+	if (tabName[0] != '\0')
+	{
+		description.Append("  (");
+		description.Append(tabName);
+		description.Append(")");
+	}
+	description.SetTranslatable(kFalse);
+	return description;
 }
 
 // Re-state one side of the Glyph tab's query on the find/change options. The command carries two
@@ -1364,6 +1480,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// mode returns another set of matches - so Change Checked compares this against the tab in force
 	// then and refuses rather than lining rows up with the wrong occurrences.
 	KBSResultModel::SetSearchMode(CurrentSearchModeValue());
+
+	// ...and WHAT WAS ASKED FOR, for the heading of the file "Save Results..." writes. Recorded here,
+	// beside the tab, because both answers have the same lifetime: they describe THESE rows, and the
+	// user is free to retype the query the moment this search returns.
+	KBSResultModel::SetQueryText(DescribeCurrentQuery());
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
