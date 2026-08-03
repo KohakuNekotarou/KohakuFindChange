@@ -250,6 +250,23 @@ namespace KBSResultModel
 	void SetSearchMode(int32 mode);
 	int32 GetSearchMode();
 
+	/** The query these results were found with, as ONE READY-MADE LINE - the string plus the tab it
+	    was searched on: "cat  (Text)", or "Glyph 1234 (Kozuka Mincho Pr6N  Regular) U+845B  (Glyph)".
+
+	    Held as a finished line rather than as its parts because the parts live in two different
+	    places: the string is on IFindChangeOptions, and the tab's NAME is the Find/Change dialog's own
+	    label, spelled by the search engine. The model would have to learn both to join them, and the
+	    only thing that reads this - the report's heading - wants them joined.
+
+	    Recorded by the search beside SetSearchMode, and cleared by Clear(), so it can never outlive
+	    the results it describes. It must NOT be read back off the Find/Change dialog at save time:
+	    the user can retype the query between the search and the save, and the file would then name a
+	    query these rows never came from.
+
+	    Empty for a scan - neither scan has a query - and empty until the first search of a session. */
+	void SetQueryText(const PMString& query);
+	PMString GetQueryText();
+
 	/** The name of the book these results came from - shown on the tree's BOOK row, which is how
 	    the panel says which book was searched. Set beside SetFromBook; the file NAME only, because
 	    a full path does not fit a palette. Empty for a document-scope search, and cleared by
@@ -355,6 +372,32 @@ namespace KBSResultModel
 	    Tab, return and backslash inside the text are escaped (\t, \n, \\), so one hit is always
 	    exactly one line with a fixed column count - a match CAN run across a paragraph break. */
 	void DescribeAllRows(PMString& out);
+
+	/** The whole result set as the text file "Save Results..." writes: a heading block, a blank line,
+	    a column-heading row, then ONE LINE PER HIT - tab separated, uncapped (every stored hit,
+	    including those past the panel's display limit).
+
+	        Kohaku Find/Change
+	        Query: cat  (Text)
+	        Book: savetest.indb
+	        Summary: 9 hit(s) in 3 of 3 chapter(s)
+	        Rows: 9
+
+	        <Document>  <Page>  <Text>  <Font>  <Flags>
+	        ch1.indd    1       ...the cat sat on the...
+	        ch1.indd    2       ...three cats...                    lock
+
+	    NOT DescribeAllRows in another dress, though they read the same rows. That one is the machine
+	    port behind app.kbsResults: it escapes tabs and newlines to "\t" / "\n" so a script can split
+	    the block back into fields. This one is pasted into a spreadsheet by a person, where a literal
+	    "\n" is noise - so here the same characters are FLATTENED TO A SPACE instead (a match can run
+	    across a paragraph break, and a real newline in a cell splits the row).
+
+	    @param summaryLine the panel's status line, written into the heading as "Summary:" - passed in
+	           rather than fetched, because the model does not know the panel. Empty = leave the line
+	           out. Handing it in is also what keeps the heading's wording identical to the panel's for
+	           every kind of run, without the model counting anything a second time. */
+	void BuildReportText(const PMString& summaryLine, PMString& out);
 
 	/** A hit node's display: the page locator and the three line segments to paint. false = index
 	    out of range. @see GetHitRow when the flags are wanted as well. */

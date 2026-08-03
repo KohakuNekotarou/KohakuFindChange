@@ -39,6 +39,9 @@ namespace
 	// searched yet). See KBSResultModel::SetSearchMode for why the replace has to compare against it.
 	int32 gSearchMode = -1;
 
+	// The query the results were found with, as one ready-made line. See KBSResultModel::SetQueryText.
+	PMString gQueryText;
+
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
@@ -191,6 +194,7 @@ void KBSResultModel::Clear()
 	gResultKind = kResultFindChange;
 	gBookName.Clear();
 	gSearchMode = -1;
+	gQueryText.Clear();
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	gContextMenuChapter = kNoContextMenuChapter;
@@ -255,6 +259,19 @@ int32 KBSResultModel::GetSearchMode()
 	return gSearchMode;
 }
 
+void KBSResultModel::SetQueryText(const PMString& query)
+{
+	gQueryText = query;
+	gQueryText.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetQueryText()
+{
+	PMString query(gQueryText);
+	query.SetTranslatable(kFalse);
+	return query;
+}
+
 void KBSResultModel::SetBookName(const PMString& name)
 {
 	gBookName = name;
@@ -273,6 +290,11 @@ void KBSResultModel::ShutdownCleanup()
 	// Assigning a fresh vector releases the storage too, not just the contents, so the static
 	// destructor at DLL unload finds nothing left to do (the KESCL ShutdownCleanup rule).
 	gChapters = std::vector<Chapter>();
+
+	// The two static PMStrings, emptied for the same reason the vectors are: nothing of ours should
+	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
+	gBookName.Clear();
+	gQueryText.Clear();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
 	// one would leave copies behind, and these hold PMStrings like the chapters do.
@@ -483,6 +505,77 @@ namespace
 		}
 		return "";
 	}
+
+	// One cell of the SAVED report: the text with its tabs and line breaks flattened to a single
+	// space. Deliberately NOT AppendEscapedUTF8's "\t" / "\n": that block is split back into fields by
+	// a script, this file is pasted into a spreadsheet by a person - where a literal backslash-n is
+	// noise, and a real newline would split the row. A run of them collapses to ONE space, so a CRLF
+	// does not become two.
+	void AppendFlattenedUTF8(std::string& out, const PMString& s)
+	{
+		const std::string utf8 = s.GetUTF8String();
+		bool folded = false;
+		for (std::string::size_type i = 0; i < utf8.size(); ++i)
+		{
+			const char c = utf8[i];
+			if (c == '\t' || c == '\r' || c == '\n')
+			{
+				if (!folded)
+					out += ' ';
+				folded = true;
+				continue;
+			}
+			out += c;
+			folded = false;
+		}
+	}
+
+	// Add one word to a space-separated cell.
+	void AppendWord(std::string& cell, const char* word)
+	{
+		if (!cell.empty())
+			cell += ' ';
+		cell += word;
+	}
+
+	// The row's flags as one cell, in the SAME WORDS AND THE SAME ORDER the panel's locator uses
+	// (KBSResultModel::BuildHitLocator) - so the file and the panel never call one thing by two names.
+	// "replaced" is the one word the locator has no place for: on the panel a replaced row shows it by
+	// having lost its check box, which a text file cannot show.
+	std::string BuildFlagCell(const KBSResultModel::Hit& hit)
+	{
+		std::string flags;
+		if (hit.isOverset)
+			AppendWord(flags, "ov");
+		if (hit.isHidden)
+			AppendWord(flags, "hidden");
+		if (hit.isLocked || hit.outcome == KBSResultModel::kOutcomeLocked)
+			AppendWord(flags, "lock");
+		// Missing and refused exclude each other (two values of one field); locked is already said
+		// above, in the word the locator uses for it.
+		if (hit.outcome == KBSResultModel::kOutcomeMissing)
+			AppendWord(flags, "missing");
+		else if (hit.outcome == KBSResultModel::kOutcomeRefused)
+			AppendWord(flags, "refused");
+		if (hit.replaced)
+			AppendWord(flags, "replaced");
+		return flags;
+	}
+
+	// The report heading's first line: WHICH command produced these rows. Reads the module's own state
+	// directly - it is in the same translation unit - rather than going back through the getters.
+	const char* ReportKindHeading()
+	{
+		switch (gResultKind)
+		{
+			case KBSResultModel::kResultMissingGlyph:	return "Find Missing Glyphs";
+			case KBSResultModel::kResultOverset:		return "Find Overset";
+			case KBSResultModel::kResultFindChange:		break;
+		}
+		// A replace turns the result set into a report of what it did, which is a different thing to
+		// have in front of you than a search's hits - so the heading says which one this is.
+		return gShowingOutcome ? "Kohaku Find/Change (after Change Checked)" : "Kohaku Find/Change";
+	}
 }
 
 void KBSResultModel::DescribeAllRows(PMString& out)
@@ -554,6 +647,88 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 	}
 
 	// SetUTF8String marks the string not translatable, which is what this needs - it is data.
+	out.SetUTF8String(buf);
+}
+
+void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
+{
+	std::string buf;
+
+	// ----- The heading: what this result set IS, before any row of it -----
+	buf += ReportKindHeading();
+
+	// The query, on the Find/Change results only - neither scan has one. Kept on the replace's
+	// aftermath as well: "what was searched for" is exactly what a report of a replace needs to name.
+	if (gResultKind == kResultFindChange && !gQueryText.IsEmpty())
+	{
+		buf += "\nQuery: ";
+		AppendFlattenedUTF8(buf, gQueryText);
+	}
+
+	// What was run over. A book search names the book; a document search names its one chapter.
+	if (gFromBook && !gBookName.IsEmpty())
+	{
+		buf += "\nBook: ";
+		AppendFlattenedUTF8(buf, gBookName);
+	}
+	else if (!gChapters.empty())
+	{
+		buf += "\nDocument: ";
+		AppendFlattenedUTF8(buf, gChapters[0].name);
+	}
+
+	// The panel's own status line, verbatim. Every kind of run words its summary differently
+	// ("9 hit(s) in 3 of 3 chapter(s)", "55 missing glyphs in 6 places."), and taking the sentence
+	// rather than re-counting is what keeps the file from ever contradicting the panel.
+	if (!summaryLine.IsEmpty())
+	{
+		buf += "\nSummary: ";
+		AppendFlattenedUTF8(buf, summaryLine);
+	}
+
+	// How many lines follow. NOT the same number as the panel shows: the display cap stops at
+	// kKBSDisplayHitLimit rows, and this file carries every stored hit.
+	buf += "\nRows: ";
+	AppendNumberUTF8(buf, GetTotalHitCount());
+
+	// ----- The table -----
+	buf += "\n\n";
+	buf += "<Document>\t<Page>\t<Text>\t<Font>\t<Flags>";
+
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+	{
+		const Chapter& chapter = gChapters[ci];
+		for (size_t hi = 0; hi < chapter.hits.size(); ++hi)
+		{
+			const Hit& hit = chapter.hits[hi];
+
+			buf += "\n";
+			AppendFlattenedUTF8(buf, chapter.name);
+			buf += "\t";
+			// The page NUMBER alone, so a spreadsheet can sort on it - the "ov" / "lock" that ride the
+			// panel's locator are in the Flags cell instead. A hit that is on no page at all
+			// (pasteboard, or overset with nothing placed anywhere) leaves the cell empty rather than
+			// writing the "PB" the page list spells for it: an empty cell sorts and filters, two
+			// letters in a number column do not.
+			if (hit.pageIndex >= 0)
+				AppendFlattenedUTF8(buf, hit.pageString);
+			buf += "\t";
+			// The line as the panel draws it: the three segments joined back together. (An overset
+			// finding has its report - "Frame (370)" - in the match segment, so this writes that.)
+			AppendFlattenedUTF8(buf, hit.preText);
+			AppendFlattenedUTF8(buf, hit.matchText);
+			AppendFlattenedUTF8(buf, hit.postText);
+			buf += "\t";
+			AppendFlattenedUTF8(buf, hit.fontName);
+			buf += "\t";
+			buf += BuildFlagCell(hit);
+		}
+	}
+
+	// A text file ends with a line break: without it the last row is a partial line, and some tools
+	// drop it.
+	buf += "\n";
+
 	out.SetUTF8String(buf);
 }
 
