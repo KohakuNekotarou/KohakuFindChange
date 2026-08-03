@@ -136,8 +136,10 @@ nothing on them to rewrite.
   to. **Cancel is the default button**, and there is no way to switch the prompt off: a suppressible
   confirmation in front of a destructive rewrite is worth less than a default of Cancel. An empty
   change string is allowed — it deletes the matches — and the prompt spells that out rather than
-  showing a blank line. **This prompt is translated** (the panel, its menu and its status line stay
-  English, echoing Find/Change's wording).
+  showing a blank line. **This prompt is translated** — as is the extra warning that follows it when
+  you tick `Save each chapter after replace` — while the panel, its menu and its status line stay
+  English, echoing Find/Change's wording. Those two are where you authorise a rewrite of your text
+  and an overwrite of your files, which is what earns them a translation.
 - On the **Glyph tab** that same prompt **draws the two glyphs themselves** instead of quoting
   strings, in the fonts that define them, with each font's name and Unicode value under it. A glyph
   id names nothing by itself, and an alternate form drawn as a character would come out as the
@@ -148,29 +150,36 @@ nothing on them to rewrite.
   they were popped over: the **book row** means every chapter, a **document row** means that chapter
   alone. They cover **every stored hit**, including any beyond the rows the panel displays, so the
   display cap can never silently shrink what a replace touches.
-- **The whole run is ONE undo step.** A single Ctrl+Z puts back every chapter it wrote to, whichever
-  chapter you happen to have in front. (It used to open one sequence per chapter, on the belief that
-  undo is per document. Measured on the running application, that was actively harmful: undoing in
-  one document stripped the step from the other chapters' histories *without* reverting their text.)
-- **Cancelling a replace undoes all of it.** The command sequence is aborted, the text goes back to
-  where the run found it, the panel is rolled back with it, and the chapters that were clean before
-  the run are marked clean again. The price is that finished chapters are thrown away too: breaking
-  off a 900-of-1000 run starts over.
-- Chapters that received a replacement are **opened in a window and left unsaved** — overwriting
-  your files stays your decision. The confirmation offers **`Save each chapter after replace`** when
-  you want it done for you. It starts **off every time**: a replace overwrites files, so it is asked
-  per run rather than remembered anywhere. With it ticked, every document a replacement landed in is
-  saved once the whole run is committed — the one in front, a chapter you had open, and a chapter KBS
-  opened by itself, all alike. Documents nothing landed in are never touched: if one of those is
-  dirty, that edit is somebody else's.
-- With **`Hide Previous Chapter`** on as well, the chapters KBS opened windowless are **closed again**
-  after they are saved, so the desk is left the way the run found it (and no window is opened just to
-  be shut a moment later). Documents you had open yourself are never closed. Rows still jump — a
-  closed chapter is reopened on the way.
+- **How a run is wrapped depends on whether you asked it to save**, because saving is what makes a
+  chapter settled. The two behave differently enough to be worth knowing apart.
+- **Without saving — the whole run is ONE undo step.** A single Ctrl+Z puts back every chapter it
+  wrote to, whichever chapter you happen to have in front. (It used to open one sequence per chapter,
+  on the belief that undo is per document. Measured on the running application, that was actively
+  harmful: undoing in one document stripped the step from the other chapters' histories *without*
+  reverting their text.) Every chapter that has work is opened before the first character is written,
+  and they all stay open and unsaved afterwards — overwriting your files stays your decision.
+  **Cancelling undoes all of it**: the text goes back to where the run found it, the panel is rolled
+  back with it, and the chapters that were clean before the run are marked clean again. The price is
+  that finished chapters are thrown away too — breaking off a 900-of-1000 run starts over.
+- The confirmation offers **`Save each chapter after replace`** when you want it done for you. It
+  starts **off every time**: a replace overwrites files, so it is asked per run rather than remembered
+  anywhere. Ticking it brings up **one more warning**, with Cancel as the default button — a saved
+  file is the one thing here that nothing takes back, and it changes what Cancel means below.
+- **With saving — one chapter at a time.** Each is opened, replaced, saved, and handed straight back,
+  so a run of any size holds **at most one chapter of its own**. A twenty-chapter book used to load all
+  twenty before writing a single character, which is more than a modest machine has to give. Every
+  document a replacement lands in is saved, whoever opened it; documents nothing landed in are never
+  touched (if one of those is dirty, that edit is somebody else's). Chapters KBS opened are **closed
+  once saved**, whatever `Hide Previous Chapter` says — that toggle is about jumping. Documents you had
+  open yourself are never closed. Rows still jump: a closed chapter is reopened on the way.
+- **Cancelling a saving run stops it where it stands.** The chapters it finished are on disk and
+  nothing can take them back, so they stay — and the panel goes on showing their rows as replaced,
+  because that is what those files now contain. The chapters it never reached keep their ticks and say
+  **`cancelled`** beside their name. Searching again picks up where it left off: what was replaced no
+  longer matches, so only the rest comes back.
 - A chapter that **cannot be written** — read-only, or a document that has never been saved at all —
-  is named in the status line, and **nothing is closed** in that case. The sweep closes with the UI
-  suppressed and does not look at the unsaved flag, so closing after a failed save would throw the
-  very replacements away.
+  is named in the status line, keeps its replacements, and is **left open with a window** so you can
+  deal with it by hand. The chapters that did save are still closed.
 - **A checked hit that is not replaced is always counted and named**, never allowed to make the
   total quietly come up short. Four ways that happens: `lock` (locked content — InDesign can search
   it but offers no way to change it, so KBS follows), `missing` (the text is no longer where the
