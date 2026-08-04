@@ -40,8 +40,15 @@
 #include "IApplication.h"		// QueryPanelManager
 #include "IActiveContext.h"		// where the observer implementation lives (kActiveContextBoss)
 #include "IPanelMgr.h"			// IID_IPANELMGR - the subject subscribed to
-#include "AppUIID.h"			// *kPaletteVisibilityChangedMessage (public header, AppUIID.h:325)
+#include "AppUIID.h"			// *kPaletteVisibilityChangedMessage (AppUIID.h:325) / kWindowAddedMessage (:71)
 #include "ShuksanID.h"			// kApplicationSuspendMsg (ShuksanID.h:1151 - another app came forward)
+
+// For InDesign's own Find/Change dialog - found through the SDK, not by its title:
+#include "IWindowList.h"		// the application's list of windows (IID_IWINDOWLIST on kAppBoss)
+#include "IWindow.h"			// GetSysWindow - the platform window behind an IWindow
+#include "IDialog.h"			// GetDialogPanel - what says WHICH dialog this window is
+#include "IControlView.h"		// GetWidgetID on that panel
+#include "FindChangeID.h"		// kFindChangeParentWidgetID - the panel the Find/Change dialog answers with
 
 // The window is rebuilt AFTER the notification arrives, so the alpha is written again once the
 // events have gone round:
@@ -57,11 +64,10 @@
 #include <windows.h>
 #endif
 
-// The toggle, for this session. *OFF by default, and not persisted: KBS's other flyout toggles
-// (Book Scope, Hide Previous Chapter) are session state as well, and this plug-in has no settings
-// store to put it in. (KESCM does persist it, through KESCMPanelState.cpp's JSON - a mechanism of
-// its own that was deliberately not brought over with the feature.)
+// The toggles, for this session. *Both OFF by default. They are remembered across restarts only
+// when the user asks - "Save Panel Settings" writes them to KBSPanelState.json (KBSPanelState.cpp).
 static bool16 sPanelTranslucent = kFalse;
+static bool16 sFindChangeTranslucent = kFalse;
 
 #ifdef WINDOWS
 
@@ -127,19 +133,43 @@ bool16 KBSGetPanelTranslucent()
 	return sPanelTranslucent;
 }
 
+#ifdef WINDOWS
+// The hook serves BOTH toggles, so it goes up while either is ON and comes down when both are OFF -
+// never left resident.
+//   For the PANEL it is the only cue there is: neither "docked and expanded <-> floating" nor
+//   "drawer -> floating" broadcasts a single SDK notification (confirmed on debug and release builds
+//   of 2026).
+//   For FIND/CHANGE the window itself is followed through the SDK (kWindowAddedMessage), so the hook
+//   is needed only for the POINTER - going solid while the cursor is over the dialog.
+static void KBSUpdateWinEventHook()
+{
+	if (sPanelTranslucent || sFindChangeTranslucent)
+		KBSInstallWinEventHook();
+	else
+		KBSRemoveWinEventHook();
+}
+#endif
+
 void KBSSetPanelTranslucent(bool16 on)
 {
 	sPanelTranslucent = on;
 
 #ifdef WINDOWS
-	// *Neither "docked and expanded <-> floating" nor "drawer -> floating" broadcasts a single SDK
-	//   notification (confirmed on both a debug and a release build of 2026). The only cue left is
-	//   the Win32 event, so the hook is up while the toggle is ON and comes down when it is OFF -
-	//   never left resident.
-	if (on)
-		KBSInstallWinEventHook();
-	else
-		KBSRemoveWinEventHook();
+	KBSUpdateWinEventHook();
+#endif
+}
+
+bool16 KBSGetFindChangeTranslucent()
+{
+	return sFindChangeTranslucent;
+}
+
+void KBSSetFindChangeTranslucent(bool16 on)
+{
+	sFindChangeTranslucent = on;
+
+#ifdef WINDOWS
+	KBSUpdateWinEventHook();
 #endif
 }
 
@@ -345,6 +375,154 @@ bool16 KBSApplyPanelTranslucency()
 }
 
 //========================================================================================
+// InDesign's OWN Find/Change dialog (2026-08-04, the user's request)
+//
+//   *The window is found through the SDK, NOT by its title. Two reasons the Win32 route that works
+//    for the panel does not work here:
+//      . the class "DroverLord - Window Class" is GENERIC - a document window's canvas is one, and
+//        so is every other dialog
+//      . the title is translated ("Suchen/Ersetzen" on a German build), so a list of candidate
+//        titles would silently miss on any build nobody thought of
+//
+//   The route, established from a Spy trace on a debug build (2026-08-04):
+//      IApplication -> IID_IWINDOWLIST -> every window
+//        -> Query IID_IDIALOG on it        (IDialog.h: it sits on the same boss as the window)
+//        -> GetDialogPanel()->GetWidgetID() == kFindChangeParentWidgetID
+//           (FindChangeID.h:512 = kFindChangePrefix + 30, i.e. 18718. A NUMBER, so no language can
+//            change it.)
+//           *MEASURED, not assumed. The first attempt used kKillerFindDialogWidgetID (+56 = 18744),
+//            which reads like the obvious candidate and is WRONG: the diagnostic below reported the
+//            open dialog as wid=18718 while the search wanted 18744, so nothing was ever found
+//            (2026-08-04). "Killer Find" is Find/Change's internal name and there are several widget
+//            ids carrying it - the one the DIALOG PANEL answers with is this one.
+//        -> IWindow::GetSysWindow()        = the HWND (SysWindow IS HWND on Windows, WSysType.h:69)
+//
+//   *Unlike the panel, WS_EX_LAYERED is NOT already set (measured: EXSTYLE 0x00000180), so it is
+//    added here - and removed again on OFF, but only from the window WE added it to. Adding it
+//    turned out to have no side effects: text, frame and every control stayed correct and usable
+//    (user's check on the real application, 2026-08-04).
+//========================================================================================
+
+#ifdef WINDOWS
+
+// The Find/Change dialog's IWindow, or nil when it is not open.
+// *GetNthWindow hands back a pointer that is NOT addref'd, so nothing is released here.
+static IWindow* KBSQueryFindChangeIWindow()
+{
+	ISession* session = GetExecutionContextSession();
+	if (session == nil)
+		return nil;
+
+	InterfacePtr<IApplication> app(session->QueryApplication());
+	if (app == nil)
+		return nil;
+
+	InterfacePtr<IWindowList> windows(app, IID_IWINDOWLIST);
+	if (windows == nil)
+		return nil;
+
+	const int32 count = windows->WindowCount();
+	for (int32 i = 0; i < count; ++i)
+	{
+		IWindow* win = windows->GetNthWindow(i);
+		if (win == nil)
+			continue;
+
+		// Only dialogs answer this - document windows and palettes drop out here.
+		InterfacePtr<IDialog> dlg(win, IID_IDIALOG);
+		if (dlg == nil)
+			continue;
+
+		IControlView* panel = dlg->GetDialogPanel();
+		if (panel != nil && panel->GetWidgetID() == kFindChangeParentWidgetID)
+			return win;
+	}
+	return nil;
+}
+
+// The HWND, cached. *The cache matters: the Win32 hook below asks on every mouse move (60-100 a
+// second), and walking the window list with a QueryInterface per window each time would be waste.
+// It is dropped whenever a window is added or removed - the observer at the foot of this file does
+// that - so a handle the OS has recycled cannot be used against a different window.
+static HWND sFcWnd = nullptr;
+
+// nullptr when the dialog is not open, or when the SDK has no platform window for it (a document
+// window answers nil to GetSysWindow, so this is not merely theoretical).
+static HWND KBSQueryFindChangeWindow()
+{
+	if (sFcWnd != nullptr && ::IsWindow(sFcWnd))
+		return sFcWnd;
+
+	sFcWnd = nullptr;
+	IWindow* win = KBSQueryFindChangeIWindow();
+	if (win == nil)
+		return nullptr;
+
+	HWND h = win->GetSysWindow();
+	if (h == nullptr || !::IsWindow(h))
+		return nullptr;
+
+	sFcWnd = h;
+	return h;
+}
+
+// Called when the window list changes: the next ask looks the dialog up again.
+static void KBSForgetFindChangeWindow()
+{
+	sFcWnd = nullptr;
+}
+
+// *The window WE put WS_EX_LAYERED on. Turning the toggle off removes the style only from this one:
+//  a window that already carried it (a future build might) must keep it, or its own drawing breaks -
+//  which is exactly the mistake the panel side is written to avoid.
+static HWND sFcStyledWnd = nullptr;
+
+#endif // WINDOWS
+
+bool16 KBSApplyFindChangeTranslucency()
+{
+#ifdef WINDOWS
+	HWND h = KBSQueryFindChangeWindow();
+	if (h == nullptr)
+		return kFalse;			// the dialog is not open - the menu says so rather than doing nothing
+
+	if (sFindChangeTranslucent)
+	{
+		const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
+		if ((ex & WS_EX_LAYERED) == 0)
+		{
+			::SetWindowLongPtr(h, GWL_EXSTYLE, ex | WS_EX_LAYERED);
+			sFcStyledWnd = h;	// ours to undo
+		}
+		// Solid again while the pointer is on it - the same rule as the panel, and the same test.
+		const BYTE alpha = KBSCursorOverWindow(h) ? 255 : kKBSPanelAlphaValue;
+		return ::SetLayeredWindowAttributes(h, 0, alpha, LWA_ALPHA) ? kTrue : kFalse;
+	}
+
+	// OFF: opaque again, and take the style back off if it was ours to add.
+	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
+	if (h == sFcStyledWnd)
+	{
+		const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
+		::SetWindowLongPtr(h, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+		::SetWindowPos(h, nullptr, 0, 0, 0, 0,
+					   SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		::RedrawWindow(h, nullptr, nullptr,
+					   RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME | RDW_UPDATENOW);
+		sFcStyledWnd = nullptr;
+	}
+	return kTrue;
+#else
+	return kFalse;		// Mac: no way to do this
+#endif
+}
+
+// (A diagnostic that listed every window with its dialog panel's WidgetID and its GetSysWindow
+//  stood here while the search was being got right, and was removed once it had done its job
+//  (2026-08-04). What it established is written into the comments above; if the window search ever
+//  needs measuring again, it is one walk of IWindowList appending those two numbers per window.)
+
+//========================================================================================
 // The chase - not losing to the window being rebuilt
 //
 //   *Why it is needed (measured 2026-07-29): applying the alpha the moment the observer below
@@ -458,8 +636,24 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	if (!isWindowEvent && !isCursorEvent)
 		return;
 
-	// *This feature only does anything while the toggle is ON (the hook is not even up when it is
-	//   OFF, but anything in flight as it comes down is rejected here).
+	// ---- Find/Change: the pointer moving is all this hook is needed for here (the window itself is
+	//      followed through kWindowAddedMessage). Only acts when what is on the window differs from
+	//      what should be, so the volume of events does no harm.
+	if (sFindChangeTranslucent)
+	{
+		HWND fc = KBSQueryFindChangeWindow();
+		if (fc != nullptr)
+		{
+			const BYTE fcWant = KBSCursorOverWindow(fc) ? 255 : kKBSPanelAlphaValue;
+			BYTE  fcCur = 0;
+			DWORD fcKey = 0, fcFlags = 0;
+			if (!::GetLayeredWindowAttributes(fc, &fcKey, &fcCur, &fcFlags) || fcCur != fcWant)
+				KBSApplyFindChangeTranslucency();
+		}
+	}
+
+	// ---- the panel. *This feature only does anything while the toggle is ON (the hook is not even
+	//      up when both are OFF, but anything in flight as it comes down is rejected here).
 	if (!KBSGetPanelTranslucent() || sPaletteWnd == nullptr)
 		return;
 
@@ -573,6 +767,24 @@ void KBSShutdownPanelAlpha()
 	// is safe even mid-teardown.
 	KBSRemoveWinEventHook();		// *a hook still up as the .pln goes down is dangerous
 
+	// Put InDesign's own Find/Change dialog back. The WS_EX_LAYERED on it is OURS, and a style plus
+	// an alpha left on a window nobody maintains any more would outlive this plug-in.
+	// *Deliberately Win32 only, from the remembered handle - no IWindowList, no IApplication. During
+	//  a controlled shutdown the model is the last thing that should be reached into, and everything
+	//  needed is already here.
+	if (sFcStyledWnd != nullptr && ::IsWindow(sFcStyledWnd))
+	{
+		::SetLayeredWindowAttributes(sFcStyledWnd, 0, 255, LWA_ALPHA);
+		const LONG_PTR ex = ::GetWindowLongPtr(sFcStyledWnd, GWL_EXSTYLE);
+		::SetWindowLongPtr(sFcStyledWnd, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+		::SetWindowPos(sFcStyledWnd, nullptr, 0, 0, 0, 0,
+					   SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		::RedrawWindow(sFcStyledWnd, nullptr, nullptr,
+					   RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME | RDW_UPDATENOW);
+	}
+	sFcStyledWnd = nullptr;
+	sFcWnd = nullptr;
+
 	if (sReapplyTimer != nil)
 	{
 		sReapplyTimer->StopTimer();
@@ -585,6 +797,7 @@ void KBSShutdownPanelAlpha()
 #else	// Mac: nothing is ever applied, so there is nothing to book and nothing to clean up
 
 static void KBSScheduleReapply() {}
+static void KBSForgetFindChangeWindow() {}
 void        KBSShutdownPanelAlpha() {}
 
 #endif // WINDOWS
@@ -737,6 +950,22 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 	//   *This writes one alpha and touches neither the model nor the UI = safe to run while the
 	//     application is being deactivated.
 	const bool16 isSuspendMsg = (protocol == IID_IAPPLICATION && theChange == kApplicationSuspendMsg);
+
+	// *(4) The application's WINDOW LIST changed - a window was opened or closed (kAppBoss /
+	//   IID_IWINDOWLIST). This is how InDesign's own Find/Change dialog is followed, and it replaces
+	//   what would otherwise have to be guesswork on Win32 events: opening the dialog broadcasts
+	//   kWindowAddedMessage, closing it broadcasts kRemoveWindowMessage (both read off a Spy trace on
+	//   a debug build, 2026-08-04).
+	//   The cached HWND is dropped either way - the dialog's window is gone, or a new one exists that
+	//   might be it - and the alpha is put on the (new) dialog when the toggle is ON.
+	if (protocol == IID_IWINDOWLIST && (theChange == kWindowAddedMessage || theChange == kRemoveWindowMessage))
+	{
+		KBSForgetFindChangeWindow();
+		if (KBSGetFindChangeTranslucent())
+			KBSApplyFindChangeTranslucency();
+		return;		// nothing here concerns the panel
+	}
+
 	if (!isPaletteMsg && !isDockMsg && !isSuspendMsg)
 		return;
 
@@ -788,6 +1017,16 @@ void KBSAttachPanelVisibilityObserver()
 		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKBSPANELVISIBILITYOBSERVER))
 	{
 		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKBSPANELVISIBILITYOBSERVER);
+	}
+
+	// *The third subject = kAppBoss / IID_IWINDOWLIST, the application's list of windows. This is
+	//   what says that InDesign's own Find/Change dialog has just been opened or closed
+	//   (kWindowAddedMessage / kRemoveWindowMessage). Same boss as above, different protocol - so it
+	//   is a second, separate attachment.
+	if (appSubject != nil &&
+		!appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKBSPANELVISIBILITYOBSERVER))
+	{
+		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKBSPANELVISIBILITYOBSERVER);
 	}
 }
 

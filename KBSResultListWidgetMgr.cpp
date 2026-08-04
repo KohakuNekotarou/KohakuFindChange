@@ -611,7 +611,7 @@ void KBSResultTree::RefreshRows()
 //----------------------------------------------------------------------------------------
 
 // The last thing ShowStatus was given. Kept in the module rather than read back off the widget:
-// the widget is gone whenever the panel is closed, and app.kbsStatus has to answer regardless (a
+// the widget is gone whenever the panel is closed, and app.kfcStatus has to answer regardless (a
 // script can run a search with no panel on screen). Also, a StaticText cannot be read back
 // reliably from outside anyway - see the panel-title work.
 static PMString gLastStatus;
@@ -652,7 +652,7 @@ void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
 	// user-entered name to a static text.
 	//
 	// ONLY what is drawn is doubled. gLastStatus keeps the message exactly as it was written:
-	// app.kbsStatus exists to hand back what the panel said, not how a widget had to spell it, and
+	// app.kfcStatus exists to hand back what the panel said, not how a widget had to spell it, and
 	// a test comparing against a file name must not have to know about this.
 	PMString display(message);
 	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);

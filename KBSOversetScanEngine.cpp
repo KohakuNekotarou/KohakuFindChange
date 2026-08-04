@@ -55,7 +55,7 @@
 #include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
 #include "KBSOversetScanEngine.h"
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
+#include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kfcStatus reads back
 #include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the borrowed hit builders
 
@@ -77,7 +77,7 @@ struct ScanningFlagGuard
 
 // How much of the overset text a row shows. Overset runs to hundreds of characters - the official
 // preflight reported 370 for one frame in the test document - and handing the whole range to
-// BuildHitForRange would put all of it in the model and in app.kbsResults, when the row only ever
+// BuildHitForRange would put all of it in the model and in app.kfcResults, when the row only ever
 // draws one line. 60 is comfortably more than a row can show.
 const int32 kOversetPreviewChars = 60;
 

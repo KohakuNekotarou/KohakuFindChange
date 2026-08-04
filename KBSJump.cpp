@@ -381,6 +381,14 @@ void KBSJump::ToggleHidePreviousChapter()
 	gHidePrevChapterOn = !gHidePrevChapterOn;
 }
 
+void KBSJump::SetHidePreviousChapter(bool on)
+{
+	// Added for the saved settings (KBSPanelState.cpp), which has to write a REMEMBERED value rather
+	// than flip whatever the flag happens to be. Toggling from a restore would come out inverted
+	// whenever the default is not what was saved.
+	gHidePrevChapterOn = on;
+}
+
 void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef docRef;

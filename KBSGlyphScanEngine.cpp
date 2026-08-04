@@ -89,7 +89,7 @@
 #include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
 #include "KBSGlyphScanEngine.h"
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kbsStatus reads back
+#include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kfcStatus reads back
 #include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the borrowed hit builders (BuildHitForRange / FinalizeHits)
 
@@ -480,7 +480,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 
 			// The font that had no glyph for this text - the answer to "why is this a box", and the
 			// thing the fix has to change. Kept RAW: the row is drawn with convertAmpersand off, so
-			// an '&' in a font name has to survive verbatim, and app.kbsResults reports it as it is.
+			// an '&' in a font name has to survive verbatim, and app.kfcResults reports it as it is.
 			hit.fontName = runs[r].fontName;
 			hit.fontName.SetTranslatable(kFalse);
 

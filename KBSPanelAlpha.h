@@ -66,6 +66,35 @@ void	KBSSetPanelTranslucent(bool16 on);
 //    docked", rather than leaving a click with no visible result unexplained.
 bool16	KBSApplyPanelTranslucency();
 
+//----------------------------------------------------------------------------------------
+// The same treatment for InDesign's OWN Find/Change dialog (2026-08-04, the user's request).
+//
+//   Measured on the real application before it was built (work/findchange-window-probe.ps1):
+//     class   = "DroverLord - Window Class"   top-level, owner = the main frame ("indesign")
+//     EXSTYLE = 0x00000180  = *WS_EX_LAYERED is NOT set, unlike a floating panel's OWL.Dock
+//   So the style has to be added by us - and taken off again when the toggle goes OFF, which is
+//   the opposite of the panel side, where InDesign's own style must never be touched.
+//   Adding it turned out to have no side effects at all: text, frame and every control stayed
+//   correct and usable (user's check, 2026-08-04).
+//
+//   *"DroverLord - Window Class" is a GENERIC class - a document window's canvas is one too, and
+//    so is every other dialog - so the class alone cannot identify it. The search adds: top-level,
+//    owner is the main frame, and the title is one of the known Find/Change titles.
+//----------------------------------------------------------------------------------------
+
+// The toggle's current state (*OFF by default).
+bool16	KBSGetFindChangeTranslucent();
+
+// Set the toggle. Updates the flag; the window is left to KBSApplyFindChangeTranslucency below.
+void	KBSSetFindChangeTranslucent(bool16 on);
+
+// Write the current flag onto the Find/Change window.
+//  - Returns kFalse when the dialog is not open (so the menu can say so rather than doing nothing
+//    visible), and on Mac
+//  - Turning it OFF also removes the WS_EX_LAYERED we added, but ONLY from the window we added it
+//    to - a window that already had the style is left with it
+bool16	KBSApplyFindChangeTranslucency();
+
 // Start listening for the panel being shown, hidden, docked or floated.
 // *Called once at startup (KBSStartupShutdown::Startup). After that, floating the panel again or
 //   re-opening it re-applies the translucency by itself while the toggle is ON.

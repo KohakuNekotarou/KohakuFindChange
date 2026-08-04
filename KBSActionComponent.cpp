@@ -56,6 +56,7 @@
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
+#include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -225,6 +226,43 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				msg = "Translucent panel: on - has no effect while the panel is docked.";
 			msg.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(msg);
+			break;
+		}
+
+		// "Translucent Find/Change": the same treatment for InDesign's OWN Find/Change dialog - the
+		// window this plug-in takes its query from, so having it fade out of the way while the
+		// document is read is the point of it. *Windows only, OFF by default.
+		// The dialog is found through the SDK's window list (never by its title, which is translated),
+		// so this works whatever language InDesign is running in. See KBSPanelAlpha.cpp.
+		case kKBSTranslucentFindChangeActionID:
+		{
+			const bool16 on = !KBSGetFindChangeTranslucent();
+			KBSSetFindChangeTranslucent(on);
+
+			// As with the panel, the wording follows whether an alpha actually reached a window.
+			// Toggling it with the dialog closed is legitimate - it applies when the dialog opens -
+			// so that case is stated rather than left looking broken.
+			const bool16 applied = KBSApplyFindChangeTranslucency();
+			PMString msg;
+			if (!on)
+				msg = "Translucent Find/Change: off.";
+			else if (applied)
+				msg = "Translucent Find/Change: on.";
+			else
+				msg = "Translucent Find/Change: on - applies when the Find/Change dialog is open.";
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+			break;
+		}
+
+		// "Save Panel Settings": write the settings toggles above to a JSON file of our own in the
+		// user's preferences folder; it is read back at startup. Explicit rather than automatic, the
+		// way KESCM has it - a setting the user did not ask to keep is one they cannot account for
+		// later. Everything, including where the file goes and what it reports, is in
+		// KBSPanelState.cpp.
+		case kKBSSavePanelSettingsActionID:
+		{
+			KBSSavePanelState();
 			break;
 		}
 
@@ -774,6 +812,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// the status line instead.
 			int16 actionState = kEnabledAction;
 			if (KBSGetPanelTranslucent())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSTranslucentFindChangeActionID)
+		{
+			// Selectable whether or not the Find/Change dialog is open, for the same reason the
+			// panel's toggle stays selectable while docked: what is being set is the preference, and
+			// it applies the moment the window exists. DoAction says which case it was.
+			int16 actionState = kEnabledAction;
+			if (KBSGetFindChangeTranslucent())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}

@@ -57,7 +57,7 @@ namespace KBSResultTree
 	void RestoreStatusOnPanelShow();
 
 	/** The last message ShowStatus was given, whether or not the panel was open to display it.
-	    Kept for the app.kbsStatus script property (KBSScriptProvider.cpp), which is how a script -
+	    Kept for the app.kfcStatus script property (KBSScriptProvider.cpp), which is how a script -
 	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */
 	void GetLastStatus(PMString& outMessage);
 

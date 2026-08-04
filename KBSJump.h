@@ -55,6 +55,11 @@ namespace KBSJump
 	          with a toggle they could not reach to switch off (2026-08-03). */
 	bool IsHidePreviousChapterOn();
 	void ToggleHidePreviousChapter();
+
+	/** Set the toggle outright. For the saved settings (KBSPanelState.cpp), which restores a
+	    remembered value - flipping would come out inverted whenever the saved state matches the
+	    default. Nothing else should use it: the flyout toggles. */
+	void SetHidePreviousChapter(bool on);
 }
 
 #endif // __KBSJump_h__

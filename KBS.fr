@@ -58,7 +58,7 @@
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSScriptingDefs.h"	// p_KBSStatus - the four-character ID behind app.kbsStatus
+#include "KBSScriptingDefs.h"	// p_KBSStatus - the four-character ID behind app.kfcStatus
 #include "GenericID.h"
 #include "ShuksanID.h"
 #include "TextID.h"
@@ -387,7 +387,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Scripting provider: serves app.kbsStatus. Derives from kBaseScriptProviderBoss, which brings
+	 * Scripting provider: serves app.kfcStatus. Derives from kBaseScriptProviderBoss, which brings
 	 * the machinery that dispatches script requests; all this boss adds is our own handler. The
 	 * property itself is declared in the VersionedScriptElementInfo resource at the end of this file.
 	 */
@@ -473,10 +473,23 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Translucent Panel: toggle (check mark). ON = this panel is drawn faint while it floats,
-		// and comes back to solid while the pointer is on it. ★Windows only.
+		// and comes back to solid while the pointer is on it. *Windows only.
 		kKBSTranslucentPanelActionID,
 		kKBSTargetMenuPath
 		kKBSTranslucentPanelMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Translucent Find/Change: the same for InDesign's OWN Find/Change dialog. Windows only.
+		kKBSTranslucentFindChangeActionID,
+		kKBSTargetMenuPath
+		kKBSTranslucentFindChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Save Panel Settings: write the toggles above to a JSON file of our own in the user's
+		// preferences folder, read back at startup. A plain command, not a toggle.
+		kKBSSavePanelSettingsActionID,
+		kKBSTargetMenuPath
+		kKBSSavePanelSettingsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between the search/scope toggles and the replace block.
@@ -629,6 +642,32 @@ resource ActionDef (kSDKDefActionResourceID)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Translucent Find/Change. kCustomEnabling for the check mark, like the toggle above it. Not
+		// greyed out while the dialog is closed, for the same reason the panel one is not greyed out
+		// while docked: the flag is what the user is setting, and it applies the moment the dialog
+		// opens. The status line says which of the two happened.
+		kKBSActionComponentBoss,
+		kKBSTranslucentFindChangeActionID,
+		kKBSTranslucentFindChangeMenuKey,	// "Translucent Find/Change" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Save Panel Settings. NO kCustomEnabling: there is nothing to enable it against - it writes
+		// the settings down, which is possible with nothing loaded and no results. (It is still
+		// caught by the blanket disable while a run is going, like How to Use below.) KESCM's own
+		// carries the same flags for the same reason.
+		kKBSActionComponentBoss,
+		kKBSSavePanelSettingsActionID,
+		kKBSSavePanelSettingsMenuKey,	// "Save Panel Settings"
+		kOtherActionArea,
+		kNormalAction,
+		kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
@@ -930,7 +969,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// below the fourth, a sliver of chopped-off letters (user's screenshot, work/キャプチャ.PNG).
 		// A remainder of zero leaves nothing for a part-line to be drawn into.
 		//
-		// ⚠ The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
+		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
 		// never measured. If the palette font ever changes size, measure again - the rule is the
 		// remainder, not the number 48.
 		StaticMultiLineTextWidget
@@ -1125,7 +1164,7 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 
 
 /*
- * Scripting: app.kbsStatus - the panel's status line, readable from a script.
+ * Scripting: app.kfcStatus - the panel's status line, readable from a script.
  *
  * One read-only string property on the application object. What it is for is verification: the
  * panel reports what a search or a replace did in a single line, and without this the only way to
@@ -1133,7 +1172,7 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
  * command and then read the answer:
  *
  *     app.menuActions.itemByName("Search").invoke();
- *     app.kbsStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
+ *     app.kfcStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
  *
  * !! WHICH NAME finds this action MOVES (measured 2026-08-02). itemByName matches the name the
  *   action currently CARRIES, and UpdateActionStates renames it - so "Search", the resource name, is
@@ -1163,7 +1202,7 @@ resource VersionedScriptElementInfo(1)
 		{
 			kKBSStatusPropertyScriptElement,	// this property's script element ID
 			p_KBSStatus,						// ScriptID (KBSScriptingDefs.h)
-			"kbs status",						// name -> app.kbsStatus
+			"kfc status",						// name -> app.kfcStatus
 			"The last message the Kohaku Find/Change panel put on its status line.",	// description
 			StringType,							// type
 			{}									// alternate types
@@ -1178,7 +1217,7 @@ resource VersionedScriptElementInfo(1)
 		{
 			kKBSResultsPropertyScriptElement,	// this property's script element ID
 			p_KBSResults,						// ScriptID (KBSScriptingDefs.h)
-			"kbs results",						// name -> app.kbsResults
+			"kfc results",						// name -> app.kfcResults
 			"Every row the Kohaku Find/Change panel is holding, tab-separated, one hit per line.",
 			StringType,							// type
 			{}									// alternate types

@@ -71,7 +71,7 @@ DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKBSPrefix + 8)
 // result row that names a closed document still jumps and still replaces (by reopening it), so the
 // results are retired with their document. Document scope only - see KBSCloseDocResponder.cpp.
 DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
-// Scripting: puts app.kbsStatus on the application object, so the panel's own status line can be
+// Scripting: puts app.kfcStatus on the application object, so the panel's own status line can be
 // read from a script (and therefore over COM). Built for verification - the panel says what a
 // search or a replace did in one line, and until now the only way to read it was to look at it.
 DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
@@ -163,7 +163,7 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 // The panel tab's name: an observer on the panel boss whose only job is to write the current
 // scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKBSPrefix + 13)
-// Scripting: the provider behind app.kbsStatus (see KBSScriptProvider.cpp).
+// Scripting: the provider behind app.kfcStatus (see KBSScriptProvider.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 // (A commented block claiming + 5 ... + 14 were free sat here until 2026-08-02. It was left over
 // from the template and every one of those numbers is taken by the lines just above, so it was an
@@ -245,7 +245,15 @@ DECLARE_PMID(kActionIDSpace, kKBSHowToActionID, kKBSPrefix + 18)
 // set and applies the moment the panel floats again. OFF by default, and not remembered across
 // restarts. See KBSPanelAlpha.cpp.
 DECLARE_PMID(kActionIDSpace, kKBSTranslucentPanelActionID, kKBSPrefix + 19)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 20)
+// "Save Panel Settings": write the flyout's SETTINGS toggles to a JSON file of our own in the user's
+// preferences folder, read back at startup (KBSPanelState.cpp). A plain command, not a toggle - and
+// an explicit one, the way KESCM has it: settings are saved when asked for, never behind the user's
+// back. Today the file holds Translucent Panel and nothing else.
+DECLARE_PMID(kActionIDSpace, kKBSSavePanelSettingsActionID, kKBSPrefix + 20)
+// "Translucent Find/Change": the same treatment for InDesign's OWN Find/Change dialog. Check-mark
+// toggle, Windows only, OFF by default. The dialog is found through the SDK's window list, not by
+// its title, so it works whatever language InDesign is running in (KBSPanelAlpha.cpp).
+DECLARE_PMID(kActionIDSpace, kKBSTranslucentFindChangeActionID, kKBSPrefix + 21)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 21)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 22)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 23)
@@ -320,6 +328,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // "Translucent Panel" toggle: ON = the panel is drawn faint while it floats, and comes back to solid
 // while the pointer is on it. English in both string tables, like the rest of the flyout.
 #define kKBSTranslucentPanelMenuKey		kKBSStringPrefix "kKBSTranslucentPanelMenuKey"
+// "Translucent Find/Change": the same, for InDesign's own Find/Change dialog.
+#define kKBSTranslucentFindChangeMenuKey	kKBSStringPrefix "kKBSTranslucentFindChangeMenuKey"
+// "Save Panel Settings": write the settings above to a file of our own, read back at startup.
+#define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
 // Replace feature menu item keys.
 #define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
@@ -432,6 +444,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // block's separator (3.0). It is the one toggle that changes the PANEL rather than what a run does,
 // so it sits last among them (user's call 2026-08-04). KESCM places its own the same way.
 #define kKBSTranslucentPanelMenuItemPosition	2.5
+// ...and the same for InDesign's own Find/Change dialog, directly under it: the two are one idea
+// applied to two windows, so they read as a pair.
+#define kKBSTranslucentFindChangeMenuItemPosition	2.6
+// Save Panel Settings closes the toggle block: it is the command that acts on the toggles above it,
+// so it sits directly under them and above the replace block's separator (3.0). KESCM puts its own
+// in the same relation to its settings (9.56, under the toggles at 9.5x).
+#define kKBSSavePanelSettingsMenuItemPosition	2.8
 
 // The replace block sits below the existing toggles, above the About separator (10.0).
 #define kKBSSeparator3MenuItemPosition		3.0

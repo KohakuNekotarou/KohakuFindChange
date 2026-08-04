@@ -422,9 +422,9 @@ namespace KBSResultModel
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
 	/** The WHOLE result set as one tab-separated block, so a script can read what the panel is
-	    showing. Serves app.kbsResults (KBSScriptProvider.cpp), its only caller.
+	    showing. Serves app.kfcResults (KBSScriptProvider.cpp), its only caller.
 
-	    Its reason to exist is the same as app.kbsStatus': verification. The status line gives one
+	    Its reason to exist is the same as app.kfcStatus': verification. The status line gives one
 	    summary sentence, which proves the counts and nothing else - whether the right ROW carries
 	    "missing", whether a locked row lost its check box, whether a page reads "P4(1)ov" - none of
 	    that is in it, and reading it off the screen cannot be automated. This is those same rows in
@@ -461,7 +461,7 @@ namespace KBSResultModel
 	    the aftermath of a replace only; see SetChangeText.
 
 	    NOT DescribeAllRows in another dress, though they read the same rows. That one is the machine
-	    port behind app.kbsResults: it escapes tabs and newlines to "\t" / "\n" so a script can split
+	    port behind app.kfcResults: it escapes tabs and newlines to "\t" / "\n" so a script can split
 	    the block back into fields. This one is pasted into a spreadsheet by a person, where a literal
 	    "\n" is noise - so here the same characters are FLATTENED TO A SPACE instead (a match can run
 	    across a paragraph break, and a real newline in a cell splits the row).

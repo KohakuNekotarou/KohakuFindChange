@@ -546,7 +546,7 @@ void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
 		// one place that draws one doubles the ampersands of the WHOLE line on its way to the widget
 		// (KBSResultListWidgetMgr's WriteStatusWidget, since 2026-07-31). Doubling the name here as
 		// well ran that twice: "A&B.indd" went to "A&&B.indd" and then to "A&&&&B.indd", which a
-		// StaticText draws as "A&&B.indd" - and the extra one also reached app.kbsStatus and the
+		// StaticText draws as "A&&B.indd" - and the extra one also reached app.kfcStatus and the
 		// saved report's Summary line, which are supposed to hold the message verbatim
 		// (found 2026-08-03 in the defect audit).
 		//

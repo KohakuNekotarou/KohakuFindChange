@@ -45,7 +45,7 @@ REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
 // The panel's own view: the minimum size the panel can be dragged to.
 REGISTER_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
-// Scripting: app.kbsStatus - the panel's status line, readable from a script or over COM.
+// Scripting: app.kfcStatus - the panel's status line, readable from a script or over COM.
 REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
 // The Glyph tab's replace confirmation: the dialog's controller and the view that draws one glyph.
 REGISTER_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialogControllerImpl)

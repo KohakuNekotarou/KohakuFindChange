@@ -21,7 +21,7 @@
 namespace KBSOversetScanEngine
 {
 	/** Scan the current scope for overset text and fill KBSResultModel with what was found.
-	    Puts its own summary on the panel's status line (so app.kbsStatus can be read back).
+	    Puts its own summary on the panel's status line (so app.kfcStatus can be read back).
 
 	    Changes NOTHING in the document: no command, no command sequence, nothing to undo.
 

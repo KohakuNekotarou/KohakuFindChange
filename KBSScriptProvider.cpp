@@ -4,7 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Scripting: app.kbsStatus - the last message the panel put on its status line, read-only.
+//  Scripting: app.kfcStatus - the last message the panel put on its status line, read-only.
 //
 //  WHY THIS EXISTS
 //
@@ -17,7 +17,7 @@
 //  COM from PowerShell:
 //
 //      $app = New-Object -ComObject "InDesign.Application.2026"
-//      $app.DoScript("app.kbsStatus", 1246973031)
+//      $app.DoScript("app.kfcStatus", 1246973031)
 //
 //  READ-ONLY on purpose. Setting it would let a script write something the panel never said, which
 //  is exactly the property this is useful for not having.

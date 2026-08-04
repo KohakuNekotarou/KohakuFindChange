@@ -26,6 +26,7 @@
 #include "KBSBookWatch.h"
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
+#include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSResultModel.h"
 
 /** Implements IStartupShutdownService for the plug-in. */
@@ -41,6 +42,10 @@ public:
 	    (see KBSPanelAlpha.cpp). */
 	virtual void Startup()
 	{
+		// The saved settings first: restoring "Translucent Panel = ON" is what puts up the Win32
+		// event hook, and doing it before the subscription below keeps the order the same as a
+		// session where the user switches it on by hand.
+		KBSLoadPanelStateIfPresent();
 		KBSBookWatchAttach();
 		KBSAttachPanelVisibilityObserver();
 	}
