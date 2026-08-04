@@ -41,6 +41,7 @@
 #include "ISession.h"			// GetExecutionContextSession
 #include "IWidgetUtils.h"		// GetViewYPosition
 #include "ShuksanID.h"			// kPaletteWindowFontId
+#include "TextChar.h"			// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign
 #include "Utils.h"
 
 // Project includes:
@@ -81,6 +82,60 @@ static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, c
 		ToDouble(bg.red   * u + fg.red   * t),
 		ToDouble(bg.green * u + fg.green * t),
 		ToDouble(bg.blue  * u + fg.blue  * t));
+}
+
+// U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS - the mark for a forced line break. TextChar.h names
+// the pilcrow (kTextChar_PilchrowSign, :122) but carries no constant for this one, so it is named
+// here rather than left as a bare number in the loop below.
+static const UTF32TextChar kKBSReturnArrow = 0x21B5;
+
+// Turn the two break characters into visible marks, in place.
+//
+// This cell draws ONE line, so a raw CR or LF has no width: the paragraphs either side of it run
+// together and read as a single piece of text. A match that SPANS a break is exactly what a row has
+// to be honest about - the replace rewrites the break too, joining the paragraphs for real - and
+// since 2026-08-04 the match segment is no longer cut at the first break (KBSSearchEngine::
+// SplitLineAroundMatch), so these marks are what make the rest of it readable.
+//
+// The two marks are the ones InDesign itself draws with Show Hidden Characters on: a pilcrow for a
+// paragraph end, a return arrow for a forced line break (Shift+Enter). They are two different
+// things to a replace, so the row spells them differently.
+//
+// Whole runs are copied between the marks rather than one character at a time, so a surrogate pair
+// is never split. Most rows hold no break at all, so the string is scanned once before anything is
+// built: the common row pays one pass and no allocation.
+static void KBSMarkUpBreaks(PMString& s)
+{
+	int32 n = 0;
+	const UTF16TextChar* buf = s.GrabUTF16Buffer(&n);
+	if (buf == nil || n <= 0)
+		return;
+
+	bool16 any = kFalse;
+	for (int32 i = 0; i < n && !any; ++i)
+		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF);
+	if (!any)
+		return;
+
+	PMString out;
+	out.SetTranslatable(kFalse);
+	int32 runStart = 0;
+	for (int32 i = 0; i < n; ++i)
+	{
+		if (buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
+			continue;
+		if (i > runStart)
+			out.AppendW(buf + runStart, i - runStart);
+		out.AppendW(buf[i] == kTextChar_CR
+			? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
+			: kKBSReturnArrow);
+		runStart = i + 1;
+	}
+	if (n > runStart)
+		out.AppendW(buf + runStart, n - runStart);
+
+	s = out;
+	s.SetTranslatable(kFalse);
 }
 
 //----------------------------------------------------------------------------------------
@@ -157,6 +212,12 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	PMString locator, flag, pre, match, post;
 	data->GetSegments(locator, flag, pre, match, post);
 
+	// Break characters become visible marks BEFORE anything is measured or ellipsized below: every
+	// width taken from here on has to be the width of what is actually drawn.
+	KBSMarkUpBreaks(pre);
+	KBSMarkUpBreaks(match);
+	KBSMarkUpBreaks(post);
+
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
 	if (fonts == nil)
@@ -229,9 +290,11 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	//
 	// There used to be a tab stop here - a fixed column from the cell's left edge - so the line
 	// text would form a column of its own. It cannot: the locator's width varies by several
-	// characters now that it carries "ov", "hid" and "lock", so a short locator was flung out to
-	// the tab while a long one sat right against its text. The same list showed both gaps at once
-	// and the wide one read as a mistake (user's call 2026-07-28, from the running panel).
+	// characters now that it carries "overset", "hidden" and "locked", so a short locator was flung
+	// out to the tab while a long one sat right against its text. The same list showed both gaps at
+	// once and the wide one read as a mistake (user's call 2026-07-28, from the running panel).
+	// The words grew again on 2026-08-04 ("ov" -> "overset", "lock" -> "locked"), which only makes
+	// the fixed column less workable - one gap remains the right answer.
 	//
 	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
 	// keeps that fixed for every row (see KBSResultListWidgetMgr - the check box sits in the margin

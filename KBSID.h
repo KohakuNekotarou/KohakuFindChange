@@ -255,7 +255,9 @@ DECLARE_PMID(kActionIDSpace, kKBSSavePanelSettingsActionID, kKBSPrefix + 20)
 // toggle, Windows only, OFF by default. The dialog is found through the SDK's window list, not by
 // its title, so it works whatever language InDesign is running in (KBSPanelAlpha.cpp).
 DECLARE_PMID(kActionIDSpace, kKBSTranslucentFindChangeActionID, kKBSPrefix + 21)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 22)
+// The flyout's fourth rule, below the toggle block (2026-08-04, when the blocks were rearranged and
+// three separators no longer parted five blocks). MenuDef only, no ActionDef - like the three above.
+DECLARE_PMID(kActionIDSpace, kKBSSeparator4ActionID, kKBSPrefix + 22)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 23)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 24)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 25)
@@ -426,43 +428,51 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 #define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
 
 // Menu item positions:
+//
+// The flyout reads in five blocks, parted by four rules (the user's arrangement, 2026-08-04):
+//    1.0 - 1.2    the three commands that RUN something over the current scope
+//   ---- 1.3
+//    1.6          Change Checked - the one command that writes to the DOCUMENTS
+//   ---- 2.0
+//    2.2 - 2.8    the four check-mark toggles
+//   ---- 3.0
+//    4.0 - 5.0    the two commands that write a FILE of our own
+//   ---- 10.0
+//   10.5 - 11.0   the two reference items
+// Positions that the new order allowed to stay were left where they were, so only the items that
+// actually moved carry new numbers.
 
-// The scope toggle and its separator sit between the search command (1.0) and Hide Previous
-// Chapter (2.0), so neither existing position had to move.
-#define kKBSSeparator2MenuItemPosition		1.3
-#define kKBSBookScopeMenuItemPosition		1.6
-
+// Block 1 - the three "run something over the scope" commands, in the order they were added. The
+// scope they run on is set by Book Scope, two blocks below.
 #define kKBSSearchBookMenuItemPosition		1.0
-// The glyph scan is the search command's sibling, so it sits directly under it - above the scope
-// toggle's separator (1.3), which keeps the two "run something" commands together.
 #define kKBSFindMissingGlyphsMenuItemPosition	1.1
-// The overset scan is the third "run something over the scope" command, so it follows the other two
-// and still sits above the scope toggle's separator (1.3).
 #define kKBSFindOversetMenuItemPosition		1.2
-#define kKBSHidePrevChapterMenuItemPosition	2.0
-// Translucent Panel goes at the END of the toggle block - after the two above, before the replace
-// block's separator (3.0). It is the one toggle that changes the PANEL rather than what a run does,
-// so it sits last among them (user's call 2026-08-04). KESCM places its own the same way.
-#define kKBSTranslucentPanelMenuItemPosition	2.5
-// ...and the same for InDesign's own Find/Change dialog, directly under it: the two are one idea
-// applied to two windows, so they read as a pair.
-#define kKBSTranslucentFindChangeMenuItemPosition	2.6
-// Save Panel Settings closes the toggle block: it is the command that acts on the toggles above it,
-// so it sits directly under them and above the replace block's separator (3.0). KESCM puts its own
-// in the same relation to its settings (9.56, under the toggles at 9.5x).
-#define kKBSSavePanelSettingsMenuItemPosition	2.8
+#define kKBSSeparator2MenuItemPosition		1.3
 
-// The replace block sits below the existing toggles, above the About separator (10.0).
-#define kKBSSeparator3MenuItemPosition		3.0
-#define kKBSReplaceCheckedMenuItemPosition	4.0
-// Save Results... sits under the replace command, above the About separator (10.0). It belongs at the
-// bottom of the block because it is the one command that acts on the RESULTS rather than on the
-// document - everything above it produces or changes them, this one takes them away with you.
+// Block 2 - Change Checked, alone between two rules. It is the only item on this menu that rewrites
+// the documents, so it is kept apart from both the read-only runs above it and the toggles below,
+// where it cannot be reached by a slip of the pointer.
+#define kKBSReplaceCheckedMenuItemPosition	1.6
+#define kKBSSeparator3MenuItemPosition		2.0
+
+// Block 3 - the four check-mark toggles. Book Scope leads: it is the one that decides what the
+// commands in block 1 run on. Then Hide Previous Chapter, and the two Translucent toggles last -
+// one idea applied to two windows, so they read as a pair (Find/Change first, this panel second).
+#define kKBSBookScopeMenuItemPosition		2.2
+#define kKBSHidePrevChapterMenuItemPosition	2.4
+#define kKBSTranslucentFindChangeMenuItemPosition	2.6
+#define kKBSTranslucentPanelMenuItemPosition	2.8
+#define kKBSSeparator4MenuItemPosition		3.0
+
+// Block 4 - the two commands that write a file of our own and touch no document: the toggles above
+// (Save Panel Settings), and the result set (Save Results...).
+#define kKBSSavePanelSettingsMenuItemPosition	4.0
 #define kKBSSaveResultsMenuItemPosition		5.0
 #define	kKBSSeparator1MenuItemPosition		10.0
-// "How to Use..." sits between the separator and About, the placement KESCM uses (its own is
-// Sep2 9.95 / How to Use 10 / About 12). No separator of its own: another rule right above About
-// would draw two dividers with a single item between them.
+
+// Block 5 - the reference items, the placement KESCM uses (its own is Sep2 9.95 / How to Use 10 /
+// About 12). No rule between them: another one right above About would draw two dividers with a
+// single item between them.
 #define kKBSHowToMenuItemPosition			10.5
 #define kKBSAboutThisMenuItemPosition		11.0
 

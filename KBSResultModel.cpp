@@ -597,11 +597,11 @@ namespace
 	{
 		std::string flags;
 		if (hit.isOverset)
-			AppendWord(flags, "ov");
+			AppendWord(flags, "overset");
 		if (hit.isHidden)
 			AppendWord(flags, "hidden");
 		if (hit.isLocked || hit.outcome == KBSResultModel::kOutcomeLocked)
-			AppendWord(flags, "lock");
+			AppendWord(flags, "locked");
 		// Missing and refused exclude each other (two values of one field); locked is already said
 		// above, in the word the locator uses for it.
 		if (hit.outcome == KBSResultModel::kOutcomeMissing)
@@ -769,8 +769,8 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 			buf += "\n";
 			AppendFlattenedUTF8(buf, chapter.name);
 			buf += "\t";
-			// The page NUMBER alone, so a spreadsheet can sort on it - the "ov" / "lock" that ride the
-			// panel's locator are in the Flags cell instead. A hit that is on no page at all
+			// The page NUMBER alone, so a spreadsheet can sort on it - the "overset" / "locked" that
+			// ride the panel's locator are in the Flags cell instead. A hit that is on no page at all
 			// (pasteboard, or overset with nothing placed anywhere) leaves the cell empty rather than
 			// writing the "PB" the page list spells for it: an empty cell sorts and filters, two
 			// letters in a number column do not.
@@ -1100,12 +1100,12 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 
 	if (hit.pageString.IsEmpty())
 	{
-		hit.locator.Append("ov");	// overset with nothing placed anywhere: no page to name
+		hit.locator.Append("overset");	// overset with nothing placed anywhere: no page to name
 	}
 	else
 	{
-		// An overset hit carries the "+" indicator's page and sorts by it; a trailing "ov" (after
-		// the page and ordinal) marks it as overset -> e.g. "P1(2)ov".
+		// An overset hit carries the "+" indicator's page and sorts by it; a trailing " overset"
+		// (after the page and ordinal) marks it as overset -> e.g. "P1(2) overset".
 		hit.locator.Append("P");
 		hit.locator.Append(hit.pageString);
 		if (hit.pageOrdinal > 0)
@@ -1115,30 +1115,31 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 			hit.locator.Append(")");
 		}
 		if (hit.isOverset)
-			hit.locator.Append("ov");
+			hit.locator.Append(" overset");
 	}
 
 	// What the row cannot show any other way, each separated by a space, in this order:
 	//   hidden  - on a switched-off layer, so the page will look empty on arrival
-	//   lock    - locked, so the row carries no check box and the replace will not touch it
+	//   locked  - locked, so the row carries no check box and the replace will not touch it
 	//   missing - the same text could not be found where the search left it
 	//   refused - InDesign's own replace command would not run there
 	// The last two are put there by a replace, or by a jump that finds the text gone, so they never
-	// appear on a fresh search's rows. They stack on either shape: "P1(2)ov hidden lock",
-	// "ov missing", "P7 hidden".
+	// appear on a fresh search's rows. They stack on either shape: "P1(2) overset hidden locked",
+	// "overset missing", "P7 hidden".
 	//
-	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+lock" reads as "page 5,
-	// overset". Spelled out rather than clipped to "hid" / "lck" - these are what explain a row the
-	// user cannot act on, so they are worth the characters, unlike "ov", which merely qualifies a
-	// page number. ("loc" was never an option: English reads it as "location".)
+	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
+	// overset". EVERY word is spelled out in full (user's call, 2026-08-04): these are what explain
+	// a row the user cannot act on, so they are worth the characters. Clipped forms were tried and
+	// dropped - "hid" / "lck" are hard to read, "loc" reads as "location" in English, and "ov" left
+	// the one word a reader most needs to recognise as the least legible of the set.
 	if (hit.isHidden)
 		hit.locator.Append(" hidden");
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
-		hit.locator.Append(" lock");
+		hit.locator.Append(" locked");
 
 	// NOT chained onto the test above. A locked row can be jumped to and found changed, and then it
-	// has both things to say - "P4(1) lock missing" - where an else left it saying only that it was
-	// locked, which is not why the jump landed on different text. Missing and refused do exclude
+	// has both things to say - "P4(1) locked missing" - where an else left it saying only that it
+	// was locked, which is not why the jump landed on different text. Missing and refused do exclude
 	// each other: outcome holds one value.
 	//
 	// These two go into their own string rather than onto the locator because the cell draws them

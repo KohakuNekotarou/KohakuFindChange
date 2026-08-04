@@ -62,8 +62,10 @@ namespace KBSResultModel
 	    the match; the jump anchors (Task 3) point back at the exact occurrence. */
 	struct Hit
 	{
-		PMString	locator;	// the page locator "P<page>(<n>)" / "ov" (drawn at full text colour,
-								// followed by a tab stop, ahead of the line)
+		PMString	locator;	// the page locator "P<page>(<n>)" / "overset" (drawn at full text
+								// colour, ahead of the line, with one gap between the two - there is
+								// no tab stop: the locator's width varies too much for a fixed
+								// column, see KBSColorTextView)
 		PMString	preText;	// the line's text before the match
 		PMString	matchText;	// the matched text (drawn at full text colour)
 		PMString	postText;	// the line's text after the match
@@ -72,12 +74,13 @@ namespace KBSResultModel
 								// match: its own page. For an overset match: the page of the "+"
 								// indicator (or "" when nothing is placed anywhere).
 		int32		pageIndex;	// that page's document order (-1 = no page); sorts hits into page order
-		bool		isOverset;	// match is overset -> the locator gets an "ov" prefix ("ovP<page>")
+		bool		isOverset;	// match is overset -> the locator gets a trailing " overset"
+								// ("P<page>(<n>) overset")
 		bool		isLocked;	// match sits on a locked layer or in a locked story -> the locator
-								// gets " Locked" and the row gets NO check box. InDesign can search
+								// gets " locked" and the row gets NO check box. InDesign can search
 								// locked content but offers no way to change it ("Search Only"), so
 								// the row is listed and jumpable but never selectable.
-		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " Hidden".
+		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " hidden".
 								// Only reachable when the Find/Change dialog's "Include Hidden
 								// Layers" is on, and then the text is composed and jumpable but
 								// draws nothing, so the row has to say why the page looks empty.
@@ -399,7 +402,7 @@ namespace KBSResultModel
 	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
 	struct RowDisplay
 	{
-		PMString		locator;	// "P1(2)ov hidden lock" - drawn at the full text colour
+		PMString		locator;	// "P1(2) overset hidden locked" - drawn at the full text colour
 		PMString		accentFlag;	// "missing" / "refused", or empty - drawn in the accent colour
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
@@ -614,16 +617,15 @@ namespace KBSResultModel
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the post-replace thinning both call it, so the two can no longer drift apart.
 
-	        P<page>(<n>)ov hidden lock          -> hit.locator
+	        P<page>(<n>) overset hidden locked  -> hit.locator
 	        missing | refused                   -> hit.accentFlag, drawn after it in accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
-	    spaces and spelled out rather than clipped, because each one explains a row the user cannot
-	    act on. "+" is deliberately NOT the separator: InDesign's own overset marker is a "+", so
-	    "P5+lock" reads as "page 5, overset". "ov" stays short - it only qualifies a page number, it
-	    does not explain anything.
+	    spaces and spelled out IN FULL rather than clipped, because each one explains a row the user
+	    cannot act on. "+" is deliberately NOT the separator: InDesign's own overset marker is a "+",
+	    so "P5+locked" reads as "page 5, overset".
 
-	    The flags STACK - "P4(1) lock missing" is a locked row that has since been jumped to and
+	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
 	    found changed. Only missing and refused are exclusive, being two values of one field. */
 	void BuildHitLocator(Hit& hit);
 

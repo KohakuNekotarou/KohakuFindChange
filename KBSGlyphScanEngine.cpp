@@ -56,7 +56,7 @@
 // Interface includes:
 #include "IComposeScanner.h"	// CopyText - reading the character between two boxes
 #include "IDocument.h"			// GetName - the chapter row's display name
-#include "IFrameList.h"			// GetWasOverset - "this story has text that did not fit"
+#include "IFrameList.h"			// GetFirstDamagedFrameIndex - is this story's wax out of date?
 #include "IFrameListComposer.h"	// RecomposeThruLastFrame - compose what is stale before reading it
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
 #include "IPMFont.h"			// GetNotDefinedGlyph / AppendFamilyName / AppendStyleName
@@ -88,6 +88,7 @@
 // Project includes:
 #include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
 #include "KBSGlyphScanEngine.h"
+#include "KBSOversetScanEngine.h"	// IsStoryOverset - the ONE answer to "is this overset right now?"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kfcStatus reads back
 #include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
@@ -251,16 +252,9 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	if (waxStrand == nil)
 		return;
 
-	// Asked of the FRAME LIST, which remembers the answer from its last composition
-	// (IFrameList.h:146-157), because the wax cannot always say: an overset line carries no glyphs,
-	// and a story placed nowhere at all has no lines to look at. GetWasOversetValid comes first -
-	// the state is persisted, so it can be there without meaning anything yet (:149).
 	InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
 	if (frameList != nil)
 	{
-		if (frameList->GetWasOversetValid() && frameList->GetWasOverset())
-			outHasOverset = true;
-
 		// ***** Compose what is out of date BEFORE reading it. *****
 		// The wax is the composer's last answer. A story edited since it last composed can hand
 		// back glyphs that are no longer on the page - a box the user has already fixed, or none
@@ -275,6 +269,22 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 				composer->RecomposeThruLastFrame();
 		}
 	}
+
+	// ***** Does this story hold text that did not fit? ***** Asked AFTER the recompose above, and of the
+	// same interface the overset scan uses, so this plug-in has ONE answer to the question rather
+	// than two (KBSOversetScanEngine::IsStoryOverset -> ITextParcelList::GetIsOverset).
+	//
+	// It used to be IFrameList::GetWasOverset(), asked BEFORE the recompose, and both halves of that
+	// were wrong (2026-08-04):
+	//   * WHAT it asked - the frame list remembers what the last composition found, and that answer
+	//     is PERSISTED (IFrameList.h:146-157). A document whose overset had since been fixed still
+	//     said yes, and kept saying yes after a close and reopen (measured on adv-index2.indd). The
+	//     status line then claimed text it could not check while the overset scan, on the same
+	//     document, correctly reported none - two scans of one plug-in disagreeing.
+	//   * WHEN it asked - before the recompose that this very function performs, so even a fresh
+	//     answer would have been the stale one.
+	if (KBSOversetScanEngine::IsStoryOverset(model))
+		outHasOverset = true;
 
 	// READ-ONLY iterator: this walk never changes a wax line nor applies one, which is exactly the
 	// case IWaxStrand.h:100-106 describes ("code that draws") and offers an optimisation for. The
@@ -308,11 +318,16 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 
 		// An overset line (IWaxLine.h:68: no valid parcel key). Measured 2026-08-02: these carry no
 		// glyphs whatsoever, and asking IFrameListComposer to compose the whole frame list adds
-		// none - so there is nothing here to read, and nothing is guessed at either. The scan
-		// records that it could not look, and the summary says so.
-		if (!line->GetParcelKey().IsValid())
-			outHasOverset = true;
-		else
+		// none - so there is nothing here to read, and nothing is guessed at either. Skipped.
+		//
+		// ***** Skipped, but NOT reported as overset from here. ***** Whether the STORY holds
+		// overset is decided once, above, by the same question the overset scan asks. A line's
+		// parcel key on its own is not that question: a story that fits perfectly still ends with a
+		// line whose key is invalid, so raising the flag here made the scan announce
+		// "Text in overset cannot be checked." about documents holding no overset at all - while
+		// the overset scan, asked about the very same document, correctly answered none
+		// (2026-08-04, measured on adv-index2.indd and adv-index3.indd).
+		if (line->GetParcelKey().IsValid())
 			CollectNotdefsOnLine(line, out);
 
 		line = waxIter->GetNextWaxLine();

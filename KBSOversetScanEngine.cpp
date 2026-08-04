@@ -338,7 +338,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	}
 	KBSSearchEngine::DeleteHitCache(cache);
 
-	// Page order, and the "ovP<page>(<n>)" locator on every row - the same pass the search runs.
+	// Page order, and the "P<page>(<n>) overset" locator on every row - the same pass the search runs.
 	KBSSearchEngine::FinalizeHits(outChapter.hits);
 	return static_cast<int32>(outChapter.hits.size());
 }
@@ -412,6 +412,31 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 }
 
 }	// anonymous namespace
+
+// The shared answer to "is this story overset right now?" - see KBSOversetScanEngine.h for why the
+// glyph scan asks this rather than the frame list's REMEMBERED one. Position 0 is the main thread,
+// the same reach the question it replaced had.
+bool KBSOversetScanEngine::IsStoryOverset(ITextModel* model)
+{
+	if (model == nil)
+		return false;
+
+	// ***** ITextParcelList ALONE says yes about a story that fits. ***** It counts the thread's
+	// final CR as an overset parcel, which is why ThreadOverset below has to correct the COUNT
+	// (see its comment). The frame pass of the scan itself never sees that, because it asks
+	// ITextUtils::IsOverset first and only then reads the detail - so this asks in the same order.
+	//
+	// Measured 2026-08-04: without this gate a document with nothing overset reported overset here,
+	// which is precisely the false "Text in overset cannot be checked." this function was added to
+	// remove.
+	InterfacePtr<IFrameList> frameList(model->QueryFrameList());
+	if (frameList == nil || !Utils<ITextUtils>()->IsOverset(frameList))
+		return false;
+
+	TextIndex whereItStarts = kInvalidTextIndex;
+	int32 howMuch = 0;
+	return ThreadOverset(model, 0, whereItStarts, howMuch);
+}
 
 void KBSOversetScanEngine::Run()
 {

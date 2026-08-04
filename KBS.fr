@@ -425,11 +425,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefAlphabeticPosition,											// Menu Position.
 		kSDKDefIsNotDynamicMenuFlag,										// kSDKDefIsNotDynamicMenuFlag or kSDKDefIsDynamicMenuFlag
 
-		// Separator for the popup menu on the panel
-		kKBSSeparator1ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator1MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// ----- The panel's flyout menu -----
+		// Written here in the order it is DRAWN. What actually decides that order is each item's
+		// position number, and the five blocks those numbers form are laid out in KBSID.h. The
+		// separators' names are in the order they were added, not the order they appear in - the
+		// first one written was the rule above About, which is why it is Separator1 down at 10.0.
+
+		// --- Block 1: the three commands that run something over the current scope ---
 
 		// Find in Document / Find in Book: run the search over the current scope using the settings
 		// in InDesign's own Find/Change dialog. Drawn under whichever of the two names the scope
@@ -454,13 +456,30 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSFindOversetMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between the search command and the toggles.
+		// Separator between the three runs above and Change Checked.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator2MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document.
+		// --- Block 2: the one command that rewrites the documents, alone between two rules ---
+
+		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
+		kKBSReplaceCheckedActionID,
+		kKBSTargetMenuPath
+		kKBSReplaceCheckedMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Separator between Change Checked and the toggles.
+		kKBSSeparator3ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator3MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// --- Block 3: the four check-mark toggles ---
+
+		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document. Leads the
+		// block because it is what the three commands in block 1 run on.
 		kKBSScopeBookActionID,
 		kKBSTargetMenuPath
 		kKBSBookScopeMenuItemPosition,
@@ -472,18 +491,28 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Translucent Panel: toggle (check mark). ON = this panel is drawn faint while it floats,
-		// and comes back to solid while the pointer is on it. *Windows only.
+		// Translucent Find/Change: toggle (check mark) for InDesign's OWN Find/Change dialog.
+		// *Windows only.
+		kKBSTranslucentFindChangeActionID,
+		kKBSTargetMenuPath
+		kKBSTranslucentFindChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Translucent Panel: the same idea applied to this panel - drawn faint while it floats, and
+		// back to solid while the pointer is on it. Directly under the one above; the two read as a
+		// pair. *Windows only.
 		kKBSTranslucentPanelActionID,
 		kKBSTargetMenuPath
 		kKBSTranslucentPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Translucent Find/Change: the same for InDesign's OWN Find/Change dialog. Windows only.
-		kKBSTranslucentFindChangeActionID,
-		kKBSTargetMenuPath
-		kKBSTranslucentFindChangeMenuItemPosition,
+		// Separator between the toggles and the two commands that write a file.
+		kKBSSeparator4ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator4MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
+
+		// --- Block 4: the two commands that write a file of our own ---
 
 		// Save Panel Settings: write the toggles above to a JSON file of our own in the user's
 		// preferences folder, read back at startup. A plain command, not a toggle.
@@ -492,39 +521,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSavePanelSettingsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between the search/scope toggles and the replace block.
-		kKBSSeparator3ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator3MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
-		kKBSReplaceCheckedActionID,
-		kKBSTargetMenuPath
-		kKBSReplaceCheckedMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Save Results...: write the current result set to a tab-separated text file.
 		kKBSSaveResultsActionID,
 		kKBSTargetMenuPath
 		kKBSSaveResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- The result rows' right-click context menu (2026-08-01) -----
-		// Popped at the cursor by the row event handler (KBSResultNodeEH::RButtonDn, through
-		// IMenuManager::HandlePopupMenu with this subtree's name). Check All / Uncheck All are its two
-		// items; they sat on the flyout above until this date, where they could only ever mean "every
-		// hit everywhere". Here they mean the row the menu was popped over - the BOOK row for all of
-		// it, a document row for that chapter alone - which is why they moved.
-		kKBSCheckAllActionID,
-		kKBSResultRowMenuName
-		kKBSCheckAllMenuItemPosition,
+		// Separator between those and the two reference items that close the menu.
+		kKBSSeparator1ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator1MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSUncheckAllActionID,
-		kKBSResultRowMenuName
-		kKBSUncheckAllMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// --- Block 5: the two reference items ---
 
 		// "How to Use...": the plug-in's operating reference, in a scrollable dialog (KBSHowTo.cpp).
 		// Between the separator and About, where KESCM puts its own.
@@ -537,6 +546,24 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSPopupAboutThisActionID,
 		kKBSTargetMenuPath
 		kKBSAboutThisMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// ----- The result rows' right-click context menu (2026-08-01) -----
+		// A menu of its own, not part of the flyout above - which is why it is written last here,
+		// after that menu has been laid out from top to bottom. Popped at the cursor by the row event
+		// handler (KBSResultNodeEH::RButtonDn, through IMenuManager::HandlePopupMenu with this
+		// subtree's name). Check All / Uncheck All are its two items; they sat on the flyout until
+		// this date, where they could only ever mean "every hit everywhere". Here they mean the row
+		// the menu was popped over - the BOOK row for all of it, a document row for that chapter
+		// alone - which is why they moved.
+		kKBSCheckAllActionID,
+		kKBSResultRowMenuName
+		kKBSCheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSUncheckAllActionID,
+		kKBSResultRowMenuName
+		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 	}

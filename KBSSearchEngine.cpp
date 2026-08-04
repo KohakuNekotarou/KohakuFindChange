@@ -889,9 +889,9 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
 	// on no page). Name the page of the "+" overset indicator instead (the last placed parcel's
-	// frame, climbing out of a pushed-out table) so the hit lists as "P<page>(n)ov" and sorts into
-	// that page. If nothing is placed anywhere, leave it pageless: the locator falls back to a bare
-	// "ov" and sorts to the end.
+	// frame, climbing out of a pushed-out table) so the hit lists as "P<page>(n) overset" and sorts
+	// into that page. If nothing is placed anywhere, leave it pageless: the locator falls back to a
+	// bare "overset" and sorts to the end.
 	//
 	// The overset lookup itself is NOT cached: it climbs out of whatever table pushed the text out,
 	// so two overset positions in one story can legitimately land on different frames.
@@ -1161,7 +1161,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 
 // Put a chapter's hits in PAGE order and bake the "P<page>(<n>) " locator onto each hit line
 // (the KESCL convention: page string, section-aware; a within-page ordinal in parens only when
-// the page holds more than one match; "ov" for an overset match, which has no page). The locator
+// the page holds more than one match; "overset" for an overset match, which has no page). The locator
 // rides on the front of preText, so the colour cell draws it in the normal colour ahead of the
 // match. Pure string / index work - no recompose, so no dirty guard needed here.
 void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
@@ -1724,6 +1724,29 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
+// The most characters a match segment carries, and the ONE place that limit is applied.
+//
+// A format-only search matches every unbroken run of text carrying the format, which can be dozens
+// of paragraphs. Copying all of it per hit and holding it for the life of the result set would cost
+// far more than the single line a row can ever draw, so it is capped. The cap is far past what any
+// cell shows, so what is dropped was never going to be read - and the row still shows that the
+// match continues, because the break marks are inside what IS kept.
+//
+// ⚠⚠ SplitLineAroundMatch and CopyMatchText MUST cut in the SAME place, which is why both go
+// through this one function. The two strings are compared to each other before a replace
+// (MatchIsSameOccurrence): a match cut differently on the two sides reads as "the text moved since
+// the search ran", and every replace is refused with 'missing'.
+static const int32 kKBSMaxMatchChars = 500;
+
+static TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
+{
+	if (end < start)
+		return start;
+	if (end - start > kKBSMaxMatchChars)
+		return start + kKBSMaxMatchChars;
+	return end;
+}
+
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
 	PMString& outPre, PMString& outMatch, PMString& outPost)
 {
@@ -1738,39 +1761,56 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 	if (scanner == nil)
 		return;
 
-	// The paragraph that holds the match; excludeEOS (default) trims the paragraph terminator.
+	// The leading context comes from the paragraph the match STARTS in; excludeEOS (default) trims
+	// the paragraph terminator.
 	int32 paraLen = 0;
 	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
 	if (paraStart < 0 || paraLen <= 0)
 		return;
 
-	WideString para;
-	scanner->CopyText(paraStart, paraLen, &para);
+	// ★The match itself is taken WHOLE, not cut at the end of that paragraph (2026-08-04).
+	// A single match can run over any number of paragraphs - a format-only search matches every
+	// unbroken run of text carrying the format, and a GREP can be written to cross a break on
+	// purpose. Cutting it here made the row show ONE paragraph of what a replace would rewrite in
+	// full, so a user who ticked that row lost text that was never on screen (measured: two
+	// paragraphs and the break between them replaced by one word, joining what was left to the
+	// paragraph below). The breaks inside the match are drawn as marks by the cell - see
+	// KBSColorTextView, which turns CR into a pilcrow and a forced line break into a return arrow.
+	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
 
-	// Split by UTF-16 unit, matching TextIndex: the match sits at [start-paraStart, end-paraStart)
-	// in the paragraph. GrabUTF16Buffer + SetXString copies exact unit ranges (a match boundary
-	// never falls inside a surrogate pair, so no code point is cut).
-	// Read straight out of the WideString. GrabUTF16Buffer lives on UnicodeSavvyString, the base
-	// PMString and WideString share, so building a PMString first would copy the whole paragraph a
-	// second time to reach the same buffer - once per hit, for nothing.
-	int32 n = 0;
-	const UTF16TextChar* buf = para.GrabUTF16Buffer(&n);
-	if (buf == nil || n <= 0)
-		return;
+	WideString w;
+	if (start > paraStart)
+	{
+		scanner->CopyText(paraStart, static_cast<int32>(start - paraStart), &w);
+		outPre = PMString(w);
+		outPre.SetTranslatable(kFalse);
+	}
+	if (matchEnd > start)
+	{
+		WideString m;
+		scanner->CopyText(start, static_cast<int32>(matchEnd - start), &m);
+		outMatch = PMString(m);
+		outMatch.SetTranslatable(kFalse);
+	}
 
-	int32 ms = static_cast<int32>(start - paraStart);
-	int32 ml = static_cast<int32>(end - start);
-	if (ms < 0)		ms = 0;
-	if (ms > n)		ms = n;
-	if (ml < 0)		ml = 0;
-	if (ms + ml > n)	ml = n - ms;
-
-	outPre.SetXString(buf, ms);
-	outPre.SetTranslatable(kFalse);
-	outMatch.SetXString(buf + ms, ml);
-	outMatch.SetTranslatable(kFalse);
-	outPost.SetXString(buf + ms + ml, n - ms - ml);
-	outPost.SetTranslatable(kFalse);
+	// The trailing context comes from the paragraph the match ENDS in, which is a DIFFERENT
+	// paragraph from the one it started in once the match spans a break. Probed at matchEnd - 1 so
+	// a match ending exactly on a paragraph terminator answers with the paragraph it ended, not the
+	// one after it.
+	int32 endParaLen = 0;
+	const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
+	const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);
+	if (endParaStart >= 0 && endParaLen > 0)
+	{
+		const TextIndex endParaEnd = endParaStart + endParaLen;
+		if (endParaEnd > matchEnd)
+		{
+			WideString p;
+			scanner->CopyText(matchEnd, static_cast<int32>(endParaEnd - matchEnd), &p);
+			outPost = PMString(p);
+			outPost.SetTranslatable(kFalse);
+		}
+	}
 }
 
 bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
@@ -1803,20 +1843,15 @@ void KBSSearchEngine::CopyMatchText(const UIDRef& storyRef, TextIndex start, Tex
 	if (scanner == nil)
 		return;
 
-	// The paragraph is looked up for its END and nothing else: SplitLineAroundMatch cuts its match
-	// segment at the paragraph terminator (it splits a string that stops there), so a match running
-	// past one has to be cut in the same place here or the two would disagree about it. None of the
-	// paragraph is copied - that is the whole point of this function.
-	int32 paraLen = 0;
-	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
-	if (paraStart < 0 || paraLen <= 0)
-		return;
-
-	TextIndex matchEnd = end;
-	if (matchEnd > paraStart + paraLen)
-		matchEnd = paraStart + paraLen;
+	// Cut where SplitLineAroundMatch cuts - through the same function, so the two cannot drift apart
+	// (see KBSCapMatchEnd for what a disagreement would cost). Until 2026-08-04 both stopped at the
+	// end of the paragraph the match started in; now both carry the whole match up to the cap.
+	//
+	// No paragraph lookup is needed any more, and none of the surrounding text is copied - that is
+	// the whole point of this function.
+	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
 	if (matchEnd <= start)
-		return;		// nothing left of the match inside this paragraph
+		return;
 
 	WideString text;
 	scanner->CopyText(start, static_cast<int32>(matchEnd - start), &text);

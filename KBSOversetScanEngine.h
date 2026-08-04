@@ -18,8 +18,28 @@
 #ifndef __KBSOversetScanEngine_h__
 #define __KBSOversetScanEngine_h__
 
+class ITextModel;
+
 namespace KBSOversetScanEngine
 {
+	/** Is this story's MAIN thread overset RIGHT NOW?
+
+	    Shared with the glyph scan, which has to say on its status line whether part of the document
+	    could not be looked at. It used to ask IFrameList::GetWasOverset() instead, and that is a
+	    different question: the frame list remembers what the LAST COMPOSITION found and the answer
+	    is persisted, so a document whose overset has since been fixed still says yes - it survived
+	    a close and reopen when this was measured (2026-08-04, adv-index2.indd). The two scans then
+	    disagreed about one document, the glyph scan claiming text it could not check while the
+	    overset scan correctly reported none.
+
+	    Asked of the same interface the overset scan itself uses (ITextParcelList::GetIsOverset), so
+	    there is one answer to "is this overset" in this plug-in rather than two.
+
+	    The MAIN thread only - position 0 - which is the same reach the frame-list question had. A
+	    table cell overflowing on its own is a separate thread and is NOT included here; the overset
+	    scan reports those, and the glyph scan reads cells through the wax like any other text. */
+	bool IsStoryOverset(ITextModel* model);
+
 	/** Scan the current scope for overset text and fill KBSResultModel with what was found.
 	    Puts its own summary on the panel's status line (so app.kfcStatus can be read back).
 
