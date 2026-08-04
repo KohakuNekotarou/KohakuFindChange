@@ -147,6 +147,12 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 * the scope has to be (re)written the moment the panel appears. See KBSPanelTitle.cpp.
 			 */
 			IID_IOBSERVER, kKBSPanelObserverImpl,
+			/*
+			 * The panel's view replaced (2026-08-04): PalettePanelView plus a floor under how small
+			 * the panel can be dragged, through ConstrainDimensions. See KBSPanelView.cpp - the same
+			 * shape KESCL has used since 2026-07-17, which took it from customconditionaltextui.
+			 */
+			IID_ICONTROLVIEW, kKBSPanelViewImpl,
 		}
 	},
 

@@ -43,6 +43,8 @@ REGISTER_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
 REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 // Panel tab name: writes the scope onto the tab when the panel appears.
 REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
+// The panel's own view: the minimum size the panel can be dragged to.
+REGISTER_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
 // Scripting: app.kbsStatus - the panel's status line, readable from a script or over COM.
 REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
 // The Glyph tab's replace confirmation: the dialog's controller and the view that draws one glyph.

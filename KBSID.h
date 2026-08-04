@@ -178,7 +178,10 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
 // The panel illustration's tooltip: hovering the icon shows the URL clicking it opens, so the
 // picture is not a mystery button (see KBSIconTip.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSIconTipImpl, kKBSPrefix + 19)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 20)
+// The panel's own IControlView: stock palette behaviour plus a floor under how small the user can
+// drag the panel (see KBSPanelView.cpp). +19 is the tooltip above, and +18 is a retired id that is
+// deliberately not reused, so this is the next free number.
+DECLARE_PMID(kImplementationIDSpace, kKBSPanelViewImpl, kKBSPrefix + 20)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 21)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 22)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 23)
