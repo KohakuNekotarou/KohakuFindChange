@@ -1,9 +1,4 @@
-# Kohaku Find/Change (KBS)
-
-> **On the name**: the display name is **Kohaku Find/Change**, after InDesign's own Find/Change.
-> The build output stays `KohakuFindChange.pln`, and the internal plug-in name and the code prefix
-> stay `KohakuBookSearch` / `KBS`, so nothing in the ID system moves.
-
+# Kohaku Find/Change
 Adobe InDesign C++ SDK Plug-In.
 Searches the front document, or every chapter of the active book (.indb) at once — the book-wide search the built-in Find/Change cannot do — using the Find/Change dialog's own query, and lists what it found in a tree panel you can jump from.
 Only the occurrences you tick are replaced, across as many chapters as you like.
