@@ -171,16 +171,10 @@ namespace KBSResultModel
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// empty = this chapter has NO font level (Find/Change)
 
-		// A replace was cancelled before it got here, so this chapter was never visited. Its rows
-		// keep their checks - they were asked for and not reached - and without this the row itself
-		// is the only thing on screen, which reads exactly like a chapter that simply had nothing
-		// done to it (user's report, 2026-08-03: "it would be clearer if it said cancelled next to
-		// the document name").
-		//
-		// Set by the replace engine, cleared by Clear() and by every fresh search.
-		bool					notReached;
-
-		Chapter() : notReached(false) {}
+		// A `notReached` flag lived here from 2026-08-03 to 2026-08-05, marking a chapter a cancelled
+		// replace never got to so its row could say "cancelled". Only the chapter-at-a-time path could
+		// produce one, and it went with "save after replace": a cancel now aborts the single sequence
+		// the whole run is wrapped in, so either every chapter was replaced or none was.
 	};
 
 	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
@@ -367,13 +361,6 @@ namespace KBSResultModel
 
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
-
-	/** Mark a chapter as never visited, because the replace was cancelled before its turn came.
-	    The chapter row says so; its rows keep their checks. Out-of-range indices are ignored. */
-	void SetChapterNotReached(int32 chapterIdx);
-
-	/** Was this chapter left unvisited by a cancelled replace? false for an index out of range. */
-	bool IsChapterNotReached(int32 chapterIdx);
 
 	/** How many FONT rows this chapter shows - the groups that still have a displayed hit under the
 	    panel's cap. ZERO means this chapter has no font level at all, which is how the tree knows to

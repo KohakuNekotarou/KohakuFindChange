@@ -182,8 +182,8 @@ namespace KBSBookScope
 	    UI-suppressed, and IDocFileHandler::Close only offers to save "if uiFlags allow"
 	    (IDocFileHandler.h:97-101) - so closing a modified chapter throws that modification away
 	    without a word. It is reachable in ordinary use: a jump opens a chapter and gives it a
-	    window, the user replaces in it without ticking "save after replace" (or simply types in
-	    it), and the next run would hand it back with the work still in it. A kept chapter stays ON
+	    window, the user replaces in it (a replace never saves) or simply types in it, and the next
+	    run would hand it back with the work still in it. A kept chapter stays ON
 	    the held list, so a later call closes it once it has been saved. This is the distinction
 	    CloseDisplayedDocsIfClean has always made - it skips a dirty document for exactly this
 	    reason - now made here as well. */

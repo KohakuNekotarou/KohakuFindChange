@@ -80,13 +80,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // by format with nothing typed - which the dialog allows and KBS now runs).
                 kKBSConfirmFindFormatKey,		"Find Format",
                 kKBSConfirmChangeFormatKey,		"Change Format",
-                // Both start with the condition, because the box below can make them false: a run
-                // that saves writes every chapter to disk and closes the ones this plug-in opened,
-                // and no undo puts a saved file back. The box is ticked AFTER this text is drawn,
-                // so it cannot be rewritten at that moment - stating the condition up front is what
-                // keeps the dialog honest either way.
-                kKBSConfirmUnsavedOneKey,		"Unless you tick the box below, the chapter is opened and left UNSAVED - a single undo puts it back.",
-                kKBSConfirmUnsavedManyKey,		"Unless you tick the box below, the ^1 chapters are opened and left UNSAVED - a single undo puts them all back.",
+                // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
+                // box below", because a "save after replace" box underneath could make them false.
+                // That box is gone with its feature, so a run has only one outcome left to state.
+                kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED.",
+                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED.",
+                // Follows the line above on both layouts, whatever the count.
+                kKBSConfirmSeveralChaptersKey,	"Take care when you are replacing across several chapters.",
 
                 // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
                 // The count and the closing line above are shared with it - only these four are new.
@@ -95,12 +95,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSGlyphConfirmArrowKey,		"->",
                 kKBSGlyphConfirmDontShowKey,	"Don't show again",
 
-                // ----- "Save after replace" (the box, what it does besides saving, and the warning)
-                kKBSSaveAfterReplaceKey,		"Save each chapter after replace",
-                kKBSSaveAfterReplaceNoteKey,	"Chapters are opened one at a time and closed again after saving.",
-                // No quotation marks around the box's name: no string in this table escapes a
-                // double quote, and the resource compiler is not worth finding out about here.
-                kKBSSaveAfterReplaceWarningKey,	"Save each chapter after replace is ticked." kLineSeparatorString kLineSeparatorString "Documents are saved as their replacements are done, and the ones this plug-in opened are then closed. Cancelling part-way through does not put a saved file back." kLineSeparatorString kLineSeparatorString "Continue?",
+                // "Save after replace" had three strings here (the box, its note, and the extra
+                // warning that went up when it was ticked) from 2026-08-02 until the feature was
+                // removed on 2026-08-05. Their keys are retired in KBSID.h.
 
 		// ----- Misc strings
                 kKBSAboutBoxStringKey,			kKBSDisplayName ", version " kKBSVersion "\n\n"

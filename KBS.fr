@@ -1529,46 +1529,34 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			"",									// the controller fills it
 			0
 
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
-
-		// A "Don't show again" check box stood here from 2026-07-28 to 2026-08-01. It was removed
-		// because ticking it suppressed the confirmation for a DESTRUCTIVE rewrite permanently and
-		// almost invisibly - the only way back is Preferences > General > Reset All Warning Dialogs.
-		// The box below is the opposite bargain: it asks for MORE than the run would do on its own,
-		// and it is asked every time rather than remembered.
-
-		// ----- "Save each chapter after replace" -----
-		// Drawn OFF every time - nothing writes to it on open and nothing remembers it between runs.
-		// This overwrites the user's files, so it is asked per run rather than configured once.
-		EVECheckBoxWidget
-		(
-			kKBSReplaceConfirmSaveWidgetID,	// WidgetId
-			kSysCheckBoxPMRsrcId,			// RsrcId
-			kBindNone,						// Frame binding
-			Frame(0, 0, 340, 20)			// Frame (l,t,r,b)
-			kTrue,							// Visible
-			kTrue,							// Enabled
-			kAlignLeft,						// Alignment
-			kKBSSaveAfterReplaceKey,		// "Save each chapter after replace"
-
 			kEVEAlignLeft | kEVENoSpaceAfter,
 		),
 
-		// What the box does BESIDES saving, said here rather than discovered afterwards.
+		// ----- "Take care when you are replacing across several chapters." -----
+		// A line of its own rather than more text on the one above: it is a different kind of
+		// statement - that one describes this run, this one warns about the next.
 		EVEStaticTextWidget
 		(
-			kKBSReplaceConfirmSaveNoteWidgetID,
+			kKBSReplaceConfirmCareWidgetID,
 			kSysStaticTextPMRsrcId,
 			kBindNone,
-			Frame(0, 0, 340, 32)
+			Frame(0, 0, 340, 20)
 			kTrue, kTrue, kAlignLeft,
 			kDontEllipsize, kFalse,
-			kKBSSaveAfterReplaceNoteKey,
+			"",									// the controller fills it
 			0
 
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
+
+		// Two check boxes have stood here and both are gone:
+		//   - "Don't show again", 2026-07-28 to 2026-08-01. Ticking it suppressed the confirmation
+		//     for a DESTRUCTIVE rewrite permanently and almost invisibly - the only way back is
+		//     Preferences > General > Reset All Warning Dialogs.
+		//   - "Save each chapter after replace" and its note, 2026-08-02 to 2026-08-05, removed with
+		//     the feature itself (user's decision: a machine that cannot hold the whole book open is
+		//     served by ticking fewer rows). A run now always leaves every chapter it wrote to open
+		//     and unsaved, which is the state the closing line above describes.
 
 		// ----- OK / Cancel (Cancel is the default - see the note above) -----
 		EVEGenericPanelWidget

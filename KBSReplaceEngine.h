@@ -37,31 +37,22 @@ namespace KBSReplaceEngine
 {
 	/** Replace every checked hit in the current result set.
 
-	    ***** HOW the run is wrapped depends on saveAfterReplace, because saving is what makes a
-	    chapter settled. ***** (Split in two on 2026-08-03.)
+	    The WHOLE run is ONE command sequence, across every chapter, so a book-wide replace undoes
+	    with a single Ctrl+Z whichever chapter the user has in front, and cancelling puts the whole
+	    book back. Every chapter that has work is opened before the first character is written, and
+	    every one stays open and unsaved afterwards. (Corrected 2026-07-28. It used to be one
+	    sequence per chapter, on the belief that "undo is per document" made the chapter the largest
+	    grain available. Measured on the running application, that arrangement was actively harmful:
+	    undoing in one document removed the step from the other chapters' histories as well WITHOUT
+	    reverting their text, leaving them replaced with no way back.) The price is that the run is
+	    all-or-nothing - an error left standing when the sequence ends rolls back every chapter.
 
-	    NOT saving: the WHOLE run is ONE command sequence, across every chapter, so a book-wide
-	    replace undoes with a single Ctrl+Z whichever chapter the user has in front, and cancelling
-	    puts the whole book back. Every chapter that has work is opened before the first character
-	    is written, and every one stays open and unsaved afterwards. (Corrected 2026-07-28. It used
-	    to be one sequence per chapter, on the belief that "undo is per document" made the chapter
-	    the largest grain available. Measured on the running application, that arrangement was
-	    actively harmful: undoing in one document removed the step from the other chapters'
-	    histories as well WITHOUT reverting their text, leaving them replaced with no way back.)
-	    The price is that the run is all-or-nothing - an error left standing when the sequence ends
-	    rolls back every chapter.
-
-	    SAVING: one chapter at a time - open, replace, close its own sequence, save, hand it back -
-	    so a run of any size holds at most one chapter of its own. A book of twenty chapters used to
-	    load all twenty before writing anything, which is more than a modest machine has to give.
-	    A chapter whose sequence ends with an error standing is put back WHOLE - its text, and its
-	    rows with it - and is neither saved nor closed. The summary names it: the rollback leaves
-	    nothing on any row to explain itself, so the chapter has to say it instead.
-
-	    A saved file cannot be taken back by any sequence, so cancelling THERE stops the run where
-	    it stands and leaves the finished chapters finished. The panel goes on showing their rows as
-	    replaced (they match what is now in those files), the chapters the run never reached keep
-	    their ticks, and their rows say "cancelled". The caller warns the user before the run starts.
+	    ***** A SECOND shape existed from 2026-08-03 to 2026-08-05 ***** - one chapter at a time,
+	    for runs that SAVED, so that a book of twenty chapters was never all open at once. It was
+	    removed with "save after replace" itself, and could not outlive it: a chapter that has not
+	    been written to disk cannot be closed, because closing it would throw its replacements away.
+	    A machine that cannot hold a whole book open is served by ticking fewer rows instead
+	    (user's decision, 2026-08-05).
 
 	    A chapter whose re-walk does not reach every checked hit is reported rather than replaced
 	    at guessed positions - that means the document was edited, or the Find/Change query
@@ -79,23 +70,18 @@ namespace KBSReplaceEngine
 	        them; the summary names the chapter instead. A walk that simply ran to the end of the
 	        chapter without the hit coming up is a different thing - those rows say missing.
 
-	    Chapters are left MODIFIED AND UNSAVED unless saveAfterReplace says otherwise: overwriting
-	    the user's files is their decision, which is why it is asked for on the confirmation and
-	    never remembered between runs.
+	    ***** NOTHING IS EVER SAVED, AND NOTHING IS EVER CLOSED. ***** Every chapter a replacement
+	    lands in is left MODIFIED AND UNSAVED, with a window open on it, and the summary says so:
+	    overwriting the user's files is the user's own step to take. (The confirmation carried a
+	    "save after replace" box from 2026-08-02 to 2026-08-05, which is where the second shape
+	    above came from.)
 
 	    Refuses to run at all while another replace is up (see IsReplacing), and while the panel is
 	    showing a replace's report rather than a work list.
 
 	    @param outSummary OUT a ready-to-show status line (counts, chapters that did not line up).
-	    @param saveAfterReplace save every document a replacement lands in - whoever opened it. A
-	           document that took no replacement is left alone: nothing of ours is in it, so a dirty
-	           flag there is somebody else's edit. A chapter this plug-in opened is closed once
-	           saved, WHATEVER "Hide Previous Chapter" says - that toggle is about jumping, and a
-	           run that saves has no reason to hold anything (the search stopped consulting it on
-	           2026-08-02, this on 2026-08-03). A chapter whose save FAILS keeps its replacements,
-	           is not closed, and is given a window to be dealt with by hand.
 	    @return the number of hits actually replaced (0 on any early exit). */
-	int32 ReplaceChecked(PMString& outSummary, bool saveAfterReplace);
+	int32 ReplaceChecked(PMString& outSummary);
 
 	/** Do the current Find/Change settings still describe the search the panel's results came from?
 

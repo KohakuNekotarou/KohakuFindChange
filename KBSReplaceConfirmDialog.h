@@ -23,7 +23,9 @@
 //
 //  Text and GREP asked through CAlert::ModalAlert until 2026-08-02. That alert cannot carry a
 //  check box with a label of our own - the SDK offers "Don't show again" and "Apply to All",
-//  both fixed wording (CAlert.h:185,209) - and "save after replace" had to go somewhere.
+//  both fixed wording (CAlert.h:185,209) - and "save after replace" had to go somewhere. That box
+//  was removed on 2026-08-05, but the move stays: one prompt for all three tabs, and a Cancel that
+//  can be the default button (an alert carrying a box cannot be given one).
 //
 //========================================================================================
 
@@ -95,19 +97,12 @@ public:
 		@param checkedCount how many hits will be rewritten (the opening sentence, glyph layout).
 		@param chapterCount how many documents will be written to (the closing sentence, glyph).
 		@param message      the whole prompt, for the Text / GREP layout. Empty = glyph layout.
-		@param outSaveAfterReplace OUT: was the "save after replace" box ticked? Written only when
-		                    the user approves - a Cancel leaves the caller's own value alone.
 		@return true when the user approved the rewrite.
 	*/
-	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message,
-		bool& outSaveAfterReplace);
+	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message);
 
 	/** The controller's way back: OK sets it, Ask() reads it. */
 	static void SetAccepted(bool accepted);
-
-	/** The controller's way back for the check box: OK reads the box and states it here. Never
-		called on Cancel, which is what leaves the answer at its every-time default of false. */
-	static void SetSaveAfterReplace(bool save);
 
 	/** What the controller was told to show. Read by InitializeDialogFields. */
 	static int32 GetCheckedCount();
@@ -126,7 +121,6 @@ private:
 	static int32	sCheckedCount;
 	static int32	sChapterCount;
 	static PMString	sMessage;
-	static bool		sSaveAfterReplace;
 
 	/** Fill one side from one attribute list.
 		@param glyphID the glyph the caller already read off the options.

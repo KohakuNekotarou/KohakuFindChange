@@ -302,12 +302,16 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // rather than child by child, so EVE closes the gap they leave.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmMessageWidgetID, kKBSPrefix + 21)
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 22)
-// The "save after replace" box and the line under it. Session-free: the box is drawn OFF every
-// time the prompt opens (user's call, 2026-08-02) because it overwrites the user's files, and a
-// setting that remembers is a setting that gets forgotten about.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveWidgetID, kKBSPrefix + 23)
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 25)
+// RETIRED 2026-08-05, NOT TO BE REUSED: the "save after replace" box and the line under it, which
+// stood on the confirmation from 2026-08-02 until the feature was removed. A widget id that comes
+// back on a DIFFERENT control is read by a saved workspace as the old one; the numbers cost nothing.
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveWidgetID, kKBSPrefix + 23)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24)
+// "Take care when you are replacing across several chapters", under the line above. The GLYPH layout
+// only: the Text / GREP one carries the same sentence inside its single wrapped block, assembled by
+// KBSActionComponent, which is why there is no second widget for it there.
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
+//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 26)
 
 
 // "About Plug-ins" sub-menu:
@@ -395,14 +399,23 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
 #define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
 #define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
-// The closing line, split by how many chapters will be written to. The whole replace is ONE undo
-// step however many chapters it touches - KBSReplaceEngine wraps the entire run in a single command
-// sequence, which is what lets one Ctrl+Z put all of it back. (Until 2026-07-28 this said "one undo
-// step per chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one
-// document silently stripped the step from the others without reverting their text.) The two keys
-// differ only in singular/plural, which languages that inflect cannot build from one string.
+// The closing line, split by how many chapters will be written to. The two keys differ only in
+// singular/plural, which languages that inflect cannot build from one string.
+//
+// Both used to end by promising the undo ("a single undo puts it back"). Dropped on 2026-08-05
+// (user's call): the sentence is about what the user is LEFT WITH, and a promise about undo in the
+// same breath softens it. The behaviour it described is unchanged and still worth knowing here - the
+// whole replace is ONE undo step however many chapters it touches, because KBSReplaceEngine wraps
+// the entire run in a single command sequence. (Until 2026-07-28 this said "one undo step per
+// chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one document
+// silently stripped the step from the others without reverting their text.)
 #define kKBSConfirmUnsavedOneKey	kKBSStringPrefix "kKBSConfirmUnsavedOneKey"
 #define kKBSConfirmUnsavedManyKey	kKBSStringPrefix "kKBSConfirmUnsavedManyKey"
+// The warning that follows it, in the user's own words (2026-08-05). Shown WHATEVER the count: on a
+// one-chapter run it reads as notice of what a bigger one will do. It matters more since the plug-in
+// stopped offering to save - a run across a whole book now leaves every chapter it touched standing
+// open, and that is a surprise worth putting in front of the run rather than after it.
+#define kKBSConfirmSeveralChaptersKey	kKBSStringPrefix "kKBSConfirmSeveralChaptersKey"
 
 // The Glyph tab's own confirmation, the one that draws the glyphs. The count and the closing line
 // are shared with the plain alert above - the same sentences, on a different screen - so the only
@@ -416,16 +429,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // the box back is a resource change rather than a translation round; nothing reads it today.
 #define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
 
-// The "save after replace" box and its note. Translated for the same reason the rest of this
-// prompt is: this is where the user authorises a rewrite of their text, and now also where they
-// authorise OVERWRITING the files it lives in. The status line that reports what happened stays
-// English, like every other status line here.
-#define kKBSSaveAfterReplaceKey			kKBSStringPrefix "kKBSSaveAfterReplaceKey"
-#define kKBSSaveAfterReplaceNoteKey		kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
-// The warning that goes up when the box IS ticked. Saving is the one thing this plug-in does that
-// nothing can take back - not an undo, and not the progress bar's Cancel - so it is said once more,
-// on its own, after the rewrite has already been approved, and with Cancel as the default button.
-#define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
+// RETIRED 2026-08-05 with the feature they belonged to: the "save after replace" box, its note, and
+// the extra warning that went up when the box was ticked. They stood here from 2026-08-02. Removed
+// from both string tables as well - unlike kKBSGlyphConfirmDontShowKey above, which is a box that
+// could come back, these describe a run this plug-in no longer performs.
+//#define kKBSSaveAfterReplaceKey		kKBSStringPrefix "kKBSSaveAfterReplaceKey"
+//#define kKBSSaveAfterReplaceNoteKey	kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
+//#define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
 
 // Menu item positions:
 //

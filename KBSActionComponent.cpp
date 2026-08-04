@@ -98,10 +98,8 @@ public:
 		    Find/Change dialog, not from this panel, so this is the only place the user sees what is
 		    about to be written - and how many hits will change. An empty change string is spelled
 		    out: deleting the matches is a legitimate request, but never a surprise.
-		    @param outSaveAfterReplace OUT: did the user tick "save after replace"? Only written when
-		           they approve; false is the every-time default.
 		    @return true to go ahead. */
-		bool ConfirmReplace(int32 checkedCount, bool& outSaveAfterReplace);
+		bool ConfirmReplace(int32 checkedCount);
 		
 
 
@@ -332,44 +330,16 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				}
 			}
 
-			// false unless the user ticks the box, and it starts false on every run - the prompt
-			// draws the box off and nothing remembers it.
-			bool saveAfterReplace = false;
-			if (!this->ConfirmReplace(checkedCount, saveAfterReplace))
+			// ONE prompt, and this is it. A second warning stood here from 2026-08-02 to
+			// 2026-08-05, for the "save after replace" box: saving was the one thing this plug-in
+			// did that nothing could take back, so it was asked again on its own. With that box
+			// gone, everything a run does is undoable - the chapters are left open and unsaved -
+			// and a second prompt in front of an undoable step is just a step to click through.
+			if (!this->ConfirmReplace(checkedCount))
 				break;
 
-			// ***** Ticking that box is the one choice here that nothing can take back. *****
-			// A replace is undoable and a cancelled run rolls itself back - but a SAVED file is on
-			// disk, and neither Ctrl+Z nor the progress bar's Cancel puts it back. It also changes
-			// what Cancel MEANS: a saving run stops where it stands and leaves the chapters it
-			// finished saved, where a run that does not save puts the whole book back.
-			//
-			// So it is asked once more, on its own, with CANCEL as the default button - a stray
-			// Enter must not be what overwrites the user's files.
-			//
-			// Translated like the confirmation it follows: this is the moment the user authorises
-			// overwriting their files, and the rule in this plug-in is that the prompts before a
-			// rewrite are translated while the panel and its status line stay English.
-			//
-			// ***** No Translate() and no SetTranslatable() here. ***** ModalAlert translates
-			// everything it is handed, including the message (CAlert.h:99-100), so the key goes
-			// through as it stands.
-			//
-			// CAlert::SetShowAlerts(kFalse) - what a script running with NEVER_INTERACT does -
-			// makes ModalAlert return the DEFAULT button (CAlert.h:220-222). That is Cancel here,
-			// so an unattended script does not overwrite anything. Safe way round.
-			if (saveAfterReplace)
-			{
-				PMString warning(kKBSSaveAfterReplaceWarningKey);
-				const int16 answer = CAlert::ModalAlert(warning,
-					kOKString, kCancelString, kNullString,
-					2 /*Cancel is the default*/, CAlert::eWarningIcon);
-				if (answer != 1)
-					break;
-			}
-
 			PMString summary;
-			KBSReplaceEngine::ReplaceChecked(summary, saveAfterReplace);
+			KBSReplaceEngine::ReplaceChecked(summary);
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
 			KBSResultTree::ShowStatus(summary);
 			break;
@@ -520,7 +490,7 @@ static void AppendFormatNote(PMString& str, const char* formatKey, const PMStrin
 
 /* ConfirmReplace
 */
-bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterReplace)
+bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
@@ -660,9 +630,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	// How many documents this will write to decides what can honestly be promised about undo: one
-	// chapter undoes with a single Ctrl+Z, several take one undo each because InDesign's undo
-	// history is per document.
+	// How many chapters this will write to. Only the singular/plural of the sentence turns on it now
+	// - it used to decide what could be promised about undo as well, until that promise came off the
+	// prompt on 2026-08-05.
 	const int32 chapterCount = KBSResultModel::GetCheckedChapterCount();
 	PMString chapterStr;
 	chapterStr.AppendNumber(chapterCount);
@@ -672,20 +642,27 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount, bool& outSaveAfterRe
 	::ReplaceStringParameters(&unsaved, chapterStr);
 	msg.Append(unsaved);
 
+	// ...and the warning that follows it, on its own line and WHATEVER the count (user, 2026-08-05).
+	// On a one-chapter run it reads as notice of what a bigger one will do, which is the point: the
+	// plug-in no longer offers to save, so a book-wide replace leaves every chapter it touched
+	// standing open, and that is better said before the run than discovered after it.
+	msg.Append(kLineSeparatorString);
+	PMString care(kKBSConfirmSeveralChaptersKey);
+	care.Translate();
+	msg.Append(care);
+
 	// ONE prompt for every tab (2026-08-02). It used to be CAlert::ModalAlert here and the glyph
-	// dialog above; both are the same dialog now, because an alert cannot carry a check box with a
-	// label of our own - the SDK offers "Don't show again" and "Apply to All", both fixed wording
-	// (CAlert.h:185,209) - and the "save after replace" box had to go somewhere.
-	//
-	// Keeping CANCEL as the default button was the other reason. This starts a destructive rewrite
-	// and a stray Enter must not be what starts it; WarningAlertWithDontShowAgain, the one alert
-	// that draws a box at all, takes no default-button argument.
+	// dialog above; both are the same dialog now. The box that forced the move - "save after
+	// replace" - was itself removed on 2026-08-05, but the arrangement stays for the reason that
+	// outlived it: CANCEL is the DEFAULT button here. This starts a destructive rewrite and a stray
+	// Enter must not be what starts it, and the alerts that draw a box of their own take no
+	// default-button argument (CAlert.h:185,209).
 	//
 	// An empty message asks with the GLYPH layout, so this is where the two part company: the
 	// glyphs when they resolved, the assembled sentences when they did not.
 	PMString glyphLayout;
 	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount, chapterCount,
-		glyphResolved ? glyphLayout : msg, outSaveAfterReplace);
+		glyphResolved ? glyphLayout : msg);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
 	KBSReplaceConfirmDialog::ReleaseSides();

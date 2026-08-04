@@ -398,20 +398,6 @@ bool KBSResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 	return true;
 }
 
-void KBSResultModel::SetChapterNotReached(int32 chapterIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	gChapters[chapterIdx].notReached = true;
-}
-
-bool KBSResultModel::IsChapterNotReached(int32 chapterIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	return gChapters[chapterIdx].notReached;
-}
-
 int32 KBSResultModel::GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
