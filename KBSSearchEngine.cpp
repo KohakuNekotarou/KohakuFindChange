@@ -2214,7 +2214,16 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		//
 		// Only chapters KBS opened are closed: ReleaseHeldDoc checks the held list itself, so one
 		// the user already had open passes through untouched.
-		KBSBookScope::ReleaseHeldDoc(chapterDocRef);
+		//
+		// ***** CLOSED ON THE SPOT, not scheduled. ***** A scheduled close does not run until the
+		// current tick has unwound, and this run IS that tick - so every chapter handed back here
+		// stayed open, and kept its .indd locked, until the whole search was over. Holding one
+		// chapter at a time is the entire point of this loop, so the close has to happen here.
+		// (Measured 2026-08-04 on the replace, which walks chapters the same way: four chapters,
+		// four .idlk files standing at once.) Safe at this point - the walk has halted, the dirty
+		// guard inside CollectHitsInDoc has already restored the flag, and everything read after
+		// this (FinalizeChapterHits, the Chapter it fills in) is plain values, not database work.
+		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
 
 		if (docCapped)
 			collectionTruncated = true;

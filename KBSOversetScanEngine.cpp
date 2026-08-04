@@ -655,7 +655,14 @@ void KBSOversetScanEngine::Run()
 		// text indices, which survive the document being closed. A jump reopens what it needs
 		// through ReopenChapterDoc. Only chapters KBS opened are closed: ReleaseHeldDoc checks the
 		// held list itself, so one the user already had open passes through untouched.
-		KBSBookScope::ReleaseHeldDoc(chapterDocRef);
+		//
+		// ***** CLOSED ON THE SPOT, not scheduled. ***** A scheduled close waits for this run to
+		// unwind, so every chapter handed back here would still be open, and still locking its
+		// .indd, when the scan ended - the one thing the chapter-at-a-time shape exists to avoid
+		// (measured 2026-08-04 on the replace, which walks chapters the same way). Safe at this
+		// point: ScanOneDocument has returned, so its dirty guard has restored the flag and nothing
+		// of ours is still holding the document.
+		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
 	}
 
 	// ***** Ask ONE more time, outside the loop. *****
