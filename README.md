@@ -15,9 +15,6 @@ This plugin was designed and implemented by **KohakuNekotarou** in collaboration
 ## Note
 We cannot be held responsible for any issues that may arise; please use this service at your own risk.
 
-## Releases
-https://github.com/KohakuNekotarou/KohakuFindChange/releases
-
 ## 連絡
 農作業の合間に趣味でInDesignのScriptやPlugInを作っています。
 お仕事のお依頼は
