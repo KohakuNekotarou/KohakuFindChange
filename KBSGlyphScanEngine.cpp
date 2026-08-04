@@ -88,7 +88,7 @@
 // Project includes:
 #include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
 #include "KBSGlyphScanEngine.h"
-#include "KBSOversetScanEngine.h"	// IsStoryOverset - the ONE answer to "is this overset right now?"
+#include "KBSOversetScanEngine.h"	// StoryHasAnyOverset - the ONE answer to "is this overset right now?"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// Rebuild / ShowStatus - also what app.kfcStatus reads back
 #include "KBSRunGuard.h"		// is anything else of ours running? (the modal bar pumps events)
@@ -272,7 +272,9 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 
 	// ***** Does this story hold text that did not fit? ***** Asked AFTER the recompose above, and of the
 	// same interface the overset scan uses, so this plug-in has ONE answer to the question rather
-	// than two (KBSOversetScanEngine::IsStoryOverset -> ITextParcelList::GetIsOverset).
+	// than two (KBSOversetScanEngine::StoryHasAnyOverset -> ITextParcelList::GetIsOverset). It covers
+	// the whole story, cells included: text that did not compose carries no glyphs to read wherever
+	// it sits, so a cell overflowing on its own has to be admitted to just as a pushed-out frame is.
 	//
 	// It used to be IFrameList::GetWasOverset(), asked BEFORE the recompose, and both halves of that
 	// were wrong (2026-08-04):
@@ -283,7 +285,7 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	//     document, correctly reported none - two scans of one plug-in disagreeing.
 	//   * WHEN it asked - before the recompose that this very function performs, so even a fresh
 	//     answer would have been the stale one.
-	if (KBSOversetScanEngine::IsStoryOverset(model))
+	if (KBSOversetScanEngine::StoryHasAnyOverset(model))
 		outHasOverset = true;
 
 	// READ-ONLY iterator: this walk never changes a wax line nor applies one, which is exactly the
@@ -377,10 +379,11 @@ bool IsCrossableBreak(IComposeScanner* scanner, TextIndex pos)
     - applying a font to the range - wants to reach all of it in one go. Only a SINGLE break is
     crossed: two in a row mean an empty paragraph between the boxes, which is a different place.
 
-    ***** The row's DISPLAYED text is still cut at the paragraph that holds its start
-    (KBSSearchEngine::SplitLineAroundMatch trims a range that runs past its paragraph), so a row
-    that crosses a break shows the boxes before it and not the ones after. The COUNT and the RANGE
-    both cover the whole run, so the summary and any fix are unaffected. */
+    ***** The row DISPLAYS the whole run, break and all (2026-08-04). KBSSearchEngine::
+    SplitLineAroundMatch no longer stops at the paragraph the range starts in, and the break itself
+    is drawn as a mark - a pilcrow, or a return arrow for a forced line break - so a run that crosses
+    one shows the boxes on BOTH sides of it. The COUNT and the RANGE always covered the whole run, so
+    neither the summary nor any fix is changed by this; only what the row shows grew. */
 void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vector<NotdefRun>& out)
 {
 	if (found.empty())

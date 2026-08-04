@@ -22,7 +22,10 @@ class ITextModel;
 
 namespace KBSOversetScanEngine
 {
-	/** Is this story's MAIN thread overset RIGHT NOW?
+	/** Does this story hold ANY text that did not fit, RIGHT NOW? Its main thread, or any cell of any
+	    table in it (nested tables included) - the same two questions the scan itself asks, asked in
+	    the same order, of the same interface (ITextParcelList::GetIsOverset). So this plug-in has ONE
+	    answer to "is this overset" rather than two that can drift apart.
 
 	    Shared with the glyph scan, which has to say on its status line whether part of the document
 	    could not be looked at. It used to ask IFrameList::GetWasOverset() instead, and that is a
@@ -32,13 +35,12 @@ namespace KBSOversetScanEngine
 	    disagreed about one document, the glyph scan claiming text it could not check while the
 	    overset scan correctly reported none.
 
-	    Asked of the same interface the overset scan itself uses (ITextParcelList::GetIsOverset), so
-	    there is one answer to "is this overset" in this plug-in rather than two.
-
-	    The MAIN thread only - position 0 - which is the same reach the frame-list question had. A
-	    table cell overflowing on its own is a separate thread and is NOT included here; the overset
-	    scan reports those, and the glyph scan reads cells through the wax like any other text. */
-	bool IsStoryOverset(ITextModel* model);
+	    ***** The cells are asked about for the same reason the frames are. ***** Text that did not
+	    compose carries no glyphs to read wherever it sits, so a cell overflowing on its own hides
+	    missing glyphs exactly as a pushed-out frame does, and the scan has to admit it either way.
+	    An earlier version of this function asked only about the main thread, which left the glyph
+	    scan silent about documents Find Overset had findings for. */
+	bool StoryHasAnyOverset(ITextModel* model);
 
 	/** Scan the current scope for overset text and fill KBSResultModel with what was found.
 	    Puts its own summary on the panel's status line (so app.kfcStatus can be read back).

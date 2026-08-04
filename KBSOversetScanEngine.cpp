@@ -144,14 +144,21 @@ bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32&
     "Table cell (121)" finding that matches the official preflight is one of those nested cells.
 
     ***** Still no recursion. ***** The sequence is already flat; walking a cell's own tables as
-    well would visit those threads a second time and report every nested cell twice. */
-void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>& out)
+    well would visit those threads a second time and report every nested cell twice.
+
+    @param out  where the places are collected - or nil for a caller that only wants to know WHETHER
+                any cell overflowed (StoryHasAnyOverset). With nil the walk stops at the first one,
+                since nothing further can change the answer.
+    @return whether any overset cell was found at all. */
+bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>* out)
 {
+	bool found = false;
+
 	// Aggregated on kTextStoryBoss, and it owns one ITextStoryThreadDict per table
 	// (SnpIterTableUseDictHier.cpp:154-163).
 	InterfacePtr<ITextStoryThreadDictHier> dictHier(model, UseDefaultIID());
 	if (dictHier == nil)
-		return;
+		return false;
 
 	IDataBase* const db = ::GetDataBase(dictHier);
 
@@ -190,14 +197,22 @@ void CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
 			if (!ThreadOverset(model, cellPos, start, count))
 				continue;
 
+			// A caller that only asked WHETHER anything overflowed has its answer now, and the
+			// remaining tables cannot change it.
+			if (out == nil)
+				return true;
+
 			OversetPlace place;
 			place.storyRef = storyRef;
 			place.start = start;
 			place.count = count;
 			place.inCell = true;
-			out.push_back(place);
+			out->push_back(place);
+			found = true;
 		}
 	}
+
+	return found;
 }
 
 /** Scan one document and turn every overset place into a result row.
@@ -273,7 +288,7 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		}
 
 		// (2) cells overflowing on their own - the red dot. Nested tables included.
-		CollectOversetCells(storyRef, model, places);
+		CollectOversetCells(storyRef, model, &places);
 	}
 
 	KBSSearchEngine::HitCache* cache = KBSSearchEngine::NewHitCache();
@@ -413,29 +428,43 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 
 }	// anonymous namespace
 
-// The shared answer to "is this story overset right now?" - see KBSOversetScanEngine.h for why the
-// glyph scan asks this rather than the frame list's REMEMBERED one. Position 0 is the main thread,
-// the same reach the question it replaced had.
-bool KBSOversetScanEngine::IsStoryOverset(ITextModel* model)
+// The shared answer to "does this story hold overset text right now?" - see KBSOversetScanEngine.h
+// for why the glyph scan asks this rather than the frame list's REMEMBERED one. BOTH of the scan's
+// own questions are asked, in the scan's own order: the thread the frames carry, then the cells that
+// overflow on their own.
+bool KBSOversetScanEngine::StoryHasAnyOverset(ITextModel* model)
 {
 	if (model == nil)
 		return false;
 
-	// ***** ITextParcelList ALONE says yes about a story that fits. ***** It counts the thread's
-	// final CR as an overset parcel, which is why ThreadOverset below has to correct the COUNT
-	// (see its comment). The frame pass of the scan itself never sees that, because it asks
-	// ITextUtils::IsOverset first and only then reads the detail - so this asks in the same order.
+	// ***** (1) The thread the frames carry - the red "+". *****
+	//
+	// ITextParcelList ALONE says yes about a story that fits: it counts the thread's final CR as an
+	// overset parcel, which is why ThreadOverset has to correct the COUNT (see its comment). The
+	// frame pass of the scan itself never sees that, because it asks ITextUtils::IsOverset first and
+	// only then reads the detail - so this asks in the same order.
 	//
 	// Measured 2026-08-04: without this gate a document with nothing overset reported overset here,
-	// which is precisely the false "Text in overset cannot be checked." this function was added to
+	// which is precisely the false "Text in overset cannot be checked." this function exists to
 	// remove.
 	InterfacePtr<IFrameList> frameList(model->QueryFrameList());
-	if (frameList == nil || !Utils<ITextUtils>()->IsOverset(frameList))
-		return false;
+	if (frameList != nil && Utils<ITextUtils>()->IsOverset(frameList))
+	{
+		TextIndex whereItStarts = kInvalidTextIndex;
+		int32 howMuch = 0;
+		if (ThreadOverset(model, 0, whereItStarts, howMuch))
+			return true;
+	}
 
-	TextIndex whereItStarts = kInvalidTextIndex;
-	int32 howMuch = 0;
-	return ThreadOverset(model, 0, whereItStarts, howMuch);
+	// ***** (2) Cells overflowing on their own - the red dot, nested tables included. *****
+	//
+	// The glyph scan cannot read what did not compose WHEREVER it sits: a cell overflowing on its own
+	// hides missing glyphs exactly as a pushed-out frame does. Asking only (1) left the scan silent
+	// about a document Find Overset had findings for - the same two-scans-disagree fault that the
+	// main-thread half of this function was written to remove, one level further down (2026-08-04).
+	//
+	// nil = collect nothing and stop at the first one; only the yes or no is wanted here.
+	return CollectOversetCells(::GetUIDRef(model), model, nil);
 }
 
 void KBSOversetScanEngine::Run()

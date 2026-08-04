@@ -909,6 +909,12 @@ type KBSIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKBSIconW
  *   the image's, so the icon compile step is skipped and the old artwork is linked again (the
  *   .pln's own date still moves, which is what makes this hard to spot). Touch this file after
  *   swapping the picture.
+ *
+ * KohakuNeko_On.png sits in this folder beside the files named below and is DELIBERATELY not one of
+ * them: it is the original artwork (400x400) the 32px icons were drawn down from, kept so they can
+ * be redrawn from it rather than enlarged from a thumbnail. Nothing compiles it in and nothing
+ * loads it - if it is ever wanted on screen, it needs a resource line of its own here, and a
+ * properly sized version to point that line at.
  */
 resource PNGA(kKBSIconResID) "Kohakuneko_OFF32.png"
 resource PNGR(kKBSIconResID) "Kohakuneko_OFF32.png"
@@ -999,7 +1005,9 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// 2026-08-04 off a screenshot: four baselines 11.8px apart), so 48 = exactly four. The frame
 		// was 52 - four lines and 4px over - and the widget draws into whatever room it is given:
 		// narrowing the panel pushed the text to five lines and the TOP 4px OF THE FIFTH appeared
-		// below the fourth, a sliver of chopped-off letters (user's screenshot, work/キャプチャ.PNG).
+		// below the fourth, a sliver of chopped-off letters (from a screenshot the user took, kept in
+		// work/ - its name is not spelled here because this .fr is compiled as CP932 and the rest of
+		// the file is plain ASCII).
 		// A remainder of zero leaves nothing for a part-line to be drawn into.
 		//
 		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was

@@ -246,16 +246,24 @@ namespace KBSSearchEngine
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
 	/** Just the matched text at [start, end), cut where SplitLineAroundMatch would cut its match
-	    segment - clipped to the end of the paragraph holding 'start' - but WITHOUT building the
-	    line around it.
+	    segment - both go through the same 500-character cap (KBSCapMatchEnd), which is what keeps
+	    the two from ever disagreeing about a match - but WITHOUT building the line around it.
 
-	    SplitLineAroundMatch copies the whole paragraph two or three times over to produce three
-	    strings; the same-occurrence test throws two of them away. This reads the matched characters
+	    SplitLineAroundMatch reads the surrounding paragraphs as well to produce three strings; the
+	    same-occurrence test throws two of them away. This reads the matched characters
 	    and nothing else, which is what makes it affordable once per checked hit. */
 	void CopyMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end, PMString& outMatch);
 
-	/** The paragraph holding [start, end), split at those exact UTF-16 offsets into the three
-	    segments a hit row paints: the text before the match, the matched text, and the text after.
+	/** The line around [start, end), in the three segments a hit row paints: the text before the
+	    match (from the start of the paragraph the match BEGINS in), the matched text itself, and the
+	    text after it (to the end of the paragraph the match ENDS in - a different paragraph once the
+	    match spans a break).
+
+	    The match is carried WHOLE however many paragraphs it crosses, up to the 500-character cap
+	    (KBSCapMatchEnd). Past that cap no trailing segment is written at all: what follows the cut is
+	    more of the MATCH, and this segment is drawn in the normal colour, so writing it would show
+	    the rest of the match as though it lay outside it.
+
 	    Any of the three may come back empty; all three are empty when the position cannot be read.
 
 	    Used by the search when a hit is collected, and again by the replace pass to rebuild a
