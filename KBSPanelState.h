@@ -19,6 +19,10 @@
 //    - Translucent Panel (*Windows only. Only the FLAG is restored; putting the alpha on the
 //      window is done by the panel's AutoAttach and the palette-visibility observer, because at
 //      startup there is no panel yet.)
+//    - Translucent Find/Change (*Windows only, and the same again: the flag alone. InDesign's own
+//      Find/Change dialog is certainly not open at startup, and the window-list observer puts the
+//      alpha on the moment it is. **This line was missing from the list until 2026-08-04, when it
+//      was already being saved and restored - the code was right and the note was not.)
 //    - Hide Previous Chapter (the user's call, 2026-08-04). It closes chapter windows as a jump
 //      lands, which is why it was left out at first - but a restored ON cannot act on its own:
 //      the jump asks ShouldHidePreviousChapter, which ALSO requires the results to have come from

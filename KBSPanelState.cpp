@@ -25,7 +25,7 @@
 // Project includes (the state accessors of every setting saved here):
 #include "KBSPanelState.h"
 #include "KBSResultTree.h"		// ShowStatus - where the result, or the failure, is reported
-#include "KBSPanelAlpha.h"		// KBSGetPanelTranslucent / KBSSetPanelTranslucent
+#include "KBSPanelAlpha.h"		// the get / set of BOTH translucency toggles (panel and Find/Change)
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 
 // The file name, in the roaming preferences folder itself.

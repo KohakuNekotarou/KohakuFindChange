@@ -248,13 +248,13 @@ DECLARE_PMID(kActionIDSpace, kKBSTranslucentPanelActionID, kKBSPrefix + 19)
 // "Save Panel Settings": write the flyout's SETTINGS toggles to a JSON file of our own in the user's
 // preferences folder, read back at startup (KBSPanelState.cpp). A plain command, not a toggle - and
 // an explicit one, the way KESCM has it: settings are saved when asked for, never behind the user's
-// back. Today the file holds Translucent Panel and nothing else.
+// back. The file holds three settings - Translucent Panel, Translucent Find/Change and Hide Previous
+// Chapter. *Book Scope is deliberately not among them; the reason is in KBSPanelState.h.
 DECLARE_PMID(kActionIDSpace, kKBSSavePanelSettingsActionID, kKBSPrefix + 20)
 // "Translucent Find/Change": the same treatment for InDesign's OWN Find/Change dialog. Check-mark
 // toggle, Windows only, OFF by default. The dialog is found through the SDK's window list, not by
 // its title, so it works whatever language InDesign is running in (KBSPanelAlpha.cpp).
 DECLARE_PMID(kActionIDSpace, kKBSTranslucentFindChangeActionID, kKBSPrefix + 21)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 21)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 22)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 23)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 24)

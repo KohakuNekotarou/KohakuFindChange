@@ -89,10 +89,14 @@ bool16	KBSGetFindChangeTranslucent();
 void	KBSSetFindChangeTranslucent(bool16 on);
 
 // Write the current flag onto the Find/Change window.
-//  - Returns kFalse when the dialog is not open (so the menu can say so rather than doing nothing
-//    visible), and on Mac
-//  - Turning it OFF also removes the WS_EX_LAYERED we added, but ONLY from the window we added it
-//    to - a window that already had the style is left with it
+//  - While ON: returns kFalse when the dialog is not open (so the menu can say so rather than
+//    leaving a click with no visible result unexplained), and on Mac
+//  - While OFF: always kTrue on Windows. Two separate things happen - the dialog open NOW goes back
+//    to opaque, and the WS_EX_LAYERED we added comes off the window WE ADDED IT TO, which need not
+//    be the one open now and may be no open window at all. A window that already carried the style
+//    is left with it.
+//    *Until 2026-08-04 both hung off "is a dialog open", so switching OFF with the dialog closed ran
+//     no clean-up at all and left the record standing against a handle the OS can recycle.
 bool16	KBSApplyFindChangeTranslucency();
 
 // Start listening for the panel being shown, hidden, docked or floated.

@@ -659,9 +659,13 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Save Panel Settings. NO kCustomEnabling: there is nothing to enable it against - it writes
-		// the settings down, which is possible with nothing loaded and no results. (It is still
-		// caught by the blanket disable while a run is going, like How to Use below.) KESCM's own
-		// carries the same flags for the same reason.
+		// the settings down, which is possible with nothing loaded and no results. KESCM's own carries
+		// the same flags for the same reason.
+		// !Without kCustomEnabling this action never reaches UpdateActionStates at all, so the blanket
+		// disable at the top of that method does NOT cover it - the hook completes the enabling only
+		// for actions that ask for it (ActionDefs.h:40). The note here said the opposite until
+		// 2026-08-04. It changes nothing in practice: a run's progress bar is modal, so the flyout
+		// cannot be opened while one is going (measured on the running panel, 2026-08-03).
 		kKBSActionComponentBoss,
 		kKBSSavePanelSettingsActionID,
 		kKBSSavePanelSettingsMenuKey,	// "Save Panel Settings"
@@ -723,9 +727,11 @@ resource ActionDef (kSDKDefActionResourceID)
 		// to be enabled against. It reads a text - no document, no result set, no selection - so it
 		// stays live with nothing loaded, which is exactly when a first-time user reaches for it.
 		//
-		// It IS still caught by the blanket disable at the top of UpdateActionStates while a run is
-		// going. That path is unreachable rather than wrong: the run's progress bar is modal, so the
-		// flyout cannot be opened to see it (measured on the running panel, 2026-08-03).
+		// !It is NOT caught by the blanket disable at the top of UpdateActionStates either: an action
+		// without kCustomEnabling is never passed to that method, which completes the enabling only
+		// for the ones that ask for it (ActionDefs.h:40). This note claimed the reverse until
+		// 2026-08-04. It changes nothing in practice: the run's progress bar is modal, so the flyout
+		// cannot be opened while one is going (measured on the running panel, 2026-08-03).
 		kKBSActionComponentBoss,
 		kKBSHowToActionID,
 		kKBSHowToMenuKey,				// "How to Use..."
