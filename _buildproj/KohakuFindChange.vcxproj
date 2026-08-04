@@ -236,6 +236,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSScriptProvider.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSReplaceConfirmDialog.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.cpp"/>
