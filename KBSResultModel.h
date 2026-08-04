@@ -105,6 +105,12 @@ namespace KBSResultModel
 		TextIndex	textStart;	// the match's start position in that story
 		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
 
+		// The WHOLE match, as one number - what the same-occurrence test compares against.
+		// matchText below is capped at 500 characters for drawing, so it cannot answer "is this
+		// still the same text" for a long GREP match; this can. 0 = never computed, or the text
+		// could not be read, and it never compares equal (see MatchIsSameOccurrence).
+		uint64		matchHash;
+
 		// --- replace support ---
 		// The order the text walker handed this match back in, WITHIN ITS CHAPTER (0-based). It is
 		// stamped before the page-order sort, and it is the ONLY key that survives a replace pass:
@@ -138,7 +144,7 @@ namespace KBSResultModel
 		// document and per book on 2026-08-01, which is what made the old default unnecessary.
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
-				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex),
+				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
 	};
 
@@ -560,14 +566,19 @@ namespace KBSResultModel
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
 
-	/** The three things the replace's same-occurrence test asks of a row: the story it was found
-	    in, where the match started, and what it read.
+	/** What the same-occurrence test asks of a row: the story it was found in, where the match
+	    started and ENDED, and the whole of its text as one number.
+
+	    ★ The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped at
+	    500 characters for the row, so comparing it judged a long GREP match on its first 500 and
+	    let a rewrite past that point through as "the same occurrence" (found 2026-08-04). The hash
+	    covers the match whole - see KBSSearchEngine::HashMatchText.
 
 	    Its own getter because it runs once per checked hit, and the two getters it replaces carry
 	    freight it does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies
 	    four PMStrings to hand back one. false = index out of range. */
 	bool GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
-		PMString& outMatch);
+		TextIndex& outEnd, uint64& outHash);
 
 	// (GetHitAnchor and GetHitStoryStamp stood here. Both served the replace's trusted-story fast
 	// path, which skipped the same-occurrence test for a story nobody had edited - and skipped its

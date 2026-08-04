@@ -245,14 +245,21 @@ namespace KBSSearchEngine
 	    @see IsMatchEditable for what the answer means, and what "cannot tell" resolves to. */
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
-	/** Just the matched text at [start, end), cut where SplitLineAroundMatch would cut its match
-	    segment - both go through the same 500-character cap (KBSCapMatchEnd), which is what keeps
-	    the two from ever disagreeing about a match - but WITHOUT building the line around it.
+	/** The whole of a match, boiled down to one 64-bit number.
 
-	    SplitLineAroundMatch reads the surrounding paragraphs as well to produce three strings; the
-	    same-occurrence test throws two of them away. This reads the matched characters
-	    and nothing else, which is what makes it affordable once per checked hit. */
-	void CopyMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end, PMString& outMatch);
+	    WHAT IT REPLACED: a CopyMatchText that handed the matched characters back as a PMString,
+	    capped at 500 (kKBSMaxMatchChars) because a row only ever draws one line. The
+	    same-occurrence test compared that capped copy - so a GREP match of 2000 characters was
+	    judged on its first 500, and a rewrite past that point went through as "the same
+	    occurrence" (found 2026-08-04). This reads the match WHOLE and keeps nothing but the hash,
+	    so the length of the match costs one number either way.
+
+	    64-bit, not 32: a collision here means "the text changed and we replaced it anyway", which
+	    is the one direction this plug-in must not fail in.
+
+	    @return the hash, or 0 when the text could not be read at all. 0 is treated as "cannot
+	            vouch for this" by MatchIsSameOccurrence - it never compares equal. */
+	uint64 HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end);
 
 	/** The line around [start, end), in the three segments a hit row paints: the text before the
 	    match (from the start of the paragraph the match BEGINS in), the matched text itself, and the
@@ -303,22 +310,29 @@ namespace KBSSearchEngine
 	    built. */
 	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
 
-	/** Is the match at [start, end) the SAME occurrence a stored hit describes? Three questions,
+	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
 	    all of which must answer yes:
 
 	      - same story          (a match in another story is never the one the row means)
 	      - same position       (start == expectStart + posDelta)
-	      - same matched text   (what is there now reads the way the row says it did)
+	      - same LENGTH         (end - start == expectEnd - expectStart)
+	      - same text, WHOLE    (the stored hash covers every character of the match)
 
 	    posDelta is how far THIS pass has already moved the text ahead of this point in this story -
 	    our own replacements, cancelled out - so whatever difference is left is the USER's editing,
 	    which is exactly the case that must not be written over. A caller that has changed nothing
-	    (the jump) passes 0.
+	    (the jump) passes 0. It shifts where a match STARTS, never how long it is, which is why the
+	    two lengths are compared directly.
 
-	    An unreadable or out-of-range position comes back with empty text and therefore answers
-	    false, which is the safe answer: when in doubt, do not write. */
+	    ★ The last two questions arrived on 2026-08-04. Until then the text was compared through
+	    the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters was
+	    judged on its first 500, and neither a rewrite past the cap nor a change of length was seen.
+
+	    expectHash 0 means the search could not read that match, so nothing can be vouched for and
+	    the answer is false - the safe answer: when in doubt, do not write. */
 	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
-		UID expectStoryUID, TextIndex expectStart, const PMString& expectMatch, int32 posDelta);
+		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash,
+		int32 posDelta);
 }
 
 #endif // __KBSSearchEngine_h__

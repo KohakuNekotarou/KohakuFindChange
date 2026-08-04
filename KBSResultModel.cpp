@@ -1068,7 +1068,7 @@ bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDF
 }
 
 bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
-	TextIndex& outStart, PMString& outMatch)
+	TextIndex& outStart, TextIndex& outEnd, uint64& outHash)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return false;
@@ -1078,8 +1078,8 @@ bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& ou
 	const Hit& h = c.hits[hitIdx];
 	outStoryUID = h.storyUID;
 	outStart = h.textStart;
-	outMatch = h.matchText;
-	outMatch.SetTranslatable(kFalse);
+	outEnd = h.textEnd;
+	outHash = h.matchHash;
 	return true;
 }
 

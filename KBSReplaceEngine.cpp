@@ -245,12 +245,14 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 {
 	UID expectStory = kInvalidUID;
 	TextIndex expectStart = kInvalidTextIndex;
-	PMString storedMatch;
-	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, storedMatch))
+	TextIndex expectEnd = kInvalidTextIndex;
+	uint64 expectHash = 0;
+	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart,
+			expectEnd, expectHash))
 		return false;		// no row to compare against - leave the text alone
 
 	return KBSSearchEngine::MatchIsSameOccurrence(story, start, end,
-		expectStory, expectStart, storedMatch, posDelta);
+		expectStory, expectStart, expectEnd, expectHash, posDelta);
 }
 
 // ***** THERE IS NO FAST PATH PAST THIS TEST, AND THERE MUST NOT BE ONE. *****
@@ -277,10 +279,10 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 // proof: whatever changed, the position or the text stops lining up and the row is reported instead
 // of written.
 //
-// What it costs: a copy of the MATCHED CHARACTERS ONLY, once per checked hit (see
-// KBSSearchEngine::CopyMatchText - since 2026-08-04 no paragraph is looked up at all, and none of
-// the surrounding text is read; the copy stops at the 500-character cap both sides share). The speed-up it replaces was one of six added on 2026-07-29 whose effect was
-// never measured, so nothing measurable was given up.
+// What it costs: reading the MATCHED CHARACTERS ONLY, once per checked hit, and hashing them (see
+// KBSSearchEngine::HashMatchText - no paragraph is looked up, none of the surrounding text is read,
+// and nothing is kept but 64 bits). The speed-up it replaces was one of six added on 2026-07-29
+// whose effect was never measured, so nothing measurable was given up.
 
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
@@ -1072,11 +1074,17 @@ void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummar
 	// Checked rows whose text no longer reads the way the panel says. Not an error and not a
 	// failure to line up - the row came up exactly where it was expected, the TEXT there had
 	// changed - so it is reported on its own terms.
+	//
+	// ***** THE WORD IS "missing", AND IT LEADS WITH A "!". ***** It used to read "not found",
+	// while the ROWS have always been marked "missing" (KBSResultModel::BuildHitLocator) - one
+	// outcome under two names, which left the reader matching a sentence against rows that did not
+	// use its word. The "!" is there because this is the one line in the summary the user has to
+	// act on: some of what they ticked was deliberately left alone (user's request, 2026-08-04).
 	if (t.missing > 0)
 	{
-		outSummary.Append(" ");
+		outSummary.Append(" ! ");
 		outSummary.AppendNumber(t.missing);
-		outSummary.Append(" hit(s) not found - the text is no longer where the search left it.");
+		outSummary.Append(" hit(s) missing - the text is no longer where the search left it.");
 	}
 
 	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own

@@ -424,11 +424,18 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// scan's own words there - "Frame (370)" - so the comparison could never agree, and every click
 	// on one was answering a jump that had just landed correctly with "Not found - the text is no
 	// longer where the search left it" and stamping the row 'missing' (2026-08-02).
-	PMString storedLocator, storedPre, storedMatch, storedPost;
-	KBSResultModel::GetHitDisplay(chapterIdx, hitIdx, storedLocator, storedPre, storedMatch, storedPost);
+	// The stored HASH, not the drawn text: the row's match string is capped at 500 characters, so
+	// asking it about a long GREP match only ever compared the first 500 (2026-08-04). The story,
+	// position and length arms are all trivially satisfied here - this side asks about the very
+	// range the row recorded - so what does the work is the hash.
+	UID expectStory = kInvalidUID;
+	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
+	uint64 expectHash = 0;
+	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
+		expectHash);
 	const bool sameOccurrence = !KBSResultModel::MatchTextIsLiveText()
 		|| KBSSearchEngine::MatchIsSameOccurrence(
-			storyRef, start, end, storyUID, start, storedMatch, 0);
+			storyRef, start, end, storyUID, start, end, expectHash, 0);
 
 	const bool overset = IsTextIndexOverset(storyRef, start);
 

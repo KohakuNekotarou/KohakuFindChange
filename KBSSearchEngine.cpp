@@ -926,6 +926,11 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	if (outHit.isLocked)
 		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 
+	// The whole match as one number, for the same-occurrence test the replace and the jump run.
+	// Taken here, beside the three drawn segments, because both describe THIS match as the search
+	// found it - but this one is NOT capped, and it is the one that is compared. See HashMatchText.
+	outHit.matchHash = KBSSearchEngine::HashMatchText(storyRef, start, end);
+
 	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
 	// row exactly the same way from the range the replace command hands back.
 	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, end,
@@ -1732,10 +1737,12 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 // cell shows, so what is dropped was never going to be read - and the row still shows that the
 // match continues, because the break marks are inside what IS kept.
 //
-// !! SplitLineAroundMatch and CopyMatchText MUST cut in the SAME place, which is why both go
-// through this one function. The two strings are compared to each other before a replace
-// (MatchIsSameOccurrence): a match cut differently on the two sides reads as "the text moved since
-// the search ran", and every replace is refused with 'missing'.
+// !! DISPLAY ONLY since 2026-08-04. The cap used to bind the same-occurrence test as well:
+// SplitLineAroundMatch and a CopyMatchText beside it had to cut in the SAME place, or a match cut
+// differently on the two sides read as "the text moved since the search ran" and every replace was
+// refused with 'missing'. That test now compares the match WHOLE, through a hash taken with no cap
+// at all (HashMatchText), so nothing but the drawn row passes through here - and a row that is
+// clipped for drawing can no longer cost a replace.
 static const int32 kKBSMaxMatchChars = 500;
 
 static TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
@@ -1823,7 +1830,8 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 }
 
 bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
-	UID expectStoryUID, TextIndex expectStart, const PMString& expectMatch, int32 posDelta)
+	UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash,
+	int32 posDelta)
 {
 	if (storyRef.GetUID() != expectStoryUID)
 		return false;
@@ -1831,41 +1839,68 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 	if (start != expectStart + posDelta)
 		return false;
 
-	// Cut the same way the search cut what it stored (a match spanning paragraphs is trimmed
-	// identically on both sides), but read ONLY the matched characters - see CopyMatchText. The
-	// model holds RAW text; the ellipsizing happens at draw time, so this compares like with like.
-	PMString liveMatch;
-	KBSSearchEngine::CopyMatchText(storyRef, start, end, liveMatch);
-	return liveMatch == expectMatch;
+	// ***** THE LENGTH. ***** posDelta shifts where a match STARTS, never how long it is, so the
+	// two lengths are compared directly. Nothing asked this until 2026-08-04: the text comparison
+	// stood in for it, and that comparison was capped at 500 characters - so a GREP match that had
+	// grown or shrunk past the cap read as unchanged.
+	if ((end - start) != (expectEnd - expectStart))
+		return false;
+
+	// ***** THE TEXT, WHOLE. ***** Not the drawn 500 characters (see GetHitMatchIdentity): the
+	// stored hash covers the entire match, so a rewrite anywhere inside it is caught however long
+	// it is. A stored 0 means the search could not read that match - nothing to compare against,
+	// so nothing is written.
+	if (expectHash == 0)
+		return false;
+	return KBSSearchEngine::HashMatchText(storyRef, start, end) == expectHash;
 }
 
-void KBSSearchEngine::CopyMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end,
-	PMString& outMatch)
+uint64 KBSSearchEngine::HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end)
 {
-	outMatch.Clear();
-	outMatch.SetTranslatable(kFalse);
+	if (end <= start)
+		return 0;
 
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 	if (model == nil)
-		return;
+		return 0;
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	if (scanner == nil)
-		return;
+		return 0;
 
-	// Cut where SplitLineAroundMatch cuts - through the same function, so the two cannot drift apart
-	// (see KBSCapMatchEnd for what a disagreement would cost). Until 2026-08-04 both stopped at the
-	// end of the paragraph the match started in; now both carry the whole match up to the cap.
+	// ***** NO CAP HERE, and that is the whole point. ***** CopyMatchText stops at
+	// kKBSMaxMatchChars because what it produces is held for the life of the result set; this holds
+	// nothing but the 64 bits below, so the match is read in full however long it is.
 	//
-	// No paragraph lookup is needed any more, and none of the surrounding text is copied - that is
-	// the whole point of this function.
-	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
-	if (matchEnd <= start)
-		return;
+	// Read in blocks rather than in one call: a single CopyText of an enormous match would build
+	// one WideString that size, and nothing here needs the whole match in memory at once.
+	const int32 kBlock = 4096;
+	uint64 hash = 14695981039346656037ULL;		// FNV-1a 64-bit offset basis
+	for (TextIndex at = start; at < end; at += kBlock)
+	{
+		const int32 want = (end - at > kBlock) ? kBlock : static_cast<int32>(end - at);
+		WideString block;
+		scanner->CopyText(at, want, &block);
 
-	WideString text;
-	scanner->CopyText(start, static_cast<int32>(matchEnd - start), &text);
-	outMatch = PMString(text);
-	outMatch.SetTranslatable(kFalse);
+		// A short read means the story ended before the range did - the text is not what the range
+		// says it is, so refuse to vouch for it rather than hashing a fragment.
+		if (block.CharCount() < want)
+			return 0;
+
+		for (int32 i = 0; i < want; ++i)
+		{
+			// FNV-1a over the UTF-32 value, byte by byte, so a character's high bits count as much
+			// as its low ones.
+			const uint32 ch = static_cast<uint32>(block.GetChar(i).GetValue());
+			for (int32 b = 0; b < 4; ++b)
+			{
+				hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
+				hash *= 1099511628211ULL;		// FNV-1a 64-bit prime
+			}
+		}
+	}
+
+	// 0 is the "could not read" answer, so a real hash must never be 0.
+	return (hash != 0) ? hash : 1;
 }
 
 int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph)
