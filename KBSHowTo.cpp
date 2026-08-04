@@ -45,39 +45,30 @@ namespace
 //========================================================================================
 
 const wchar_t* const kHowToEN =
-	L"Kohaku Find/Change - How to Use\n"
-	L"\n"
 	L"[Searching (Find in Document / Find in Book)]\n"
-	L"- Searches on the Text, GREP and Glyph tabs. A Find Format can be set as well.\n"
 	L"- What to look for is typed in Edit > Find/Change. This plug-in has no search box of its own.\n"
-	L"- The tab, and the search options under Search: (master pages / locked layers / hidden layers / locked stories / footnotes / case sensitive / whole word), are used exactly as that dialog has them. Those settings are kept SEPARATELY PER TAB.\n"
-	L"- The dialog's own Search: menu (Document, Story and so on) is NOT used. The scope is set by Book Scope below, and a run always covers the whole document (every chapter's whole document, for a book).\n"
-	L"- The Object, Colour and transliterate tabs are not supported.\n"
-	L"- Leave the find box empty and set only a Find Format to search by formatting alone.\n"
+	L"- Searches on the Text, GREP and Glyph tabs.\n"
+	L"- The Search: menu in Edit > Find/Change (Document, Story and so on) is not used. A run always covers the whole document (every chapter's whole document, for a book).\n"
+	L"- The Object and Colour tabs are not supported.\n"
 	L"\n"
 	L"[Scope (Book Scope)]\n"
-	L"- Book Scope: OFF (the default) means the front document, ON means every chapter of the active book. It applies to all three commands.\n"
-	L"- Closed chapters are opened invisibly, read, and closed again as soon as that chapter is done. Chapters you had open yourself are never touched.\n"
+	L"- Book Scope: ON means every chapter of the active book.\n"
+	L"- Closed chapters are opened invisibly to be read.\n"
 	L"\n"
 	L"[Find Missing Glyphs]\n"
 	L"- Lists every place a font has no glyph for the character in front of it - what the official preflight profile calls Missing glyph.\n"
-	L"- The results are grouped by font, because a box is fixed by changing the font.\n"
-	L"- Overset text cannot be checked.\n"
+	L"- Missing glyphs inside overset text cannot be checked.\n"
 	L"\n"
 	L"[Find Overset]\n"
-	L"- Lists every place text did not fit: a frame's red + and a table cell overflowing on its own, nested tables included.\n"
-	L"- Clicking a row scrolls to the + itself.\n"
+	L"- Lists every place text did not fit.\n"
 	L"\n"
 	L"[Reading the results]\n"
-	L"- Clicking a row jumps to it, and a marker flashes over the spot for about a second (the text is not selected).\n"
 	L"- The up and down arrow keys walk the whole tree, opening the rows they pass through.\n"
 	L"- Hide Previous Chapter: with it ON, the other unmodified document windows are closed as a jump lands.\n"
 	L"\n"
 	L"[Replacing (Change Checked)]\n"
 	L"- Tick the rows you want and run Change Checked from the menu: only the ticked occurrences are replaced.\n"
-	L"- What they are replaced with is the Change to box in Edit > Find/Change. A Change Format works too - leave the change box empty and set only a Change Format to change the formatting and leave the text alone.\n"
 	L"- Check All / Uncheck All are on the result rows' right-click menu. Over the book row they mean every chapter, over a document row that chapter alone. They reach rows beyond the ones on screen.\n"
-	L"- With save after replace OFF (the default): the chapters are left open and UNSAVED, and the whole run is a single undo step.\n"
 	L"- With save after replace ON (the box in the confirmation): each chapter is opened, replaced, saved and closed in turn, so a twenty-chapter book still holds only one chapter at a time.\n"
 	L"- Cancelling a saving run: chapters already saved cannot be taken back, so it stops there. What was done stays in the results, and the chapters it never reached are marked cancelled.\n"
 	L"\n"
@@ -87,47 +78,37 @@ const wchar_t* const kHowToEN =
 	L"[Limits]\n"
 	L"- The panel draws the first 5000 rows. Every hit is still held, so checking, replacing and saving are never capped by what is on screen.\n"
 	L"- A run collects at most 10000 rows and says so when it stops there.\n"
-	L"- Do not switch Find/Change tabs between a search and Change Checked (KBS notices and refuses the run).\n"
 	L"\n"
 	L"[Please note]\n"
-	L"- The search follows InDesign's own Find/Change settings. Case sensitivity, whole word and any formats left in that dialog narrow this search as well.\n"
+	L"- The search follows InDesign's own Find/Change settings. Formats and other options left in that dialog narrow this search as well.\n"
 	L"\n"
 	L"DISCLAIMER: We cannot take responsibility for any problems that may arise. Use at your own risk.";
 
 const wchar_t* const kHowToJA =
-	L"Kohaku Find/Change の使い方\n"
-	L"\n"
 	L"【検索（Find in Document / Find in Book）】\n"
-	L"・Text / GREP / Glyph の3つのタブで検索できます。Find Format（検索形式）の指定も使えます。\n"
-	L"・検索する文字は 編集 > 検索と置換 に入力します。このプラグインは検索欄を持ちません。\n"
-	L"・タブと、Search: の下の検索オプション（マスターページ／ロックされたレイヤー／非表示レイヤー／ロックされたストーリー／脚注／大文字小文字の区別／完全一致）は、そのダイアログの設定がそのまま使われます。これらの設定はタブごとに別々です。\n"
-	L"・ダイアログの Search:（Document / Story など）は使いません。対象範囲は下の Book Scope で決まり、常にドキュメント全体（ブックなら各章の全体）を検索します。\n"
-	L"・オブジェクト／カラー／文字種変換の各タブは対象外です。\n"
-	L"・検索文字を空にして Find Format だけを指定すると、その書式の箇所を探します。\n"
+	L"・検索する文字は 編集 > 検索と置換 に検索内容を入力します。このプラグインは検索入力欄を持ちません。\n"
+	L"・Text / GREP / Glyph の3つのタブで検索できます。\n"
+	L"・編集 > 検索と置換の Search:（Document / Story など）は使いません。常にドキュメント全体（ブックなら各章の全体）を検索します。\n"
+	L"・オブジェクト／カラーの各タブは対象外です。\n"
 	L"\n"
 	L"【検索範囲（Book Scope）】\n"
-	L"・Book Scope: OFF（既定）＝前面のドキュメント、ON＝アクティブなブックの全章。下の3つのコマンドすべてに効きます。\n"
-	L"・閉じている章は非表示で開いて調べ、その章が終わり次第すぐ閉じます。自分で開いていた章には触りません。\n"
+	L"・Book Scope: ON＝アクティブなブックの全章。\n"
+	L"・閉じている章は非表示で開いて調べます。\n"
 	L"\n"
 	L"【欠落グリフの検索（Find Missing Glyphs）】\n"
 	L"・フォントにその文字の字形が無い箇所を一覧にします。公式のプリフライトの「欠落グリフ」と同じものです。\n"
-	L"・結果はフォントごとにまとまります（□はフォント単位で直すため）。\n"
-	L"・あふれ（オーバーセット）のテキストは調べられません。\n"
+	L"・あふれ（オーバーセット）に有る欠落グリフは調べられません。\n"
 	L"\n"
 	L"【あふれの検索（Find Overset）】\n"
-	L"・入りきらなかったテキストを一覧にします。テキストフレームの「+」に加え、表のセル単独のあふれ（入れ子の表を含む）も検出します。\n"
-	L"・行をクリックすると「+」の位置へスクロールします。\n"
+	L"・入りきらなかったテキストを一覧にします。\n"
 	L"\n"
 	L"【結果の見方】\n"
-	L"・行をクリックするとその箇所へジャンプし、マーカーが1秒ほど点滅します（テキストは選択されません）。\n"
 	L"・上下の矢印キーで、途中の行を開きながらツリー全体を巡回できます。\n"
 	L"・Hide Previous Chapter: ON にすると、ジャンプ後にジャンプ先以外の未変更のドキュメントウィンドウを閉じます。\n"
 	L"\n"
 	L"【置換（Change Checked）】\n"
 	L"・検索結果の行にチェックを入れ、メニューの Change Checked を実行すると、チェックした箇所だけが置換されます。\n"
-	L"・置換後の文字は 編集 > 検索と置換 の「置換文字列」です。Change Format（置換形式）も使えます。置換文字を空にして Change Format だけを指定すると、文字はそのままで書式だけが変わります。\n"
 	L"・チェックの一括操作は、結果の行を右クリック > Check All / Uncheck All。ブック行なら全章、ドキュメント行ならその章だけに効きます。表示されていない分にも効きます。\n"
-	L"・置換後保存が OFF のとき（既定）：章は開いたまま・未保存で残り、実行全体が取り消し1回分です。\n"
 	L"・置換後保存が ON のとき（確認ダイアログのチェックボックス）：1章ずつ「開く→置換→保存→閉じる」を繰り返すので、20章のブックでも一度に抱える章は1つです。\n"
 	L"・ON でキャンセルしたとき：保存済みの章は取り消せないのでそこで停止します。済んだ分は結果に残り、届かなかった章には cancelled と出ます。\n"
 	L"\n"
@@ -137,10 +118,9 @@ const wchar_t* const kHowToJA =
 	L"【制限】\n"
 	L"・パネルに出るのは先頭5000行までです（内部にはすべて保持しているので、チェックや置換、書き出しが表示数で制限されることはありません）。\n"
 	L"・1回の実行で集めるのは10000件までです。そこで打ち切ったときはその旨をお知らせします。\n"
-	L"・検索してから Change Checked を実行するまでの間に、検索と置換のタブを切り替えないでください（KBS が検知して実行を断ります）。\n"
 	L"\n"
 	L"【注意】\n"
-	L"・検索は InDesign 本体の 検索と置換 の設定に従います。大文字小文字／完全一致／書式の指定がそのダイアログに残っていると、この検索も同じように絞り込まれます。\n"
+	L"・検索は InDesign 本体の 検索と置換 の設定に従います。書式の指定などが残っていると、この検索も同じように絞り込まれます。\n"
 	L"\n"
 	L"【免責】 どのような問題が起こっても責任を取れません。ご利用は自己責任でお願いします。";
 
@@ -220,8 +200,16 @@ void KBSHowTo::Show()
 
 	// Script route unavailable or failed: the plain (non-scrollable) alert is better than no
 	// reference at all.
+	//
+	// It is the one route that needs a heading. The reference itself carries none - the ScriptUI
+	// window puts "Kohaku Find/Change - How to Use" in its title bar, so a first line saying the same
+	// thing was just repeating it (user's call, 2026-08-04) - but CAlert has no title of its own to
+	// borrow: its bar says "Adobe InDesign", and the text would start mid-reference with nothing
+	// naming what it belongs to. Same wording as the window title, in both languages, so the two
+	// routes are recognisably the same document.
 	PMString fallback;
 	fallback.SetTranslatable(kFalse);
+	fallback.Append("Kohaku Find/Change - How to Use\n\n");
 	fallback.AppendW(reinterpret_cast<const UTF16TextChar*>(text));
 	CAlert::InformationAlert(fallback);
 }

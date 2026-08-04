@@ -859,17 +859,28 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 	kKBSPanelTitleKey,					// Panel name
 	{
 		// Status read-out at the top: the search summary (total hits / chapters, or a scan's own
-		// tally). THREE LINES and wrapping, not one line ellipsized (user's call 2026-08-02): the
+		// tally). WRAPPING over several lines, not one line ellipsized (user's call 2026-08-02): the
 		// summaries outgrew a single line some time ago - a scan appends "Text in overset cannot be
 		// checked.", a book search can append the names of chapters it could not open - and the end
 		// of the sentence was the part being thrown away. Bound left/right/top so it widens with
 		// the panel and stays put vertically.
+		//
+		// ***** THE HEIGHT MUST BE A WHOLE NUMBER OF LINES. ***** A line is 12px here (measured
+		// 2026-08-04 off a screenshot: four baselines 11.8px apart), so 48 = exactly four. The frame
+		// was 52 - four lines and 4px over - and the widget draws into whatever room it is given:
+		// narrowing the panel pushed the text to five lines and the TOP 4px OF THE FIFTH appeared
+		// below the fourth, a sliver of chopped-off letters (user's screenshot, work/キャプチャ.PNG).
+		// A remainder of zero leaves nothing for a part-line to be drawn into.
+		//
+		// ⚠ The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
+		// never measured. If the palette font ever changes size, measure again - the rule is the
+		// remainder, not the number 48.
 		StaticMultiLineTextWidget
 		(
 			kKBSStaticTextWidgetID,			 // WidgetId
 			kPMRsrcID_None,					 // RsrcId
 			kBindLeft | kBindRight | kBindTop, // Frame binding
-			Frame(5, 6, 256, 58),			 // Frame: left, top, right, bottom (3 lines at ~17px)
+			Frame(5, 6, 256, 54),			 // Frame: left, top, right, bottom (48px = four 12px lines)
 			kTrue, kTrue,					 // Visible, Enabled
 			// StaticTextAttributes: alignment, ellipsize style, convert ampersands. kDontEllipsize
 			// because a wrapping box has somewhere to put the rest of the sentence - the whole point
@@ -891,9 +902,10 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * resized - KESCM binds its own to the top alone, but that panel does not resize the way
 		 * this one does.
 		 *
-		 * 32x32, sitting on the BOTTOM of the message block (top 26 = 58 - 32), which is where
+		 * 32x32, sitting on the BOTTOM of the message block (top 22 = 54 - 32), which is where
 		 * KESCM puts its own: a picture hanging off the top of a part-empty message box reads as
-		 * detached from it.
+		 * detached from it. It moved up with the message box on 2026-08-04 - the two share a bottom
+		 * edge, and that is the whole of why this number is what it is.
 		 *
 		 * THREE of them, STACKED at one frame: the plain cat until something has been run, the
 		 * searching cat once it has, and the changing cat once a replace has written something.
@@ -907,7 +919,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKBSIconWidgetID,
 			kKBSIconResID, kKBSPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 26, 292, 58),		// 4px clear of the text, 8px in from the panel's edge
+			Frame(260, 22, 292, 54),		// 4px clear of the text, 8px in from the panel's edge
 			kTrue, kTrue,
 			kADBEIconSuiteButtonType,
 		),
@@ -916,7 +928,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKBSIconFoundWidgetID,
 			kKBSIconFoundResID, kKBSPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 26, 292, 58),		// SAME frame as the one above - they are alternatives
+			Frame(260, 22, 292, 54),		// SAME frame as the one above - they are alternatives
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),
@@ -925,7 +937,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKBSIconChangedWidgetID,
 			kKBSIconChangedResID, kKBSPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 26, 292, 58),		// SAME frame again
+			Frame(260, 22, 292, 54),		// SAME frame again
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),
@@ -937,7 +949,9 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		(
 			kKBSResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindAll,						// Frame binding: grow with the panel
-			Frame(4, 61, 296, 356),			// Frame (below the message block to the panel's edges)
+			Frame(4, 57, 296, 356),			// Frame (below the message block to the panel's edges)
+											// Moved up 4px with the message box on 2026-08-04, so the
+											// gap under it stays the 3px it always was.
 			kTrue, kTrue,					// Visible, Enabled
 			kTrue,							// EraseBeforeDraw
 			kInterfacePaletteFill,			// InterfaceColor
