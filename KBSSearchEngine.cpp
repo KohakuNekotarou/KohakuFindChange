@@ -1732,7 +1732,7 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 // cell shows, so what is dropped was never going to be read - and the row still shows that the
 // match continues, because the break marks are inside what IS kept.
 //
-// ⚠⚠ SplitLineAroundMatch and CopyMatchText MUST cut in the SAME place, which is why both go
+// !! SplitLineAroundMatch and CopyMatchText MUST cut in the SAME place, which is why both go
 // through this one function. The two strings are compared to each other before a replace
 // (MatchIsSameOccurrence): a match cut differently on the two sides reads as "the text moved since
 // the search ran", and every replace is refused with 'missing'.
@@ -1768,7 +1768,7 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 	if (paraStart < 0 || paraLen <= 0)
 		return;
 
-	// ★The match itself is taken WHOLE, not cut at the end of that paragraph (2026-08-04).
+	// *The match itself is taken WHOLE, not cut at the end of that paragraph (2026-08-04).
 	// A single match can run over any number of paragraphs - a format-only search matches every
 	// unbroken run of text carrying the format, and a GREP can be written to cross a break on
 	// purpose. Cutting it here made the row show ONE paragraph of what a replace would rewrite in
@@ -1797,6 +1797,15 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 	// paragraph from the one it started in once the match spans a break. Probed at matchEnd - 1 so
 	// a match ending exactly on a paragraph terminator answers with the paragraph it ended, not the
 	// one after it.
+	//
+	// !ONLY when the match was not capped (2026-08-04). Past the cap, what follows matchEnd is more
+	// of the MATCH - and this segment is drawn in the normal colour, so writing it here would show
+	// the rest of the match as though it were text lying outside it. Nothing is lost by leaving it
+	// out: a capped match is 500 characters, already far wider than the cell, so the row ellipsizes
+	// inside the match itself and the reader can see that it continues.
+	if (matchEnd != end)
+		return;
+
 	int32 endParaLen = 0;
 	const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
 	const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);

@@ -41,12 +41,12 @@
 #include "ISession.h"			// GetExecutionContextSession
 #include "IWidgetUtils.h"		// GetViewYPosition
 #include "ShuksanID.h"			// kPaletteWindowFontId
-#include "TextChar.h"			// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign
 #include "Utils.h"
 
 // Project includes:
 #include "KBSID.h"
 #include "KBSColorTextView.h"
+#include "KBSResultModel.h"		// MarkUpBreaksForDisplay - the pilcrow / return arrow a break draws as
 
 // How far up the widget chain to look for the hilite (see KBSViewOrParentIsHilited). One step is
 // all this panel needs (cell -> row); the extra steps only keep it working if the row ever gains
@@ -84,59 +84,10 @@ static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, c
 		ToDouble(bg.blue  * u + fg.blue  * t));
 }
 
-// U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS - the mark for a forced line break. TextChar.h names
-// the pilcrow (kTextChar_PilchrowSign, :122) but carries no constant for this one, so it is named
-// here rather than left as a bare number in the loop below.
-static const UTF32TextChar kKBSReturnArrow = 0x21B5;
-
-// Turn the two break characters into visible marks, in place.
-//
-// This cell draws ONE line, so a raw CR or LF has no width: the paragraphs either side of it run
-// together and read as a single piece of text. A match that SPANS a break is exactly what a row has
-// to be honest about - the replace rewrites the break too, joining the paragraphs for real - and
-// since 2026-08-04 the match segment is no longer cut at the first break (KBSSearchEngine::
-// SplitLineAroundMatch), so these marks are what make the rest of it readable.
-//
-// The two marks are the ones InDesign itself draws with Show Hidden Characters on: a pilcrow for a
-// paragraph end, a return arrow for a forced line break (Shift+Enter). They are two different
-// things to a replace, so the row spells them differently.
-//
-// Whole runs are copied between the marks rather than one character at a time, so a surrogate pair
-// is never split. Most rows hold no break at all, so the string is scanned once before anything is
-// built: the common row pays one pass and no allocation.
-static void KBSMarkUpBreaks(PMString& s)
-{
-	int32 n = 0;
-	const UTF16TextChar* buf = s.GrabUTF16Buffer(&n);
-	if (buf == nil || n <= 0)
-		return;
-
-	bool16 any = kFalse;
-	for (int32 i = 0; i < n && !any; ++i)
-		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF);
-	if (!any)
-		return;
-
-	PMString out;
-	out.SetTranslatable(kFalse);
-	int32 runStart = 0;
-	for (int32 i = 0; i < n; ++i)
-	{
-		if (buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
-			continue;
-		if (i > runStart)
-			out.AppendW(buf + runStart, i - runStart);
-		out.AppendW(buf[i] == kTextChar_CR
-			? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
-			: kKBSReturnArrow);
-		runStart = i + 1;
-	}
-	if (n > runStart)
-		out.AppendW(buf + runStart, n - runStart);
-
-	s = out;
-	s.SetTranslatable(kFalse);
-}
+// (The break characters are turned into marks by KBSResultModel::MarkUpBreaksForDisplay, which
+//  stood here as a static until 2026-08-04. It moved because the SAVED REPORT has to show a match
+//  the same way this cell does, and a second copy of the rule would be a second thing to keep in
+//  step - the same reason BuildHitLocator is one function serving two callers.)
 
 //----------------------------------------------------------------------------------------
 // KBSRowData - the per-row data holder (three text segments)
@@ -214,9 +165,9 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 
 	// Break characters become visible marks BEFORE anything is measured or ellipsized below: every
 	// width taken from here on has to be the width of what is actually drawn.
-	KBSMarkUpBreaks(pre);
-	KBSMarkUpBreaks(match);
-	KBSMarkUpBreaks(post);
+	KBSResultModel::MarkUpBreaksForDisplay(pre);
+	KBSResultModel::MarkUpBreaksForDisplay(match);
+	KBSResultModel::MarkUpBreaksForDisplay(post);
 
 	// The palette window's font (same one KESCL's report panel measures with).
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());

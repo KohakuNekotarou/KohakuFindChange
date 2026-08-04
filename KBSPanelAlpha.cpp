@@ -17,8 +17,19 @@
 //    4. if it is "OWL.Dock" (floating) or "OWL.FrameDrawer" (pulled out of an icon as a drawer),
 //       write the alpha with SetLayeredWindowAttributes
 //
-//  *The OWL.Dock HWND CHANGES when the panel is closed and re-opened (it comes from a reuse pool).
-//    The OWL.Palette HWND does not. So no window handle is held across calls - it is looked up again.
+//  *The OWL.Dock HWND CHANGES when the panel is DOCKED and then floated again: the old window is
+//    DESTROYED and a new one is made. Closing and re-opening the panel is different - the same Dock
+//    survives, alpha and all. The OWL.Palette HWND does not change in either case. So no window
+//    handle is held across calls - it is looked up again.
+//    **That pair of facts is also why turning the toggle OFF can never leave a faint window behind,
+//    which is the one thing this file's "do nothing while docked" rule looks like it should
+//    (measured 2026-08-04 on Release 21.0.2.2, one step at a time, reading the alpha from another
+//    process - see docs/ai-notes/win32-window-transparency.md):
+//      . OFF while the panel is merely CLOSED reaches the Dock and writes 255 - it is still there
+//      . OFF while DOCKED reaches nothing, but there is nothing left to reach: the Dock that
+//        carried the 77 was destroyed by the docking, and floating again builds a fresh one at 255
+//    *Nor can one panel's alpha reach another's: a Dock belongs to ONE panel (55-56 of them exist
+//    from startup, waiting invisible, each naming its own panel), so nothing is ever handed round.
 //  *InDesign itself puts WS_EX_LAYERED on OWL.Dock (EXSTYLE = 0x08080000). The style is neither
 //    added nor removed here. *Removing it breaks the application's own drawing - to undo, write
 //    alpha = 255 and nothing else.

@@ -13,6 +13,7 @@
 #include "VCPlugInHeaders.h"
 
 // General includes:
+#include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign - see MarkUpBreaksForDisplay
 #include "Utils.h"
 
 #include <algorithm>	// std::lower_bound - where the display cap falls inside one font group
@@ -701,6 +702,54 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 	out.SetUTF8String(buf);
 }
 
+// U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS - the mark for a forced line break. TextChar.h names
+// the pilcrow (kTextChar_PilchrowSign, :122) but carries no constant for this one, so it is named
+// here rather than left as a bare number in the loop below.
+static const UTF32TextChar kKBSReturnArrow = 0x21B5;
+
+// See KBSResultModel.h for what this is for and why it is DISPLAY ONLY.
+//
+// The two marks are the ones InDesign itself draws with Show Hidden Characters on: a pilcrow for a
+// paragraph end, a return arrow for a forced line break (Shift+Enter). They are two different things
+// to a replace, so a row spells them differently.
+//
+// Whole runs are copied between the marks rather than one character at a time, so a surrogate pair
+// is never split. Most strings hold no break at all, so the string is scanned once before anything
+// is built: the common row pays one pass and no allocation.
+void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
+{
+	int32 n = 0;
+	const UTF16TextChar* buf = s.GrabUTF16Buffer(&n);
+	if (buf == nil || n <= 0)
+		return;
+
+	bool16 any = kFalse;
+	for (int32 i = 0; i < n && !any; ++i)
+		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF);
+	if (!any)
+		return;
+
+	PMString out;
+	out.SetTranslatable(kFalse);
+	int32 runStart = 0;
+	for (int32 i = 0; i < n; ++i)
+	{
+		if (buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
+			continue;
+		if (i > runStart)
+			out.AppendW(buf + runStart, i - runStart);
+		out.AppendW(buf[i] == kTextChar_CR
+			? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
+			: kKBSReturnArrow);
+		runStart = i + 1;
+	}
+	if (n > runStart)
+		out.AppendW(buf + runStart, n - runStart);
+
+	s = out;
+	s.SetTranslatable(kFalse);
+}
+
 void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 {
 	std::string buf;
@@ -785,11 +834,18 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 			if (hit.pageOrdinal > 0)
 				AppendNumberUTF8(buf, hit.pageOrdinal);
 			buf += "\t";
-			// The line as the panel draws it: the three segments joined back together. (An overset
-			// finding has its report - "Frame (370)" - in the match segment, so this writes that.)
-			AppendFlattenedUTF8(buf, hit.preText);
-			AppendFlattenedUTF8(buf, hit.matchText);
-			AppendFlattenedUTF8(buf, hit.postText);
+			// The line as the panel draws it: the three segments joined back together, and carrying
+			// the SAME break marks the panel puts on them (2026-08-04), so a match that spans
+			// paragraphs reads as one row in both places rather than as two different rows.
+			//   *The flattening still runs, after the marks: it folds the TABS a line can carry -
+			//    which would split this cell into extra columns - and by then the marks have taken
+			//    the breaks out of its way, so it has nothing else left to fold.
+			//   *A mark is one CHARACTER, so nothing here can put a line break into the file.
+			// (An overset finding has its report - "Frame (370)" - in the match segment, so this
+			// writes that.)
+			PMString seg(hit.preText);	MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
+			seg = hit.matchText;		MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
+			seg = hit.postText;			MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
 			buf += "\t";
 			AppendFlattenedUTF8(buf, hit.fontName);
 			buf += "\t";

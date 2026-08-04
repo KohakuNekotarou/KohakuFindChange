@@ -629,6 +629,26 @@ namespace KBSResultModel
 	    found changed. Only missing and refused are exclusive, being two values of one field. */
 	void BuildHitLocator(Hit& hit);
 
+	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
+	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break
+	    (LF) - in place. A string holding neither is left exactly as it came.
+
+	    THE one definition, called by BOTH places a match is shown: the panel's cell
+	    (KBSColorTextView::Draw) and the saved report (BuildReportText). Since 2026-08-04 a match is
+	    carried WHOLE however many paragraphs it spans, and neither of those draws a raw break with
+	    any width - the paragraphs either side of it run together and read as one piece of text -
+	    so both have to mark them, and marking them differently in the two places would make one row
+	    read as two different rows.
+
+	    ***** DISPLAY ONLY. ***** Never applied to what the model holds: the stored match text is
+	    compared character for character against the document before a replace
+	    (KBSSearchEngine::MatchIsSameOccurrence), and a marked-up copy would fail every comparison.
+	    Callers mark a COPY, at the moment they draw or write it.
+
+	    (The report flattens what is left afterwards, which is what keeps its tabs from splitting a
+	    cell. The marks take the breaks out of that pass's way, so nothing there changes.) */
+	void MarkUpBreaksForDisplay(PMString& s);
+
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
 	    and clears the selection - a row that says why it cannot be changed must not stay checked.
 	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
