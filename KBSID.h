@@ -385,7 +385,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // IAttrReport::AppendDescription - the call behind the Settings line in Style Options - and the two
 // styles are added by their full path (KBSSearchEngine::DescribeFormatSetting).
 //
-// ? Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
+// ! Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
 // bosses and the SDK has no ClassID-to-name call". That was asking the wrong object. The prompt
 // shortens the list; the saved report writes it in full.
 //
