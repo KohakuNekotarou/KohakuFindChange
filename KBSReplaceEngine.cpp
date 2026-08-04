@@ -180,16 +180,23 @@ struct RunTotals
 	int32	refused;			// the replace command was asked and said no
 	int32	chaptersSaved;
 	int32	chaptersNotSaved;
+	// Chapters whose own sequence was rolled back because an error was standing when it closed.
+	// Nothing survived in them, so none of the counters above may take anything from them - which
+	// is exactly why they need a counter of their own: a chapter that goes through a run leaving no
+	// trace in the summary at all is the one thing this file is built not to do.
+	int32	chaptersRolledBack;
 
-	// The FIRST name in each of the three lists that name one. Kept with a flag of its own rather
+	// The FIRST name in each of the four lists that name one. Kept with a flag of its own rather
 	// than testing IsEmpty(): a chapter whose name is empty would otherwise never count as the
 	// first, and every later one would overwrite it.
 	PMString	firstSkipped;
 	PMString	firstNotWalked;
 	PMString	firstNotSaved;
+	PMString	firstRolledBack;
 	bool		haveFirstSkipped;
 	bool		haveFirstNotWalked;
 	bool		haveFirstNotSaved;
+	bool		haveFirstRolledBack;
 
 	// The user stopped the run from the progress bar. What that MEANS depends on which path was
 	// running - see BuildSummary.
@@ -208,13 +215,15 @@ struct RunTotals
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0), chaptersStepLimited(0),
 		  chaptersNotWalked(0), missing(0), locked(0), refused(0),
-		  chaptersSaved(0), chaptersNotSaved(0),
+		  chaptersSaved(0), chaptersNotSaved(0), chaptersRolledBack(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstNotSaved(false),
+		  haveFirstRolledBack(false),
 		  cancelled(false), chaptersClosed(false)
 	{
 		firstSkipped.SetTranslatable(kFalse);
 		firstNotWalked.SetTranslatable(kFalse);
 		firstNotSaved.SetTranslatable(kFalse);
+		firstRolledBack.SetTranslatable(kFalse);
 	}
 };
 
@@ -268,9 +277,9 @@ bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
 // proof: whatever changed, the position or the text stops lining up and the row is reported instead
 // of written.
 //
-// What it costs: one FindSurroundingParagraph plus a copy of the MATCHED CHARACTERS ONLY (see
-// KBSSearchEngine::CopyMatchText - the paragraph is looked up for its end and never copied), once
-// per checked hit. The speed-up it replaces was one of six added on 2026-07-29 whose effect was
+// What it costs: a copy of the MATCHED CHARACTERS ONLY, once per checked hit (see
+// KBSSearchEngine::CopyMatchText - since 2026-08-04 no paragraph is looked up at all, and none of
+// the surrounding text is read; the copy stops at the 500-character cap both sides share). The speed-up it replaces was one of six added on 2026-07-29 whose effect was
 // never measured, so nothing measurable was given up.
 
 // Replace this chapter's checked hits. Returns how many were replaced.
@@ -795,6 +804,10 @@ void ReplaceChapterByChapter(RunTotals& io)
 		KBSResultModel::BeginRowBackup();
 
 		bool aborted = false;
+		// How many hits went into THIS chapter. It lives out here, and not inside the block below,
+		// because the save that follows has to ask it: a chapter nothing was written to is not this
+		// plug-in's to overwrite (see where it is read).
+		int32 chapterReplaced = 0;
 		{
 			// ABORTABLE for the same reason the other path uses one: the error-code route does not
 			// carry a rollback (measured 2026-07-31), so it has to be stated outright. Per chapter
@@ -831,6 +844,7 @@ void ReplaceChapterByChapter(RunTotals& io)
 			// (The counters were added before the abort was known, until 2026-08-03.)
 			if (!aborted)
 			{
+				chapterReplaced = replaced;
 				io.replaced += replaced;
 				if (replaced > 0)
 					++io.chaptersTouched;
@@ -866,9 +880,40 @@ void ReplaceChapterByChapter(RunTotals& io)
 			KBSResultModel::RollBackRows();
 			if (chapterDB != nil && !wasModified)
 				chapterDB->SetModified(kFalse);
+
+			// ***** SAID OUT LOUD. ***** Its rows went back to being checked with no word on them,
+			// which on screen is indistinguishable from a chapter the run never reached - so without
+			// this the one chapter something actually went wrong in is the only one the summary
+			// passes over in silence. Counted after the rollback, where it is certain.
+			++io.chaptersRolledBack;
+			if (!io.haveFirstRolledBack)
+			{
+				int32 rolledBackHits = 0;
+				KBSResultModel::GetChapterDisplay(ci, io.firstRolledBack, rolledBackHits);
+				io.firstRolledBack.SetTranslatable(kFalse);
+				io.haveFirstRolledBack = true;
+			}
 			continue;		// not saved and not closed: there is nothing of ours in it
 		}
 		KBSResultModel::ForgetRowBackup();
+
+		// ***** NOTHING OF OURS WENT IN, SO IT IS NOT OURS TO OVERWRITE. ***** Every checked hit here
+		// came back missing, locked or refused, and the file on disk is exactly what this run found.
+		// If the document is dirty all the same, that is SOMEBODY ELSE'S edit - most likely the very
+		// edit that made these hits come back missing - and saving it would put work on disk that
+		// nobody asked this plug-in to write. (The contract has always said so: see the header on
+		// saveAfterReplace. The condition was lost on 2026-08-03 when the saving moved into this
+		// chapter-at-a-time loop, and until then only the chapters in `touched` were ever saved.)
+		//
+		// Handed back all the same, if this run is what opened it: ReleaseHeldDoc refuses a document
+		// with unsaved work in it, so this can only ever close one that has nothing in it to lose,
+		// and leaving it open would keep its .indd locked for no reason at all.
+		if (chapterReplaced <= 0)
+		{
+			if (KBSBookScope::ReleaseHeldDoc(docRef, true /*close now*/))
+				io.chaptersClosed = true;
+			continue;
+		}
 
 		// ----- save it, now that its sequence is closed -----
 		// Deliberately outside the sequence: a save cannot be undone, so it has no business inside an
@@ -894,7 +939,14 @@ void ReplaceChapterByChapter(RunTotals& io)
 			// front document, or over chapters the user already had open, closes nothing at all -
 			// and used to report "Chapters this plug-in opened were closed." all the same, which is
 			// a sentence about something that did not happen.
-			if (KBSBookScope::ReleaseHeldDoc(docRef))
+			//
+			// ***** CLOSED ON THE SPOT, not scheduled. ***** A scheduled close waits for this run to
+			// unwind, so all four chapters of a four-chapter book were still open - and still locking
+			// their files - when it ended (measured 2026-08-04 by counting .idlk files as it ran).
+			// That is the one thing this whole chapter-at-a-time shape exists to avoid, so the close
+			// has to happen here. Safe at this point: the chapter's sequence is closed, it has just
+			// been saved, and no walk is standing.
+			if (KBSBookScope::ReleaseHeldDoc(docRef, true /*close now*/))
 				io.chaptersClosed = true;
 			continue;
 		}
@@ -940,9 +992,15 @@ void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummar
 	{
 		// The count leads here too - it is the one thing the user needs to know. What follows is
 		// appended by the branches below, exactly as on a run that finished.
+		//
+		// ***** REPLACED, not "replaced and saved". ***** The number after it counts the chapters a
+		// replacement LANDED in, and a chapter whose save then failed is one of those - so the older
+		// wording promised a save for a file that is still sitting there unwritten, in the same
+		// breath as the sentence further down saying it could not be written. How many were saved is
+		// that sentence's business, and it now speaks on a cancelled run too.
 		outSummary.Append("Replace cancelled - ");
 		outSummary.AppendNumber(t.replaced);
-		outSummary.Append(" replaced and saved in ");
+		outSummary.Append(" replaced in ");
 		outSummary.AppendNumber(t.chaptersTouched);
 		outSummary.Append(" chapter(s) before it stopped.");
 	}
@@ -962,10 +1020,12 @@ void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummar
 	if (t.replaced > 0 && !saveAfterReplace)
 		outSummary.Append(" Not saved - check them and save yourself.");
 
-	// NOT after a cancel: the opening sentence there has already said how many chapters were saved
-	// ("2400 replaced and saved in 2 chapter(s)"), and a second "2 chapter(s) saved." right behind
-	// it reads as a separate fact rather than the same one twice.
-	if (t.chaptersSaved > 0 && !t.cancelled)
+	// On a cancelled run as well. It used to be held back there, because the opening sentence said
+	// "replaced AND SAVED in N chapter(s)" and repeating the number right behind it read as two
+	// separate facts - but those were never the same number: the chapters a replacement landed in
+	// are not the chapters that then went to disk. The opening sentence no longer claims the save,
+	// so this is the one place that counts it, and it has to count it on both endings.
+	if (t.chaptersSaved > 0)
 	{
 		outSummary.Append(" ");
 		outSummary.AppendNumber(t.chaptersSaved);
@@ -1059,6 +1119,22 @@ void BuildSummary(const RunTotals& t, bool saveAfterReplace, PMString& outSummar
 		outSummary.Append(" chapter(s) could not be searched (\"");
 		outSummary.Append(t.firstNotWalked);
 		outSummary.Append("\" first) - nothing was written there.");
+	}
+
+	// Chapters whose own sequence was rolled back: an error was standing when it closed, so the
+	// replacements in it were taken back and its rows were put back with them. Named here for the
+	// same reason as the two above - the rollback left nothing on any row to explain itself, and a
+	// chapter that came away with its ticks intact is otherwise read as one the run never reached.
+	//
+	// Only the chapter-at-a-time path can produce these: the other one has a single sequence around
+	// the whole run, so there is no such thing there as one chapter going back on its own.
+	if (t.chaptersRolledBack > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersRolledBack);
+		outSummary.Append(" chapter(s) were put back (\"");
+		outSummary.Append(t.firstRolledBack);
+		outSummary.Append("\" first) - something went wrong while replacing, so nothing was written there.");
 	}
 }
 

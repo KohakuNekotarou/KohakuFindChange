@@ -54,6 +54,9 @@ namespace KBSReplaceEngine
 	    SAVING: one chapter at a time - open, replace, close its own sequence, save, hand it back -
 	    so a run of any size holds at most one chapter of its own. A book of twenty chapters used to
 	    load all twenty before writing anything, which is more than a modest machine has to give.
+	    A chapter whose sequence ends with an error standing is put back WHOLE - its text, and its
+	    rows with it - and is neither saved nor closed. The summary names it: the rollback leaves
+	    nothing on any row to explain itself, so the chapter has to say it instead.
 
 	    A saved file cannot be taken back by any sequence, so cancelling THERE stops the run where
 	    it stands and leaves the finished chapters finished. The panel goes on showing their rows as

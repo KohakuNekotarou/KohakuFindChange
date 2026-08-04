@@ -191,15 +191,25 @@ namespace KBSBookScope
 
 	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
 	    chapter the user already had open is not held and is left alone, so a run can hand back every
-	    chapter it walked without keeping track of who opened which. Scheduled + UI-suppressed exactly
-	    like ReleaseHeldDocs, so it is safe to call from inside a run - and, like it, it refuses to
-	    close a chapter with unsaved work in it.
+	    chapter it walked without keeping track of who opened which. UI-suppressed exactly like
+	    ReleaseHeldDocs, and like it, it refuses to close a chapter with unsaved work in it.
+
+	    ***** closeNow decides WHEN, and it is not a detail. ***** The default SCHEDULES the close
+	    (IDocFileHandler::kSchedule), which does not happen until the current notification or idle
+	    tick has unwound - and a RUN does not unwind until it returns. Measured 2026-08-04 by counting
+	    the .indd lock files during a four-chapter saving replace: they went 1, 2, 3, 4 and only fell
+	    to zero once the run was over, so "hands each chapter back as it goes" held every chapter to
+	    the end after all. closeNow = true closes on the spot (kProcess), which is what a run needs
+	    when the whole point of its shape is to hold one chapter at a time.
+
+	    Only pass true from OUTSIDE a command sequence and with no walk standing - a run that has just
+	    ended a chapter's sequence and saved it, which is the case this was added for.
 
 	    @return true when the chapter was actually handed back. false when it was not ours, when it
 	            is no longer open, or when it holds unsaved changes. A caller that REPORTS having
 	            closed chapters has to read this rather than assume: "nothing of ours was open" and
 	            "we closed what was" are different facts, and only this can tell them apart. */
-	bool ReleaseHeldDoc(const UIDRef& docRef);
+	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
 	/** Stop holding this chapter WITHOUT closing it: it has a WINDOW now, so it is the user's and no
 	    longer something a run may hand back.

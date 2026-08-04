@@ -264,7 +264,7 @@ void KBSBookScope::ReleaseHeldDocs()
 	}
 }
 
-bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
+bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 {
 	if (docRef == UIDRef::gNull)
 		return false;
@@ -310,7 +310,13 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef)
 		return false;
 	if (!docFileHandler->CanClose(docRef))
 		return false;
-	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+
+	// ***** kProcess closes NOW; kSchedule closes when the caller has finished. ***** A run asks for
+	// the first (see the header): a scheduled close does not happen until the current tick unwinds,
+	// and a run is that tick - so every chapter it "handed back" was still open, and still locking
+	// its .indd, until the whole run was over. Measured 2026-08-04 on a four-chapter saving replace.
+	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
+		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
 	return true;
 }
 
