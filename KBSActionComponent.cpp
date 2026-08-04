@@ -55,6 +55,7 @@
 #include "KBSOversetScanEngine.h"	// Find Overset
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
+#include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -198,6 +199,32 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Toggle the session flag that JumpToHit reads. Its check mark is drawn in
 			// UpdateActionStates.
 			KBSJump::ToggleHidePreviousChapter();
+			break;
+		}
+
+		// "Translucent Panel": draw this panel faint (alpha kKBSPanelAlphaValue = 77, about 30%) so
+		// the document underneath stays readable, and bring it back to solid while the pointer is on
+		// it. *Windows only, OFF by default. It takes effect while the panel FLOATS, and while it is
+		// pulled out of an icon as a drawer; docked and expanded it can still be ticked but nothing
+		// looks different - the flag is set, and it applies the moment the panel floats again (that
+		// following is done by the observer in KBSPanelAlpha.cpp, on kPaletteVisibilityChangedMessage).
+		case kKBSTranslucentPanelActionID:
+		{
+			const bool16 on = !KBSGetPanelTranslucent();
+			KBSSetPanelTranslucent(on);
+
+			// The wording follows whether an alpha actually reached a window. Ticking it while docked
+			// changes nothing on screen, so the reason is said in words rather than left a mystery.
+			const bool16 applied = KBSApplyPanelTranslucency();
+			PMString msg;
+			if (!on)
+				msg = "Translucent panel: off.";
+			else if (applied)
+				msg = "Translucent panel: on.";
+			else
+				msg = "Translucent panel: on - has no effect while the panel is docked.";
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
 			break;
 		}
 
@@ -737,6 +764,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
 			int16 actionState = KBSBookScope::IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
 			if (KBSJump::IsHidePreviousChapterOn())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSTranslucentPanelActionID)
+		{
+			// *Selectable even while the panel is docked - deliberately NOT greyed out (the user's
+			// call in KESCM, 2026-07-29). Where the click has no visible result, DoAction says so on
+			// the status line instead.
+			int16 actionState = kEnabledAction;
+			if (KBSGetPanelTranslucent())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}

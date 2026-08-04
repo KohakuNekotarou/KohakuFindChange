@@ -153,6 +153,15 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 * shape KESCL has used since 2026-07-17, which took it from customconditionaltextui.
 			 */
 			IID_ICONTROLVIEW, kKBSPanelViewImpl,
+			/*
+			 * Roll-over (2026-08-04, brought over from KESCM): while the "Translucent Panel" toggle
+			 * is ON, the panel goes back to solid with the pointer on it. Verified over the whole
+			 * panel area in KESCM, 2026-07-29.
+			 * Note that IMouseRollOver has no usage example anywhere in the SDK; besides this AddIn
+			 * it needs CREATE_PMINTERFACE *and* an entry in KBSFactoryList.h - a missing factory
+			 * entry fails completely silently. Implementation: KBSPanelAlpha.cpp.
+			 */
+			IID_IMOUSEROLLOVER, kKBSPanelRollOverImpl,
 		}
 	},
 
@@ -336,6 +345,28 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * Panel visibility observer (2026-08-04, brought over from KESCM). Subscribes to the panel
+	 * manager's subject and waits for kPaletteVisibilityChangedMessage, which fires whenever a panel
+	 * is opened, closed, restored from an icon or drawer-expanded. The "Translucent Panel" toggle
+	 * puts its alpha on the panel's CURRENT top-level window (an OWL.Dock), and that window is thrown
+	 * away and recreated by those very actions - so without this the translucency would be silently
+	 * lost. The attach itself is in KBSPanelAlpha.cpp; this line only puts our IID, and so the
+	 * observer implementation, onto the boss.
+	 *
+	 * It goes on kActiveContextBoss rather than the kSessionBoss above because that is the proven
+	 * arrangement: KESCM carries three observers there, this one among them. (A free-floating
+	 * observer boss did NOT receive these notifications in practice - see KESCM.fr.)
+	 */
+	AddIn
+	{
+		kActiveContextBoss,
+		kInvalidClass,
+		{
+			IID_IKBSPANELVISIBILITYOBSERVER, kKBSPanelVisibilityObserverImpl,
+		}
+	},
+
+	/*
 	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
 	 * is closed - a row naming a closed document would still jump, and Change Checked would still
 	 * reopen it to replace in it. Book results are left to the book-side responder.
@@ -439,6 +470,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSHidePrevChapterActionID,
 		kKBSTargetMenuPath
 		kKBSHidePrevChapterMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Translucent Panel: toggle (check mark). ON = this panel is drawn faint while it floats,
+		// and comes back to solid while the pointer is on it. ★Windows only.
+		kKBSTranslucentPanelActionID,
+		kKBSTargetMenuPath
+		kKBSTranslucentPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between the search/scope toggles and the replace block.
@@ -574,6 +612,20 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSHidePrevChapterActionID,
 		kKBSHidePrevChapterMenuKey,		// "Hide Previous Chapter" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Translucent Panel. kCustomEnabling for the check mark, like the two toggles above - and for
+		// nothing else: it is deliberately NOT greyed out while the panel is docked, where it has no
+		// visible effect (the user's call in KESCM, 2026-07-29). Pressing it there sets the flag,
+		// which applies the moment the panel floats again, and the status line says so rather than
+		// leaving a click with no result unexplained.
+		kKBSActionComponentBoss,
+		kKBSTranslucentPanelActionID,
+		kKBSTranslucentPanelMenuKey,	// "Translucent Panel" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

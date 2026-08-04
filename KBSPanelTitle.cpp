@@ -41,6 +41,7 @@ namespace GoToURLUtils
 #include "KBSID.h"
 #include "KBSBookScope.h"		// IsBookScopeOn - the only input to the name
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
+#include "KBSPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
 #include "KBSPanelTitle.h"
 #include "KBSResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
 
@@ -179,6 +180,20 @@ public:
 
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
 			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), true);
+
+		// *At startup (KBSStartupShutdown::Startup) the panel manager may not have come up yet, in
+		// which case the subscription failed - so it is tried again here. IsAttached guards it, so
+		// this cannot subscribe twice.
+		KBSAttachPanelVisibilityObserver();
+
+		// ...and if "Translucent Panel" is ON, put the alpha back: re-opening the panel gives it a
+		// different top-level window (OWL.Dock), which is what the alpha was on. Safe to call
+		// unconditionally - OFF, docked and Mac are all rejected inside.
+		// *This is the safety net; the following is really done by the observer in KBSPanelAlpha.cpp
+		//   (kPaletteVisibilityChangedMessage).
+		//   *Note: AutoAttach runs every time the widgets are rebuilt, so it is no place to write a
+		//   fixed default - it only reflects whatever KBSGetPanelTranslucent currently says.
+		KBSApplyPanelTranslucency();
 	}
 
 	virtual void AutoDetach()

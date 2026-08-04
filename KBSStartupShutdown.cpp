@@ -25,6 +25,7 @@
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
 #include "KBSPanelTitle.h"
+#include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSResultModel.h"
 
 /** Implements IStartupShutdownService for the plug-in. */
@@ -34,11 +35,14 @@ public:
 	KBSStartupShutdown(IPMUnknown* boss) : CPMUnknown<IStartupShutdownService>(boss) {}
 	virtual ~KBSStartupShutdown() {}
 
-	/** The panel and the draw-event service are resource-driven, so the only thing to start is the
-	    book-close watcher that retires book-scope results (see KBSBookWatch.cpp). */
+	/** The panel and the draw-event service are resource-driven, so the only things to start are the
+	    book-close watcher that retires book-scope results (see KBSBookWatch.cpp) and the subscription
+	    that keeps the "Translucent Panel" toggle applied across the panel being re-opened or moved
+	    (see KBSPanelAlpha.cpp). */
 	virtual void Startup()
 	{
 		KBSBookWatchAttach();
+		KBSAttachPanelVisibilityObserver();
 	}
 
 	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and
@@ -50,6 +54,10 @@ public:
 		// must not be what a saved workspace remembers.
 		KBSPanelTitle::Restore();
 		KBSBookWatchDetach();
+		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
+		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
+		// up is a leaked resource - neither may outlive this .pln.
+		KBSShutdownPanelAlpha();
 		KBSMarkerExpiryIdleTask::Shutdown();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();

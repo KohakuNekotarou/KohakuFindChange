@@ -52,3 +52,8 @@ REGISTER_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialog
 REGISTER_PMINTERFACE(KBSGlyphView, kKBSGlyphViewImpl)
 // The panel illustration's tooltip (the URL a click on it opens).
 REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)
+// "Translucent Panel": the observer that re-applies the alpha when the panel's window is rebuilt,
+// and the roll-over that takes it off while the pointer is on the panel (KBSPanelAlpha.cpp).
+// !The roll-over fails SILENTLY without its line here - CREATE_PMINTERFACE alone is not enough.
+REGISTER_PMINTERFACE(KBSPanelVisibilityObserver, kKBSPanelVisibilityObserverImpl)
+REGISTER_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)

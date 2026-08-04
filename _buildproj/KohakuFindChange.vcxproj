@@ -102,7 +102,7 @@
          <Command>merge_res.cmd "$(IntDir)"  KBS &amp; echo Deleting old resources... &amp; del /f /s "$(TargetDir)($(TargetName) Resources)\"*.idrc &gt; $(IntDir)prevDeletedResources.txt &amp;  xcopy /Q /E "$(IntDir)"*.idrc "$(TargetDir)($(TargetName) Resources)\" /Y</Command>
       </PreLinkEvent>
       <Link>
-         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objd\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objd\Public.lib; $(ID_SDK_DIR)\build\win\objd\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objd\DV_WidgetBin.lib</AdditionalDependencies>
+         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objd\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objd\Public.lib; $(ID_SDK_DIR)\build\win\objd\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objd\DV_WidgetBin.lib; user32.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\debug\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
@@ -135,7 +135,7 @@
          <Command>merge_res.cmd "$(IntDir)"  KBS &amp; echo Deleting old resources... &amp; del /f /s "$(TargetDir)($(TargetName) Resources)\"*.idrc &gt; $(IntDir)prevDeletedResources.txt &amp;  xcopy /Q /E "$(IntDir)"*.idrc "$(TargetDir)($(TargetName) Resources)\" /Y</Command>
       </PreLinkEvent>
       <Link>
-         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objdx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objdx64\Public.lib; $(ID_SDK_DIR)\build\win\objdx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objdx64\DV_WidgetBin.lib</AdditionalDependencies>
+         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objdx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objdx64\Public.lib; $(ID_SDK_DIR)\build\win\objdx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objdx64\DV_WidgetBin.lib; user32.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\debugx64\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
@@ -170,7 +170,7 @@
       </PreLinkEvent>
       <Link>
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
-         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objr\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objr\Public.lib; $(ID_SDK_DIR)\build\win\objr\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objr\DV_WidgetBin.lib</AdditionalDependencies>
+         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objr\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objr\Public.lib; $(ID_SDK_DIR)\build\win\objr\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objr\DV_WidgetBin.lib; user32.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\release\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
@@ -205,7 +205,7 @@
       </PreLinkEvent>
       <Link>
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
-         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objrx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objrx64\Public.lib; $(ID_SDK_DIR)\build\win\objrx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objrx64\DV_WidgetBin.lib</AdditionalDependencies>
+         <AdditionalDependencies>$(ID_SDK_DIR)\build\win\objrx64\PMRuntime.lib; $(ID_SDK_DIR)\build\win\objrx64\Public.lib; $(ID_SDK_DIR)\build\win\objrx64\WidgetBin.lib; $(ID_SDK_DIR)\build\win\objrx64\DV_WidgetBin.lib; user32.lib</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\releasex64\sdk\KohakuFindChange.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChange/KohakuFindChange.lib</ImportLibrary>
@@ -236,6 +236,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSCloseDocResponder.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelAlpha.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSScriptProvider.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSReplaceConfirmDialog.cpp"/>
@@ -274,6 +275,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetLocator.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelTitle.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelAlpha.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookWatch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSScriptingDefs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceConfirmDialog.h"/>

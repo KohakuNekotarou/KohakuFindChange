@@ -43,6 +43,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSFindOversetMenuKey,			"Find Overset",
                 kKBSBookScopeMenuKey,			"Book Scope",
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
+                kKBSTranslucentPanelMenuKey,	"Translucent Panel",
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSUncheckAllMenuKey,			"Uncheck All",

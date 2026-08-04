@@ -109,7 +109,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSROWDATA, kKBSPrefix + 0)
 // The session-attached observer that retires a book-scope result set when its book closes. Its own
 // IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 2)
+// The observer that re-applies the "Translucent Panel" alpha when the panel is opened, closed,
+// docked or floated (kPaletteVisibilityChangedMessage). Its own IID because it is an AddIn onto
+// kActiveContextBoss, which carries observers that are not ours. See KBSPanelAlpha.cpp.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSPANELVISIBILITYOBSERVER, kKBSPrefix + 2)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 4)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 5)
@@ -182,8 +185,11 @@ DECLARE_PMID(kImplementationIDSpace, kKBSIconTipImpl, kKBSPrefix + 19)
 // drag the panel (see KBSPanelView.cpp). +19 is the tooltip above, and +18 is a retired id that is
 // deliberately not reused, so this is the next free number.
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelViewImpl, kKBSPrefix + 20)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 21)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 22)
+// "Translucent Panel" (2026-08-04, brought over from KESCM): the observer that re-applies the alpha
+// when the panel's window is rebuilt, and the roll-over that takes it off while the pointer is on
+// the panel. Both in KBSPanelAlpha.cpp.
+DECLARE_PMID(kImplementationIDSpace, kKBSPanelVisibilityObserverImpl, kKBSPrefix + 21)
+DECLARE_PMID(kImplementationIDSpace, kKBSPanelRollOverImpl, kKBSPrefix + 22)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 23)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 24)
 //DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 25)
@@ -234,7 +240,11 @@ DECLARE_PMID(kActionIDSpace, kKBSSaveResultsActionID, kKBSPrefix + 17)
 // (KBSHowTo.cpp). Deliberately NOT greyed out by anything - it is the one item that has to stay
 // readable when nothing is loaded and while a run is going, which is when it is most wanted.
 DECLARE_PMID(kActionIDSpace, kKBSHowToActionID, kKBSPrefix + 18)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 19)
+// "Translucent Panel" on the flyout: a check-mark toggle (ON = this panel is drawn translucent while
+// it floats). *Windows only. *Selectable while docked, where it has no visible effect - the flag is
+// set and applies the moment the panel floats again. OFF by default, and not remembered across
+// restarts. See KBSPanelAlpha.cpp.
+DECLARE_PMID(kActionIDSpace, kKBSTranslucentPanelActionID, kKBSPrefix + 19)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 20)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 21)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 22)
@@ -307,6 +317,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
+// "Translucent Panel" toggle: ON = the panel is drawn faint while it floats, and comes back to solid
+// while the pointer is on it. English in both string tables, like the rest of the flyout.
+#define kKBSTranslucentPanelMenuKey		kKBSStringPrefix "kKBSTranslucentPanelMenuKey"
 // Replace feature menu item keys.
 #define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
@@ -360,7 +373,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // IAttrReport::AppendDescription - the call behind the Settings line in Style Options - and the two
 // styles are added by their full path (KBSSearchEngine::DescribeFormatSetting).
 //
-// ⚠ Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
+// ? Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
 // bosses and the SDK has no ClassID-to-name call". That was asking the wrong object. The prompt
 // shortens the list; the saved report writes it in full.
 //
@@ -415,6 +428,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // and still sits above the scope toggle's separator (1.3).
 #define kKBSFindOversetMenuItemPosition		1.2
 #define kKBSHidePrevChapterMenuItemPosition	2.0
+// Translucent Panel goes at the END of the toggle block - after the two above, before the replace
+// block's separator (3.0). It is the one toggle that changes the PANEL rather than what a run does,
+// so it sits last among them (user's call 2026-08-04). KESCM places its own the same way.
+#define kKBSTranslucentPanelMenuItemPosition	2.5
 
 // The replace block sits below the existing toggles, above the About separator (10.0).
 #define kKBSSeparator3MenuItemPosition		3.0
