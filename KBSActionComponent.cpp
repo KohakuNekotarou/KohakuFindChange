@@ -399,7 +399,10 @@ static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID, const P
 // paragraph or character STYLE is not in the attribute list this counted, which is what made the
 // prompt print "Find: ^1" and threaten to delete matches it was only going to restyle (2026-08-04).
 //
-// WHAT is set is still not named - see the note on HasFormatSet in KBSSearchEngine.cpp.
+// WHAT is set IS named, as of the same day: DescribeFormatSetting asks the attributes to describe
+// themselves (IAttrReport::AppendDescription) and adds the two styles by their full path. The note
+// that used to stand here - "the 222 attribute bosses have no readable names" - was asking the wrong
+// object. See DescribeFormatSetting in KBSSearchEngine.cpp.
 
 // ***** ReplaceStringParameters LEAVES ^1 STANDING WHEN THE STRING IS EMPTY. ***** The header says
 // the parameter "may be empty"; what the prompt actually printed for a format-only search was the
@@ -433,13 +436,18 @@ static void AppendFormatNote(PMString& str, const char* formatKey, const PMStrin
 	// means "nothing extra to say" - never "nothing is set", which is HasFindFormatSet's answer and
 	// was decided before this line is reached.
 	//
-	// NOTE: this goes on AFTER InsertAmpersandForDisplay has doubled the user's own strings, so an
-	// '&' inside a style or swatch name would be eaten by the alert's accelerator handling. Worth
-	// doubling here too if this detail is kept.
+	// ***** DOUBLED HERE TOO, BECAUSE THIS IS THE USER'S TEXT AS WELL. ***** It arrives AFTER the
+	// caller ran InsertAmpersandForDisplay over the find / change string, and it carries names taken
+	// straight out of the document - styles, swatches, fonts - so a style called "A&B" would be
+	// quoted back as "AB" by the alert's accelerator handling, in the ONE place the user checks what
+	// is about to be written. Same doubling and same reason as the two strings above, one step later.
 	if (!detail.IsEmpty())
 	{
+		PMString shown(detail);
+		shown.SetTranslatable(kFalse);
+		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&shown);
 		str.Append(" (");
-		str.Append(detail);
+		str.Append(shown);
 		str.Append(")");
 	}
 	str.SetTranslatable(kFalse);

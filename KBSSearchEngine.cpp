@@ -285,9 +285,10 @@ bool HasFindQuery()
 // while the list this used to count was still empty - so the replace prompt captioned that very
 // search "Find: ^1" and promised to DELETE the matches it was only going to restyle.
 //
-// WHAT IS NOT ASKED: which style, or which attributes. Naming two conditions out of the 222 in
-// TextAttrID.h invites the reading that those are the only two set (user's decision, 2026-08-03), so
-// every caller says "Find Format" and points at the pane.
+// WHAT IS NOT ASKED HERE: which style, or which attributes - this answers yes or no and nothing
+// else. That question has an answer of its own since later the same day: DescribeFormatSetting,
+// where the attributes describe themselves. A caller wanting both asks this one first, because an
+// empty description does NOT mean nothing is set (see that function's note).
 static bool HasFormatSet(IFindChangeOptions* opts, IFindChangeOptions::SearchMode mode, bool findSide)
 {
 	if (opts == nil)

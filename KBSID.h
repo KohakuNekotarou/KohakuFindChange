@@ -355,10 +355,17 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmSaveNoteWidgetID, kKBSPrefix + 24
 // would state the opposite of what happens.
 #define kKBSConfirmEmptyReplaceKey	kKBSStringPrefix "kKBSConfirmEmptyReplaceKey"
 // The dialog's own name for its format pane, appended to whichever side has one set: "cat  + Find
-// Format", or on its own when the box beside it is empty. WHAT is set is not named - TextAttrID.h
-// declares 222 attribute bosses and the SDK has no ClassID-to-name call - so the prompt points at
-// the pane and the user reads the detail where they set it. See HasFormatSet in
-// KBSActionComponent.cpp for why naming even the two styles was turned down.
+// Format", or on its own when the box beside it is empty. WHAT is set follows in parentheses, in
+// InDesign's own words and the user's own language: the attributes describe THEMSELVES through
+// IAttrReport::AppendDescription - the call behind the Settings line in Style Options - and the two
+// styles are added by their full path (KBSSearchEngine::DescribeFormatSetting).
+//
+// ⚠ Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
+// bosses and the SDK has no ClassID-to-name call". That was asking the wrong object. The prompt
+// shortens the list; the saved report writes it in full.
+//
+// The two places a format can be set - the attribute list and the style fields beside it - are in
+// HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
 #define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
 #define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
 // The closing line, split by how many chapters will be written to. The whole replace is ONE undo
