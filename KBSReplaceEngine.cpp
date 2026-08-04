@@ -1452,13 +1452,32 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 			continue;
 		}
 
-		// The chapter may have been closed since the search (a held window the user shut). Bring
-		// it back the way a jump does, and rebind the model to the live database.
-		if (!KBSBookScope::IsDocStillOpen(docRef))
+		// Resolve the chapter to a LIVE document, BY FILE.
+		//
+		// ***** NOT gated on IsDocStillOpen, and that is the whole point. ***** It used to be:
+		// "still open? then keep the docRef the search left". But that question is asked of a
+		// docRef whose document was closed when the search finished, and a UIDRef is only
+		// (IDataBase*, UID) - so once the address is reused by a document opened afterwards, and
+		// the UID lands the same (chapters built the same way have the same internal UIDs), it
+		// answers YES about a DIFFERENT DOCUMENT. The chapter was then never reopened, the walk ran
+		// over its neighbour, and every row came back 'missing' - measured 2026-08-04, 2 to 4 book
+		// replaces in 10, always in a chapter after the first, never in the first one (nothing is
+		// open yet when the first is resolved, so there is nothing to be confused with).
+		//
+		// ReopenChapterDoc answers the same question by FILE: it hands back the open document that
+		// lives in this chapter's .indd, or opens it. A file cannot be confused with another file.
 		{
 			UIDRef reopened;
-			if (!KBSBookScope::ReopenChapterDoc(file, reopened))
+			if (KBSBookScope::ReopenChapterDoc(file, reopened))
 			{
+				docRef = reopened;
+				KBSResultModel::RebindChapterDoc(ci, reopened);
+			}
+			else if (!KBSBookScope::IsDocStillOpen(docRef))
+			{
+				// No file to open by, or the file would not open. The first of those is normal - a
+				// DOCUMENT-scope row is the front document and carries no file - so the old question
+				// is asked before giving up, and it is safe here: nothing was closed behind it.
 				++totals.chaptersSkipped;
 				if (!totals.haveFirstSkipped)
 				{
@@ -1472,8 +1491,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary, bool saveAfterRepla
 				pending.push_back(chapter);
 				continue;
 			}
-			docRef = reopened;
-			KBSResultModel::RebindChapterDoc(ci, reopened);
 		}
 
 		chapter.docRef = docRef;

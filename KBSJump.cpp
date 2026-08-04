@@ -346,23 +346,33 @@ namespace
 	// why through the status line, so it should just return.
 	bool EnsureChapterReachable(int32 chapterIdx, UIDRef& ioDocRef, const IDFile& file)
 	{
+		// ***** BY FILE FIRST, never gated on IsDocStillOpen. ***** That question is asked of a
+		// docRef whose document may have been closed since the search, and a UIDRef is only
+		// (IDataBase*, UID) - once the address is reused by a document opened afterwards, and the
+		// UID lands the same, it answers YES about a DIFFERENT DOCUMENT. ReopenChapterDoc asks by
+		// FILE instead: it hands back the open document living in this chapter's .indd, or opens
+		// it. See the longer note at the same change in KBSReplaceEngine's resolve pass.
+		UIDRef reopened;
+		if (KBSBookScope::ReopenChapterDoc(file, reopened))
+		{
+			ioDocRef = reopened;
+			KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
+			return true;
+		}
+
+		// No file to open by - a DOCUMENT-scope row is the front document and carries none - or the
+		// file would not open. The first of those is normal, so ask the old question before giving
+		// up; it is safe here, since nothing was closed behind it.
 		if (KBSBookScope::IsDocStillOpen(ioDocRef))
 			return true;
 
-		UIDRef reopened;
-		if (!KBSBookScope::ReopenChapterDoc(file, reopened))
-		{
-			// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
-			// nothing at all when clicked reads as a broken panel: the file has been moved,
-			// deleted, renamed, or is open in another application.
-			PMString message("Cannot open that chapter - moved, deleted, or in use?");
-			message.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(message);
-			return false;
-		}
-		ioDocRef = reopened;
-		KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
-		return true;
+		// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
+		// nothing at all when clicked reads as a broken panel: the file has been moved, deleted,
+		// renamed, or is open in another application.
+		PMString message("Cannot open that chapter - moved, deleted, or in use?");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return false;
 	}
 
 } // anonymous namespace

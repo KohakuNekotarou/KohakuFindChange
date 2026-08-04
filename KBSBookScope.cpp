@@ -19,7 +19,7 @@
 #include "IBookContentMgr.h"
 #include "IBookManager.h"
 #include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
-#include "IBookUtils.h"			// OpenOneDocument, OriginallyCloseDocInfo, IsSourceDocumentAlreadyOpen
+#include "IBookUtils.h"			// FindDocFromContentUID, GetBookContentStatus
 #include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
 #include "IDataBase.h"			// IsModified (the hide sweep skips dirty docs)
 #include "IDocFileHandler.h"
@@ -350,32 +350,70 @@ static bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
 	return true;
 }
 
+// Does this open document live in that file? Asked through IDataBase::GetSysFile - "the file
+// associated with the database" (IDataBase.h:270-274), which is how the SDK's own samples read a
+// document's file (persistentlistui/PstLstUITVHierarchyAdapter.cpp:97).
+//
+// A document that has never been saved has no file and can never be the chapter being looked for.
+static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
+{
+	if (doc == nil)
+		return false;
+	IDataBase* db = ::GetDataBase(doc);
+	if (db == nil)
+		return false;
+	const IDFile* docFile = db->GetSysFile();
+	if (docFile == nil)
+		return false;
+	SDKFileHelper helper(*docFile);
+	return helper.GetPath() == wantedPath;
+}
+
 bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 {
 	outDocRef = UIDRef::gNull;
 
 	SDKFileHelper fileHelper(file);
-	if (fileHelper.GetPath().empty())
+	const PMString wantedPath = fileHelper.GetPath();
+	if (wantedPath.empty())
 		return false;	// a front-document entry carries no file - nothing to reopen
 
-	// If the user reopened it themselves, rebind to THEIR document and do NOT hold it (closing it
-	// would surprise them).
+	// Is it open already - because the user reopened it, or because an earlier chapter of this very
+	// run is still standing? Rebind to THAT document and do NOT hold it: closing something somebody
+	// else opened would surprise them.
+	//
+	// ***** ASKED BY WALKING THE DOCUMENT LIST, and it has to be. ***** This used to ask
+	// IBookUtils::IsSourceDocumentAlreadyOpen, which hands back an index into the document list
+	// (IBookUtils.h:314-319), and took that index on trust - which put a DIFFERENT chapter's
+	// document in this chapter's place. Measured 2026-08-04: 4 book replaces in 10 came back with a
+	// chapter's rows all marked 'missing' and that chapter never opened at all, because this handed
+	// back a neighbour that WAS open. The walk then ran over the wrong document and every row failed
+	// its same-occurrence test - silently, since the call had reported success.
+	//
+	// The give-away was WHERE it failed: the FIRST chapter never did. A replace resolves its
+	// chapters with the earlier ones still open, so the question gets asked with 1, then 2, then 3
+	// documents standing - while a SEARCH closes each chapter before opening the next and asks it
+	// with none, which is why searching was never wrong.
+	//
+	// That API has no caller anywhere in this SDK - not in a sample, not in source/open - so there
+	// was never anything to check its behaviour against. This asks the question the way KBS already
+	// asks "is this document still open" a few lines up (IsDocStillOpen).
 	{
-		int32 fileIndex = -1;
-		if (Utils<IBookUtils>()->IsSourceDocumentAlreadyOpen(file, fileIndex))
+		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		if (docList != nil)
 		{
-			InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
-			if (docList != nil)
+			const int32 count = docList->GetDocCount();
+			for (int32 i = 0; i < count; ++i)
 			{
-				IDocument* doc = docList->GetNthDoc(fileIndex);
-				if (doc != nil)
-				{
-					outDocRef = ::GetUIDRef(doc);
-					return true;
-				}
+				if (!KBSDocumentLivesInFile(docList->GetNthDoc(i), wantedPath))
+					continue;
+				outDocRef = ::GetUIDRef(docList->GetNthDoc(i));
+				return true;
 			}
-			return false;
 		}
+		// Not open: fall through to the open below. ***** NEVER return false from here. ***** "It is
+		// not already open" is the ordinary case, and the old code turned two of its own nil checks
+		// into a false, which the caller reports as a chapter that could not be opened at all.
 	}
 
 	// The windowless, UI-suppressed open - by FILE (the book may be closed).
