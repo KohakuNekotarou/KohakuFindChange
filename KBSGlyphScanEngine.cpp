@@ -61,7 +61,7 @@
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
 #include "IPMFont.h"			// GetNotDefinedGlyph / AppendFamilyName / AppendStyleName
 #include "IStoryList.h"			// the document's stories
-#include "ITextModel.h"			// QueryStrand
+#include "ITextModel.h"			// QueryStrand, and GetStoryThreadSpan - which thread a position is in
 #include "IWaxGlyphIterator.h"	// one glyph at a time: its id, its text index, its run
 #include "IWaxGlyphs.h"			// the container an iterator hands back (nil == end of line)
 #include "IWaxIterator.h"		// line by line through a story's wax
@@ -380,6 +380,47 @@ bool IsCrossableBreak(IComposeScanner* scanner, TextIndex pos)
 	return buf[0] == kTextChar_CR || buf[0] == kTextChar_LF;
 }
 
+/** Are these two positions in the SAME story thread?
+
+    A story is not one run of text. The body, every table cell and every footnote are separate
+    THREADS of the same ITextModel, laid end to end - which is why the wax iterator hands their
+    lines over together, and why this scan finds boxes in all of them without asking.
+
+    ***** A ROW MUST NOT CROSS A THREAD BOUNDARY, AND NOTHING ELSE STOPS IT. ***** Every story
+    thread is terminated by a kTextChar_CR - stated as a rule to anyone writing one in
+    hiddentext/HidTxtModel.cpp:243-244 - and IsCrossableBreak accepts a CR. So the last box of one
+    thread and the first box of the next are exactly the "one line break apart" case MergeIntoRuns
+    joins, and they were being joined.
+
+    The table ANCHOR was never what needed guarding: 0x0016 is not a break, so it was already
+    refused, and a row that stops at one looks correct. It is the CR that ENDS a thread that let a
+    row escape into the next one.
+
+    Measured 2026-08-05 on work/kbs-selftest/glyphscan-threadboundary.indd before this existed:
+    "10 missing glyphs in 7 places" where 9 places is the truth. One row read "c1 [box][CR][box] c2"
+    - one row naming TWO DIFFERENT CELLS - and the second box had no row of its own at all, so
+    nothing on the panel could take the user to it. The glyph COUNT was right either way; what was
+    lost was where they are.
+
+    ***** ASKED OF THE MODEL, POSITION BY POSITION, RATHER THAN BY LISTING THE BOUNDARIES. ***** The
+    first attempt walked ITextStoryThreadDictHier and collected each dictionary's
+    GetThreadBlockTextRange().GetStart(). That fixed the body-to-cell case and left CELL-TO-CELL
+    exactly as it was, because a dictionary is per TABLE, not per cell: its thread block covers the
+    whole table, so the boundaries between its cells are not in that list at all (measured - p5 of
+    the document above stayed merged). ITextModel answers about the thread ITSELF (ITextModel.h:226),
+    which is the finest unit there is, so cells, footnotes and the body all come out of one question. */
+bool SameStoryThread(ITextModel* model, TextIndex a, TextIndex b)
+{
+	if (model == nil)
+		return true;		// cannot tell - behave as before rather than start splitting rows
+
+	TextIndex startA = kInvalidTextIndex;
+	TextIndex startB = kInvalidTextIndex;
+	model->GetStoryThreadSpan(a, &startA);
+	model->GetStoryThreadSpan(b, &startB);
+	return startA == startB;
+}
+
 /** Sort the collected glyphs and merge neighbours into the runs that become rows.
 
     ***** The sort is not tidiness. IWaxGlyphIterator.h:151-156 warns that the text indices "may not be
@@ -387,8 +428,10 @@ bool IsCrossableBreak(IComposeScanner* scanner, TextIndex pos)
     one character can produce several glyphs and several characters one glyph. Adjacency can only be
     judged once the positions are in order, and the same index can arrive more than once.
 
-    A run is broken by a gap OR by a change of font: two boxes side by side in two different fonts
-    are two different problems, and the row names the font.
+    A run is broken by a gap, by a change of font, OR by a THREAD BOUNDARY. Two boxes side by side
+    in two different fonts are two different problems, and the row names the font; two boxes in
+    different threads are in different PLACES - one in the body and one inside a table cell, or one
+    in each of two cells - however few characters lie between them (see SameStoryThread).
 
     ONE line break may sit inside a run (2026-08-02, user's call): a stretch of text that a font
     cannot set does not stop being one problem because it wrapped onto a new paragraph, and the fix
@@ -420,9 +463,15 @@ void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vect
 			NotdefRun& last = out.back();
 			if (g.pos < last.end)
 				continue;		// this character was already taken (several glyphs, one character)
+			// The thread test is asked LAST, and deliberately: it is the only one of the three that
+			// costs a call into the model, and by here the cheap two have already ruled out every box
+			// that is not a neighbour of this run. last.end - 1 is the run's last BOX (a swallowed
+			// break sits before that index, never on it), which is the position the new one has to
+			// share a thread with. See SameStoryThread.
 			if (last.fontName.Compare(kTrue, g.fontName) == 0
 				&& (g.pos == last.end
-					|| (g.pos == last.end + 1 && IsCrossableBreak(scanner, last.end))))
+					|| (g.pos == last.end + 1 && IsCrossableBreak(scanner, last.end)))
+				&& SameStoryThread(model, last.end - 1, g.pos))
 			{
 				// Neighbour in the same font, or one line break away from it - keep it on one row.
 				// The break itself is taken INTO the range, which is what lets a font be applied to
