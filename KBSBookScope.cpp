@@ -160,6 +160,33 @@ namespace
 		return (db != nil) && (db->IsModified() != kFalse);
 	}
 
+	/** Accepts every presentation. A local stand-in for the stock accept-all predicate (KESCL keeps
+	    its own too, so we do not depend on where the stock predicate objects live). */
+	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
+	{
+		return true;
+	}
+
+	/** Does this document have a WINDOW anywhere - front, or behind another tab? The
+	    all-presentations search, because GetFrontmostPresentationForDocument answers nil for a
+	    document sitting behind another tab (ShowChapterWindow has always asked it this way).
+
+	    Asked by the held-chapter releases since 2026-08-05: a window makes a chapter the USER'S,
+	    whoever raised the window. ShowChapterWindow and the jump take a chapter off the held list
+	    when they raise one themselves, but a window can be raised behind this module's back - the
+	    book panel lists every chapter, and double-clicking one there windows the very document being
+	    held. A release that closed it then would take a window the user is looking at; and once they
+	    had saved their work, not even the unsaved-work door would stand in the way. */
+	bool DocHasAnyWindow(const UIDRef& docRef)
+	{
+		IDataBase* db = docRef.GetDataBase();
+		if (db == nil)
+			return false;
+		FindPresentation_PreferCriteria noPreference;
+		return Utils<IDocumentUIUtils>()->FindPresentationForDocument(
+			db, KBSAcceptAnyPresentation, noPreference) != nil;
+	}
+
 	IBook* FindOpenBookByPath(const PMString& bookPath)
 	{
 		if (bookPath.IsEmpty())
@@ -246,6 +273,14 @@ void KBSBookScope::ReleaseHeldDocs()
 		if (!IsDocStillOpen(held[i]))
 			continue;
 
+		// ***** A window makes it the user's, whoever raised it. ***** Not closed, and DROPPED
+		// rather than put back on the list (the list was taken and cleared above, so skipping is
+		// dropping): a windowed chapter is not something a later sweep may close either, and the
+		// user can see it and close it themselves. See DocHasAnyWindow for how a held chapter
+		// comes to have a window at all.
+		if (DocHasAnyWindow(held[i]))
+			continue;
+
 		// ***** Unsaved work in it? Then it is not ours to close. ***** Put it BACK on the held
 		// list: it is still a chapter this plug-in opened, so once it has been saved a later call
 		// hands it back like any other. Leaving it off the list instead would mean nothing ever
@@ -324,6 +359,20 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 		return false;
 	}
 
+	// ***** A window makes it the user's, whoever raised it. ***** ShowChapterWindow and the jump
+	// take a chapter off this list when THEY raise one; this catches a window raised behind this
+	// module's back (the book panel windows a held chapter without a word to us - see
+	// DocHasAnyWindow). Claim dropped, nothing closed - and TRUE, not false: the chapter is no
+	// longer this module's to close, which is what "handed back" means to every caller. Closing it
+	// instead would take a window the user is looking at; once they had saved their work, the
+	// unsaved-work door below would not even stand in the way any more.
+	if (DocHasAnyWindow(docRef))
+	{
+		gHeldDocInfo.fCurrentOpenedDocumentList.erase(
+			gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
+		return true;
+	}
+
 	// ***** Unsaved work in it? Then it is not ours to close. ***** Asked BEFORE it comes off the
 	// list, so it stays held and a later call can hand it back once it has been saved. Reached when
 	// a chapter this plug-in opened has been written to and not saved - a replace run without "save
@@ -380,12 +429,8 @@ void KBSBookScope::ShutdownCleanup()
 	gBookScopeOn = false;
 }
 
-// Accepts every presentation. A local stand-in for the stock accept-all predicate (KESCL keeps
-// its own too, so we do not depend on where the stock predicate objects live).
-static bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
-{
-	return true;
-}
+// (KBSAcceptAnyPresentation lived here until 2026-08-05; it moved up into the anonymous namespace
+// when DocHasAnyWindow - which the held-chapter releases ask - joined it there.)
 
 // Does this open document live in that file? Asked through IDataBase::GetSysFile - "the file
 // associated with the database" (IDataBase.h:270-274), which is how the SDK's own samples read a

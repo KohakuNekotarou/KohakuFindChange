@@ -381,6 +381,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	int32 steps = 0;
 	// Room for the stored hits plus slack for matches that only exist because of a replacement
 	// (see the re-hit skip below). A hard stop, so no query can spin in here.
+	//
+	// ***** THE SLACK IS ENOUGH, AND THAT WAS MEASURED, NOT MODELLED (2026-08-05). ***** On paper a
+	// change string holding the find string K times costs K skipped re-hits per replacement, which
+	// for K >= 4 would spend this ceiling on a perfectly legitimate replace. On the running
+	// application it does not: 100 hits of "KOHAKU" -> TEN KOHAKUs completed in full, Text and GREP
+	// both (work/kbs-selftest/run-rehit-limit-test.ps1), which needs the walker to be handing back
+	// at most a couple of re-hits per replacement, not one per copy - the walker itself resumes past
+	// the text a replacement wrote. So do not "fix" this ceiling for the contains-the-find-string
+	// shape; the fix was designed, then measured first, and withdrawn as needless.
 	const int32 kMaxSteps = hitCount * 4 + 64;
 
 	// The range the last replacement wrote, so a match INSIDE it can be recognised.
@@ -1135,6 +1144,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		IDFile file;
 		if (!KBSResultModel::GetChapterLocation(ci, docRef, file))
 		{
+			// Unreachable while GetChapterLocation only fails on an out-of-range index and ci comes
+			// straight from GetChapterCount - but if the two ever come apart, this chapter's checked
+			// rows must not drop out of the run in silence: nothing on their locators would say a
+			// word, and the replaced total would come up short with nothing to explain it, which is
+			// the one thing the summary's rule exists to prevent. Counted and named exactly like a
+			// chapter that would not open - to the user, that is what it is.
+			++totals.chaptersSkipped;
+			if (!totals.haveFirstSkipped)
+			{
+				int32 chapterHits = 0;
+				KBSResultModel::GetChapterDisplay(ci, totals.firstSkipped, chapterHits);
+				totals.firstSkipped.SetTranslatable(kFalse);
+				totals.haveFirstSkipped = true;
+			}
 			pending.push_back(chapter);		// unopened - the loop below only counts it past
 			continue;
 		}

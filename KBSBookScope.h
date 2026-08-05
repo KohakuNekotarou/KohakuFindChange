@@ -186,7 +186,12 @@ namespace KBSBookScope
 	    run would hand it back with the work still in it. A kept chapter stays ON
 	    the held list, so a later call closes it once it has been saved. This is the distinction
 	    CloseDisplayedDocsIfClean has always made - it skips a dirty document for exactly this
-	    reason - now made here as well. */
+	    reason - now made here as well.
+
+	    ***** And a chapter found with a WINDOW is dropped from the list, not closed. ***** A window
+	    makes it the user's whoever raised it - the book panel can window a held chapter behind this
+	    module's back - and a visible document is one the user can deal with themselves. Same rule as
+	    ReleaseHeldDoc's. */
 	void ReleaseHeldDocs();
 
 	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
@@ -205,10 +210,16 @@ namespace KBSBookScope
 	    Only pass true from OUTSIDE a command sequence and with no walk standing - a run that has just
 	    ended a chapter's sequence and saved it, which is the case this was added for.
 
-	    @return true when the chapter was actually handed back. false when it was not ours, when it
-	            is no longer open, or when it holds unsaved changes. A caller that REPORTS having
-	            closed chapters has to read this rather than assume: "nothing of ours was open" and
-	            "we closed what was" are different facts, and only this can tell them apart. */
+	    ***** A chapter found with a WINDOW is handed to the user, not closed. ***** The panel-raised
+	    window this covers is one this module never saw being opened (the book panel windows a held
+	    chapter without a word to us); the chapter comes off the held list, nothing is closed, and the
+	    answer is TRUE - it is no longer ours to close, which is what "handed back" means.
+
+	    @return true when the chapter was actually handed back - closed, or found with a window and
+	            left to the user. false when it was not ours, when it is no longer open, or when it
+	            holds unsaved changes (and no window). A caller that REPORTS having closed chapters
+	            has to read this rather than assume: "nothing of ours was open" and "we closed what
+	            was" are different facts, and only this can tell them apart. */
 	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
 	/** Is this chapter one WE opened - is it on the held list right now?
