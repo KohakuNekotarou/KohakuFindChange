@@ -264,6 +264,23 @@ void KBSBookScope::ReleaseHeldDocs()
 	}
 }
 
+bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
+{
+	if (docRef == UIDRef::gNull)
+		return false;
+
+	// The same walk ReleaseHeldDoc opens with. Kept as its own function rather than folded into that
+	// one's answer because the two questions are asked at different MOMENTS - this one before the
+	// release, that one after - and only the pair of them says whether a failure to close was real.
+	// See the header.
+	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	{
+		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
+			return true;
+	}
+	return false;
+}
+
 bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 {
 	if (docRef == UIDRef::gNull)
@@ -649,6 +666,34 @@ void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
 			reason.SetTranslatable(kFalse);
 			outSummary.Append(reason);
 		}
+	}
+	outSummary.Append(").");
+}
+
+void KBSBookScope::AppendUnclosedNote(PMString& outSummary, const std::vector<PMString>& names)
+{
+	if (names.empty())
+		return;
+
+	// The other end of the run from AppendUnopenableNote, and deliberately built to the same shape:
+	// same count-then-name form, same three-and-then-"..." limit, same RAW names (the status line
+	// doubles the ampersands of the whole message on its way to the widget - see the long note in
+	// AppendUnopenableNote).
+	outSummary.Append("  ");
+	outSummary.AppendNumber(static_cast<int32>(names.size()));
+	outSummary.Append(" chapter(s) left open with no window (");
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		if (i > 0)
+			outSummary.Append(", ");
+		if (i >= 3)								// a status line stays short, even at three lines
+		{
+			outSummary.Append("...");
+			break;
+		}
+		PMString name(names[i]);
+		name.SetTranslatable(kFalse);
+		outSummary.Append(name);
 	}
 	outSummary.Append(").");
 }

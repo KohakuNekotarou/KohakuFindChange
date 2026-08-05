@@ -31,6 +31,7 @@
 #include "IFrameList.h"			// the argument ITextUtils::IsOverset takes
 #include "IFrameListComposer.h"	// RecomposeThruLastFrame - compose what is stale before asking
 #include "ILayoutUIUtils.h"		// GetFrontDocument - the same way KBSSearchEngine resolves scope
+#include "IParcelList.h"		// GetLastParcelKey / GetParcelFrameUID - was this thread placed at all?
 #include "IStoryList.h"			// the document's stories
 #include "ITableModel.h"		// const_iterator / GetGridID - one visit per cell thread
 #include "ITextModel.h"			// QueryFrameList / QueryTextParcelList
@@ -43,6 +44,7 @@
 // General includes:
 #include "IDataBase.h"			// SaveRestoreModifiedState
 #include "PMString.h"
+#include "ParcelKey.h"			// ParcelKey::IsValid - the placed-parcel walk's stop condition
 #include "PersistUtils.h"		// ::GetUIDRef
 #include "ProgressBar.h"		// RangeProgressBar - the scan's progress + cancel
 #include "TableTypes.h"			// GridID - the key a cell's thread is filed under
@@ -81,11 +83,24 @@ struct ScanningFlagGuard
 // draws one line. 60 is comfortably more than a row can show.
 const int32 kOversetPreviewChars = 60;
 
-// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice: chapters are
-// opened one at a time now and closed again straight after, so there is no moment at which the scan
-// could add up all their story counts. This scan only moves the bar at chapter boundaries anyway,
-// so an equal slice costs nothing but the weighting between a long chapter and a short one.
-const int32 kKBSChapterProgressSpan = 1;
+// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice, because the run
+// no longer knows how big a chapter is before it opens it: chapters are opened one at a time and
+// closed again straight after, so there is no all-chapters-open moment in which to add up their
+// story counts.
+//
+// Within a chapter the slice is divided by STORIES, which a document that IS open can be asked for
+// for free (IStoryList keeps the count). The same shape and the same number the search uses -
+// KBSSearchEngine's kKBSChapterProgressSpan, whose note explains the size: large enough that a
+// 500-story chapter still gets whole steps apiece, small enough that a 100-chapter book stays far
+// inside int32.
+//
+// ***** It was 1 until 2026-08-05, and that was the whole reason a one-document scan showed nothing.
+// ***** With a span of one there was no room to move the bar inside a chapter, so a document-scope
+// scan sat at 0% and finished - and the Cancel button, which needs the bar to have been moved to
+// answer at all, never got the chance. The reasoning recorded here for the old value ("story counts
+// are no longer knowable up front") does not survive comparison with the search, which counts them
+// AFTER opening each chapter and has always divided its slice that way.
+const int32 kKBSChapterProgressSpan = 10000;
 
 /** One place where text did not fit. */
 struct OversetPlace
@@ -129,6 +144,48 @@ bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32&
 	return true;
 }
 
+/** Is ANY of this thread actually placed - does it hold at least one parcel that sits in a frame?
+
+    ***** This is what tells "this cell overflowed" from "this cell never got the chance". *****
+    ThreadOverset answers the same yes for both: a cell whose own text ran past its bottom edge, and
+    a cell in a table that was pushed out of its frame entirely, where nothing was composed because
+    there was nowhere to compose it. The second is not a finding of its own - the FRAME is the
+    finding, and the official preflight says exactly that: measured 2026-08-05 on
+    work/kbs-selftest/pushed-table.indd, InDesign reported two "Text Frame / Overset text" errors and
+    not one word about the ten cells inside them, while this scan reported all twelve.
+
+    The distinction is in the parcels. A cell that overflowed IS on the page - its first lines are
+    drawn, so its parcel list holds a parcel with a real frame UID - whereas a pushed-out cell has a
+    parcel list in which every parcel answers kInvalidUID.
+
+    Written as the walk KBSOversetLocator's LocateInThread already runs, and for the same reason it
+    runs it: that one climbs to the frame the "+" is drawn in, this one only asks whether there was
+    one. (Kept here rather than exported from there because the two questions are different - a
+    caller of this one does not want the geometry, and a caller of that one has already decided to
+    point at something.) */
+bool ThreadHasPlacedParcel(ITextModel* model, TextIndex pos)
+{
+	if (model == nil)
+		return false;
+
+	InterfacePtr<ITextParcelList> tpl(model->QueryTextParcelList(pos));
+	if (tpl == nil)
+		return false;
+	InterfacePtr<IParcelList> pl(tpl, UseDefaultIID());
+	if (pl == nil)
+		return false;
+
+	// From the LAST parcel backwards: an overflowing thread has its overset parcels at the end, so
+	// the placed one it is looking for is nearer that end than the start on the failing path, and on
+	// the succeeding path the very first step answers.
+	for (ParcelKey k = pl->GetLastParcelKey(); k.IsValid(); k = pl->GetPreviousParcelKey(k))
+	{
+		if (pl->GetParcelFrameUID(k) != kInvalidUID)
+			return true;
+	}
+	return false;
+}
+
 /** Collect every cell of every table in this story that is overset ON ITS OWN.
 
     ***** The tables are reached through the thread-dictionary hierarchy, not through
@@ -149,8 +206,16 @@ bool ThreadOverset(ITextModel* model, TextIndex pos, TextIndex& outStart, int32&
     @param out  where the places are collected - or nil for a caller that only wants to know WHETHER
                 any cell overflowed (StoryHasAnyOverset). With nil the walk stops at the first one,
                 since nothing further can change the answer.
+    @param maxPlaces  stop once 'out' holds this many places - what is left of the run's whole-run
+                ceiling. Ignored when out is nil (that caller stops at the first one anyway).
+                ***** The bound belongs HERE, not on the rows built afterwards. ***** A ceiling that
+                only counts ROWS lets this walk collect without bound first and throw the surplus
+                away second, which is the opposite of what a safety ceiling is for: the document it
+                exists for - a book of overset table cells - is exactly the one where the collecting
+                itself is the cost. The glyph scan bounds its own walk the same way.
     @return whether any overset cell was found at all. */
-bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>* out)
+bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>* out,
+	size_t maxPlaces)
 {
 	bool found = false;
 
@@ -197,10 +262,25 @@ bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
 			if (!ThreadOverset(model, cellPos, start, count))
 				continue;
 
+			// ***** Did this cell overflow, or was it never placed at all? ***** A table pushed out of
+			// its frame leaves every one of its cells composing nothing, and ThreadOverset says yes to
+			// all of them - which put ten rows on the panel for a document the official preflight
+			// reports two frames for (2026-08-05, work/kbs-selftest/pushed-table.indd). The frame IS
+			// the finding there, and it is already collected by the caller's frame pass; a row per
+			// pushed-out cell only buries it. See ThreadHasPlacedParcel.
+			if (!ThreadHasPlacedParcel(model, cellPos))
+				continue;
+
 			// A caller that only asked WHETHER anything overflowed has its answer now, and the
 			// remaining tables cannot change it.
 			if (out == nil)
 				return true;
+
+			// Full. Asked BEFORE the push, so the list never goes over - the caller reads its size
+			// to decide whether the walk was cut short, and a list one entry past the bound would
+			// make that test read a size it never set.
+			if (out->size() >= maxPlaces)
+				return found;
 
 			OversetPlace place;
 			place.storyRef = storyRef;
@@ -222,14 +302,33 @@ bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
                        is worse than a number, and the official preflight does not report them at
                        all (measured 2026-08-02), so saying how many there were is already more
                        than InDesign itself offers.
-    @param maxRows       stop collecting once this chapter holds this many rows - what is left of
-                         the run's whole-run ceiling (KBSResultModel::kKBSCollectHitLimit).
-    @param outHitCeiling set when collecting stopped because of maxRows rather than because the
+    @param maxRows       stop once this chapter has collected this many PLACES - what is left of the
+                         run's whole-run ceiling (KBSResultModel::kKBSCollectHitLimit). Every row
+                         comes from a place, so bounding the places bounds the rows as well, and it
+                         bounds the WALK that finds them, which counting rows alone did not.
+    @param outHitCeiling set when the walk stopped because of maxRows rather than because the
                          document ran out, so the summary can say the list is not the whole story.
+    @param progressBar   the run's bar, or nil. progressBase is where this chapter's slice starts and
+                         chapterSpan is how wide it is; the slice is divided between this document's
+                         stories, so the bar moves WITHIN a chapter and a one-document scan is not a
+                         motionless 0%.
+    @param outCancelled  set when the user pressed Cancel while this chapter was being walked, at
+                         which point the scan stops where it stands and the caller throws the whole
+                         list away.
+
+    ***** THE CANCEL IS ASKED FROM INSIDE THE CHAPTER, WHICH THE SEARCH CANNOT DO. ***** WasCancelled
+    pumps the event queue, and the search's walk holds the text walker's critical section while it
+    runs - so there it can only be asked between chapters (see KBSSearchEngine's CollectHitsInDoc).
+    This scan runs no walker: it reads IStoryList itself, holds no critical section, and processes no
+    command, so the question is safe here. Asked once per story, which is far less often than the
+    search moves its own bar.
+
     @return how many ROWS the chapter got. */
 int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	KBSResultModel::Chapter& outChapter, int32& outOffPage,
-	int32 maxRows, bool& outHitCeiling)
+	int32 maxRows, bool& outHitCeiling,
+	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan,
+	int32& ioProgressReported, bool& outCancelled)
 {
 	outChapter.name = chapterName;
 	outChapter.docRef = docRef;
@@ -245,10 +344,23 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 
 	std::vector<OversetPlace> places;
 
+	// The bound the walk below stops at. Negative or zero cannot arrive - the caller breaks out of
+	// its chapter loop when nothing is left - but it is clamped rather than trusted, because the
+	// value it would take on is size_t and an unsigned cast of a negative number is enormous.
+	const size_t maxPlaces = (maxRows > 0) ? static_cast<size_t>(maxRows) : 0;
+
 	// User accessible only - the population the search and the glyph scan walk. IStoryList.h:38-42
 	// states internal stories are not subject to find/change, so reporting them would name places
 	// the rest of the panel never looks at.
 	const int32 storyCount = storyList->GetUserAccessibleStoryCount();
+
+	// This chapter's slice of the bar, cut into one piece per story. At least one step apiece, so a
+	// document with more stories than the slice has steps still crawls forward rather than standing
+	// still - the overshoot that allows is clamped at the chapter's own end below.
+	int32 stepsPerStory = (storyCount > 0) ? (chapterSpan / storyCount) : chapterSpan;
+	if (stepsPerStory < 1)
+		stepsPerStory = 1;
+
 	for (int32 i = 0; i < storyCount; ++i)
 	{
 		const UIDRef storyRef = storyList->GetNthUserAccessibleStoryUID(i);
@@ -272,7 +384,8 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		}
 
 		// (1) the thread the frames carry - the red "+".
-		if (frameList != nil && Utils<ITextUtils>()->IsOverset(frameList))
+		if (places.size() < maxPlaces
+			&& frameList != nil && Utils<ITextUtils>()->IsOverset(frameList))
 		{
 			TextIndex start = 0;
 			int32 count = 0;
@@ -288,20 +401,57 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		}
 
 		// (2) cells overflowing on their own - the red dot. Nested tables included.
-		CollectOversetCells(storyRef, model, &places);
-	}
+		CollectOversetCells(storyRef, model, &places, maxPlaces);
 
-	KBSSearchEngine::HitCache* cache = KBSSearchEngine::NewHitCache();
-	for (size_t p = 0; p < places.size(); ++p)
-	{
-		// The whole-run ceiling, asked against the ROWS built so far - not against p. A place whose
-		// "+" sits on no page is counted and skipped below, so the two numbers are not the same.
-		if (static_cast<int32>(outChapter.hits.size()) >= maxRows)
+		// ***** Full: the remaining stories are not walked either. ***** Walking them would cost the
+		// time of a full scan - every story, every table, every cell of every table - to produce
+		// places that are thrown away unread. The glyph scan stops at the same point for the same
+		// reason (KBSGlyphScanEngine's ScanOneDocument).
+		//
+		// It is stated as a ceiling here rather than left for the row loop to notice, because the row
+		// loop cannot: a place that lands on no page builds no row, so the rows can come back short
+		// of the bound on a walk that was cut short all the same.
+		if (places.size() >= maxPlaces)
 		{
 			outHitCeiling = true;
 			break;
 		}
 
+		// ----- the bar, and the button on it -----
+		// Moving the bar is what makes Cancel answer at all: the button's state is set by the message
+		// loop, and SetPosition is what runs it (see KBSAdvanceProgress). Not forced - the 8-step
+		// threshold in there keeps a document of many tiny stories from repainting once per story.
+		if (progressBar != nil)
+		{
+			int32 position = progressBase + (i + 1) * stepsPerStory;
+			const int32 chapterEnd = progressBase + chapterSpan;
+			if (position > chapterEnd)
+				position = chapterEnd;		// never into the next chapter's slice - the bar would jump back
+			KBSAdvanceProgress(progressBar, ioProgressReported, position);
+
+			// kFalse = do not raise the global error state, which would outlive the scan and fail the
+			// commands that come after it.
+			if (progressBar->WasCancelled(kFalse))
+			{
+				outCancelled = true;
+				break;
+			}
+		}
+	}
+
+	// Cancelled: none of the work below is worth doing - the caller throws the whole list away, rows
+	// and all. Returned from HERE, above the hit cache, so there is nothing yet to hand back.
+	if (outCancelled)
+		return 0;
+
+	// Every place gets its turn from here on - no second ceiling. The walk above already stopped at
+	// maxPlaces, and a row can only come from a place, so the rows cannot exceed the bound however
+	// this loop goes. That also lets every place be ASKED about its page: the row ceiling used to sit
+	// here and break out of the loop, which left the places past it uncounted in outOffPage as well -
+	// so a truncated scan under-reported how many findings it could not point at.
+	KBSSearchEngine::HitCache* cache = KBSSearchEngine::NewHitCache();
+	for (size_t p = 0; p < places.size(); ++p)
+	{
 		KBSResultModel::Hit hit;
 		hit.checked = false;		// a scan is a report, not a work list: no row is selectable
 
@@ -463,8 +613,17 @@ bool KBSOversetScanEngine::StoryHasAnyOverset(ITextModel* model)
 	// about a document Find Overset had findings for - the same two-scans-disagree fault that the
 	// main-thread half of this function was written to remove, one level further down (2026-08-04).
 	//
-	// nil = collect nothing and stop at the first one; only the yes or no is wanted here.
-	return CollectOversetCells(::GetUIDRef(model), model, nil);
+	// ***** A pushed-out cell is not counted here either, and that changes nothing. ***** Since
+	// 2026-08-05 CollectOversetCells passes over a cell that was never placed (ThreadHasPlacedParcel),
+	// and this function asks it the same way the scan does - on purpose, so the two cannot drift. It
+	// costs no answer: a cell can only be pushed out by its table being pushed out, which means the
+	// frame holding that table is overset, which (1) above has already said yes to. Nothing is lost
+	// from the glyph scan's "part of this document could not be looked at" either, for the same
+	// reason - that text is inside the overflow (1) reported.
+	//
+	// nil = collect nothing and stop at the first one; only the yes or no is wanted here. The place
+	// bound goes unread on that path for the same reason - there is no list to bound.
+	return CollectOversetCells(::GetUIDRef(model), model, nil, 0 /*maxPlaces: unused with nil*/);
 }
 
 void KBSOversetScanEngine::Run()
@@ -529,6 +688,16 @@ void KBSOversetScanEngine::Run()
 		// is not known yet - the summary reports the ones that could not, after the scan.
 		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
+			// ***** THE MODEL IS ALREADY EMPTY BY HERE - DRAW IT. ***** This exit is PAST the commit
+			// point above, so the previous run's rows are gone from the model; without this the tree
+			// goes on showing them while the status line announces that nothing was scanned, and a
+			// row the model no longer holds is a row that answers nothing when it is clicked.
+			// ShowStatus writes the status widget and nothing else (see KBSResultTree.h).
+			//
+			// The search never had this fault, for a reason that is easy to miss: it returns its
+			// summary to KBSActionComponent, which rebuilds the tree unconditionally afterwards. A
+			// scan puts its own summary up, so every one of its exits has to say this for itself.
+			KBSResultTree::Rebuild();
 			summary.Append("The active book has no chapters.");
 			KBSResultTree::ShowStatus(summary);
 			return;
@@ -541,6 +710,7 @@ void KBSOversetScanEngine::Run()
 		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (doc == nil)
 		{
+			KBSResultTree::Rebuild();	// past the commit point - see the sibling exit above
 			summary.Append("No document to scan.");
 			KBSResultTree::ShowStatus(summary);
 			return;
@@ -560,11 +730,11 @@ void KBSOversetScanEngine::Run()
 	KBSResultModel::SetBookName(bookName);
 	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
 
-	// ----- the progress bar: one step per chapter -----
-	// It used to be sized in STORIES, to weight a hundred-story chapter above a two-story one. Two
-	// things ended that: the scan only ever moves the bar at chapter boundaries (ScanOneDocument
-	// does not report from inside), so the weighting bought nothing but a smoother-looking crawl,
-	// and story counts are no longer knowable up front - chapters are opened one at a time now.
+	// ----- the progress bar: one equal slice per chapter, divided by stories inside -----
+	// Every chapter gets the same slice because a chapter's size is not knowable before it is opened,
+	// and ScanOneDocument then divides that slice between the stories it finds - so the bar moves
+	// through a single document too, which is what gives the Cancel button a chance to be pressed and
+	// answered. See kKBSChapterProgressSpan.
 	const int32 progressTotal = static_cast<int32>(targets.size()) * kKBSChapterProgressSpan;
 
 	PMString progressTitle(fromBook ? "Scanning book for overset text..."
@@ -588,6 +758,10 @@ void KBSOversetScanEngine::Run()
 	int32 rowTotal = 0;
 	int32 offPage = 0;
 	int32 chaptersWithHits = 0;
+	// Chapters this run OPENED and could not hand back. Named in the summary: they have no window,
+	// so the user can neither see them nor close them, and they hold their .indd locked - see
+	// KBSBookScope::AppendUnclosedNote.
+	std::vector<PMString> unclosed;
 
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
@@ -639,8 +813,11 @@ void KBSOversetScanEngine::Run()
 		KBSResultModel::Chapter chapter;
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
 		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter, offPage,
-			remaining, collectionTruncated);
+			remaining, collectionTruncated,
+			&progressBar, progressBase, kKBSChapterProgressSpan, progressReported, cancelled);
 
+		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so a
+		// chapter the walk left early still hands it on at the right place.
 		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
@@ -661,7 +838,26 @@ void KBSOversetScanEngine::Run()
 		// The two orders were both correct - appending touches no database - but three loops of one
 		// shape that differ in a detail are three loops somebody has to compare line by line before
 		// changing any of them.
-		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
+		//
+		// ***** ASKED FIRST WHETHER IT IS OURS, BECAUSE THE RELEASE'S false CANNOT BE READ ALONE.
+		// ***** It answers false for four different things, two of them perfectly ordinary (the
+		// chapter was the user's own copy, or it is no longer open) and two of them a real failure (it
+		// came out modified, or the close was refused). Only the pair of questions tells them apart.
+		// A chapter left behind by a failure is WINDOWLESS: nothing on screen shows it, nothing the
+		// user can do closes it, and it holds its .indd locked for the rest of the session - so it is
+		// worth a line in the summary. (The same shape as the replace's ShowChapterWindow, whose
+		// return value was being discarded until 2026-08-05.)
+		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
+		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/) && wasOurs)
+			unclosed.push_back(targets[i].shortName);
+
+		// ***** Cancelled INSIDE this chapter - and only now may the loop end. ***** The release above
+		// has to run first whatever happened: a chapter abandoned half-walked is still a chapter this
+		// run opened windowless, and leaving it standing would lock its .indd with no window to close
+		// it by. Its rows are dropped rather than appended - the cancel throws the whole list away a
+		// few lines below, and a partial chapter has no business reaching the model on the way.
+		if (cancelled)
+			break;
 
 		if (rows > 0)
 		{
@@ -694,7 +890,10 @@ void KBSOversetScanEngine::Run()
 
 	BuildSummary(rowTotal, chaptersWithHits, static_cast<int32>(targets.size()), fromBook,
 		bookName, offPage, collectionTruncated, summary);
+	// The two ends of the run, in the order they happened: what could not be opened, then what could
+	// not be closed again. Both append nothing in the ordinary case.
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
+	KBSBookScope::AppendUnclosedNote(summary, unclosed);
 	KBSResultTree::ShowStatus(summary);
 }
 

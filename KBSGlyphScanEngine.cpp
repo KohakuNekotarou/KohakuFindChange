@@ -114,11 +114,22 @@ struct ScanningFlagGuard
 // loop; this is a backstop so a defect could never hang the application.
 const int32 kMaxWaxLines = 200000;
 
-// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice: chapters are
-// opened one at a time now and closed again straight after, so there is no moment at which the scan
-// could add up all their story counts. This scan only moves the bar at chapter boundaries anyway,
-// so an equal slice costs nothing but the weighting between a long chapter and a short one.
-const int32 kKBSChapterProgressSpan = 1;
+// How much of the progress bar one CHAPTER gets. Every chapter gets the same slice, because the run
+// no longer knows how big a chapter is before it opens it: chapters are opened one at a time and
+// closed again straight after, so there is no all-chapters-open moment in which to add up their
+// story counts.
+//
+// Within a chapter the slice is divided by STORIES, which a document that IS open can be asked for
+// for free (IStoryList keeps the count). The same shape and the same number the search uses -
+// KBSSearchEngine's kKBSChapterProgressSpan, whose note explains the size.
+//
+// ***** It was 1 until 2026-08-05, and that was the whole reason a one-document scan showed nothing.
+// ***** With a span of one there was no room to move the bar inside a chapter, so a document-scope
+// scan sat at 0% and finished - and the Cancel button, which needs the bar to have been moved to
+// answer at all, never got the chance. The reasoning recorded here for the old value ("story counts
+// are no longer knowable up front") does not survive comparison with the search, which counts them
+// AFTER opening each chapter and has always divided its slice that way.
+const int32 kKBSChapterProgressSpan = 10000;
 
 /** One notdef glyph: where it sits, and the font that had no glyph for it. */
 struct NotdefGlyph
@@ -285,7 +296,12 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	//     document, correctly reported none - two scans of one plug-in disagreeing.
 	//   * WHEN it asked - before the recompose that this very function performs, so even a fresh
 	//     answer would have been the stale one.
-	if (KBSOversetScanEngine::StoryHasAnyOverset(model))
+	//
+	// Not asked again once the answer is yes. The flag is raised for the whole SCAN, not per story,
+	// and one sentence on the status line is all it can produce - while the question itself walks
+	// every table and every cell of this story to answer it. (It is stated as a short-circuit rather
+	// than left to the assignment because the cost is on the CALL, not on the store.)
+	if (!outHasOverset && KBSOversetScanEngine::StoryHasAnyOverset(model))
 		outHasOverset = true;
 
 	// READ-ONLY iterator: this walk never changes a wax line nor applies one, which is exactly the
@@ -433,10 +449,27 @@ void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vect
     @param outHitCeiling  set when collecting stopped because of maxRows rather than because the
                           document ran out. The summary has to say so: a report that comes back
                           short without a word reads as "this is everything wrong with the book".
+    @param progressBar    the run's bar, or nil. progressBase is where this chapter's slice starts
+                          and chapterSpan is how wide it is; the slice is divided between this
+                          document's stories, so the bar moves WITHIN a chapter and a one-document
+                          scan is not a motionless 0%.
+    @param outCancelled   set when the user pressed Cancel while this chapter was being walked, at
+                          which point the scan stops where it stands and the caller throws the whole
+                          list away.
+
+    ***** THE CANCEL IS ASKED FROM INSIDE THE CHAPTER, WHICH THE SEARCH CANNOT DO. ***** WasCancelled
+    pumps the event queue, and the search's walk holds the text walker's critical section while it
+    runs - so there it can only be asked between chapters (see KBSSearchEngine's CollectHitsInDoc).
+    This scan runs no walker: it reads IStoryList itself, holds no critical section, and processes no
+    command, so the question is safe here. Asked once per story, which is far less often than the
+    search moves its own bar.
+
     @return how many rows were produced. */
 int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	KBSResultModel::Chapter& outChapter, bool& outHasOverset, int32& outGlyphCount,
-	int32 maxRows, bool& outHitCeiling)
+	int32 maxRows, bool& outHitCeiling,
+	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan,
+	int32& ioProgressReported, bool& outCancelled)
 {
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -467,6 +500,14 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 	// find/change or spell checking, so scanning them would report boxes in places the rest of the
 	// panel - and InDesign itself - never looks at.
 	const int32 storyCount = storyList->GetUserAccessibleStoryCount();
+
+	// This chapter's slice of the bar, cut into one piece per story. At least one step apiece, so a
+	// document with more stories than the slice has steps still crawls forward rather than standing
+	// still - the overshoot that allows is clamped at the chapter's own end below.
+	int32 stepsPerStory = (storyCount > 0) ? (chapterSpan / storyCount) : chapterSpan;
+	if (stepsPerStory < 1)
+		stepsPerStory = 1;
+
 	for (int32 i = 0; i < storyCount; ++i)
 	{
 		const UIDRef storyRef = storyList->GetNthUserAccessibleStoryUID(i);
@@ -521,6 +562,27 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		// full scan to produce rows that are thrown away.
 		if (outHitCeiling)
 			break;
+
+		// ----- the bar, and the button on it -----
+		// Moving the bar is what makes Cancel answer at all: the button's state is set by the message
+		// loop, and SetPosition is what runs it (see KBSAdvanceProgress). Not forced - the 8-step
+		// threshold in there keeps a document of many tiny stories from repainting once per story.
+		if (progressBar != nil)
+		{
+			int32 position = progressBase + (i + 1) * stepsPerStory;
+			const int32 chapterEnd = progressBase + chapterSpan;
+			if (position > chapterEnd)
+				position = chapterEnd;		// never into the next chapter's slice - the bar would jump back
+			KBSAdvanceProgress(progressBar, ioProgressReported, position);
+
+			// kFalse = do not raise the global error state, which would outlive the scan and fail the
+			// commands that come after it.
+			if (progressBar->WasCancelled(kFalse))
+			{
+				outCancelled = true;
+				break;
+			}
+		}
 	}
 
 	KBSSearchEngine::DeleteHitCache(cache);
@@ -648,6 +710,16 @@ void KBSGlyphScanEngine::Run()
 		// is not known yet - the summary reports the ones that could not, after the scan.
 		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
+			// ***** THE MODEL IS ALREADY EMPTY BY HERE - DRAW IT. ***** This exit is PAST the commit
+			// point above, so the previous run's rows are gone from the model; without this the tree
+			// goes on showing them while the status line announces that nothing was scanned, and a
+			// row the model no longer holds is a row that answers nothing when it is clicked.
+			// ShowStatus writes the status widget and nothing else (see KBSResultTree.h).
+			//
+			// The search never had this fault, for a reason that is easy to miss: it returns its
+			// summary to KBSActionComponent, which rebuilds the tree unconditionally afterwards. A
+			// scan puts its own summary up, so every one of its exits has to say this for itself.
+			KBSResultTree::Rebuild();
 			summary.Append("The active book has no chapters.");
 			KBSResultTree::ShowStatus(summary);
 			return;
@@ -660,6 +732,7 @@ void KBSGlyphScanEngine::Run()
 		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
 		if (doc == nil)
 		{
+			KBSResultTree::Rebuild();	// past the commit point - see the sibling exit above
 			summary.Append("No document to scan.");
 			KBSResultTree::ShowStatus(summary);
 			return;
@@ -679,13 +752,12 @@ void KBSGlyphScanEngine::Run()
 	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run
 	KBSResultModel::SetBookName(bookName);
 
-	// ----- the progress bar: one step per chapter -----
-	// It used to be sized in STORIES, to weight a hundred-story chapter above a two-story one. Two
-	// things ended that: the scan only ever moves the bar at chapter boundaries (ScanOneDocument
-	// does not report from inside), so the weighting bought nothing but a smoother-looking crawl,
-	// and story counts are no longer knowable up front - chapters are opened one at a time now.
-	// Shown for both scopes, since a single document takes just as long as a short book and equally
-	// needs a way out.
+	// ----- the progress bar: one equal slice per chapter, divided by stories inside -----
+	// Every chapter gets the same slice because a chapter's size is not knowable before it is opened,
+	// and ScanOneDocument then divides that slice between the stories it finds - so the bar moves
+	// through a single document too, which is what gives the Cancel button a chance to be pressed and
+	// answered. Shown for both scopes, since a single document takes just as long as a short book and
+	// equally needs a way out. See kKBSChapterProgressSpan.
 	const int32 progressTotal = static_cast<int32>(targets.size()) * kKBSChapterProgressSpan;
 
 	PMString progressTitle(fromBook ? "Scanning book for missing glyphs..."
@@ -710,6 +782,10 @@ void KBSGlyphScanEngine::Run()
 	bool collectionTruncated = false;
 	int32 glyphTotal = 0;
 	int32 rowTotal = 0;
+	// Chapters this run OPENED and could not hand back. Named in the summary: they have no window,
+	// so the user can neither see them nor close them, and they hold their .indd locked - see
+	// KBSBookScope::AppendUnclosedNote.
+	std::vector<PMString> unclosed;
 
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
@@ -762,8 +838,11 @@ void KBSGlyphScanEngine::Run()
 		chapter.file = targets[i].file;		// so a jump can reopen a chapter that gets closed
 		int32 chapterGlyphs = 0;
 		const int32 rows = ScanOneDocument(chapterDocRef, targets[i].shortName, chapter,
-			hasOverset, chapterGlyphs, remaining, collectionTruncated);
+			hasOverset, chapterGlyphs, remaining, collectionTruncated,
+			&progressBar, progressBase, kKBSChapterProgressSpan, progressReported, cancelled);
 
+		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so a
+		// chapter the walk left early still hands it on at the right place.
 		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
@@ -784,7 +863,25 @@ void KBSGlyphScanEngine::Run()
 		// The two orders were both correct - appending touches no database - but three loops of one
 		// shape that differ in a detail are three loops somebody has to compare line by line before
 		// changing any of them.
-		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
+		//
+		// ***** ASKED FIRST WHETHER IT IS OURS, BECAUSE THE RELEASE'S false CANNOT BE READ ALONE.
+		// ***** It answers false for four different things, two of them perfectly ordinary (the
+		// chapter was the user's own copy, or it is no longer open) and two of them a real failure (it
+		// came out modified, or the close was refused). Only the pair of questions tells them apart.
+		// A chapter left behind by a failure is WINDOWLESS: nothing on screen shows it, nothing the
+		// user can do closes it, and it holds its .indd locked for the rest of the session - so it is
+		// worth a line in the summary.
+		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
+		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/) && wasOurs)
+			unclosed.push_back(targets[i].shortName);
+
+		// ***** Cancelled INSIDE this chapter - and only now may the loop end. ***** The release above
+		// has to run first whatever happened: a chapter abandoned half-walked is still a chapter this
+		// run opened windowless, and leaving it standing would lock its .indd with no window to close
+		// it by. Its rows are dropped rather than appended - the cancel throws the whole list away a
+		// few lines below, and a partial chapter has no business reaching the model on the way.
+		if (cancelled)
+			break;
 
 		if (rows > 0)
 		{
@@ -816,7 +913,10 @@ void KBSGlyphScanEngine::Run()
 	KBSResultTree::Rebuild();
 
 	BuildSummary(glyphTotal, rowTotal, hasOverset, collectionTruncated, summary);
+	// The two ends of the run, in the order they happened: what could not be opened, then what could
+	// not be closed again. Both append nothing in the ordinary case.
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
+	KBSBookScope::AppendUnclosedNote(summary, unclosed);
 	KBSResultTree::ShowStatus(summary);
 }
 

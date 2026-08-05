@@ -211,6 +211,36 @@ namespace KBSBookScope
 	            "we closed what was" are different facts, and only this can tell them apart. */
 	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
+	/** Is this chapter one WE opened - is it on the held list right now?
+
+	    ***** It exists because ReleaseHeldDoc's false cannot be read on its own. ***** That answer
+	    covers four different things: the chapter was never ours, it is no longer open, it holds
+	    unsaved work, or the close was refused. The first two are the ordinary course of a run and
+	    mean nothing is wrong; the last two mean a chapter this plug-in opened WINDOWLESS is still
+	    standing, with its .indd locked and no window for the user to find it by. A caller that wants
+	    to report the second pair has to be able to tell them apart, and this is the question that
+	    does it: ask before the release, and a false afterwards is then a real failure.
+
+	    Cheap - a walk of a list that holds at most a handful of entries. */
+	bool IsHeldDoc(const UIDRef& docRef);
+
+	/** Name the chapters a run opened and could NOT hand back, appending to a status line. The
+	    companion of AppendUnopenableNote, at the other end of the same run: one says which chapters
+	    never opened, this one says which ones never closed.
+
+	    Worth saying because the user cannot see them: a chapter opened windowless has no window, so
+	    it can neither be looked at nor closed by hand, and it keeps its .indd locked for the rest of
+	    the session. It happens when the chapter came out MODIFIED (a run guards against that with
+	    IDataBase::SaveRestoreModifiedState, so it means something else touched it) or when the close
+	    was refused.
+
+	    Appends nothing when every chapter was handed back, which is the ordinary case. At most three
+	    are named and the rest become "...", the same shape AppendUnopenableNote uses.
+
+	    Names are appended RAW, ampersands and all - the one place that draws a status line doubles
+	    them for the whole message (see AppendUnopenableNote for the full note). */
+	void AppendUnclosedNote(PMString& outSummary, const std::vector<PMString>& names);
+
 	/** Stop holding this chapter WITHOUT closing it: it has a WINDOW now, so it is the user's and no
 	    longer something a run may hand back.
 

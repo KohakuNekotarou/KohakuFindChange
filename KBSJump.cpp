@@ -530,6 +530,24 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		}
 		KBSResultTree::ShowStatus(message);
 	}
+	else if (!KBSResultModel::MatchTextIsLiveText() && !overset)
+	{
+		// ***** An OVERSET row whose place is not overset any anymore. *****
+		//
+		// An overset finding is a statement about the document as it was AT SCAN TIME, and this is the
+		// one row that can go silently stale: the test above cannot speak for it - its match segment
+		// holds the scan's own words ("Frame (370)"), so the comparison is short-circuited - and the
+		// jump itself works perfectly, scrolling to whatever now stands at that position. The result
+		// was a click that moved the view and said nothing at all, over a row that no longer describes
+		// anything (the text was made to fit, or an edit moved this position into placed text).
+		//
+		// The ROW is left alone on purpose. 'missing' means "the text is not where the search left
+		// it", which is not what happened here, and there is nothing to fix on a row whose whole
+		// content is a measurement - the answer is to scan again, which is what this says.
+		PMString message("No longer overset here - this row is out of date. Run Find Overset again.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+	}
 }
 
 void KBSJump::ShowChapter(int32 chapterIdx)
