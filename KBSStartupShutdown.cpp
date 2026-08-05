@@ -21,6 +21,7 @@
 
 // Project includes:
 #include "KBSID.h"
+#include "KBSDrawEventHandler.h"	// the jump marker's static state, emptied at shutdown
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
@@ -64,6 +65,10 @@ public:
 		// up is a leaked resource - neither may outlive this .pln.
 		KBSShutdownPanelAlpha();
 		KBSMarkerExpiryIdleTask::Shutdown();
+		// After the task that would clear it, and state-only - the marker holds a static PMString
+		// (its document's file) as well as a raw IDataBase*, and neither may still be standing at
+		// DLL unload. Not ClearMarker: that repaints, and the document may be going away already.
+		KBSDrawEventHandler::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
 	}

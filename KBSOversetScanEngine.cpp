@@ -644,17 +644,11 @@ void KBSOversetScanEngine::Run()
 		progressBase += kKBSChapterProgressSpan;
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		if (rows > 0)
-		{
-			KBSResultModel::AppendChapter(chapter);		// only chapters with findings go in
-			rowTotal += rows;
-			++chaptersWithHits;
-		}
-
-		// ***** Hand the chapter back. ***** The scan is over and its rows are plain data - UIDs and
-		// text indices, which survive the document being closed. A jump reopens what it needs
-		// through ReopenChapterDoc. Only chapters KBS opened are closed: ReleaseHeldDoc checks the
-		// held list itself, so one the user already had open passes through untouched.
+		// ***** Hand the chapter back HERE, before its rows go into the model. ***** The scan is over
+		// and its rows are plain data - UIDs and text indices, which survive the document being
+		// closed. A jump reopens what it needs through ReopenChapterDoc. Only chapters KBS opened are
+		// closed: ReleaseHeldDoc checks the held list itself, so one the user already had open passes
+		// through untouched.
 		//
 		// ***** CLOSED ON THE SPOT, not scheduled. ***** A scheduled close waits for this run to
 		// unwind, so every chapter handed back here would still be open, and still locking its
@@ -662,7 +656,19 @@ void KBSOversetScanEngine::Run()
 		// (measured 2026-08-04 on the replace, which walks chapters the same way). Safe at this
 		// point: ScanOneDocument has returned, so its dirty guard has restored the flag and nothing
 		// of ours is still holding the document.
+		//
+		// BEFORE AppendChapter, which is the order the search uses (KBSSearchEngine::SearchBook).
+		// The two orders were both correct - appending touches no database - but three loops of one
+		// shape that differ in a detail are three loops somebody has to compare line by line before
+		// changing any of them.
 		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
+
+		if (rows > 0)
+		{
+			KBSResultModel::AppendChapter(chapter);		// only chapters with findings go in
+			rowTotal += rows;
+			++chaptersWithHits;
+		}
 	}
 
 	// ***** Ask ONE more time, outside the loop. *****

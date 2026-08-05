@@ -287,9 +287,14 @@ namespace KBSResultModel
 	    Why it has to be remembered: the replace pass RE-WALKS each chapter, and a walk runs in the
 	    mode that is current AT THAT MOMENT. Switching tabs between a search and Change Checked
 	    therefore re-walks with a different query, returns a different set of matches, and leaves
-	    every stored walk order pointing at the wrong occurrence. Nothing wrong is written - the
-	    same-occurrence test refuses each one - but the whole run comes back "missing" with nothing to
-	    explain it. Comparing this against the current mode is what lets the replace say why. */
+	    every stored walk order pointing at the wrong occurrence.
+
+	    ***** AND SINCE 2026-08-05 THAT WOULD BE WRITTEN. ***** This note used to end "Nothing wrong
+	    is written - the same-occurrence test refuses each one - but the whole run comes back
+	    'missing'". That test is gone (see KBSReplaceEngine.h), so comparing this against the current
+	    mode is no longer about explaining a run that failed harmlessly: it is one of the two things
+	    standing between a changed query and the wrong occurrences being rewritten. The other is
+	    KBSSearchEngine::BuildWalkSignature. */
 	void SetSearchMode(int32 mode);
 	int32 GetSearchMode();
 
@@ -578,7 +583,7 @@ namespace KBSResultModel
 	/** What the same-occurrence test asks of a row: the story it was found in, where the match
 	    started and ENDED, and the whole of its text as one number.
 
-	    ★ The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped at
+	    !! The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped at
 	    500 characters for the row, so comparing it judged a long GREP match on its first 500 and
 	    let a rewrite past that point through as "the same occurrence" (found 2026-08-04). The hash
 	    covers the match whole - see KBSSearchEngine::HashMatchText.
@@ -608,17 +613,27 @@ namespace KBSResultModel
 	    @return the number of rows left in the model. */
 	int32 KeepCheckedRows();
 
-	/** Record a completed replacement: the row keeps its page locator but takes the range the
-	    replace command reported writing, is marked replaced, and leaves the selection. A replaced
+	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
+	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced
 	    hit can never be checked again - the text it matched is gone, so a second replace pass would
 	    have nothing to line it up with.
+
+	    ***** THE STORY IS TAKEN FROM THE COMMAND, NOT LEFT AS THE ROW HAD IT. ***** It used to be
+	    left alone, on the reasoning that the walk could only ever land a checked hit on the story
+	    that hit was found in - which the same-occurrence test guaranteed, by refusing to write
+	    anything that had moved. That test went on 2026-08-05 (see KBSReplaceEngine.h), and with it
+	    the guarantee: an edit that removes a whole frame between the search and the replace makes the
+	    Nth match a match in a LATER story. The row then held one story with the other story's range,
+	    so the line read back at the end of the chapter, and the hash taken from it, both came from
+	    text that has nothing to do with this row (SetHitSegments, GetHitReplacedRange).
 
 	    The three displayed segments are deliberately NOT set here: several matches can share one
 	    paragraph, and a line read at the moment ITS match was written still shows the later matches
 	    in that paragraph unreplaced. The replace pass fills them in once the chapter is finished -
 	    see SetHitSegments and GetHitReplacedRange. Until then the row still shows what the search
 	    found, which is why a run that is cancelled between the two can be rolled back as one. */
-	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx, TextIndex newStart, TextIndex newEnd);
+	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStoryUID,
+		TextIndex newStart, TextIndex newEnd);
 
 	/** Where a REPLACED row's new text sits: its story and the range MarkHitReplaced recorded.
 	    The replace pass walks its chapter's rows with this at the end of the run to read each
@@ -677,10 +692,13 @@ namespace KBSResultModel
 	    so both have to mark them, and marking them differently in the two places would make one row
 	    read as two different rows.
 
-	    ***** DISPLAY ONLY. ***** Never applied to what the model holds: the stored match text is
-	    compared character for character against the document before a replace
-	    (KBSSearchEngine::MatchIsSameOccurrence), and a marked-up copy would fail every comparison.
-	    Callers mark a COPY, at the moment they draw or write it.
+	    ***** DISPLAY ONLY. ***** Never applied to what the model holds. What the model holds is what
+	    a JUMP compares against the document (KBSSearchEngine::MatchIsSameOccurrence, through the
+	    hash taken over the stored range), and a marked-up copy would fail every comparison - a click
+	    on a row would answer "the text is no longer here" about text that had not moved at all.
+	    Callers mark a COPY, at the moment they draw or write it. (Until 2026-08-05 the REPLACE ran
+	    that comparison too, on every row, before writing; it no longer does, and the jump is its only
+	    caller. The rule here is unchanged either way.)
 
 	    (The report flattens what is left afterwards, which is what keeps its tabs from splitting a
 	    cell. The marks take the breaks out of that pass's way, so nothing there changes.) */

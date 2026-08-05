@@ -337,8 +337,13 @@ void KBSResultModel::ShutdownCleanup()
 
 	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
 	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
+	//
+	// ALL FOUR of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one
+	// string that is only ever filled by a replace was the one left holding storage at unload. When
+	// a static is added above, it is added here too - that is what this list is.
 	gBookName.Clear();
 	gQueryText.Clear();
+	gChangeText.Clear();
 	gWalkSignature.Clear();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
@@ -1096,7 +1101,7 @@ bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& ou
 // (GetHitAnchor and GetHitStoryStamp were defined here until 2026-08-03 - see the note where they
 // were declared in KBSResultModel.h.)
 
-void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
+void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStoryUID,
 	TextIndex newStart, TextIndex newEnd)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -1113,6 +1118,11 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx,
 	//
 	// The displayed segments are left as the search wrote them, on purpose: they are read back
 	// when the chapter is done, by which time no later replacement can still change them.
+	//
+	// The STORY comes from the command as well - see the header. It is normally the story the row
+	// already named; when it is not, the row is describing a match somewhere else and the range
+	// alone would be read against the wrong text.
+	h.storyUID = newStoryUID;
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;

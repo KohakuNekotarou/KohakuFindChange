@@ -41,6 +41,7 @@
 #include "DocumentContextID.h"	// kEndSpreadMessage
 #include "OutPrvID.h"			// kSepPrvOPPEnabledVPAttr (Overprint Preview detection)
 #include "AutoGSave.h"
+#include "SDKFileHelper.h"		// the marker's document, named by its file - see KBSMarkerDocPath
 #include "PersistUtils.h"		// ::GetDataBase
 #include "TransformUtils.h"		// ::InnerToSpreadMatrix / ::InnerToPasteboardMatrix
 #include "ILayoutUIUtils.h"
@@ -67,6 +68,34 @@ CREATE_PMINTERFACE(KBSDrawEventHandler, kKBSDrawEventHandlerImpl)
 bool16     KBSDrawEventHandler::sHasMarker = kFalse;
 PMRect     KBSDrawEventHandler::sMarkerPb  = PMRect(0, 0, 0, 0);
 IDataBase* KBSDrawEventHandler::sMarkerDB  = nil;
+PMString   KBSDrawEventHandler::sMarkerDocPath;
+
+// The file a database's document lives in - empty when it has none (never saved) or cannot be asked.
+//
+// ***** WHY THE MARKER NEEDS THIS AT ALL. ***** sMarkerDB is an IDataBase*, and an address is not an
+// identity: when a document is closed its address is free to be handed to the next one opened, so a
+// marker left over from a closed document can match a document that has nothing to do with it. KBS
+// has met exactly this before - a UIDRef is (IDataBase*, UID), and reusing one across a close is what
+// made a book replace report a whole chapter 'missing' (2026-08-04, see KBSBookScope). The answer
+// there was to ask the FILE, and it is the answer here.
+//
+// Called only where the database is known to be alive: at SetMarker time (the jump has just been
+// there) and inside a draw event (drawing only happens for open documents). It is never called on
+// sMarkerDB itself, which is the pointer that may be stale.
+static PMString KBSMarkerDocPath(IDataBase* db)
+{
+	PMString path;
+	path.SetTranslatable(kFalse);
+	if (db == nil)
+		return path;
+	const IDFile* sysFile = db->GetSysFile();
+	if (sysFile == nil)
+		return path;
+	SDKFileHelper helper(*sysFile);
+	path = helper.GetPath();
+	path.SetTranslatable(kFalse);
+	return path;
+}
 
 // Repaint the layout so the marker appears / disappears immediately. 'db' is a non-owning pointer
 // whose document may have been closed since the marker was set (the expiry task fires up to a
@@ -97,6 +126,9 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
 	sMarkerDB  = db;
 	sMarkerPb  = pbRect;
 	sHasMarker = kTrue;
+	// Taken NOW, while the document is certainly alive - the jump has just been in it. See
+	// KBSMarkerDocPath for what it is for.
+	sMarkerDocPath = KBSMarkerDocPath(db);
 	KBSRepaintViews(db);
 
 	// The marker is a flash, not a highlight: hand it to the timer that takes it away again.
@@ -114,7 +146,19 @@ void KBSDrawEventHandler::ClearMarker()
 	IDataBase* db = sMarkerDB;	// remember the document to repaint before we forget it
 	sHasMarker = kFalse;
 	sMarkerDB  = nil;
+	sMarkerDocPath.Clear();
 	KBSRepaintViews(db);
+}
+
+void KBSDrawEventHandler::ShutdownCleanup()
+{
+	// State only - no repaint, nothing asked of any document. See the header: at this point the
+	// marker's document may already be going away, and KBSRepaintViews would go looking for it.
+	// The idle task that would otherwise clear the marker has been retired just before this
+	// (KBSMarkerExpiryIdleTask::Shutdown), so nothing is left to fire either.
+	sHasMarker = kFalse;
+	sMarkerDB  = nil;
+	sMarkerDocPath.Clear();
 }
 
 //----------------------------------------------------------------------------------------
@@ -183,6 +227,31 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 		{
 			sHasMarker = kFalse;
 			sMarkerDB  = nil;
+			sMarkerDocPath.Clear();
+			return kFalse;
+		}
+	}
+
+	// ***** SAME ADDRESS IS NOT SAME DOCUMENT. ***** The test above finds the address on the
+	// document list, which is exactly what a REUSED address does too: close the document the marker
+	// was set in, open another, and this spread's database can be the marker's old pointer wearing a
+	// different document. Both tests then pass and the marker is painted over somebody else's page.
+	//
+	// A book run makes this reachable rather than theoretical - it opens and closes a chapter at a
+	// time, so addresses are being handed round throughout (KBSBookScope::ReleaseHeldDoc), and a
+	// jump can leave a marker standing while the next run does it.
+	//
+	// So the file decides. 'db' is the spread being drawn, which is open by definition, so asking it
+	// is safe; sMarkerDB is never asked, only compared. Two empty paths mean neither document has
+	// ever been saved - there is nothing to tell them apart with, and the address stands alone as it
+	// always did.
+	{
+		const PMString drawnPath(KBSMarkerDocPath(db));
+		if ((!drawnPath.IsEmpty() || !sMarkerDocPath.IsEmpty()) && !(drawnPath == sMarkerDocPath))
+		{
+			sHasMarker = kFalse;
+			sMarkerDB  = nil;
+			sMarkerDocPath.Clear();
 			return kFalse;
 		}
 	}

@@ -255,7 +255,13 @@ namespace KBSBookScope
 	    already-visible document to the front - a document that already has a window anywhere,
 	    including behind another tab, is left exactly as it is.
 
-	    @return true when a window was actually opened. */
+	    @return true when the chapter HAS a window afterwards - whether this call opened it or it
+	            already had one. false means it has none and the user cannot see it, which for a
+	            chapter a replace has just written to is worth reporting: the run leaves every
+	            chapter unsaved for the user to deal with, and one with no window cannot be dealt
+	            with. (It answered false for "it already had a window" until 2026-08-05, which made
+	            the two indistinguishable and the answer not worth reading. The replace's caller was
+	            discarding it.) */
 	bool ShowChapterWindow(const UIDRef& docRef);
 
 	/** The "Hide Previous Chapter" sweep (Task 3): close every OTHER document that HAS a window and

@@ -83,14 +83,27 @@ namespace KBSReplaceEngine
 	    the user's own step to take. (The confirmation carried a "save after replace" box from
 	    2026-08-02 to 2026-08-05, which is where the second shape above came from.)
 
-	    ***** AND NOTHING IS CLOSED - EXCEPT ON A CANCEL. ***** A run that goes through leaves every
-	    chapter it opened standing, because the replacements are in them. A run that is CANCELLED has
-	    put every character back, so the chapters it opened hold nothing of it and are handed back
-	    (ReleaseHeldDocs) - each one locks its .indd while it stands, which is the whole reason. The
-	    search and the two scans have always done this on their own cancel; the replace did not,
-	    between 2026-08-02 and 2026-08-05, because the only path that closed anything was the one
-	    that SAVED and it went with "save after replace". A chapter the USER had open, or had already
-	    edited, is not this run's to close and stays exactly as it was.
+	    ***** WHAT IS LEFT OPEN IS EXACTLY WHAT HAS SOMETHING IN IT. ***** A chapter a replacement
+	    landed in stays open, gets a window, and is left unsaved - the replacements are in it and only
+	    the user can decide about them. Every OTHER chapter this run opened is handed back
+	    (KBSBookScope::ReleaseHeldDoc), because each one locks its .indd while it stands and a
+	    windowless document cannot even be closed by hand - it is in no menu. Three cases:
+
+	      - a run that is CANCELLED has put every character back, so no chapter holds anything of it
+	        and they all go (ReleaseHeldDocs). The search and the two scans have always done this on
+	        their own cancel; the replace did not, between 2026-08-02 and 2026-08-05, because the only
+	        path that closed anything was the one that SAVED and it went with "save after replace";
+	      - a run that goes THROUGH hands back the chapters no replacement landed in - every checked
+	        hit there came back locked, missing or refused, or the walk never ran. Added 2026-08-05:
+	        such a chapter used to stay open, windowless and locked for the rest of the session, and
+	        WITH ITS MODIFIED FLAG SET, because a walk can mark a database changed without changing a
+	        character (which is why the SEARCH guards its own walk with SaveRestoreModifiedState and
+	        this one deliberately does not). That flag then stopped anything from ever closing it;
+	      - a run that cannot start its command sequence at all writes nothing and hands back
+	        everything, the same way.
+
+	    A chapter the USER had open, or had already edited, is on none of these lists: it was never
+	    held, so it is not this run's to close and stays exactly as it was.
 
 	    Refuses to run at all while another replace is up (see IsReplacing), and while the panel is
 	    showing a replace's report rather than a work list.

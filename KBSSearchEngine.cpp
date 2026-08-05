@@ -926,9 +926,10 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	if (outHit.isLocked)
 		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 
-	// The whole match as one number, for the same-occurrence test the replace and the jump run.
-	// Taken here, beside the three drawn segments, because both describe THIS match as the search
-	// found it - but this one is NOT capped, and it is the one that is compared. See HashMatchText.
+	// The whole match as one number, for the same-occurrence test the JUMP runs. (The replace ran it
+	// too until 2026-08-05 - see KBSReplaceEngine.h.) Taken here, beside the three drawn segments,
+	// because both describe THIS match as the search found it - but this one is NOT capped, and it
+	// is the one that is compared. See HashMatchText.
 	outHit.matchHash = KBSSearchEngine::HashMatchText(storyRef, start, end);
 
 	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
@@ -1371,12 +1372,21 @@ bool KBSSearchEngine::CommitReplaceGlyph()
 // asking each attribute for all of them costs nine QueryInterfaces on a list that holds a handful of
 // entries at most, once per run.
 //
-// ***** AND WHY IT IS ALLOWED TO BE INCOMPLETE. ***** An attribute that answers none of them
-// contributes its CLASS and nothing else, so "this format condition was added or removed" is always
-// seen while "same condition, different value" may not be. That is survivable because this signature
-// is not what keeps the replace correct - the per-hit same-occurrence test is
-// (KBSReplaceEngine::MatchStillStandsHere, which runs for every row with no fast path past it).
-// What this buys is the MESSAGE: "search again" instead of a run that comes back all-missing.
+// ***** WHERE IT IS STILL INCOMPLETE, AND WHAT THAT NOW COSTS. ***** An attribute that answers none
+// of the nine contributes its CLASS and nothing else, so "this format condition was added or
+// removed" is always seen, while "same condition, different value" may not be.
+//
+// That used to be written down here as survivable, on the grounds that this signature "is not what
+// keeps the replace correct - the per-hit same-occurrence test is". THAT TEST WAS REMOVED ON
+// 2026-08-05 (user's decision - see KBSReplaceEngine.h), and this door is now the only thing between
+// an edited query and a replace that rewrites occurrences the user never saw. So a value this misses
+// is no longer a worse MESSAGE; it is a wrong replacement, made in silence.
+//
+// It is left as it is for now because there is no generic value read to widen it with (see above),
+// and because the nine below are the value-carrying bases the text attributes are built on - an
+// attribute answering none of them is the exception, not the rule. If a real case turns up, the
+// place to fix it is here, and the test for it is two searches whose Find Format differs only by
+// that attribute's value, run through Change Checked without re-searching.
 static void AppendAttributeSignature(const AttributeBossList* attrs, int32 n, PMString& out)
 {
 	out.Append(" a");

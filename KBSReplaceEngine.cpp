@@ -129,14 +129,21 @@ struct PendingChapter
 	// is fixed before the opening starts, and dropping the failures out of the list would leave it
 	// short of its own total and never reaching the end.
 	bool	opened;
-	// Was this chapter already unsaved BEFORE the run touched it? Only asked so that a CANCEL can
-	// put the flag back: AbortCommandSequence restores the text but not the modified flag, so a
-	// cancelled run left every chapter it had reached looking unsaved with nothing to save. (A real
-	// Undo does clear it - the application does that itself - which is what made the difference
-	// visible.) Chapters that were already dirty stay dirty; that was not ours to change.
+	// Was this chapter already unsaved BEFORE the run touched it? Asked so that the flag can be put
+	// back for a chapter this run leaves with nothing in it - on a CANCEL, where
+	// AbortCommandSequence restores the text but not the flag (a cancelled run left every chapter it
+	// had reached looking unsaved with nothing to save; a real Undo does clear it, the application
+	// does that itself, which is what made the difference visible), and on the way out of a run that
+	// went through, for a chapter no replacement landed in (see HandBackChaptersWithNothingInThem).
+	// Chapters that were already dirty stay dirty; that was not ours to change.
 	bool	wasModified;
 
-	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false) {}
+	// Did a replacement actually land here? A chapter that got one is the user's to look at and save
+	// (it is given a window and left open); a chapter that got none has nothing in it and is handed
+	// straight back, because it is holding its .indd locked for no reason at all.
+	bool	tookReplacement;
+
+	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false) {}
 };
 
 // How many checked, not-yet-replaced hits does this chapter hold? Zero means the chapter is not
@@ -169,7 +176,9 @@ struct RunTotals
 	int32	chaptersTouched;	// chapters at least one replacement landed in
 	int32	chaptersSkipped;	// could not be opened at all
 	int32	chaptersStepLimited;// the re-walk hit the safety ceiling
+	int32	chaptersStalled;	// the re-walk stopped coming up with new matches
 	int32	chaptersNotWalked;	// opened, but the text walker would not run on them
+	int32	chaptersNoWindow;	// a replacement landed, but no window could be opened on it
 	int32	missing;			// checked hits whose text is no longer where the row says
 	int32	locked;				// checked hits on a locked layer or in a locked story
 	int32	refused;			// the replace command was asked and said no
@@ -188,7 +197,7 @@ struct RunTotals
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0), chaptersStepLimited(0),
-		  chaptersNotWalked(0), missing(0), locked(0), refused(0),
+		  chaptersStalled(0), chaptersNotWalked(0), chaptersNoWindow(0), missing(0), locked(0), refused(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false),
 		  cancelled(false)
 	{
@@ -225,6 +234,13 @@ struct RunTotals
 // outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
 //                are when the walk simply runs out of matches - but these rows were never looked
 //                at, so they get no word on their locator and the summary names the chapter.
+// outStalled   = the walk stopped moving forward: the find command handed back the SAME occurrence
+//                twice running, which no amount of further asking will get past. Reported apart
+//                from the ceiling above because the two need different advice - the ceiling means
+//                "the change text probably contains the find text", while this one is a query that
+//                cannot advance (a zero-width GREP match is the way in). The SEARCH has always
+//                guarded itself against this (see the prev* net in CollectHitsInDoc); the replace
+//                had only the ceiling, which caught it eventually and then explained it wrongly.
 // outMissing   = checked hits whose turn never came: the walk ran to the end of the chapter
 //                without them coming up, so the matches the search found are no longer there.
 //                Left untouched, counted and marked. (Until 2026-08-05 this also covered a hit
@@ -244,11 +260,12 @@ struct RunTotals
 //                every other counter here exists to prevent.
 //   progressBar  - the run's bar, sized in HITS. This chapter moves it from progressBase to
 //                  progressBase + (its own checked hits) as it consumes them. nil is allowed.
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit,
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit, bool& outStalled,
 	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
 	outStepLimit = false;
+	outStalled = false;
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
@@ -371,6 +388,14 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	TextIndex lastReplStart = kInvalidTextIndex;
 	TextIndex lastReplEnd = kInvalidTextIndex;
 
+	// What the LAST FIND handed back, whatever became of it - the net against a walk that stops
+	// moving forward. The same net CollectHitsInDoc has always had, arriving here on 2026-08-05:
+	// this loop's only stop was kMaxSteps, so a query that cannot advance was ground out four times
+	// per stored hit and then explained to the user as a change string containing the find string.
+	UID prevStory = kInvalidUID;
+	TextIndex prevStart = kInvalidTextIndex;
+	TextIndex prevEnd = kInvalidTextIndex;
+
 	// (A posDelta map stood here: how far THIS pass had moved the text in each story, so that our own
 	// replacements could be cancelled out before the same-occurrence test compared positions -
 	// without it, "cat" -> "kitten" would have refused every match after the first. It had no other
@@ -415,8 +440,29 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		// that contains the find string ("cat" -> "cat cat"). It was never in the search results,
 		// so it must NOT consume a walk order, or every later hit would line up one off and the
 		// wrong occurrences would be replaced.
+		//
+		// ***** THIS IS ASKED BEFORE THE STALL TEST BELOW, and the order is not free. ***** A
+		// replacement that begins with the find string ("cat" -> "cat cat") hands the next find back
+		// a match at the SAME START AND LENGTH as the one just replaced, which is exactly what the
+		// stall test is looking for - so testing first would break off the chapter on the one shape
+		// this skip exists to absorb. A walk that really cannot get past that shape is still stopped:
+		// by kMaxSteps, whose message ("does the change text contain the find text?") is the right
+		// one for it.
 		if (story.GetUID() == lastReplStory && start >= lastReplStart && start < lastReplEnd)
 			continue;
+
+		// The same occurrence twice running, and not the case above: the walk is not going anywhere.
+		// Whatever is left in targets is reported as missing, exactly as it would be if the walk had
+		// simply ended - the difference is said about the CHAPTER (outStalled), because the rows
+		// themselves are not what went wrong.
+		if (story.GetUID() == prevStory && start == prevStart && end == prevEnd)
+		{
+			outStalled = true;
+			break;
+		}
+		prevStory = story.GetUID();
+		prevStart = start;
+		prevEnd = end;
 
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
@@ -466,6 +512,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			// row is what MarkHitReplaced needs to record the outcome against. Counted as missing
 			// for the same reason a row the walk never reached is - it was asked for and not done -
 			// so the total cannot quietly come up short.
+			//
+			// ***** UNREACHABLE AS THIS FUNCTION STANDS, AND KEPT ANYWAY. ***** targets and
+			// rowByWalkOrder are filled from the same pass over the same rows, and only a walkOrder
+			// of 0 or more goes into either, so every walk order in targets has a row. It is a door
+			// against the two coming to be built differently - the one thing that must never happen
+			// here is a checked hit that is neither replaced nor accounted for.
 			if (hitIdx < 0)
 			{
 				++outMissing;
@@ -488,11 +540,19 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 				if (hitIdx >= 0)
 				{
-					// The range ONLY. The command reports the text it wrote, so this is exact - no
-					// guessing at the change string's length, which GREP back-references would make
-					// impossible anyway - but the line around it is not read until the chapter is
-					// finished. See the pass below the walk for why it cannot be read here.
-					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStart, replacedEnd);
+					// The STORY AND RANGE the command reports, and nothing else. Both come from the
+					// command, so both are exact - no guessing at the change string's length, which
+					// GREP back-references would make impossible anyway - but the line around them is
+					// not read until the chapter is finished. See the pass below the walk for why it
+					// cannot be read here.
+					//
+					// The story is handed over as well since 2026-08-05. It is normally the one the
+					// row already named, and had to be while the same-occurrence test stood in front
+					// of this line; with that test gone, a walk landing this hit in a DIFFERENT story
+					// is possible, and a row holding one story with the other's range would have its
+					// line and its hash read out of unrelated text (see MarkHitReplaced).
+					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStory.GetUID(),
+						replacedStart, replacedEnd);
 					replacedRows.push_back(hitIdx);
 				}
 			}
@@ -572,9 +632,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		}
 		else
 		{
-			// The walk ran to the end of the chapter without them coming up, so those matches are
-			// gone. Said on the rows THEMSELVES rather than on the chapter, which named a file and
-			// left the user to guess which of its rows it meant.
+			// The walk ended without them coming up - it ran out of matches, or it stopped moving
+			// forward (outStalled) - so as far as this chapter is concerned those matches are gone.
+			// Said on the rows THEMSELVES rather than on the chapter, which named a file and
+			// left the user to guess which of its rows it meant. (A walk that STALLED also says so
+			// about the chapter, since that is a fact about the query rather than about any row.)
 			//
 			// COUNTED as well, not merely marked. These are checked hits that were not replaced, and
 			// the rule this file is built on is that every one of those is named in the summary
@@ -699,6 +761,17 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
 	}
 
+	// And the third way a chapter can end early: the walk stopped moving forward - the same
+	// occurrence came back twice running. Worth its own sentence rather than being folded into the
+	// ceiling above, because the advice is the opposite: nothing about the CHANGE text is at fault,
+	// the FIND query is one that cannot advance (a zero-width GREP match is the way in).
+	if (t.chaptersStalled > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersStalled);
+		outSummary.Append(" chapter(s) stopped early - the search did not move forward there (a query that matches nothing at all?).");
+	}
+
 	// Chapters the text walker would not run on at all. Unlike every case above, nothing on their
 	// rows explains it - the walk never got far enough to say anything about a single one - so the
 	// chapter is named here instead. The SEARCH reports the same failure the same way; without this
@@ -712,10 +785,70 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append("\" first) - nothing was written there.");
 	}
 
+	// ***** A chapter that WAS written to and has no window. ***** Everything this run does is left
+	// for the user to look at and save, so a replacement they cannot see is the one outcome that
+	// leaves them with no move to make - and it used to be reported nowhere: the window was asked
+	// for and the answer thrown away (fixed 2026-08-05, along with the answer being worth reading -
+	// see KBSBookScope::ShowChapterWindow). Rare: it means kOpenLayoutCmdBoss itself would not run.
+	if (t.chaptersNoWindow > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersNoWindow);
+		outSummary.Append(" chapter(s) were changed but could not be shown - open them from the book panel to save them.");
+	}
+
 	// One more sentence stood here until 2026-08-05: chapters whose OWN sequence was rolled back,
 	// which only the chapter-at-a-time path could produce. This path wraps the whole run in a single
 	// sequence, so there is no such thing here as one chapter going back on its own - an error
 	// standing at the end takes every chapter with it, and the cancel sentence above covers that.
+}
+
+// ***** HAND BACK EVERY CHAPTER THIS RUN OPENED AND THEN LEFT NOTHING IN. *****
+//
+// The run keeps the chapters a replacement landed in - they hold the user's unsaved work and each
+// one is given a window to be seen and saved through. A chapter that got NONE is a different thing
+// entirely: it holds nothing of this run, nobody can see it (it was opened windowless), and while it
+// stands it keeps its .indd locked. There is no way for the user to close it either - a document
+// with no window is not in the Window menu.
+//
+// It happens whenever every checked hit in a chapter came back locked, missing or refused, when the
+// walker would not run there at all, or when the walk ended before any of its rows came up.
+//
+// ***** THE MODIFIED FLAG GOES BACK FIRST, AND THAT ORDER IS THE POINT. ***** A walk can leave a
+// database marked modified without changing a character - that is exactly why the SEARCH wraps its
+// own walk in IDataBase::SaveRestoreModifiedState, which the replace deliberately does not (it is
+// meant to leave documents changed). So a chapter nothing was written to can still come out of the
+// walk looking unsaved, and ReleaseHeldDoc REFUSES to close a chapter with unsaved work in it - it
+// would be thrown away silently. Left as it was, such a chapter could never be handed back again by
+// anything, and stayed open and locked for the rest of the session.
+//
+// Only for chapters that were CLEAN when this run found them. One the user had already edited is
+// still edited, and saying otherwise would put their work at risk of a silent close.
+//
+// The same two steps the CANCEL path takes, for the same reasons; it takes them over every chapter,
+// because an abort leaves nothing in any of them. (This is the half that was missing from the run
+// that goes THROUGH - added 2026-08-05.)
+void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pending)
+{
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+	{
+		if (!pending[pi].opened || pending[pi].tookReplacement)
+			continue;
+
+		if (!pending[pi].wasModified)
+		{
+			IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
+			if (chapterDB != nil)
+				chapterDB->SetModified(kFalse);
+		}
+
+		// closeNow: a scheduled close does not run until the current tick has unwound, and this run
+		// IS that tick - the chapters would stay open, and stay locked, until it was over. The same
+		// call and the same reasoning as the search's per-chapter release (KBSSearchEngine::
+		// SearchBook). Safe here: the command sequence is closed, the walk has halted, and a chapter
+		// the user opened themselves is not on the held list and passes through untouched.
+		KBSBookScope::ReleaseHeldDoc(pending[pi].docRef, true /*close now*/);
+	}
 }
 
 } // anonymous namespace
@@ -785,13 +918,19 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	// the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so what it walks by is whatever the dialog
 	// holds RIGHT NOW, not what it held when these rows were found.
 	//
-	// The per-hit same-occurrence test used to be the backstop for this ("Nothing wrong is written -
-	// the same-occurrence test refuses each one", KBSResultModel.h). It stopped being one when the
-	// trusted-story fast path arrived: a story nobody had edited was taken on trust and the test
-	// skipped outright, so a retyped query wrote the change string over occurrences the user had
-	// never seen while the panel reported the ORIGINAL rows as replaced (found 2026-08-03 in the
-	// defect audit). That fast path is gone, so the test is the backstop again - and this door is
-	// what says WHY, because a whole run coming back "37 hit(s) not found" would be true and useless.
+	// ***** THERE IS NOTHING BEHIND THIS TEST ANY MORE. ***** The per-hit same-occurrence test used
+	// to be the backstop for it ("Nothing wrong is written - the same-occurrence test refuses each
+	// one", KBSResultModel.h). It first stopped being one when the trusted-story fast path arrived -
+	// a story nobody had edited was taken on trust and the test skipped outright, so a retyped query
+	// wrote the change string over occurrences the user had never seen while the panel reported the
+	// ORIGINAL rows as replaced (found 2026-08-03 in the defect audit) - and then it was removed
+	// outright on 2026-08-05 (user's decision, see ReplaceChecked).
+	//
+	// So this is no longer the door that says WHY a run came back all-missing; it is the door that
+	// keeps the run from happening at all. What it does not catch is not caught by anything (the
+	// DOCUMENT being edited - stated on the confirmation instead), and what it does not KNOW about a
+	// query it can catch - see the note on the incompleteness of BuildWalkSignature - is a wrong
+	// replacement made in silence. Widen the signature rather than lean on anything downstream.
 	//
 	// An EMPTY signature on either side means it could not be described, not that it differs -
 	// results from before this field existed answer empty too - so only two known-different
@@ -953,6 +1092,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// search. It used to be book scope only, on the reasoning that a one-document replace is a
 	// single step with nothing to cancel between - but the bar is sized in HITS, not chapters, so a
 	// single document with thousands of them takes just as long and had no way to be stopped.
+	//
+	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters and once
+	// more when the loop ends, never inside a chapter - the walk holds the walker's critical section
+	// and must not pump UI work (see the section in ReplaceInChapter). So a Cancel pressed during a
+	// ONE-CHAPTER run does not break off the work: the chapter is replaced to the end, and then the
+	// whole sequence is aborted and every character put back. The button is honoured - nothing is
+	// left changed - but it is honoured at the end rather than at the moment it is pressed.
 	// DisableChildProgressBars keeps the chapter opens in the resolve pass below from raising bars
 	// of their own.
 	//
@@ -1089,6 +1235,26 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// DELIBERATELY UNNAMED (user's call, 2026-07-28). SetName is what Edit > Undo would say after
 	// the word "Undo"; leaving it unset lets InDesign word the step the way it words its own.
 	// To put the name back: seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
+	//
+	// (The string above is TRACKING DATA, not that name - CmdUtils.h:134 - so it names this caller in
+	// a lost-sequence report and nowhere else.)
+
+	// ***** NO SEQUENCE, NO RUN. ***** BeginAbortableCmdSeq answers nil on error (CmdUtils.h:135),
+	// and everything this function promises rests on the sequence it hands back: one Ctrl+Z for the
+	// whole book, and a Cancel that puts every chapter back. Without it the replacements would go in
+	// as loose commands - undoable one at a time at best - and, worse, a CANCEL would find no
+	// sequence to abort while still reporting "nothing was changed" over a book that had been
+	// rewritten. Refusing before a character is written is the only honest answer (2026-08-05).
+	if (seq == nil)
+	{
+		// Nothing was written, so there is nothing to roll back and nothing to keep: drop the row
+		// backup, and hand back every chapter the resolve pass opened - none of them took a
+		// replacement, which is exactly what this hands back.
+		KBSResultModel::ForgetRowBackup();
+		HandBackChaptersWithNothingInThem(pending);
+		outSummary.Append("Could not start an undoable step - nothing was changed.");
+		return 0;
+	}
 
 	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
 	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
@@ -1155,12 +1321,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const UIDRef& docRef = pending[pi].docRef;
 
 		bool stepLimit = false;
+		bool stalled = false;
 		bool notWalked = false;
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, missing, locked, refused,
-			notWalked, &progressBar, progressBase, progressReported);
+		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, stalled, missing, locked,
+			refused, notWalked, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to line
 		// up, or the safety ceiling) must still hand the bar on at the right place.
@@ -1173,6 +1340,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			++totals.chaptersTouched;
 		if (stepLimit)
 			++totals.chaptersStepLimited;
+		if (stalled)
+			++totals.chaptersStalled;
+
+		// Did anything land here? What decides whether this chapter is kept open for the user or
+		// handed straight back at the end of the run - see HandBackChaptersWithNothingInThem.
+		pending[pi].tookReplacement = (replaced > 0);
 		if (notWalked)
 		{
 			// The walk never started here, so no row of this chapter carries a reason - the chapter
@@ -1281,13 +1454,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	}
 	KBSResultModel::ForgetRowBackup();
 
-	// NOTHING IS SAVED ON THIS PATH, and nothing is closed. That is not a decision taken here - it
-	// is what the path IS: a run that saves went the other way at the fork above, because saving is
-	// the only thing that makes a chapter safe to close. Everything this run touched therefore stays
-	// open and unsaved, and the summary tells the user to deal with it.
+	// NOTHING IS SAVED ON THIS PATH. That is not a decision taken here - it is what the path IS: a
+	// run that saves went the other way at the fork above, because saving is the only thing that
+	// makes a chapter with replacements in it safe to close. Every chapter a replacement LANDED in
+	// therefore stays open and unsaved, and the summary tells the user to deal with it.
 	//
-	// (Saving and closing lived here, guarded by `if (saveAfterReplace)`, from 2026-08-02 to
-	// 2026-08-03; they then moved into the chapter-at-a-time path, and went with it on 2026-08-05.)
+	// (Saving lived here, guarded by `if (saveAfterReplace)`, from 2026-08-02 to 2026-08-03; it then
+	// moved into the chapter-at-a-time path, and went with it on 2026-08-05.)
 
 	// Windows are opened AFTER the sequence, never from inside it - the other half of the pair the
 	// resolve pass above makes: no document and no window is opened while the sequence is standing.
@@ -1298,8 +1471,27 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	//
 	// Every chapter a replacement landed in gets one: the change has to be visible, because it is
 	// the user who has to save it.
+	//
+	// ***** AND THE ANSWER IS READ. ***** A chapter that was written to and could not be SHOWN is
+	// the one outcome that leaves the user nothing to do - the run saves nothing, so what it wrote
+	// can only be dealt with through a window. It was discarded here until 2026-08-05, when
+	// ShowChapterWindow's answer was also made worth reading ("it already had a window" used to come
+	// back false as well, which is the ordinary case, not a failure).
 	for (size_t i = 0; i < touched.size(); ++i)
-		KBSBookScope::ShowChapterWindow(touched[i]);
+	{
+		if (!KBSBookScope::ShowChapterWindow(touched[i]))
+			++totals.chaptersNoWindow;
+	}
+
+	// ***** AND THE CHAPTERS THIS RUN LEFT NOTHING IN GO BACK. ***** Everything above is about the
+	// chapters that were CHANGED; a chapter this run opened and then wrote nothing to has no reason
+	// to stay - it holds nothing of the run, has no window to be seen through, and locks its .indd
+	// while it stands. See HandBackChaptersWithNothingInThem for the whole of why, including why
+	// the modified flag has to go back first.
+	//
+	// AFTER the windows above, not before: the opens are the commands with a measured history of
+	// disturbing undo (2026-07-28), so they stay as close to the end of the sequence as they were.
+	HandBackChaptersWithNothingInThem(pending);
 
 	// The panel now becomes a REPORT of what the replace did: the rows it changed, and the rows it
 	// was asked about and left alone, each saying why on its locator. The rows the user had
