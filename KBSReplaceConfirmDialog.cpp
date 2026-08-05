@@ -40,6 +40,7 @@
 
 // Project includes:
 #include "KBSID.h"
+#include "KBSLoc.h"			// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSReplaceConfirmDialog.h"
 
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
@@ -378,6 +379,12 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 	const PMString& message = KBSReplaceConfirmDialog::GetMessage();
 	const bool textLayout = !message.IsEmpty();
 
+	// The "Don't show again" box, restamped through the language switch: the .fr writes the enUS
+	// label, and this is what says it in Japanese on a Japanese UI (KBSLoc - the jaJP string
+	// table is gone). Present in both layouts, so it is stamped here rather than in either.
+	this->SetTextControlData(kKBSReplaceConfirmDontShowWidgetID,
+		KBSLoc::Text(kKBSGlyphConfirmDontShowKey, KBSJa::kGlyphDontShow));
+
 	this->ShowOrHide(kKBSReplaceConfirmMessageWidgetID, textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmGlyphBlockWidgetID, !textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, !textLayout);
@@ -410,22 +417,29 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	// same question, laid out differently. Each key is translated BEFORE the count goes in: a key only
 	// translates while it is the WHOLE string, and the count is real data, so it is marked
 	// untranslatable first.
+	// The three fixed labels first - "Find", the arrow, "Change to". The .fr resource writes
+	// their enUS strings; this restamps them through the language switch, the same way every
+	// other Japanese string is produced since the jaJP table went (2026-08-05).
+	this->SetTextControlData(kKBSGlyphConfirmFindLabelWidgetID,
+		KBSLoc::Text(kKBSGlyphConfirmFindLabelKey, KBSJa::kGlyphFindLabel));
+	this->SetTextControlData(kKBSGlyphConfirmArrowWidgetID,
+		KBSLoc::Text(kKBSGlyphConfirmArrowKey, KBSJa::kGlyphArrow));
+	this->SetTextControlData(kKBSGlyphConfirmChangeLabelWidgetID,
+		KBSLoc::Text(kKBSGlyphConfirmChangeLabelKey, KBSJa::kGlyphChangeLabel));
+
 	PMString countStr;
 	countStr.AppendNumber(KBSReplaceConfirmDialog::GetCheckedCount());
 	countStr.SetTranslatable(kFalse);
 	PMString countLine(KBSReplaceConfirmDialog::GetCheckedCount() == 1
-		? kKBSConfirmReplaceOneKey : kKBSConfirmReplaceManyKey);
-	countLine.Translate();
+		? KBSLoc::Text(kKBSConfirmReplaceOneKey, KBSJa::kConfirmReplaceOne)
+		: KBSLoc::Text(kKBSConfirmReplaceManyKey, KBSJa::kConfirmReplaceMany));
 	::ReplaceStringParameters(&countLine, countStr);
-	countLine.SetTranslatable(kFalse);
 	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID, countLine);
 
 	// What the run does NOT check - between the glyphs and the closing lines, the same place the
 	// Text / GREP layout puts it (KBSActionComponent::ConfirmReplace assembles that one). No
 	// parameter in this string, so it only needs translating.
-	PMString editedSince(kKBSConfirmEditedSinceKey);
-	editedSince.Translate();
-	editedSince.SetTranslatable(kFalse);
+	PMString editedSince(KBSLoc::Text(kKBSConfirmEditedSinceKey, KBSJa::kConfirmEditedSince));
 	this->SetTextControlData(kKBSReplaceConfirmEditedWidgetID, editedSince);
 
 	// The closing sentence, the same way.
@@ -433,18 +447,15 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	chapterStr.AppendNumber(KBSReplaceConfirmDialog::GetChapterCount());
 	chapterStr.SetTranslatable(kFalse);
 	PMString unsaved(KBSReplaceConfirmDialog::GetChapterCount() <= 1
-		? kKBSConfirmUnsavedOneKey : kKBSConfirmUnsavedManyKey);
-	unsaved.Translate();
+		? KBSLoc::Text(kKBSConfirmUnsavedOneKey, KBSJa::kConfirmUnsavedOne)
+		: KBSLoc::Text(kKBSConfirmUnsavedManyKey, KBSJa::kConfirmUnsavedMany));
 	::ReplaceStringParameters(&unsaved, chapterStr);
-	unsaved.SetTranslatable(kFalse);
 	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID, unsaved);
 
 	// ...and the warning under it, WHATEVER the count (user, 2026-08-05). No parameter in this one,
 	// so it only needs translating. The Text / GREP layout says the same thing inside its single
 	// wrapped block - see KBSActionComponent::ConfirmReplace.
-	PMString care(kKBSConfirmSeveralChaptersKey);
-	care.Translate();
-	care.SetTranslatable(kFalse);
+	PMString care(KBSLoc::Text(kKBSConfirmSeveralChaptersKey, KBSJa::kConfirmSeveralChapters));
 	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID, care);
 
 	// The four lines under the two frames. All optional, and all for the same reason: an empty

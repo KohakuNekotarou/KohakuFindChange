@@ -68,8 +68,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // ----- Change Checked confirmation prompt
                 // ^1 takes real data (a count, the user's find / change string), which is marked
                 // untranslatable before it goes in - see KBSActionComponent::ConfirmReplace.
-                // The Japanese wording lives in KBS_jaJP.fr; read its header before editing it,
-                // the encoding rules there are not obvious.
+                // The Japanese wording lives in KBSLoc.h (runtime switch by UI language - the
+                // jaJP string table is gone, 2026-08-05).
                 kKBSConfirmReplaceOneKey,		"Change 1 checked hit?",
                 kKBSConfirmReplaceManyKey,		"Change ^1 checked hits?",
                 kKBSConfirmFindKey,				"Find: ^1",

@@ -797,7 +797,15 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 		kWildFS, k_itIT, kSDKDefStringsResourceID + index_enUS
 		kWildFS, k_nbNO, kSDKDefStringsResourceID + index_enUS
 		kWildFS, k_fiFI, kSDKDefStringsResourceID + index_enUS
-		kInDesignJapaneseFS, k_jaJP, kSDKDefStringsResourceID + index_jaJP
+		// kWildFS AND the enUS table: there is no Japanese string table any more (2026-08-05,
+		// user's call). The strings KBS speaks in Japanese are switched at RUN TIME instead -
+		// see KBSLoc.h - so the table serves English to every locale, and no LocaleIndex gap
+		// can strand a locale on raw keys again. (The official samples' shape,
+		// kInDesignJapaneseFS + a jaJP table, matched NO row on a Roman-engine install running
+		// a Japanese UI - this machine - and every string drew as its raw key, measured
+		// 2026-08-05. kWildFS matters for the same reason: the featureset and the UI language
+		// are separate axes.)
+		kWildFS, k_jaJP, kSDKDefStringsResourceID + index_enUS
 	}
 };
 
@@ -1357,7 +1365,7 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 					{
 						EVEStaticTextWidget
 						(
-							kInvalidWidgetID,
+							kKBSGlyphConfirmFindLabelWidgetID,
 							kSysStaticTextPMRsrcId,
 							kBindNone,
 							Frame(0, 0, 140, 18)
@@ -1413,7 +1421,7 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 				// --- the arrow between them ---
 				EVEStaticTextWidget
 				(
-					kInvalidWidgetID,
+					kKBSGlyphConfirmArrowWidgetID,
 					kSysStaticTextPMRsrcId,
 					kBindNone,
 					Frame(0, 0, 30, 18)
@@ -1440,7 +1448,7 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 					{
 						EVEStaticTextWidget
 						(
-							kInvalidWidgetID,
+							kKBSGlyphConfirmChangeLabelWidgetID,
 							kSysStaticTextPMRsrcId,
 							kBindNone,
 							Frame(0, 0, 140, 18)
@@ -1628,4 +1636,5 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 #endif // __ODFRC__
 
 #include "KBS_enUS.fr"
-#include "KBS_jaJP.fr"
+// KBS_jaJP.fr is gone (2026-08-05): the Japanese now lives in KBSLoc.h and is switched at run
+// time by UI language. See the LocaleIndex note above.

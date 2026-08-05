@@ -316,7 +316,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
 // Text / GREP layout carries the same sentence inside its single wrapped block, so there is no
 // second widget for it there - the same arrangement the line above uses.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmEditedWidgetID, kKBSPrefix + 26)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 27)
+// The glyph dialog's three fixed labels ("Find", the arrow, "Change to"). They carry ids so the
+// runtime language switch (KBSLoc) can restamp them Japanese - the jaJP string table that used
+// to do it is gone (2026-08-05).
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindLabelWidgetID, kKBSPrefix + 27)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmArrowWidgetID, kKBSPrefix + 28)
+DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 29)
+//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 30)
 
 
 // "About Plug-ins" sub-menu:
@@ -373,11 +379,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmEditedWidgetID, kKBSPrefix + 26)
 // plain literal rather than a translated key.
 #define kKBSResultRowMenuName				"KBSRtMenuResultRow"
 
-// The Change Checked confirmation prompt. Its wording lives in the string tables (KBS_enUS.fr /
-// KBS_jaJP.fr) instead of being built from C++ literals, so a Japanese InDesign shows a Japanese
-// prompt - KBS.fr already routes k_jaJP to the jaJP table. The keys carry the plug-in's prefix
-// number, so they cannot collide with a built-in phrase and come back as somebody else's
-// translation.
+// The Change Checked confirmation prompt. The ENGLISH wording lives in KBS_enUS.fr under these
+// keys; the JAPANESE lives in KBSLoc.h and is switched in at run time by UI language (the jaJP
+// string table is gone - 2026-08-05). The keys carry the plug-in's prefix number, so they cannot
+// collide with a built-in phrase and come back as somebody else's translation.
 //
 // Singular and plural are separate keys rather than one "hit(s)": that reads like a placeholder
 // nobody filled in, and languages that inflect differently cannot be built from it at all.
