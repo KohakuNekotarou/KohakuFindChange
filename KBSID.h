@@ -311,7 +311,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 
 // only: the Text / GREP one carries the same sentence inside its single wrapped block, assembled by
 // KBSActionComponent, which is why there is no second widget for it there.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
-//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 26)
+// "If the text has been edited since the search..." - the GLYPH layout's copy of the warning that
+// the plug-in no longer checks whether a match is still the one the row found (2026-08-05). The
+// Text / GREP layout carries the same sentence inside its single wrapped block, so there is no
+// second widget for it there - the same arrangement the line above uses.
+DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmEditedWidgetID, kKBSPrefix + 26)
+//DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 27)
 
 
 // "About Plug-ins" sub-menu:
@@ -399,6 +404,15 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
 // HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
 #define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
 #define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
+// ***** The one thing this prompt has to say that the panel cannot show. ***** Since 2026-08-05 a
+// replace does NOT check that the match it is about to rewrite is still the one the row was found
+// at: the chapter is walked again and the Nth match takes the Nth checked row's replacement. Edit
+// the text between searching and replacing and that numbering points somewhere else - so the user
+// is told, before anything is written, that holding the document steady is theirs to do.
+//
+// Translated like the rest of this prompt, and for the same reason: this is where the user
+// authorises a rewrite of their own text. The status line that reports the outcome stays English.
+#define kKBSConfirmEditedSinceKey	kKBSStringPrefix "kKBSConfirmEditedSinceKey"
 // The closing line, split by how many chapters will be written to. The two keys differ only in
 // singular/plural, which languages that inflect cannot build from one string.
 //

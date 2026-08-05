@@ -54,15 +54,23 @@ namespace KBSReplaceEngine
 	    A machine that cannot hold a whole book open is served by ticking fewer rows instead
 	    (user's decision, 2026-08-05).
 
-	    A chapter whose re-walk does not reach every checked hit is reported rather than replaced
-	    at guessed positions - that means the document was edited, or the Find/Change query
-	    changed, since the search ran.
+	    ***** THE RUN DOES NOT CHECK THAT THE TEXT IS STILL THE TEXT THE SEARCH FOUND. *****
+	    (User's decision, 2026-08-05.) The chapter is walked again with the same query and the Nth
+	    match is replaced for the Nth checked row - so if the document has been edited since the
+	    search in a way that adds or removes a match, a replacement lands somewhere the user never
+	    ticked. Keeping the document steady between the two is the user's responsibility, and the
+	    confirmation says so before anything is written (kKBSConfirmEditedSinceKey).
+
+	    A same-occurrence test used to stand in that gap, refusing any row whose story, position or
+	    text no longer lined up. See the note above the walk in KBSReplaceEngine.cpp for what it
+	    did, what it cost, and what remains of it (the JUMP still asks it, so a click on a row can
+	    still answer "the replacement is no longer here").
 
 	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
 	    allowed to make the total quietly come up short. Four ways that happens:
 	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
 	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
-	      - missing: the text could not be found where the row said it was.
+	      - missing: the re-walk ran to the end of the chapter without that hit's turn coming up.
 	      - refused: the replace command was asked and would not run. The only one of the four that
 	        is a failure rather than a decision.
 	      - not reached: the safety ceiling cut the re-walk short before the hit came up. Those rows

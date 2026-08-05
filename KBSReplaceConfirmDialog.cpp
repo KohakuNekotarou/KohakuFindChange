@@ -383,6 +383,7 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, !textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmUnsavedWidgetID, !textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmCareWidgetID, !textLayout);
+	this->ShowOrHide(kKBSReplaceConfirmEditedWidgetID, !textLayout);
 
 	if (textLayout)
 	{
@@ -418,6 +419,14 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	::ReplaceStringParameters(&countLine, countStr);
 	countLine.SetTranslatable(kFalse);
 	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID, countLine);
+
+	// What the run does NOT check - between the glyphs and the closing lines, the same place the
+	// Text / GREP layout puts it (KBSActionComponent::ConfirmReplace assembles that one). No
+	// parameter in this string, so it only needs translating.
+	PMString editedSince(kKBSConfirmEditedSinceKey);
+	editedSince.Translate();
+	editedSince.SetTranslatable(kFalse);
+	this->SetTextControlData(kKBSReplaceConfirmEditedWidgetID, editedSince);
 
 	// The closing sentence, the same way.
 	PMString chapterStr;

@@ -606,11 +606,28 @@ namespace KBSResultModel
 	bool GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
 		TextIndex& outEnd);
 
-	/** Give a row the three text segments it displays, leaving every other field alone. The other
-	    half of MarkHitReplaced: the replace pass calls it once per replaced row after the chapter's
-	    last replacement, when the paragraphs have stopped moving. */
+	/** Give a row what it now stands for: the three text segments it DISPLAYS, and the hash the
+	    same-occurrence test COMPARES. The other half of MarkHitReplaced: the replace pass calls it
+	    once per replaced row after the chapter's last replacement, when the paragraphs have stopped
+	    moving. Every other field is left alone.
+
+	    ***** THE HASH GOES IN THE SAME CALL, AND IT HAS TO. ***** The two describe one fact - what
+	    this row points at now - and a row carrying one of them from before the replacement and the
+	    other from after it is a row that cannot be jumped to: MatchIsSameOccurrence reads the hash,
+	    finds the text it was taken from is gone, and answers "the replacement is no longer here".
+
+	    That is exactly what happened between 2026-08-04 and 2026-08-05. The test used to compare
+	    matchText, which this function has always updated, so the pair could not come apart; when
+	    the hash took over as the thing compared (see KBSSearchEngine::HashMatchText), the update
+	    did not follow it here, and every replaced row lost its jump. Splitting display from
+	    comparison was
+	    right - the drawn text is capped at 500 characters and cannot vouch for a long match - but
+	    they are still written at the same moment, from the same range.
+
+	    @param newMatchHash KBSSearchEngine::HashMatchText over the range the replace command
+	           reported writing - the SAME range the three segments were read from. */
 	void SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
-		const PMString& newMatch, const PMString& newPost);
+		const PMString& newMatch, const PMString& newPost, uint64 newMatchHash);
 
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the post-replace thinning both call it, so the two can no longer drift apart.

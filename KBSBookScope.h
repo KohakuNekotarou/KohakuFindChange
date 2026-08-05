@@ -226,10 +226,28 @@ namespace KBSBookScope
 	    is safe to call on any document. */
 	void ForgetHeldDoc(const UIDRef& docRef);
 
+	/** Does this chapter entry name a FILE at all?
+
+	    A BOOK chapter always does. A DOCUMENT-scope row does not: it is the front document, and it
+	    is carried as a docRef with an empty file beside it.
+
+	    ***** That difference is what tells ReopenChapterDoc's two failures apart. ***** It answers
+	    false both when there was nothing to open BY and when the file would not open, and a caller
+	    has to know which: only the first may fall back on the docRef the search left behind. The
+	    second must give up instead, because that docRef belongs to a document which was closed when
+	    the search finished - and asking IsDocStillOpen about a closed one is the very fault removed
+	    on 2026-08-04 (a UIDRef is only (IDataBase*, UID), so a reused address with a matching UID
+	    answers YES about a DIFFERENT document). See the resolve pass in KBSReplaceEngine.
+
+	    Asked through the same SDKFileHelper::GetPath() ReopenChapterDoc itself asks - through this
+	    very function - so the two cannot come to differ. */
+	bool ChapterHasFile(const IDFile& file);
+
 	/** Reopen a chapter by its file (Task 3 jump): if the user reopened it themselves, rebind to
 	    THEIR open copy (and do not hold it); otherwise open it windowless + UI-suppressed and hold
 	    it. The (re)opened document is returned in outDocRef. false = cannot reopen (missing file,
-	    locked). Used when a jump target's held chapter was closed by the user since the search. */
+	    locked) - or there was no file to open by at all, which ChapterHasFile is what tells apart.
+	    Used when a jump target's held chapter was closed by the user since the search. */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
 
 	/** Give a chapter that is open WITHOUT a window (the search opens them that way) a real layout

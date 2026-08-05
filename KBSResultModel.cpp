@@ -1113,7 +1113,7 @@ bool KBSResultModel::GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& ou
 }
 
 void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
-	const PMString& newMatch, const PMString& newPost)
+	const PMString& newMatch, const PMString& newPost, uint64 newMatchHash)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return;
@@ -1131,6 +1131,10 @@ void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMStri
 	h.preText = newPre;			h.preText.SetTranslatable(kFalse);
 	h.matchText = newMatch;		h.matchText.SetTranslatable(kFalse);
 	h.postText = newPost;		h.postText.SetTranslatable(kFalse);
+
+	// ***** AND the hash, in the same call. ***** See the header for why the two cannot be set
+	// apart from one another.
+	h.matchHash = newMatchHash;
 }
 
 void KBSResultModel::BuildHitLocator(Hit& hit)

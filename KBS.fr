@@ -1517,6 +1517,30 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
+		// ----- "If the text has been edited since the search..." -----
+		// The GLYPH layout's copy of the warning; the Text / GREP one carries the same sentence
+		// inside the wrapped block above (KBSActionComponent assembles it).
+		//
+		// MULTI-line, unlike the two single-line widgets below it: this sentence is about twice
+		// their length and wraps at 340px in both languages. A single-line widget would have
+		// ellipsized it, and this is the one line on the prompt that must be read in full.
+		EVEStaticMultiLineTextWidget
+		(
+			kKBSReplaceConfirmEditedWidgetID, kSysStaticTextPMRsrcId,
+			kBindNone,
+			Frame(0, 0, 340, 40)			// EVE grows it to fit the text
+			kTrue, kTrue, kAlignLeft,
+			kDontEllipsize, kFalse,
+			// StaticMultiLineTextAttr
+			0,								// fScrollBarWidgetID
+			kDialogWindowFontId;			// fFontID
+			3,								// fNumPixelsBetweenLines
+			0, 0,							// fInset
+			"",								// the controller fills it
+
+			kEVEAlignLeft | kEVELargeSpaceAfter,
+		),
+
 		// ----- "The chapter is opened and left UNSAVED..." -----
 		EVEStaticTextWidget
 		(

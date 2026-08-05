@@ -80,6 +80,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // by format with nothing typed - which the dialog allows and KBS now runs).
                 kKBSConfirmFindFormatKey,		"Find Format",
                 kKBSConfirmChangeFormatKey,		"Change Format",
+                // Sits between the query and the closing lines: what is about to be written, then
+                // what could go wrong with it, then what the run leaves behind.
+                kKBSConfirmEditedSinceKey,		"If the text has been edited since the search, a replacement can land somewhere you did not intend.",
                 // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
                 // box below", because a "save after replace" box underneath could make them false.
                 // That box is gone with its feature, so a run has only one outcome left to state.

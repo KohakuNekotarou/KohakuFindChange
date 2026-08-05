@@ -719,21 +719,23 @@ void KBSResultTree::ShowCheckedStatus()
 	if (total == 0)
 		return;		// no results: leave whatever the search left on the line
 
-	// The count leads, so it survives the narrow status field's tail truncation.
+	// "(100/2000 checked)" - the whole thing in brackets, no space around the slash and no full
+	// stop (user's wording, 2026-08-05). The count still leads, so it survives the narrow status
+	// field's tail truncation.
+	//
+	// The TOTAL is every stored hit, not the number of rows on screen. That is the number Check All
+	// acts on and the number a replace would rewrite, so it is the one the line has to state.
+	//
+	// (A second sentence stood here until 2026-08-05: "(5000 shown)", added whenever the results ran
+	// past the panel's display cap, so that Check All followed by a replace could not surprise
+	// anyone. Dropped on the user's decision - the line says what is checked, and nothing else.)
 	PMString msg;
 	msg.SetTranslatable(kFalse);
+	msg.Append("(");
 	msg.AppendNumber(KBSResultModel::GetCheckedCount());
-	msg.Append(" / ");
+	msg.Append("/");
 	msg.AppendNumber(total);
-	msg.Append(" checked.");
-	if (total > KBSResultModel::kKBSDisplayHitLimit)
-	{
-		// The panel only shows the first N rows, but checking spans every stored hit - say so, so
-		// "Check All" followed by a replace is never a surprise.
-		msg.Append(" (");
-		msg.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
-		msg.Append(" shown)");
-	}
+	msg.Append(" checked)");
 	KBSResultTree::ShowStatus(msg);
 }
 

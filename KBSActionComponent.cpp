@@ -630,6 +630,19 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
+	// ***** What the run does NOT check. ***** Since 2026-08-05 a replace walks the chapter again
+	// and gives the Nth match the Nth checked row's replacement, without asking whether that match
+	// is still the one the row was found at. Edit the text in between and the numbering points
+	// elsewhere - so it is said here, in the one place the user sees before anything is written.
+	//
+	// Between the query and the closing lines on purpose: what is about to be written, then what
+	// could go wrong with it, then what the run leaves behind.
+	PMString editedSince(kKBSConfirmEditedSinceKey);
+	editedSince.Translate();
+	msg.Append(editedSince);
+	msg.Append(kLineSeparatorString);
+	msg.Append(kLineSeparatorString);
+
 	// How many chapters this will write to. Only the singular/plural of the sentence turns on it now
 	// - it used to decide what could be promised about undo as well, until that promise came off the
 	// prompt on 2026-08-05.

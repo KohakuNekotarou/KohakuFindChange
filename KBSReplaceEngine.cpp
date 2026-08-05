@@ -197,70 +197,39 @@ struct RunTotals
 	}
 };
 
-// Is the match the walk just landed on the SAME occurrence this row describes?
+// ***** A SAME-OCCURRENCE TEST STOOD HERE UNTIL 2026-08-05, AND IT NO LONGER DOES. *****
 //
-// The walk order alone cannot tell "the Nth match" apart from "a DIFFERENT Nth match". An edit
-// made between the search and the replace that removes one match and adds another elsewhere keeps
-// the COUNT intact, so every checked hit still comes up and nothing looks wrong - while the
-// numbering now points at text the user never checked, and that text gets rewritten.
+// MatchStillStandsHere asked, of every checked hit and with no fast path past it, whether the match
+// the walk had landed on was the one the row described - same story, same position (our own
+// replacements cancelled out through a posDelta map), same text. A row that did not line up was
+// left alone and reported as 'missing' rather than written.
 //
-// Comparing the matched TEXT alone does not catch it: in a plain-text search every match reads the
-// same, so that question is always answered yes. Asking for the story, the position and the text
-// together does - see KBSSearchEngine::MatchIsSameOccurrence, which both this and the jump use.
+// What it was guarding against is real and has not gone away: the walk order alone cannot tell "the
+// Nth match" from "a DIFFERENT Nth match". An edit made between the search and the replace that
+// removes one match and adds another keeps the COUNT intact, so every checked hit still comes up and
+// nothing looks wrong - while the numbering now points at text the user never checked.
 //
-// posDelta is what this pass has already added to (or taken from) this story ahead of here, so the
-// only difference left to find is the user's editing.
-bool MatchStillStandsHere(int32 chapterIdx, int32 hitIdx, const UIDRef& story,
-	TextIndex start, TextIndex end, int32 posDelta)
-{
-	UID expectStory = kInvalidUID;
-	TextIndex expectStart = kInvalidTextIndex;
-	TextIndex expectEnd = kInvalidTextIndex;
-	uint64 expectHash = 0;
-	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart,
-			expectEnd, expectHash))
-		return false;		// no row to compare against - leave the text alone
-
-	return KBSSearchEngine::MatchIsSameOccurrence(story, start, end,
-		expectStory, expectStart, expectEnd, expectHash, posDelta);
-}
-
-// ***** THERE IS NO FAST PATH PAST THIS TEST, AND THERE MUST NOT BE ONE. *****
+// It was removed on the user's decision (2026-08-05): keeping the document steady between searching
+// and replacing is the USER's responsibility, and it is now stated as such on the confirmation
+// (kKBSConfirmEditedSinceKey - "if the text has been edited since the search, a replacement can land
+// somewhere you did not intend"). NOTHING stands in its place - an all-or-nothing rollback was
+// considered the same day and deliberately not taken. What the walk finds when a checked hit's turn
+// comes is what gets rewritten, and a run that reaches fewer hits than it was given still commits
+// the ones it managed; the summary reports the shortfall, as it always has.
 //
-// One stood here from the speed-up work until 2026-08-03: every story was asked for
-// ITextModel::GetTextChangeCount at the start of the chapter, and a story whose count still matched
-// what the search recorded was "trusted" - its rows skipped this test entirely.
-//
-// The reasoning was that an unmoved story returns the very same matches in the very same order. It
-// is true of the DOCUMENT and says nothing about the QUERY: the walker is handed the live
-// IFindChangeOptions (ITextWalker.h:58-61), so a find string retyped between the search and the
-// replace makes the walk return a different set of matches - and with the test skipped, nothing
-// compared the position the walk had landed on against the position the row named. The change
-// string went over occurrences the user had never seen, while the panel reported the ORIGINAL rows
-// as replaced. (There was a second way in, too: the walk index counts matches across the WHOLE
-// chapter, so a story with no checked hits gaining one shifts every later index by one, and the
-// shifted match can land in a story that is itself untouched and therefore trusted.)
-//
-// It was removed rather than repaired (user's call, 2026-08-03: "safer is better"). Repairing it
-// would have meant proving that every Find/Change setting which changes the match set is accounted
-// for before the run starts - and Find Format cannot be: AttributeBossList keeps operator== private
-// and offers no generic way to read an attribute's VALUE, so "paragraph style A -> paragraph style
-// B" is not a difference this plug-in can see from outside. Running the test always needs no such
-// proof: whatever changed, the position or the text stops lining up and the row is reported instead
-// of written.
-//
-// What it costs: reading the MATCHED CHARACTERS ONLY, once per checked hit, and hashing them (see
-// KBSSearchEngine::HashMatchText - no paragraph is looked up, none of the surrounding text is read,
-// and nothing is kept but 64 bits). The speed-up it replaces was one of six added on 2026-07-29
-// whose effect was never measured, so nothing measurable was given up.
+// KBSSearchEngine::MatchIsSameOccurrence and the hash behind it are NOT gone - the JUMP still asks
+// them, which is how clicking a row can answer "the replacement is no longer here" instead of
+// scrolling to whatever now sits at that position.
 
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
 //                are when the walk simply runs out of matches - but these rows were never looked
 //                at, so they get no word on their locator and the summary names the chapter.
-// outMissing   = checked hits the walk could not find where the row said they were, either
-//                because what came up there is a different occurrence, or because the row's turn
-//                never came at all. Left untouched, counted and marked (MatchStillStandsHere).
+// outMissing   = checked hits whose turn never came: the walk ran to the end of the chapter
+//                without them coming up, so the matches the search found are no longer there.
+//                Left untouched, counted and marked. (Until 2026-08-05 this also covered a hit
+//                whose turn DID come but whose text no longer lined up, which is what the
+//                same-occurrence test caught - see the note above the walk for where it went.)
 // outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
 //                those but offers no way to change them, so KBS does not either - they are left
 //                untouched and counted (see KBSSearchEngine::IsMatchEditable).
@@ -402,11 +371,10 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	TextIndex lastReplStart = kInvalidTextIndex;
 	TextIndex lastReplEnd = kInvalidTextIndex;
 
-	// How far THIS pass has moved the text in each story. A replacement whose change string is not
-	// the same length as the find string shifts every later match in that story - our own doing, so
-	// it is cancelled out before the position test. Without this, "cat" -> "kitten" would refuse
-	// every match after the first one.
-	std::map<UID, int32> posDelta;
+	// (A posDelta map stood here: how far THIS pass had moved the text in each story, so that our own
+	// replacements could be cancelled out before the same-occurrence test compared positions -
+	// without it, "cat" -> "kitten" would have refused every match after the first. It had no other
+	// reader, so it went with that test on 2026-08-05.)
 
 	// "May this frame's text be written to?" answered once per FRAME rather than once per hit. The
 	// check climbs the page-item hierarchy and asks four separate locks, while a chapter's hits
@@ -453,16 +421,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
 
-		// How far this pass has already moved the text ahead of here, in THIS story. Subtracted
-		// out before the position test below, so what is left to find is the user's editing.
-		const UID storyUID = story.GetUID();
-		int32 delta = 0;
-		{
-			const std::map<UID, int32>::const_iterator d = posDelta.find(storyUID);
-			if (d != posDelta.end())
-				delta = d->second;
-		}
-
 		// An unselected hit is only counted past. Its stored text range is deliberately NOT
 		// refreshed: ReplaceChecked ends by turning the panel into a report of the run
 		// (KeepCheckedRows), which keeps the rows it was ASKED about and drops the ones the user
@@ -500,17 +458,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 				continue;
 			}
 
-			// ***** THE last check before anything is written: is this the same occurrence the row
-			// describes - same story, same place, same text? ***** A checked row whose text has moved
-			// or changed underneath is left alone and counted, never rewritten.
+			// ***** The same-occurrence test stood HERE, and this is the line it guarded. *****
+			// See the long note above the walk for what it did and why it went (2026-08-05): what
+			// the walk lands on at a checked hit's turn is now simply what gets rewritten.
 			//
-			// Asked of EVERY row, with nothing allowed past it - see the note over
-			// MatchStillStandsHere for the fast path that used to sit here and what it cost.
-			if (hitIdx < 0 || !MatchStillStandsHere(chapterIdx, hitIdx, story, start, end, delta))
+			// This much remains: a walk position with no row behind it cannot be reported on, and a
+			// row is what MarkHitReplaced needs to record the outcome against. Counted as missing
+			// for the same reason a row the walk never reached is - it was asked for and not done -
+			// so the total cannot quietly come up short.
+			if (hitIdx < 0)
 			{
 				++outMissing;
-				if (hitIdx >= 0)
-					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -525,10 +483,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 				lastReplStart = replacedStart;
 				lastReplEnd = replacedEnd;
 
-				// The command reports the range it WROTE, so the shift this replacement causes is
-				// exact - no guessing at the change string's length, which GREP back-references
-				// would make impossible anyway.
-				posDelta[storyUID] += static_cast<int32>((replacedEnd - replacedStart) - (end - start));
+				// (The shift this replacement causes was accumulated here, into posDelta, for the
+				// same-occurrence test to cancel out. Nothing reads it since that test went.)
 
 				if (hitIdx >= 0)
 				{
@@ -589,10 +545,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 			if (!KBSResultModel::GetHitReplacedRange(chapterIdx, hi, rowStory, rowStart, rowEnd)
 				|| rowStory == kInvalidUID)
 				continue;
+			// ***** BOTH of the row's descriptions of itself, read from the SAME range, written in
+			// the SAME call. ***** The three segments are what the row DRAWS; the hash is what the
+			// same-occurrence test COMPARES, and a jump into this row runs that test. Reading only
+			// the segments left the hash describing the text that was here BEFORE the replacement,
+			// so every replaced row answered a click with "the replacement is no longer here"
+			// (2026-08-04 to 2026-08-05 - see SetHitSegments).
+			const UIDRef rowStoryRef(db, rowStory);
 			PMString pre, match, post;
-			KBSSearchEngine::SplitLineAroundMatch(UIDRef(db, rowStory), rowStart, rowEnd,
-				pre, match, post);
-			KBSResultModel::SetHitSegments(chapterIdx, hi, pre, match, post);
+			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, rowStart, rowEnd, pre, match, post);
+			KBSResultModel::SetHitSegments(chapterIdx, hi, pre, match, post,
+				KBSSearchEngine::HashMatchText(rowStoryRef, rowStart, rowEnd));
 		}
 	}
 
@@ -694,12 +657,17 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// while the ROWS have always been marked "missing" (KBSResultModel::BuildHitLocator) - one
 	// outcome under two names, which left the reader matching a sentence against rows that did not
 	// use its word. The "!" is there because this is the one line in the summary the user has to
-	// act on: some of what they ticked was deliberately left alone (user's request, 2026-08-04).
+	// act on: some of what they ticked was not written (user's request, 2026-08-04).
+	//
+	// The WORDING changed on 2026-08-05 with the same-occurrence test. It used to say the text was
+	// "no longer where the search left it", which was that test speaking - it compared each match
+	// against the row before writing. What is left is the plainer fact: the chapter was walked
+	// again and those matches did not come up.
 	if (t.missing > 0)
 	{
 		outSummary.Append(" ! ");
 		outSummary.AppendNumber(t.missing);
-		outSummary.Append(" hit(s) missing - the text is no longer where the search left it.");
+		outSummary.Append(" hit(s) missing - not found when the chapter was searched again.");
 	}
 
 	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
@@ -1046,11 +1014,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				docRef = reopened;
 				KBSResultModel::RebindChapterDoc(ci, reopened);
 			}
-			else if (!KBSBookScope::IsDocStillOpen(docRef))
+			// ***** TWO different failures, and only ONE of them may fall back. *****
+			//
+			//   - There was no file to open BY. Normal: a DOCUMENT-scope row is the front document
+			//     and carries none. The old question is safe here - that docRef IS the live front
+			//     document, and nothing was closed behind it.
+			//
+			//   - The file would not open (moved, deleted, in use by another application). Here the
+			//     docRef is the one the SEARCH left, and its document was closed when the search
+			//     finished - so asking IsDocStillOpen about it is the exact fault removed above. It
+			//     can answer YES about a DIFFERENT document, and the walk then runs over the wrong
+			//     chapter and reports every row missing. Skip instead: it is the one answer that
+			//     cannot be wrong, and the summary names the chapter either way.
+			else if (KBSBookScope::ChapterHasFile(file) || !KBSBookScope::IsDocStillOpen(docRef))
 			{
-				// No file to open by, or the file would not open. The first of those is normal - a
-				// DOCUMENT-scope row is the front document and carries no file - so the old question
-				// is asked before giving up, and it is safe here: nothing was closed behind it.
 				++totals.chaptersSkipped;
 				if (!totals.haveFirstSkipped)
 				{
@@ -1276,6 +1253,25 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			if (chapterDB != nil)
 				chapterDB->SetModified(kFalse);
 		}
+
+		// ***** Hand the chapters back. ***** Nothing of this run is left in them - the abort took
+		// every character back and the flags above went with it - so a chapter this plug-in opened
+		// has no reason to stay, and each one holds its .indd locked while it does.
+		//
+		// The search and the two scans have always done this on THEIR cancel, through
+		// ReleaseSearchedBook (which closes the chapters AND forgets the book). A replace asks for
+		// the closing half alone: its results stay on the panel, so the book they came from must
+		// still be remembered - that is what the book watcher reads to know when to drop them.
+		//
+		// AFTER the flags above, never before: ReleaseHeldDocs refuses to close a chapter with
+		// unsaved work in it, and until they are back every chapter this run touched still says it
+		// has some. A chapter the USER had already edited keeps its flag, so it stays open and stays
+		// held - which is what should happen to somebody else's unsaved work.
+		//
+		// (Nothing was closed here between 2026-08-02 and 2026-08-05: the run that SAVED handed its
+		// chapters back as it went, and that was the only path that closed anything. It went with
+		// "save after replace", and took this with it until now.)
+		KBSBookScope::ReleaseHeldDocs();
 
 		// The panel is back to being the search's results, so there is no report to turn it into -
 		// KeepCheckedRows is deliberately NOT called on this exit. The wording is left to

@@ -360,10 +360,13 @@ namespace
 			return true;
 		}
 
-		// No file to open by - a DOCUMENT-scope row is the front document and carries none - or the
-		// file would not open. The first of those is normal, so ask the old question before giving
-		// up; it is safe here, since nothing was closed behind it.
-		if (KBSBookScope::IsDocStillOpen(ioDocRef))
+		// ***** TWO different failures, and only ONE of them may fall back. ***** No file to open BY
+		// is normal - a DOCUMENT-scope row is the front document and carries none - and the old
+		// question is safe for it: that docRef IS the live front document, with nothing closed
+		// behind it. A file that would NOT open is the other case, and there the docRef is the one
+		// the search left behind, whose document was closed when the search finished - the exact
+		// thing the note above says must not be asked about. Say "cannot be reached" instead.
+		if (!KBSBookScope::ChapterHasFile(file) && KBSBookScope::IsDocStillOpen(ioDocRef))
 			return true;
 
 		// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does

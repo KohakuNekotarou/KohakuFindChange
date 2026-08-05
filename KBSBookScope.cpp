@@ -369,14 +369,24 @@ static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
 	return helper.GetPath() == wantedPath;
 }
 
+bool KBSBookScope::ChapterHasFile(const IDFile& file)
+{
+	SDKFileHelper fileHelper(file);
+	return !fileHelper.GetPath().empty();
+}
+
 bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 {
 	outDocRef = UIDRef::gNull;
 
+	// Through ChapterHasFile rather than testing the path here, so "does this entry name a file"
+	// is asked in ONE place: callers have to ask it too, to tell this failure from the one below
+	// (see that function's header), and two spellings of one question is how they come to disagree.
+	if (!ChapterHasFile(file))
+		return false;	// a front-document entry carries no file - nothing to reopen
+
 	SDKFileHelper fileHelper(file);
 	const PMString wantedPath = fileHelper.GetPath();
-	if (wantedPath.empty())
-		return false;	// a front-document entry carries no file - nothing to reopen
 
 	// Is it open already - because the user reopened it, or because an earlier chapter of this very
 	// run is still standing? Rebind to THAT document and do NOT hold it: closing something somebody

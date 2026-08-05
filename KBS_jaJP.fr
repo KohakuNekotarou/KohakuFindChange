@@ -92,6 +92,7 @@ resource StringTable (kSDKDefStringsResourceID + index_jaJP)
                 kKBSConfirmEmptyReplaceKey,		"（空欄：一致した箇所は削除されます）",
                 kKBSConfirmFindFormatKey,		"検索形式",
                 kKBSConfirmChangeFormatKey,		"置換形式",
+                kKBSConfirmEditedSinceKey,		"検索後にテキストが編集されていると意図していない場所が置換される場合が有ります。",
                 kKBSConfirmUnsavedOneKey,		"章は開かれたまま未保存の状態で残ります。",
                 kKBSConfirmUnsavedManyKey,		"^1 個の章が開かれたまま未保存の状態で残ります。",
                 kKBSConfirmSeveralChaptersKey,	"複数の章を置換する場合は、ご注意ください。",
