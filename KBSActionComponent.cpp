@@ -367,20 +367,34 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// talking about. Do nothing rather than guess at "everything".
 			//
 			// Either way this covers every STORED hit, including the ones past the panel's display cap
-			// (kKBSDisplayHitLimit), which is why the status line spells the numbers out afterwards.
+			// (kKBSDisplayHitLimit) - most of them scrolled out of sight, which is why the status line
+			// says afterwards which row it was done over.
 			const int32 target = KBSResultModel::GetContextMenuChapter();
 			if (target == KBSResultModel::kNoContextMenuChapter)
 				break;
 			const bool check = (actionID.Get() == kKBSCheckAllActionID);
+
+			// The row's own name, read BEFORE the change - nothing here renames a row, but the name is
+			// what the status line is about, so it is taken from the same place the row draws it from.
+			PMString targetName;
 			if (target == KBSResultModel::kContextMenuBookRow)
+			{
 				KBSResultModel::SetAllChecked(check);
+				targetName = KBSResultModel::GetBookName();
+			}
 			else
+			{
 				KBSResultModel::SetChapterChecked(target, check);
+				int32 targetHits = 0;
+				KBSResultModel::GetChapterDisplay(target, targetName, targetHits);
+			}
+			targetName.SetTranslatable(kFalse);
+
 			// Only what the rows DRAW changed - the tree's shape is untouched - so repaint them in
 			// place instead of rebuilding. One notification per chapter, and the expansion state
 			// survives (a chapter the user collapsed stays collapsed).
 			KBSResultTree::RefreshRows();
-			KBSResultTree::ShowCheckedStatus();
+			KBSResultTree::ShowCheckAllStatus(targetName, check);
 			break;
 		}
 

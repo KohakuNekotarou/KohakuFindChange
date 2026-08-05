@@ -88,7 +88,20 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 		return;
 
 	KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
-	KBSResultTree::ShowCheckedStatus();
+
+	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
+	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.
+	KBSResultTree::RefreshCheckedCounts(nodeID->GetChapter());
+
+	// ...and say WHICH row it was, by the locator the row leads with: "P1(2)  checked".
+	//
+	// The COUNT is deliberately not repeated here - that is what the two rows above now read out
+	// (user's call, 2026-08-05, which is also why the old "<checked> / <total> checked." line went).
+	// What the line adds is the identity of the row that just changed, which is worth having when
+	// the list is long enough that the row is nowhere near the pointer.
+	PMString locator, pre, match, post;
+	if (KBSResultModel::GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
+		KBSResultTree::ShowHitCheckStatus(locator, nowChecked);
 }
 
 // End, KBSResultCheckObserver.cpp.

@@ -38,6 +38,12 @@ namespace KBSResultTree
 	    re-expands everything). Safe to call when the panel is closed (does nothing then). */
 	void RefreshRows();
 
+	/** Repaint ONLY the rows that read out a checked count: the book row, and the one chapter row
+	    named here. What a single check box changes and nothing more - the box draws itself, and no
+	    other hit row is affected - so this is what a box's observer calls instead of RefreshRows.
+	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
+	void RefreshCheckedCounts(int32 chapterIdx);
+
 	/** Write a one-line message to the panel's status read-out (its single-line StaticText). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */
@@ -61,9 +67,35 @@ namespace KBSResultTree
 	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */
 	void GetLastStatus(PMString& outMessage);
 
-	/** Write "<checked> / <total> checked." to the panel's status line (and note the display cap
-	    when the result set is bigger than the panel shows). Called after any check change. */
-	void ShowCheckedStatus();
+	/** Say on the status line WHAT was just ticked or cleared, and over WHICH row:
+
+	        ch1.indd  all checked
+	        selftest.indb  all unchecked
+
+	    ***** Check All / Uncheck All only. ***** Those two reach every hit of a book or of a
+	    document, most of them scrolled out of sight, so what they did has to be said somewhere the
+	    user is looking - and WHICH row they were asked over is the whole question, since the same
+	    two commands mean "this chapter" or "the whole book" depending on it.
+
+	    Ticking a single box says nothing here (2026-08-05). The book and document rows read out
+	    "(N/M checked)" themselves, so the line would be overwriting the search's own summary to
+	    repeat what is already on screen.
+
+	    @param targetName the row the menu was popped over - a chapter's name, or the book's.
+	    @param nowChecked true = Check All, false = Uncheck All. */
+	void ShowCheckAllStatus(const PMString& targetName, bool nowChecked);
+
+	/** The same, for ONE box:
+
+	        P1(2)  checked
+	        P4  unchecked
+
+	    Named by its LOCATOR, which is what the row itself leads with - so the line reads as an echo
+	    of the row that was clicked, the way the Check All line echoes a chapter's name.
+
+	    @param locator the hit row's page locator (KBSResultModel::GetHitDisplay's first field).
+	    @param nowChecked the state the box was just put into. */
+	void ShowHitCheckStatus(const PMString& locator, bool nowChecked);
 
 	/** "Save Results..." on the panel's flyout: write the current result set to a tab-separated text
 	    file the user picks. Implemented in KBSReportSave.cpp.

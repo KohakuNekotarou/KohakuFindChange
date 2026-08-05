@@ -970,6 +970,23 @@ int32 KBSResultModel::GetCheckedCount()
 	return count;
 }
 
+int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+
+	// Same rule as GetCheckedCount, applied to one chapter: a REPLACED row does not count, because
+	// it is no longer waiting to be done.
+	int32 count = 0;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	for (size_t hi = 0; hi < hits.size(); ++hi)
+	{
+		if (hits[hi].checked && !hits[hi].replaced)
+			++count;
+	}
+	return count;
+}
+
 int32 KBSResultModel::GetCheckedChapterCount()
 {
 	int32 count = 0;

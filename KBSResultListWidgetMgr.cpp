@@ -317,11 +317,19 @@ private:
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
 		const InterfacePtr<IPanelControlData>& rowData) const
 	{
+		// "<book>  (N/M checked)" - how many of this book's hits are ticked, out of all of them
+		// (user's wording, 2026-08-05; it used to read just "(M)"). The row a Check All over the
+		// book acts on is this row, so what it did is answered in the same place it was asked.
+		//
+		// Both numbers are UNCAPPED - every stored hit, not the rows on screen. That is what Check
+		// All ticks and what a replace would rewrite.
 		PMString label(KBSResultModel::GetBookName());
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
+		label.AppendNumber(KBSResultModel::GetCheckedCount());
+		label.Append("/");
 		label.AppendNumber(KBSResultModel::GetTotalHitCount());
-		label.Append(")");
+		label.Append(" checked)");
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
@@ -334,25 +342,23 @@ private:
 		int32 fullCount = 0;
 		if (!KBSResultModel::GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
 			return;
-		const int32 shownCount = KBSResultModel::GetDisplayHitCount(nodeID->GetChapter());
 
-		// "<name>  (N)", or "<name>  (shown / total)" for the one boundary chapter the display cap
-		// splits. The panel shows the first kKBSDisplayHitLimit hits book-wide; the rest stay in the
-		// model for a future export, so the boundary chapter shows how many of its hits are on screen.
+		// "<name>  (N/M checked)" - the same read-out the book row carries, for this chapter alone
+		// (user's wording, 2026-08-05). A Check All over a DOCUMENT row means that chapter, so this
+		// is where its answer belongs.
+		//
+		// Both numbers are UNCAPPED. The label used to read "(shown / total)" on the one boundary
+		// chapter the display cap falls inside, which was the panel talking about ITSELF rather than
+		// about the work: the hits past the cap are still stored, still ticked by Check All and
+		// still rewritten by a replace. Saying how many are drawn was dropped with the matching
+		// "(N shown)" on the status line.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (shownCount < fullCount)
-		{
-			label.AppendNumber(shownCount);
-			label.Append(" / ");
-			label.AppendNumber(fullCount);
-		}
-		else
-		{
-			label.AppendNumber(fullCount);
-		}
-		label.Append(")");
+		label.AppendNumber(KBSResultModel::GetChapterCheckedCount(nodeID->GetChapter()));
+		label.Append("/");
+		label.AppendNumber(fullCount);
+		label.Append(" checked)");
 
 		// A chapter a cancelled replace never reached used to say "cancelled" here (2026-08-03). Only
 		// the chapter-at-a-time path could leave one: it saved as it went, so a cancel stopped the run
@@ -590,6 +596,14 @@ void KBSResultTree::RefreshRows()
 	// up when they scroll into view. The row heights do not change here, which is what NodeChanged
 	// requires.
 	//
+	// ***** The BOOK row first, and it has to be asked for by name. ***** childrenChangedAlso
+	// refreshes a node's children, so refreshing the chapters does NOT reach the row above them.
+	// It carries "(N/M checked)" now (2026-08-05), so it goes stale the moment anything is ticked -
+	// which is exactly what this function is called for. Only drawn on a book search; NodeChanged
+	// on a node the tree does not hold is harmless.
+	if (KBSResultModel::IsFromBook())
+		treeMgr->NodeChanged(KBSResultNodeID::CreateBook(), kFalse /*children handled below*/);
+
 	// The chapter AND each of its font rows, because childrenChangedAlso reaches a node's children -
 	// and with the font level the hit rows are GRANDchildren. A chapter has a few fonts, not a few
 	// thousand, so this stays a handful of calls.
@@ -601,6 +615,32 @@ void KBSResultTree::RefreshRows()
 		for (int32 f = 0; f < fonts; ++f)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);
 	}
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::RefreshCheckedCounts - repaint only the rows that read out a checked count
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
+{
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
+	if (panelData == nil)
+		return;
+	IControlView* listView = panelData->FindWidget(kKBSResultListWidgetID);
+	if (listView == nil)
+		return;
+	InterfacePtr<ITreeViewMgr> treeMgr(listView, UseDefaultIID());
+	if (treeMgr == nil)
+		return;
+
+	// TWO rows, and childrenChangedAlso is kFalse for both. Ticking one box changes what the book
+	// row and that chapter's row read out and NOTHING else: the box that was clicked draws itself,
+	// and every other hit row is unaffected. RefreshRows would repaint every chapter and every font
+	// row in the panel to say the same thing.
+	if (KBSResultModel::IsFromBook())
+		treeMgr->NodeChanged(KBSResultNodeID::CreateBook(), kFalse);
+	if (chapterIdx >= 0)
+		treeMgr->NodeChanged(KBSResultNodeID::Create(chapterIdx), kFalse);
 }
 
 //----------------------------------------------------------------------------------------
@@ -710,32 +750,43 @@ void KBSResultTree::ShowStatus(const PMString& message)
 }
 
 //----------------------------------------------------------------------------------------
-// KBSResultTree::ShowCheckedStatus - how many hits are currently selected for replacement
+// KBSResultTree::ShowCheckAllStatus - what Check All / Uncheck All just did, and to which row
 //----------------------------------------------------------------------------------------
 
-void KBSResultTree::ShowCheckedStatus()
+void KBSResultTree::ShowCheckAllStatus(const PMString& targetName, bool nowChecked)
 {
-	const int32 total = KBSResultModel::GetTotalHitCount();
-	if (total == 0)
+	if (KBSResultModel::GetTotalHitCount() == 0)
 		return;		// no results: leave whatever the search left on the line
 
-	// "(100/2000 checked)" - the whole thing in brackets, no space around the slash and no full
-	// stop (user's wording, 2026-08-05). The count still leads, so it survives the narrow status
-	// field's tail truncation.
+	// "<name>  all checked" - the row's own name first, spaced the way the tree spaces its label
+	// from its count, so the line reads as an echo of the row that was clicked.
 	//
-	// The TOTAL is every stored hit, not the number of rows on screen. That is the number Check All
-	// acts on and the number a replace would rewrite, so it is the one the line has to state.
+	// The NAME is what matters here and the counts are deliberately left out: the row itself now
+	// reads "(N/M checked)", and this line exists to answer "which one did I just do that to?" -
+	// the same two commands mean one chapter or the whole book depending on where the menu was
+	// popped, and that is the part the panel cannot show afterwards.
 	//
-	// (A second sentence stood here until 2026-08-05: "(5000 shown)", added whenever the results ran
-	// past the panel's display cap, so that Check All followed by a replace could not surprise
-	// anyone. Dropped on the user's decision - the line says what is checked, and nothing else.)
-	PMString msg;
+	// (Until 2026-08-05 this was ShowCheckedStatus, which put "<checked> / <total> checked." here
+	// after ANY change of any box. The count moved onto the rows; what was left worth saying is
+	// this.)
+	PMString msg(targetName);
 	msg.SetTranslatable(kFalse);
-	msg.Append("(");
-	msg.AppendNumber(KBSResultModel::GetCheckedCount());
-	msg.Append("/");
-	msg.AppendNumber(total);
-	msg.Append(" checked)");
+	msg.Append(nowChecked ? "  all checked" : "  all unchecked");
+	KBSResultTree::ShowStatus(msg);
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::ShowHitCheckStatus - one box, named by the row's own locator
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::ShowHitCheckStatus(const PMString& locator, bool nowChecked)
+{
+	// Same shape as the Check All line above, one row narrower: what was clicked, then what it now
+	// is. The locator is what the row LEADS with, so the two read as the same thing said twice -
+	// which is the point, since the row that changed may be anywhere in a long list.
+	PMString msg(locator);
+	msg.SetTranslatable(kFalse);
+	msg.Append(nowChecked ? "  checked" : "  unchecked");
 	KBSResultTree::ShowStatus(msg);
 }
 

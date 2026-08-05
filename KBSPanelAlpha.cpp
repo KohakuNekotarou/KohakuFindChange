@@ -100,10 +100,23 @@ static bool16 sFindChangeTranslucent = kFalse;
 //   parent chain ends after one step, at kOWLHostedPanelWrapperBoss (0x1645a), whose bbox is the
 //   panel body itself = the chrome is outside the widget tree, on the OWL side.
 //
-// *Do NOT decide this from the rectangle alone (GetWindowRect + PtInRect): another window on top
-//   would still count as "on the panel". The rectangle is a cheap rejection; the answer comes from
-//   WindowFromPoint -> GA_ROOT matching. *Thanks to that rejection, every pointer move away from
-//   the panel costs nothing but integer comparisons.
+// *Do NOT decide this from the rectangle alone (GetWindowRect + PtInRect): a window of ANOTHER
+//   APPLICATION on top would still count as "on the panel". The rectangle is a cheap rejection; the
+//   answer comes from WindowFromPoint. *Thanks to that rejection, every pointer move away from the
+//   panel costs nothing but integer comparisons.
+//
+// ***** BUT A WINDOW OF OUR OWN ON TOP OF THE PANEL IS STILL THE PANEL. ***** (2026-08-05, on the
+//   user's report: "right-clicking a document row turns the opaque panel faint again".) The panel's
+//   context menu opens over the panel and answers WindowFromPoint for as long as it is up, so with
+//   the plain GA_ROOT == target test the answer became "the pointer is elsewhere" the moment the
+//   menu appeared - and showing a window is EVENT_OBJECT_SHOW, which is inside the hook's range, so
+//   the faint alpha was written immediately. A tooltip over the panel is the same shape.
+//
+//   The test is therefore "the pointer is inside the panel's rectangle, and what is under it belongs
+//   to INDESIGN" rather than "...belongs to this very window". What that gives up is the case where
+//   ANOTHER of InDesign's own windows covers the panel: the panel then stays opaque while hidden
+//   behind it. Nothing is on screen to look wrong, and the next pointer move off the rectangle puts
+//   it right - which is a far smaller price than the panel flickering every time its own menu opens.
 static bool KBSCursorOverWindow(HWND target)
 {
 	if (target == nullptr)
@@ -118,7 +131,19 @@ static bool KBSCursorOverWindow(HWND target)
 		return false;		// outside the rectangle = certainly not on it (most mouse moves end here)
 
 	HWND under = ::WindowFromPoint(pt);
-	return (under != nullptr && ::GetAncestor(under, GA_ROOT) == target);
+	if (under == nullptr)
+		return false;
+
+	const HWND root = ::GetAncestor(under, GA_ROOT);
+	if (root == target)
+		return true;		// the panel itself - the ordinary answer
+
+	// Ours as well? Then it is something the panel put up over itself (its context menu, a tooltip),
+	// and the pointer has not left the panel. Asked of the TOP-LEVEL window: a menu is its own
+	// top-level window, owned by the application, not a child of the panel.
+	DWORD pid = 0;
+	::GetWindowThreadProcessId(root, &pid);
+	return (pid == ::GetCurrentProcessId());
 }
 
 // *The alpha that SHOULD be on the window: faint only while the toggle is ON and the pointer is
