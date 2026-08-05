@@ -247,6 +247,13 @@ bool KBSResultModel::IsReportOnlyKind()
 	return gResultKind == kResultMissingGlyph || gResultKind == kResultOverset;
 }
 
+bool KBSResultModel::NoRowHasCheckBox()
+{
+	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
+	// The two are the same question - see the header for why both halves have to be asked.
+	return KBSResultModel::IsReportOnlyKind() || gShowingOutcome;
+}
+
 bool KBSResultModel::MatchTextIsLiveText()
 {
 	// Named the ONE kind that departs from it, not "is a scan": the glyph scan is every bit as much

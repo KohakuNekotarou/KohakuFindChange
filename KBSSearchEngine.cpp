@@ -1830,19 +1830,21 @@ void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex sta
 }
 
 bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
-	UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash,
-	int32 posDelta)
+	UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash)
 {
 	if (storyRef.GetUID() != expectStoryUID)
 		return false;
 
-	if (start != expectStart + posDelta)
+	// A posDelta was added in here until 2026-08-05 - how far the REPLACE pass had moved this story
+	// ahead of this point, its own work cancelled out. The replace no longer asks this question at
+	// all, and the jump (now the only caller) moves nothing, so there is nothing left to cancel.
+	if (start != expectStart)
 		return false;
 
-	// ***** THE LENGTH. ***** posDelta shifts where a match STARTS, never how long it is, so the
-	// two lengths are compared directly. Nothing asked this until 2026-08-04: the text comparison
-	// stood in for it, and that comparison was capped at 500 characters - so a GREP match that had
-	// grown or shrunk past the cap read as unchanged.
+	// ***** THE LENGTH. ***** Compared directly: a match that has been rewritten in place keeps its
+	// start. Nothing asked this until 2026-08-04: the text comparison stood in for it, and that
+	// comparison was capped at 500 characters - so a GREP match that had grown or shrunk past the
+	// cap read as unchanged.
 	if ((end - start) != (expectEnd - expectStart))
 		return false;
 

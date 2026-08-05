@@ -314,15 +314,20 @@ namespace KBSSearchEngine
 	    all of which must answer yes:
 
 	      - same story          (a match in another story is never the one the row means)
-	      - same position       (start == expectStart + posDelta)
+	      - same position       (start == expectStart)
 	      - same LENGTH         (end - start == expectEnd - expectStart)
 	      - same text, WHOLE    (the stored hash covers every character of the match)
 
-	    posDelta is how far THIS pass has already moved the text ahead of this point in this story -
-	    our own replacements, cancelled out - so whatever difference is left is the USER's editing,
-	    which is exactly the case that must not be written over. A caller that has changed nothing
-	    (the jump) passes 0. It shifts where a match STARTS, never how long it is, which is why the
-	    two lengths are compared directly.
+	    ***** THE JUMP IS THE ONLY CALLER, AND HAS BEEN SINCE 2026-08-05. ***** A click on a row asks
+	    this about the very range that row recorded, so the first three questions are satisfied by
+	    construction and the hash is what does the work - the answer being how the panel can say "the
+	    replacement is no longer here" instead of scrolling to whatever took its place.
+
+	    The REPLACE asked it too until that date, of every row before writing it, and that is what
+	    the position arm was for. It carried a posDelta alongside - how far the replace pass had
+	    already moved the text in this story, its own replacements cancelled out, so that whatever
+	    difference was left was the USER's editing. Both went together (KBSReplaceEngine::
+	    ReplaceChecked): with no caller that moves text, nothing is left to cancel out.
 
 	    ★ The last two questions arrived on 2026-08-04. Until then the text was compared through
 	    the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters was
@@ -331,8 +336,7 @@ namespace KBSSearchEngine
 	    expectHash 0 means the search could not read that match, so nothing can be vouched for and
 	    the answer is false - the safe answer: when in doubt, do not write. */
 	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
-		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash,
-		int32 posDelta);
+		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash);
 }
 
 #endif // __KBSSearchEngine_h__

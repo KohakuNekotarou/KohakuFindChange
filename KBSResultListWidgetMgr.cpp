@@ -323,13 +323,32 @@ private:
 		//
 		// Both numbers are UNCAPPED - every stored hit, not the rows on screen. That is what Check
 		// All ticks and what a replace would rewrite.
+		//
+		// ***** ONLY ON A LIST THAT HAS BOXES. ***** A scan and a replace's report have none at all,
+		// so "checked" is a word about nothing there and the count is 0 by definition: this row read
+		// "(0/120 checked)" over a missing-glyph scan from 2026-08-05 until NoRowHasCheckBox was
+		// given a home in the model. Those lists go back to the plain total, which is what this row
+		// has always said when there was no work to offer.
+		//
+		// M counts LOCKED hits too, though Check All cannot tick them (RowHasCheckBox turns them
+		// away) - so a fully checked chapter of locked-and-free hits reads short of its own total on
+		// purpose. The alternative, a denominator that leaves them out, would disagree with the hit
+		// count every other part of the panel reports.
 		PMString label(KBSResultModel::GetBookName());
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		label.AppendNumber(KBSResultModel::GetCheckedCount());
-		label.Append("/");
-		label.AppendNumber(KBSResultModel::GetTotalHitCount());
-		label.Append(" checked)");
+		if (KBSResultModel::NoRowHasCheckBox())
+		{
+			label.AppendNumber(KBSResultModel::GetTotalHitCount());
+			label.Append(")");
+		}
+		else
+		{
+			label.AppendNumber(KBSResultModel::GetCheckedCount());
+			label.Append("/");
+			label.AppendNumber(KBSResultModel::GetTotalHitCount());
+			label.Append(" checked)");
+		}
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
@@ -352,13 +371,24 @@ private:
 		// about the work: the hits past the cap are still stored, still ticked by Check All and
 		// still rewritten by a replace. Saying how many are drawn was dropped with the matching
 		// "(N shown)" on the status line.
+		//
+		// And, exactly as on the book row, only where there are boxes to count: a scan and a
+		// replace's report fall back to the plain total. See ApplyBookRow for the whole of it.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		label.AppendNumber(KBSResultModel::GetChapterCheckedCount(nodeID->GetChapter()));
-		label.Append("/");
-		label.AppendNumber(fullCount);
-		label.Append(" checked)");
+		if (KBSResultModel::NoRowHasCheckBox())
+		{
+			label.AppendNumber(fullCount);
+			label.Append(")");
+		}
+		else
+		{
+			label.AppendNumber(KBSResultModel::GetChapterCheckedCount(nodeID->GetChapter()));
+			label.Append("/");
+			label.AppendNumber(fullCount);
+			label.Append(" checked)");
+		}
 
 		// A chapter a cancelled replace never reached used to say "cancelled" here (2026-08-03). Only
 		// the chapter-at-a-time path could leave one: it saved as it went, so a cancel stopped the run
@@ -378,27 +408,21 @@ private:
 		int32 fullCount = 0;
 		if (!KBSResultModel::GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
-		const int32 shownCount =
-			KBSResultModel::GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
 
-		// "<font>  (N)", or "<font>  (shown / total)" for the one group the display cap splits -
-		// the document row's rule, applied unchanged. The count is ROWS, not glyphs: a run of boxes
-		// side by side is one row, so the two numbers differ, and every number in this tree means
-		// "how many rows are under me" (user's call 2026-08-02). The status line is where the glyph
-		// count is said.
+		// "<font>  (N)". The count is ROWS, not glyphs: a run of boxes side by side is one row, so
+		// the two numbers differ, and every number in this tree means "how many rows are under me"
+		// (user's call 2026-08-02). The status line is where the glyph count is said.
+		//
+		// UNCAPPED, like the two rows above it. This one read "(shown / total)" on the single group
+		// the display cap falls inside until 2026-08-05, which was the document row's old rule - and
+		// it outlived it there by a day, leaving one tree speaking two dialects: a chapter saying
+		// how much WORK it holds and a font under it saying how much of itself is DRAWN. The hits
+		// past the cap are still stored and still counted everywhere else, so the drawn number was
+		// the odd one out and it went the same way.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (shownCount < fullCount)
-		{
-			label.AppendNumber(shownCount);
-			label.Append(" / ");
-			label.AppendNumber(fullCount);
-		}
-		else
-		{
-			label.AppendNumber(fullCount);
-		}
+		label.AppendNumber(fullCount);
 		label.Append(")");
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift() + kFontLevelIndent, label);
 	}
@@ -438,13 +462,15 @@ private:
 		// to narrow the column in front of the locators for every row at once (see the cell's frame
 		// below) - nothing is left ragged, because there is nothing left to line up with.
 		//
-		// Two ways it happens, and they are asked separately because they are different facts: a
-		// SCAN reports rather than offers work (no row of that kind ever had a box), and a replace's
-		// REPORT is what is left after every row lost its box at once. A Find/Change work list is
-		// the case that has to keep the full zone: it mixes rows that have a box with rows that do
-		// not, and those locators have to stay in one column.
-		const bool everyRowLostBox = KBSResultModel::IsReportOnlyKind()
-			|| KBSResultModel::IsShowingReplaceOutcome();
+		// Two ways it happens, and they are different facts: a SCAN reports rather than offers work
+		// (no row of that kind ever had a box), and a replace's REPORT is what is left after every
+		// row lost its box at once. Both are asked, together, inside NoRowHasCheckBox. A Find/Change
+		// work list is the case that has to keep the full zone: it mixes rows that have a box with
+		// rows that do not, and those locators have to stay in one column.
+		// Both halves live in KBSResultModel::NoRowHasCheckBox now - the branch rows above ask the
+		// same question to decide whether "checked" is a word their label may use at all, and three
+		// rows of one tree must not be able to disagree about it.
+		const bool everyRowLostBox = KBSResultModel::NoRowHasCheckBox();
 		const bool noCheckBox = row.replaced || row.locked
 			|| row.outcome != KBSResultModel::kOutcomeNone
 			|| everyRowLostBox;

@@ -374,19 +374,22 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			const bool check = (actionID.Get() == kKBSCheckAllActionID);
 
-			// The row's own name, read BEFORE the change - nothing here renames a row, but the name is
-			// what the status line is about, so it is taken from the same place the row draws it from.
+			// The row's own name, READ FIRST and changed second. Nothing here renames a row, so the
+			// order cannot matter today - it is written this way because the sentence the status line
+			// is about ("this row, all checked") names the row as it was ASKED, and a reader should
+			// not have to prove that the call in between left it alone. The name comes from the same
+			// place the row draws it from.
 			PMString targetName;
 			if (target == KBSResultModel::kContextMenuBookRow)
 			{
-				KBSResultModel::SetAllChecked(check);
 				targetName = KBSResultModel::GetBookName();
+				KBSResultModel::SetAllChecked(check);
 			}
 			else
 			{
-				KBSResultModel::SetChapterChecked(target, check);
 				int32 targetHits = 0;
 				KBSResultModel::GetChapterDisplay(target, targetName, targetHits);
+				KBSResultModel::SetChapterChecked(target, check);
 			}
 			targetName.SetTranslatable(kFalse);
 

@@ -250,6 +250,23 @@ namespace KBSResultModel
 	    a row that promises an action nothing carries out. */
 	bool IsReportOnlyKind();
 
+	/** Does NO row of this result set carry a check box?
+
+	    A property of the WHOLE list, and there are two ways it happens - a SCAN reports rather than
+	    offering work (IsReportOnlyKind), and a replace's REPORT is what is left after every row lost
+	    its box at once (IsShowingReplaceOutcome). They are different facts, which is why both are
+	    asked, but everything that draws the panel wants the OR of them.
+
+	    ***** ASKED BY THE BRANCH ROWS TOO, AND THAT IS WHY IT IS HERE. ***** The book row and the
+	    document rows read out "(N/M checked)", which is a sentence only a work list can mean. On a
+	    list where nothing has a box the checked count is 0 by definition, so those rows read
+	    "(0/55 checked)" over a scan that has nothing to check - which is what they did from
+	    2026-08-05 until this question was given one home (KBSResultListWidgetMgr::ApplyBookRow /
+	    ApplyChapterRow). ApplyHitRow, which narrows the check-box column on the same condition,
+	    asks it here as well: three rows of one tree cannot be allowed to disagree about whether the
+	    list they are in offers work. */
+	bool NoRowHasCheckBox();
+
 	/** Is a hit's matchText the text that is REALLY at its position in the story?
 
 	    True for everything the search and the glyph scan produce - both take the row's three

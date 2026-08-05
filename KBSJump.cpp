@@ -61,7 +61,7 @@
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
-#include "KBSSearchEngine.h"		// MatchIsSameOccurrence - the one test the replace uses too
+#include "KBSSearchEngine.h"		// MatchIsSameOccurrence - the jump is its only caller since 2026-08-05
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 
 namespace
@@ -429,9 +429,8 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// offset into the story, so ANY edit earlier in that story moves it - and that is exactly the
 	// case where scrolling here and drawing a marker would frame text the user never searched for.
 	//
-	// The story and position arms of the test are trivially satisfied here (we are asking ABOUT the
-	// stored position, and this side has replaced nothing, so the delta is zero). What does the work
-	// is the text.
+	// The story and position arms of the test are trivially satisfied here - we are asking ABOUT the
+	// stored position. What does the work is the text.
 	//
 	// ***** Asked only of a row whose match IS story text. ***** An overset finding carries the
 	// scan's own words there - "Frame (370)" - so the comparison could never agree, and every click
@@ -448,7 +447,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		expectHash);
 	const bool sameOccurrence = !KBSResultModel::MatchTextIsLiveText()
 		|| KBSSearchEngine::MatchIsSameOccurrence(
-			storyRef, start, end, storyUID, start, end, expectHash, 0);
+			storyRef, start, end, storyUID, start, end, expectHash);
 
 	const bool overset = IsTextIndexOverset(storyRef, start);
 

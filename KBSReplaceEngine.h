@@ -78,11 +78,19 @@ namespace KBSReplaceEngine
 	        them; the summary names the chapter instead. A walk that simply ran to the end of the
 	        chapter without the hit coming up is a different thing - those rows say missing.
 
-	    ***** NOTHING IS EVER SAVED, AND NOTHING IS EVER CLOSED. ***** Every chapter a replacement
-	    lands in is left MODIFIED AND UNSAVED, with a window open on it, and the summary says so:
-	    overwriting the user's files is the user's own step to take. (The confirmation carried a
-	    "save after replace" box from 2026-08-02 to 2026-08-05, which is where the second shape
-	    above came from.)
+	    ***** NOTHING IS EVER SAVED. ***** Every chapter a replacement lands in is left MODIFIED AND
+	    UNSAVED, with a window open on it, and the summary says so: overwriting the user's files is
+	    the user's own step to take. (The confirmation carried a "save after replace" box from
+	    2026-08-02 to 2026-08-05, which is where the second shape above came from.)
+
+	    ***** AND NOTHING IS CLOSED - EXCEPT ON A CANCEL. ***** A run that goes through leaves every
+	    chapter it opened standing, because the replacements are in them. A run that is CANCELLED has
+	    put every character back, so the chapters it opened hold nothing of it and are handed back
+	    (ReleaseHeldDocs) - each one locks its .indd while it stands, which is the whole reason. The
+	    search and the two scans have always done this on their own cancel; the replace did not,
+	    between 2026-08-02 and 2026-08-05, because the only path that closed anything was the one
+	    that SAVED and it went with "save after replace". A chapter the USER had open, or had already
+	    edited, is not this run's to close and stays exactly as it was.
 
 	    Refuses to run at all while another replace is up (see IsReplacing), and while the panel is
 	    showing a replace's report rather than a work list.
@@ -105,9 +113,20 @@ namespace KBSReplaceEngine
 	    IFindChangeOptions - so a query edited between the search and the replace makes the Nth match a
 	    different occurrence entirely.
 
-	    ***** IT IS NOT WHAT KEEPS THE REPLACE CORRECT. ***** That is the per-hit same-occurrence test,
-	    which runs for every row with nothing allowed past it. This door exists so the user is told
-	    WHY, instead of watching a whole run come back "not found".
+	    ***** SINCE 2026-08-05 THIS IS THE ONLY DOOR IN FRONT OF THE RUN. ***** It used to be the
+	    lesser of two: a per-hit same-occurrence test compared every row against the text before
+	    writing it, and this question existed only so the user was told WHY, instead of watching a
+	    whole run come back "missing". That test was removed on the user's decision (see
+	    ReplaceChecked above), so what is left divides like this:
+
+	      - the QUERY changing between the search and the replace is caught, here, and the run is
+	        refused before a character is written;
+	      - the DOCUMENT being edited between the two is NOT caught by anything, and is stated on
+	        the confirmation instead (kKBSConfirmEditedSinceKey).
+
+	    The difference is that this one can be asked from outside: the dialog's own settings are
+	    readable, and BuildWalkSignature turns them into something comparable. Whether the user
+	    retyped a paragraph is not.
 
 	    ***** TWO SIDE EFFECTS, both deliberate. ***** It STATES the tab (KBSSearchEngine::
 	    CommitSearchMode - the walk needs that whatever the answer is, and the comparison has to be
