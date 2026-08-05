@@ -836,7 +836,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// Needs something checked, AND a work list to check it on. After a replace the panel is
 			// a report of what that replace did, and no row on it has a check box - but the rows the
-			// run never reached (a chapter the safety ceiling cut short, one that would not open)
+			// run never reached (a chapter that would not open, a cancelled run)
 			// stay checked so the report can hold them, so the count alone would leave this enabled
 			// over a list with nothing selectable anywhere on it: a destructive command, offered
 			// against something the user cannot see or change. Check All / Uncheck All grey

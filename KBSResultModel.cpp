@@ -1298,8 +1298,8 @@ int32 KBSResultModel::KeepCheckedRows()
 	// anything. A row counts as asked about when any of these hold:
 	//   replaced - it was changed (its check was cleared when it was written)
 	//   outcome  - it was reached and left alone, and says why (its check was cleared then too)
-	//   checked  - still selected, so the run never reached it: the safety ceiling, a chapter that
-	//              would not open, or a cancel. Those rows carry no reason, on purpose.
+	//   checked  - still selected, so the run never reached it: a chapter that would not open, or
+	//              a cancel. Those rows carry no reason, on purpose.
 	//   isLocked - found by the search and never offerable. Kept so the list can account for a
 	//              search that turned up more than the replace was allowed to touch.
 	bool anyAsked = false;

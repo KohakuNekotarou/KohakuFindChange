@@ -1059,12 +1059,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	// over MatchStillStandsHere in KBSReplaceEngine.cpp.)
 
 	// Walk the whole document. Each ProcessCommand advances the walker to the next match ("find
-	// next"), so we keep going until no more hits. prev* is a safety net: if the finder ever hands
-	// back the exact same occurrence twice in a row (a query that does not advance the walker, e.g.
-	// a zero-width GREP match), stop this walk rather than spin forever.
-	TextIndex prevStart = kInvalidTextIndex;
-	TextIndex prevEnd   = kInvalidTextIndex;
-	UID       prevStory = kInvalidUID;
+	// next"), so we keep going until no more hits; the maxHits ceiling is the stop of last resort.
 	// Where the bar stands within this chapter: how many stories the walk has finished, and how long
 	// the one it is in now is. The walk visits a story at a time, so a change of story means the one
 	// before it is done - whatever order the walker chose to take them in.
@@ -1095,13 +1090,6 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		TextIndex start = kInvalidTextIndex;
 		TextIndex end = kInvalidTextIndex;
 		UIDRef story = cmdData->GetRange(start, end);
-
-		// No forward progress since the last match: bail out of this walk to avoid a hang.
-		if (story.GetUID() == prevStory && start == prevStart && end == prevEnd)
-			break;
-		prevStory = story.GetUID();
-		prevStart = start;
-		prevEnd   = end;
 
 		// Move the bar. A story we have not seen before means the one before it is finished; within a
 		// story, the position is how far into its text this match sits. Safe inside the walker's

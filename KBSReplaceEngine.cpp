@@ -175,8 +175,6 @@ struct RunTotals
 	int32	replaced;			// hits actually rewritten
 	int32	chaptersTouched;	// chapters at least one replacement landed in
 	int32	chaptersSkipped;	// could not be opened at all
-	int32	chaptersStepLimited;// the re-walk hit the safety ceiling
-	int32	chaptersStalled;	// the re-walk stopped coming up with new matches
 	int32	chaptersNotWalked;	// opened, but the text walker would not run on them
 	int32	chaptersNoWindow;	// a replacement landed, but no window could be opened on it
 	int32	missing;			// checked hits whose text is no longer where the row says
@@ -196,8 +194,8 @@ struct RunTotals
 	bool		cancelled;
 
 	RunTotals()
-		: replaced(0), chaptersTouched(0), chaptersSkipped(0), chaptersStepLimited(0),
-		  chaptersStalled(0), chaptersNotWalked(0), chaptersNoWindow(0), missing(0), locked(0), refused(0),
+		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
+		  chaptersNotWalked(0), chaptersNoWindow(0), missing(0), locked(0), refused(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false),
 		  cancelled(false)
 	{
@@ -231,16 +229,6 @@ struct RunTotals
 // scrolling to whatever now sits at that position.
 
 // Replace this chapter's checked hits. Returns how many were replaced.
-// outStepLimit = the walk was cut off by the safety ceiling. Checked hits are left over, as they
-//                are when the walk simply runs out of matches - but these rows were never looked
-//                at, so they get no word on their locator and the summary names the chapter.
-// outStalled   = the walk stopped moving forward: the find command handed back the SAME occurrence
-//                twice running, which no amount of further asking will get past. Reported apart
-//                from the ceiling above because the two need different advice - the ceiling means
-//                "the change text probably contains the find text", while this one is a query that
-//                cannot advance (a zero-width GREP match is the way in). The SEARCH has always
-//                guarded itself against this (see the prev* net in CollectHitsInDoc); the replace
-//                had only the ceiling, which caught it eventually and then explained it wrongly.
 // outMissing   = checked hits whose turn never came: the walk ran to the end of the chapter
 //                without them coming up, so the matches the search found are no longer there.
 //                Left untouched, counted and marked. (Until 2026-08-05 this also covered a hit
@@ -260,12 +248,10 @@ struct RunTotals
 //                every other counter here exists to prevent.
 //   progressBar  - the run's bar, sized in HITS. This chapter moves it from progressBase to
 //                  progressBase + (its own checked hits) as it consumes them. nil is allowed.
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimit, bool& outStalled,
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
-	outStepLimit = false;
-	outStalled = false;
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
@@ -378,32 +364,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 
 	int32 walkIndex = 0;
 	int32 replacedCount = 0;
-	int32 steps = 0;
-	// Room for the stored hits plus slack for matches that only exist because of a replacement
-	// (see the re-hit skip below). A hard stop, so no query can spin in here.
-	//
-	// ***** THE SLACK IS ENOUGH, AND THAT WAS MEASURED, NOT MODELLED (2026-08-05). ***** On paper a
-	// change string holding the find string K times costs K skipped re-hits per replacement, which
-	// for K >= 4 would spend this ceiling on a perfectly legitimate replace. On the running
-	// application it does not: 100 hits of "KOHAKU" -> TEN KOHAKUs completed in full, Text and GREP
-	// both (work/kbs-selftest/run-rehit-limit-test.ps1), which needs the walker to be handing back
-	// at most a couple of re-hits per replacement, not one per copy - the walker itself resumes past
-	// the text a replacement wrote. So do not "fix" this ceiling for the contains-the-find-string
-	// shape; the fix was designed, then measured first, and withdrawn as needless.
-	const int32 kMaxSteps = hitCount * 4 + 64;
 
 	// The range the last replacement wrote, so a match INSIDE it can be recognised.
 	UID lastReplStory = kInvalidUID;
 	TextIndex lastReplStart = kInvalidTextIndex;
 	TextIndex lastReplEnd = kInvalidTextIndex;
-
-	// What the LAST FIND handed back, whatever became of it - the net against a walk that stops
-	// moving forward. The same net CollectHitsInDoc has always had, arriving here on 2026-08-05:
-	// this loop's only stop was kMaxSteps, so a query that cannot advance was ground out four times
-	// per stored hit and then explained to the user as a change string containing the find string.
-	UID prevStory = kInvalidUID;
-	TextIndex prevStart = kInvalidTextIndex;
-	TextIndex prevEnd = kInvalidTextIndex;
 
 	// (A posDelta map stood here: how far THIS pass had moved the text in each story, so that our own
 	// replacements could be cancelled out before the same-occurrence test compared positions -
@@ -425,10 +390,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 	// pass has very likely moved.
 	std::vector<int32> replacedRows;
 
-	while (!targets.empty() && steps < kMaxSteps)
+	// How the walk moves forward is the walker's business alone: each find command advances it to
+	// the next match, exactly as the official loop runs it (SnpFindAndReplace), and the walk ends
+	// when the find says there is nothing more.
+	while (!targets.empty())
 	{
-		++steps;
-
 		// Move the run's bar to where this chapter has got to. Moving it from inside the walk is what
 		// makes the Cancel button answer at all; advances smaller than a few hits are swallowed, so
 		// this does not run the message loop once per replacement. (spellpanel updates its bar from
@@ -449,29 +415,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		// that contains the find string ("cat" -> "cat cat"). It was never in the search results,
 		// so it must NOT consume a walk order, or every later hit would line up one off and the
 		// wrong occurrences would be replaced.
-		//
-		// ***** THIS IS ASKED BEFORE THE STALL TEST BELOW, and the order is not free. ***** A
-		// replacement that begins with the find string ("cat" -> "cat cat") hands the next find back
-		// a match at the SAME START AND LENGTH as the one just replaced, which is exactly what the
-		// stall test is looking for - so testing first would break off the chapter on the one shape
-		// this skip exists to absorb. A walk that really cannot get past that shape is still stopped:
-		// by kMaxSteps, whose message ("does the change text contain the find text?") is the right
-		// one for it.
 		if (story.GetUID() == lastReplStory && start >= lastReplStart && start < lastReplEnd)
 			continue;
-
-		// The same occurrence twice running, and not the case above: the walk is not going anywhere.
-		// Whatever is left in targets is reported as missing, exactly as it would be if the walk had
-		// simply ended - the difference is said about the CHAPTER (outStalled), because the rows
-		// themselves are not what went wrong.
-		if (story.GetUID() == prevStory && start == prevStart && end == prevEnd)
-		{
-			outStalled = true;
-			break;
-		}
-		prevStory = story.GetUID();
-		prevStart = start;
-		prevEnd = end;
 
 		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
@@ -628,40 +573,22 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, bool& outStepLimi
 		}
 	}
 
-	// Checked hits the re-walk never reached. WHY it did not reach them decides what may be
-	// said about them.
-	if (!targets.empty())
+	// Checked hits the re-walk never reached: the walk ran out of matches before their turn came,
+	// so as far as this chapter is concerned those matches are gone. Said on the rows THEMSELVES
+	// rather than on the chapter, which named a file and left the user to guess which of its rows
+	// it meant.
+	//
+	// COUNTED as well, not merely marked. These are checked hits that were not replaced, and the
+	// rule this file is built on is that every one of those is named in the summary rather than
+	// letting the total quietly come up short. Marking the row and not counting it left a request
+	// for ten reading "7 replaced." with nothing to explain the other three, and the explanation
+	// sitting on rows the user had to go hunting for.
+	for (std::set<int32>::const_iterator t = targets.begin(); t != targets.end(); ++t)
 	{
-		if (steps >= kMaxSteps)
-		{
-			// The safety ceiling cut the walk short. These rows were never looked at, so nothing
-			// can honestly be said about them: no word goes on their locator, and the summary
-			// explains the chapter instead.
-			outStepLimit = true;
-		}
-		else
-		{
-			// The walk ended without them coming up - it ran out of matches, or it stopped moving
-			// forward (outStalled) - so as far as this chapter is concerned those matches are gone.
-			// Said on the rows THEMSELVES rather than on the chapter, which named a file and
-			// left the user to guess which of its rows it meant. (A walk that STALLED also says so
-			// about the chapter, since that is a fact about the query rather than about any row.)
-			//
-			// COUNTED as well, not merely marked. These are checked hits that were not replaced, and
-			// the rule this file is built on is that every one of those is named in the summary
-			// rather than letting the total quietly come up short (see this function's header, which
-			// has always said outMissing covers a row "because the row's turn never came at all").
-			// Marking the row and not counting it left a request for ten reading "7 replaced." with
-			// nothing to explain the other three, and the explanation sitting on rows the user had to
-			// go hunting for.
-			for (std::set<int32>::const_iterator t = targets.begin(); t != targets.end(); ++t)
-			{
-				++outMissing;
-				const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(*t);
-				if (row != rowByWalkOrder.end())
-					KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeMissing);
-			}
-		}
+		++outMissing;
+		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(*t);
+		if (row != rowByWalkOrder.end())
+			KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeMissing);
 	}
 	return replacedCount;
 }
@@ -759,26 +686,6 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(t.refused);
 		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
-	}
-
-	// Same symptom, different cause: the walk was cut off by its own safety ceiling. Saying
-	// "edited since the search?" here would send the user looking for the wrong thing.
-	if (t.chaptersStepLimited > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(t.chaptersStepLimited);
-		outSummary.Append(" chapter(s) stopped at the safety limit - does the change text contain the find text?");
-	}
-
-	// And the third way a chapter can end early: the walk stopped moving forward - the same
-	// occurrence came back twice running. Worth its own sentence rather than being folded into the
-	// ceiling above, because the advice is the opposite: nothing about the CHANGE text is at fault,
-	// the FIND query is one that cannot advance (a zero-width GREP match is the way in).
-	if (t.chaptersStalled > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(t.chaptersStalled);
-		outSummary.Append(" chapter(s) stopped early - the search did not move forward there (a query that matches nothing at all?).");
 	}
 
 	// Chapters the text walker would not run on at all. Unlike every case above, nothing on their
@@ -1343,17 +1250,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const int32 ci = pending[pi].chapterIdx;
 		const UIDRef& docRef = pending[pi].docRef;
 
-		bool stepLimit = false;
-		bool stalled = false;
 		bool notWalked = false;
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, stepLimit, stalled, missing, locked,
+		const int32 replaced = ReplaceInChapter(ci, docRef, missing, locked,
 			refused, notWalked, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
-		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to line
-		// up, or the safety ceiling) must still hand the bar on at the right place.
+		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
+		// line up) must still hand the bar on at the right place.
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 		totals.replaced += replaced;
 		totals.missing += missing;
@@ -1361,10 +1266,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		totals.refused += refused;
 		if (replaced > 0)
 			++totals.chaptersTouched;
-		if (stepLimit)
-			++totals.chaptersStepLimited;
-		if (stalled)
-			++totals.chaptersStalled;
 
 		// Did anything land here? What decides whether this chapter is kept open for the user or
 		// handed straight back at the end of the run - see HandBackChaptersWithNothingInThem.

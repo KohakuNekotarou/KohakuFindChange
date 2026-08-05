@@ -445,9 +445,8 @@ private:
 		//   outcome  - the row already carries a reason it was left alone (missing / refused)
 		//   report   - the panel is showing the aftermath of a replace, where NO row is selectable.
 		//              This is the one that catches the rows carrying no reason at all: a chapter
-		//              the safety ceiling cut short, or one that could not be opened. It is a
-		//              property of the panel rather than of the row, which is why it is still a
-		//              second question.
+		//              that could not be opened. It is a property of the panel rather than of the
+		//              row, which is why it is still a second question.
 		//   scan     - a scan REPORTS; there is nothing on it to replace (the missing-glyph one by
 		//              the user's decision of 2026-08-02, after weighing a font-only replace and
 		//              turning it down; the overset one because a frame's size is not something a

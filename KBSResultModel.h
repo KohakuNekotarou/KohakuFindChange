@@ -713,8 +713,8 @@ namespace KBSResultModel
 	/** Is the panel showing the AFTERMATH of a replace rather than a search's results? Set by
 	    KeepCheckedRows, cleared by Clear. While it is on, no row offers a check box:
 	    the list is a report, not a work list. It is asked as well as the per-row flags because the
-	    aftermath can hold rows with no flag at all - a chapter the safety limit cut short, or one
-	    that could not be opened. Those were never looked at, so nothing can be said about them. */
+	    aftermath can hold rows with no flag at all - a chapter that could not be opened. Those
+	    were never looked at, so nothing can be said about them. */
 	bool IsShowingReplaceOutcome();
 
 	/** Start remembering every row a replace changes, so a run the user stops can be put back.

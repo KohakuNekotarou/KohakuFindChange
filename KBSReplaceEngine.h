@@ -67,16 +67,12 @@ namespace KBSReplaceEngine
 	    still answer "the replacement is no longer here").
 
 	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
-	    allowed to make the total quietly come up short. Four ways that happens:
+	    allowed to make the total quietly come up short. Three ways that happens:
 	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
 	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
 	      - missing: the re-walk ran to the end of the chapter without that hit's turn coming up.
-	      - refused: the replace command was asked and would not run. The only one of the four that
+	      - refused: the replace command was asked and would not run. The only one of the three that
 	        is a failure rather than a decision.
-	      - not reached: the safety ceiling cut the re-walk short before the hit came up. Those rows
-	        are the only ones carrying NO word on their locator, because nothing was found out about
-	        them; the summary names the chapter instead. A walk that simply ran to the end of the
-	        chapter without the hit coming up is a different thing - those rows say missing.
 
 	    ***** NOTHING IS EVER SAVED. ***** Every chapter a replacement lands in is left MODIFIED AND
 	    UNSAVED, with a window open on it, and the summary says so: overwriting the user's files is
