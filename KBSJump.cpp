@@ -24,8 +24,12 @@
 #include "IFrameList.h"
 #include "IFrameListComposer.h"
 #include "IGeometry.h"
-#include "ILayoutControlData.h"		// kFitNone
+#include "IHierarchy.h"				// the match's frame as a page item - which spread is it on?
+#include "ILayoutCmdData.h"			// kSetSpreadCmdBoss carries the view it is addressing
+#include "ILayoutControlData.h"		// kFitNone; GetSpreadRef - which spread the view is showing
 #include "ILayoutUIUtils.h"
+#include "IPasteboardUtils.h"		// QuerySpread - the spread containing a page item
+#include "ISpread.h"
 #include "IOpenLayoutCmdData.h"		// SetPerspective_ - the inherited zoom rides the open command
 #include "IPageList.h"
 #include "IPanorama.h"
@@ -44,6 +48,7 @@
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
 #include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
+#include "SpreadID.h"				// kSetSpreadCmdBoss - put a spread in the layout view
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "CmdUtils.h"
 #include "PersistUtils.h"			// ::GetUIDRef
@@ -224,6 +229,89 @@ namespace
 		}
 		outRect = PMRect(minX, minY, maxX, maxY);
 		return true;
+	}
+
+	// The spread a match sits on: its frame -> the spread containing that frame. kInvalidUID when the
+	// match has no frame at all (and for the query failures around it, which read the same).
+	//
+	// The frame is resolved through KBSSearchEngine::EditableFrameForMatch, which is the same answer
+	// the hit's own locator was built from - an overset match names the frame carrying the "+".
+	UID SpreadForMatch(const UIDRef& storyRef, TextIndex pos)
+	{
+		const UID frameUID = KBSSearchEngine::EditableFrameForMatch(storyRef, pos);
+		if (frameUID == kInvalidUID)
+			return kInvalidUID;
+		InterfacePtr<IHierarchy> frameHier(storyRef.GetDataBase(), frameUID, UseDefaultIID());
+		if (frameHier == nil)
+			return kInvalidUID;
+		InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(frameHier));
+		return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+	}
+
+	/** Put the layout view on the SPREAD the match sits on, before anything is scrolled.
+
+	    ***** SCROLLING TO A POINT ASSUMES THE VIEW IS ALREADY ON THAT POINT'S SPREAD. ***** The scroll
+	    below moves the view to a pasteboard POINT, and a point taken from one spread means something
+	    else - or nothing at all - to a view showing another. A MASTER spread is where this shows up
+	    plainly, because it is not in the ordinary spreads' continuous pasteboard at all: measured
+	    2026-08-05 with Include Master Pages on, the row read "PA master cat one" correctly and
+	    clicking it left the window on EMPTY PASTEBOARD - no page, no text, no marker, nothing said -
+	    while the body row beside it landed correctly in the same test run.
+
+	    ***** THE TEST IS "IS IT A DIFFERENT SPREAD", NOT "IS IT A MASTER". ***** That is the rule
+	    Adobe's own code follows: SnapTracker.cpp:224 compares ::GetUIDRef(spread) against
+	    ILayoutControlData::GetSpreadRef() and issues the command whenever they differ, with no special
+	    case for masters anywhere. This started out master-only, on the reasoning that ordinary
+	    spread-to-spread jumps had worked by scrolling for as long as the panel had existed; that is a
+	    reason to TEST the ordinary case, not a reason to keep a second rule of our own beside Adobe's.
+
+	    !! AND THE GEOMETRY MUST BE COMPUTED AFTER THIS RUNS. SnapTracker.cpp:234-235 recalculates its
+	    pasteboard point the moment the spread has changed ("Re-calculate the starting point"), which
+	    is the same statement from the other side: a pasteboard coordinate taken before the change
+	    cannot be trusted after it. Hence the call site - ahead of KBSFindOversetLocator and
+	    GetFirstChunkPasteboardRect, both of which read their coordinates fresh.
+
+	    kSetSpreadCmdBoss with ILayoutCmdData is the command (SnapTracker.cpp:390-413 is the worked
+	    example; customdatalinkui, basicdragdrop and CPathCreationTracker do the same three steps).
+	    That a layout view can show a master spread at all is stated by
+	    ILayoutUIUtils::GetVisibleMasterSpreadUID (ILayoutUIUtils.h:220).
+
+	    Silent when it cannot do it: the scroll that follows is no worse off than before. */
+	void EnsureSpreadInView(const UIDRef& storyRef, TextIndex pos)
+	{
+		const UID targetSpread = SpreadForMatch(storyRef, pos);
+		if (targetSpread == kInvalidUID)
+			return;
+
+		InterfacePtr<ILayoutControlData> layout(Utils<ILayoutUIUtils>()->QueryFrontLayoutData());
+		if (layout == nil)
+			return;
+		if (layout->GetSpreadRef().GetUID() == targetSpread)
+			return;			// already looking at it - the ordinary case, and the cheapest exit
+
+		IDocument* const viewDoc = layout->GetDocument();
+		if (viewDoc == nil)
+			return;
+
+		// The spread UID was read out of the STORY's database and is about to be handed to a command
+		// addressed at the VIEW's. They are the same database on every path that reaches here - the
+		// caller has just brought this hit's document to the front - but a UID means nothing outside
+		// the database it came from, so the two are checked rather than assumed.
+		if (::GetDataBase(viewDoc) != storyRef.GetDataBase())
+			return;
+
+		InterfacePtr<ICommand> setSpreadCmd(CmdUtils::CreateCommand(kSetSpreadCmdBoss));
+		if (setSpreadCmd == nil)
+			return;
+		InterfacePtr<ILayoutCmdData> cmdData(setSpreadCmd, UseDefaultIID());
+		if (cmdData == nil)
+			return;
+		// The view's OWN document, exactly as the worked example takes it - this command addresses a
+		// view, and the document it is showing is the one that answers for it.
+		cmdData->Set(::GetUIDRef(viewDoc), layout);
+		setSpreadCmd->SetItemList(UIDList(::GetDataBase(viewDoc), targetSpread));
+		if (CmdUtils::ProcessCommand(setSpreadCmd) != kSuccess)
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// the scroll still runs; do not poison later commands
 	}
 
 	// Accepts every presentation (a local accept-all predicate).
@@ -469,6 +557,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// ShouldHidePreviousChapter.
 	if (ShouldHidePreviousChapter())
 		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
+
+	// The window is the right one; make sure it is showing the right SPREAD before anything is
+	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
+	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
+	EnsureSpreadInView(storyRef, start);
 
 	// A visible match scrolls to its wax rectangle AND gets a red marker rectangle. An overset match
 	// has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator, which
