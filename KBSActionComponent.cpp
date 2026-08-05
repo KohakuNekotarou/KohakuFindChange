@@ -523,6 +523,12 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// Read only - KBS never writes to the user's Find/Change settings.
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	const bool glyphMode = (mode == IFindChangeOptions::kGlyphSearch);
+	// Transliterate quotes character types where the other text tabs quote strings, so it shares
+	// the glyph tab's "empty box deletes" exemption below - its change side always holds a type.
+	// It does NOT share the format-note exemption: the glyph tab's attribute list always carries
+	// the query's own font, so a note there would say nothing, but on this tab a format is set
+	// only when the user set one - information the prompt has to repeat.
+	const bool translitMode = (mode == IFindChangeOptions::kTransliterateSearch);
 
 	// A glyph replace with nothing in the Change To box used to be refused here. It is not: an empty
 	// Change To DELETES every match, which is what the Find/Change dialog does with it (confirmed
@@ -567,10 +573,18 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	PMString findStr(opts->GetFindString(mode));
+	// Not seeded from GetFindString on the Transliterate tab. IFindChangeOptions.h:690-691 calls
+	// that tab's find string "irrelevant" - irrelevant, not guaranteed empty - so anything left in
+	// it would be quoted ahead of the character type. DescribeCurrentQuery already states that tab
+	// as the type alone; this line says the same thing. (The Glyph tab keeps the seed on purpose:
+	// picking a glyph with a character of its own also leaves that character in the box.)
+	PMString findStr(translitMode ? PMString() : PMString(opts->GetFindString(mode)));
 	if (glyphMode)
 		AppendGlyphDescription(findStr, opts->GetFindGlyphID(),
 			glyphResolved ? KBSReplaceConfirmDialog::GetFindSide().fFontLabel : PMString());
+	else if (translitMode)
+		findStr.Append(KBSSearchEngine::CharacterTypeName(
+			static_cast<int32>(opts->GetFindCharacterType())));
 	findStr.SetTranslatable(kFalse);
 	// CAlert draws its message through a widget that reads a lone '&' as a keyboard accelerator -
 	// its own check box arrives spelled "&Don't show again". Without this a search for "A&B" is
@@ -597,6 +611,8 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 		msg.Append("   (GREP)");
 	else if (glyphMode)
 		msg.Append("   (Glyph)");
+	else if (translitMode)
+		msg.Append("   (Transliterate)");
 	msg.Append(kLineSeparatorString);
 
 	// On the Glyph tab the change side has no string at all - it is the glyph chosen in Change To,
@@ -611,6 +627,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 			AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID(),
 				glyphResolved ? KBSReplaceConfirmDialog::GetChangeSide().fFontLabel : PMString());
 	}
+	else if (translitMode)
+		replaceStr.Append(KBSSearchEngine::CharacterTypeName(
+			static_cast<int32>(opts->GetReplaceCharacterType())));
 	else
 		replaceStr = opts->GetReplaceString(mode);
 	replaceStr.SetTranslatable(kFalse);
@@ -622,8 +641,8 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 
 	// Text and GREP only: on those tabs the change string is a STRING, and a blank line there could
 	// as easily be a mistake as a deletion, so it is spelled out. The Glyph tab says it with the
-	// blank itself - see above.
-	if (replaceStr.IsEmpty() && !glyphMode && !changeHasFormat)
+	// blank itself - see above - and Transliterate always names a type.
+	if (replaceStr.IsEmpty() && !glyphMode && !translitMode && !changeHasFormat)
 	{
 		// An empty change string is a legitimate request - it deletes every match - so it is
 		// spelled out instead of leaving a blank line for the user to interpret.

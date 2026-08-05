@@ -114,6 +114,7 @@ std::wstring ActionNamePart()
 	{
 		case IFindChangeOptions::kGrepSearch:	name += L"Grep";	break;
 		case IFindChangeOptions::kGlyphSearch:	name += L"Glyph";	break;
+		case IFindChangeOptions::kTransliterateSearch:	name += L"Transliterate";	break;
 		default:								name += L"Text";	break;
 	}
 	return name;

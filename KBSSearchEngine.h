@@ -90,7 +90,15 @@ namespace KBSSearchEngine
 	    dialog commits the glyph through kFindChangeGlyphIDCmdBoss when one is picked, so a walk driven
 	    from outside the dialog has to commit it again. Stating the mode alone left the engine in glyph
 	    mode with no glyph and the panel found nothing at all (user, 2026-07-30). The CHANGE glyph is
-	    deliberately NOT stated here - see CommitReplaceGlyph.
+	    deliberately NOT stated here - see CommitReplaceSide.
+
+	    The CHANGE MODE - IFindChangeOptions' second axis, kChange versus kTransliterate (the CJK
+	    character-type conversion) - is stated as well, whatever the tab, through
+	    kFindChangeModeCmdBoss: SnpFindAndReplace's own header says a walk that wants character types
+	    "must first change the mode with this command", and the same axis committed by somebody else
+	    would otherwise be what a Text-tab walk quietly runs with. On the Transliterate tab the FIND
+	    character type is stated too (kFindCharacterTypeCmdBoss), the exact glyph rule again; the
+	    CHANGE character type belongs to CommitReplaceSide.
 
 	    @param overrideFindGlyph  normally kInvalidGlyphID: state the glyph the dialog holds, which is
 	           what every existing caller wants. Anything else is stated INSTEAD of it, for callers
@@ -101,20 +109,27 @@ namespace KBSSearchEngine
 	          command inside the replace sequence would become part of that undo step. */
 	void CommitSearchMode(Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
 
-	/** State the glyph a Glyph-tab replace will WRITE, by re-committing the one the user already has
-	    in the dialog's Change To box. Call it immediately after CommitSearchMode on the replace path
-	    only - a search must never leave a change glyph standing, since nothing on screen would say it
-	    had been set.
+	/** State what a replace will WRITE, for the tabs whose change side is not a string: the Glyph
+	    tab's Change To glyph, and the Transliterate tab's change character type. Both are
+	    re-committed at the value the dialog already holds. Call it immediately after
+	    CommitSearchMode on the replace path only - a search must never leave a change-side value
+	    standing, since nothing on screen would say it had been set.
 
-	    Does nothing unless the Glyph tab is the mode in force. Returns false when that tab has no
-	    change glyph chosen: the caller must then refuse the replace rather than walk, because the
-	    command would otherwise write whatever glyph was committed last - a glyph the user never chose
-	    on this run, and the exact failure this whole mechanism exists to prevent.
+	    Does nothing on the other tabs. On the Glyph tab an EMPTY Change To is stated as -1 (it
+	    deletes every match); false means only that the settings could not be read at all: the
+	    caller must then refuse the replace rather than walk, because the command would otherwise
+	    write whatever was committed last - a value the user never chose on this run, and the exact
+	    failure this whole mechanism exists to prevent.
 
-	    @return true when it is safe to replace: either not a glyph replace at all, or a change glyph
-	            is set and has been stated.
+	    @return true when it is safe to replace.
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
-	bool CommitReplaceGlyph();
+	bool CommitReplaceSide();
+
+	/** The Find/Change dialog's English name for a CJK character type ("Kanji", "Full-Width
+	    Katakana", ...) - the Transliterate tab's query, which has no find string to quote. Never a
+	    translation key; a value outside the enum comes back EMPTY - the walk signature is the place
+	    that states the raw number. */
+	const char* CharacterTypeName(int32 characterType);
 
 	/** Is anything set in the dialog's Find Format / Change Format pane, for the tab in force?
 
@@ -171,7 +186,7 @@ namespace KBSSearchEngine
 	    ***** RECORD IT WHEN THE REPLACE RUNS, NOT WHEN THE REPORT IS SAVED. ***** The user is free
 	    to retype Change To the moment the replace returns, and a report that read the dialog at save
 	    time would name a replacement these rows never took (the same rule, and the same reason, as
-	    SetQueryText). KBSReplaceEngine records it on the way in, after CommitReplaceGlyph - the
+	    SetQueryText). KBSReplaceEngine records it on the way in, after CommitReplaceSide - the
 	    Glyph tab's change glyph is not on the options until that has run.
 
 	    Comes back EMPTY when the settings cannot be read, and on the Glyph tab when Change To holds

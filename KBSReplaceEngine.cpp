@@ -791,14 +791,15 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	}
 
 	// ----- (2) whether that tab is one this panel can walk at all -----
-	// Anything else searches by attribute through a walker of its own and never produced these rows
-	// in the first place, so there is nothing here to rewrite.
+	// Object and Colour search by attribute through a walker of their own and never produced these
+	// rows in the first place, so there is nothing here to rewrite.
 	if (searchedMode >= 0
 		&& searchedMode != IFindChangeOptions::kTextSearch
 		&& searchedMode != IFindChangeOptions::kGrepSearch
-		&& searchedMode != IFindChangeOptions::kGlyphSearch)
+		&& searchedMode != IFindChangeOptions::kGlyphSearch
+		&& searchedMode != IFindChangeOptions::kTransliterateSearch)
 	{
-		outSummary.Append("These results did not come from the Text, GREP or Glyph tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
+		outSummary.Append("These results did not come from a text tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
 		return true;
 	}
 
@@ -940,12 +941,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	if (KBSReplaceEngine::RefuseChangedQuery(outSummary))
 		return 0;
 
-	// ...and on the Glyph tab, the glyph that will be WRITTEN. Stated only here, never on the search
-	// path, so a search can never leave a change glyph set behind the user's back. An EMPTY Change To
-	// box is stated too, not refused - it means "delete every match", the same as an empty change
-	// string on the Text tab. false now means only that the Find/Change settings could not be read at
-	// all. Also outside the sequence, and before it opens, so nothing has been written yet.
-	if (!KBSSearchEngine::CommitReplaceGlyph())
+	// ...and what the replace will WRITE, for the tabs whose change side is not a string: the Glyph
+	// tab's Change To glyph, the Transliterate tab's change character type. Stated only here, never
+	// on the search path, so a search can never leave a change-side value set behind the user's
+	// back. An EMPTY Change To box is stated too, not refused - it means "delete every match", the
+	// same as an empty change string on the Text tab. false means only that the Find/Change settings
+	// could not be read at all. Also outside the sequence, and before it opens, so nothing has been
+	// written yet.
+	if (!KBSSearchEngine::CommitReplaceSide())
 	{
 		outSummary.Append("Find/Change settings are unavailable - nothing was changed.");
 		return 0;
@@ -956,7 +959,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// returns - so reading the dialog at save time would put a replacement in the report that these
 	// rows never took. Same rule, same reason, as the query line the search records (SetQueryText).
 	//
-	// Here rather than earlier because CommitReplaceGlyph has just stated the Glyph tab's change glyph
+	// Here rather than earlier because CommitReplaceSide has just stated the Glyph tab's change glyph
 	// on the options: before that call, the change side of a glyph replace is not there to be read.
 	// Still outside every command sequence, and past all the doors above, so nothing that gets this
 	// far is recorded without running.

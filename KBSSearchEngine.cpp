@@ -527,6 +527,12 @@ PMString DescribeCurrentQuery()
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	if (mode == IFindChangeOptions::kGlyphSearch)
 		description = DescribeGlyphQuery(opts, true /*findSide*/);
+	else if (mode == IFindChangeOptions::kTransliterateSearch)
+	{
+		// The query is a character type; the tab name below says the rest.
+		description.Append(KBSSearchEngine::CharacterTypeName(
+			static_cast<int32>(opts->GetFindCharacterType())));
+	}
 	else
 	{
 		description.Append(opts->GetFindString(mode));
@@ -601,6 +607,32 @@ void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 	{
 		// Same reasoning as the mode commit below: the walk simply runs with whatever was committed
 		// last, but the error state has to be cleared or it fails every find command after it.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
+}
+
+// Process one of the find/change option commands that carry a single int - the shape of
+// SnpFindAndReplace's ProcessFindChangeCommandInt32: the value in the default IIntData, and which
+// mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
+// (kFindChangeModeCmdBoss does; the two character-type bosses hold only the value - checked
+// against a live object-model dump - so that field is set only when it answers).
+void CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
+	if (cmd == nil)
+		return;
+	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
+	if (valueData == nil)
+		return;
+	valueData->Set(value);
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (modeData != nil)
+		modeData->Set(mode);
+
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		// Same reasoning as the mode commit: the walk simply runs with whatever was committed last,
+		// but the error state has to be cleared or it fails every find command after it.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
 }
@@ -1278,7 +1310,8 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 	// their mode would only mislead the engine.
 	if (mode != IFindChangeOptions::kTextSearch
 		&& mode != IFindChangeOptions::kGrepSearch
-		&& mode != IFindChangeOptions::kGlyphSearch)
+		&& mode != IFindChangeOptions::kGlyphSearch
+		&& mode != IFindChangeOptions::kTransliterateSearch)
 		return;
 
 	// Read the glyph BEFORE the mode is committed. Committing a mode is a declaration, and there is
@@ -1293,6 +1326,11 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 		(overrideFindGlyph != kInvalidGlyphID)
 			? overrideFindGlyph
 			: ((mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID);
+
+	// The second axis and the Transliterate tab's query, read before the commits for the same
+	// reason as the glyph above.
+	const IFindChangeOptions::ChangeMode changeMode = opts->GetChangeMode();
+	const IFindChangeOptions::CharacterType findCharType = opts->GetFindCharacterType();
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
 	if (cmd == nil)
@@ -1316,6 +1354,12 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
 
+	// The CHANGE MODE - kChange, or kTransliterate for the CJK character-type conversion - stated
+	// for every tab, at the value the dialog already holds. It is the axis SnpFindAndReplace's
+	// header warns about ("you must first change the mode with this command"), and it is global:
+	// left unstated, a Text-tab walk runs with whatever anybody committed last.
+	CommitFindChangeInt(kFindChangeModeCmdBoss, static_cast<int32>(changeMode), static_cast<int32>(mode));
+
 	// Now the glyph, and for the same reason the mode needed committing at all: what the dialog
 	// HOLDS is not what the engine WALKS BY. The Glyph tab issues kFindChangeGlyphIDCmdBoss when the
 	// user picks a glyph, so a walk driven from outside the dialog has to issue it again - stating
@@ -1326,23 +1370,56 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 	// a search can never leave a change glyph standing behind the user's back.
 	if (mode == IFindChangeOptions::kGlyphSearch)
 		CommitGlyphID(findGlyphID, kTrue);
+
+	// ...and the Transliterate tab's query, which is a character type rather than a find string -
+	// the glyph rule over again, find side only for the same reason.
+	if (mode == IFindChangeOptions::kTransliterateSearch)
+		CommitFindChangeInt(kFindCharacterTypeCmdBoss, static_cast<int32>(findCharType), static_cast<int32>(mode));
 }
 
-bool KBSSearchEngine::CommitReplaceGlyph()
+bool KBSSearchEngine::CommitReplaceSide()
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return false;
-	if (opts->GetSearchMode() != IFindChangeOptions::kGlyphSearch)
-		return true;	// Not a glyph replace - nothing to state, nothing to stop.
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
-	// An empty Change To box is NOT refused. It means "delete every match" - the same thing an empty
-	// change string means on the Text tab - and that is what the Find/Change dialog does with it.
-	// KBS used to stop the run here, which made the panel strictly less capable than the dialog it
-	// delegates to (user's report 2026-07-31). What the old code was right about is that the empty
-	// box must never be left UNSTATED; CommitGlyphID states it on this side for exactly that reason.
-	CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side of the query
+	if (mode == IFindChangeOptions::kGlyphSearch)
+	{
+		// An empty Change To box is NOT refused. It means "delete every match" - the same thing an
+		// empty change string means on the Text tab - and that is what the Find/Change dialog does
+		// with it. KBS used to stop the run here, which made the panel strictly less capable than
+		// the dialog it delegates to (user's report 2026-07-31). What the old code was right about
+		// is that the empty box must never be left UNSTATED; CommitGlyphID states it on this side
+		// for exactly that reason.
+		CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side of the query
+	}
+	else if (mode == IFindChangeOptions::kTransliterateSearch)
+	{
+		// The character type the conversion writes, stated at the dialog's own value - the change
+		// glyph's rule over again.
+		CommitFindChangeInt(kReplaceCharacterTypeCmdBoss,
+			static_cast<int32>(opts->GetReplaceCharacterType()), static_cast<int32>(mode));
+	}
 	return true;
+}
+
+const char* KBSSearchEngine::CharacterTypeName(int32 characterType)
+{
+	switch (characterType)
+	{
+		case IFindChangeOptions::kKanji:				return "Kanji";
+		case IFindChangeOptions::kHalfWidthKatakana:	return "Half-Width Katakana";
+		case IFindChangeOptions::kHalfWidthRoman:		return "Half-Width Roman";
+		case IFindChangeOptions::kFullWidthHiragana:	return "Full-Width Hiragana";
+		case IFindChangeOptions::kFullWidthKatakana:	return "Full-Width Katakana";
+		case IFindChangeOptions::kFullWidthRoman:		return "Full-Width Roman";
+		case IFindChangeOptions::kNone:					return "None";
+		case IFindChangeOptions::kWesternArabicDigits:	return "Western Arabic Digits";
+		case IFindChangeOptions::kArabicIndicDigits:	return "Arabic-Indic Digits";
+		case IFindChangeOptions::kFarsiDigits:			return "Farsi Digits";
+		default:										return "";
+	}
 }
 
 // One find ATTRIBUTE, as far as the SDK will let it be read from outside: its class, and then
@@ -1547,6 +1624,14 @@ PMString KBSSearchEngine::DescribeCurrentChange()
 	if (mode == IFindChangeOptions::kGlyphSearch)
 		return DescribeGlyphQuery(opts, false /*findSide*/);
 
+	// The Transliterate tab writes a character type, stated the same way its find side is.
+	if (mode == IFindChangeOptions::kTransliterateSearch)
+	{
+		description.Append(KBSSearchEngine::CharacterTypeName(
+			static_cast<int32>(opts->GetReplaceCharacterType())));
+		return description;
+	}
+
 	description.Append(opts->GetReplaceString(mode));
 
 	// "dog  + Change Format (size: 20 pt)", or "Change Format (...)" alone when the box is empty and
@@ -1603,6 +1688,12 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		outSignature.Append(" g");
 		outSignature.AppendNumber(static_cast<int32>(opts->GetFindGlyphID()));
 	}
+	else if (mode == IFindChangeOptions::kTransliterateSearch)
+	{
+		// The Transliterate tab's query is a character type, not a find string.
+		outSignature.Append(" t");
+		outSignature.AppendNumber(static_cast<int32>(opts->GetFindCharacterType()));
+	}
 	else
 	{
 		// Text and GREP keep SEPARATE find strings, so this is asked for the mode in force - the same
@@ -1610,6 +1701,12 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		outSignature.Append(" q");
 		outSignature.Append(opts->GetFindString(mode));
 	}
+
+	// The SECOND axis, kChange versus kTransliterate. The tab test upstream does not cover it: it
+	// sits beside the tab, and a walk runs with whichever value was committed last - so results
+	// searched under one value must not be replaced under the other.
+	outSignature.Append(" cm");
+	outSignature.AppendNumber(static_cast<int32>(opts->GetChangeMode()));
 
 	// ----- the switches that decide WHICH occurrences of it come back -----
 	// The four matching options first, then the five scope switches GetKBSWalkerScopeOptions reads.
@@ -1957,28 +2054,13 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		return 0;
 	}
 
-	// Transliterate is the CJK character-type conversion (Kanji / kana / half- and full-width), and it
-	// is a SECOND axis: IFindChangeOptions carries it both as a search mode of its own and as a
-	// ChangeMode that sits alongside the tab. SnpFindAndReplace states outright that it "assumes
-	// Change is used, however if you want to search based on Japanese character types, you must first
-	// change the mode" with kFindChangeModeCmdBoss - a command this panel does not issue.
-	//
-	// So it is turned away rather than walked. Left to fall through it would be the Glyph bug over
-	// again, and quieter: the mode never gets stated, so the walk runs in whatever mode was committed
-	// last, while the find string is non-empty often enough to sail past the check below - a result
-	// list that looks ordinary and answers a question the user did not ask. (Nothing would be written
-	// wrongly - the replace already refuses any results that did not come from Text or GREP - so what
-	// is at stake is the truth of the list, not the text.)
-	//
-	// Refusing is also what keeps the promise this panel is built on: KBS never writes to the user's
-	// Find/Change settings. Committing kChange to force the other axis would do exactly that.
-	InterfacePtr<IFindChangeOptions> changeModeOpts(QuerySessionPreferences<IFindChangeOptions>());
-	if (tab == IFindChangeOptions::kTransliterateSearch
-		|| (changeModeOpts != nil && changeModeOpts->GetChangeMode() == IFindChangeOptions::kTransliterate))
-	{
-		outSummary.Append("Find/Change is set to transliterate character types, which this panel does not search. Switch it back to Text, GREP or Glyph, or use InDesign's own Find/Change.");
-		return 0;
-	}
+	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
+	// walked like any other text tab since 2026-08-05 (user's call: whatever the official panel is
+	// set to, this panel searches and replaces the same way). It rides the same text walker and the
+	// same find/replace commands; what it needs is its axes stated before the walk - the ChangeMode
+	// and the find character type - which CommitSearchMode now does, the exact glyph rule again.
+	// (It was refused here until the Japanese version came into use; on a Roman-featureset install
+	// the tab cannot be reached at all, so the transliterate paths simply lie dormant there.)
 
 	// A caller with its own glyph query - the missing-glyph scan - has nothing on the dialog that
 	// could be missing, so HasFindQuery is the wrong question for it. What it does need is the GLYPH
@@ -1996,16 +2078,22 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	else if (!HasFindQuery())
 	{
 		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
-		// query on another tab is no help and saying so avoids a hunt. The Glyph tab is worded for
-		// what it actually wants: a glyph picked from its grid, not text typed into a field.
+		// query on another tab is no help and saying so avoids a hunt. The Glyph and Transliterate
+		// tabs are worded for what they actually want - a glyph picked from a grid, a character
+		// type chosen from a dropdown - because "type what to find" points at a field neither
+		// tab has.
 		const bool glyphTab = (tab == IFindChangeOptions::kGlyphSearch);
-		outSummary.Append(glyphTab ? "No glyph set on the " : "No search text set on the ");
+		const bool translitTab = (tab == IFindChangeOptions::kTransliterateSearch);
+		outSummary.Append(glyphTab ? "No glyph set on the "
+			: (translitTab ? "No character type set on the " : "No search text set on the "));
 		PMString tabName(SearchModeName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
 		outSummary.Append(glyphTab
 			? " tab. Choose the glyph to find in Edit > Find/Change, then run the search from the panel flyout."
-			: " tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout.");
+			: (translitTab
+				? " tab. Choose the character type to find in Edit > Find/Change, then run the search from the panel flyout."
+				: " tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout."));
 		return 0;
 	}
 
