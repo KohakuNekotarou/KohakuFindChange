@@ -785,27 +785,31 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 {
 	kStringTableRsrcType,
 	{
-		kWildFS, k_enUS, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_enGB, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_deDE, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_frFR, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_esES, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_ptBR, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_svSE, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_daDK, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_nlNL, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_itIT, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_nbNO, kSDKDefStringsResourceID + index_enUS
-		kWildFS, k_fiFI, kSDKDefStringsResourceID + index_enUS
-		// kWildFS AND the enUS table: there is no Japanese string table any more (2026-08-05,
-		// user's call). The strings KBS speaks in Japanese are switched at RUN TIME instead -
-		// see KBSLoc.h - so the table serves English to every locale, and no LocaleIndex gap
-		// can strand a locale on raw keys again. (The official samples' shape,
-		// kInDesignJapaneseFS + a jaJP table, matched NO row on a Roman-engine install running
-		// a Japanese UI - this machine - and every string drew as its raw key, measured
-		// 2026-08-05. kWildFS matters for the same reason: the featureset and the UI language
-		// are separate axes.)
-		kWildFS, k_jaJP, kSDKDefStringsResourceID + index_enUS
+		// ONE wild row. This is the shape the SDK samples use when a plug-in ships a single
+		// string table: candlechart/CdlChart.fr:340, basictextadornment/BscTA.fr:345,
+		// customdatalinkui/CusDtLnkUI.fr:437, customdatalink/CusDtLnk.fr:562,
+		// basicshape/BscShp.fr:270 - they all close with this exact line. The other official
+		// shape, a row per locale (basiclocalization/BscL10N.fr:196-219), is for a plug-in that
+		// really carries seventeen translated tables. KBS carries one, so there is nothing for
+		// a per-locale row to select.
+		//
+		// It replaces a list of thirteen named locales that every one of them pointed at this
+		// same enUS table (2026-08-06). That list was NOT equivalent to this line: the lookup
+		// is a match, not a default (LocaleIndex.h:124-134, "Does wildcard matching"), so the
+		// locales absent from it - koKR, zhCN, zhTW, ruRU - matched no row at all and drew
+		// every menu, panel and prompt as its RAW KEY. That exact failure was measured on a
+		// Japanese UI on 2026-08-05 (memory plugin-ui-localization-fr-encoding), and the note
+		// that used to sit here claimed a locale could no longer be stranded - while four
+		// still were.
+		//
+		// The Japanese KBS speaks is not in a table any more (2026-08-05, user's call): it is
+		// switched in at RUN TIME by UI language - see KBSLoc.h. The official jaJP shape
+		// (kInDesignJapaneseFS + a jaJP table) was tried and matched NO row on a Roman-engine
+		// install running a Japanese UI, which is what the development machine was on
+		// 2026-08-05 (it became a true Japanese install - featureSet 'Japn' - on 2026-08-06).
+		// kWildFS is what covers both, because the featureset and the UI language are
+		// separate axes and this table is meant for every combination of them.
+		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
 	}
 };
 

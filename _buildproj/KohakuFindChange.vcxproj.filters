@@ -137,6 +137,9 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSLoc.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSFactoryList.h">
          <Filter>Header Files</Filter>
       </ClInclude>

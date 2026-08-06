@@ -262,6 +262,7 @@
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSLoc.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSFactoryList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSBookScope.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSSearchEngine.h"/>

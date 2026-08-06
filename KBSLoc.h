@@ -46,15 +46,26 @@ namespace KBSLoc
 		PMString s;
 		if (JapaneseUI())
 		{
+			// PMString's own way in from UTF-16 (PMString.h:164-170). The cast is the one
+			// the SDK itself makes for wide literals (PMString.h:1071-1073). char16_t
+			// rather than wchar_t on purpose: PMString(const wchar_t*) would say outright
+			// that it is not a key - which is what is wanted here - but wchar_t is UTF-32
+			// on the Mac (PMString.h:96-97), and these literals are UTF-16.
 			s.SetXString(reinterpret_cast<const UTF16TextChar*>(japanese),
 				static_cast<int32>(std::char_traits<char16_t>::length(japanese)));
 		}
 		else
 		{
-			PMString k(englishKey);
-			k.Translate();
-			s = k;
+			// The official one-liner for "here is a string-table key, give me its
+			// translation" (PMString.h:80-83), written exactly this way by the
+			// localization sample itself - basiclocalization/BscL10NDialogController.cpp:115.
+			s = PMString(englishKey, PMString::kTranslateDuringCall);
 		}
+		// PMString.h files SetTranslatable under DISCOURAGED (:698-721) and points at
+		// WideString, a kNoTranslate constructor or SetCString-with-encoding instead. None of
+		// those three can carry a UTF-16 literal out as a PMString, and this is the very
+		// means the alert's own contract names: CAlert.h:84 says a string is translated
+		// "unless the string has been translated already or isn't translatable".
 		s.SetTranslatable(kFalse);
 		return s;
 	}
