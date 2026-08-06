@@ -28,7 +28,7 @@
 #include "SDKDef.h"
 
 // Company:
-#define kKBSCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". (Matches KESCL/KESCM so all group under Plug-Ins > KohakuNekotarou.)
+#define kKBSCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". It is a string-table KEY, not what the user sees: both tables map it to "Kohaku Plug-Ins", so the group reads Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (measured on the real application 2026-08-06 - this note used to claim the group was called KohakuNekotarou). KESCL/KESCM/KT use the same key and the same value, which is what puts all four under one group.
 #define kKBSCompanyValue	"KohakuNekotarou"	// Company name displayed externally.
 
 // Plug-in:
@@ -289,6 +289,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmUnsavedWidgetID, kKBSPrefix + 16)
 // UNUSED since 2026-08-01 - the "Don't show again" box it named is no longer in the dialog. Like
 // the string key beside it (kKBSGlyphConfirmDontShowKey), it is kept rather than freed: a widget id
 // that once shipped stays spent, so a saved workspace referring to it cannot bind to something else.
+// ! Until 2026-08-06 the dialog controller went on stamping a label into this id every time the
+// confirmation opened. It was harmless - SetTextControlData looks the widget up first and there is
+// nothing to find - but it made the id read as live. Removed; nothing writes it now.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The panel's illustrations, stacked at ONE frame to the right of the status message - exactly one
 // is visible and enabled at a time (KBSPanelIcon picks, and it is the ONLY place that knows which
@@ -444,8 +447,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSGlyphConfirmArrowKey		kKBSStringPrefix "kKBSGlyphConfirmArrowKey"
 // UNUSED since 2026-08-01, when the "Don't show again" box came off both confirmations (it made a
 // destructive rewrite suppressible with one tick, and the only way back is Preferences > General >
-// Reset All Warning Dialogs). Left in place, with its entry in both string tables, so that putting
-// the box back is a resource change rather than a translation round; nothing reads it today.
+// Reset All Warning Dialogs). Left in place, with its entry in the string table, so that putting
+// the box back is a resource change rather than a translation round. Nothing reads it today - true
+// since 2026-08-06, when the controller stopped stamping it into a widget that does not exist.
 #define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
 
 // RETIRED 2026-08-05 with the feature they belonged to: the "save after replace" box, its note, and

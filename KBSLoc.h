@@ -92,6 +92,9 @@ namespace KBSJa
 	const char16_t kGlyphFindLabel[]   = u"検索";
 	const char16_t kGlyphChangeLabel[] = u"置換後";
 	const char16_t kGlyphArrow[]       = u"→";
+	// No caller since 2026-08-06 - the box this labels came off the dialog on 2026-08-01, and the
+	// controller stopped stamping it into a widget that no longer exists. Kept for the same reason
+	// KBSID.h keeps the key and the id: putting the box back should not need a translation round.
 	const char16_t kGlyphDontShow[]    = u"次回から表示しない";
 
 	// ----- About box -----

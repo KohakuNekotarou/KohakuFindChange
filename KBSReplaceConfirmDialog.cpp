@@ -379,11 +379,12 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 	const PMString& message = KBSReplaceConfirmDialog::GetMessage();
 	const bool textLayout = !message.IsEmpty();
 
-	// The "Don't show again" box, restamped through the language switch: the .fr writes the enUS
-	// label, and this is what says it in Japanese on a Japanese UI (KBSLoc - the jaJP string
-	// table is gone). Present in both layouts, so it is stamped here rather than in either.
-	this->SetTextControlData(kKBSReplaceConfirmDontShowWidgetID,
-		KBSLoc::Text(kKBSGlyphConfirmDontShowKey, KBSJa::kGlyphDontShow));
+	// (A "Don't show again" label was stamped here until 2026-08-06. The box itself came off both
+	// layouts on 2026-08-01, so kKBSReplaceConfirmDontShowWidgetID names nothing in KBS.fr any
+	// more and the call found no widget to write to - CDialogController::SetTextControlData
+	// checks FindWidget first, so it did nothing at all. Its comment claimed the opposite
+	// ("present in both layouts"), which is the only reason it survived a reading. The id and the
+	// string key stay reserved in KBSID.h so the box can come back as a resource change.)
 
 	this->ShowOrHide(kKBSReplaceConfirmMessageWidgetID, textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmGlyphBlockWidgetID, !textLayout);
