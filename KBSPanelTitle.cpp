@@ -42,6 +42,7 @@ namespace GoToURLUtils
 #include "KBSBookScope.h"		// IsBookScopeOn - the only input to the name
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
+#include "KBSPanelMetrics.h"	// how tall the message block has to be in this UI language
 #include "KBSPanelTitle.h"
 #include "KBSResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
 
@@ -167,6 +168,12 @@ public:
 	virtual void AutoAttach()
 	{
 		KBSPanelTitle::Update();
+
+		// The LAYOUT first, because the two calls below fill in what these frames hold. The .fr
+		// carries the English measurements and a Japanese UI draws the palette font half again as
+		// tall, so on that UI the message box has to be taller or the last line of every message is
+		// cut off mid-glyph (reported 2026-08-06). See KBSPanelMetrics.h.
+		KBSPanelMetrics::Update();
 
 		// The widgets are built fresh every time the panel is shown, so the picture that belongs on
 		// screen has to be written on NOW - the .fr's visible flags are only a starting point.

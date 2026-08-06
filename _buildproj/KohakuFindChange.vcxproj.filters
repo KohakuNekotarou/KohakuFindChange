@@ -102,6 +102,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelMetrics.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -201,6 +204,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelMetrics.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.h">

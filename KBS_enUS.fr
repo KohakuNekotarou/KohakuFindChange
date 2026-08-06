@@ -33,7 +33,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         	 // ----- Menu strings
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
                 kKBSAboutMenuKey,					kKBSDisplayName "...",
-                kKBSPluginsMenuKey,				kKBSDisplayName,
+                // kKBSPluginsMenuKey was here until 2026-08-06. Its menu path macro was never used
+                // by the .fr, so nothing ever asked for this string (see KBSID.h).
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 

@@ -50,7 +50,11 @@
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
 #include "GraphicsID.h"		// IID_IDRWEVTHANDLER - the red-marker draw handler (Task 3)
-#include "AppFrameworkID.h"	// IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl (Task 3)
+// kApplicationObjectScriptElement (:427) - the object app.kfcStatus is put on at the end of this
+// file. The official scripting sample credits this header with exactly that (BPI.fr:55). It is NOT
+// where IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl come from, which the note here
+// claimed until 2026-08-06 - those are ShuksanID.h:376 and :824.
+#include "AppFrameworkID.h"
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
 #include "ScriptInfoTypes.fh"	// Property / Provider - the scripting definitions below
 #include "ScriptingID.h"		// kCoreScriptManagerBoss / kBaseScriptProviderBoss
@@ -59,11 +63,13 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSScriptingDefs.h"	// p_KBSStatus - the four-character ID behind app.kfcStatus
-#include "GenericID.h"
-#include "ShuksanID.h"
-#include "TextID.h"
-// kFindChangeClientBoss and the walker service ids the search walks with.
-#include "TextWalkerServiceProviderID.h"
+
+// GenericID.h, TextID.h, TextWalkerServiceProviderID.h and a SECOND copy of ShuksanID.h stood here
+// until 2026-08-06. Nothing in this file ever named a symbol from any of them: the search's own ids
+// (kFindChangeClientBoss and the walker services) are needed by the .cpp files that walk text, which
+// include those headers themselves - not by the resources. Everything below resolves from
+// ShuksanID.h (included once, above), widgetid.h, GraphicsID.h, TipsID.h, DocumentID.h,
+// AppFrameworkID.h and the .fh type files.
 
 
 #ifdef __ODFRC__
@@ -105,21 +111,27 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 {{{
 
 	/*
-	 * This boss class supports two interfaces:
-	 * IActionComponent and IPMPersist.
-     *
-	 * 
+	 * The plug-in's menu commands. It inherits kBaseActionComponentBoss, which is what EVERY action
+	 * component in the product does - layerpanel/LayerPanelClass.fr:403, spellpanel:339,
+	 * linksui:170 and :178, buttonui:103 - and what the samples do (basicpanel/BscPnl.fr:92).
+	 *
+	 * What the parent brings, read off the running application's object model (debug-boss-registry/
+	 * IObjectModel_RomanFS.txt:492-493, kAboutMenuComponentBoss): IID_IPMPERSIST (kPMPersistImpl)
+	 * AND IID_NEVERWRITESTODOCUMENT (kNeverWritesToDocumentImpl).
+	 *
+	 * Until 2026-08-06 this was built from kInvalidClass with IID_IPMPERSIST written out by hand -
+	 * the shape candlechartui/CdlChtUI.fr:93 has. That shape runs, but it is missing the second
+	 * interface, and the product's form gives both without spelling either out.
+	 *
 	 * @ingroup kohakubooksearch
 	 */
 	Class
 	{
 		kKBSActionComponentBoss,
-		kInvalidClass,
+		kBaseActionComponentBoss,
 		{
-			// Handle the actions from the menu.
+			// Handle the actions from the menu. The rest comes from the parent boss above.
 			IID_IACTIONCOMPONENT, kKBSActionComponentImpl,
-			// Persist the state of the menu across application instantiation. Implementation provided by the API.
-			IID_IPMPERSIST, kPMPersistImpl
 		}
 	},
 
@@ -578,7 +590,12 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss, 		// ClassID of boss class that implements the ActionID.
 		kKBSAboutActionID,	// ActionID.
 		kKBSAboutMenuKey,	// Sub-menu string.
-		kOtherActionArea,				// Area name (see ActionDefs.h).
+		// The Help > About Plug-ins entry belongs to the help menu's area, which is what the samples
+		// (basicpanel/BscPnl.fr:200) and KESCM (KESCM.fr:638) both give it. The area only ever
+		// matters to the keyboard shortcut editor, and every action here is invisible in it, but
+		// this is the classification the SDK puts on this one item. The popup's own "About This
+		// Plug-in..." below stays kOtherActionArea - so does basicpanel's (:230).
+		kHelpMenuActionArea,			// Area name (see ActionDefs.h).
 		kNormalAction,					// Type of action (see ActionDefs.h).
 		kDisableIfLowMem,				// Enabling type (see ActionDefs.h).
 		kInvalidInterfaceID,			// Selection InterfaceID this action cares about or kInvalidInterfaceID.
@@ -978,7 +995,9 @@ resource PanelList (kSDKDefPanelResourceID)
 		kIsResizable,
 		kKBSPanelWidgetActionID,	// Action ID to show/hide the panel
 		"",							// panelName empty: placed via altMenu below (Plug-Ins menu, not Window) - like KESCL/KESCM.
-		kKBSPanelPluginsMenuPath,	// Plug-Ins > KohakuNekotarou > KohakuBookSearch
+		kKBSPanelPluginsMenuPath,	// Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (walked on the
+									// running menu tree, 2026-08-06 - the parts are KEYS, and both
+									// tables translate them to those words)
 		kKBSPanelPluginsMenuPosition,	// Alternate menu position
 		kKBSPaletteIconResID, kKBSPluginID,	// PNG icon for the collapsed dock tab
 		c_Panel
@@ -999,7 +1018,13 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 	kPMRsrcID_None,						// RsrcID
 	kBindNone,							// Binding (0=none)
 	Frame(0, 0, 300, 360),				// Default size (207x32 -> 300x360 with the result tree,
-										// Task 2). Resizable (kIsResizable in PanelList).
+										// Task 2). Resizable (kIsResizable in PanelList), down to a
+										// floor of 224 - KESCM's fixed width, so the two panels
+										// line up when docked together. This is the size the panel
+										// OPENS at, where the message takes three lines on a
+										// Japanese UI; narrower it takes four, which is what the
+										// block is sized to hold. Both numbers, and the
+										// measurements behind them, are in KBSPanelMetrics.cpp.
 	kTrue, kTrue,						// Visible, Enabled
 	kTrue,								// Erase background (kFalse -> kTrue with the tree)
 	kInterfacePaletteFill,				// Erase to color
@@ -1013,14 +1038,22 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// of the sentence was the part being thrown away. Bound left/right/top so it widens with
 		// the panel and stays put vertically.
 		//
-		// ***** THE HEIGHT MUST BE A WHOLE NUMBER OF LINES. ***** A line is 12px here (measured
-		// 2026-08-04 off a screenshot: four baselines 11.8px apart), so 48 = exactly four. The frame
-		// was 52 - four lines and 4px over - and the widget draws into whatever room it is given:
-		// narrowing the panel pushed the text to five lines and the TOP 4px OF THE FIFTH appeared
-		// below the fourth, a sliver of chopped-off letters (from a screenshot the user took, kept in
-		// work/ - its name is not spelled here because this .fr is compiled as CP932 and the rest of
-		// the file is plain ASCII).
+		// ***** THE HEIGHT MUST BE A WHOLE NUMBER OF LINES. ***** A line is 12px on an ENGLISH UI
+		// (measured 2026-08-04 off a screenshot: four baselines 11.8px apart), so 48 = exactly four.
+		// The frame was 52 - four lines and 4px over - and the widget draws into whatever room it is
+		// given: narrowing the panel pushed the text to five lines and the TOP 4px OF THE FIFTH
+		// appeared below the fourth, a sliver of chopped-off letters (from a screenshot the user
+		// took, kept in work/ - its name is not spelled here because this .fr is compiled as CP932
+		// and the rest of the file is plain ASCII).
 		// A remainder of zero leaves nothing for a part-line to be drawn into.
+		//
+		// ***** AND THE LINE IS NOT 12px IN EVERY LANGUAGE. ***** On a JAPANESE UI the palette font
+		// draws 18px lines (measured 2026-08-06 on the running panel: baselines at y=218, 236, 254),
+		// so this 48px box held two and two thirds of them and the last line of every message was
+		// cut off. A resource carries one set of numbers and these are the English set;
+		// KBSPanelMetrics puts the real height on when the panel appears (72 = 18x4 there, the same
+		// four-line budget this 48 is). If this number changes, change that one too - it is stated
+		// against this one.
 		//
 		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
 		// never measured. If the palette font ever changes size, measure again - the rule is the

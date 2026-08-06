@@ -27,6 +27,7 @@
 
 // Project includes:
 #include "KBSID.h"
+#include "KBSPanelMetrics.h"	// the floor, which moves with the message block's height
 
 /** The panel's view: PalettePanelView with a minimum size.
 
@@ -50,23 +51,19 @@ public:
 	*/
 	virtual PMPoint ConstrainDimensions(const PMPoint& dimensions) const;
 
-private:
-	// ***** WHERE THESE TWO NUMBERS COME FROM. *****
+	// ***** THE TWO NUMBERS ARE NOT HERE. ***** They are KBSPanelMetrics', because the height one
+	// has to move with the message block, and how tall THAT is depends on the UI language (a
+	// Japanese palette font draws 18px lines where an English one draws 12px). Keeping the floor
+	// and the block in one place is what stops a taller block from quietly eating the result rows
+	// the floor exists to protect.
 	//
-	// WIDTH. The message block is laid out in KBS.fr as: 5px margin, the message box, 4px clear,
-	// the 32px illustration, 8px margin. 250 leaves the message about 200px - three lines for the
-	// opening hint and four for the longest status line, which is what its box holds. It is also
-	// roughly the width the panel is usually left at (user's call, 2026-08-04: "about the size the
-	// panel is now").
-	//
-	// HEIGHT. 160 is KESCL's, and it works out the same way here: the message block ends at 54 and
-	// the tree starts at 57, so this leaves a little over five 19px rows - enough for a result set
-	// to look like a list rather than a single row peeping out.
-	//
-	// Neither is a hard rule of the layout; they are the point past which the panel stops being
-	// able to say anything. If the message block or the row height changes, these move with them.
-	static const int kKBSMinimumPanelWidth  = 250;
-	static const int kKBSMinimumPanelHeight = 160;
+	// What they mean has not changed. The WIDTH is the point past which the panel stops being able
+	// to say anything: every widget is bound to the edges, so it narrows happily until the message
+	// wraps past what its box holds and the tree's rows are ellipsized down to nothing. It is now
+	// what the panel actually measures at the size it is usually left at (user's call, 2026-08-06;
+	// it was 250 from 2026-08-04, measured by eye rather than off the running panel). The HEIGHT
+	// leaves about five 19px rows under the message block - enough for a result set to look like a
+	// list rather than a single row peeping out.
 };
 
 CREATE_PERSIST_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
@@ -77,11 +74,14 @@ PMPoint KBSPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 {
 	PMPoint constrainedDim = desiredDimen;
 
-	if (constrainedDim.X() < kKBSMinimumPanelWidth)
-		constrainedDim.X(kKBSMinimumPanelWidth);
+	const int32 minWidth = KBSPanelMetrics::MinimumPanelWidth();
+	const int32 minHeight = KBSPanelMetrics::MinimumPanelHeight();
 
-	if (constrainedDim.Y() < kKBSMinimumPanelHeight)
-		constrainedDim.Y(kKBSMinimumPanelHeight);
+	if (constrainedDim.X() < minWidth)
+		constrainedDim.X(minWidth);
+
+	if (constrainedDim.Y() < minHeight)
+		constrainedDim.Y(minHeight);
 
 	return constrainedDim;
 }

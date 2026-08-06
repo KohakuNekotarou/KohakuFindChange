@@ -332,9 +332,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSAboutMenuKey			kKBSStringPrefix "kKBSAboutMenuKey"
 #define kKBSAboutMenuPath		kSDKDefStandardAboutMenuPath kKBSCompanyKey
 
-// "Plug-ins" sub-menu:
-#define kKBSPluginsMenuKey 		kKBSStringPrefix "kKBSPluginsMenuKey"
-#define kKBSPluginsMenuPath		kSDKDefPlugInsStandardMenuPath kKBSCompanyKey kSDKDefDelimitMenuPath kKBSPluginsMenuKey
+// A "Plug-ins" sub-menu path (kKBSPluginsMenuKey / kKBSPluginsMenuPath) stood here from the Dolly
+// template until 2026-08-06. The .fr never used either one: the panel's own entry under that menu
+// is kKBSPanelPluginsMenuPath below, which spells the leaf with kKBSPanelTitleKey, and the flyout
+// hangs off kKBSTargetMenuPath. The string value that went with the key is gone from KBS_enUS.fr
+// too. Menu path macros are not ids and nothing outside this plug-in can name them, so there is
+// nothing to reserve.
 
 // Menu item keys:
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
@@ -368,7 +371,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
 #define kKBSPanelTitleKey					kKBSStringPrefix	"kKBSPanelTitleKey"
-// Panel entry under the Plug-Ins menu (Plug-Ins > KohakuNekotarou > KohakuBookSearch), like KESCL/KESCM:
+// Panel entry under the Plug-Ins menu, like KESCL/KESCM. The parts are KEYS; on the running menu
+// tree they read Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (measured 2026-08-06):
 #define kKBSPanelPluginsMenuPath			kSDKDefPlugInsStandardMenuPath kKBSCompanyKey kSDKDefDelimitMenuPath kKBSPanelTitleKey
 #define kKBSPanelPluginsMenuPosition		101.0
 #define kKBSStaticTextKey kKBSStringPrefix	"kKBSStaticTextKey"

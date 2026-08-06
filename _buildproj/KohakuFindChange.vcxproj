@@ -244,6 +244,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSPanelMetrics.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSRunGuard.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\KBSHowTo.cpp"/>
@@ -284,6 +285,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSReplaceConfirmDialog.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSGlyphView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelIcon.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSPanelMetrics.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSOversetScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSRunGuard.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\KBSHowTo.h"/>
