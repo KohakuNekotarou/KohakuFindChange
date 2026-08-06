@@ -32,8 +32,14 @@
 namespace
 {
 	// The outport of the LAST placed parcel in the thread that 'pos' composes into: its frame UID
-	// and its bottom-right corner (horizontal text) in pasteboard coordinates. Returns false when
-	// the thread has no placed parcel at all (every parcel reports kInvalidUID = overset).
+	// and its outport corner in pasteboard coordinates. Returns false when the thread has no placed
+	// parcel at all (every parcel reports kInvalidUID = overset).
+	//
+	// VERTICAL TEXT NEEDS NO SPECIAL CASE (measured 2026-08-06, on the Japanese build, through
+	// KESCM's copy of this code): the corner is taken in the PARCEL's own coordinates, and
+	// GetParcelToFrameMatrix carries the writing direction, so the transformed point lands where
+	// InDesign actually draws the "+" - bottom LEFT for vertical text. Do not add a branch on
+	// writing direction here.
 	bool LocateInThread(ITextModel* textModel, IDataBase* db, TextIndex pos, UID& outFrame, PBPMPoint& outPb)
 	{
 		InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
@@ -57,7 +63,7 @@ namespace
 			const PMMatrix toFrame      = pl->GetParcelToFrameMatrix(k);		// parcel -> text-frame inner
 			const PMMatrix toPasteboard = ::InnerToPasteboardMatrix(frameGeo);	// frame inner -> pasteboard
 
-			PMPoint corner(parcelBounds.Right(), parcelBounds.Bottom());		// outport corner (horizontal text)
+			PMPoint corner(parcelBounds.Right(), parcelBounds.Bottom());		// outport corner, in parcel coordinates
 			toFrame.Transform(&corner);
 			toPasteboard.Transform(&corner);
 
