@@ -157,7 +157,15 @@ struct PendingChapter
 	// straight back, because it is holding its .indd locked for no reason at all.
 	bool	tookReplacement;
 
-	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false) {}
+	// This chapter's checked, not-yet-replaced hits, counted ONCE where the run is sized and read
+	// from here after that (how far this chapter's slice moves the bar). The number cannot change
+	// in between: the panel's actions are greyed out for the whole run, the bar is modal, and a
+	// chapter's own hits are only marked replaced as IT runs. Until 2026-08-07 every reading
+	// counted the chapter's rows over again.
+	int32	checkedCount;
+
+	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false),
+		checkedCount(0) {}
 };
 
 // How many checked, not-yet-replaced hits does this chapter hold? Zero means the chapter is not
@@ -279,7 +287,11 @@ struct RunTotals
 //                ordinary end of walk (kNotFound / kFoundCompleted).
 //   progressBar  - the run's bar, sized in HITS. This chapter moves it from progressBase to
 //                  progressBase + (its own checked hits) as it consumes them. nil is allowed.
-int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
+//   scopeOptions - the search's five scope switches, read ONCE for the whole run by the caller
+//                  and handed to every chapter alike - the same shape CollectHitsInDoc takes
+//                  them in, and the same necessity: this walk has to visit exactly what the
+//                  search's walk visited or the walk orders stop lining up.
+int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked, bool& outWalkFailed,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
@@ -364,8 +376,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 	if (walker->IsWalking())
 		walker->Halt();
 
-	WalkerScopeOptions scopeOptions;
-	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
 	{
@@ -491,16 +501,16 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 		if (story.GetUID() == lastReplStory && start >= lastReplStart && start < lastReplEnd)
 			continue;
 
-		const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
-		const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
-
 		// An unselected hit is only counted past. Its stored text range is deliberately NOT
 		// refreshed: ReplaceChecked ends by turning the panel into a report of the run
 		// (KeepCheckedRows), which keeps the rows it was ASKED about and drops the ones the user
 		// had unchecked - so a row left alone here is on its way out of the list anyway, and a pass
-		// that replaced nothing has not moved anything to begin with.
+		// that replaced nothing has not moved anything to begin with. Its row is not even looked
+		// up - only a checked hit needs one.
 		if (targets.find(walkIndex) != targets.end())
 		{
+			const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
+			const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
 			// May this text be rewritten at all? The Find/Change dialog can be told to SEARCH
 			// locked layers and locked stories, but InDesign gives no way to CHANGE what it finds
 			// there, so neither does KBS. The match had to be walked to keep the walk order lined
@@ -569,23 +579,20 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 				// (The shift this replacement causes was accumulated here, into posDelta, for the
 				// same-occurrence test to cancel out. Nothing reads it since that test went.)
 
-				if (hitIdx >= 0)
-				{
-					// The STORY AND RANGE the command reports, and nothing else. Both come from the
-					// command, so both are exact - no guessing at the change string's length, which
-					// GREP back-references would make impossible anyway - but the line around them is
-					// not read until the chapter is finished. See the pass below the walk for why it
-					// cannot be read here.
-					//
-					// The story is handed over as well since 2026-08-05. It is normally the one the
-					// row already named, and had to be while the same-occurrence test stood in front
-					// of this line; with that test gone, a walk landing this hit in a DIFFERENT story
-					// is possible, and a row holding one story with the other's range would have its
-					// line and its hash read out of unrelated text (see MarkHitReplaced).
-					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStory.GetUID(),
-						replacedStart, replacedEnd);
-					replacedRows.push_back(hitIdx);
-				}
+				// The STORY AND RANGE the command reports, and nothing else. Both come from the
+				// command, so both are exact - no guessing at the change string's length, which
+				// GREP back-references would make impossible anyway - but the line around them is
+				// not read until the chapter is finished. See the pass below the walk for why it
+				// cannot be read here.
+				//
+				// The story is handed over as well since 2026-08-05. It is normally the one the
+				// row already named, and had to be while the same-occurrence test stood in front
+				// of this line; with that test gone, a walk landing this hit in a DIFFERENT story
+				// is possible, and a row holding one story with the other's range would have its
+				// line and its hash read out of unrelated text (see MarkHitReplaced).
+				KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStory.GetUID(),
+					replacedStart, replacedEnd);
+				replacedRows.push_back(hitIdx);
 			}
 			else
 			{
@@ -594,8 +601,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 				// this counter the hit just vanishes: the row came up, nothing was written, and the
 				// replaced total silently comes up short with nothing to explain it.
 				++outRefused;
-				if (hitIdx >= 0)
-					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
+				KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
 			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
@@ -1113,6 +1119,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// far is recorded without running.
 	KBSResultModel::SetChangeText(KBSSearchEngine::DescribeCurrentChange());
 
+	// The five scope switches, read ONCE for the whole run and handed to every chapter's walk -
+	// the same single reading the search takes above its own chapter loop, and for the same two
+	// reasons: the answer cannot differ between chapters (nothing can touch the dialog while the
+	// run's modal bar is up), and this walk HAS to run with exactly the switches the search ran
+	// with or the walk orders stop lining up. Read once per chapter here until 2026-08-07.
+	WalkerScopeOptions scopeOptions;
+	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
+
 	// The whole account of this run - every counter the summary reads, in one structure. It used to
 	// be seventeen locals here.
 	//
@@ -1130,30 +1144,32 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// What the user gets in exchange is that Cancel is absolute: one sequence around everything, so
 	// stopping the run puts the whole book back.
 
-	// Chapters that took a replacement, and so want a window afterwards. Collected rather than
-	// opened on the spot - see the comment on the loop that consumes this, below.
-	std::vector<UIDRef> touched;
-
-	// FIRST PASS, deliberately OUTSIDE the command sequence: turn every chapter that has work into
-	// a live document, reopening the ones the user has closed since the search.
-	//
-	// Reopening is a document OPEN, and an open processed BETWEEN two chapters' replacements is
-	// exactly what was measured on 2026-07-28 to throw away the undo history of the chapters
-	// already done - that is why ShowChapterWindow was moved out to the far end of this function.
-	// The reopen belongs on the same side of the fence for the same reason. Doing it here also
-	// means a chapter that cannot be opened at all is counted before anything has been written,
-	// instead of interrupting a run that is already half committed.
 	// How much work the run has to get through - what the bar is sized with. Counted BEFORE anything
 	// is opened, because the bar has to be up while the chapters are being opened: that is the slow
 	// part when the user has closed the windows the search was holding.
 	//
 	// HITS, not chapters. A chapter is a coarse unit: one chapter of 5000 hits and one of 3 both
 	// counted as a single step, so the bar stood still through the long one. Hits are the work.
-	// (A chapter count was taken alongside this until 2026-08-02 and never read - the bar is sized
-	// in hits, and the chapters that hold them are counted again as they are resolved, below.)
+	//
+	// The run's chapter list is born HERE as well: a chapter with nothing checked is not in it -
+	// not opened, not walked, not a step of the bar - and every chapter that is in it carries its
+	// count with it (PendingChapter::checkedCount, which is also where the reasons the number
+	// stays right are). Until 2026-08-07 that count was taken up to three times per chapter -
+	// here, at the door of the resolve pass below, and again as each chapter's turn came - three
+	// passes over the same rows for an answer that cannot change while the run stands.
+	std::vector<PendingChapter> pending;
 	int32 totalCheckedHits = 0;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
-		totalCheckedHits += CountCheckedInChapter(ci);
+	{
+		const int32 checkedHere = CountCheckedInChapter(ci);
+		if (checkedHere <= 0)
+			continue;		// nothing selected here - do not even open this chapter
+		PendingChapter chapter;
+		chapter.chapterIdx = ci;
+		chapter.checkedCount = checkedHere;
+		pending.push_back(chapter);
+		totalCheckedHits += checkedHere;
+	}
 
 	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request), matching the
 	// search. It used to be book scope only, on the reasoning that a one-document replace is a
@@ -1185,18 +1201,23 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
-	std::vector<PendingChapter> pending;
-	for (int32 ci = 0; ci < chapterCount; ++ci)
+	// FIRST PASS, deliberately OUTSIDE the command sequence: turn every chapter in the list into a
+	// live document, reopening the ones the user has closed since the search.
+	//
+	// Reopening is a document OPEN, and an open processed BETWEEN two chapters' replacements is
+	// exactly what was measured on 2026-07-28 to throw away the undo history of the chapters
+	// already done - that is why ShowChapterWindow was moved out to the far end of this function.
+	// The reopen belongs on the same side of the fence for the same reason. Doing it here also
+	// means a chapter that cannot be opened at all is counted before anything has been written,
+	// instead of interrupting a run that is already half committed.
+	//
+	// A chapter that cannot be opened STAYS in the list, unopened: it is a step the bar was sized
+	// with, and dropping it is what used to leave the bar short of its own total, stopping at
+	// 4 of 5 with nothing left to do.
+	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
-		if (CountCheckedInChapter(ci) <= 0)
-			continue;		// nothing selected here - do not even open this chapter
-
-		// Past this line the chapter is one of the chaptersWithWork the bar was sized with, so it
-		// joins the list whatever happens below. A chapter that cannot be opened is still a step
-		// the bar has to take: dropping it here is what used to leave the bar short of its own
-		// total, stopping at 4 of 5 with nothing left to do.
-		PendingChapter chapter;
-		chapter.chapterIdx = ci;
+		PendingChapter& chapter = pending[pi];
+		const int32 ci = chapter.chapterIdx;
 
 		UIDRef docRef;
 		IDFile file;
@@ -1216,8 +1237,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				totals.firstSkipped.SetTranslatable(kFalse);
 				totals.haveFirstSkipped = true;
 			}
-			pending.push_back(chapter);		// unopened - the loop below only counts it past
-			continue;
+			continue;		// unopened - the loop below only counts it past
 		}
 
 		// Resolve the chapter to a LIVE document, BY FILE.
@@ -1263,9 +1283,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 					totals.firstSkipped.SetTranslatable(kFalse);
 					totals.haveFirstSkipped = true;
 				}
-				// Moved, deleted, or in use: counted and named just above, and kept in the list
+				// Moved, deleted, or in use: counted and named just above; it stays in the list
 				// unopened so the bar still takes its step for it.
-				pending.push_back(chapter);
 				continue;
 			}
 		}
@@ -1277,7 +1296,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			IDataBase* const chapterDB = docRef.GetDataBase();
 			chapter.wasModified = (chapterDB != nil) && (chapterDB->IsModified() != kFalse);
 		}
-		pending.push_back(chapter);
 	}
 
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
@@ -1348,9 +1366,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
-		// Counted BEFORE the chapter runs: afterwards these hits are marked replaced and would count
-		// as zero, leaving the bar short of its own total.
-		const int32 chapterChecked = CountCheckedInChapter(pending[pi].chapterIdx);
+		// The count the run was sized with, carried on the chapter - see PendingChapter::
+		// checkedCount for why it is still right when this chapter's turn comes. (A recount taken
+		// after the chapter ran would find zero, its hits being marked replaced by then.)
+		const int32 chapterChecked = pending[pi].checkedCount;
 
 		PMString taskLine;
 		taskLine.SetTranslatable(kFalse);
@@ -1408,7 +1427,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, missing, locked,
+		const int32 replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
 			refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
@@ -1421,8 +1440,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		if (replaced > 0)
 			++totals.chaptersTouched;
 
-		// Did anything land here? What decides whether this chapter is kept open for the user or
-		// handed straight back at the end of the run - see HandBackChaptersWithNothingInThem.
+		// Did anything land here? What decides whether this chapter is kept open for the user -
+		// and given a window, in the loop past the sequence - or handed straight back at the end
+		// of the run (HandBackChaptersWithNothingInThem).
 		pending[pi].tookReplacement = (replaced > 0);
 		if (notWalked)
 		{
@@ -1453,13 +1473,6 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				totals.haveFirstWalkFailed = true;
 			}
 		}
-
-		// A chapter that received a replacement wants a real window, so the change is visible and
-		// can be undone - or saved - by hand. Chapters nothing landed in stay as they were:
-		// opening windows on untouched documents would only be clutter. Nothing is saved here.
-		// The window is not opened yet - see the loop after the sequence.
-		if (replaced > 0)
-			touched.push_back(docRef);
 	}
 
 	// ASK ONCE MORE, now that the loop is over.
@@ -1563,17 +1576,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// nothing left to undo it with. Opening the windows once everything is committed keeps that
 	// command clear of the replacements.
 	//
-	// Every chapter a replacement landed in gets one: the change has to be visible, because it is
-	// the user who has to save it.
+	// Every chapter a replacement landed in gets one - PendingChapter::tookReplacement is the
+	// record of which those are (a second list of the same chapters stood beside it until
+	// 2026-08-07): the change has to be visible, because it is the user who has to save it.
 	//
 	// ***** AND THE ANSWER IS READ. ***** A chapter that was written to and could not be SHOWN is
 	// the one outcome that leaves the user nothing to do - the run saves nothing, so what it wrote
 	// can only be dealt with through a window. It was discarded here until 2026-08-05, when
 	// ShowChapterWindow's answer was also made worth reading ("it already had a window" used to come
 	// back false as well, which is the ordinary case, not a failure).
-	for (size_t i = 0; i < touched.size(); ++i)
+	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
-		if (!KBSBookScope::ShowChapterWindow(touched[i]))
+		if (!pending[pi].tookReplacement)
+			continue;
+		if (!KBSBookScope::ShowChapterWindow(pending[pi].docRef))
 			++totals.chaptersNoWindow;
 	}
 
