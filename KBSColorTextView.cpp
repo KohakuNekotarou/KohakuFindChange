@@ -10,8 +10,9 @@
 //  (before / matched / after). KBSRowData is the tiny data holder aggregated on the same boss.
 //
 //  Recipe: the multi-colour cell draw proven against customdatalinkui's DVControlView -
-//  AGMGraphicsContext + StringUtils::PMDrawString / PMDrawStringRGB, the palette font from
-//  IInterfaceFonts, the baseline from IWidgetUtils::GetViewYPosition. convertAmpersand is kFalse
+//  AGMGraphicsContext + StringUtils::PMDrawString / PMDrawStringRGB, the palette SYSTEM SCRIPT
+//  font from IInterfaceFonts (the one the branch rows use, and the one the shipping panels use for
+//  document text), the baseline from IWidgetUtils::GetViewYPosition. convertAmpersand is kFalse
 //  on BOTH the draw and the measure so a literal '&' in the search text is neither underlined
 //  nor dropped. Selected rows are drawn in the theme's selected-text colours, which a hand-drawn
 //  cell has to ask for itself (a stock StaticText gets all four colours from its .fr and lets the
@@ -40,7 +41,7 @@
 #include "WidgetDefs.h"			// EllipsizeStyle (kEllipsizeBeginning / kEllipsizeEnd)
 #include "ISession.h"			// GetExecutionContextSession
 #include "IWidgetUtils.h"		// GetViewYPosition
-#include "ShuksanID.h"			// kPaletteWindowFontId
+#include "ShuksanID.h"			// kPaletteWindowSystemScriptFontId
 #include "Utils.h"
 
 // Project includes:
@@ -169,11 +170,21 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	KBSResultModel::MarkUpBreaksForDisplay(match);
 	KBSResultModel::MarkUpBreaksForDisplay(post);
 
-	// The palette window's font (same one KESCL's report panel measures with).
+	// The palette window's SYSTEM SCRIPT font - the same one every OTHER row of this tree already
+	// draws in: KBS.fr's chapter label declares kPaletteWindowSystemScriptFontId for both its
+	// normal and its hilite font (KBS.fr:1205), and the branch rows are stock static texts that
+	// take it from there. This cell asked for kPaletteWindowFontId until 2026-08-07, which left one
+	// row of one tree wanting a different font from the rows above it.
+	//
+	// It is also what the shipping panels reach for whenever a widget has to show text that came
+	// out of a DOCUMENT, or that a user typed: the layer panel stamps it on the layer-name cell
+	// (LayerPanelTreeViewWidgetMgr.cpp:128) and the spell panel's misspelled-word box asks for the
+	// dialog-window counterpart (SpellDialogViews_enUS.fr:95). A hit row is exactly that case - it
+	// draws the document's own text, in whatever script the document happens to be written in.
 	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
 	if (fonts == nil)
 		return;
-	const InterfaceFontInfo& fontInfo = fonts->GetFont(kPaletteWindowFontId);
+	const InterfaceFontInfo& fontInfo = fonts->GetFont(kPaletteWindowSystemScriptFontId);
 
 	const PMRect frame = this->GetInnerContentFrame();
 	const PMReal y = Utils<IWidgetUtils>()->GetViewYPosition(&gc, fontInfo, frame.Height());

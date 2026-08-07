@@ -36,13 +36,21 @@ namespace
 // language reads only its own line, 54 is fine here (18x3) even though it would be four and
 // a half Roman lines - no Roman UI ever gets it.
 //
-// FOUR lines (user's call, 2026-08-06), which is the same budget the Roman block has always
-// had. It was briefly three - the panel was going to be kept wide enough that three sufficed -
-// but the floor below ended up at 260, where the opening message needs four. The block and the
-// floor are a pair: the width decides how many lines a message takes, and this decides how many
-// there is room to draw. Narrow the floor without widening this and the last line is clipped.
+// The two languages get DIFFERENT line budgets, and that is the point of having two numbers:
+// four Roman lines and THREE Japanese ones (user's call, 2026-08-07) come to nearly the same
+// block - 48px against 54px - so the panel looks the same in both while neither clips.
+//
+// Why three is enough at the floor: the opening message DRAWS 535px wide on a Japanese UI and
+// the box at the floor is 193px (see below), so it takes 2.8 lines. Four was carried from
+// 2026-08-06, when the floor was 260 and the arithmetic was measured against a different width;
+// the third line has been the last one with ink on it ever since the floor moved to 242.
+//
+// The block and the floor are a pair: the width decides how many lines a message takes, and this
+// decides how many there is room to draw. Narrow the floor without raising this and the last
+// line is clipped.
 const int32 kMessageHeightRoman = 48;	// 12px x 4 lines
-const int32 kMessageHeightCJK   = 72;	// 18px x 4 lines  (= 12px x 6 on a Roman UI)
+const int32 kMessageHeightCJK   = 54;	// 18px x 3 lines  (= four and a half Roman lines, which
+										// no Roman UI ever gets - see the note above)
 
 // The gap between the message block and the tree, as the .fr has always had it.
 const int32 kGapUnderMessageBlock = 3;
@@ -54,34 +62,36 @@ const int32 kGapUnderMessageBlock = 3;
 //
 //     box 301 (panel 350) -> 2 lines      <- pointlessly wide
 //     box 251 (panel 300) -> 3 lines      <- what the panel opens at
-//     box 216 (panel 265) -> 4 lines      <- where the clipping was reported when the block
-//                                            still held three; this is what the block is sized for
-//     box 193 (panel 242) -> the floor    <- user's call, 2026-08-07
+//     box 217 (panel 266) -> 3 lines      <- ***** the floor *****, and MEASURED there: the
+//                                            opening message drew three 18px lines in the 54px
+//                                            block with nothing clipped (2026-08-07, Japanese UI)
+//     box 216 (panel 265) -> 4 lines      <- where the clipping was reported back when the
+//                                            Japanese block was 48px (2 2/3 lines)
 //
-// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** Raised 224 -> 242 on
-// 2026-08-07 ("make the minimum width about the size it is now"), measured off the running panel.
+// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** 224 -> 242 -> 266, each
+// time on the same instruction ("make the minimum width the size it is now") and each time
+// measured off the running panel rather than reasoned about. 266 is 2026-08-07.
 //
 // 224 was KESCM's fixed width (KESCM.fr:1105), put here so the two would line up when docked
 // together. That is GIVEN UP, deliberately: a floor is there to stop the panel being dragged down
 // to where it cannot be read, and the width it is read at is this one. Lining up with a sibling
 // was a second job asked of the same number, and the two wanted different answers.
 //
-// ! 535 / 193 = 2.8, so the opening message needs three lines at the floor and the block holds
-//   four - but that is arithmetic, NOT a measurement: the widths above were measured and this
-//   one was not. If a message ever takes five lines down here, the fifth is clipped.
-//   The floor is how small the panel MAY be made; it is not a promise about every message.
+// ! The floor and the block are now measured AT THE SAME WIDTH: the opening message takes three
+//   18px lines in a 54px block at box 217, with nothing clipped. That is one message, though, not
+//   a promise about every message - a longer one takes a fourth line and the fourth is clipped.
+//   The floor is how small the panel MAY be made.
 //
 // Same floor in both languages: a Roman UI draws the same message in 12px lines, so it simply
 // has room to spare rather than a layout of its own.
 //
-// ! It is the WIDTH that decides the line count, and the block above holds four lines in either
-//   language (see kMessageHeightRoman / kMessageHeightCJK). The two numbers are a pair - neither
-//   is meaningful without the other. (This read "only holds three lines" until 2026-08-07, left
-//   over from before the block was sized to four.)
+// ! It is the WIDTH that decides the line count, and the block above holds four Roman lines or
+//   three Japanese ones (see kMessageHeightRoman / kMessageHeightCJK). The two numbers are a pair
+//   with this one - neither is meaningful without the other.
 //
 // Height: stated against the Roman block so that a taller block simply moves it. The floor is
 // there to keep about five 19px result rows visible, which has nothing to do with language.
-const int32 kMinimumWidth       = 242;	// the width the panel is worked at (measured 2026-08-07)
+const int32 kMinimumWidth       = 266;	// the width the panel is worked at (measured 2026-08-07)
 const int32 kMinimumHeightRoman = 160;
 
 /** Does this UI language draw the palette font tall? Measured for Japanese (18px vs 12px).

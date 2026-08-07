@@ -43,9 +43,10 @@ namespace KBSPanelMetrics
 	    adding 24px each time would walk the tree off the bottom of the panel. */
 	void Update();
 
-	/** The message block's height in pixels: a whole number of lines in BOTH UI languages.
-	    72 = 18x4 (Japanese) = 12x6 (English); 48 = 12x4. A remainder would leave room for a
-	    part-line, which is drawn as a sliver of chopped-off letters. */
+	/** The message block's height in pixels: a whole number of lines IN THE LANGUAGE IT IS USED
+	    FOR. 54 = 18x3 (Japanese); 48 = 12x4 (English). A remainder would leave room for a
+	    part-line, which is drawn as a sliver of chopped-off letters - and each language only
+	    ever reads its own number, so 54 not dividing by 12 costs nothing. */
 	int32 MessageBlockHeight();
 
 	/** The floor under a drag. The width is what the panel measures at its usual size

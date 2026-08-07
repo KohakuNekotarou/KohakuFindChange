@@ -19,9 +19,10 @@
 //  scan. A Find/Change chapter has no groups and its hits hang off it directly, which is the tree
 //  KBS has always drawn.
 //
-//  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget (the framework
-//  indent is unused, as in KESCL). This file also hosts KBSResultTree::Rebuild (the tree lives
-//  here). Ported from KESCL's KESCLResultListWidgetMgr, simplified to two levels - itself
+//  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget, applied on top of
+//  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
+//  file also hosts KBSResultTree::Rebuild (the tree lives here). Ported from KESCL's
+//  KESCLResultListWidgetMgr, simplified to two levels - itself
 //  modelled on the paneltreeview sample's PnlTrvTVWidgetMgr.
 //
 //========================================================================================
@@ -208,8 +209,9 @@ public:
 		// It is not only the selection highlight. With the V2 option flags set it also runs
 		// ApplyIndentToWidget, which REWRITES the frame.Left of this row's child widgets
 		// (CTreeViewWidgetMgr.cpp:207-221 and :234-252), plus HideExpanderIfNotExpandable and
-		// ApplyDataToWidget. This panel switches the framework indent off and positions every row's
-		// content itself, so our frames have to be applied ON TOP of whatever the base class did.
+		// ApplyDataToWidget. Those all run - the framework indent is NOT switched off here, it is
+		// simply overwritten: this panel positions every row's content itself, so our frames have to
+		// be applied ON TOP of whatever the base class just did.
 		//
 		// The shipping panels (LayerPanelTreeViewWidgetMgr, LinksUIPanelTreeViewWidgetMgr) call it
 		// last, and that was copied here on 2026-07-31 - it silently undid this file's indent and
@@ -236,9 +238,17 @@ public:
 
 	virtual PMReal GetIndentForNode(const NodeID& node) const
 	{
-		// PER-LEVEL indent (the base sums these up the ancestor chain). Unused in practice (the
-		// framework indent is off, as in KESCL); the Apply*Row methods draw the hierarchy with
-		// explicit offsets. Kept consistent in case a framework path ever consults it.
+		// PER-LEVEL indent. The base class sums these up the ancestor chain (GetIndent) and
+		// ApplyIndentToWidget moves this row's children by the total.
+		//
+		// That DOES run here - the kHierarchical constructor sets the V2 option flag, so the base's
+		// ApplyNodeIDToWidget calls it on every row (CTreeViewWidgetMgr.cpp:212-218) - and it
+		// rewrites the frame.Left of every child bound on BOTH sides, which is the hit row's colour
+		// cell and the chapter row's label. What makes the framework indent invisible in this panel
+		// is NOT that it is switched off: it is that the Apply*Row methods run AFTER it and set
+		// every frame themselves. That is the whole reason the base call has to stay FIRST (see
+		// ApplyNodeIDToWidget). These values are kept in step with what those methods draw, so the
+		// two can never pull a row in different directions.
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
