@@ -261,39 +261,41 @@ namespace KBSSearchEngine
 	    @note Two of the five ("include locked layers" / "include locked stories") are FIND-only in
 	          InDesign - the header states there is no option to change in locked content. They stay
 	          in the shared scope so both walks visit the same matches in the same order, and the
-	          replace refuses the locked ones one at a time instead (see IsMatchEditable). */
+	          replace refuses the locked ones one at a time instead (see EditableFrameForMatch). */
 	void GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions);
 
-	/** May the text at this position be REWRITTEN? The Find/Change dialog can be told to search
-	    locked layers and locked stories, but InDesign offers no way to change what it finds there
-	    ("Search Only"), so the replace has to make the same distinction itself: those matches are
-	    listed and can be jumped to, and are then left untouched.
+	/** May the text a hit describes be REWRITTEN? ONE question, asked in TWO steps - the frame the
+	    match sits in, then the locks on it - because the second half is the expensive one and a
+	    chapter's hits usually share a handful of frames. A pass asking about many hits resolves the
+	    frame per hit and the locks ONCE PER FRAME; no lock can change while a replace pass is
+	    running.
 
-	    Two locks are asked about, which is the pair the dialog names:
+	    Why it has to be asked at all: the Find/Change dialog can be told to search locked layers
+	    and locked stories, but InDesign offers no way to CHANGE what it finds there ("Search
+	    Only"), so the replace has to make the same distinction itself. Those matches are listed and
+	    can be jumped to, and are then left untouched.
+
+	    EditableFrameForMatch - the frame the match composes into, or, for an overset match
+	    (composed but placed nowhere), the frame carrying the "+" indicator. kInvalidUID when
+	    neither can be resolved, which IsFrameEditable then reads as editable.
+
+	    IsFrameEditable - are the story and that frame both unlocked? The locks asked about are the
+	    ones the dialog names:
 	      - the STORY's insert lock (IItemLockData on the text story, which also answers for an
-	        inline by way of its parent), and
-	      - the LAYER the match's frame sits on.
+	        inline by way of its parent),
+	      - the page ITEM's own lock flags, asked of the frame and of its outermost parent, and
+	      - the LAYER the frame sits on.
 
-	    @return false ONLY when one of those two locks is positively found. Anything that cannot be
+	    @return false ONLY when one of those locks is positively found. Anything that cannot be
 	            resolved - a story without the lock interface, an overset match placed in no frame,
 	            an item on no layer - reads as editable, because that is what it was before this
-	            test existed and a "cannot tell" must not start refusing ordinary replacements. */
-	bool IsMatchEditable(const UIDRef& storyRef, TextIndex pos);
+	            test existed and a "cannot tell" must not start refusing ordinary replacements.
 
-	/** The frame that decides whether the match at 'pos' may be edited: the frame it composes into,
-	    or - for an overset match, composed but placed nowhere - the frame carrying the "+"
-	    indicator. kInvalidUID when neither can be resolved, which IsFrameEditable then reads as
-	    editable (see IsMatchEditable's @return).
-
-	    This and IsFrameEditable are IsMatchEditable taken apart, so a pass asking about many hits
-	    can ask the expensive half ONCE PER FRAME instead of once per hit: a chapter's hits usually
-	    share a handful of frames, and no lock can change while a replace pass is running. Callers
-	    with a single hit to ask about should keep using IsMatchEditable. */
+	    (A single-call IsMatchEditable(storyRef, pos) stood in front of this pair for callers with
+	    one hit to ask about. It turned out to have none - the replace pass and the jump both want
+	    the frame in hand for their own reasons, so both called the pair - and it was removed on
+	    2026-08-08.) */
 	UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos);
-
-	/** Are the story and that frame both unlocked? The expensive half: it climbs the page-item
-	    hierarchy and asks four separate locks, which is why it is worth remembering per frame.
-	    @see IsMatchEditable for what the answer means, and what "cannot tell" resolves to. */
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
 	/** The whole of a match, boiled down to one 64-bit number.

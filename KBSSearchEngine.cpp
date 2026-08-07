@@ -93,7 +93,10 @@
 #include "WideString.h"
 
 #include <vector>
-#include <string>					// the leading-separator test in DescribeFormatSetting
+#include <utility>					// std::move - a finished chapter is handed to the model, not copied
+// (<string> stood here for the leading-separator test in DescribeFormatSetting, which used to run
+// the whole description through GetUTF8String to look at three characters. It takes the three
+// characters now - 2026-08-08 - and nothing else in this file wants a std::string.)
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <stdio.h>					// snprintf - the U+ formatting in DescribeGlyphQuery
@@ -807,8 +810,8 @@ bool IsFrameHidden(IDataBase* db, UID frameUID)
 
 // Is this frame on a LOCKED layer? Same two-step as the hidden test above (spread layer -> the
 // document layer that carries the switch), asked so the replace can leave such a match alone.
-// A frame that resolves to no layer reads as unlocked - see IsMatchEditable on why "cannot tell"
-// must not turn into a refusal.
+// A frame that resolves to no layer reads as unlocked - see IsFrameEditable in the header on why
+// "cannot tell" must not turn into a refusal.
 bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 {
 	if (db == nil || frameUID == kInvalidUID)
@@ -978,6 +981,211 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 	return cache.insert(std::make_pair(key, facts)).first->second;
 }
 
+//------------------------------------------------------------------------------------
+// WHAT A HIT NEEDS READ OUT OF THE STORY'S TEXT - the three drawn segments, and the hash of the
+// whole match. Every hit wants both, one straight after the other, so they are taken TOGETHER:
+// one ITextModel / IComposeScanner pair for the pair of them, and the matched characters copied
+// ONCE. They used to open the story separately and copy the same range twice over (2026-08-08).
+//
+// The public wrappers further down do the same work for a caller holding a single range - the
+// replace pass rebuilding one row, the jump checking one - and go through the same two helpers,
+// so what the search stored and what those two read can never be computed differently.
+//------------------------------------------------------------------------------------
+
+// The most characters a match segment carries, and the ONE place that limit is applied.
+//
+// A format-only search matches every unbroken run of text carrying the format, which can be dozens
+// of paragraphs. Copying all of it per hit and holding it for the life of the result set would cost
+// far more than the single line a row can ever draw, so it is capped. The cap is far past what any
+// cell shows, so what is dropped was never going to be read - and the row still shows that the
+// match continues, because the break marks are inside what IS kept.
+//
+// !! DISPLAY ONLY since 2026-08-04. The cap used to bind the same-occurrence test as well:
+// SplitLineAroundMatch and a CopyMatchText beside it had to cut in the SAME place, or a match cut
+// differently on the two sides read as "the text moved since the search ran" and every replace was
+// refused with 'missing'. That test now compares the match WHOLE, through a hash taken with no cap
+// at all (HashMatchText), so nothing but the drawn row passes through here - and a row that is
+// clipped for drawing can no longer cost a replace.
+const int32 kKBSMaxMatchChars = 500;
+
+TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
+{
+	if (end < start)
+		return start;
+	if (end - start > kKBSMaxMatchChars)
+		return start + kKBSMaxMatchChars;
+	return end;
+}
+
+// FNV-1a, 64-bit. Taken over the UTF-32 value of each character, byte by byte, so a character's
+// high bits count as much as its low ones.
+//
+// 64-bit, not 32: a collision here means "the text changed and we replaced it anyway", which is the
+// one direction this plug-in must not fail in.
+const uint64 kKBSHashOffsetBasis = 14695981039346656037ULL;
+const uint64 kKBSHashPrime = 1099511628211ULL;
+
+void HashAccumulate(uint64& ioHash, const WideString& text, int32 count)
+{
+	for (int32 i = 0; i < count; ++i)
+	{
+		const uint32 ch = static_cast<uint32>(text.GetChar(i).GetValue());
+		for (int32 b = 0; b < 4; ++b)
+		{
+			ioHash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
+			ioHash *= kKBSHashPrime;
+		}
+	}
+}
+
+// ...over text somebody has ALREADY read. The caller has to have the whole match in hand - a
+// partial read hashes to a number that means nothing (see HashRangeWithScanner's short-read test).
+uint64 HashOfWideString(const WideString& text)
+{
+	uint64 hash = kKBSHashOffsetBasis;
+	HashAccumulate(hash, text, text.CharCount());
+	// 0 is the "could not read" answer, so a real hash must never be 0.
+	return (hash != 0) ? hash : 1;
+}
+
+// The line around [start, end) in its three drawn segments - see the contract on
+// KBSSearchEngine::SplitLineAroundMatch, which this implements.
+//
+// outMatchWide hands the matched characters back as they were read, so a caller that also wants
+// them hashed does not have to copy them out of the story a second time. It is the CAPPED match:
+// equal to (end - start) characters only when the match fitted inside kKBSMaxMatchChars, which is
+// exactly the test a caller has to make before hashing it.
+//
+// A nil scanner is allowed and answers like an unreadable position: all three segments empty.
+void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex end,
+	PMString& outPre, PMString& outMatch, PMString& outPost, WideString& outMatchWide)
+{
+	outPre.Clear();		outPre.SetTranslatable(kFalse);
+	outMatch.Clear();	outMatch.SetTranslatable(kFalse);
+	outPost.Clear();	outPost.SetTranslatable(kFalse);
+	outMatchWide.Clear();
+
+	if (scanner == nil)
+		return;
+
+	// The leading context comes from the paragraph the match STARTS in; excludeEOS (default) trims
+	// the paragraph terminator.
+	int32 paraLen = 0;
+	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
+	if (paraStart < 0 || paraLen <= 0)
+		return;
+
+	// *The match itself is taken WHOLE, not cut at the end of that paragraph (2026-08-04).
+	// A single match can run over any number of paragraphs - a format-only search matches every
+	// unbroken run of text carrying the format, and a GREP can be written to cross a break on
+	// purpose. Cutting it here made the row show ONE paragraph of what a replace would rewrite in
+	// full, so a user who ticked that row lost text that was never on screen (measured: two
+	// paragraphs and the break between them replaced by one word, joining what was left to the
+	// paragraph below). The breaks inside the match are drawn as marks by the cell - see
+	// KBSColorTextView, which turns CR into a pilcrow and a forced line break into a return arrow.
+	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
+
+	if (start > paraStart)
+	{
+		WideString w;
+		scanner->CopyText(paraStart, static_cast<int32>(start - paraStart), &w);
+		outPre = PMString(w);
+		outPre.SetTranslatable(kFalse);
+	}
+	if (matchEnd > start)
+	{
+		// Read into the caller's buffer, so the hash can be taken from these very characters.
+		scanner->CopyText(start, static_cast<int32>(matchEnd - start), &outMatchWide);
+		outMatch = PMString(outMatchWide);
+		outMatch.SetTranslatable(kFalse);
+	}
+
+	// The trailing context comes from the paragraph the match ENDS in, which is a DIFFERENT
+	// paragraph from the one it started in once the match spans a break. Probed at matchEnd - 1 so
+	// a match ending exactly on a paragraph terminator answers with the paragraph it ended, not the
+	// one after it.
+	//
+	// !ONLY when the match was not capped (2026-08-04). Past the cap, what follows matchEnd is more
+	// of the MATCH - and this segment is drawn in the normal colour, so writing it here would show
+	// the rest of the match as though it were text lying outside it. Nothing is lost by leaving it
+	// out: a capped match is 500 characters, already far wider than the cell, so the row ellipsizes
+	// inside the match itself and the reader can see that it continues.
+	if (matchEnd != end)
+		return;
+
+	int32 endParaLen = 0;
+	const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
+	const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);
+	if (endParaStart >= 0 && endParaLen > 0)
+	{
+		const TextIndex endParaEnd = endParaStart + endParaLen;
+		if (endParaEnd > matchEnd)
+		{
+			WideString p;
+			scanner->CopyText(matchEnd, static_cast<int32>(endParaEnd - matchEnd), &p);
+			outPost = PMString(p);
+			outPost.SetTranslatable(kFalse);
+		}
+	}
+}
+
+// The whole of [start, end) as one number - see the contract on KBSSearchEngine::HashMatchText,
+// which this implements. A nil scanner answers 0, like any other text that could not be read.
+uint64 HashRangeWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex end)
+{
+	if (scanner == nil || end <= start)
+		return 0;
+
+	// ***** NO CAP HERE, and that is the whole point. ***** The drawn segment stops at
+	// kKBSMaxMatchChars because what it produces is held for the life of the result set; this holds
+	// nothing but the 64 bits below, so the match is read in full however long it is.
+	//
+	// Read in blocks rather than in one call: a single CopyText of an enormous match would build
+	// one WideString that size, and nothing here needs the whole match in memory at once.
+	const int32 kBlock = 4096;
+	uint64 hash = kKBSHashOffsetBasis;
+	for (TextIndex at = start; at < end; at += kBlock)
+	{
+		const int32 want = (end - at > kBlock) ? kBlock : static_cast<int32>(end - at);
+		WideString block;
+		scanner->CopyText(at, want, &block);
+
+		// A short read means the story ended before the range did - the text is not what the range
+		// says it is, so refuse to vouch for it rather than hashing a fragment.
+		if (block.CharCount() < want)
+			return 0;
+
+		HashAccumulate(hash, block, want);
+	}
+
+	// 0 is the "could not read" answer, so a real hash must never be 0.
+	return (hash != 0) ? hash : 1;
+}
+
+// Both text reads for one hit, through one scanner.
+//
+// The hash is taken from the characters the split just read whenever those ARE the whole match,
+// which is every match up to the 500-character display cap - so the ordinary hit copies its text
+// out of the story exactly once. A longer match falls back on reading itself in blocks: the drawn
+// segment stopped at the cap, and the hash is the one that must cover every character.
+//
+// A story with no text model leaves the hit as it came: three empty segments and a hash of 0,
+// which is what every caller already reads as "this position could not be read".
+void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResultModel::Hit& outHit)
+{
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+
+	WideString matchWide;
+	SplitLineWithScanner(scanner, start, end, outHit.preText, outHit.matchText, outHit.postText,
+		matchWide);
+
+	const TextIndex matchLength = end - start;
+	outHit.matchHash = (matchLength > 0 && matchWide.CharCount() == matchLength)
+		? HashOfWideString(matchWide)
+		: HashRangeWithScanner(scanner, start, end);
+}
+
 // Fill a hit from one match (story, [start, end)): its jump anchors, and the containing
 // paragraph's text split into (before / matched / after) at the exact UTF-16 offsets.
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
@@ -1031,16 +1239,15 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	if (outHit.isLocked)
 		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 
-	// The whole match as one number, for the same-occurrence test the JUMP runs. (The replace ran it
-	// too until 2026-08-05 - see KBSReplaceEngine.h.) Taken here, beside the three drawn segments,
-	// because both describe THIS match as the search found it - but this one is NOT capped, and it
-	// is the one that is compared. See HashMatchText.
-	outHit.matchHash = KBSSearchEngine::HashMatchText(storyRef, start, end);
-
-	// The line's three drawn segments. Shared with the replace pass, which rebuilds a replaced
-	// row exactly the same way from the range the replace command hands back.
-	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, end,
-		outHit.preText, outHit.matchText, outHit.postText);
+	// The line's three drawn segments, and the whole match as one number for the same-occurrence
+	// test the JUMP runs. (The replace ran that test too until 2026-08-05 - see KBSReplaceEngine.h.)
+	// Both describe THIS match as the search found it, and both come out of one reading of the
+	// story - see ReadHitText. The segments are capped for drawing; the hash never is, because it
+	// is the one that gets compared.
+	//
+	// The same two helpers serve the replace pass, which rebuilds a replaced row exactly this way
+	// from the range the replace command hands back.
+	ReadHitText(storyRef, start, end, outHit);
 }
 
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
@@ -1048,12 +1255,18 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
 // the user's Find/Change settings verbatim, so the search mode (Text or GREP) is followed.
 //
+// scopeOptions: the five switches every chapter of this run is walked with, read once by the caller
+// (see SearchBook). They are the same for every chapter by definition - the replace pass re-walks
+// with exactly these, or the walk order the hits were numbered by no longer lines up - so reading
+// them here would have been the Find/Change settings asked once per chapter for one answer.
+//
 // progressBar / progressBase: the run's bar and the point on it where this chapter starts.
 // chapterSpan / storiesInDoc: how much of the bar this chapter owns, and how many stories to divide
 // that slice between - asked by the caller once the chapter is open, since a chapter's size is not
 // knowable before then. The walk moves the bar as it goes: a story at a time, each one subdivided
 // by how far into its text the current match sits. nil is allowed for the bar.
-void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits,
+void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
+	std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
 	int32& ioProgressReported)
@@ -1110,10 +1323,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		walker->Halt();
 
 	// The single shared scope definition - the replace pass re-walks each chapter with exactly
-	// these options, or the walk order the hits were numbered by would no longer line up.
-	WalkerScopeOptions scopeOptions;
-	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
-
+	// these options, or the walk order the hits were numbered by would no longer line up. Handed in
+	// by the caller, which reads them once for the whole run.
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
 	{
@@ -1287,12 +1498,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			break;
 		}
 
-		KBSResultModel::Hit hit;
+		// ***** BUILT WHERE IT IS GOING TO LIVE. ***** A Hit carries six PMStrings, so filling a
+		// local one and copying it in here cost six heap allocations per match that nothing asked
+		// for (2026-08-08). emplace_back hands back the new element itself (C++17), and BuildHit
+		// never touches this vector, so the reference cannot be invalidated under it.
+		KBSResultModel::Hit& hit = outHits.emplace_back();
 		BuildHit(docRef, story, start, end, frameFacts, hit);
 		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
 		// into page order. The replace pass re-walks the chapter and matches on this number.
-		hit.walkOrder = static_cast<int32>(outHits.size());
-		outHits.push_back(hit);
+		hit.walkOrder = static_cast<int32>(outHits.size()) - 1;
 	}
 
 	if (walker->IsWalking())
@@ -1681,13 +1895,18 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
 	// language the description itself came back in, and a description that does NOT start with it is
 	// left exactly as it came.
 	//
-	// Asked of the UTF-8 form rather than the platform one: PMString.h:863-866 says outright to
-	// "check to make sure the code really wants a platform encoded string - if instead it wants utf8
-	// you can call GetUTF8String", and nothing here wants the platform encoding. The platform form is
-	// for strings on their way OUT to the OS, and running a whole settings description through that
-	// conversion to look at three ASCII characters is a conversion nobody asked for.
-	const std::string leading(out.GetUTF8String());
-	if (leading.compare(0, 3, " + ") == 0)
+	// ***** THREE CHARACTERS ARE TAKEN, NOT THE WHOLE LINE CONVERTED. ***** Append's second argument
+	// is a character count (PMString.h:300-304), so the test copies the three it is about to look
+	// at. This asked for out.GetUTF8String() until 2026-08-08 - a conversion of an entire settings
+	// description, however long, to read its first three ASCII characters. (It asked
+	// GetPlatformString for them until 2026-08-07, which PMString.h:863-866 names as the call to
+	// avoid when UTF-8 will do; neither encoding was ever wanted here.)
+	PMString leading;
+	leading.SetTranslatable(kFalse);
+	leading.Append(out, 3);
+	PMString separator(" + ");
+	separator.SetTranslatable(kFalse);
+	if (leading.Compare(kTrue /*casesensitive*/, separator) == 0)
 		out.Remove(0, 3);
 
 	out.SetTranslatable(kFalse);
@@ -1862,7 +2081,7 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	// Only. They are still taken here, and still handed to the REPLACE walk, because both walks
 	// have to visit the same matches in the same order or the walk order the hits were numbered by
 	// stops lining up. The distinction is made where it belongs instead: the replace asks
-	// IsMatchEditable before it writes and leaves a locked match alone.
+	// EditableFrameForMatch / IsFrameEditable before it writes and leaves a locked match alone.
 	//
 	// (Note for anyone reading this as new behaviour: WalkerScopeOptions defaults every switch to
 	// kTrue, so locked layers and locked stories were ALREADY inside both walks before this
@@ -1879,16 +2098,10 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	outOptions.SetIncludeFootnotes(opts->GetIncludeFootnotes(mode));
 }
 
-bool KBSSearchEngine::IsMatchEditable(const UIDRef& storyRef, TextIndex pos)
-{
-	// The frame that decides the layer, resolved exactly as BuildHit resolves it: the frame the
-	// match is composed into, or - for an overset match, composed but placed nowhere - the frame
-	// carrying the "+" indicator, which is the frame the hit's own locator already names. Resolving
-	// it the same way on both sides is what keeps "the row has no check box" and "the replace
-	// refuses" describing the same set of hits.
-	return IsEditableInFrame(storyRef, KBSSearchEngine::EditableFrameForMatch(storyRef, pos));
-}
-
+// The frame is resolved exactly as BuildHit resolves it: the frame the match is composed into, or -
+// for an overset match, composed but placed nowhere - the frame carrying the "+" indicator, which is
+// the frame the hit's own locator already names. Resolving it the same way on both sides is what
+// keeps "the row has no check box" and "the replace refuses" describing the same set of hits.
 UID KBSSearchEngine::EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos)
 {
 	UID frameUID = FrameUIDForPosition(storyRef, pos);
@@ -1909,104 +2122,18 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
-// The most characters a match segment carries, and the ONE place that limit is applied.
-//
-// A format-only search matches every unbroken run of text carrying the format, which can be dozens
-// of paragraphs. Copying all of it per hit and holding it for the life of the result set would cost
-// far more than the single line a row can ever draw, so it is capped. The cap is far past what any
-// cell shows, so what is dropped was never going to be read - and the row still shows that the
-// match continues, because the break marks are inside what IS kept.
-//
-// !! DISPLAY ONLY since 2026-08-04. The cap used to bind the same-occurrence test as well:
-// SplitLineAroundMatch and a CopyMatchText beside it had to cut in the SAME place, or a match cut
-// differently on the two sides read as "the text moved since the search ran" and every replace was
-// refused with 'missing'. That test now compares the match WHOLE, through a hash taken with no cap
-// at all (HashMatchText), so nothing but the drawn row passes through here - and a row that is
-// clipped for drawing can no longer cost a replace.
-static const int32 kKBSMaxMatchChars = 500;
-
-static TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
-{
-	if (end < start)
-		return start;
-	if (end - start > kKBSMaxMatchChars)
-		return start + kKBSMaxMatchChars;
-	return end;
-}
-
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
 	PMString& outPre, PMString& outMatch, PMString& outPost)
 {
-	outPre.Clear();		outPre.SetTranslatable(kFalse);
-	outMatch.Clear();	outMatch.SetTranslatable(kFalse);
-	outPost.Clear();	outPost.SetTranslatable(kFalse);
-
+	// One range, opened for this call alone - the shape a caller holding a single hit wants (the
+	// replace pass rebuilding a row, and nothing else today). The search's own hits go through
+	// ReadHitText instead, which reads the segments and the hash off ONE scanner; both end up in
+	// SplitLineWithScanner, so a stored row and a rebuilt one are split identically.
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	if (model == nil)
-		return;
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
-	if (scanner == nil)
-		return;
 
-	// The leading context comes from the paragraph the match STARTS in; excludeEOS (default) trims
-	// the paragraph terminator.
-	int32 paraLen = 0;
-	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
-	if (paraStart < 0 || paraLen <= 0)
-		return;
-
-	// *The match itself is taken WHOLE, not cut at the end of that paragraph (2026-08-04).
-	// A single match can run over any number of paragraphs - a format-only search matches every
-	// unbroken run of text carrying the format, and a GREP can be written to cross a break on
-	// purpose. Cutting it here made the row show ONE paragraph of what a replace would rewrite in
-	// full, so a user who ticked that row lost text that was never on screen (measured: two
-	// paragraphs and the break between them replaced by one word, joining what was left to the
-	// paragraph below). The breaks inside the match are drawn as marks by the cell - see
-	// KBSColorTextView, which turns CR into a pilcrow and a forced line break into a return arrow.
-	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
-
-	WideString w;
-	if (start > paraStart)
-	{
-		scanner->CopyText(paraStart, static_cast<int32>(start - paraStart), &w);
-		outPre = PMString(w);
-		outPre.SetTranslatable(kFalse);
-	}
-	if (matchEnd > start)
-	{
-		WideString m;
-		scanner->CopyText(start, static_cast<int32>(matchEnd - start), &m);
-		outMatch = PMString(m);
-		outMatch.SetTranslatable(kFalse);
-	}
-
-	// The trailing context comes from the paragraph the match ENDS in, which is a DIFFERENT
-	// paragraph from the one it started in once the match spans a break. Probed at matchEnd - 1 so
-	// a match ending exactly on a paragraph terminator answers with the paragraph it ended, not the
-	// one after it.
-	//
-	// !ONLY when the match was not capped (2026-08-04). Past the cap, what follows matchEnd is more
-	// of the MATCH - and this segment is drawn in the normal colour, so writing it here would show
-	// the rest of the match as though it were text lying outside it. Nothing is lost by leaving it
-	// out: a capped match is 500 characters, already far wider than the cell, so the row ellipsizes
-	// inside the match itself and the reader can see that it continues.
-	if (matchEnd != end)
-		return;
-
-	int32 endParaLen = 0;
-	const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
-	const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);
-	if (endParaStart >= 0 && endParaLen > 0)
-	{
-		const TextIndex endParaEnd = endParaStart + endParaLen;
-		if (endParaEnd > matchEnd)
-		{
-			WideString p;
-			scanner->CopyText(matchEnd, static_cast<int32>(endParaEnd - matchEnd), &p);
-			outPost = PMString(p);
-			outPost.SetTranslatable(kFalse);
-		}
-	}
+	WideString matchWide;		// the hash's shortcut, which this caller has no use for
+	SplitLineWithScanner(scanner, start, end, outPre, outMatch, outPost, matchWide);
 }
 
 bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
@@ -2039,50 +2166,13 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 
 uint64 KBSSearchEngine::HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end)
 {
-	if (end <= start)
-		return 0;
-
+	// One range, opened for this call alone - see SplitLineAroundMatch above on who wants that
+	// shape. The arithmetic itself is HashRangeWithScanner's, which is also what the search's own
+	// hits go through (ReadHitText), so a hash taken here and one taken at search time are the same
+	// number for the same text. That has to hold: comparing them IS the same-occurrence test.
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	if (model == nil)
-		return 0;
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
-	if (scanner == nil)
-		return 0;
-
-	// ***** NO CAP HERE, and that is the whole point. ***** CopyMatchText stops at
-	// kKBSMaxMatchChars because what it produces is held for the life of the result set; this holds
-	// nothing but the 64 bits below, so the match is read in full however long it is.
-	//
-	// Read in blocks rather than in one call: a single CopyText of an enormous match would build
-	// one WideString that size, and nothing here needs the whole match in memory at once.
-	const int32 kBlock = 4096;
-	uint64 hash = 14695981039346656037ULL;		// FNV-1a 64-bit offset basis
-	for (TextIndex at = start; at < end; at += kBlock)
-	{
-		const int32 want = (end - at > kBlock) ? kBlock : static_cast<int32>(end - at);
-		WideString block;
-		scanner->CopyText(at, want, &block);
-
-		// A short read means the story ended before the range did - the text is not what the range
-		// says it is, so refuse to vouch for it rather than hashing a fragment.
-		if (block.CharCount() < want)
-			return 0;
-
-		for (int32 i = 0; i < want; ++i)
-		{
-			// FNV-1a over the UTF-32 value, byte by byte, so a character's high bits count as much
-			// as its low ones.
-			const uint32 ch = static_cast<uint32>(block.GetChar(i).GetValue());
-			for (int32 b = 0; b < 4; ++b)
-			{
-				hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
-				hash *= 1099511628211ULL;		// FNV-1a 64-bit prime
-			}
-		}
-	}
-
-	// 0 is the "could not read" answer, so a real hash must never be 0.
-	return (hash != 0) ? hash : 1;
+	return HashRangeWithScanner(scanner, start, end);
 }
 
 int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph)
@@ -2267,6 +2357,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// ...and WHICH TAB was searched. The replace pass re-walks each chapter, and a re-walk in another
 	// mode returns another set of matches - so Change Checked compares this against the tab in force
 	// then and refuses rather than lining rows up with the wrong occurrences.
+	//
+	// Read again rather than reusing `tab` from the top of this function, and that is deliberate:
+	// `tab` was taken BEFORE CommitSearchMode, and what belongs on the results is the mode the walk
+	// is about to actually run in. The two agree today - the commit states the value it just read -
+	// but this is the one that would still be right on the day they stopped agreeing.
 	KBSResultModel::SetSearchMode(CurrentSearchModeValue());
 
 	// ...and WHAT WAS ASKED FOR, for the heading of the file "Save Results..." writes. Recorded here,
@@ -2292,6 +2387,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// of a mode commit and compared against one read on the other could differ with nothing having
 	// changed. See KBSSearchEngine::RememberFindFormat.
 	KBSSearchEngine::RememberFindFormat();
+
+	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
+	// everything above, they are the same for every chapter by definition (the replace pass has to
+	// re-walk with exactly these), and nothing can change them while the run is on: the progress bar
+	// below is modal. Read inside CollectHitsInDoc until 2026-08-08, which asked the Find/Change
+	// settings once per chapter for an answer that could not differ.
+	WalkerScopeOptions scopeOptions;
+	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
@@ -2412,8 +2515,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		std::vector<KBSResultModel::Hit> hits;
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
-		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), hits, docCapped, walkResult,
-			&progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc, progressReported);
+		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, hits, docCapped,
+			walkResult, &progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc,
+			progressReported);
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
@@ -2487,7 +2591,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// per-chapter rebuild would be work nobody sees. (Growing the tree chapter by chapter used
 		// to be how the search showed it was alive; the bar does that now, and does it for chapters
 		// that hold no hits at all - which the growing tree never could.)
-		KBSResultModel::AppendChapter(chapter);
+		//
+		// Handed over rather than copied: the model takes the hits and leaves this Chapter empty.
+		// Safe because it is a fresh one per pass of this loop and the count above was taken before
+		// the handover - and it is the point of the swap() four lines up, which used to be undone by
+		// a copy on this line (2026-08-08).
+		KBSResultModel::AppendChapter(std::move(chapter));
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each

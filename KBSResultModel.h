@@ -185,8 +185,17 @@ namespace KBSResultModel
 	    caller fills in nothing but the hits, and no result can reach the tree ungrouped.
 	    (A SetResults that swapped the whole vector in at once sat beside this until 2026-07-30, by
 	    which time nothing called it: two entry points for filling the same model, one of them also
-	    resetting the report flag, was a difference waiting to be tripped over.) */
-	void AppendChapter(const Chapter& chapter);
+	    resetting the report flag, was a difference waiting to be tripped over.)
+
+	    ***** THE CHAPTER IS TAKEN, NOT COPIED. ***** Pass it with std::move: the model takes the
+	    hits over and the caller's Chapter is left empty. Every caller builds one, hands it over and
+	    drops it, and a chapter of a large search holds thousands of Hits with six PMStrings each -
+	    which this copied until 2026-08-08.
+
+	    !! The hits have to be NEWLY BUILT ones. Their fontGroup / fontGroupPos are read as unset at
+	    their constructor's -1, and an ungrouped chapter no longer writes that value back over
+	    them. */
+	void AppendChapter(Chapter&& chapter);
 
 	/** Forget the results (an empty search, or a teardown that still wants the tree emptied). */
 	void Clear();
@@ -311,9 +320,12 @@ namespace KBSResultModel
 	    the user can retype the query between the search and the save, and the file would then name a
 	    query these rows never came from.
 
-	    Empty for a scan - neither scan has a query - and empty until the first search of a session. */
+	    Empty for a scan - neither scan has a query - and empty until the first search of a session.
+
+	    ***** RECORDED HERE, READ INSIDE THE MODEL. ***** BuildReportText writes it into the saved
+	    report's heading, and that is the whole of its use - so there is no getter. One stood here
+	    until 2026-08-08 with no callers at all. */
 	void SetQueryText(const PMString& query);
-	PMString GetQueryText();
 
 	/** What the replace was told to WRITE, as one ready-made line - the change string plus its Change
 	    Format, or the Glyph tab's replacement glyph. See KBSSearchEngine::DescribeCurrentChange.
@@ -327,17 +339,17 @@ namespace KBSResultModel
 	    2026-08-04): a "Change:" line in the report of a plain search would name something that has
 	    not happened, which reads as something that has.
 
-	    Cleared by Clear(), so it can never outlive the results it describes. */
+	    Cleared by Clear(), so it can never outlive the results it describes. Read inside the model
+	    only, like SetQueryText's line - BuildReportText is the one place that wants it. */
 	void SetChangeText(const PMString& change);
-	PMString GetChangeText();
 
 	/** EVERYTHING a walk is driven by, as one opaque comparable string: the query itself plus every
 	    Find/Change switch that decides which matches come back (see
 	    KBSSearchEngine::BuildWalkSignature for the list).
 
-	    Not the same thing as GetQueryText, and deliberately a second field rather than a richer
-	    version of it: that one is a CAPTION - it is written into the saved report's heading and has
-	    to stay readable - while this one is a KEY, compared for equality and never shown.
+	    Not the same thing as SetQueryText's line, and deliberately a second field rather than a
+	    richer version of it: that one is a CAPTION - it is written into the saved report's heading
+	    and has to stay readable - while this one is a KEY, compared for equality and never shown.
 
 	    Why the replace needs it. Change Checked RE-WALKS each chapter and lines the Nth match of that
 	    walk up with the hit whose walkOrder is N. That only holds while the walk returns the same

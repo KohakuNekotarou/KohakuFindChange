@@ -140,15 +140,17 @@ namespace
 			}
 		}
 
+		// No font level for this chapter, and nothing to write: -1 / -1 is what Hit's own constructor
+		// sets, this is the only code in the plug-in that ever writes those two fields, and the hits
+		// arriving here have just been built. Walking the whole chapter to store the values it
+		// already holds is what this did until 2026-08-08.
+		//
+		// !! That rests on the hits being NEW. A caller that ever hands over hits carried across from
+		// an earlier result set has to reset the pair itself - the alternative is this loop back, and
+		// it costs one pass over every hit of every ungrouped chapter to defend against a caller that
+		// does not exist.
 		if (!anyFont)
-		{
-			for (size_t i = 0; i < chapter.hits.size(); ++i)
-			{
-				chapter.hits[i].fontGroup = -1;
-				chapter.hits[i].fontGroupPos = -1;
-			}
 			return;
-		}
 
 		// The hits arrive in PAGE order, so walking them in order leaves the groups in
 		// first-appearance order - which is the order the panel shows them in (user's call
@@ -196,11 +198,16 @@ namespace
 	}
 }
 
-void KBSResultModel::AppendChapter(const Chapter& chapter)
+void KBSResultModel::AppendChapter(Chapter&& chapter)
 {
-	gChapters.push_back(chapter);
-	// Grouped on the way in, on the copy the model owns - the argument is const, and the groups index
-	// the hits they are built from, so they have to be built where those hits are going to live.
+	// ***** THE HITS ARE TAKEN, NOT COPIED. ***** A chapter of a large search holds thousands of
+	// Hits and each Hit holds six PMStrings, so copying the vector in here doubled the cost of
+	// filling the model for nothing: every caller builds a Chapter, hands it over and drops it.
+	// Copied until 2026-08-08 - and the search had used swap() to keep the same hits from being
+	// copied into that Chapter one line earlier, which this then undid.
+	gChapters.push_back(std::move(chapter));
+	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
+	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
 }
 
@@ -286,30 +293,19 @@ int32 KBSResultModel::GetSearchMode()
 	return gSearchMode;
 }
 
+// The two recorded lines are READ inside this file only - BuildReportText writes them into the
+// saved report's heading and nothing else asks for them. Getters for them lived here until
+// 2026-08-08 and had no callers at all.
 void KBSResultModel::SetQueryText(const PMString& query)
 {
 	gQueryText = query;
 	gQueryText.SetTranslatable(kFalse);
 }
 
-PMString KBSResultModel::GetQueryText()
-{
-	PMString query(gQueryText);
-	query.SetTranslatable(kFalse);
-	return query;
-}
-
 void KBSResultModel::SetChangeText(const PMString& change)
 {
 	gChangeText = change;
 	gChangeText.SetTranslatable(kFalse);
-}
-
-PMString KBSResultModel::GetChangeText()
-{
-	PMString change(gChangeText);
-	change.SetTranslatable(kFalse);
-	return change;
 }
 
 void KBSResultModel::SetWalkSignature(const PMString& signature)

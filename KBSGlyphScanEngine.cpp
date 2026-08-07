@@ -84,6 +84,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <utility>				// std::move - a finished chapter is handed to the model, not copied
 
 // Project includes:
 #include "KBSBookScope.h"		// the chapter list, and the windowless chapters it holds open
@@ -934,7 +935,9 @@ void KBSGlyphScanEngine::Run()
 
 		if (rows > 0)
 		{
-			KBSResultModel::AppendChapter(chapter);		// only chapters with findings go in
+			// Handed over, not copied: the model takes the rows and leaves this Chapter empty, which
+			// is safe because it is a fresh one per pass of this loop and nothing below reads it.
+			KBSResultModel::AppendChapter(std::move(chapter));	// only chapters with findings go in
 			rowTotal += rows;
 			glyphTotal += chapterGlyphs;
 		}

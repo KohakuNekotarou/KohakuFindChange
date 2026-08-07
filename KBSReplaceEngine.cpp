@@ -261,7 +261,7 @@ struct RunTotals
 //                same-occurrence test caught - see the note above the walk for where it went.)
 // outLocked    = checked hits sitting on a locked layer or in a locked story. InDesign can search
 //                those but offers no way to change them, so KBS does not either - they are left
-//                untouched and counted (see KBSSearchEngine::IsMatchEditable).
+//                untouched and counted (see KBSSearchEngine::EditableFrameForMatch).
 // outRefused   = checked hits the replace command itself would not run on. Not a decision of ours
 //                like the two above, and not a walk that lost its place like the two flags - the
 //                command was asked and said no.
