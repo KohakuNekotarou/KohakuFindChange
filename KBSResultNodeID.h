@@ -96,8 +96,16 @@ public:
 	virtual int32 Compare(const NodeIDClass* nodeID) const
 	{
 		const KBSResultNodeID* other = static_cast<const KBSResultNodeID*>(nodeID);
+		// Nothing hands this a nil - a NodeID owns its NodeIDClass and clones it on every copy
+		// (NodeID.h:135, 193) - and the two official implementations do not guard at all
+		// (paneltreeview's asserts and dereferences anyway; widgetbin's IntNodeID just
+		// dereferences). The guard stays because an assert is not a guard in a release build, but
+		// it answers "not equal" rather than the 0 it used to: 0 is the one answer that would make
+		// the tree treat an unusable node as THIS row, and equality is the last thing a missing
+		// node should be able to claim. Which side it falls on does not matter - only that it is
+		// not the same side as this.
 		if (other == nil)
-			return 0;
+			return 1;
 		if (fChapter < other->fChapter)	return -1;
 		if (fChapter > other->fChapter)	return 1;
 		if (fFont < other->fFont)	return -1;

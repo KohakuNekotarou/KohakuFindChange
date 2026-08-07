@@ -97,9 +97,18 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
-		// A scan reports; it does not offer work. Asked first because it is a property of the
-		// RESULT SET, not of the row: no row of a scan carries a box, whatever that row holds.
-		if (KBSResultModel::IsReportOnlyKind())
+		// Is this a list that offers work at all? Asked first because it is a property of the RESULT
+		// SET, not of the row: when the answer is no, no row carries a box whatever that row holds.
+		//
+		// ***** THE WHOLE QUESTION, NOT HALF OF IT. ***** This asked IsReportOnlyKind alone until
+		// 2026-08-07, which left the OTHER half - a replace's aftermath - for every caller to
+		// remember on its own, and all five of them did (SetHitChecked, SetAllChecked,
+		// SetChapterChecked, GetCheckableCount, GetChapterCheckableCount). Nothing was wrong with
+		// the answers; what was wrong is that the sixth caller would have had to know. The two
+		// halves are ORed in one place - NoRowHasCheckBox - and this is that place's customer, not
+		// its rival. The callers still take their early exit, but they take it on the same
+		// question (see there).
+		if (KBSResultModel::NoRowHasCheckBox())
 			return false;
 
 		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
@@ -907,12 +916,11 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 		return;
 	Hit& h = c.hits[hitIdx];
 	// The same question the panel asks before it draws a box, asked here so the model can never hold
-	// a checked hit that no row offered. It covers the report kinds too - a scan has nothing to
-	// replace - which the per-row tests below cannot say anything about.
+	// a checked hit that no row offered. It covers the whole list as well as the row - a scan has
+	// nothing to replace, and neither has a replace's report - which the per-row flags cannot say
+	// anything about.
 	if (!RowHasCheckBox(h))
 		return;
-	if (gShowingOutcome)
-		return;		// the panel is a report right now, not a work list
 	h.checked = checked;
 }
 
@@ -934,8 +942,11 @@ bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecke
 
 void KBSResultModel::SetAllChecked(bool checked)
 {
-	if (gShowingOutcome)
-		return;		// nothing on a report is selectable
+	// Nothing on a list that offers no work is selectable. A short cut, not a second opinion: the
+	// per-row test below asks the same question, and this only saves walking every hit to be told
+	// so once per row.
+	if (NoRowHasCheckBox())
+		return;
 
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
 	{
@@ -953,8 +964,8 @@ void KBSResultModel::SetAllChecked(bool checked)
 
 void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
 {
-	if (gShowingOutcome)
-		return;		// nothing on a report is selectable
+	if (NoRowHasCheckBox())
+		return;		// the same short cut SetAllChecked takes, over one chapter
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return;
 
@@ -1019,8 +1030,8 @@ int32 KBSResultModel::GetCheckedChapterCount()
 
 int32 KBSResultModel::GetCheckableCount()
 {
-	if (gShowingOutcome)
-		return 0;	// every row has lost its box, so Check All / Uncheck All grey out
+	if (NoRowHasCheckBox())
+		return 0;	// no row of this list has a box, so Check All / Uncheck All grey out
 
 	int32 count = 0;
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
@@ -1037,8 +1048,8 @@ int32 KBSResultModel::GetCheckableCount()
 
 int32 KBSResultModel::GetChapterCheckableCount(int32 chapterIdx)
 {
-	if (gShowingOutcome)
-		return 0;	// every row has lost its box, whichever chapter the menu was popped over
+	if (NoRowHasCheckBox())
+		return 0;	// no row has a box, whichever chapter the menu was popped over
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return 0;
 
@@ -1285,12 +1296,8 @@ void KBSResultModel::ForgetRowBackup()
 	std::vector<BackedUpRow>().swap(gRowBackup);
 }
 
-void KBSResultModel::DropChapter(int32 chapterIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	gChapters.erase(gChapters.begin() + chapterIdx);
-}
+// (DropChapter - erase one chapter and leave the others - was defined here until 2026-08-07. See
+// the note where it was declared in KBSResultModel.h.)
 
 int32 KBSResultModel::KeepCheckedRows()
 {
@@ -1368,6 +1375,21 @@ int32 KBSResultModel::KeepCheckedRows()
 			}
 			runStart = runEnd;
 		}
+
+		// ***** AND THE FONT GROUPS, because the thinning renumbered the hits they point AT. *****
+		// A group holds POSITIONS in the chapter's hits vector (FontGroup::hitIndices), and every
+		// hit holds the group it is in and its place inside it - all three of which were true of
+		// the vector this pass has just replaced. Left alone, GetFontGroupHit would hand the tree
+		// positions that name a different row or none at all, and KBSResultNodeID::Create(chapter,
+		// hit) would stamp a stale group onto the node: two nodes naming one hit while carrying
+		// different fonts, which is the one thing that header says must never happen.
+		//
+		// Not reachable today - a chapter only HAS groups when its hits name a font, which only the
+		// glyph scan does, and a scan is a report whose rows carry no check box for a replace to be
+		// asked about (RowHasCheckBox), so KBSReplaceEngine turns back at its door before it can
+		// get here. It is rebuilt anyway because the rule this pass has to keep is "the model is
+		// consistent when it returns", not "nothing calls it in the one arrangement we have today".
+		BuildFontGroups(gChapters[ci]);
 	}
 
 	// ...then drop the chapters left with nothing.

@@ -739,13 +739,13 @@ namespace KBSResultModel
 	    were given. */
 	void ForgetRowBackup();
 
-	/** Remove one chapter from the results, leaving the others in place. For retiring a single
-	    chapter whose results have gone stale - the book-scope half of the result-invalidation work,
-	    where closing one chapter should drop that chapter rather than the whole result set.
-	    @note Indices after chapterIdx shift down by one - iterate backwards when dropping several.
-	    @note NOTHING CALLS THIS YET. It is here for the chapter-level invalidation that is still to
-	          be written; until that lands it is untested, so treat it as a sketch, not as API. */
-	void DropChapter(int32 chapterIdx);
+	// (DropChapter(int32) stood here - erase one chapter from the results and leave the others - as
+	// groundwork for chapter-level invalidation: closing one chapter of a book would drop that
+	// chapter rather than the whole result set. It was never called: the feature it was for has not
+	// been written, and a function nobody has run is a guess about what that feature will need,
+	// not a head start on it. Removed 2026-08-07 (git has it if the
+	// chapter-level work does land - and it would want reviewing then anyway, since dropping a
+	// chapter has to renumber the fontGroups the same way KeepCheckedRows does).
 }
 
 #endif // __KBSResultModel_h__
