@@ -112,9 +112,18 @@ bool KBSReplaceConfirmDialog::ResolveSide(Text::GlyphID glyphID, const Attribute
 	}
 	outSide.fFontLabel.SetTranslatable(kFalse);
 
-	// The Unicode is a bonus, not a requirement: an ALTERNATE form has none to give - Adobe's
-	// own note about it is in SnpInsertGlyph.cpp:291-299 - and writing U+0000 in its place
-	// would be a lie. An empty string here means "do not show that line at all".
+	// The Unicode is a bonus, not a requirement: the header says plainly that this call "May
+	// return 0" (IGlyphUtils.h:281), and writing U+0000 in its place would be a lie. An empty
+	// string here means "do not show that line at all".
+	//
+	// ***** AND THIS IS THE UPPER OF THE TWO CALLS, WHICH IS WHY AN ALTERNATE FORM DOES ANSWER.
+	// ***** GlyphToCharacter (:275) is the lower one, and Adobe's own note against IT is that an
+	// alternate form of a Unicode character does not come back (SnpInsertGlyph.cpp:291-299).
+	// GetUnicodeForGlyphID is built on that call and goes further - "Uses GlyphToCharacter to get
+	// its work done. Will also get a unicode value for glyphs in OpenType features"
+	// (IGlyphUtils.h:277-278) - which is the whole reason it is the one asked here.
+	// (Corrected 2026-08-08: the note here used to cite that BUG? comment as though it described
+	// THIS call, so it explained the empty line by the very case this API is chosen to answer.)
 	//
 	// Formatted with snprintf because PMString::AppendNumber only writes decimal, and the
 	// number has to read the way the Find/Change dialog's own ID field reads it.
@@ -482,11 +491,13 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID,
 		KBSReplaceConfirmDialog::BuildCareLine());
 
-	// The four lines under the two frames. All optional, and all for the same reason: an empty
-	// Change To box has no font to name and no Unicode to give, and an ALTERNATE form has no
-	// Unicode either (SnpInsertGlyph.cpp:291-299 records Adobe's own note about that). An empty
-	// line under one frame but not the other reads as a fault, so the line is hidden rather than
-	// blanked. Already marked untranslatable where they were built - they are data.
+	// The four lines under the two frames. All optional: an empty Change To box has no font to name
+	// and no Unicode to give, and GetUnicodeForGlyphID "May return 0" for a glyph of any kind
+	// (IGlyphUtils.h:281). ***** NOT the alternate-form case this used to name ***** - that is
+	// Adobe's note against the LOWER call, GlyphToCharacter, and answering for alternate forms is
+	// exactly what the call ResolveSide makes is chosen for (see it). An empty line under one frame
+	// but not the other reads as a fault, so the line is hidden rather than blanked. Already marked
+	// untranslatable where they were built - they are data.
 	const KBSReplaceConfirmDialog::Side& findSide = KBSReplaceConfirmDialog::GetFindSide();
 	const KBSReplaceConfirmDialog::Side& changeSide = KBSReplaceConfirmDialog::GetChangeSide();
 	this->SetOptionalLine(kKBSGlyphConfirmFindFontWidgetID, findSide.fFontLabel);

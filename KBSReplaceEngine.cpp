@@ -73,6 +73,13 @@ namespace
 //   kFoundCompleted  the walk is over AND at least one match came up along the way. Start and end
 //                    are kInvalidTextIndex, so there is nothing here to act on either.
 //   kFailure         an ERROR. The walk did not finish, it broke off.
+//   kReplaceAllCompleted
+//                    a Change All finished (IFindChangeService.h:81-84). NEVER reachable from this
+//                    function: that answer belongs to kReplaceAllTextCmdBoss, and KBS does not run
+//                    it - the official Change All takes no subset of the matches, which is the
+//                    whole reason this engine walks match by match. Listed anyway because the enum
+//                    has FIVE members (:43), and a table naming four of them reads as if it were
+//                    the whole contract. The four above are the ones this function can produce.
 //
 // ***** THE LAST ONE IS WHY THIS RETURNS A RESULT AND NOT A BOOL. ***** It used to answer true or
 // false, so a chapter whose search failed halfway looked exactly like a chapter whose matches were
@@ -168,21 +175,15 @@ struct PendingChapter
 		checkedCount(0) {}
 };
 
-// How many checked, not-yet-replaced hits does this chapter hold? Zero means the chapter is not
-// visited at all, so a replace never brings up documents it is not going to touch. The COUNT (not
-// just "any") is what sizes the progress bar: the run's real unit of work is a hit, not a chapter.
-int32 CountCheckedInChapter(int32 chapterIdx)
-{
-	int32 checkedCount = 0;
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
-	{
-		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
-			++checkedCount;
-	}
-	return checkedCount;
-}
+// ***** A CountCheckedInChapter STOOD HERE UNTIL 2026-08-08, AND THE MODEL ALREADY ANSWERED IT.
+// ***** It asked "how many of this chapter's hits are checked and not yet replaced" with its own
+// loop over GetHitCount / GetHitFlags - which is KBSResultModel::GetChapterCheckedCount, by the
+// same rule (checked && !replaced), with the same out-of-range answer, and that is the question
+// the tree's chapter row reads out as "(N/M checked)". Two spellings of one question is how they
+// come to disagree; the run asks the model now.
+//
+// The 2026-08-07 pass that cut this from three calls per chapter down to one did not notice that
+// the surviving call was still a private copy of the model's own.
 
 // Everything a run has to say about itself, in one place. It used to be seventeen locals in
 // ReplaceChecked; they were gathered up when a second way through that function arrived on
@@ -563,9 +564,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 				continue;
 			}
 
-			// The replace command answers with two values and no more (IFindChangeService.h:58-59:
-			// kSuccess with the range it wrote, or kFailure), so unlike the find above there is
-			// nothing here to tell apart - anything that is not kSuccess is the command declining.
+			// TWO answers and no more on this side, unlike the find above. The service's own
+			// ReplaceText states that contract outright (IFindChangeService.h:57-65: kSuccess with
+			// the range it wrote, or kFailure), and the command was measured to behave the same way
+			// (see the file header). So there is nothing here to tell apart - anything that is not
+			// kSuccess is the command declining.
 			UIDRef replacedStory;
 			TextIndex replacedStart = kInvalidTextIndex, replacedEnd = kInvalidTextIndex;
 			if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, replacedStory, replacedStart, replacedEnd)
@@ -757,9 +760,9 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// is simply untrue here. So the chapter is named, right where the reader is still looking at the
 	// number it is explaining.
 	//
-	// It took a distinction to see this at all: the walker commands answer with four different
-	// values (IFindChangeService.h:46-49) and KBS used to read every one of them that was not
-	// kSuccess as "nothing here". Adobe's own loop keeps them apart - SnpFindAndReplace.cpp:796
+	// It took a distinction to see this at all: the walker commands answer with a whole enum
+	// (IFindChangeService.h:43 - five members, of which the four in RunWalkerCmd's table can arrive
+	// here) and KBS used to read every one of them that was not kSuccess as "nothing here". Adobe's own loop keeps them apart - SnpFindAndReplace.cpp:796
 	// returns the result untouched and :644-648 turns kFailure, and only kFailure, into a failure.
 	if (t.chaptersWalkFailed > 0)
 	{
@@ -1157,11 +1160,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// stays right are). Until 2026-08-07 that count was taken up to three times per chapter -
 	// here, at the door of the resolve pass below, and again as each chapter's turn came - three
 	// passes over the same rows for an answer that cannot change while the run stands.
+	//
+	// ...and it is the MODEL that counts, since 2026-08-08. The one reading left was still a
+	// private loop of this file's own; GetChapterCheckedCount is the same question asked where the
+	// tree's chapter row asks it. See the note where that loop used to live.
 	std::vector<PendingChapter> pending;
 	int32 totalCheckedHits = 0;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
-		const int32 checkedHere = CountCheckedInChapter(ci);
+		const int32 checkedHere = KBSResultModel::GetChapterCheckedCount(ci);
 		if (checkedHere <= 0)
 			continue;		// nothing selected here - do not even open this chapter
 		PendingChapter chapter;

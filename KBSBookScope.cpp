@@ -382,8 +382,11 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 
 	// ***** Unsaved work in it? Then it is not ours to close. ***** Asked BEFORE it comes off the
 	// list, so it stays held and a later call can hand it back once it has been saved. Reached when
-	// a chapter this plug-in opened has been written to and not saved - a replace run without "save
-	// after replace", or the user typing in a chapter a jump opened for them. See HasUnsavedChanges.
+	// a chapter this plug-in opened has been written to and not saved - which since 2026-08-08 is
+	// known to mean ONE thing: a replace landed in it and its window would not open. "The user
+	// typing in a chapter a jump opened for them", named here until then, cannot get this far: the
+	// window test just above drops it, and a jump takes its chapter off the held list anyway
+	// (ForgetHeldDoc). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges.
 	if (HasUnsavedChanges(docRef))
 		return false;
 

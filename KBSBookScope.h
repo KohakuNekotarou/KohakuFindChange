@@ -181,12 +181,24 @@ namespace KBSBookScope
 	    ***** A chapter holding UNSAVED CHANGES IS KEPT, not closed. ***** These closes are
 	    UI-suppressed, and IDocFileHandler::Close only offers to save "if uiFlags allow"
 	    (IDocFileHandler.h:97-101) - so closing a modified chapter throws that modification away
-	    without a word. It is reachable in ordinary use: a jump opens a chapter and gives it a
-	    window, the user replaces in it (a replace never saves) or simply types in it, and the next
-	    run would hand it back with the work still in it. A kept chapter stays ON
-	    the held list, so a later call closes it once it has been saved. This is the distinction
-	    CloseDisplayedDocsIfClean has always made - it skips a dirty document for exactly this
-	    reason - now made here as well.
+	    without a word. A kept chapter stays ON the held list, so a later call closes it once it has
+	    been saved. This is the distinction CloseDisplayedDocsIfClean has always made - it skips a
+	    dirty document for exactly this reason - now made here as well.
+
+	    ***** WHOSE unsaved work this door protects, corrected 2026-08-08. ***** It used to say the
+	    test was "reachable in ordinary use: a jump opens a chapter and gives it a window, the user
+	    replaces in it or simply types in it". THAT CASE CANNOT REACH THIS TEST. A chapter that
+	    gains a window stops being held at that moment (ForgetHeldDoc - both ShowChapterWindow and
+	    KBSJump call it), and even where one slips through, the DocHasAnyWindow test above drops it
+	    first. Nobody can type into a document with no window. A SCRIPT can open one windowless and
+	    modify it, but such a document was not opened by us and is never held - ReopenChapterDoc
+	    rebinds to an already-open document without holding it, whoever opened it and however.
+
+	    What does reach here is windowless AND dirty AND held, and only this plug-in can produce
+	    that combination: a chapter a REPLACE wrote to whose window would not open (the run reports
+	    it as chaptersNoWindow). So the work being protected is the user's REPLACEMENTS, not their
+	    typing. Same conclusion - do not close it - for a different reason, and worth keeping
+	    straight: the wrong reason makes this test look reachable far more often than it is.
 
 	    A chapter whose close cannot go through at all (no file handler, or CanClose refuses) is
 	    kept the same way (2026-08-08): dropping it - which is what happened before, the list having
