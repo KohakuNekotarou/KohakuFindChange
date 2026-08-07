@@ -679,8 +679,13 @@ void KBSOversetScanEngine::Run()
 	// afterwards wipes the record the run has just made. The book watcher then has no book to ask
 	// about, and closing that book leaves its results sitting on the panel. Measured 2026-08-02, with
 	// these two lines below the scope block: the scan worked, and closing the book did nothing at all.
+	//
+	// ForgetSearchedFindFormat with them: a scan's rows are not a Find/Change query, so nothing here
+	// will ever put a format back - which is exactly why the memory of the LAST search must not be
+	// left standing over them (the rule has no exceptions; see KBSSearchEngine.h).
 	KBSResultModel::Clear();
 	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
+	KBSSearchEngine::ForgetSearchedFindFormat();
 
 	if (fromBook)
 	{
@@ -883,6 +888,7 @@ void KBSOversetScanEngine::Run()
 		// give the chapters back. The closes are scheduled, so it is safe from in here.
 		KBSResultModel::Clear();
 		KBSBookScope::ReleaseSearchedBook();	// closes the chapters AND forgets the book
+		KBSSearchEngine::ForgetSearchedFindFormat();	// ...and the format, as every Clear() does
 		KBSResultTree::Rebuild();
 		summary.Append("Scan cancelled.");
 		KBSResultTree::ShowStatus(summary);

@@ -111,6 +111,7 @@
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
 #include "KBSRunGuard.h"		// never retire results out from under ANY run of ours
+#include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
 
 namespace
 {
@@ -176,7 +177,10 @@ void RetireBookResultsIfGone()
 	if (!showingThatBooksResults)
 		return;
 
+	// ForgetSearchedFindFormat alongside, as every Clear() has one: the format the replace's door
+	// compares against belongs to the rows going away here.
 	KBSResultModel::Clear();
+	KBSSearchEngine::ForgetSearchedFindFormat();
 	KBSResultTree::Rebuild();
 
 	// A panel that empties itself without a word reads as a crash.

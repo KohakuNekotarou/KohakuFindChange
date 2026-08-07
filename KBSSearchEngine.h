@@ -267,6 +267,18 @@ namespace KBSSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
+	/** Drop what RememberFindFormat kept. PAIR THIS WITH EVERY KBSResultModel::Clear(), exactly as
+	    KBSBookScope::ReleaseSearchedBook is paired with one - the remembered format describes the
+	    rows that are being thrown away, so it has no business outliving them.
+
+	    The rule is worth having no exceptions to even where a particular call has nothing to do
+	    (a scan's results are not a Find/Change query, and the search's own commit point overwrites
+	    the memory a moment later anyway): that is the same reasoning KBSCloseDocResponder gives for
+	    calling ReleaseSearchedBook on a document-scope result set. Until 2026-08-08 this was kept in
+	    step by hand at two of the EIGHT places that clear the model, and the comment in the .cpp
+	    said there were only those two. */
+	void ForgetSearchedFindFormat();
+
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
 	    with exactly the options the search that produced the hits used, or the walk order those

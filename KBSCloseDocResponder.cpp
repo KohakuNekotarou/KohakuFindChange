@@ -47,6 +47,7 @@
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
+#include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -124,8 +125,12 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// behind it, so this call finds nothing to do every time it runs. It is here so that "every
 	// KBSResultModel::Clear() is paired with one" stays a rule with no exceptions to remember -
 	// the next person to add a Clear() elsewhere should not have to work out whether theirs counts.
+	//
+	// ...and the Find Format those rows were searched with, by the same rule and for the same
+	// reason (2026-08-08: it was the one piece of result-set state that had been left out of it).
 	KBSResultModel::Clear();
 	KBSBookScope::ReleaseSearchedBook();
+	KBSSearchEngine::ForgetSearchedFindFormat();
 	KBSResultTree::Rebuild();
 
 	PMString cleared("Results cleared - the document was closed.");

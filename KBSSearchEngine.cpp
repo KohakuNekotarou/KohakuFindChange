@@ -174,7 +174,12 @@ enum ChapterWalkResult
 	kChapterWalkFailed
 };
 
-/** A short reason to put in the status line. Not translatable - it names internals. */
+/** A short reason to put in the status line. Not translatable - it names internals.
+    Answers only for the endings that mean "this chapter was never walked at all". The other two
+    have sentences of their own and are turned away by the caller before they reach here:
+    kChapterWalked has nothing to report, and kChapterWalkFailed gets AppendSearchErrorNote's
+    wording because its hits ARE in the list. Both come back empty, which the caller reads as
+    "add no reason" rather than writing a name with a dangling colon after it. */
 const char* ChapterWalkResultText(ChapterWalkResult result)
 {
 	switch (result)
@@ -264,8 +269,15 @@ bool gSearching = false;
 // WHY IT LIVES HERE AND NOT ON KBSResultModel, beside the walk signature it belongs with: that
 // header states its own rule - the search mode is "held as a plain int so this header needs no text
 // includes" - and an AttributeBossList member would drag the text headers into every file that
-// includes the model. The lifetime is kept in step by hand instead, at the two points on this path
-// that call KBSResultModel::Clear(): the search's commit point, and the cancelled exit.
+// includes the model. The lifetime is kept in step by hand instead: every caller of
+// KBSResultModel::Clear() calls KBSSearchEngine::ForgetSearchedFindFormat() beside it, which is
+// the rule KBSBookScope::ReleaseSearchedBook already follows and for the same reason.
+//
+// This comment said the model was cleared at "the two points on this path" until 2026-08-08. There
+// are EIGHT, in six files - the two scans clear it at their own commit points and cancelled exits,
+// the replace clears it when the query has changed under the results, and both the close-document
+// responder and the book watch clear it when what the rows describe goes away - and the six of them
+// left the memory standing over a result set it had nothing to do with.
 boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 
 // The attribute database that list's UIDs are in. Kept beside it because a UID means nothing
@@ -365,7 +377,14 @@ static bool HasFormatSet(IFindChangeOptions* opts, IFindChangeOptions::SearchMod
 	if (opts == nil)
 		return false;
 
+	// The database is the first argument of every call below, so it is tested before being handed
+	// over - the same order DescribeGlyphQuery and RememberFindFormat use since 2026-08-08. With no
+	// attribute database there is nothing to answer from, and "cannot tell" is false here: this
+	// question captions a search and gates a sentence in the replace prompt, and both of those are
+	// better left unsaid than said wrongly.
 	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil)
+		return false;
 
 	// allowCreation = kFalse on the change side: the default is kTrue and would CREATE what it hands
 	// back. This is a read, and a prompt must not write to the user's settings.
@@ -509,7 +528,14 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts, bool findSide)
 	description.Append("Glyph ");
 	description.AppendNumber(static_cast<int32>(glyphID));
 
+	// ***** ASKED BEFORE IT IS HANDED OVER. ***** Every attribute call below takes this database as
+	// its first argument, so a nil one has to be turned away here rather than passed in and judged
+	// afterwards - which is what this did until 2026-08-08, and what three sibling readers of the
+	// format pane in this file did with it.
 	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil)
+		return description;
+
 	// Each side keeps its own font: the glyph being replaced is in the font it was found in, and the
 	// one written in its place is in whatever font the Change To box was set from. kFalse on the
 	// change side because KBS never writes to the user's Find/Change settings, and the default of
@@ -517,7 +543,7 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts, bool findSide)
 	const AttributeBossList* const attrs = findSide
 		? opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch)
 		: opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch, kFalse);
-	if (db == nil || attrs == nil)
+	if (attrs == nil)
 		return description;
 
 	InterfacePtr<const ITextAttrUID> familyAttr(static_cast<const ITextAttrUID*>(
@@ -1215,7 +1241,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 
 	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
 	// that follows from the frame comes out of the cache.
-	UID matchFrameUID = FrameUIDForPosition(storyRef, start);
+	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
 	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, frameFacts);
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
@@ -1235,7 +1261,11 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, frameFacts);
 			if (oversetFacts.hasPage)
 			{
-				matchFrameUID = loc.frameUID;	// kept in step; the FACTS below are what every field is read from
+				// The FACTS are the whole of what the rest of this function reads - the page, the
+				// hidden flag, the lock - so switching this pointer is the entire handover. (The
+				// overset frame's UID was also assigned to matchFrameUID here until 2026-08-08,
+				// where nothing ever read it again: a value kept "in step" for no reader is one
+				// more thing to keep right.)
 				facts = &oversetFacts;
 			}
 		}
@@ -1421,12 +1451,30 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 	while (true)
 	{
+		// ***** A COMMAND THAT COULD NOT BE BUILT IS A FAILED WALK, NOT A FINISHED ONE. *****
+		// These two exits left outResult at kChapterWalked until 2026-08-08, so a chapter whose find
+		// command could not be created reported itself as searched to the end - the same statement
+		// about the user's DOCUMENT that the four walker answers below were flattened into until the
+		// day before. Adobe's loop takes the other view: SnpFindAndReplace.cpp:752-765 leaves its
+		// result at the kFailure it was initialised to and breaks out. So does the replace engine's
+		// RunWalkerCmd (KBSReplaceEngine.cpp:94-99), which had the answer right on both of them while
+		// this side did not - it is the same loop, written twice.
+		//
+		// kChapterWalkFailed rather than a "never started" reason, because either is possible here:
+		// this is inside the loop, so the walk may already have collected matches. That is exactly
+		// what the failed-walk sentence says - the hits are real, the rest was never looked at.
 		InterfacePtr<ICommand> findCmd(CmdUtils::CreateCommand(kFindTextCmdBoss));
 		if (findCmd == nil)
+		{
+			outResult = kChapterWalkFailed;
 			break;
+		}
 		InterfacePtr<IFindChangeCmdData> cmdData(findCmd, UseDefaultIID());
 		if (cmdData == nil)
+		{
+			outResult = kChapterWalkFailed;
 			break;
+		}
 		cmdData->SetTextWalker(walker);
 
 		// ***** WHAT THE COMMAND ANSWERED, not merely whether it landed on something. *****
@@ -1838,10 +1886,15 @@ void KBSSearchEngine::RememberFindFormat()
 	if (opts == nil)
 		return;
 
+	// The database first, and on its own: it is the argument the call below takes, so it is tested
+	// before it is handed over rather than afterwards (see DescribeGlyphQuery).
 	IDataBase* const db = opts->GetUIDAttrDB();
-	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, opts->GetSearchMode());
-	if (db == nil || attrs == nil)
+	if (db == nil)
 		return;			// nothing to remember - FindFormatHasChanged then says "cannot tell"
+
+	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, opts->GetSearchMode());
+	if (attrs == nil)
+		return;
 
 	// A SHALLOW copy: the attributes' reference counts go up and the list itself is ours
 	// (AttributeBossList.h:153-157). Held in a boost::shared_ptr, which is how the SDK's own callers
@@ -1874,6 +1927,13 @@ bool KBSSearchEngine::FindFormatHasChanged()
 	return gSearchedFindAttrs->IsEqual(db, attrs) == kFalse;
 }
 
+void KBSSearchEngine::ForgetSearchedFindFormat()
+{
+	// The public door onto the file-static pair - see the header for the rule it exists to make
+	// keepable, and ForgetFindFormat above for why the list and its database go together.
+	ForgetFindFormat();
+}
+
 PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
 {
 	PMString out;
@@ -1886,7 +1946,13 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
 		return out;
 
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+
+	// Tested before it is handed over, like every other reader of the format pane in this file
+	// (2026-08-08). Empty is the honest answer with no database: the caller's contract already says
+	// that empty means "say nothing extra", never "nothing is set".
 	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil)
+		return out;
 
 	const AttributeBossList* const attrs = findSide
 		? opts->GetFindAttributeBossList(db, mode)
@@ -2360,6 +2426,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// whatever happens next.
 	KBSResultModel::Clear();
 	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
+	// ...and the format the CLEARED rows were found with. RememberFindFormat overwrites it a few
+	// lines below, so this line changes nothing on this path - it is here so that "every Clear()
+	// forgets the format" is a rule with no exceptions to remember, the way ReleaseSearchedBook is.
+	ForgetFindFormat();
 
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
@@ -2619,9 +2689,16 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 			// chapter is indistinguishable from a chapter with no matches otherwise - which is
 			// exactly what made this class of failure hard to see.
 			PMString entry(targets[i].shortName);
-			entry.Append(": ");
+			// The colon belongs to the reason, so an ending with no name of its own leaves the
+			// chapter standing on its own rather than "chapter.indd: " with nothing after it.
+			// See ChapterWalkResultText, which answers empty for the two endings this branch
+			// does not handle.
 			PMString why(ChapterWalkResultText(walkResult));
-			entry.Append(why);
+			if (!why.IsEmpty())
+			{
+				entry.Append(": ");
+				entry.Append(why);
+			}
 			entry.SetTranslatable(kFalse);
 			unsearchable.push_back(entry);
 			continue;

@@ -977,8 +977,13 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 		{
 			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
 			// nothing here touches the panel.
+			//
+			// The remembered format goes with them, and here it matters more than anywhere: what was
+			// just compared against it is gone, so leaving it standing would have the NEXT question
+			// about a changed query answered from a search whose rows no longer exist.
 			KBSResultModel::Clear();
 			KBSBookScope::ReleaseSearchedBook();
+			KBSSearchEngine::ForgetSearchedFindFormat();
 			outSummary.Append("The Find/Change query has changed since this search ran, so these results no longer describe it - they have been cleared. Search again.");
 			return true;
 		}
