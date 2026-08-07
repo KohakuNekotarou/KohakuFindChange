@@ -311,11 +311,31 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
-		if (walkOrder < 0)
-			continue;
-		rowByWalkOrder[walkOrder] = i;
 		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked && !replaced)
+		const bool haveFlags = KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked);
+		if (walkOrder < 0)
+		{
+			// A checked row with NO walk order cannot be lined up with any match of the re-walk, so
+			// the walk below can never reach it - and it must not vanish from the count either: the
+			// rule this file is built on is that every checked hit that is not replaced is named in
+			// the summary. Counted as missing, which to the user is what it is: asked for, not done.
+			//
+			// ***** UNREACHABLE AS THE MODEL IS FILLED TODAY, AND KEPT ANYWAY. ***** The search
+			// stamps every hit with its walk order (KBSSearchEngine, before the page-order sort),
+			// and a scan's rows carry no check box at all - so no checked row without a walk order
+			// exists yet. This is a door against the two coming to be built differently, the same
+			// door the walk below keeps for a walk order with no row behind it (hitIdx < 0). Without
+			// it such a row was on the bar - the run is sized with GetChapterCheckedCount, which
+			// asks nothing about walk orders - and in no counter at all.
+			if (haveFlags && checked && !replaced)
+			{
+				++outMissing;
+				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
+			}
+			continue;
+		}
+		rowByWalkOrder[walkOrder] = i;
+		if (haveFlags && checked && !replaced)
 			targets.insert(walkOrder);
 	}
 	if (targets.empty())
