@@ -11,7 +11,13 @@
 //  before changing any of it.
 //
 //  *The steps:
-//    1. find the window with cls == "OWL.Palette" whose title is this panel's, in our own process
+//    1. ask the SDK for this panel's OWL.Palette window -
+//       IPanelMgr::GetPanelFromWidgetID -> GetPaletteRefContainingPanel -> PaletteRef::GetOWLControl
+//       *Brought over from KESCM on 2026-08-07 (user's call). What stood here was an EnumWindows
+//        walk that matched the window's TITLE against this plug-in's display name. It worked, but
+//        it identified a window by a string that is a UI label - KBS renames its own tab to carry
+//        the scope, which is why the test had to be a PREFIX rather than an equality - and a
+//        WidgetID is a number that no rename or translation can move.
 //    2. GetAncestor(GA_ROOT) for the top-level window it is on RIGHT NOW
 //    3. if that is "indesign" (the main frame) the panel is docked and expanded -> do nothing
 //    4. if it is "OWL.Dock" (floating) or "OWL.FrameDrawer" (pulled out of an icon as a drawer),
@@ -42,7 +48,7 @@
 
 // Project includes:
 #include "KBSPanelAlpha.h"		// kKBSPanelAlphaValue and the chase constants
-#include "KBSID.h"				// kKBSDisplayName (the window title to look for) + our IIDs / ImplIDs
+#include "KBSID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
 
 // For the observer that follows the panel being shown, hidden, docked or floated:
 #include "CObserver.h"
@@ -58,8 +64,13 @@
 #include "IWindowList.h"		// the application's list of windows (IID_IWINDOWLIST on kAppBoss)
 #include "IWindow.h"			// GetSysWindow - the platform window behind an IWindow
 #include "IDialog.h"			// GetDialogPanel - what says WHICH dialog this window is
-#include "IControlView.h"		// GetWidgetID on that panel
+#include "IControlView.h"		// GetWidgetID on that panel; also what GetPanelFromWidgetID hands back
 #include "FindChangeID.h"		// kFindChangeParentWidgetID - the panel the Find/Change dialog answers with
+
+// *For OUR OWN panel's window. PaletteRef carries the HWND: PaletteRef.h:47 says an OWLControlRef
+//  IS an HWND, and :188 is the getter. So a WidgetID is enough to reach the window, and neither a
+//  title match nor a walk of every window is needed.
+#include "PaletteRef.h"			// PaletteRef::GetOWLControl (= the HWND)
 
 // The window is rebuilt AFTER the notification arrives, so the alpha is written again once the
 // events have gone round:
@@ -218,111 +229,6 @@ void KBSSetFindChangeTranslucent(bool16 on)
 
 #ifdef WINDOWS
 
-// *The window title to look for. Built from kKBSDisplayName, which is THE definition of the panel's
-//   name - both string tables put it under kKBSPanelTitleKey - so this is locale independent.
-//   *If the panel's name in the .fr is ever changed without this following it, the feature stops
-//   working silently.
-#define KBS_WIDEN_(x)	L ## x
-#define KBS_WIDEN(x)	KBS_WIDEN_(x)
-static const wchar_t* const kKBSPaletteWindowTitle = KBS_WIDEN(kKBSDisplayName);
-
-// **The ONE difference from KESCM's copy of this file: the title is matched as a PREFIX, not for
-//   equality. KESCM's tab reads its display name and nothing else; KBS renames its own tab to carry
-//   the scope - "Kohaku Find/Change - Book" / " - Document" (KBSPanelTitle::Update) - so an equality
-//   test would match only while the tab happened to be back at its plain name.
-//   Both forms start with kKBSDisplayName, so a prefix test catches the panel whether or not the
-//   window title follows the tab label. Nothing else in this process is an OWL.Palette whose title
-//   starts with this plug-in's display name.
-static bool KBSTitleMatches(const wchar_t* title, const wchar_t* wanted)
-{
-	return ::wcsncmp(title, wanted, ::wcslen(wanted)) == 0;
-}
-
-// Passed through EnumWindows / EnumChildWindows.
-struct KBSFindPaletteCtx
-{
-	const wchar_t*	fTitle;
-	DWORD			fPid;
-	HWND			fFound;
-};
-
-static bool KBSWindowMatches(HWND h, KBSFindPaletteCtx* ctx)
-{
-	wchar_t cls[64] = { 0 };
-	if (::GetClassNameW(h, cls, 64) == 0)
-		return false;
-	if (::wcscmp(cls, L"OWL.Palette") != 0)
-		return false;
-
-	wchar_t title[256] = { 0 };
-	::GetWindowTextW(h, title, 256);
-	return KBSTitleMatches(title, ctx->fTitle);
-}
-
-static BOOL CALLBACK KBSEnumChildProc(HWND h, LPARAM lp)
-{
-	KBSFindPaletteCtx* ctx = reinterpret_cast<KBSFindPaletteCtx*>(lp);
-	if (KBSWindowMatches(h, ctx))
-	{
-		ctx->fFound = h;
-		return FALSE;		// found it - stop
-	}
-	return TRUE;
-}
-
-static BOOL CALLBACK KBSEnumTopProc(HWND h, LPARAM lp)
-{
-	KBSFindPaletteCtx* ctx = reinterpret_cast<KBSFindPaletteCtx*>(lp);
-
-	DWORD pid = 0;
-	::GetWindowThreadProcessId(h, &pid);
-	if (pid != ctx->fPid)
-		return TRUE;		// other processes' windows are not ours to look at
-
-	if (KBSWindowMatches(h, ctx))
-	{
-		ctx->fFound = h;
-		return FALSE;
-	}
-	::EnumChildWindows(h, KBSEnumChildProc, lp);
-	return (ctx->fFound == nullptr) ? TRUE : FALSE;
-}
-
-// Find the OWL.Palette HWND by the panel's name. nullptr when it is not there.
-static HWND KBSFindPaletteWindow(const wchar_t* title)
-{
-	KBSFindPaletteCtx ctx;
-	ctx.fTitle = title;
-	ctx.fPid   = ::GetCurrentProcessId();
-	ctx.fFound = nullptr;
-
-	::EnumWindows(KBSEnumTopProc, reinterpret_cast<LPARAM>(&ctx));
-	return ctx.fFound;
-}
-
-// *Remember the OWL.Palette that was found. Closing and re-opening the panel does not change its
-//   HWND (what changes is the parent OWL.Dock), so the cache holds.
-//   Why it is here: kPaletteVisibilityChangedMessage, which is subscribed to below, fires several
-//   times over merely opening one document (measured 2026-07-29). Walking every window with
-//   EnumWindows each time would be waste.
-static HWND sPaletteWnd = nullptr;
-
-// The panel window, cache first. *The OS reuses handles, so a live handle is not enough - the class
-//   name and the title are checked too before it is used (still far cheaper than walking every window).
-static HWND KBSQueryPaletteWindow()
-{
-	KBSFindPaletteCtx ctx;
-	ctx.fTitle = kKBSPaletteWindowTitle;
-	ctx.fPid   = ::GetCurrentProcessId();
-	ctx.fFound = nullptr;
-
-	if (sPaletteWnd != nullptr && ::IsWindow(sPaletteWnd) && KBSWindowMatches(sPaletteWnd, &ctx))
-		return sPaletteWnd;
-
-	sPaletteWnd = KBSFindPaletteWindow(kKBSPaletteWindowTitle);
-	return sPaletteWnd;
-}
-
 // Is this window's class the one expected?
 static bool KBSClassIs(HWND h, const wchar_t* wanted)
 {
@@ -332,6 +238,77 @@ static bool KBSClassIs(HWND h, const wchar_t* wanted)
 	if (::GetClassNameW(h, cls, 64) == 0)
 		return false;
 	return ::wcscmp(cls, wanted) == 0;
+}
+
+// ***THIS PANEL'S OWL.Palette WINDOW, ASKED OF THE SDK.*** KESCM's route, brought over 2026-08-07.
+//
+//   IPanelMgr::GetPanelFromWidgetID(WidgetID)      ... a number - no rename or translation moves it
+//     -> IPanelMgr::GetPaletteRefContainingPanel() ... the PaletteRef carrying that panel
+//        -> PaletteRef::GetOWLControl()            ... PaletteRef.h:47 (an OWLControlRef IS an HWND), :188
+//
+// *WHAT COMES BACK IS A CONTRACT, not an observation: IPanelMgr.h:197-201 says of
+//   GetPaletteRefContainingPanel that "For regular tabbed palettes, this should return an object of
+//   type kTabPanelContainerType" - the OWL.Palette level. So the class of the returned window is not
+//   checked here. (The cache below does check it, for an unrelated reason: the OS reuses HWNDs.)
+//
+// *The first two calls have an official example in codesnippets/SnpShowPalette.cpp:157-159.
+//
+// !GetPanelFromWidgetID does NOT AddRef - IPanelMgr.h:104-112 carries no release note, and the one
+//  that says "caller must release" is CreatePanel - so nothing is released here.
+//
+// This finds the same window the old EnumWindows walk found; what has gone is the need to know what
+// that window is CALLED. Turning it into a top-level window that can be made translucent is still
+// KBSQueryTranslucentTarget's job, untouched - that is where the drawer and the docked-and-expanded
+// cases are handled, and it has measurements behind it.
+static HWND KBSQueryPanelPaletteFromSDK()
+{
+	// *The session can be gone during shutdown.
+	ISession* session = GetExecutionContextSession();
+	if (session == nil)
+		return nullptr;
+
+	InterfacePtr<IApplication> app(session->QueryApplication());
+	if (app == nil)
+		return nullptr;
+
+	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	if (panelMgr == nil)
+		return nullptr;
+
+	IControlView* panel = panelMgr->GetPanelFromWidgetID(kKBSPanelWidgetID);
+	if (panel == nil)
+		return nullptr;		// the panel has never been built in this session
+
+	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panel);
+	if (!container.IsValid())
+		return nullptr;
+
+	HWND h = container.GetOWLControl();
+	return (h != nullptr && ::IsWindow(h)) ? h : nullptr;
+}
+
+// *Remember the OWL.Palette that was found. Closing and re-opening the panel does not change its
+//   HWND (what changes is the parent OWL.Dock), so the cache holds.
+//   Why it is here: kPaletteVisibilityChangedMessage, which is subscribed to below, fires several
+//   times over merely opening one document (measured 2026-07-29), and the Win32 hook further down
+//   runs on every cursor move - so the trips out to the model are kept few.
+static HWND sPaletteWnd = nullptr;
+
+// The panel window, cache first. *The OS reuses handles, so a live handle is not enough - the class
+//   name is checked as well before it is used.
+//   !The TITLE is no longer part of this test. It used to be, because the title was also how the
+//    window was FOUND, so the same string had to vouch for a cached handle as well. Now that the
+//    lookup aims at a WidgetID there is no name left to agree with: a handle that is live and is
+//    still an OWL.Palette is either ours or a stale one, and a stale one is dropped by the two
+//    paths that see windows being made and destroyed - the visibility notification, and the hook
+//    below, which re-checks the class on every WINDOW event for exactly this reason.
+static HWND KBSQueryPaletteWindow()
+{
+	if (sPaletteWnd != nullptr && ::IsWindow(sPaletteWnd) && KBSClassIs(sPaletteWnd, L"OWL.Palette"))
+		return sPaletteWnd;
+
+	sPaletteWnd = KBSQueryPanelPaletteFromSDK();
+	return sPaletteWnd;
 }
 
 // The top-level window the panel is on right now - but only when it is one that can be made
@@ -776,8 +753,8 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	//   value can be handed to another window after this panel is closed. Following GA_ROOT without
 	//   checking would make SOMEBODY ELSE'S PANEL translucent (and the hook stays up until the toggle
 	//   goes OFF, so events keep arriving here after our panel is gone).
-	//   !No full window walk (EnumWindows) here: if the cache is stale it is simply dropped, and
-	//     looking it up again is left to the notification and Apply paths (KBSQueryPaletteWindow).
+	//   !Nothing is looked UP here: if the cache is stale it is simply dropped, and finding the panel
+	//     again is left to the notification and Apply paths (KBSQueryPaletteWindow).
 	//     This callback fires a great deal, so each pass is kept cheap.
 	if (!::IsWindow(sPaletteWnd))
 	{
@@ -785,19 +762,19 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 		return;
 	}
 
-	// *The class name / title check is done for WINDOW events only. Running GetClassNameW +
-	//   GetWindowTextW on every cursor move (60-100 a second) would be waste.
+	// *The class name check is done for WINDOW events only. Running GetClassNameW on every cursor
+	//   move (60-100 a second) would be waste.
 	//   !Why that is safe: for an HWND to be reused by another window, that window has to be created
 	//     and SHOWN. Being shown is EVENT_OBJECT_SHOW = a window event, so a swap always passes
 	//     through this check at the moment it happens. A window that is never shown is rejected by
 	//     KBSQueryTranslucentTarget anyway, as neither "OWL.Dock" nor "OWL.FrameDrawer".
+	//   !This checked the window's TITLE too until 2026-08-07. It could, because the title was how
+	//     the panel was found in the first place; now that the lookup is a WidgetID (see
+	//     KBSQueryPanelPaletteFromSDK) the class is all there is to check - and it is what the
+	//     reuse it guards against would change.
 	if (isWindowEvent)
 	{
-		KBSFindPaletteCtx ctx;
-		ctx.fTitle = kKBSPaletteWindowTitle;
-		ctx.fPid   = ::GetCurrentProcessId();
-		ctx.fFound = nullptr;
-		if (!KBSWindowMatches(sPaletteWnd, &ctx))
+		if (!KBSClassIs(sPaletteWnd, L"OWL.Palette"))
 		{
 			sPaletteWnd = nullptr;
 			return;
@@ -1007,8 +984,8 @@ bool8 KBSPanelRollOver::IsMouseOver() const
 	//   for ("is the pointer on it NOW").
 #ifdef WINDOWS
 	// *Nothing is measured while the toggle is OFF. This AddIn exists for the translucency toggle,
-	//   and while it is off nobody uses the answer - whereas KBSQueryPaletteWindow walks every window
-	//   with EnumWindows when its cache is stale, and people not using the feature should not pay for
+	//   and while it is off nobody uses the answer - whereas KBSQueryPaletteWindow goes out to the
+	//   panel manager when its cache is stale, and people not using the feature should not pay for
 	//   it (the same rule KBSEffectiveAlpha follows in not even looking at the cursor while OFF).
 	if (!sPanelTranslucent)
 		return kFalse;
