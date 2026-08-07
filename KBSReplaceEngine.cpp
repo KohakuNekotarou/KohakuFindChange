@@ -383,6 +383,18 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
 	{
+		// ***** THE ONE EXIT THAT IS PAST Initialize. ***** Every refusal above this line is before
+		// the walker was given anything to walk, so there is nothing to stop; this one is after. A
+		// walker left walking is not merely untidy: the next caller that guards its Initialize with
+		// IsWalking CONTINUES it, and that is what InDesign's own Find/Change does
+		// (SnpFindAndReplace.cpp:772). The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask
+		// IsWalking, then Halt), and it is the shape the bottom of this function already uses.
+		//
+		// Added 2026-08-08, on the fourth audit of the search block: KBSSearchEngine::CollectHitsInDoc
+		// halts at its matching exit and says in a comment that this engine "is already symmetric this
+		// way". It was not - that claim was written without opening this file.
+		if (walker->IsWalking())
+			walker->Halt();
 		outNotWalked = true;
 		return 0;
 	}

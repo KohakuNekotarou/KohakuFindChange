@@ -274,10 +274,14 @@ bool gSearching = false;
 // the rule KBSBookScope::ReleaseSearchedBook already follows and for the same reason.
 //
 // This comment said the model was cleared at "the two points on this path" until 2026-08-08. There
-// are EIGHT, in six files - the two scans clear it at their own commit points and cancelled exits,
-// the replace clears it when the query has changed under the results, and both the close-document
-// responder and the book watch clear it when what the rows describe goes away - and the six of them
-// left the memory standing over a result set it had nothing to do with.
+// are NINE, in six files: the two on this path (the commit point and the cancelled exit), the same
+// two in each of the two scans, the replace's "the query has changed" exit, and one each in the
+// close-document responder and the book watch - and the seven outside this file left the memory
+// standing over a result set it had nothing to do with.
+//
+// (That sentence was written saying EIGHT. The nine were counted mechanically on the fourth audit
+// of this block; every one of them does have its pairing, so what was wrong was the count in the
+// comment and not the code. Counting by hand is how the "two" got there in the first place.)
 boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 
 // The attribute database that list's UIDs are in. Kept beside it because a UID means nothing
@@ -334,6 +338,16 @@ bool HasFindQuery()
 		return false;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
+	// The attribute database is the first argument of the call below, so it is tested before it is
+	// handed over - the order the four other readers of the format pane in this file were given on
+	// 2026-08-08. This one was not: that pass counted the places it had opened rather than the places
+	// that ask the question, and BuildWalkSignature was missed the same way (found on the fourth
+	// audit of this block). False with no database, because this door STOPS a search: "cannot tell"
+	// must not start one.
+	IDataBase* const queryDB = opts->GetUIDAttrDB();
+	if (queryDB == nil)
+		return false;
+
 	// ***** ASK THE OPTIONS, NEVER THE FIND STRING. *****
 	// IFindChangeOptions.h:684-699 says this interface "is in a unique position to know whether
 	// there is adequate information defined on it to allow searching for 'something'", and spells
@@ -352,7 +366,7 @@ bool HasFindQuery()
 	//
 	// (Until 2026-08-03 the Glyph tab asked this and Text / GREP asked the find string - one
 	// function answering the same question two ways. The format-only search was what that cost.)
-	return opts->IsThereSomethingToFind(opts->GetUIDAttrDB(), mode) != kFalse;
+	return opts->IsThereSomethingToFind(queryDB, mode) != kFalse;
 }
 
 // Is anything set in one side of the dialog's format pane? See the header for what this is for; what
@@ -1367,6 +1381,17 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	}
 
 	// Always start a fresh walk from the top of the document.
+	//
+	// ***** THE OPPOSITE OF WHAT THE SNIPPET DOES, AND ON PURPOSE. ***** SnpFindAndReplace.cpp:772
+	// initialises only when the walker is NOT walking, because it drives Find Next one key press at a
+	// time and wants to carry on the walk it already has. This panel lists a whole document in one
+	// run, so it always wants a walk of its own from the top.
+	//
+	// What that costs, stated because nothing else here states it: the walker comes from the service
+	// provider, so it is SHARED with the Find/Change dialog. A search started from this panel
+	// therefore throws away a Find Next sequence the user had going there, and their next click on
+	// Find Next begins again from the top. Not measured - it follows from the two lines below and
+	// from the guard the snippet puts around its own Initialize.
 	if (walker->IsWalking())
 		walker->Halt();
 
@@ -1402,9 +1427,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	{
 		// ***** THE ONE EXIT THAT IS PAST Initialize. ***** Every refusal above this line is before
 		// the walker was given anything to walk, so there is nothing to stop; this one is after, and
-		// leaving a walker walking is what the Halt at the bottom of this function exists to prevent.
-		// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt), and the
-		// replace engine's two walks are already symmetric this way.
+		// leaving a walker walking is what the Halt at the bottom of this function exists to prevent -
+		// the next caller that guards its Initialize with IsWalking CONTINUES the walk left standing,
+		// which is exactly what InDesign's own Find/Change does (SnpFindAndReplace.cpp:772).
+		// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt).
+		//
+		// This said "and the replace engine's two walks are already symmetric this way" until
+		// 2026-08-08. They were not: KBSReplaceEngine's matching exit returned without halting, and
+		// the claim had been written without opening the file it was about. Both sides halt now.
 		if (walker->IsWalking())
 			walker->Halt();
 		// Named for what actually happened. It used to answer kChapterNoWalker - "no text walker" -
@@ -1428,6 +1458,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// The price of holding it: UI work must not be pumped inside it, which is why the progress bar's
 	// cancel is only asked between chapters (see SearchBook). Do not "correct" this to the one-command
 	// shape without measuring both. (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
+	//
+	// ***** THE REST OF THIS INTERFACE IS DELIBERATELY LEFT ALONE. ***** It also carries
+	// InitTextWalkerTerminator / TerminateTextWalkerTerminator, which spellpanel DOES call
+	// (SpellPanelObserver.cpp:336, :349), and the snapshot pair beside them. Those bracket a walk
+	// that OUTLIVES the call which started it - spellpanel's runs for as long as its panel is open,
+	// across the user's clicks - and the terminator is what halts such a walk when the ground moves
+	// under it. This walk begins and ends inside this function with a modal bar up throughout, so
+	// there is no window in which anything could move. (Checked on the fourth audit of this block,
+	// 2026-08-08, so the next reader does not have to work out whether they were an oversight.)
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
 	// What each of this document's frames answers about the hits inside it - see FrameFacts. Scoped
@@ -2095,6 +2134,20 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 	if (opts == nil)
 		return;		// empty = "cannot tell" - see the header on why that must not read as "different"
 
+	// The attribute database, taken and tested HERE rather than down where it is first used. The
+	// three format questions at the end of this function all take it as their first argument, and
+	// the header's contract is that a signature which cannot be read comes back EMPTY - so building
+	// the switches into the string first and only then meeting a nil database would leave a
+	// signature that LOOKS complete while saying nothing at all about Find Format. That is the one
+	// thing that must not happen to a string whose whole job is to be compared: it would compare
+	// equal to a run with a different format set.
+	//
+	// (Missed on 2026-08-08 along with HasFindQuery, when the four other readers of the pane in this
+	// file were given this order; found on the fourth audit of this block.)
+	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil)
+		return;
+
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	outSignature.Append("m");
 	outSignature.AppendNumber(static_cast<int32>(mode));
@@ -2158,7 +2211,6 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 	// itself - RememberFindFormat / FindFormatHasChanged, which the replace asks alongside this
 	// signature - and asking it there is what closed the "same condition, different value" gap this
 	// file carried until 2026-08-07.
-	IDataBase* const db = opts->GetUIDAttrDB();
 	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, mode);
 	outSignature.Append(" n");
 	outSignature.AppendNumber(attrs != nil ? attrs->CountBosses() : 0);
