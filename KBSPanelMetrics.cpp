@@ -54,29 +54,34 @@ const int32 kGapUnderMessageBlock = 3;
 //
 //     box 301 (panel 350) -> 2 lines      <- pointlessly wide
 //     box 251 (panel 300) -> 3 lines      <- what the panel opens at
-//     box 216 (panel 265) -> 4 lines      <- the width the user works at; this is the one the
-//                                            block is sized for, and where the clipping was
-//                                            reported when the block still held three
-//     box 175 (panel 224) -> the floor    <- user's call, 2026-08-06
+//     box 216 (panel 265) -> 4 lines      <- where the clipping was reported when the block
+//                                            still held three; this is what the block is sized for
+//     box 193 (panel 242) -> the floor    <- user's call, 2026-08-07
 //
-// ***** THE FLOOR IS KESCM'S PANEL WIDTH. ***** KESCM is kNotResizable at 224 (KESCM.fr:1105),
-// so putting KBS's floor there makes the two panels line up when they are docked together, which
-// is how they are used. KESCM has no floor of its own - it cannot be resized at all.
+// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** Raised 224 -> 242 on
+// 2026-08-07 ("make the minimum width about the size it is now"), measured off the running panel.
 //
-// ! 535 / 175 = 3.06, so the message should still need four lines at the floor and the block
-//   still holds it - but that is arithmetic, NOT a measurement: the widths above were measured
-//   and this one was not. If a message ever takes five lines down here, the fifth is clipped.
+// 224 was KESCM's fixed width (KESCM.fr:1105), put here so the two would line up when docked
+// together. That is GIVEN UP, deliberately: a floor is there to stop the panel being dragged down
+// to where it cannot be read, and the width it is read at is this one. Lining up with a sibling
+// was a second job asked of the same number, and the two wanted different answers.
+//
+// ! 535 / 193 = 2.8, so the opening message needs three lines at the floor and the block holds
+//   four - but that is arithmetic, NOT a measurement: the widths above were measured and this
+//   one was not. If a message ever takes five lines down here, the fifth is clipped.
 //   The floor is how small the panel MAY be made; it is not a promise about every message.
 //
 // Same floor in both languages: a Roman UI draws the same message in 12px lines, so it simply
 // has room to spare rather than a layout of its own.
 //
-// ! It is the WIDTH that decides the line count, and the block above only holds three lines.
-//   The two numbers are a pair - neither is meaningful without the other.
+// ! It is the WIDTH that decides the line count, and the block above holds four lines in either
+//   language (see kMessageHeightRoman / kMessageHeightCJK). The two numbers are a pair - neither
+//   is meaningful without the other. (This read "only holds three lines" until 2026-08-07, left
+//   over from before the block was sized to four.)
 //
 // Height: stated against the Roman block so that a taller block simply moves it. The floor is
 // there to keep about five 19px result rows visible, which has nothing to do with language.
-const int32 kMinimumWidth       = 224;	// KESCM's fixed panel width
+const int32 kMinimumWidth       = 242;	// the width the panel is worked at (measured 2026-08-07)
 const int32 kMinimumHeightRoman = 160;
 
 /** Does this UI language draw the palette font tall? Measured for Japanese (18px vs 12px).
