@@ -29,6 +29,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSResultModel.h"
+#include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 
 /** Implements IStartupShutdownService for the plug-in. */
 class KBSStartupShutdown : public CPMUnknown<IStartupShutdownService>
@@ -71,6 +72,11 @@ public:
 		KBSDrawEventHandler::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
+		// ...and the search engine's own: the Find Format it remembers is an AttributeBossList
+		// holding references to the dialog's attributes, so letting it go is database work and
+		// belongs here rather than in a static destructor at DLL unload. It was the one piece of
+		// module state with no cleanup of its own until 2026-08-08.
+		KBSSearchEngine::ShutdownCleanup();
 	}
 };
 

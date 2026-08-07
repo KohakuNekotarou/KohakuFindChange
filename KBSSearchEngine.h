@@ -105,9 +105,17 @@ namespace KBSSearchEngine
 	           that supply their own glyph query - the missing-glyph scan passes kAnyNotDefGlyphID.
 	           Only meaningful while the Glyph tab is the mode in force.
 
+	    @return true when every value above was actually stated. FALSE MUST STOP THE CALLER: what
+	            was not stated is not merely missing, it is whatever was committed last - by an
+	            earlier run, or by the dialog on a tab the user has since left - so a walk that went
+	            ahead would search by a query nobody typed and the results would then be filed under
+	            the tab that IS on screen. The SDK's own snippet stops on this command too
+	            (SnpFindAndReplace.cpp:511-516, :598-603). This returned void until 2026-08-08, and
+	            both callers therefore believed it had always worked.
+
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
 	          command inside the replace sequence would become part of that undo step. */
-	void CommitSearchMode(Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
+	bool CommitSearchMode(Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
 
 	/** State what a replace will WRITE, for the tabs whose change side is not a string: the Glyph
 	    tab's Change To glyph, and the Transliterate tab's change character type. Both are
@@ -115,11 +123,17 @@ namespace KBSSearchEngine
 	    CommitSearchMode on the replace path only - a search must never leave a change-side value
 	    standing, since nothing on screen would say it had been set.
 
-	    Does nothing on the other tabs. On the Glyph tab an EMPTY Change To is stated as -1 (it
-	    deletes every match); false means only that the settings could not be read at all: the
-	    caller must then refuse the replace rather than walk, because the command would otherwise
-	    write whatever was committed last - a value the user never chose on this run, and the exact
-	    failure this whole mechanism exists to prevent.
+	    Does nothing on the other tabs, whose change side is a string the replace command carries
+	    itself. On the Glyph tab an EMPTY Change To is stated as -1 (it deletes every match).
+
+	    False means the value is NOT standing on the options - either the settings could not be read
+	    at all, or the command that states them did not go through. The caller must then refuse the
+	    replace rather than walk, because the command would otherwise write whatever was committed
+	    last - a value the user never chose on this run, and the exact failure this whole mechanism
+	    exists to prevent.
+
+	    (Until 2026-08-08 only the first of those two answered false: the stating was done through
+	    calls that returned void, so a command that failed left this promising it was safe to write.)
 
 	    @return true when it is safe to replace.
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
@@ -390,6 +404,19 @@ namespace KBSSearchEngine
 	    the answer is false - the safe answer: when in doubt, do not write. */
 	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
 		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash);
+
+	/** Let go of the module's static storage during InDesign's controlled shutdown, so every static
+	    destructor at DLL unload finds nothing left to do.
+
+	    What there is to let go of: the Find Format this file remembers for the replace's "has the
+	    query changed" door (RememberFindFormat) - an AttributeBossList holding references to the
+	    dialog's attributes, and the raw IDataBase* they belong to. Dropping the list releases those
+	    attributes, which is database work, and doing it from a static destructor means doing it
+	    after the application has torn down.
+
+	    Called from KBSStartupShutdown::Shutdown, beside the same call on KBSDrawEventHandler,
+	    KBSBookScope and KBSResultModel. */
+	void ShutdownCleanup();
 }
 
 #endif // __KBSSearchEngine_h__

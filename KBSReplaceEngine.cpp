@@ -907,7 +907,18 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	// Deliberately OUTSIDE any command sequence: this processes a command of its own, and a
 	// session-setting command inside the replace's sequence would become part of its undo step. Every
 	// caller of this function asks before opening one.
-	KBSSearchEngine::CommitSearchMode();
+	//
+	// ***** AND ITS ANSWER DECIDES WHETHER THERE IS A REPLACE AT ALL. ***** A tab that could not be
+	// stated leaves the engine in whatever mode was committed last, and a replace walked in the
+	// wrong mode writes the wrong tab's change side over what this tab found - which is the very
+	// fault CommitSearchMode was written for (user's report, 2026-07-30). The failure was swallowed
+	// here until 2026-08-08. The results are NOT cleared: they still describe the search that found
+	// them, so this refuses the way every other door in this plug-in does and leaves the panel be.
+	if (!KBSSearchEngine::CommitSearchMode())
+	{
+		outSummary.Append("The Find/Change tab could not be set, so nothing was changed. Try again, or reopen Edit > Find/Change.");
+		return true;
+	}
 
 	// ----- (3) the QUERY itself, which the tab does not cover -----
 	//

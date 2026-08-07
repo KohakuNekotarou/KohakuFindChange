@@ -652,7 +652,13 @@ PMString DescribeCurrentQuery()
 // fields: IIntData is the glyph itself, and IBoolData picks the side - kTrue for the glyph being
 // looked for, kFalse for the one that replaces it. This is what SnpFindAndReplace does in
 // Do_FindGlyph and Do_ReplaceGlyph, the only worked glyph example in the SDK.
-void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
+//
+// ***** THE ANSWER IS RETURNED, NOT SWALLOWED. ***** false means the value was NOT stated, and the
+// engine will therefore walk - or write - with whatever was committed last. On the replace side
+// that is a glyph the user never chose on this run and cannot see anywhere on screen, which is the
+// exact failure CommitReplaceSide exists to prevent; on the find side it is a query nobody typed.
+// This returned void until 2026-08-08, so every caller believed it had succeeded.
+bool CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 {
 	// An empty box means different things on the two sides, so they are treated differently.
 	//
@@ -666,25 +672,30 @@ void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 	// makes the replace command fall back on whatever change glyph was committed last, writing a
 	// glyph the user did not choose and cannot see anywhere on screen. Stating it is what overwrites
 	// that leftover.
+	// Nothing to state, and nothing wrong: the find side of an empty box is left as the dialog has
+	// it (the search is stopped long before this by HasFindQuery). That is a success, not a failure.
 	if (glyphID == kInvalidGlyphID && findSide)
-		return;
+		return true;
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeGlyphIDCmdBoss));
 	if (cmd == nil)
-		return;
+		return false;
 	InterfacePtr<IIntData>  value(cmd, UseDefaultIID());
 	InterfacePtr<IBoolData> side(cmd, UseDefaultIID());
 	if (value == nil || side == nil)
-		return;
+		return false;
 	value->Set(glyphID);
 	side->Set(findSide);
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
-		// Same reasoning as the mode commit below: the walk simply runs with whatever was committed
-		// last, but the error state has to be cleared or it fails every find command after it.
+		// The error state has to be cleared whatever the caller does with the answer, or it fails
+		// every find command after it - and the caller is told, so it can stop rather than run with
+		// a value that is not the one on screen.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
 	}
+	return true;
 }
 
 // Process one of the find/change option commands that carry a single int - the shape of
@@ -692,14 +703,18 @@ void CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 // mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
 // (kFindChangeModeCmdBoss does; the two character-type bosses hold only the value - checked
 // against a live object-model dump - so that field is set only when it answers).
-void CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
+//
+// Returns whether the value was stated, for the same reason CommitGlyphID does: the snippet this is
+// shaped after hands its ErrorCode back too, and every caller of it stops on a failure
+// (SnpFindAndReplace.cpp:511-516, :598-603, :623-628).
+bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
-		return;
+		return false;
 	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
 	if (valueData == nil)
-		return;
+		return false;
 	valueData->Set(value);
 	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
 	if (modeData != nil)
@@ -707,10 +722,13 @@ void CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
-		// Same reasoning as the mode commit: the walk simply runs with whatever was committed last,
-		// but the error state has to be cleared or it fails every find command after it.
+		// Cleared whatever the caller does with the answer - left standing it fails every find
+		// command after it - and reported, so the caller can stop instead of walking by a value the
+		// dialog does not hold.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
 	}
+	return true;
 }
 
 // A frame UID -> its page, named the way the Pages panel names it (section prefix and all). Shared
@@ -1325,6 +1343,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// The single shared scope definition - the replace pass re-walks each chapter with exactly
 	// these options, or the walk order the hits were numbered by would no longer line up. Handed in
 	// by the caller, which reads them once for the whole run.
+	//
+	// !! ADOBE CALLS THIS NOWHERE. Every other step of this walk is the shape SnpFindAndReplace
+	// uses, but the snippet builds its scope from the SELECTION
+	// (QueryWalkerScope_UsingSelections, :774) because it is driving Find Next from a dialog. A
+	// panel that lists a whole document has to say so instead, and the document form is the one
+	// IWalkerScopeFactoryUtils.h:102-109 documents for it - so what stands behind this line is the
+	// header's contract, not a worked example. (Grepped 2026-08-08: the only callers in the SDK
+	// tree are this file, KBSReplaceEngine and KESCL, all three ours.)
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
 	if (scope == nil)
 	{
@@ -1625,22 +1651,26 @@ void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, 
 	ioReported = target;
 }
 
-void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
+bool KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
-		return;
+		return false;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 
 	// The tabs this panel can walk with the TEXT walker. Object and Colour search by attribute
 	// through walkers of their own (kObjectWalkerService / kColorSearchWalkerService) and return page
 	// items rather than lines of text; SearchBook turns those away before reaching here, so stating
 	// their mode would only mislead the engine.
+	//
+	// false rather than "nothing to do": nothing was stated, so a caller that walked anyway would
+	// walk in whatever mode was committed last. Both callers turn these tabs away before they get
+	// here, so this is the answer for a route that does not exist yet rather than for one that does.
 	if (mode != IFindChangeOptions::kTextSearch
 		&& mode != IFindChangeOptions::kGrepSearch
 		&& mode != IFindChangeOptions::kGlyphSearch
 		&& mode != IFindChangeOptions::kTransliterateSearch)
-		return;
+		return false;
 
 	// Read the glyph BEFORE the mode is committed. Committing a mode is a declaration, and there is
 	// no promise anywhere that it leaves that mode's other settings untouched - so take the value
@@ -1662,7 +1692,7 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
 	if (cmd == nil)
-		return;
+		return false;
 
 	// TWO separate int fields on this boss, both kIntDataImpl behind different IIDs (checked against a
 	// live object-model dump): the DEFAULT one is the value being set, and IID_IFINDCHANGEMODEDATA is
@@ -1671,22 +1701,28 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 	InterfacePtr<IIntData> value(cmd, UseDefaultIID());
 	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
 	if (value == nil || modeData == nil)
-		return;
+		return false;
 	value->Set(static_cast<int32>(mode));
 	modeData->Set(static_cast<int32>(mode));
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
-		// Nothing to recover - the walk simply runs in whatever mode was committed last. The error
-		// state has to be cleared though: left standing it would fail every find command after it.
+		// ***** THE CALLER IS TOLD. ***** The error state is cleared either way - left standing it
+		// would fail every find command after it - but the walk must NOT go ahead: it would run in
+		// whatever mode was committed last, which is a tab the user is not looking at, and the
+		// results would then be filed under the tab that IS on screen. This swallowed the failure
+		// and carried on until 2026-08-08; the snippet this is modelled on stops instead
+		// (SnpFindAndReplace.cpp:511-516 and :598-603, both on this very command).
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
 	}
 
 	// The CHANGE MODE - kChange, or kTransliterate for the CJK character-type conversion - stated
 	// for every tab, at the value the dialog already holds. It is the axis SnpFindAndReplace's
 	// header warns about ("you must first change the mode with this command"), and it is global:
 	// left unstated, a Text-tab walk runs with whatever anybody committed last.
-	CommitFindChangeInt(kFindChangeModeCmdBoss, static_cast<int32>(changeMode), static_cast<int32>(mode));
+	if (!CommitFindChangeInt(kFindChangeModeCmdBoss, static_cast<int32>(changeMode), static_cast<int32>(mode)))
+		return false;
 
 	// Now the glyph, and for the same reason the mode needed committing at all: what the dialog
 	// HOLDS is not what the engine WALKS BY. The Glyph tab issues kFindChangeGlyphIDCmdBoss when the
@@ -1696,13 +1732,16 @@ void KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 	//
 	// Only the FIND side is stated here. The replace side is set where the replacement happens, so
 	// a search can never leave a change glyph standing behind the user's back.
-	if (mode == IFindChangeOptions::kGlyphSearch)
-		CommitGlyphID(findGlyphID, kTrue);
+	if (mode == IFindChangeOptions::kGlyphSearch && !CommitGlyphID(findGlyphID, kTrue))
+		return false;
 
 	// ...and the Transliterate tab's query, which is a character type rather than a find string -
 	// the glyph rule over again, find side only for the same reason.
-	if (mode == IFindChangeOptions::kTransliterateSearch)
-		CommitFindChangeInt(kFindCharacterTypeCmdBoss, static_cast<int32>(findCharType), static_cast<int32>(mode));
+	if (mode == IFindChangeOptions::kTransliterateSearch
+		&& !CommitFindChangeInt(kFindCharacterTypeCmdBoss, static_cast<int32>(findCharType), static_cast<int32>(mode)))
+		return false;
+
+	return true;
 }
 
 bool KBSSearchEngine::CommitReplaceSide()
@@ -1720,15 +1759,24 @@ bool KBSSearchEngine::CommitReplaceSide()
 		// the dialog it delegates to (user's report 2026-07-31). What the old code was right about
 		// is that the empty box must never be left UNSTATED; CommitGlyphID states it on this side
 		// for exactly that reason.
-		CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side of the query
+		//
+		// ***** AND WHETHER IT WAS STATED IS THE ANSWER THIS FUNCTION GIVES. ***** The header
+		// promises "true when it is safe to replace", and a change glyph that could not be
+		// committed is the one case the whole mechanism was built to catch: the command would then
+		// write whatever was committed last - a glyph the user never chose on this run and cannot
+		// see anywhere on screen. This returned true unconditionally until 2026-08-08, so the
+		// promise held only for the settings being unreadable, never for the stating failing.
+		return CommitGlyphID(opts->GetReplaceGlyphID(), kFalse);	// kFalse = the replace side
 	}
-	else if (mode == IFindChangeOptions::kTransliterateSearch)
+	if (mode == IFindChangeOptions::kTransliterateSearch)
 	{
 		// The character type the conversion writes, stated at the dialog's own value - the change
-		// glyph's rule over again.
-		CommitFindChangeInt(kReplaceCharacterTypeCmdBoss,
+		// glyph's rule over again, answered the same way.
+		return CommitFindChangeInt(kReplaceCharacterTypeCmdBoss,
 			static_cast<int32>(opts->GetReplaceCharacterType()), static_cast<int32>(mode));
 	}
+	// Text and GREP write a string, which the replace command carries itself: there is no
+	// change-side value to state, so there is nothing that could have failed to state.
 	return true;
 }
 
@@ -2292,16 +2340,26 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		return 0;
 	}
 
-	// ***** THE COMMIT POINT. ***** Past this line the run owns the panel: the old results are gone
-	// whatever happens next.
-	KBSResultModel::Clear();
-	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
-
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
 	// search driven from this panel ran as plain Text whatever tab was on screen. See
 	// KBSSearchEngine::CommitSearchMode.
-	KBSSearchEngine::CommitSearchMode(overrideFindGlyph);
+	//
+	// ***** ABOVE THE COMMIT POINT, AND ITS ANSWER IS READ. ***** A tab that could not be stated is
+	// a refusal like every other one in this function, so it has to leave the previous results
+	// standing - which is why this sits here rather than three lines lower, where it swallowed its
+	// own failure until 2026-08-08 and searched on in whatever mode had been committed last. Moving
+	// it up changes nothing the user can see: it writes back the value it has just read.
+	if (!KBSSearchEngine::CommitSearchMode(overrideFindGlyph))
+	{
+		outSummary.Append("The Find/Change tab could not be set, so nothing was searched. Try again, or reopen Edit > Find/Change.");
+		return 0;
+	}
+
+	// ***** THE COMMIT POINT. ***** Past this line the run owns the panel: the old results are gone
+	// whatever happens next.
+	KBSResultModel::Clear();
+	KBSBookScope::ReleaseSearchedBook();	// the two are one fact - see gSearchedBookPath
 
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
@@ -2715,6 +2773,22 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 bool KBSSearchEngine::IsSearching()
 {
 	return gSearching;
+}
+
+void KBSSearchEngine::ShutdownCleanup()
+{
+	// The remembered Find Format is the only thing this file keeps that is not a plain value: an
+	// AttributeBossList holding references to the dialog's attributes, and the raw IDataBase* those
+	// UIDs belong to. Neither may still be standing when the .pln unloads - dropping the list runs
+	// its destructor, which lets go of every attribute in it, and that is database work no static
+	// destructor should be doing against an application that has already torn itself down.
+	//
+	// The same rule, and the same reason, as the three cleanups beside this one in
+	// KBSStartupShutdown::Shutdown: KBSDrawEventHandler's marker holds a static PMString and a raw
+	// IDataBase*, KBSBookScope holds its chapters, KBSResultModel holds the rows. This file joined
+	// them on 2026-08-08 - the list arrived on 2026-08-07 and nothing was added here for it, so it
+	// was the one piece of module state with no controlled point to be let go at.
+	ForgetFindFormat();
 }
 
 // End, KBSSearchEngine.cpp.
