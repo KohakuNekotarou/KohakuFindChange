@@ -188,6 +188,11 @@ namespace KBSBookScope
 	    CloseDisplayedDocsIfClean has always made - it skips a dirty document for exactly this
 	    reason - now made here as well.
 
+	    A chapter whose close cannot go through at all (no file handler, or CanClose refuses) is
+	    kept the same way (2026-08-08): dropping it - which is what happened before, the list having
+	    been taken up front - left it windowless with its .indd locked and nothing able to hand it
+	    back for the rest of the session.
+
 	    ***** And a chapter found with a WINDOW is dropped from the list, not closed. ***** A window
 	    makes it the user's whoever raised it - the book panel can window a held chapter behind this
 	    module's back - and a visible document is one the user can deal with themselves. Same rule as
@@ -216,10 +221,14 @@ namespace KBSBookScope
 	    answer is TRUE - it is no longer ours to close, which is what "handed back" means.
 
 	    @return true when the chapter was actually handed back - closed, or found with a window and
-	            left to the user. false when it was not ours, when it is no longer open, or when it
-	            holds unsaved changes (and no window). A caller that REPORTS having closed chapters
-	            has to read this rather than assume: "nothing of ours was open" and "we closed what
-	            was" are different facts, and only this can tell them apart. */
+	            left to the user. false when it was not ours, when it is no longer open, when it
+	            holds unsaved changes (and no window), or when the close was refused. The last two
+	            leave the chapter ON the held list, so a later release gets another try (the refusal
+	            fell off the list as it failed until 2026-08-08). A caller that REPORTS having
+	            closed chapters has to read this rather than assume: "nothing of ours was open" and
+	            "we closed what was" are different facts, and only this can tell them apart - and
+	            telling the ordinary "no longer open" from the failures takes IsHeldDoc before plus
+	            IsDocStillOpen after, which is how the four runs count their unclosed chapters. */
 	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
 	/** Is this chapter one WE opened - is it on the held list right now?

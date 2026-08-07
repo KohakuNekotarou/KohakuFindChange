@@ -291,11 +291,18 @@ void KBSBookScope::ReleaseHeldDocs()
 			continue;
 		}
 
+		// ***** A close that cannot go through leaves the chapter HELD, like unsaved work above. *****
+		// The list was taken and cleared at the top, so a plain `continue` here is a silent drop:
+		// until 2026-08-08 these two answers stranded the chapter - windowless, its .indd locked,
+		// and off the one list that could ever hand it back. Put it back instead, so a later call
+		// gets another try (the same treatment the unsaved door above gives its chapter).
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(held[i]));
-		if (docFileHandler == nil)
+		if (docFileHandler == nil || !docFileHandler->CanClose(held[i]))
+		{
+			gHeldDocInfo.fCurrentOpenedDocumentList.push_back(held[i]);
 			continue;
-		if (docFileHandler->CanClose(held[i]))
-			docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+		}
+		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
 	}
 }
 
@@ -380,10 +387,6 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	if (HasUnsavedChanges(docRef))
 		return false;
 
-	// Off the list FIRST, so a re-entrant call cannot schedule the same close twice.
-	gHeldDocInfo.fCurrentOpenedDocumentList.erase(
-		gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
-
 	// The same close ReleaseHeldDocs uses, one document at a time: kSchedule defers it until the
 	// current notification / idle tick has unwound, and kSuppressUI plus the run's dirty guard
 	// (IDataBase::SaveRestoreModifiedState, which wraps every walk) means no save prompt.
@@ -391,11 +394,23 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// Do NOT "improve" this to IBookUtils::CloseDocumentsInBook: it takes no UI flag and no command
 	// mode, closes immediately, and crashed KESCL in 2026-07-17 when called from a notification.
 	// See the longer note on ReleaseHeldDocs.
+	//
+	// ***** A REFUSED CLOSE STAYS HELD, exactly as unsaved work does. ***** These two exits sat
+	// BELOW the erase until 2026-08-08, so a chapter whose close was refused fell off the held list
+	// in the same breath as it failed - windowless, its .indd locked, and no later ReleaseHeldDocs
+	// able to find it again. The unsaved door above has always kept its chapter listed so a later
+	// call can hand it back; a refusal is the same situation with a different cause, so it keeps
+	// the claim the same way.
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
 	if (docFileHandler == nil)
 		return false;
 	if (!docFileHandler->CanClose(docRef))
 		return false;
+
+	// Off the list BEFORE the close goes through, so a re-entrant call cannot schedule the same
+	// close twice - and not a line earlier, for the reason above.
+	gHeldDocInfo.fCurrentOpenedDocumentList.erase(
+		gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
 
 	// ***** kProcess closes NOW; kSchedule closes when the caller has finished. ***** A run asks for
 	// the first (see the header): a scheduled close does not happen until the current tick unwinds,

@@ -2632,6 +2632,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// because they need a different sentence: these chapters were searched, their hits are in the
 	// result set, and what is missing is the part of them the walk never reached.
 	std::vector<PMString> brokeOff;
+	// ...and the chapters this run OPENED and could not hand back - windowless, so the user can
+	// neither see them nor close them, and each holds its .indd locked. The two scans have always
+	// counted these (KBSBookScope::AppendUnclosedNote); the search discarded the release's answer
+	// until 2026-08-08, the one run of the four that did.
+	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
@@ -2721,7 +2726,17 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// four .idlk files standing at once.) Safe at this point - the walk has halted, the dirty
 		// guard inside CollectHitsInDoc has already restored the flag, and everything read after
 		// this (FinalizeChapterHits, the Chapter it fills in) is plain values, not database work.
-		KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/);
+		//
+		// ***** ASKED FIRST WHETHER IT IS OURS - THE RELEASE'S false CANNOT BE READ ALONE. *****
+		// The scans' shape (KBSGlyphScanEngine / KBSOversetScanEngine), with one more question on
+		// the end: IsDocStillOpen tells "the user closed it under the run" - which is theirs to do
+		// and nothing being left behind - from a chapter that is genuinely still standing. Without
+		// it, that ordinary close was counted as "left open with no window" about a chapter that is
+		// not open at all (the scans counted exactly that until 2026-08-08).
+		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
+		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
+			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
+			unclosed.push_back(targets[i].shortName);
 
 		if (docCapped)
 			collectionTruncated = true;
@@ -2834,6 +2849,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		AppendUnsearchableNote(outSummary, unsearchable);
 		AppendSearchErrorNote(outSummary, brokeOff);
 		KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
+		KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 		return 0;
 	}
 
@@ -2886,6 +2902,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	AppendUnsearchableNote(outSummary, unsearchable);
 	AppendSearchErrorNote(outSummary, brokeOff);
 	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
+	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 
 	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - they moved
 	// off the panel flyout on 2026-08-01, because a flyout has no row to ask about and those two have

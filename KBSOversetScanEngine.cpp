@@ -848,13 +848,19 @@ void KBSOversetScanEngine::Run()
 		// ***** ASKED FIRST WHETHER IT IS OURS, BECAUSE THE RELEASE'S false CANNOT BE READ ALONE.
 		// ***** It answers false for four different things, two of them perfectly ordinary (the
 		// chapter was the user's own copy, or it is no longer open) and two of them a real failure (it
-		// came out modified, or the close was refused). Only the pair of questions tells them apart.
-		// A chapter left behind by a failure is WINDOWLESS: nothing on screen shows it, nothing the
-		// user can do closes it, and it holds its .indd locked for the rest of the session - so it is
-		// worth a line in the summary. (The same shape as the replace's ShowChapterWindow, whose
-		// return value was being discarded until 2026-08-05.)
+		// came out modified, or the close was refused). A chapter left behind by a failure is
+		// WINDOWLESS: nothing on screen shows it, nothing the user can do closes it, and it holds its
+		// .indd locked for the rest of the session - so it is worth a line in the summary. (The same
+		// shape as the replace's ShowChapterWindow, whose return value was being discarded until
+		// 2026-08-05.)
+		//
+		// THREE questions, not two (2026-08-08): IsHeldDoc before, IsDocStillOpen after. The pair
+		// alone cannot tell "the user closed it under the run" - their own doing, with nothing left
+		// behind - from the real failures, and so counted it as "left open with no window" about a
+		// chapter that is not open at all.
 		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
-		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/) && wasOurs)
+		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
+			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
 		// ***** Cancelled INSIDE this chapter - and only now may the loop end. ***** The release above

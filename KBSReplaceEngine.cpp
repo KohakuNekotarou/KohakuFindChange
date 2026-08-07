@@ -842,7 +842,13 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 // The same two steps the CANCEL path takes, for the same reasons; it takes them over every chapter,
 // because an abort leaves nothing in any of them. (This is the half that was missing from the run
 // that goes THROUGH - added 2026-08-05.)
-void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pending)
+// outUnclosed: the chapters this pass could NOT hand back, by name, for the summary
+// (KBSBookScope::AppendUnclosedNote). The other three runs have counted these since before today;
+// the replace discarded the release's answer here until 2026-08-08. A chapter left behind is
+// windowless - nothing on screen shows it, nothing the user can do closes it, and it holds its
+// .indd locked - so it is worth a line.
+void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pending,
+	std::vector<PMString>& outUnclosed)
 {
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
@@ -861,7 +867,24 @@ void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pendin
 		// call and the same reasoning as the search's per-chapter release (KBSSearchEngine::
 		// SearchBook). Safe here: the command sequence is closed, the walk has halted, and a chapter
 		// the user opened themselves is not on the held list and passes through untouched.
-		KBSBookScope::ReleaseHeldDoc(pending[pi].docRef, true /*close now*/);
+		//
+		// THREE questions, the shape all four runs share since 2026-08-08: IsHeldDoc before (a
+		// chapter that was never ours answers false for no fault of anyone's), the release itself,
+		// and IsDocStillOpen after ("the user closed it under the run" is their own doing, not a
+		// chapter left standing).
+		const bool wasOurs = KBSBookScope::IsHeldDoc(pending[pi].docRef);
+		if (!KBSBookScope::ReleaseHeldDoc(pending[pi].docRef, true /*close now*/)
+			&& wasOurs && KBSBookScope::IsDocStillOpen(pending[pi].docRef))
+		{
+			// Named the way the summary's other chapter mentions are (firstNotWalked and its
+			// siblings): the model's display name for the row. Still valid here - this runs before
+			// KeepCheckedRows reshapes the chapter list.
+			PMString name;
+			int32 hitCount = 0;
+			KBSResultModel::GetChapterDisplay(pending[pi].chapterIdx, name, hitCount);
+			name.SetTranslatable(kFalse);
+			outUnclosed.push_back(name);
+		}
 	}
 }
 
@@ -1309,8 +1332,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// backup, and hand back every chapter the resolve pass opened - none of them took a
 		// replacement, which is exactly what this hands back.
 		KBSResultModel::ForgetRowBackup();
-		HandBackChaptersWithNothingInThem(pending);
+		std::vector<PMString> unclosed;
+		HandBackChaptersWithNothingInThem(pending, unclosed);
 		outSummary.Append("Could not start an undoable step - nothing was changed.");
+		KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 		return 0;
 	}
 
@@ -1560,7 +1585,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	//
 	// AFTER the windows above, not before: the opens are the commands with a measured history of
 	// disturbing undo (2026-07-28), so they stay as close to the end of the sequence as they were.
-	HandBackChaptersWithNothingInThem(pending);
+	//
+	// BEFORE KeepCheckedRows, which reshapes the chapter list the hand-back's names come from.
+	std::vector<PMString> unclosed;
+	HandBackChaptersWithNothingInThem(pending, unclosed);
 
 	// The panel now becomes a REPORT of what the replace did: the rows it changed, and the rows it
 	// was asked about and left alone, each saying why on its locator. The rows the user had
@@ -1569,6 +1597,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	KBSResultModel::KeepCheckedRows();
 
 	BuildSummary(totals, outSummary);
+	// The chapters the hand-back could not close, at the end the way the scans say it - it appends
+	// nothing in the ordinary case.
+	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return totals.replaced;
 }
 
