@@ -931,13 +931,22 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	//
 	// So this is no longer the door that says WHY a run came back all-missing; it is the door that
 	// keeps the run from happening at all. What it does not catch is not caught by anything (the
-	// DOCUMENT being edited - stated on the confirmation instead), and what it does not KNOW about a
-	// query it can catch - see the note on the incompleteness of BuildWalkSignature - is a wrong
-	// replacement made in silence. Widen the signature rather than lean on anything downstream.
+	// DOCUMENT being edited - stated on the confirmation instead), so anything it does not know
+	// about a query is a wrong replacement made in silence. Widen the test rather than lean on
+	// anything downstream.
+	//
+	// ***** IT IS TWO QUESTIONS, NOT ONE. ***** The signature covers the tab, the query and every
+	// switch, and it COUNTS the Find Format conditions without saying what they are set to. The
+	// values are compared separately, by the attribute list itself
+	// (KBSSearchEngine::FindFormatHasChanged) - because until 2026-08-07 they were fingerprinted by
+	// hand into the signature, and an attribute that answered none of the nine interfaces that probe
+	// used went in as its class alone. "Find Format: size 14 pt" edited to "size 20 pt" then left the
+	// signature IDENTICAL and walked straight through this door.
 	//
 	// An EMPTY signature on either side means it could not be described, not that it differs -
 	// results from before this field existed answer empty too - so only two known-different
-	// signatures refuse.
+	// signatures refuse. The format test follows the same rule and answers false when it cannot
+	// tell.
 	//
 	// ***** AND THE RESULTS GO. ***** (User's call, 2026-08-03.) Every other refusal in this plug-in
 	// leaves the panel exactly as it found it - that is the rule the search's own refusals were moved
@@ -950,8 +959,10 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 		const PMString walkedSignature = KBSResultModel::GetWalkSignature();
 		PMString currentSignature;
 		KBSSearchEngine::BuildWalkSignature(currentSignature);
-		if (!walkedSignature.IsEmpty() && !currentSignature.IsEmpty()
-			&& walkedSignature != currentSignature)
+		const bool signatureDiffers = !walkedSignature.IsEmpty() && !currentSignature.IsEmpty()
+			&& walkedSignature != currentSignature;
+
+		if (signatureDiffers || KBSSearchEngine::FindFormatHasChanged())
 		{
 			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
 			// nothing here touches the panel.

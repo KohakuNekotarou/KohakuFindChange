@@ -10,10 +10,17 @@
 //  user's current Find/Change options as they are, so the mode (Text or GREP) is followed.
 //
 //  For each match the finder hands back (story, start, end); BuildHit then reads the containing
-//  paragraph (IComposeScanner::FindSurroundingParagraph + CopyText) and splits it, at the exact
-//  UTF-16 offsets, into the three segments the colour cell paints. The split is UTF-16-unit
-//  exact (GrabUTF16Buffer + SetXString) so it matches TextIndex semantics; match boundaries
-//  never fall inside a surrogate pair, so no code point is ever cut.
+//  paragraph (IComposeScanner::FindSurroundingParagraph + CopyText) and splits it into the three
+//  segments the colour cell paints. The offsets are TextIndex throughout, and a TextIndex counts
+//  CODE POINTS - a surrogate pair is ONE, the same unit WideString::CharCount counts in (measured
+//  on the running application, 2026-08-05). So a match boundary cannot land inside a pair and no
+//  character is ever cut in half.
+//
+//  (That paragraph read "The split is UTF-16-unit exact (GrabUTF16Buffer + SetXString)" until
+//  2026-08-07, and both halves were wrong: the split goes through WideString, and the unit is the
+//  code point. The wrong unit is not harmless bookkeeping - it sent an audit hunting a surrogate
+//  bug that did not exist, and the "fix" drafted for it would have hashed only the high half of
+//  every surrogate pair.)
 //
 //========================================================================================
 
@@ -60,16 +67,10 @@
 #include "IPMFont.h"				// the face, for that lookup
 #include "ITextAttrFont.h"			// the font STYLE name  (kTextAttrFontStyleBoss)
 #include "ITextAttrUID.h"			// the font FAMILY uid  (kTextAttrFontUIDBoss)
-// The value-carrying bases a text attribute can be built on. BuildWalkSignature asks every FIND
-// attribute for all of them, because that list is where Find Format lives and AttributeBossList
-// offers no generic way to read a value (its operator== is private) - see AppendAttributeSignature.
-#include "ITextAttrString.h"
-#include "ITextAttrWideString.h"
-#include "ITextAttrInt32.h"
-#include "ITextAttrInt16.h"
-#include "ITextAttrRealNumber.h"
-#include "ITextAttrBoolean.h"
-#include "ITextAttrClassID.h"
+// (Seven more text-attribute headers stood here until 2026-08-07 - ITextAttrString / WideString /
+// Int32 / Int16 / RealNumber / Boolean / ClassID. BuildWalkSignature used to ask every find
+// attribute for all of them to fingerprint its value by hand. AttributeBossList::IsEqual does that
+// comparison properly, so the probe and its includes are gone; see RememberFindFormat.)
 
 // General includes:
 #include "IAttrReport.h"			// AppendDescription - a text attribute states itself, in the user's language
@@ -149,18 +150,25 @@ int32 CountSearchableStories(const UIDRef& docRef)
 	return storyList->GetUserAccessibleStoryCount();
 }
 
-// Why a chapter could not be walked AT ALL - which is a different thing from "walked it and found
-// nothing". Returning zero hits for a chapter that was never actually searched reads as "this
-// chapter has no matches", and there is no way for the user to see through that. Every failure
-// below is therefore counted and named in the summary.
+// How a chapter's walk ended - which is NOT the same question as how many matches it found.
+// Returning zero hits for a chapter that was never actually searched reads as "this chapter has no
+// matches", and there is no way for the user to see through that. Every ending below except
+// kChapterWalked is therefore counted and named in the summary.
 enum ChapterWalkResult
 {
-	kChapterWalked = 0,		// the walk ran (it may legitimately have found nothing)
-	kChapterNoDatabase,		// the chapter's UIDRef carries no database, so there is nothing to walk
-	kChapterNoOptions,		// no Find/Change options to search with
-	kChapterNoWalker,		// the text-walker service handed out no walker
-	kChapterNoScope,		// QueryDocumentWalkerScope refused this document
-	kChapterNoClient		// the find/change walker client could not be created
+	kChapterWalked = 0,			// the walk ran to the end (it may legitimately have found nothing)
+	kChapterNoDatabase,			// the chapter's UIDRef carries no database, so there is nothing to walk
+	kChapterNoOptions,			// no Find/Change options to search with
+	kChapterNoWalker,			// the text-walker service handed out no walker
+	kChapterNoScope,			// QueryDocumentWalkerScope refused this document
+	kChapterNoClient,			// the find/change walker client could not be created
+	kChapterNoSelectionUtils,	// the walker has no ITextWalkerSelectionUtils to hold the critical section with
+
+	// ...and the one that is not a "never started" at all: the walk DID start, found what it found,
+	// and then broke off with an error partway through. Its hits are real and are kept; what is
+	// missing is the rest of the chapter, which is why it gets a sentence of its own rather than
+	// being reported as "could not be searched". See CollectHitsInDoc's loop.
+	kChapterWalkFailed
 };
 
 /** A short reason to put in the status line. Not translatable - it names internals. */
@@ -168,35 +176,70 @@ const char* ChapterWalkResultText(ChapterWalkResult result)
 {
 	switch (result)
 	{
-		case kChapterNoDatabase:	return "no database";
-		case kChapterNoOptions:		return "no find options";
-		case kChapterNoWalker:		return "no text walker";
-		case kChapterNoScope:		return "no walker scope";
-		case kChapterNoClient:		return "no walker client";
-		default:					return "";
+		case kChapterNoDatabase:		return "no database";
+		case kChapterNoOptions:			return "no find options";
+		case kChapterNoWalker:			return "no text walker";
+		case kChapterNoScope:			return "no walker scope";
+		case kChapterNoClient:			return "no walker client";
+		case kChapterNoSelectionUtils:	return "no walker selection utils";
+		default:						return "";
 	}
 }
 
-/** Name the chapters that were skipped rather than searched, and why. Appends nothing when every
-    chapter was actually walked, so the ordinary summary is unchanged. */
-void AppendUnsearchableNote(PMString& outSummary, int32 count, const PMString& firstName,
-	ChapterWalkResult reason)
+// The shape every chapter note in KBS shares: a count, then up to three names, then "...".
+// KBSBookScope::AppendUnopenableNote sets it and says so outright ("deliberately built to the same
+// shape"); this is the search side's copy, shared by both notes below so they cannot drift from
+// each other the way this file's single-name version had already drifted from its two siblings.
+void AppendChapterNames(PMString& outSummary, const std::vector<PMString>& names)
 {
-	if (count <= 0)
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		if (i > 0)
+			outSummary.Append(", ");
+		if (i >= 3)								// a status line stays short, even at three lines
+		{
+			outSummary.Append("...");
+			break;
+		}
+		// RAW, with its ampersands as the user typed them: the one place that draws a status line
+		// doubles the ampersands of the WHOLE line on its way to the widget. See the long note in
+		// KBSBookScope::AppendUnopenableNote for what doubling twice looked like.
+		PMString name(names[i]);
+		name.SetTranslatable(kFalse);
+		outSummary.Append(name);
+	}
+}
+
+/** Name the chapters that were never searched at all, and why. Each entry is already "name: reason"
+    - the name is the user's and the reason names internals, so neither is a translation key.
+    Appends nothing when every chapter was walked, so the ordinary summary is unchanged. */
+void AppendUnsearchableNote(PMString& outSummary, const std::vector<PMString>& entries)
+{
+	if (entries.empty())
 		return;
 
-	outSummary.Append(" ");
-	outSummary.AppendNumber(count);
+	outSummary.Append("  ");
+	outSummary.AppendNumber(static_cast<int32>(entries.size()));
 	outSummary.Append(" chapter(s) could not be searched (");
-	// The chapter name is user data and the reason names internals - neither is a translation key.
-	PMString name(firstName);
-	name.SetTranslatable(kFalse);
-	outSummary.Append(name);
-	outSummary.Append(": ");
-	PMString why(ChapterWalkResultText(reason));
-	why.SetTranslatable(kFalse);
-	outSummary.Append(why);
+	AppendChapterNames(outSummary, entries);
 	outSummary.Append(").");
+}
+
+/** ...and the chapters whose walk BROKE OFF partway. A different sentence from the one above on
+    purpose: these chapters were searched, their hits are in the list, and what is wrong is that the
+    search stopped early - so the part of them that is missing from the list is missing because
+    nobody looked, not because there was nothing there. Saying "could not be searched" would be
+    false in one direction and saying nothing at all would be false in the other. */
+void AppendSearchErrorNote(PMString& outSummary, const std::vector<PMString>& names)
+{
+	if (names.empty())
+		return;
+
+	outSummary.Append("  ");
+	outSummary.AppendNumber(static_cast<int32>(names.size()));
+	outSummary.Append(" chapter(s) stopped with a search error (");
+	AppendChapterNames(outSummary, names);
+	outSummary.Append(") - the rest of each was never searched.");
 }
 
 // (A local AppendUnopenableNote sat here until 2026-08-02. The glyph scan had grown its own copy of
@@ -210,6 +253,31 @@ void AppendUnsearchableNote(PMString& outSummary, int32 count, const PMString& f
 // A search is running. The progress bar pumps events while it is up, so without this a menu command
 // could be dispatched INTO the running search. The panel's actions read it through IsSearching().
 bool gSearching = false;
+
+// The FIND FORMAT the results on the panel were searched with - a shallow copy of the dialog's find
+// attribute list, taken when the search ran and compared before Change Checked re-walks. See
+// KBSSearchEngine::RememberFindFormat for why the list is COPIED rather than described.
+//
+// WHY IT LIVES HERE AND NOT ON KBSResultModel, beside the walk signature it belongs with: that
+// header states its own rule - the search mode is "held as a plain int so this header needs no text
+// includes" - and an AttributeBossList member would drag the text headers into every file that
+// includes the model. The lifetime is kept in step by hand instead, at the two points on this path
+// that call KBSResultModel::Clear(): the search's commit point, and the cancelled exit.
+boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
+
+// The attribute database that list's UIDs are in. Kept beside it because a UID means nothing
+// without its database, so a list from a DIFFERENT one must not be compared against it - see
+// FindFormatHasChanged.
+IDataBase* gSearchedFindAttrDB = nil;
+
+// Let the remembered format go. The two fields are ONE fact, so they are dropped together and in
+// one place: forgetting the list but keeping the database would leave FindFormatHasChanged's
+// "different database" guard comparing against a database no list belongs to.
+void ForgetFindFormat()
+{
+	gSearchedFindAttrs.reset();
+	gSearchedFindAttrDB = nil;
+}
 
 // Raise gSearching for the length of a search, whichever way SearchBook returns.
 struct SearchingFlagGuard
@@ -474,21 +542,26 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts, bool findSide)
 	description.Append(")");
 
 	// The Unicode is a bonus: an ALTERNATE form has none to give, and writing U+0000 there would be a
-	// lie. QueryFace hands back a reference this function owns - release it before returning.
-	IPMFont* const font = family->QueryFace(styleName);
-	if (font != nil)
+	// lie.
+	//
+	// The face is taken through an InterfacePtr, which is how Adobe takes it every time
+	// (SnpModifyLayoutGrid.cpp:1050, SnpInspectLayoutGrid.cpp:465) - QueryFace hands back a reference
+	// and this function is done with it before it returns, so nothing here should be holding one by
+	// hand. (Its sibling in KBSReplaceConfirmDialog::ResolveSide is a raw pointer on purpose and must
+	// stay one: that face is kept for the dialog's lifetime and let go in ReleaseSides.)
+	//
+	// IFontFamily.h:201 asks for BOTH checks - a face can come back non-nil and still not be
+	// installed - and an uninstalled one has no glyph to look a character up in.
+	InterfacePtr<IPMFont> font(family->QueryFace(styleName));
+	if (font != nil && font->GetFontStatus() == IPMFont::kFontInstalled)
 	{
-		if (font->GetFontStatus() == IPMFont::kFontInstalled)
+		const UTF32TextChar ch = Utils<IGlyphUtils>()->GetUnicodeForGlyphID(font, glyphID);
+		if (ch.GetValue() != 0)
 		{
-			const UTF32TextChar ch = Utils<IGlyphUtils>()->GetUnicodeForGlyphID(font, glyphID);
-			if (ch.GetValue() != 0)
-			{
-				char buf[16];
-				snprintf(buf, sizeof(buf), " U+%04X", static_cast<unsigned int>(ch.GetValue()));
-				description.Append(buf);
-			}
+			char buf[16];
+			snprintf(buf, sizeof(buf), " U+%04X", static_cast<unsigned int>(ch.GetValue()));
+			description.Append(buf);
 		}
-		font->Release();
 	}
 
 	return description;
@@ -1060,7 +1133,17 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
 	{
-		outResult = kChapterNoWalker;
+		// ***** THE ONE EXIT THAT IS PAST Initialize. ***** Every refusal above this line is before
+		// the walker was given anything to walk, so there is nothing to stop; this one is after, and
+		// leaving a walker walking is what the Halt at the bottom of this function exists to prevent.
+		// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt), and the
+		// replace engine's two walks are already symmetric this way.
+		if (walker->IsWalking())
+			walker->Halt();
+		// Named for what actually happened. It used to answer kChapterNoWalker - "no text walker" -
+		// which the summary would then print, and there IS a walker: what is missing is the interface
+		// the critical section is taken on.
+		outResult = kChapterNoSelectionUtils;
 		return;
 	}
 
@@ -1109,15 +1192,46 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			break;
 		cmdData->SetTextWalker(walker);
 
+		// ***** WHAT THE COMMAND ANSWERED, not merely whether it landed on something. *****
+		// The contract is IFindChangeService.h:46-49, and it has four answers of which only the
+		// first carries a range:
+		//   kSuccess         a match, with its position
+		//   kNotFound        no match - the walk is over
+		//   kFoundCompleted  the walk is over AND matches came up along the way. Start and end are
+		//                    kInvalidTextIndex, so there is nothing here to collect either
+		//   kFailure         an ERROR. The walk did not finish, it BROKE OFF partway
+		//
+		// The last one is why this is not "did it find something, yes or no". A chapter whose walk
+		// broke off has been searched as far as it got and no further, and letting that end the loop
+		// silently says the rest of the chapter holds no matches - a statement about the user's
+		// DOCUMENT, and not a true one. kChapterWalkFailed carries the difference out to the summary
+		// (AppendSearchErrorNote), while the hits collected before the break are kept, because they
+		// are real.
+		//
+		// The replace engine draws the same distinction from the same header (RunWalkerCmd in
+		// KBSReplaceEngine.cpp, 2026-08-07); this side was still flattening all four answers into one
+		// until 2026-08-07. Official shape: SnpFindAndReplace.cpp:790-796 folds a failed
+		// ProcessCommand into kFailure as well, and its caller (:642-670) turns kFailure - and only
+		// kFailure - into a failure.
 		if (CmdUtils::ProcessCommand(findCmd) != kSuccess)
 		{
 			// End of THIS walk only: the error state a failed find raises would otherwise
 			// outlive it and block every later command in the session.
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			outResult = kChapterWalkFailed;
 			break;
 		}
-		if (cmdData->GetFindChangeResult() != IFindChangeService::kSuccess)
-			break;	// kNotFound: no more matches, walk complete.
+		const IFindChangeService::FindChangeResult found = cmdData->GetFindChangeResult();
+		if (found != IFindChangeService::kSuccess)
+		{
+			// Cleared on this path too. A command can report kSuccess and still leave an error
+			// standing, and one left standing fails the commands that come after it - the replace
+			// engine clears at both of these points for exactly that reason.
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			if (found == IFindChangeService::kFailure)
+				outResult = kChapterWalkFailed;
+			break;		// kNotFound / kFoundCompleted: no more matches, the walk is complete.
+		}
 
 		TextIndex start = kInvalidTextIndex;
 		TextIndex end = kInvalidTextIndex;
@@ -1422,113 +1536,80 @@ const char* KBSSearchEngine::CharacterTypeName(int32 characterType)
 	}
 }
 
-// One find ATTRIBUTE, as far as the SDK will let it be read from outside: its class, and then
-// whatever a small set of generic value interfaces answers for it.
+// ***** THE FIND FORMAT COMPARES ITSELF. *****
 //
-// This is where Find Format lives - the paragraph style, character style, font, size, colour and the
-// rest that the dialog's format pane sets - and on the Glyph tab it is also where the font family and
-// style of the query itself are kept. Every one of them changes WHICH matches a walk returns, so a
-// signature that ignored them would call two different queries the same.
+// Find Format is the paragraph style, character style, font, size, colour and the rest that the
+// dialog's format pane sets, and on the Glyph tab it is also where the font family and style of the
+// query itself are kept. Every one of them changes WHICH matches a walk returns, so a replace that
+// re-walks under a changed one lines its stored rows up with other occurrences entirely.
 //
-// ***** WHY IT IS PROBED RATHER THAN COMPARED. ***** AttributeBossList keeps operator== and
-// operator!= PRIVATE (AttributeBossList.h:251-252), so two lists cannot be compared, and there is no
-// generic "give me this attribute's value" call either - only CountBosses / GetClassN / QueryBossN.
-// The nine interfaces below are the value-carrying bases the text attributes are built on, and
-// asking each attribute for all of them costs nine QueryInterfaces on a list that holds a handful of
-// entries at most, once per run.
+// The list knows how to answer that: AttributeBossList::IsEqual is a deep compare over every
+// attribute in both lists (AttributeBossList.h:179-182). So the search keeps a copy of the list it
+// ran with, and the replace asks the copy.
 //
-// ***** WHERE IT IS STILL INCOMPLETE, AND WHAT THAT NOW COSTS. ***** An attribute that answers none
-// of the nine contributes its CLASS and nothing else, so "this format condition was added or
-// removed" is always seen, while "same condition, different value" may not be.
+// ***** WHAT THIS REPLACED, AND WHY IT HAD TO GO. ***** Until 2026-08-07 the signature carried a
+// hand-rolled fingerprint of each attribute instead: its class, plus whatever answered out of nine
+// value-carrying interfaces (ITextAttrUID / Font / String / WideString / Int32 / Int16 / RealNumber
+// / Boolean / ClassID). An attribute answering none of the nine went in as its CLASS alone - so
+// "this condition was added or removed" was always seen while "same condition, DIFFERENT VALUE" was
+// not. The note above it said so, and said it was survivable because the per-hit same-occurrence
+// test stood behind it. That test was removed on 2026-08-05 (user's decision, see
+// KBSReplaceEngine.h), which turned the gap into a wrong replacement made in silence - and the
+// reason given for living with it, "there is no generic value read to widen it with", was wrong:
+// there was no generic value READ, but there has always been a generic COMPARE.
 //
-// That used to be written down here as survivable, on the grounds that this signature "is not what
-// keeps the replace correct - the per-hit same-occurrence test is". THAT TEST WAS REMOVED ON
-// 2026-08-05 (user's decision - see KBSReplaceEngine.h), and this door is now the only thing between
-// an edited query and a replace that rewrites occurrences the user never saw. So a value this misses
-// is no longer a worse MESSAGE; it is a wrong replacement, made in silence.
+// The comment that sent that search down the wrong path is worth naming, because it was half right:
+// "AttributeBossList keeps operator== and operator!= PRIVATE, so two lists cannot be compared". They
+// are private (:245-252). Sealing the operators and publishing a named method is a normal C++ way of
+// making callers say which comparison they mean - here IsEqual (deep) sits beside Intersects and
+// IntersectionContainsDifferences - and "the operator is private" was read as "the question cannot
+// be asked".
 //
-// It is left as it is for now because there is no generic value read to widen it with (see above),
-// and because the nine below are the value-carrying bases the text attributes are built on - an
-// attribute answering none of them is the exception, not the rule. If a real case turns up, the
-// place to fix it is here, and the test for it is two searches whose Find Format differs only by
-// that attribute's value, run through Change Checked without re-searching.
-static void AppendAttributeSignature(const AttributeBossList* attrs, int32 n, PMString& out)
+// ⚠ Adobe calls neither IsEqual nor IntersectionContainsDifferences anywhere in the SDK, so the
+// header's contract is all there is to go on. Measured instead: see the audit note for the two
+// searches - identical but for one attribute's value - that this was checked with.
+void KBSSearchEngine::RememberFindFormat()
 {
-	out.Append(" a");
-	out.AppendNumber(static_cast<int32>(attrs->GetClassN(n).Get()));
+	ForgetFindFormat();		// whatever is remembered below replaces this, and a failure remembers nothing
 
-	// A UID: an applied paragraph or character style, a font family, a swatch. THE one that matters
-	// most here - "style A -> style B" is a format change that shows up nowhere else.
-	InterfacePtr<const ITextAttrUID> uidAttr(static_cast<const ITextAttrUID*>(
-		attrs->QueryBossN(n, ITextAttrUID::kDefaultIID)));
-	if (uidAttr != nil)
-	{
-		out.Append("=u");
-		out.AppendNumber(static_cast<int32>(uidAttr->GetUIDData().Get()));
-	}
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
 
-	InterfacePtr<const ITextAttrFont> fontAttr(static_cast<const ITextAttrFont*>(
-		attrs->QueryBossN(n, ITextAttrFont::kDefaultIID)));
-	if (fontAttr != nil)
-	{
-		out.Append("=f");
-		out.Append(fontAttr->GetFontName());
-	}
+	IDataBase* const db = opts->GetUIDAttrDB();
+	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, opts->GetSearchMode());
+	if (db == nil || attrs == nil)
+		return;			// nothing to remember - FindFormatHasChanged then says "cannot tell"
 
-	InterfacePtr<const ITextAttrString> strAttr(static_cast<const ITextAttrString*>(
-		attrs->QueryBossN(n, ITextAttrString::kDefaultIID)));
-	if (strAttr != nil)
-	{
-		out.Append("=s");
-		out.Append(strAttr->GetString());
-	}
+	// A SHALLOW copy: the attributes' reference counts go up and the list itself is ours
+	// (AttributeBossList.h:153-157). Held in a boost::shared_ptr, which is how the SDK's own callers
+	// take the result - chmlfilter/CHMLFiltTextHelper.cpp:134 does exactly this before handing the
+	// copy to a command.
+	//
+	// A copy rather than the pointer: what GetFindAttributeBossList returns is the LIVE list behind
+	// the dialog, and the user is free to edit the format pane the moment the search returns.
+	gSearchedFindAttrs.reset(attrs->Duplicate());
+	gSearchedFindAttrDB = db;
+}
 
-	InterfacePtr<const ITextAttrWideString> wideAttr(static_cast<const ITextAttrWideString*>(
-		attrs->QueryBossN(n, ITextAttrWideString::kDefaultIID)));
-	if (wideAttr != nil)
-	{
-		out.Append("=w");
-		out.Append(PMString(wideAttr->GetString()));
-	}
+bool KBSSearchEngine::FindFormatHasChanged()
+{
+	if (gSearchedFindAttrs == nil)
+		return false;			// nothing remembered - cannot tell, so do not refuse
 
-	InterfacePtr<const ITextAttrInt32> i32Attr(static_cast<const ITextAttrInt32*>(
-		attrs->QueryBossN(n, ITextAttrInt32::kDefaultIID)));
-	if (i32Attr != nil)
-	{
-		out.Append("=i");
-		out.AppendNumber(static_cast<int32>(i32Attr->Get()));
-	}
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
 
-	InterfacePtr<const ITextAttrInt16> i16Attr(static_cast<const ITextAttrInt16*>(
-		attrs->QueryBossN(n, ITextAttrInt16::kDefaultIID)));
-	if (i16Attr != nil)
-	{
-		out.Append("=h");
-		out.AppendNumber(static_cast<int32>(i16Attr->Get()));
-	}
+	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil || db != gSearchedFindAttrDB)
+		return false;			// a different attribute database: the UIDs inside do not mean the same thing
 
-	// Scaled and truncated rather than formatted: this is a fingerprint, not a read-out, and
-	// PMString has no plain "append a PMReal" that does not also decide how to round it.
-	InterfacePtr<const ITextAttrRealNumber> realAttr(static_cast<const ITextAttrRealNumber*>(
-		attrs->QueryBossN(n, ITextAttrRealNumber::kDefaultIID)));
-	if (realAttr != nil)
-	{
-		out.Append("=r");
-		out.AppendNumber(static_cast<int32>(ToDouble(realAttr->Get()) * 1000.0));
-	}
+	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, opts->GetSearchMode());
+	if (attrs == nil)
+		return false;
 
-	InterfacePtr<const ITextAttrBoolean> boolAttr(static_cast<const ITextAttrBoolean*>(
-		attrs->QueryBossN(n, ITextAttrBoolean::kDefaultIID)));
-	if (boolAttr != nil)
-		out.Append(boolAttr->GetFlag() ? "=b1" : "=b0");
-
-	InterfacePtr<const ITextAttrClassID> classAttr(static_cast<const ITextAttrClassID*>(
-		attrs->QueryBossN(n, ITextAttrClassID::kDefaultIID)));
-	if (classAttr != nil)
-	{
-		out.Append("=c");
-		out.AppendNumber(static_cast<int32>(classAttr->GetClassData().Get()));
-	}
+	return gSearchedFindAttrs->IsEqual(db, attrs) == kFalse;
 }
 
 PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
@@ -1596,11 +1677,17 @@ PMString KBSSearchEngine::DescribeFormatSetting(bool findSide, bool limited)
 	if (dropped)
 		out.Append(" + ...");
 
-	// Drop the leading separator the first attribute brought with it. Asked of the platform string
-	// because " + " is ASCII wherever the description itself is translated; a description that does
-	// NOT start with it is left exactly as it came.
-	const std::string platform(out.GetPlatformString());
-	if (platform.compare(0, 3, " + ") == 0)
+	// Drop the leading separator the first attribute brought with it. " + " is ASCII whatever
+	// language the description itself came back in, and a description that does NOT start with it is
+	// left exactly as it came.
+	//
+	// Asked of the UTF-8 form rather than the platform one: PMString.h:863-866 says outright to
+	// "check to make sure the code really wants a platform encoded string - if instead it wants utf8
+	// you can call GetUTF8String", and nothing here wants the platform encoding. The platform form is
+	// for strings on their way OUT to the OS, and running a whole settings description through that
+	// conversion to look at three ASCII characters is a conversion nobody asked for.
+	const std::string leading(out.GetUTF8String());
+	if (leading.compare(0, 3, " + ") == 0)
 		out.Remove(0, 3);
 
 	out.SetTranslatable(kFalse);
@@ -1731,19 +1818,17 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		outSignature.Append(switches[i] ? "1" : "0");
 
 	// ----- and FIND FORMAT, which is a search condition like any other -----
-	// The dialog's format pane and, on the Glyph tab, the query's own font. The list is walked in
-	// order and its LENGTH goes in first, so an added or removed condition is a difference even when
-	// none of the values can be read (see AppendAttributeSignature).
+	// COUNTED here, not described: how many conditions the dialog's format pane holds (and, on the
+	// Glyph tab, the query's own font), so that one added or removed shows up in this string.
+	//
+	// WHAT they are set to is deliberately not fingerprinted here. That question belongs to the list
+	// itself - RememberFindFormat / FindFormatHasChanged, which the replace asks alongside this
+	// signature - and asking it there is what closed the "same condition, different value" gap this
+	// file carried until 2026-08-07.
 	IDataBase* const db = opts->GetUIDAttrDB();
 	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, mode);
 	outSignature.Append(" n");
 	outSignature.AppendNumber(attrs != nil ? attrs->CountBosses() : 0);
-	if (attrs != nil)
-	{
-		const int32 attrCount = attrs->CountBosses();
-		for (int32 i = 0; i < attrCount; ++i)
-			AppendAttributeSignature(attrs, i, outSignature);
-	}
 
 	// ...and the two conditions that list does NOT carry. A paragraph or character style set in the
 	// format pane sits in a field of its own (see HasFormatSet), so without these a query that
@@ -2201,6 +2286,13 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		KBSResultModel::SetWalkSignature(walkSignature);
 	}
 
+	// ...and the FIND FORMAT itself, kept as a list rather than described in that string, because the
+	// list compares itself properly and a hand-written fingerprint of it did not. Taken here, on the
+	// same side of CommitSearchMode as the signature, for the same reason: a value read on one side
+	// of a mode commit and compared against one read on the other could differ with nothing having
+	// changed. See KBSSearchEngine::RememberFindFormat.
+	KBSSearchEngine::RememberFindFormat();
+
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
@@ -2251,13 +2343,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// Chapters that could not be searched at all. Counted separately from "searched, no hits":
 	// the summary has to be able to say a chapter was skipped, or a book search silently returns
 	// fewer chapters than the book has and looks like the chapters simply held no matches.
-	int32 unsearchableCount = 0;
-	PMString unsearchableName;
-	ChapterWalkResult unsearchableReason = kChapterWalked;
-	// A separate flag rather than unsearchableName.IsEmpty(): a chapter whose name is empty would
-	// otherwise never count as "the first one", and every later chapter would overwrite the reason.
-	// (Same trap the replace engine's firstSkipped already sidesteps.)
-	bool haveFirstUnsearchable = false;
+	// Each entry is already spelled "name: why", ready for the note.
+	std::vector<PMString> unsearchable;
+	// ...and the chapters whose walk STARTED and then broke off. Kept apart from the list above
+	// because they need a different sentence: these chapters were searched, their hits are in the
+	// result set, and what is missing is the part of them the walk never reached.
+	std::vector<PMString> brokeOff;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
@@ -2350,19 +2441,27 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 
 		if (docCapped)
 			collectionTruncated = true;
-		if (walkResult != kChapterWalked)
+		if (walkResult == kChapterWalkFailed)
 		{
-			// This chapter was never actually searched. Keep the first one's name so the summary
-			// can say which chapter and why - a skipped chapter is indistinguishable from a chapter
-			// with no matches otherwise, and that is what made this hard to see.
-			++unsearchableCount;
-			if (!haveFirstUnsearchable)
-			{
-				unsearchableName = targets[i].shortName;
-				unsearchableName.SetTranslatable(kFalse);
-				unsearchableReason = walkResult;
-				haveFirstUnsearchable = true;
-			}
+			// The walk ran and then broke off. What it found before that is real, so this does NOT
+			// skip the chapter - it falls through and files the hits like any other. What the
+			// summary owes the user is the other half: the rest of this chapter was never looked at,
+			// and its matches are missing from the list because nobody searched for them.
+			PMString name(targets[i].shortName);
+			name.SetTranslatable(kFalse);
+			brokeOff.push_back(name);
+		}
+		else if (walkResult != kChapterWalked)
+		{
+			// This chapter was never searched at all. Named with its reason, because a skipped
+			// chapter is indistinguishable from a chapter with no matches otherwise - which is
+			// exactly what made this class of failure hard to see.
+			PMString entry(targets[i].shortName);
+			entry.Append(": ");
+			PMString why(ChapterWalkResultText(walkResult));
+			entry.Append(why);
+			entry.SetTranslatable(kFalse);
+			unsearchable.push_back(entry);
 			continue;
 		}
 		if (hits.empty())
@@ -2405,6 +2504,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	{
 		KBSResultModel::Clear();
 		KBSBookScope::ReleaseSearchedBook();	// closes the chapters AND forgets the book
+		ForgetFindFormat();						// ...and the format those results were found with
 		outSummary.Clear();
 		outSummary.SetTranslatable(kFalse);
 		outSummary.Append("Search cancelled.");
@@ -2433,8 +2533,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 			outSummary.Append(targets[0].shortName);
 			outSummary.Append("\".");
 		}
-		// "No matches" is a lie if a chapter was skipped rather than searched - say so here too.
-		AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
+		// "No matches" is a lie if a chapter was skipped, or if a walk broke off before it reached
+		// the end of one - say so here too.
+		AppendUnsearchableNote(outSummary, unsearchable);
+		AppendSearchErrorNote(outSummary, brokeOff);
 		KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 		return 0;
 	}
@@ -2485,7 +2587,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		outSummary.Append(" in the panel.");
 	}
 
-	AppendUnsearchableNote(outSummary, unsearchableCount, unsearchableName, unsearchableReason);
+	AppendUnsearchableNote(outSummary, unsearchable);
+	AppendSearchErrorNote(outSummary, brokeOff);
 	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 
 	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - they moved

@@ -208,6 +208,12 @@ namespace KBSSearchEngine
 	    not see that: retyping the find string, or turning Include Footnotes off, changes the match set
 	    without changing the tab.
 
+	    ***** FIND FORMAT IS ONLY COUNTED HERE, NOT DESCRIBED. ***** The signature carries how MANY
+	    attributes the format pane holds, and the two styles it keeps outside that list - but not the
+	    attributes' values, because the list itself knows how to compare itself and does it better:
+	    see RememberFindFormat / FindFormatHasChanged, which is the pair that answers "same conditions,
+	    different value".
+
 	    fSearchBackwards is deliberately left out - KBS always walks forward, whatever the dialog says
 	    - and so is everything on the CHANGE side, which decides what gets written rather than what
 	    gets found.
@@ -216,6 +222,36 @@ namespace KBSSearchEngine
 	    "cannot tell" rather than as "different": refusing a replace because a query could not be
 	    described would be a new way to fail. */
 	void BuildWalkSignature(PMString& outSignature);
+
+	/** Keep a copy of the FIND FORMAT this search ran with - the attribute list behind the dialog's
+	    format pane, and on the Glyph tab the query's own font - so the replace can ask whether it is
+	    still the same one. Called once per search, beside BuildWalkSignature; a search that cannot
+	    read the settings simply remembers nothing, and FindFormatHasChanged then says "cannot tell".
+
+	    ***** THE LIST COMPARES ITSELF. ***** AttributeBossList::IsEqual is a deep compare over every
+	    attribute in both lists (AttributeBossList.h:179-182), which is exactly the question being
+	    asked and is not one this plug-in can answer from outside: there is no generic "read this
+	    attribute's value" call, so KBS used to probe each attribute through nine value interfaces and
+	    fingerprint whatever answered. An attribute answering none of the nine went into that
+	    fingerprint as its CLASS alone - so "same condition, different value" was invisible, and with
+	    the per-hit same-occurrence test gone (2026-08-05) that is a wrong replacement made in
+	    silence. The copy is shallow (Duplicate, AttributeBossList.h:157: the attributes' reference
+	    counts go up), held in a boost::shared_ptr the way chmlfilter does it
+	    (CHMLFiltTextHelper.cpp:134).
+
+	    @note The operators are no help - AttributeBossList keeps operator== and operator!= private
+	          (:245-252) - which is a normal C++ way of steering callers to the named method, not a
+	          sign that the comparison is unavailable. A comment in this file said the opposite for
+	          months. */
+	void RememberFindFormat();
+
+	/** Has the Find Format changed since RememberFindFormat was called?
+
+	    @return true ONLY when the two lists can both be read and are positively different. Nothing
+	            remembered, settings unreadable, or a different attribute database - all read as
+	            false, because "cannot tell" must never turn into a refusal (the same rule an empty
+	            walk signature follows). */
+	bool FindFormatHasChanged();
 
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
