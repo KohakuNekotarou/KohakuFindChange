@@ -244,7 +244,7 @@ PMString KBSReplaceConfirmDialog::BuildUnsavedLine()
 */
 PMString KBSReplaceConfirmDialog::BuildCareLine()
 {
-	PMString line(KBSLoc::Text(kKBSConfirmSeveralChaptersKey, KBSJa::kConfirmSeveralChapters));
+	PMString line(KBSLoc::Text(kKBSConfirmCareKey, KBSJa::kConfirmCare));
 	line.SetTranslatable(kFalse);
 	return line;
 }

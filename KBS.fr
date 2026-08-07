@@ -1611,9 +1611,11 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVENoSpaceAfter,
 		),
 
-		// ----- "Take care when you are replacing across several chapters." -----
-		// A line of its own rather than more text on the one above: it is a different kind of
-		// statement - that one describes this run, this one warns about the next.
+		// ----- "Please take care." -----
+		// A line of its own rather than more text on the one above: the two are different kinds of
+		// statement - that one says what the run LEAVES BEHIND, this one is the warning about it.
+		// Single-line on purpose and safely so: since 2026-08-07 this is the shortest line on the
+		// prompt (it named the condition too until then, which the line above now states in full).
 		EVEStaticTextWidget
 		(
 			kKBSReplaceConfirmCareWidgetID,

@@ -91,8 +91,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // counting chapters, so the singular/plural pair it replaced is gone and there is
                 // no ^1 left in it.
                 kKBSConfirmUnsavedKey,			"When a replace covers several documents in a book, every document it changes is left open and UNSAVED.",
-                // Follows the line above on both layouts, whatever the count.
-                kKBSConfirmSeveralChaptersKey,	"Take care when you are replacing across several chapters.",
+                // Follows the line above on both layouts, whatever the count. Just the warning
+                // since 2026-08-07 (user's wording): the line above already states the condition
+                // it used to repeat.
+                kKBSConfirmCareKey,				"Please take care.",
 
                 // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
                 // The count and the closing line above are shared with it - only these four are new.

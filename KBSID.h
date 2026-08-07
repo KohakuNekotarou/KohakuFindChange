@@ -441,11 +441,15 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one document
 // silently stripped the step from the others without reverting their text.)
 #define kKBSConfirmUnsavedKey	kKBSStringPrefix "kKBSConfirmUnsavedKey"
-// The warning that follows it, in the user's own words (2026-08-05). Shown WHATEVER the count: on a
-// one-chapter run it reads as notice of what a bigger one will do. It matters more since the plug-in
-// stopped offering to save - a run across a whole book now leaves every chapter it touched standing
-// open, and that is a surprise worth putting in front of the run rather than after it.
-#define kKBSConfirmSeveralChaptersKey	kKBSStringPrefix "kKBSConfirmSeveralChaptersKey"
+// The warning that closes the prompt, in the user's own words. Shown WHATEVER the count.
+//
+// ***** JUST "take care" since 2026-08-07 (user's wording). ***** It used to name the condition too
+// - "take care when you are replacing across several chapters" - which is why the key was called
+// SeveralChapters. The line ABOVE it now states that condition in full (kKBSConfirmUnsavedKey:
+// "when a replace covers several documents in a book..."), so saying it twice only made the closing
+// warning longer than the thing it warns about. Renamed with the wording rather than left standing
+// as a key that names a condition its string no longer carries.
+#define kKBSConfirmCareKey	kKBSStringPrefix "kKBSConfirmCareKey"
 
 // The Glyph tab's own confirmation, the one that draws the glyphs. The count and the closing line
 // are shared with the plain alert above - the same sentences, on a different screen - so the only

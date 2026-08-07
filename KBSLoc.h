@@ -87,7 +87,9 @@ namespace KBSJa
 	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
 	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
 	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";
-	const char16_t kConfirmSeveralChapters[] = u"複数の章を置換する場合は、ご注意ください。";
+	// Just the warning since 2026-08-07 (user's wording): the line above states the condition it
+	// used to name, so repeating it here only made the closing line the longest one on the prompt.
+	const char16_t kConfirmCare[]            = u"ご注意下さい。";
 
 	// ----- Glyph confirmation dialog chrome -----
 	const char16_t kGlyphFindLabel[]   = u"検索";
