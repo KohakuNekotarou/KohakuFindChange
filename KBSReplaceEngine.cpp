@@ -749,7 +749,9 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.AppendNumber(t.chaptersWalkFailed);
 		outSummary.Append(" of those chapter(s) stopped with a search error (\"");
 		outSummary.Append(t.firstWalkFailed);
-		outSummary.Append("\" first), so the rest of that chapter was never reached.");
+		// "each", not "that chapter": this counter can be more than one, and every other sentence
+		// in this summary is written to read correctly at any count.
+		outSummary.Append("\" first) - the rest of each was never reached.");
 	}
 
 	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
