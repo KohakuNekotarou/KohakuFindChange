@@ -90,8 +90,20 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (chapterCount <= 0)
 		return;
 
-	// GetDocument hands back the document's UIDRef (not an IDocument*), and it may be gNull - an
-	// unsaved document being closed carries no reference to compare against.
+	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,
+	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL: this test used to
+	// say "an unsaved document being closed carries no reference to compare against", and that was
+	// measured to be wrong on 2026-08-08 - a never-saved document, closed unsaved, arrived here
+	// with a valid UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
+	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md).
+	//
+	// The distinction earns this much comment because of what the wrong reason concealed. If an
+	// unsaved close really did pass through here, its document-scope results would outlive their
+	// document - and a document-scope chapter carries no file, so the replace's resolve pass would
+	// be left asking IsDocStillOpen of a dead UIDRef, which a reused address can answer YES for
+	// about a DIFFERENT document (the 2026-08-04 fault). "This guard skips unsaved documents"
+	// described a hole; what it actually is is a nil test in front of a comparison, with nothing
+	// known to produce the nil.
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)
 		return;
