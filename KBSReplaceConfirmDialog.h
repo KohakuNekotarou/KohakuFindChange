@@ -94,12 +94,15 @@ public:
 		flag, but a confirmation in front of a destructive rewrite is not worth having if a single
 		tick can remove it for good.
 
+		(A chapter COUNT was passed here as well until 2026-08-07, for a closing sentence that named
+		it. That sentence now states the case instead of counting - see BuildUnsavedLine - so the
+		number had no reader left.)
+
 		@param checkedCount how many hits will be rewritten (the opening sentence, glyph layout).
-		@param chapterCount how many documents will be written to (the closing sentence, glyph).
 		@param message      the whole prompt, for the Text / GREP layout. Empty = glyph layout.
 		@return true when the user approved the rewrite.
 	*/
-	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message);
+	static bool Ask(int32 checkedCount, const PMString& message);
 
 	/** ***** THE FOUR SENTENCES BOTH LAYOUTS SAY, SPELLED IN ONE PLACE. *****
 
@@ -123,10 +126,13 @@ public:
 	/** What the run does NOT check, in the user's language. @see BuildCountLine */
 	static PMString BuildEditedSinceLine();
 
-	/** How many documents are left open and unsaved. @see BuildCountLine
-		@param chapterCount how many will be written to (decides singular / plural).
+	/** What the run leaves behind - documents open and unsaved. @see BuildCountLine
+
+		Took a chapter count until 2026-08-07 and chose between a singular and a plural string with
+		it. The wording states the case now ("when a replace covers several documents in a book..."),
+		so there is no number in it, one string does for every run, and nothing here inflects.
 	*/
-	static PMString BuildUnsavedLine(int32 chapterCount);
+	static PMString BuildUnsavedLine();
 
 	/** The warning under it, shown whatever the count. @see BuildCountLine */
 	static PMString BuildCareLine();
@@ -137,9 +143,6 @@ public:
 	/** What the controller was told to show. Read by InitializeDialogFields. */
 	static int32 GetCheckedCount();
 
-	/** @see GetCheckedCount */
-	static int32 GetChapterCount();
-
 	/** The Text / GREP prompt, or EMPTY for the glyph layout - which is also how the controller
 		tells the two apart. @see GetCheckedCount */
 	static const PMString& GetMessage();
@@ -149,7 +152,6 @@ private:
 	static Side		sChange;
 	static bool		sAccepted;
 	static int32	sCheckedCount;
-	static int32	sChapterCount;
 	static PMString	sMessage;
 
 	/** Fill one side from one attribute list.

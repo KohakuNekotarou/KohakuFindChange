@@ -47,7 +47,6 @@ KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
 bool						KBSReplaceConfirmDialog::sAccepted = false;
 int32						KBSReplaceConfirmDialog::sCheckedCount = 0;
-int32						KBSReplaceConfirmDialog::sChapterCount = 0;
 PMString					KBSReplaceConfirmDialog::sMessage;
 
 /* ResolveSide
@@ -232,16 +231,11 @@ PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
 
 /* BuildUnsavedLine
 */
-PMString KBSReplaceConfirmDialog::BuildUnsavedLine(int32 chapterCount)
+PMString KBSReplaceConfirmDialog::BuildUnsavedLine()
 {
-	PMString chapterStr;
-	chapterStr.AppendNumber(chapterCount);
-	chapterStr.SetTranslatable(kFalse);
-
-	PMString line(chapterCount <= 1
-		? KBSLoc::Text(kKBSConfirmUnsavedOneKey, KBSJa::kConfirmUnsavedOne)
-		: KBSLoc::Text(kKBSConfirmUnsavedManyKey, KBSJa::kConfirmUnsavedMany));
-	::ReplaceStringParameters(&line, chapterStr);
+	// No count and no parameter: the sentence states what a book-wide replace leaves behind rather
+	// than numbering the chapters, so one string serves every run (2026-08-07, user's wording).
+	PMString line(KBSLoc::Text(kKBSConfirmUnsavedKey, KBSJa::kConfirmUnsaved));
 	line.SetTranslatable(kFalse);
 	return line;
 }
@@ -269,13 +263,6 @@ int32 KBSReplaceConfirmDialog::GetCheckedCount()
 	return sCheckedCount;
 }
 
-/* GetChapterCount
-*/
-int32 KBSReplaceConfirmDialog::GetChapterCount()
-{
-	return sChapterCount;
-}
-
 /* GetMessage
 */
 const PMString& KBSReplaceConfirmDialog::GetMessage()
@@ -285,7 +272,7 @@ const PMString& KBSReplaceConfirmDialog::GetMessage()
 
 /* Ask
 */
-bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const PMString& message)
+bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, const PMString& message)
 {
 	// The glyph layout needs a resolved find side to draw - an empty CHANGE side is the deletion
 	// request and draws as an empty frame, but with nothing on the find side there is no prompt.
@@ -298,7 +285,6 @@ bool KBSReplaceConfirmDialog::Ask(int32 checkedCount, int32 chapterCount, const 
 	// alert's suppression flag, but a confirmation in front of a destructive rewrite is not worth
 	// having if a single tick can remove it for good.
 	sCheckedCount = checkedCount;
-	sChapterCount = chapterCount;
 	// Already assembled AND translated by the caller: what arrives here is finished text, and a
 	// key only translates while it is the WHOLE string anyway.
 	sMessage = message;
@@ -490,7 +476,7 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 
 	// The closing sentence.
 	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID,
-		KBSReplaceConfirmDialog::BuildUnsavedLine(KBSReplaceConfirmDialog::GetChapterCount()));
+		KBSReplaceConfirmDialog::BuildUnsavedLine());
 
 	// ...and the warning under it, WHATEVER the count (user, 2026-08-05).
 	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID,

@@ -87,8 +87,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
                 // box below", because a "save after replace" box underneath could make them false.
                 // That box is gone with its feature, so a run has only one outcome left to state.
-                kKBSConfirmUnsavedOneKey,		"The chapter is opened and left UNSAVED.",
-                kKBSConfirmUnsavedManyKey,		"The ^1 chapters are opened and left UNSAVED.",
+                // ONE string since 2026-08-07 (user's wording): it states the case instead of
+                // counting chapters, so the singular/plural pair it replaced is gone and there is
+                // no ^1 left in it.
+                kKBSConfirmUnsavedKey,			"When a replace covers several documents in a book, every document it changes is left open and UNSAVED.",
                 // Follows the line above on both layouts, whatever the count.
                 kKBSConfirmSeveralChaptersKey,	"Take care when you are replacing across several chapters.",
 

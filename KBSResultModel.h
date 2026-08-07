@@ -540,8 +540,19 @@ namespace KBSResultModel
 	int32 GetChapterCheckedCount(int32 chapterIdx);
 
 	/** How many CHAPTERS hold at least one checked, unreplaced hit - i.e. how many documents the
-	    replace will write to. The confirmation prompt needs it because undo is per document: one
-	    chapter means a single Ctrl+Z puts everything back, more than one means one undo each. */
+	    replace would write to.
+
+	    ***** NOTHING READS THIS SINCE 2026-08-07. ***** Its one caller was the confirmation
+	    prompt's closing line, which named the number. That line states the case instead of counting
+	    it now (KBSReplaceConfirmDialog::BuildUnsavedLine), so the count has no reader left. Kept
+	    rather than removed because it is a real question about the model and cheap to answer - but
+	    it is a candidate for removal, not a call with a caller behind it.
+
+	    (The reason recorded here until today was wrong twice over. It said the prompt needed this
+	    "because undo is per document: one chapter means a single Ctrl+Z puts everything back, more
+	    than one means one undo each". That stopped being true on 2026-07-28, when the whole run
+	    became ONE command sequence - a book-wide replace is a single undo step however many
+	    chapters it touches - and the undo promise came off the prompt itself on 2026-08-05.) */
 	int32 GetCheckedChapterCount();
 
 	/** How many hits COULD be checked at all: every hit that is neither replaced nor locked, i.e.

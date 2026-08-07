@@ -1586,17 +1586,27 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
-		// ----- "The chapter is opened and left UNSAVED..." -----
-		EVEStaticTextWidget
+		// ----- "When a replace covers several documents in a book, every document it changes is
+		//        left open and UNSAVED." -----
+		//
+		// MULTI-line since 2026-08-07, for exactly the reason the warning above it already was: the
+		// sentence it carries (the user's wording, replacing a pair that counted the chapters) runs
+		// well past 340px in both languages, and a single-line widget does NOT shorten it - with
+		// kDontEllipsize, EVE widens the WHOLE DIALOG to fit the line instead. Measured on the
+		// running prompt: the dialog went 370px -> 654px while every other row stayed at 340.
+		EVEStaticMultiLineTextWidget
 		(
-			kKBSReplaceConfirmUnsavedWidgetID,
-			kSysStaticTextPMRsrcId,
+			kKBSReplaceConfirmUnsavedWidgetID, kSysStaticTextPMRsrcId,
 			kBindNone,
-			Frame(0, 0, 340, 20)
+			Frame(0, 0, 340, 40)			// EVE grows it to fit the text
 			kTrue, kTrue, kAlignLeft,
 			kDontEllipsize, kFalse,
-			"",									// the controller fills it
-			0
+			// StaticMultiLineTextAttr
+			0,								// fScrollBarWidgetID
+			kDialogWindowFontId;			// fFontID
+			3,								// fNumPixelsBetweenLines
+			0, 0,							// fInset
+			"",								// the controller fills it
 
 			kEVEAlignLeft | kEVENoSpaceAfter,
 		),

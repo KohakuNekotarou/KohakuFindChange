@@ -675,11 +675,10 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	// How many chapters this will write to. Only the singular/plural of the sentence turns on it now
-	// - it used to decide what could be promised about undo as well, until that promise came off the
-	// prompt on 2026-08-05.
-	const int32 chapterCount = KBSResultModel::GetCheckedChapterCount();
-	msg.Append(KBSReplaceConfirmDialog::BuildUnsavedLine(chapterCount));
+	// What the run leaves behind. It used to name HOW MANY chapters, which is why a count was read
+	// here and carried into the prompt; the sentence states the case instead since 2026-08-07 (the
+	// user's wording), so nothing on this path needs the number any more.
+	msg.Append(KBSReplaceConfirmDialog::BuildUnsavedLine());
 
 	// ...and the warning that follows it, on its own line and WHATEVER the count (user, 2026-08-05).
 	// On a one-chapter run it reads as notice of what a bigger one will do, which is the point: the
@@ -698,7 +697,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// An empty message asks with the GLYPH layout, so this is where the two part company: the
 	// glyphs when they resolved, the assembled sentences when they did not.
 	PMString glyphLayout;
-	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount, chapterCount,
+	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount,
 		glyphResolved ? glyphLayout : msg);
 
 	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.

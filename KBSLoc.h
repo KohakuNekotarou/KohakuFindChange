@@ -84,8 +84,9 @@ namespace KBSJa
 	const char16_t kConfirmFindFormat[]      = u"検索形式";
 	const char16_t kConfirmChangeFormat[]    = u"置換形式";
 	const char16_t kConfirmEditedSince[]     = u"検索後にテキストが編集されていると意図していない場所が置換される場合が有ります。";
-	const char16_t kConfirmUnsavedOne[]      = u"章は開かれたまま未保存の状態で残ります。";
-	const char16_t kConfirmUnsavedMany[]     = u"^1 個の章が開かれたまま未保存の状態で残ります。";
+	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
+	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
+	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";
 	const char16_t kConfirmSeveralChapters[] = u"複数の章を置換する場合は、ご注意ください。";
 
 	// ----- Glyph confirmation dialog chrome -----

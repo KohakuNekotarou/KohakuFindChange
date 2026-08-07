@@ -425,18 +425,22 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // Translated like the rest of this prompt, and for the same reason: this is where the user
 // authorises a rewrite of their own text. The status line that reports the outcome stays English.
 #define kKBSConfirmEditedSinceKey	kKBSStringPrefix "kKBSConfirmEditedSinceKey"
-// The closing line, split by how many chapters will be written to. The two keys differ only in
-// singular/plural, which languages that inflect cannot build from one string.
+// The closing line: what the run LEAVES BEHIND.
 //
-// Both used to end by promising the undo ("a single undo puts it back"). Dropped on 2026-08-05
-// (user's call): the sentence is about what the user is LEFT WITH, and a promise about undo in the
-// same breath softens it. The behaviour it described is unchanged and still worth knowing here - the
+// ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by
+// how many chapters would be written to, because languages that inflect cannot build both from one
+// string. The new sentence states the case rather than counting it ("when a replace covers several
+// documents in a book..."), so there is no number in it and nothing left to inflect. With the count
+// went the reason for KBSReplaceConfirmDialog::Ask to be told it at all.
+//
+// It used to end by promising the undo ("a single undo puts it back"). Dropped on 2026-08-05 (user's
+// call): the sentence is about what the user is LEFT WITH, and a promise about undo in the same
+// breath softens it. The behaviour it described is unchanged and still worth knowing here - the
 // whole replace is ONE undo step however many chapters it touches, because KBSReplaceEngine wraps
 // the entire run in a single command sequence. (Until 2026-07-28 this said "one undo step per
 // chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one document
 // silently stripped the step from the others without reverting their text.)
-#define kKBSConfirmUnsavedOneKey	kKBSStringPrefix "kKBSConfirmUnsavedOneKey"
-#define kKBSConfirmUnsavedManyKey	kKBSStringPrefix "kKBSConfirmUnsavedManyKey"
+#define kKBSConfirmUnsavedKey	kKBSStringPrefix "kKBSConfirmUnsavedKey"
 // The warning that follows it, in the user's own words (2026-08-05). Shown WHATEVER the count: on a
 // one-chapter run it reads as notice of what a bigger one will do. It matters more since the plug-in
 // stopped offering to save - a run across a whole book now leaves every chapter it touched standing
