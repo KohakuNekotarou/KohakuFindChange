@@ -565,14 +565,12 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	PMString msg;
 	msg.SetTranslatable(kFalse);
 
-	PMString countStr;
-	countStr.AppendNumber(checkedCount);
-	countStr.SetTranslatable(kFalse);
-	PMString countLine(checkedCount == 1
-		? KBSLoc::Text(kKBSConfirmReplaceOneKey, KBSJa::kConfirmReplaceOne)
-		: KBSLoc::Text(kKBSConfirmReplaceManyKey, KBSJa::kConfirmReplaceMany));
-	::ReplaceStringParameters(&countLine, countStr);
-	msg.Append(countLine);
+	// ***** THE OPENING SENTENCE COMES FROM THE PROMPT, NOT FROM HERE. ***** It and the three below
+	// are the sentences the GLYPH layout says as well, and both layouts used to spell them out
+	// separately - same keys, same singular/plural test, same ::ReplaceStringParameters, written
+	// twice (until 2026-08-07). What differs between the layouts is where a sentence goes; what it
+	// says is KBSReplaceConfirmDialog::Build*Line.
+	msg.Append(KBSReplaceConfirmDialog::BuildCountLine(checkedCount));
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
@@ -673,8 +671,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	//
 	// Between the query and the closing lines on purpose: what is about to be written, then what
 	// could go wrong with it, then what the run leaves behind.
-	PMString editedSince(KBSLoc::Text(kKBSConfirmEditedSinceKey, KBSJa::kConfirmEditedSince));
-	msg.Append(editedSince);
+	msg.Append(KBSReplaceConfirmDialog::BuildEditedSinceLine());
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
@@ -682,22 +679,14 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// - it used to decide what could be promised about undo as well, until that promise came off the
 	// prompt on 2026-08-05.
 	const int32 chapterCount = KBSResultModel::GetCheckedChapterCount();
-	PMString chapterStr;
-	chapterStr.AppendNumber(chapterCount);
-	chapterStr.SetTranslatable(kFalse);
-	PMString unsaved(chapterCount <= 1
-		? KBSLoc::Text(kKBSConfirmUnsavedOneKey, KBSJa::kConfirmUnsavedOne)
-		: KBSLoc::Text(kKBSConfirmUnsavedManyKey, KBSJa::kConfirmUnsavedMany));
-	::ReplaceStringParameters(&unsaved, chapterStr);
-	msg.Append(unsaved);
+	msg.Append(KBSReplaceConfirmDialog::BuildUnsavedLine(chapterCount));
 
 	// ...and the warning that follows it, on its own line and WHATEVER the count (user, 2026-08-05).
 	// On a one-chapter run it reads as notice of what a bigger one will do, which is the point: the
 	// plug-in no longer offers to save, so a book-wide replace leaves every chapter it touched
 	// standing open, and that is better said before the run than discovered after it.
 	msg.Append(kLineSeparatorString);
-	PMString care(KBSLoc::Text(kKBSConfirmSeveralChaptersKey, KBSJa::kConfirmSeveralChapters));
-	msg.Append(care);
+	msg.Append(KBSReplaceConfirmDialog::BuildCareLine());
 
 	// ONE prompt for every tab (2026-08-02). It used to be CAlert::ModalAlert here and the glyph
 	// dialog above; both are the same dialog now. The box that forced the move - "save after

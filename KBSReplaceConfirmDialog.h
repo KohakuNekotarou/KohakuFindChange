@@ -101,6 +101,36 @@ public:
 	*/
 	static bool Ask(int32 checkedCount, int32 chapterCount, const PMString& message);
 
+	/** ***** THE FOUR SENTENCES BOTH LAYOUTS SAY, SPELLED IN ONE PLACE. *****
+
+		The prompt has two layouts and they differ only in where a sentence GOES: the Text / GREP
+		one assembles a single wrapped block (KBSActionComponent::ConfirmReplace), the Glyph one
+		puts a widget on each line (FillGlyphLayout, in this file's .cpp). Until 2026-08-07 each of
+		them also chose its own string-table key, made its own singular/plural decision and ran its
+		own ::ReplaceStringParameters - four sentences written twice. Nothing had drifted, but the
+		wording of one prompt was two edits away from disagreeing with the other, about a rewrite
+		the user is being asked to authorise. What a sentence SAYS belongs here; where it goes
+		belongs to the caller.
+
+		Each comes back FINISHED - translated for the UI language and with its number already in -
+		and marked untranslatable, so nothing downstream can take it for a key.
+
+		@param checkedCount how many hits will be rewritten (decides singular / plural).
+		@return the opening sentence.
+	*/
+	static PMString BuildCountLine(int32 checkedCount);
+
+	/** What the run does NOT check, in the user's language. @see BuildCountLine */
+	static PMString BuildEditedSinceLine();
+
+	/** How many documents are left open and unsaved. @see BuildCountLine
+		@param chapterCount how many will be written to (decides singular / plural).
+	*/
+	static PMString BuildUnsavedLine(int32 chapterCount);
+
+	/** The warning under it, shown whatever the count. @see BuildCountLine */
+	static PMString BuildCareLine();
+
 	/** The controller's way back: OK sets it, Ask() reads it. */
 	static void SetAccepted(bool accepted);
 

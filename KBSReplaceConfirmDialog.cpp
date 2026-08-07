@@ -201,6 +201,60 @@ const KBSReplaceConfirmDialog::Side* KBSReplaceConfirmDialog::GetSideForWidget(c
 	return nil;
 }
 
+/* BuildCountLine
+*/
+PMString KBSReplaceConfirmDialog::BuildCountLine(int32 checkedCount)
+{
+	// The key is translated BEFORE the count goes in - a key only translates while it is the WHOLE
+	// string - and the count itself is data, so it is marked untranslatable first: a number that
+	// happened to match a table entry would otherwise come back as somebody else's translation.
+	PMString countStr;
+	countStr.AppendNumber(checkedCount);
+	countStr.SetTranslatable(kFalse);
+
+	PMString line(checkedCount == 1
+		? KBSLoc::Text(kKBSConfirmReplaceOneKey, KBSJa::kConfirmReplaceOne)
+		: KBSLoc::Text(kKBSConfirmReplaceManyKey, KBSJa::kConfirmReplaceMany));
+	::ReplaceStringParameters(&line, countStr);
+	line.SetTranslatable(kFalse);
+	return line;
+}
+
+/* BuildEditedSinceLine
+*/
+PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
+{
+	// No parameter in this one, so it only needs translating.
+	PMString line(KBSLoc::Text(kKBSConfirmEditedSinceKey, KBSJa::kConfirmEditedSince));
+	line.SetTranslatable(kFalse);
+	return line;
+}
+
+/* BuildUnsavedLine
+*/
+PMString KBSReplaceConfirmDialog::BuildUnsavedLine(int32 chapterCount)
+{
+	PMString chapterStr;
+	chapterStr.AppendNumber(chapterCount);
+	chapterStr.SetTranslatable(kFalse);
+
+	PMString line(chapterCount <= 1
+		? KBSLoc::Text(kKBSConfirmUnsavedOneKey, KBSJa::kConfirmUnsavedOne)
+		: KBSLoc::Text(kKBSConfirmUnsavedManyKey, KBSJa::kConfirmUnsavedMany));
+	::ReplaceStringParameters(&line, chapterStr);
+	line.SetTranslatable(kFalse);
+	return line;
+}
+
+/* BuildCareLine
+*/
+PMString KBSReplaceConfirmDialog::BuildCareLine()
+{
+	PMString line(KBSLoc::Text(kKBSConfirmSeveralChaptersKey, KBSJa::kConfirmSeveralChapters));
+	line.SetTranslatable(kFalse);
+	return line;
+}
+
 /* SetAccepted
 */
 void KBSReplaceConfirmDialog::SetAccepted(bool accepted)
@@ -330,24 +384,19 @@ CREATE_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialogCo
 */
 void KBSReplaceConfirmDialogController::SetOptionalLine(const WidgetID& widgetID, const PMString& text)
 {
-	InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
-	if (panelData == nil)
-		return;
-	IControlView* view = panelData->FindWidget(widgetID);
-	if (view == nil)
-		return;
-
+	// Empty means "do not show this line at all": an ALTERNATE form has no Unicode to give and an
+	// empty Change To box has no font to name, and a blank line under one frame but not the other
+	// reads as a fault. Whether a widget is shown is ShowOrHide's question and is asked there -
+	// this used to carry a second copy of the same show/hide/enable/disable steps.
 	if (text.IsEmpty())
 	{
-		// Hidden AND disabled: a widget that is only hidden still takes clicks (the lesson from the
-		// replaced rows' check boxes). Nothing here is clickable, but the pair is the house rule.
-		view->ShowView(kFalse);
-		view->Disable();
+		this->ShowOrHide(widgetID, false);
 		return;
 	}
+	// SetTextControlData looks the widget up itself and does nothing when there is none, so a line
+	// that is not in this resource costs a lookup and no more.
 	this->SetTextControlData(widgetID, text);
-	view->ShowView(kTrue);
-	view->Enable();
+	this->ShowOrHide(widgetID, true);
 }
 
 /* ShowOrHide
@@ -361,7 +410,10 @@ void KBSReplaceConfirmDialogController::ShowOrHide(const WidgetID& widgetID, boo
 	if (view == nil)
 		return;
 
-	// Hidden AND disabled, always as a pair - see SetOptionalLine.
+	// ***** HIDDEN AND DISABLED, ALWAYS AS A PAIR. ***** A widget that is only hidden still takes
+	// clicks (the lesson from the replaced rows' check boxes - see gotourl-and-stacked-widget-traps).
+	// Nothing on this prompt is clickable, but the pair is the house rule and this is the one place
+	// that applies it, for the layout that is not showing and for the optional lines alike.
 	view->ShowView(show ? kTrue : kFalse);
 	if (show)
 		view->Enable();
@@ -414,10 +466,6 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 */
 void KBSReplaceConfirmDialogController::FillGlyphLayout()
 {
-	// The opening sentence, from the same string-table entries the message above is built from - the
-	// same question, laid out differently. Each key is translated BEFORE the count goes in: a key only
-	// translates while it is the WHOLE string, and the count is real data, so it is marked
-	// untranslatable first.
 	// The three fixed labels first - "Find", the arrow, "Change to". The .fr resource writes
 	// their enUS strings; this restamps them through the language switch, the same way every
 	// other Japanese string is produced since the jaJP table went (2026-08-05).
@@ -428,36 +476,25 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	this->SetTextControlData(kKBSGlyphConfirmChangeLabelWidgetID,
 		KBSLoc::Text(kKBSGlyphConfirmChangeLabelKey, KBSJa::kGlyphChangeLabel));
 
-	PMString countStr;
-	countStr.AppendNumber(KBSReplaceConfirmDialog::GetCheckedCount());
-	countStr.SetTranslatable(kFalse);
-	PMString countLine(KBSReplaceConfirmDialog::GetCheckedCount() == 1
-		? KBSLoc::Text(kKBSConfirmReplaceOneKey, KBSJa::kConfirmReplaceOne)
-		: KBSLoc::Text(kKBSConfirmReplaceManyKey, KBSJa::kConfirmReplaceMany));
-	::ReplaceStringParameters(&countLine, countStr);
-	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID, countLine);
+	// ***** THE FOUR SENTENCES THE OTHER LAYOUT SAYS TOO, FROM THE ONE PLACE THAT SPELLS THEM. *****
+	// All this layout decides is which widget each one lands on; the keys, the singular/plural and
+	// the parameter go through Build*Line (see the header). Until 2026-08-07 they were written out
+	// here as well as in KBSActionComponent::ConfirmReplace - the same four sentences, twice.
+	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID,
+		KBSReplaceConfirmDialog::BuildCountLine(KBSReplaceConfirmDialog::GetCheckedCount()));
 
 	// What the run does NOT check - between the glyphs and the closing lines, the same place the
-	// Text / GREP layout puts it (KBSActionComponent::ConfirmReplace assembles that one). No
-	// parameter in this string, so it only needs translating.
-	PMString editedSince(KBSLoc::Text(kKBSConfirmEditedSinceKey, KBSJa::kConfirmEditedSince));
-	this->SetTextControlData(kKBSReplaceConfirmEditedWidgetID, editedSince);
+	// Text / GREP layout puts it.
+	this->SetTextControlData(kKBSReplaceConfirmEditedWidgetID,
+		KBSReplaceConfirmDialog::BuildEditedSinceLine());
 
-	// The closing sentence, the same way.
-	PMString chapterStr;
-	chapterStr.AppendNumber(KBSReplaceConfirmDialog::GetChapterCount());
-	chapterStr.SetTranslatable(kFalse);
-	PMString unsaved(KBSReplaceConfirmDialog::GetChapterCount() <= 1
-		? KBSLoc::Text(kKBSConfirmUnsavedOneKey, KBSJa::kConfirmUnsavedOne)
-		: KBSLoc::Text(kKBSConfirmUnsavedManyKey, KBSJa::kConfirmUnsavedMany));
-	::ReplaceStringParameters(&unsaved, chapterStr);
-	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID, unsaved);
+	// The closing sentence.
+	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID,
+		KBSReplaceConfirmDialog::BuildUnsavedLine(KBSReplaceConfirmDialog::GetChapterCount()));
 
-	// ...and the warning under it, WHATEVER the count (user, 2026-08-05). No parameter in this one,
-	// so it only needs translating. The Text / GREP layout says the same thing inside its single
-	// wrapped block - see KBSActionComponent::ConfirmReplace.
-	PMString care(KBSLoc::Text(kKBSConfirmSeveralChaptersKey, KBSJa::kConfirmSeveralChapters));
-	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID, care);
+	// ...and the warning under it, WHATEVER the count (user, 2026-08-05).
+	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID,
+		KBSReplaceConfirmDialog::BuildCareLine());
 
 	// The four lines under the two frames. All optional, and all for the same reason: an empty
 	// Change To box has no font to name and no Unicode to give, and an ALTERNATE form has no

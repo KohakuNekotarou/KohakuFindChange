@@ -64,14 +64,27 @@ namespace
 // somebody else's translation.
 //const char* const kKBSReplaceSequenceName = "Kohaku Replace";
 
-// Run one find/change walker command. true = it landed on a match, with the story and range in
-// the out parameters. Anything else - no more matches, a failure, a command that would not
-// process - reads as "nothing here".
+// Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
+// on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
+// which is the header's own contract (IFindChangeService.h:46-49) rather than a convention here:
+//
+//   kSuccess         a match, with its position
+//   kNotFound        no match - the walk is over
+//   kFoundCompleted  the walk is over AND at least one match came up along the way. Start and end
+//                    are kInvalidTextIndex, so there is nothing here to act on either.
+//   kFailure         an ERROR. The walk did not finish, it broke off.
+//
+// ***** THE LAST ONE IS WHY THIS RETURNS A RESULT AND NOT A BOOL. ***** It used to answer true or
+// false, so a chapter whose search failed halfway looked exactly like a chapter whose matches were
+// gone, and its remaining rows were reported as 'missing' - "not found when the chapter was
+// searched again", which is a statement about the DOCUMENT and was not true. The official loop
+// keeps the distinction for the same reason: SnpFindAndReplace.cpp:796 returns the result untouched
+// and its caller (:642-670) turns kFailure, and only kFailure, into a failure.
 //
 // A command that fails leaves an error on the thread's global error state. It is cleared here on
 // purpose: left standing it would make the surrounding command sequence roll back (taking the
 // successful replacements with it) and would block later commands in the session.
-bool RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
+IFindChangeService::FindChangeResult RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
 	UIDRef& outStory, TextIndex& outStart, TextIndex& outEnd)
 {
 	outStory = UIDRef();
@@ -80,30 +93,31 @@ bool RunWalkerCmd(const ClassID& cmdBoss, ITextWalker* walker,
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
-		return false;
+		return IFindChangeService::kFailure;
 	InterfacePtr<IFindChangeCmdData> cmdData(cmd, UseDefaultIID());
 	if (cmdData == nil)
-		return false;
+		return IFindChangeService::kFailure;
 	cmdData->SetTextWalker(walker);
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		return false;
+		return IFindChangeService::kFailure;
 	}
 	// GetReplacementCount is never updated by these commands, so the result code is the only
 	// signal that something actually happened.
-	if (cmdData->GetFindChangeResult() != IFindChangeService::kSuccess)
+	const IFindChangeService::FindChangeResult result = cmdData->GetFindChangeResult();
+	if (result != IFindChangeService::kSuccess)
 	{
 		// Clear here too, for the same reason as above. A command can report kSuccess and still
 		// leave an error standing, and an error standing when EndCommandSequence runs rolls the
 		// whole chapter back - including the replacements that did work.
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		return false;
+		return result;
 	}
 
 	outStory = cmdData->GetRange(outStart, outEnd);
-	return true;
+	return result;
 }
 
 // A replace is running. Its progress bar pumps events, so without this a menu command could be
@@ -177,17 +191,26 @@ struct RunTotals
 	int32	chaptersSkipped;	// could not be opened at all
 	int32	chaptersNotWalked;	// opened, but the text walker would not run on them
 	int32	chaptersNoWindow;	// a replacement landed, but no window could be opened on it
+	// The walk STARTED here and then broke off with an error - a different thing from the two
+	// above, where it never started at all, and from a walk that simply ran out of matches. The
+	// rows it never reached are counted as missing like any others (there is nothing else honest
+	// to say about them), so this exists to explain WHY there are so many: the chapter was not
+	// searched to the end. Without it a broken search reads as "the text has moved", which is a
+	// statement about the user's document and is not true.
+	int32	chaptersWalkFailed;
 	int32	missing;			// checked hits whose text is no longer where the row says
 	int32	locked;				// checked hits on a locked layer or in a locked story
 	int32	refused;			// the replace command was asked and said no
 
-	// The FIRST name in each of the two lists that name one. Kept with a flag of its own rather
+	// The FIRST name in each of the three lists that name one. Kept with a flag of its own rather
 	// than testing IsEmpty(): a chapter whose name is empty would otherwise never count as the
 	// first, and every later one would overwrite it.
 	PMString	firstSkipped;
 	PMString	firstNotWalked;
+	PMString	firstWalkFailed;
 	bool		haveFirstSkipped;
 	bool		haveFirstNotWalked;
+	bool		haveFirstWalkFailed;
 
 	// The user stopped the run from the progress bar. The whole run is one command sequence, so
 	// this means the sequence was aborted and nothing at all was written - see BuildSummary.
@@ -195,12 +218,14 @@ struct RunTotals
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
-		  chaptersNotWalked(0), chaptersNoWindow(0), missing(0), locked(0), refused(0),
-		  haveFirstSkipped(false), haveFirstNotWalked(false),
+		  chaptersNotWalked(0), chaptersNoWindow(0), chaptersWalkFailed(0),
+		  missing(0), locked(0), refused(0),
+		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstWalkFailed(false),
 		  cancelled(false)
 	{
 		firstSkipped.SetTranslatable(kFalse);
 		firstNotWalked.SetTranslatable(kFalse);
+		firstWalkFailed.SetTranslatable(kFalse);
 	}
 };
 
@@ -240,22 +265,29 @@ struct RunTotals
 // outRefused   = checked hits the replace command itself would not run on. Not a decision of ours
 //                like the two above, and not a walk that lost its place like the two flags - the
 //                command was asked and said no.
-// outNotWalked = the chapter could not be WALKED AT ALL: no Find/Change options, no text walker, no
-//                walker scope for this document, no walker client. Nothing was written, and nothing
-//                can honestly be said about any individual row, so the summary names the chapter
-//                instead - the same distinction the SEARCH makes with ChapterWalkResult. Without it
-//                such a chapter dropped out of a replace in complete silence, which is exactly what
-//                every other counter here exists to prevent.
+// outNotWalked = the chapter could not be WALKED AT ALL: no database, no Find/Change options, no
+//                text walker, no walker scope for this document, no walker client. Nothing was
+//                written, and nothing can honestly be said about any individual row, so the summary
+//                names the chapter instead - the same distinction the SEARCH makes with
+//                ChapterWalkResult. Without it such a chapter dropped out of a replace in complete
+//                silence, which is exactly what every other counter here exists to prevent.
+// outWalkFailed = the walk DID start and then broke off with an error (RunWalkerCmd came back
+//                kFailure). Whatever had not come up by then is counted as missing, because there
+//                is nothing else true to say about those rows - but the CHAPTER is named as well,
+//                so the user is not told that their text has moved when what actually happened is
+//                that the search failed. Distinct from outNotWalked (never started) and from an
+//                ordinary end of walk (kNotFound / kFoundCompleted).
 //   progressBar  - the run's bar, sized in HITS. This chapter moves it from progressBase to
 //                  progressBase + (its own checked hits) as it consumes them. nil is allowed.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
-	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked,
+	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked, bool& outWalkFailed,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
 {
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
 	outNotWalked = false;
+	outWalkFailed = false;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -288,6 +320,20 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 
 	// Every failure from here to the critical section means the walk never started - see outNotWalked
 	// on why each one has to be reported rather than returning a bare zero.
+	//
+	// The DATABASE is asked for first, the same way the search asks it (KBSSearchEngine's
+	// CollectHitsInDoc, which has a kChapterNoDatabase of its own for the answer). Every step below
+	// takes it - QueryDocumentWalkerScope above all - and without this door the failure would arrive
+	// further down wearing a different name. It is NOT a liveness test: a UIDRef carries the
+	// IDataBase* itself, so a document closed underneath us leaves a dangling pointer here rather
+	// than a nil one, and "is this document still open?" has exactly one honest answer in KBS
+	// (KBSBookScope::IsDocStillOpen). What this catches is a UIDRef that never had a database.
+	if (docRef.GetDataBase() == nil)
+	{
+		outNotWalked = true;
+		return 0;
+	}
+
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 	{
@@ -408,8 +454,23 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 		// match a find has just made current.
 		UIDRef story;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-		if (!RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end))
-			break;		// the walk is finished; whatever is left in targets never came up
+		const IFindChangeService::FindChangeResult findResult =
+			RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
+		if (findResult != IFindChangeService::kSuccess)
+		{
+			// Two ways to get here and they are NOT the same thing to report.
+			//
+			// kNotFound / kFoundCompleted - the walk is finished. Whatever is left in targets never
+			// came up, which is exactly what 'missing' means, and the loop below says so on the rows.
+			//
+			// kFailure - the walk BROKE OFF. The same rows are counted the same way, because nothing
+			// truer can be said about them one by one, but the CHAPTER is named as well: without that
+			// the summary tells the user their text was not found when it was searched again, which
+			// is a statement about their document and is not what happened.
+			if (findResult == IFindChangeService::kFailure)
+				outWalkFailed = true;
+			break;
+		}
 
 		// A match sitting inside the text the previous replacement just wrote - a change string
 		// that contains the find string ("cat" -> "cat cat"). It was never in the search results,
@@ -480,9 +541,13 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef,
 				continue;
 			}
 
+			// The replace command answers with two values and no more (IFindChangeService.h:58-59:
+			// kSuccess with the range it wrote, or kFailure), so unlike the find above there is
+			// nothing here to tell apart - anything that is not kSuccess is the command declining.
 			UIDRef replacedStory;
 			TextIndex replacedStart = kInvalidTextIndex, replacedEnd = kInvalidTextIndex;
-			if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, replacedStory, replacedStart, replacedEnd))
+			if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, replacedStory, replacedStart, replacedEnd)
+				== IFindChangeService::kSuccess)
 			{
 				++replacedCount;
 				lastReplStory = replacedStory.GetUID();
@@ -666,6 +731,25 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" ! ");
 		outSummary.AppendNumber(t.missing);
 		outSummary.Append(" hit(s) missing - not found when the chapter was searched again.");
+	}
+
+	// ***** ...and WHEN THAT WAS NOT THE DOCUMENT'S FAULT, immediately after it. ***** A chapter
+	// whose re-walk broke off with an error leaves all its unreached rows in the count above, and
+	// that sentence then says their text was not found - a statement about the user's document that
+	// is simply untrue here. So the chapter is named, right where the reader is still looking at the
+	// number it is explaining.
+	//
+	// It took a distinction to see this at all: the walker commands answer with four different
+	// values (IFindChangeService.h:46-49) and KBS used to read every one of them that was not
+	// kSuccess as "nothing here". Adobe's own loop keeps them apart - SnpFindAndReplace.cpp:796
+	// returns the result untouched and :644-648 turns kFailure, and only kFailure, into a failure.
+	if (t.chaptersWalkFailed > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersWalkFailed);
+		outSummary.Append(" of those chapter(s) stopped with a search error (\"");
+		outSummary.Append(t.firstWalkFailed);
+		outSummary.Append("\" first), so the rest of that chapter was never reached.");
 	}
 
 	// Checked rows on a locked layer or in a locked story. Not a failure either: InDesign's own
@@ -1254,11 +1338,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		const UIDRef& docRef = pending[pi].docRef;
 
 		bool notWalked = false;
+		bool walkFailed = false;
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
 		const int32 replaced = ReplaceInChapter(ci, docRef, missing, locked,
-			refused, notWalked, &progressBar, progressBase, progressReported);
+			refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
 		// line up) must still hand the bar on at the right place.
@@ -1284,6 +1369,22 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				KBSResultModel::GetChapterDisplay(ci, totals.firstNotWalked, notWalkedHits);
 				totals.firstNotWalked.SetTranslatable(kFalse);
 				totals.haveFirstNotWalked = true;
+			}
+		}
+		if (walkFailed)
+		{
+			// The walk STARTED here and broke off. Its unreached rows are already in `missing` above
+			// - there is nothing truer to put on them one at a time - so this names the chapter to
+			// say that the shortfall is a search error, not the document having moved on. Counted
+			// separately from notWalked because the two are different failures and reading them as
+			// one would hide whichever is rarer.
+			++totals.chaptersWalkFailed;
+			if (!totals.haveFirstWalkFailed)
+			{
+				int32 failedHits = 0;
+				KBSResultModel::GetChapterDisplay(ci, totals.firstWalkFailed, failedHits);
+				totals.firstWalkFailed.SetTranslatable(kFalse);
+				totals.haveFirstWalkFailed = true;
 			}
 		}
 
