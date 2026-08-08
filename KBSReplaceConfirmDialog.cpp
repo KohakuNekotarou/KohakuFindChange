@@ -44,6 +44,7 @@
 #include "KBSReplaceConfirmDialog.h"
 #include "KBSResultModel.h"		// which chapters are ticked, and what they are called
 #include "KBSEditStamp.h"		// ...and whether any of them has been edited since the search
+#include "KBSBookScope.h"		// IsDocStillOpen - a closed chapter's UIDRef must not be read
 
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
@@ -248,6 +249,18 @@ PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
 		UIDRef docRef;
 		IDFile file;
 		if (!KBSResultModel::GetChapterLocation(c, docRef, file))
+			continue;
+
+		// ***** ASK THIS BEFORE THE UIDRef IS DEREFERENCED. ***** A book search closes each chapter
+		// as it finishes with it, and for a chapter closed since its UIDRef was taken the database
+		// pointer is DANGLING - "asking it anything is undefined behaviour", which is why
+		// KBSBookScope::IsDocStillOpen exists at all (see the comment over it). It compares the
+		// pointer against the session's document list and never dereferences it.
+		//
+		// A chapter that is not open now cannot be judged, and an unjudged chapter is not reported:
+		// the user cannot have edited a document they cannot see. If they reopen it and edit it,
+		// it is open again by the time this runs.
+		if (!KBSBookScope::IsDocStillOpen(docRef))
 			continue;
 
 		if (KBSEditStamp::IsChapterCurrent(c, docRef))

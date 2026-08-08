@@ -60,6 +60,12 @@ namespace KBSEditStamp
 
 	/** Does this chapter read exactly as its stamp left it?
 
+		***** THE CALLER MUST HAVE ESTABLISHED THAT THE DOCUMENT IS STILL OPEN. ***** This reads
+		the document, so a UIDRef whose database has been closed is undefined behaviour here, not
+		a nil check - use KBSBookScope::IsDocStillOpen first (it compares the database pointer
+		against the session's list without ever dereferencing it). A book search closes each
+		chapter as it finishes with it, so this is the ordinary case, not a corner one.
+
 		An UNSTAMPED chapter answers kTrue. This prompt only warns - it does not block the
 		replace - so "not known to have changed" is the answer that keeps it quiet, and the
 		alternative would put a warning on every scan-built result set that was never stamped.
