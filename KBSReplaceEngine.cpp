@@ -988,6 +988,18 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 //
 // Cancel is the DEFAULT button, the decision the glyph confirmation records for itself (KBS.fr,
 // 2026-07-31): Enter must not start a rewrite.
+//
+// ***** AND THAT DECIDES WHAT HAPPENS WHEN NOBODY IS THERE. ***** With userInteractionLevel at
+// NEVER_INTERACT the alert is never drawn and ModalAlert hands back the DEFAULT button, so a
+// scripted run STOPS at the first edited chapter and says why through app.kfcStatus ("Replace
+// cancelled - nothing was changed."). Measured 2026-08-08.
+//
+// ⚠ Not symmetrical with the confirmation prompt, which is simply skipped while interaction is
+// suppressed and lets the replace run - and the asymmetry is deliberate (user's decision,
+// 2026-08-08). An unattended run that has been told the document moved under it should stop, and
+// the status line is there to be read afterwards. ***** Do not "fix" this by making OK the default:
+// that would trade an unattended stop for an unattended rewrite, and it would also hand the Enter
+// key the one thing this dialog exists to keep it away from.
 // @param chapterIdx the chapter's index in KBSResultModel.
 // @return false when the user stops the run.
 bool AskEditedChapter(int32 chapterIdx)
