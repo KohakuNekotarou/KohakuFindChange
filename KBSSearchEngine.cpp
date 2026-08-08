@@ -107,6 +107,7 @@
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
+#include "KBSEditStamp.h"		// stamp each chapter while its document is open
 
 namespace
 {
@@ -2806,6 +2807,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// the handover - and it is the point of the swap() four lines up, which used to be undone by
 		// a copy on this line (2026-08-08).
 		KBSResultModel::AppendChapter(std::move(chapter));
+
+		// Stamp the chapter NOW, while its document is certainly open. The replace may run long
+		// afterwards, with the chapter closed and reopened in between - which is exactly the case
+		// the stamp is built to survive, but only if it was taken while there was something to read.
+		//
+		// The document comes from targets[] rather than the Chapter: the move above has just
+		// emptied that one. The index is the position the append filled, which is the last.
+		KBSEditStamp::CaptureChapter(KBSResultModel::GetChapterCount() - 1, targets[i].docRef);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
