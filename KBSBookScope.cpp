@@ -21,7 +21,7 @@
 #include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
 #include "IBookUtils.h"			// FindDocFromContentUID, GetBookContentStatus
 #include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
-#include "IDataBase.h"			// IsModified (the hide sweep skips dirty docs)
+#include "IDataBase.h"			// IsModified - HasUnsavedChanges asks it before every close here
 #include "IDocFileHandler.h"
 #include "IDocument.h"
 #include "IDocumentCommands.h"	// Open by file (windowless reopen)
@@ -46,6 +46,7 @@
 #include "CmdUtils.h"
 #include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
 #include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
+#include "K2Vector.h"			// the held-chapter list (it came in through IBookUtils.h until 2026-08-08)
 #include "SDKFileHelper.h"
 #include "UIDList.h"
 #include "Utils.h"
@@ -57,10 +58,18 @@
 
 namespace
 {
-	// The chapters WE opened (only the originally-closed ones - OpenOneDocument records exactly
-	// those in here), held open so a repeat search skips the load. OpenOneDocument also uses
-	// this record to stay under the open-database cap.
-	OriginallyCloseDocInfo gHeldDocInfo;
+	// The chapters WE opened (only the originally-closed ones), held so that ReleaseHeldDoc can hand
+	// each one back once its turn is over. A chapter the user already had open never goes on here.
+	//
+	// ***** A PLAIN VECTOR, because nothing is handed to the book API any more. ***** This used to be
+	// IBookUtils' own OriginallyCloseDocInfo - the container OpenOneDocument fills in and
+	// CloseDocumentsInBook drains - and this plug-in stopped calling BOTH of those in 2026-07 (no UI
+	// suppression on that open, no UI flag or command mode on that close; the reasons are at
+	// OpenChapterDoc and ReleaseHeldDocs). Keeping their container afterwards only suggested a
+	// partnership that is not there: the note here still read "OpenOneDocument records exactly those
+	// in here" and "uses this record to stay under the open-database cap", in the present tense,
+	// about calls that had been gone for six weeks (found in the block 11 API audit, 2026-08-08).
+	K2Vector<UIDRef> gHeldDocs;
 
 	// Which book the RESULTS on the panel came from (its full file path). NOT "which book we hold
 	// chapters for": since 2026-08-02 every run closes each chapter as soon as it is done with it,
@@ -115,6 +124,40 @@ namespace
 		return false;
 	}
 
+	/** Is this registered panel one of InDesign's book panels?
+
+	    ***** ONE PLACE, because the hard-coded ClassID above can go stale. ***** Two walks below need
+	    this answer and each spelled the test out for itself, so a renumbered kBookPanelBoss would
+	    have had to be found twice (block 11 API audit, 2026-08-08). */
+	bool IsBookPanelView(IControlView* panelView, const PMString& panelName)
+	{
+		if (panelView == nil)
+			return false;
+		return (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
+			   || PanelNameMatchesOpenBook(panelName);
+	}
+
+	/** The book file THIS panel is showing; false when the panel could not be resolved.
+
+	    Handing the panel itself in is the whole point: with a real widget IBookUIUtils resolves that
+	    panel's book, where a nil widget falls through to QueryActiveBookPanel - the active book, which
+	    is precisely the value both callers exist to avoid.
+
+	    An empty result is refused here rather than passed on, because further up it would read as
+	    "no book at all" instead of "this panel could not be asked". */
+	bool GetBookFileFromPanelView(IControlView* panelView, IDFile& outFile)
+	{
+		IDFile panelBookFile;
+		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
+
+		SDKFileHelper panelFileHelper(panelBookFile);
+		if (panelFileHelper.GetPath().empty())
+			return false;
+
+		outFile = panelBookFile;
+		return true;
+	}
+
 	/** The book's own word for a chapter's state, for the "could not be opened" report. Empty for
 	    a chapter the book considers fine - then the failure is something the book does not track
 	    (a lock file, permissions) and there is nothing honest to add. Not translatable: these are
@@ -132,17 +175,6 @@ namespace
 		}
 	}
 
-	/** The open book whose file path is 'bookPath', or nil when none has it. Non-owning - the
-	    book manager keeps the list, so nothing here is released.
-
-	    Paths rather than IBook pointers because one caller is a close notification: the closing
-	    book's IBook is already gone by then, so there is no pointer left to compare.
-
-	    The IsOpen() test is what makes this usable from that notification. Measured 2026-07-27 on
-	    the release build: when kCloseBookCmdBoss is broadcast, the closing book is STILL on
-	    IBookManager's list, so membership alone answers "yes, still open" for the very book that is
-	    closing - which made the guard reject the one case it exists for. IBook::IsOpen is the flag
-	    the close clears. */
 	/** Is there work in this document that closing it would throw away?
 
 	    Asked before every one of this module's UI-SUPPRESSED closes. IDocFileHandler::Close only
@@ -160,8 +192,16 @@ namespace
 		return (db != nil) && (db->IsModified() != kFalse);
 	}
 
-	/** Accepts every presentation. A local stand-in for the stock accept-all predicate (KESCL keeps
-	    its own too, so we do not depend on where the stock predicate objects live). */
+	/** Accepts every presentation.
+
+	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock one exists and is named
+	    FindPresCriteria::accept_all (DocumentPresFindCriteria.h:82), but that file's own preamble
+	    (:40-46) says its implementations "are found in the WidgetBin shared library, so you cannot
+	    use them from a model only plugin. Should the need arise you can create local
+	    implementations" - and prints a two-line example of exactly this shape. So this is the
+	    documented route, not a stand-in for one. (Until 2026-08-08 the note here said we kept our own
+	    because we did not know where the stock objects live, which was no longer true and read like
+	    an avoidable dependency.) KESCL carries the same predicate for the same reason. */
 	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
 	{
 		return true;
@@ -187,6 +227,11 @@ namespace
 			db, KBSAcceptAnyPresentation, noPreference) != nil;
 	}
 
+	/** The OPEN book whose file path is 'bookPath', or nil when none has it. Non-owning - the book
+	    manager keeps the list, so nothing here is released.
+
+	    A path rather than an IBook* because one caller is a close notification: the closing book's
+	    IBook is already gone by the time we can act on it, so there is no pointer left to compare. */
 	IBook* FindOpenBookByPath(const PMString& bookPath)
 	{
 		if (bookPath.IsEmpty())
@@ -196,19 +241,23 @@ namespace
 		if (bookMgr == nil)
 			return nil;
 
-		const int32 bookCount = bookMgr->GetBookCount();
-		for (int32 i = 0; i < bookCount; ++i)
-		{
-			IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
-			if (book == nil)
-				continue;
-			if (!book->IsOpen())
-				continue;
-			SDKFileHelper bookFileHelper(book->GetBookFileSpec());
-			if (bookFileHelper.GetPath() == bookPath)
-				return book;
-		}
-		return nil;
+		// The book API's own lookup by file - "Search to see if whatBook is already open or not.
+		// Returns nil means whatBook is not open" (IBookManager.h:144-149) - which is the same
+		// question ListBookChapters asks it further down this file. It used to be a walk of
+		// GetBookCount/GetNthBook comparing paths here, so the one module had two ways of asking
+		// (block 11 API audit, 2026-08-08).
+		SDKFileHelper bookFileHelper(bookPath);
+		IBook* book = bookMgr->FindOpenBookByName(bookFileHelper.GetIDFile());	// non-owning
+		if (book == nil)
+			return nil;
+
+		// ***** AND THEN IsOpen(), WHICH IS NOT REDUNDANT. ***** Measured 2026-07-27 on the release
+		// build: when kCloseBookCmdBoss is broadcast, the closing book is STILL on IBookManager's
+		// list, so anything that answers "is it listed" says "yes, still open" about the very book
+		// that is closing - which made the book watcher's guard reject the one case it exists for.
+		// IBook::IsOpen is the flag the close clears. Do not drop this test when tidying: the lookup
+		// above answers a different question from the one this function is asked.
+		return book->IsOpen() ? book : nil;
 	}
 }
 
@@ -228,17 +277,25 @@ void KBSBookScope::SetBookScopeOn(bool on)
 
 bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 {
+	IDataBase* db = docRef.GetDataBase();
+	if (db == nil)
+		return false;
+
 	InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
 	if (docList == nil)
 		return false;
-	const int32 count = docList->GetDocCount();
-	for (int32 i = 0; i < count; ++i)
-	{
-		IDocument* doc = docList->GetNthDoc(i);
-		if (doc != nil && ::GetUIDRef(doc) == docRef)
-			return true;
-	}
-	return false;
+
+	// The session's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
+	// plug-in asks this (KBSDrawEventHandler.cpp) and how KESCM asks it everywhere. It replaced a
+	// walk of GetDocCount/GetNthDoc comparing UIDRefs (block 11 API audit, 2026-08-08).
+	//
+	// ***** THE DATABASE POINTER IS COMPARED, NEVER DEREFERENCED. ***** For a chapter closed since
+	// its UIDRef was taken that pointer is dangling, and asking it anything is undefined behaviour -
+	// which is the whole reason callers have this function instead of reading the document. Passing
+	// it to FindDocByDataBase only matches it against the list. The UID is then checked as well, so
+	// the answer stays exactly as strict as the walk it replaced.
+	IDocument* doc = docList->FindDocByDataBase(db);
+	return doc != nil && ::GetUIDRef(doc) == docRef;
 }
 
 void KBSBookScope::ReleaseHeldDocs()
@@ -247,14 +304,14 @@ void KBSBookScope::ReleaseHeldDocs()
 	// which book the panel is showing - and since every run closes its chapters as it goes, doing
 	// so would blank the path while a full result set is still up (which broke both readers named
 	// on gSearchedBookPath).
-	if (gHeldDocInfo.fCurrentOpenedDocumentList.size() == 0)
+	if (gHeldDocs.size() == 0)
 		return;
 
 	// Take the list first, so a re-entrant call finds it already empty instead of scheduling
 	// the closes twice.
 	K2Vector<UIDRef> held;
-	held = gHeldDocInfo.fCurrentOpenedDocumentList;
-	gHeldDocInfo.Clear();
+	held = gHeldDocs;
+	gHeldDocs.clear();
 
 	// Close each chapter through the stock document close. kSchedule defers each close until the
 	// current notification / idle tick has unwound; kSuppressUI + the search-time dirty guard =
@@ -287,7 +344,7 @@ void KBSBookScope::ReleaseHeldDocs()
 		// closes it again. See HasUnsavedChanges for what closing it would cost.
 		if (HasUnsavedChanges(held[i]))
 		{
-			gHeldDocInfo.fCurrentOpenedDocumentList.push_back(held[i]);
+			gHeldDocs.push_back(held[i]);
 			continue;
 		}
 
@@ -299,7 +356,7 @@ void KBSBookScope::ReleaseHeldDocs()
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(held[i]));
 		if (docFileHandler == nil || !docFileHandler->CanClose(held[i]))
 		{
-			gHeldDocInfo.fCurrentOpenedDocumentList.push_back(held[i]);
+			gHeldDocs.push_back(held[i]);
 			continue;
 		}
 		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
@@ -315,9 +372,9 @@ bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
 	// one's answer because the two questions are asked at different MOMENTS - this one before the
 	// release, that one after - and only the pair of them says whether a failure to close was real.
 	// See the header.
-	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	for (int32 i = 0; i < static_cast<int32>(gHeldDocs.size()); ++i)
 	{
-		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
+		if (gHeldDocs[i] == docRef)
 			return true;
 	}
 	return false;
@@ -332,9 +389,9 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// test lives HERE rather than at every call site: a run walks its chapters without caring who
 	// opened which, and hands every one of them back the same way.
 	int32 heldIndex = -1;
-	for (int32 i = 0; i < static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()); ++i)
+	for (int32 i = 0; i < static_cast<int32>(gHeldDocs.size()); ++i)
 	{
-		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
+		if (gHeldDocs[i] == docRef)
 		{
 			heldIndex = i;
 			break;
@@ -361,8 +418,8 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// call can hand back either.
 	if (!IsDocStillOpen(docRef))
 	{
-		gHeldDocInfo.fCurrentOpenedDocumentList.erase(
-			gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
+		gHeldDocs.erase(
+			gHeldDocs.begin() + heldIndex);
 		return false;
 	}
 
@@ -375,8 +432,8 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// unsaved-work door below would not even stand in the way any more.
 	if (DocHasAnyWindow(docRef))
 	{
-		gHeldDocInfo.fCurrentOpenedDocumentList.erase(
-			gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
+		gHeldDocs.erase(
+			gHeldDocs.begin() + heldIndex);
 		return true;
 	}
 
@@ -412,8 +469,8 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 
 	// Off the list BEFORE the close goes through, so a re-entrant call cannot schedule the same
 	// close twice - and not a line earlier, for the reason above.
-	gHeldDocInfo.fCurrentOpenedDocumentList.erase(
-		gHeldDocInfo.fCurrentOpenedDocumentList.begin() + heldIndex);
+	gHeldDocs.erase(
+		gHeldDocs.begin() + heldIndex);
 
 	// ***** kProcess closes NOW; kSchedule closes when the caller has finished. ***** A run asks for
 	// the first (see the header): a scheduled close does not happen until the current tick unwinds,
@@ -442,7 +499,7 @@ void KBSBookScope::ShutdownCleanup()
 {
 	// State only, no closing, no UI: this runs while InDesign is tearing down. Clear() releases
 	// the vector's storage too, so the static destructor at DLL unload finds nothing to do.
-	gHeldDocInfo.Clear();
+	gHeldDocs.clear();
 	gSearchedBookPath.Clear();
 	gBookScopeOn = false;
 }
@@ -492,38 +549,39 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// run is still standing? Rebind to THAT document and do NOT hold it: closing something somebody
 	// else opened would surprise them.
 	//
-	// ***** ASKED BY WALKING THE DOCUMENT LIST, and it has to be. ***** This used to ask
-	// IBookUtils::IsSourceDocumentAlreadyOpen, which hands back an index into the document list
-	// (IBookUtils.h:314-319), and took that index on trust - which put a DIFFERENT chapter's
-	// document in this chapter's place. Measured 2026-08-04: 4 book replaces in 10 came back with a
-	// chapter's rows all marked 'missing' and that chapter never opened at all, because this handed
-	// back a neighbour that WAS open. The walk then ran over the wrong document and every row failed
-	// its same-occurrence test - silently, since the call had reported success.
+	// Asked through the session's own lookup by file - "Search to see if one (whatFile) is already
+	// open. If so, return it" (IDocumentList.h:64-69) - which is how the product asks it
+	// (incopyfileactions/utils/InCopyDocUtils.cpp:3177, buttonui/.../GoToAnchorPanelObserver.cpp:401).
+	// A walk of the whole document list stood here until the block 11 API audit (2026-08-08).
 	//
-	// The give-away was WHERE it failed: the FIRST chapter never did. A replace resolves its
-	// chapters with the earlier ones still open, so the question gets asked with 1, then 2, then 3
-	// documents standing - while a SEARCH closes each chapter before opening the next and asks it
-	// with none, which is why searching was never wrong.
+	// ***** THE ANSWER IS CHECKED AGAINST THE FILE WE ASKED FOR, NOT TAKEN ON TRUST. ***** The same
+	// rule OpenChapterDoc applies to FindDocFromContentUID, and for the same reason. This used to
+	// ask IBookUtils::IsSourceDocumentAlreadyOpen, which hands back an INDEX into the document list
+	// (IBookUtils.h:314-319), and trusted it - which put a DIFFERENT chapter's document in this
+	// chapter's place. Measured 2026-08-04: 4 book replaces in 10 came back with a chapter's rows all
+	// marked 'missing' and that chapter never opened at all. The walk had run over the wrong
+	// document and every row failed its same-occurrence test - silently, since the call had reported
+	// success. The give-away was WHERE it failed: the FIRST chapter never did, because a replace
+	// resolves its chapters with the earlier ones still open (1, then 2, then 3 documents standing)
+	// while a SEARCH closes each before opening the next and asks with none.
 	//
-	// That API has no caller anywhere in this SDK - not in a sample, not in source/open - so there
-	// was never anything to check its behaviour against. This asks the question the way KBS already
-	// asks "is this document still open" a few lines up (IsDocStillOpen).
+	// So the check stays whatever the lookup is: it costs one string compare, and it is the only
+	// thing standing between a wrong answer and a replace in the wrong document.
 	{
 		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
 		if (docList != nil)
 		{
-			const int32 count = docList->GetDocCount();
-			for (int32 i = 0; i < count; ++i)
+			IDocument* openDoc = docList->FindDoc(file);
+			if (KBSDocumentLivesInFile(openDoc, wantedPath))
 			{
-				if (!KBSDocumentLivesInFile(docList->GetNthDoc(i), wantedPath))
-					continue;
-				outDocRef = ::GetUIDRef(docList->GetNthDoc(i));
+				outDocRef = ::GetUIDRef(openDoc);
 				return true;
 			}
 		}
-		// Not open: fall through to the open below. ***** NEVER return false from here. ***** "It is
-		// not already open" is the ordinary case, and the old code turned two of its own nil checks
-		// into a false, which the caller reports as a chapter that could not be opened at all.
+		// Not open - or an answer that is not this file, which is treated the same way, since the
+		// open below resolves by file and cannot be confused. ***** NEVER return false from here.
+		// ***** "It is not already open" is the ordinary case, and the old code turned two of its own
+		// nil checks into a false, which the caller reports as a chapter that could not be opened.
 	}
 
 	// The windowless, UI-suppressed open - by FILE (the book may be closed).
@@ -537,7 +595,7 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	}
 
 	// Held, so ReleaseHeldDocs closes it later.
-	gHeldDocInfo.fCurrentOpenedDocumentList.push_back(docRef);
+	gHeldDocs.push_back(docRef);
 	outDocRef = docRef;
 	return true;
 }
@@ -548,10 +606,12 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	if (db == nil)
 		return false;
 
-	// Does it already have a window - front, or behind another tab? Then leave it alone. This has
-	// to be the ALL-presentations search: GetFrontmostPresentationForDocument answers nil for a
-	// document sitting behind another tab, and acting on that would open a SECOND window on the
-	// same document.
+	// Does it already have a window - front, or behind another tab? Then leave it alone. Asked
+	// through DocHasAnyWindow, which is where this module keeps that question (it wrote the search
+	// out by hand here until the block 11 API audit, 2026-08-08, making three copies of it in one
+	// file). That function has to be the ALL-presentations search: GetFrontmostPresentationForDocument
+	// answers nil for a document sitting behind another tab, and acting on that would open a SECOND
+	// window on the same document.
 	//
 	// ***** TRUE, NOT FALSE: the question this answers is "can the user see this chapter?" *****
 	// It returned false here until 2026-08-05, which put "it already had a window" and "the window
@@ -561,8 +621,7 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// ForgetHeldDoc for the same reason the successful path below calls it: a chapter with a window
 	// is the user's, and must not be sitting on the list of chapters a run may close. Normally it is
 	// not on that list at all, and this does nothing.
-	FindPresentation_PreferCriteria noPreference;
-	if (Utils<IDocumentUIUtils>()->FindPresentationForDocument(db, KBSAcceptAnyPresentation, noPreference) != nil)
+	if (DocHasAnyWindow(docRef))
 	{
 		KBSBookScope::ForgetHeldDoc(docRef);
 		return true;
@@ -577,7 +636,15 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 
 	// The command's data interface, taken BEFORE processing so the result can be read back off it
 	// afterwards. Nothing is set on it - the defaults are what a chapter window should get.
+	//
+	// ***** NO DATA INTERFACE = FAILURE, and the command is not run at all. ***** The recipe this
+	// follows breaks off here too (SDKLayoutHelper.cpp:268-272). It used to run the command anyway
+	// and skip the window test when this was nil, which returned TRUE without having established the
+	// one thing this function's true means - that the chapter now has a window (block 11 API audit,
+	// 2026-08-08).
 	InterfacePtr<IOpenLayoutPresentationCmdData> openData(cmd, IID_IOPENLAYOUTCMDDATA);
+	if (openData == nil)
+		return false;
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
 	{
@@ -589,12 +656,9 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// command) does not stop at the return code: it reads GetResultingPresentation() and checks an
 	// IWindow comes out of it, because "the command succeeded" and "there is a window" are two
 	// different statements. Saying so here matters - the caller reports this chapter as shown.
-	if (openData != nil)
-	{
-		InterfacePtr<IWindow> window(openData->GetResultingPresentation(), UseDefaultIID());
-		if (window == nil)
-			return false;
-	}
+	InterfacePtr<IWindow> window(openData->GetResultingPresentation(), UseDefaultIID());
+	if (window == nil)
+		return false;
 
 	// It has a window now, so it is no longer part of the windowless reopen cache - dropping it
 	// keeps a later ReleaseHeldDocs from closing a window the user is looking at.
@@ -610,11 +674,11 @@ void KBSBookScope::ForgetHeldDoc(const UIDRef& docRef)
 	// Backwards, and every match rather than the first: the same shape CloseDisplayedDocsIfClean
 	// uses. Nothing should ever put one document on this list twice, and a function whose whole job
 	// is "this is not ours any more" should not be the place that discovers otherwise.
-	for (int32 i = static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()) - 1; i >= 0; --i)
+	for (int32 i = static_cast<int32>(gHeldDocs.size()) - 1; i >= 0; --i)
 	{
-		if (gHeldDocInfo.fCurrentOpenedDocumentList[i] == docRef)
-			gHeldDocInfo.fCurrentOpenedDocumentList.erase(
-				gHeldDocInfo.fCurrentOpenedDocumentList.begin() + i);
+		if (gHeldDocs[i] == docRef)
+			gHeldDocs.erase(
+				gHeldDocs.begin() + i);
 	}
 }
 
@@ -636,16 +700,18 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (ref == exceptDoc)
 			continue;	// the document the jump just landed in stays
 
-		IDataBase* db = ref.GetDataBase();
-		if (db == nil || db->IsModified())
-			continue;	// a dirty document would want a save - leave it to the user
+		// A dirty document would want a save - leave it to the user. Asked through the same
+		// HasUnsavedChanges the held-chapter releases ask: this tested db == nil || IsModified()
+		// by hand and so answered "do not close" for a document with no database, while
+		// HasUnsavedChanges answers "nothing to lose" for that same document - one module, two
+		// opposite verdicts on one state (block 11 API audit, 2026-08-08). Nothing changes on
+		// screen: a document with no database has no window either, so the test below drops it.
+		if (HasUnsavedChanges(ref))
+			continue;
 
 		// Only documents that HAVE a window go: a windowless held chapter survives as the reopen
 		// cache (speed over tidiness).
-		FindPresentation_PreferCriteria noPreference;
-		IDocumentPresentation* pres = Utils<IDocumentUIUtils>()->FindPresentationForDocument(
-			db, KBSAcceptAnyPresentation, noPreference);
-		if (pres == nil)
+		if (!DocHasAnyWindow(ref))
 			continue;	// windowless - keep it held
 
 		toClose.push_back(ref);
@@ -653,12 +719,12 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 
 	for (int32 i = 0; i < static_cast<int32>(toClose.size()); ++i)
 	{
-		// Drop it from the held list first (a closed held chapter must come off before its close).
-		for (int32 h = static_cast<int32>(gHeldDocInfo.fCurrentOpenedDocumentList.size()) - 1; h >= 0; --h)
-		{
-			if (gHeldDocInfo.fCurrentOpenedDocumentList[h] == toClose[i])
-				gHeldDocInfo.fCurrentOpenedDocumentList.erase(gHeldDocInfo.fCurrentOpenedDocumentList.begin() + h);
-		}
+		// Drop it from the held list first (a closed held chapter must come off before its close),
+		// through ForgetHeldDoc - which is the function for exactly that and whose own comment said
+		// it was built to "the same shape CloseDisplayedDocsIfClean uses", i.e. it knew the loop was
+		// written twice (block 11 API audit, 2026-08-08).
+		KBSBookScope::ForgetHeldDoc(toClose[i]);
+
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(toClose[i]));
 		if (docFileHandler == nil)
 			continue;
@@ -801,12 +867,7 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 			continue;
 
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (panelView == nil)
-			continue;
-
-		const bool isBookPanel = (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
-								 || PanelNameMatchesOpenBook(panelName);
-		if (!isBookPanel)
+		if (!IsBookPanelView(panelView, panelName))
 			continue;
 
 		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
@@ -820,18 +881,10 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 		if (!PaletteRefUtils::IsPaletteVisible(container))
 			continue;
 
-		// Hand the panel itself in. With a real widget this resolves THAT panel's book instead of
-		// falling through to the active book the way a nil widget does.
-		IDFile panelBookFile;
-		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
-
-		// An empty result means the panel could not be resolved - keep looking rather than handing
-		// back a blank file that would later look like "no book".
-		SDKFileHelper panelFileHelper(panelBookFile);
-		if (panelFileHelper.GetPath().empty())
+		// Keep looking when this panel could not be asked, rather than handing back a blank file.
+		if (!GetBookFileFromPanelView(panelView, outFile))
 			continue;
 
-		outFile = panelBookFile;
 		return true;
 	}
 
@@ -892,18 +945,15 @@ bool KBSBookScope::ActivateBook(const PMString& bookPath)
 			continue;
 
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (panelView == nil)
-			continue;
-
-		const bool isBookPanel = (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
-								 || PanelNameMatchesOpenBook(panelName);
-		if (!isBookPanel)
+		if (!IsBookPanelView(panelView, panelName))
 			continue;
 
 		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is
 		// precisely the one that is NOT in front yet.
 		IDFile panelBookFile;
-		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
+		if (!GetBookFileFromPanelView(panelView, panelBookFile))
+			continue;
+
 		SDKFileHelper panelFileHelper(panelBookFile);
 		if (!(panelFileHelper.GetPath() == bookPath))
 			continue;

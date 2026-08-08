@@ -23,6 +23,16 @@
 //  before the close, and carries nil after it - the document we have to compare against is only
 //  available in the "before" signal (see [[signal-responder-catalog]]).
 //
+//  ***** AND "BEFORE" DOES NOT MEAN "BEFORE THE USER HAS DECIDED". ***** The standing warning about
+//  this family of signals is that a "before close" is not a close, because the save prompt can still
+//  be cancelled - which would leave this having thrown away the results of a document that is still
+//  open. Measured 2026-08-08 (block 11 API audit, work/kbs-selftest/run-close-cancel-test.ps1): a
+//  dirty document searched at document scope, closed with the UI on, put its save prompt up, and
+//  pressing CANCEL left the document open with all of its rows still on the panel. So the signal
+//  arrives once the close is going through, not while it can still be called off, and the warning
+//  does not apply on this path. Worth having measured rather than reasoned about: a panel that
+//  emptied itself while its document stayed open would read as work lost at random.
+//
 //  No "was it us who closed it?" guard is needed at document scope. KBS closes documents in
 //  exactly two places, and neither can close the searched document: ReleaseHeldDocs only closes
 //  chapters a BOOK search opened windowless (document scope holds none), and the Hide Previous
