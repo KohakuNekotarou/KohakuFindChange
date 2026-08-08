@@ -725,17 +725,6 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		return;
 	}
 
-	// Both counts walk every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling
-	// rather than the smaller number the panel displays - and this list normally holds more than one
-	// action that asks for them, so take each once here instead of per action. The cap is named
-	// rather than spelled out: this comment read "5000" long after the ceiling became 10000.
-	const int32 checkedCount = KBSResultModel::GetCheckedCount();
-
-	// How many rows still carry a check box in the range Check All / Uncheck All would act on. That
-	// range is the row their right-click menu was popped over (2026-08-01), so it is read here rather
-	// than model-wide: over a document whose every hit is locked or already replaced, both commands
-	// are no-ops and go grey - exactly as they do over a book with nothing left anywhere. Taken once
-	// because the two commands ask the same question.
 	// Is there anything for the current scope to run on at all - the active book while Book Scope is
 	// ON, a front document while it is OFF? The three commands that START a run share the answer, so
 	// it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
@@ -748,6 +737,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// the search command would also lose the name that carries the scope.
 	const bool16 haveTarget = KBSBookScope::HasScopeTarget() ? kTrue : kFalse;
 
+	// How many rows still carry a check box in the range Check All / Uncheck All would act on. That
+	// range is the row their right-click menu was popped over (2026-08-01), so it is read here rather
+	// than model-wide: over a document whose every hit is locked or already replaced, both commands
+	// are no-ops and go grey - exactly as they do over a book with nothing left anywhere.
+	//
+	// Hoisted out of the loop because TWO commands ask it, which is the only thing that justifies
+	// hoisting anything here. The CHECKED count stood beside it on the same grounds until 2026-08-08,
+	// long after it had only one reader left (the replace command, since 2026-08-07): a right-click
+	// menu, which holds nothing but these two commands, was walking every stored hit to answer a
+	// question no action on it asks. It is taken inside that one branch now.
 	const int32 contextChapter = KBSResultModel::GetContextMenuChapter();
 	int32 contextCheckable = 0;
 	if (contextChapter == KBSResultModel::kContextMenuBookRow)
@@ -779,26 +778,19 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// scope it would have used.
 			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKBSFindMissingGlyphsActionID)
+		else if (action == kKBSFindMissingGlyphsActionID || action == kKBSFindOversetActionID)
 		{
-			// The same one question the search command above asks, because it runs over the same
-			// scope: something to scan, or grey. Nothing about the current RESULTS decides whether a
-			// scan may run - it starts from the document, not from them.
+			// Both scans, in one branch: they ask the same one question the search command above
+			// asks, because they run over the same scope - something to scan, or grey. Nothing about
+			// the current RESULTS decides whether a scan may run; it starts from the document, not
+			// from them. (Two branches with byte-identical bodies until 2026-08-08. Official code
+			// stacks the labels of actions that share an answer rather than repeating the answer -
+			// ConditionalTextUIPanelMenuAction.cpp:123-124.)
 			//
 			// It has to be said explicitly either way: kCustomEnabling means this method owns the
 			// state, and an action this loop never names stays DISABLED. (Found on the real
 			// application - the item appeared in the flyout but invoke() answered "Action is not
 			// enabled".)
-			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKBSFindOversetActionID)
-		{
-			// The same one question the two commands above ask, because it runs over the same scope:
-			// something to scan, or grey. Nothing about the current RESULTS decides whether a scan
-			// may run - it starts from the document, not from them.
-			//
-			// Named here explicitly for the same reason as the glyph scan: kCustomEnabling means
-			// this method owns the state, and an action this loop never names stays DISABLED.
 			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSScopeBookActionID)
@@ -853,12 +845,25 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// shows them, so an empty change string (a valid "delete the matches" request) still
 			// reaches the user instead of being greyed out unexplained.
 			//
-			// A missing-glyph scan is a report as well: none of it can be replaced, and its rows
-			// carry no check boxes (RowHasCheckBox), so checkedCount would already be 0. Stated all
-			// the same - for the same reason IsShowingReplaceOutcome is stated - so the rule does
-			// not rest on a count that a later change might make non-zero.
-			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::IsShowingReplaceOutcome()
-				&& KBSResultModel::GetResultKind() == KBSResultModel::kResultFindChange)
+			// ***** THE SECOND HALF IS ONE QUESTION, AND THE MODEL ALREADY OWNS IT. ***** "Can any
+			// row of this list be checked at all" is NoRowHasCheckBox(), which ORs the two cases that
+			// answer no: a list that is a REPORT rather than a work list (the two scans), and a
+			// Find/Change list showing the last replace's outcome. This line spelled that OR out by
+			// hand - "not showing an outcome AND the kind is kResultFindChange" - until 2026-08-08.
+			//
+			// Same shape as the block 6 finding, in the same model: a question with one home, and a
+			// caller answering half of it for itself. Worse here, because the hand-written half used
+			// the very spelling the model warns against: KBSResultModel.cpp:259-263 states that the
+			// report-only kinds are LISTED rather than written as "not kResultFindChange" so that a
+			// new kind which DOES offer work has to be a decision instead of quietly losing its
+			// boxes - and this was the "not kResultFindChange" the model was guarding against.
+			//
+			// Walks every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling
+			// rather than the smaller number the panel displays. Taken here rather than above the
+			// loop because this is the only action that reads it. The cap is named rather than
+			// spelled out: this comment read "5000" long after the ceiling became 10000.
+			const int32 checkedCount = KBSResultModel::GetCheckedCount();
+			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::NoRowHasCheckBox())
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
