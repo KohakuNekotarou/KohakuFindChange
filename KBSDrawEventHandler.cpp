@@ -274,6 +274,11 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 	// test and its marker was never drawn - the jump scrolled there correctly and then pointed at
 	// nothing. This box includes "any page items sitting on the pasteboard", so those hits are
 	// marked too. Guides are left out (includeGuides defaults to kFalse): a guide cannot hold text.
+	//
+	// Confirmed on the running application 2026-08-08, by eye, on a document holding one hit inside a
+	// page, one on the right-hand page of a facing-pages spread, and one out on the pasteboard: all
+	// three are marked. (By eye because there is no other way - this drawing does not appear in a
+	// screen capture at all, which cost an afternoon to establish. See the audit note.)
 	const PMRect pbBounds     = spread->GetPagesAndItemsBounds(Transform::PasteboardCoordinates());
 	const PMRect spreadBounds = spread->GetPagesAndItemsBounds(Transform::SpreadCoordinates());
 	{
