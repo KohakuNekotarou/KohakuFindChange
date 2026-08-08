@@ -251,9 +251,14 @@ struct RunTotals
 // nothing looks wrong - while the numbering now points at text the user never checked.
 //
 // It was removed on the user's decision (2026-08-05): keeping the document steady between searching
-// and replacing is the USER's responsibility, and it is now stated as such on the confirmation
-// (kKBSConfirmEditedSinceKey - "if the text has been edited since the search, a replacement can land
-// somewhere you did not intend"). NOTHING stands in its place - an all-or-nothing rollback was
+// and replacing is the USER's responsibility. What it could not do was work across a BOOK, where a
+// chapter may be closed between the search and the replace.
+//
+// ***** Since 2026-08-08 the edit is DETECTED, though still not refused. ***** KBSEditStamp records
+// every story's ITextModel::GetChangeCount() as the search walks a chapter, and those counters live
+// in the FILE - so a chapter that was closed and reopened, even across a restart, still answers.
+// That is what defeated the test removed here. The confirmation names the chapters that changed and
+// the user decides. NOTHING stands in the way of the write itself - an all-or-nothing rollback was
 // considered the same day and deliberately not taken. What the walk finds when a checked hit's turn
 // comes is what gets rewritten, and a run that reaches fewer hits than it was given still commits
 // the ones it managed; the summary reports the shortfall, as it always has.

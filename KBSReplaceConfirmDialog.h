@@ -123,7 +123,15 @@ public:
 	*/
 	static PMString BuildCountLine(int32 checkedCount);
 
-	/** What the run does NOT check, in the user's language. @see BuildCountLine */
+	/** Whether the text has actually been edited since the search, in the user's language.
+
+		Asks KBSEditStamp about every chapter that has something ticked, and names what it finds:
+		the document, the one chapter, or how many chapters. **Returns an EMPTY string when
+		nothing has been edited** - the caller must hide the line rather than draw it blank
+		(SetOptionalLine does this; the Text / GREP caller leaves out its separators).
+
+		Until 2026-08-08 this returned a standing disclaimer on every prompt, phrased in the
+		conditional because nothing knew whether an edit had happened. @see BuildCountLine */
 	static PMString BuildEditedSinceLine();
 
 	/** What the run leaves behind - documents open and unsaved. @see BuildCountLine

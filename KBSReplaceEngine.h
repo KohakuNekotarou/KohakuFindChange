@@ -58,8 +58,9 @@ namespace KBSReplaceEngine
 	    (User's decision, 2026-08-05.) The chapter is walked again with the same query and the Nth
 	    match is replaced for the Nth checked row - so if the document has been edited since the
 	    search in a way that adds or removes a match, a replacement lands somewhere the user never
-	    ticked. Keeping the document steady between the two is the user's responsibility, and the
-	    confirmation says so before anything is written (kKBSConfirmEditedSinceKey).
+	    ticked. Keeping the document steady between the two is the user's responsibility - and since
+	    2026-08-08 the confirmation SAYS whether it was in fact edited, naming the chapters, rather
+	    than warning that it might have been (KBSEditStamp; kKBSConfirmEditedOneKey and siblings).
 
 	    A same-occurrence test used to stand in that gap, refusing any row whose story, position or
 	    text no longer lined up. See the note above the walk in KBSReplaceEngine.cpp for what it
@@ -130,8 +131,9 @@ namespace KBSReplaceEngine
 
 	      - the QUERY changing between the search and the replace is caught, here, and the run is
 	        refused before a character is written;
-	      - the DOCUMENT being edited between the two is NOT caught by anything, and is stated on
-	        the confirmation instead (kKBSConfirmEditedSinceKey).
+	      - the DOCUMENT being edited between the two is not REFUSED, but since 2026-08-08 it is
+	        DETECTED: the confirmation names the chapters that changed (KBSEditStamp). The run still
+	        goes ahead if the user approves it - holding the document steady stays theirs to do.
 
 	    The difference is that this one can be asked from outside: the dialog's own settings are
 	    readable, and BuildWalkSignature turns them into something comparable. Whether the user

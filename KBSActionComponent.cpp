@@ -671,9 +671,16 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	//
 	// Between the query and the closing lines on purpose: what is about to be written, then what
 	// could go wrong with it, then what the run leaves behind.
-	msg.Append(KBSReplaceConfirmDialog::BuildEditedSinceLine());
-	msg.Append(kLineSeparatorString);
-	msg.Append(kLineSeparatorString);
+	// Empty when nothing has actually been edited (2026-08-08 - it used to be a standing
+	// disclaimer shown every time), and then its separators go with it: two blank lines in the
+	// middle of the prompt read as a fault.
+	const PMString editedLine = KBSReplaceConfirmDialog::BuildEditedSinceLine();
+	if (!editedLine.IsEmpty())
+	{
+		msg.Append(editedLine);
+		msg.Append(kLineSeparatorString);
+		msg.Append(kLineSeparatorString);
+	}
 
 	// What the run leaves behind. It used to name HOW MANY chapters, which is why a count was read
 	// here and carried into the prompt; the sentence states the case instead since 2026-08-07 (the

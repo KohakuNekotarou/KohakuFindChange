@@ -42,6 +42,8 @@
 #include "KBSID.h"
 #include "KBSLoc.h"			// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSReplaceConfirmDialog.h"
+#include "KBSResultModel.h"		// which chapters are ticked, and what they are called
+#include "KBSEditStamp.h"		// ...and whether any of them has been edited since the search
 
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
@@ -232,8 +234,69 @@ PMString KBSReplaceConfirmDialog::BuildCountLine(int32 checkedCount)
 */
 PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
 {
-	// No parameter in this one, so it only needs translating.
-	PMString line(KBSLoc::Text(kKBSConfirmEditedSinceKey, KBSJa::kConfirmEditedSince));
+	// Only the chapters this run is about to WRITE to. A chapter with nothing ticked is not at
+	// risk from an edit, and a warning that fires for one would teach the user to read past this
+	// line - which is the one line here that can save their text.
+	int32 editedCount = 0;
+	PMString firstName;
+	const int32 chapterCount = KBSResultModel::GetChapterCount();
+	for (int32 c = 0; c < chapterCount; ++c)
+	{
+		if (KBSResultModel::GetChapterCheckedCount(c) <= 0)
+			continue;
+
+		UIDRef docRef;
+		IDFile file;
+		if (!KBSResultModel::GetChapterLocation(c, docRef, file))
+			continue;
+
+		if (KBSEditStamp::IsChapterCurrent(c, docRef))
+			continue;
+
+		// The name is only needed when exactly one chapter turns out to be edited, but it has to
+		// be taken here, while its index is in hand.
+		if (editedCount == 0)
+		{
+			int32 hitCount = 0;
+			KBSResultModel::GetChapterDisplay(c, firstName, hitCount);
+			firstName.SetTranslatable(kFalse);
+		}
+		++editedCount;
+	}
+
+	// ***** Nothing to say, so say NOTHING. ***** Empty means the line is hidden rather than drawn
+	// blank - SetOptionalLine does that for the glyph layout, and the Text / GREP caller leaves out
+	// its separators. A standing disclaimer stood here until 2026-08-08 and was shown on every
+	// prompt, because nothing knew whether the text had been edited. KBSEditStamp knows.
+	if (editedCount == 0)
+		return PMString();
+
+	// The opening names WHAT was edited; the ending is the same in all three cases. Each key is
+	// translated before anything is put into it, and what goes in is marked untranslatable first -
+	// the reasoning BuildCountLine spells out above applies unchanged.
+	PMString line;
+	if (!KBSResultModel::IsFromBook())
+	{
+		line = KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
+	}
+	else if (editedCount == 1)
+	{
+		line = KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
+		::ReplaceStringParameters(&line, firstName);
+	}
+	else
+	{
+		PMString countStr;
+		countStr.AppendNumber(editedCount);
+		countStr.SetTranslatable(kFalse);
+		line = KBSLoc::Text(kKBSConfirmEditedManyKey, KBSJa::kConfirmEditedMany);
+		::ReplaceStringParameters(&line, countStr);
+	}
+
+	// A break rather than a space: English wants one between the two sentences and Japanese does
+	// not, and a line end is right in both.
+	line.Append(kLineSeparatorString);
+	line.Append(KBSLoc::Text(kKBSConfirmEditedTailKey, KBSJa::kConfirmEditedTail));
 	line.SetTranslatable(kFalse);
 	return line;
 }
@@ -478,9 +541,11 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID,
 		KBSReplaceConfirmDialog::BuildCountLine(KBSReplaceConfirmDialog::GetCheckedCount()));
 
-	// What the run does NOT check - between the glyphs and the closing lines, the same place the
-	// Text / GREP layout puts it.
-	this->SetTextControlData(kKBSReplaceConfirmEditedWidgetID,
+	// Whether the text was actually edited since the search - between the glyphs and the closing
+	// lines, the same place the Text / GREP layout puts it. SetOptionalLine, not
+	// SetTextControlData: the line is empty when nothing was edited, and an empty line drawn on
+	// the prompt reads as a fault (2026-08-08, when this stopped being a standing disclaimer).
+	this->SetOptionalLine(kKBSReplaceConfirmEditedWidgetID,
 		KBSReplaceConfirmDialog::BuildEditedSinceLine());
 
 	// The closing sentence.

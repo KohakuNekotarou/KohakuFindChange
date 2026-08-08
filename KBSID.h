@@ -419,12 +419,22 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // ***** The one thing this prompt has to say that the panel cannot show. ***** Since 2026-08-05 a
 // replace does NOT check that the match it is about to rewrite is still the one the row was found
 // at: the chapter is walked again and the Nth match takes the Nth checked row's replacement. Edit
-// the text between searching and replacing and that numbering points somewhere else - so the user
-// is told, before anything is written, that holding the document steady is theirs to do.
+// the text between searching and replacing and that numbering points somewhere else.
+//
+// ***** These four replaced a single standing disclaimer on 2026-08-08. ***** That one line was
+// shown on every prompt and could only speak in the conditional - "IF the text has been edited" -
+// because nothing knew whether it had been. KBSEditStamp knows now, so the prompt states a FACT
+// when there is one and says nothing at all when there is not (the line is hidden, not blanked).
+//
+// Three openings and one ending, rather than three whole sentences: what differs between them is
+// only how the edited chapters are named, and the consequence is the same in all three.
 //
 // Translated like the rest of this prompt, and for the same reason: this is where the user
 // authorises a rewrite of their own text. The status line that reports the outcome stays English.
-#define kKBSConfirmEditedSinceKey	kKBSStringPrefix "kKBSConfirmEditedSinceKey"
+#define kKBSConfirmEditedDocKey		kKBSStringPrefix "kKBSConfirmEditedDocKey"
+#define kKBSConfirmEditedOneKey		kKBSStringPrefix "kKBSConfirmEditedOneKey"
+#define kKBSConfirmEditedManyKey	kKBSStringPrefix "kKBSConfirmEditedManyKey"
+#define kKBSConfirmEditedTailKey	kKBSStringPrefix "kKBSConfirmEditedTailKey"
 // The closing line: what the run LEAVES BEHIND.
 //
 // ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by

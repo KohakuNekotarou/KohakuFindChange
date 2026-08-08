@@ -83,7 +83,13 @@ namespace KBSJa
 	const char16_t kConfirmEmptyReplace[]    = u"（空欄：一致した箇所は削除されます）";
 	const char16_t kConfirmFindFormat[]      = u"検索形式";
 	const char16_t kConfirmChangeFormat[]    = u"置換形式";
-	const char16_t kConfirmEditedSince[]     = u"検索後にテキストが編集されていると意図していない場所が置換される場合が有ります。";
+	// An opening that names what was edited, plus one shared ending. Shown only when a chapter about
+	// to be written to has actually changed since the search (KBSEditStamp); otherwise the line is
+	// hidden. These four replaced a single standing conditional disclaimer on 2026-08-08.
+	const char16_t kConfirmEditedDoc[]       = u"検索後にテキストが編集されています。";
+	const char16_t kConfirmEditedOne[]       = u"検索後に「^1」のテキストが編集されています。";
+	const char16_t kConfirmEditedMany[]      = u"検索後に ^1 個の章のテキストが編集されています。";
+	const char16_t kConfirmEditedTail[]      = u"意図していない場所が置換される場合が有ります。";
 	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
 	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
 	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";

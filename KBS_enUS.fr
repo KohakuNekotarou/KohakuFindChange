@@ -83,7 +83,14 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmChangeFormatKey,		"Change Format",
                 // Sits between the query and the closing lines: what is about to be written, then
                 // what could go wrong with it, then what the run leaves behind.
-                kKBSConfirmEditedSinceKey,		"If the text has been edited since the search, a replacement can land somewhere you did not intend.",
+                //
+                // An opening that names what was edited, plus one shared ending. Shown only when a
+                // chapter about to be written to has actually changed since the search; otherwise
+                // the line is hidden. It replaced a standing conditional disclaimer on 2026-08-08.
+                kKBSConfirmEditedDocKey,		"The text has been edited since the search.",
+                kKBSConfirmEditedOneKey,		"The text of ^1 has been edited since the search.",
+                kKBSConfirmEditedManyKey,		"The text of ^1 chapters has been edited since the search.",
+                kKBSConfirmEditedTailKey,		"A replacement can land somewhere you did not intend.",
                 // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
                 // box below", because a "save after replace" box underneath could make them false.
                 // That box is gone with its feature, so a run has only one outcome left to state.
