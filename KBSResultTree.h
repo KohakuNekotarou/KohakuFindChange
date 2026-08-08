@@ -67,6 +67,16 @@ namespace KBSResultTree
 	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */
 	void GetLastStatus(PMString& outMessage);
 
+	/** Release this module's static storage during the controlled shutdown
+	    (KBSStartupShutdown::Shutdown), so no static destructor at DLL unload finds work left to do.
+
+	    One string - the status line above - but it is a PMString, which is exactly the kind of static
+	    the rule was written for: KBSResultModel::ShutdownCleanup and KBSSearchEngine::ShutdownCleanup
+	    both name "a static PMString" as the thing that must be let go here. This one was missed by
+	    both of them until 2026-08-08 (it is the third static to be added without a line in the list;
+	    see KBSResultModel::ShutdownCleanup for the first two). */
+	void ShutdownCleanup();
+
 	/** Say on the status line WHAT was just ticked or cleared, and over WHICH row:
 
 	        ch1.indd  all checked

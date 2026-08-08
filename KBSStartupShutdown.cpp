@@ -29,6 +29,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSResultModel.h"
+#include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 
 /** Implements IStartupShutdownService for the plug-in. */
@@ -72,6 +73,10 @@ public:
 		KBSDrawEventHandler::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
+		// ...and the line the panel last reported: a static PMString of exactly the kind the marker
+		// holds. It joined this list on 2026-08-08, having stood through both of the sweeps that
+		// wrote the rule down (see KBSResultTree::ShutdownCleanup).
+		KBSResultTree::ShutdownCleanup();
 		// ...and the search engine's own: the Find Format it remembers is an AttributeBossList
 		// holding references to the dialog's attributes, so letting it go is database work and
 		// belongs here rather than in a static destructor at DLL unload. It was the one piece of

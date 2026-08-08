@@ -28,14 +28,13 @@
 // General includes:
 #include "CAlert.h"
 #include "PMString.h"
-#include "LocaleSetting.h"			// which language to show
-#include "PMLocaleIds.h"			// k_jaJP
 
 #include <string>
 #include <cstdio>
 
 // Project includes:
 #include "KBSHowTo.h"
+#include "KBSLoc.h"					// JapaneseUI - the one place "is the UI Japanese" is asked
 
 namespace
 {
@@ -47,7 +46,8 @@ namespace
 const wchar_t* const kHowToEN =
 	L"[Searching (Find in Document / Find in Book)]\n"
 	L"- What to look for is typed in Edit > Find/Change. This plug-in has no search box of its own.\n"
-	L"- Searches on the Text, GREP and Glyph tabs.\n"
+	L"- Searches on the Text, GREP, Glyph and Transliterate tabs.\n"
+	L"- The Transliterate tab has no query text of its own: what it looks for is the character type picked on that tab (half-width katakana, full-width hiragana and so on), and a replace turns each stretch of that type into the type chosen on the change side.\n"
 	L"- The Search: menu in Edit > Find/Change (Document, Story and so on) is not used. A run always covers the whole document (every chapter's whole document, for a book).\n"
 	L"- The Object and Colour tabs are not supported.\n"
 	L"\n"
@@ -78,7 +78,7 @@ const wchar_t* const kHowToEN =
 	L"[Panel appearance]\n"
 	L"- Translucent Panel: ON draws this panel faint while it floats, and brings it back to solid while the pointer is on it. It does nothing while the panel is docked and expanded. Windows only.\n"
 	L"- Translucent Find/Change: the same for InDesign's own Find/Change dialog. Windows only.\n"
-	L"- Both start OFF every time InDesign is launched. Save Panel Settings keeps them for the next launch.\n"
+	L"- Both start OFF every time InDesign is launched. Save Panel Settings keeps them - and Hide Previous Chapter - for the next launch.\n"
 	L"\n"
 	L"[Limits]\n"
 	L"- The panel draws the first 5000 rows. Every hit is still held, so checking, replacing and saving are never capped by what is on screen.\n"
@@ -92,7 +92,8 @@ const wchar_t* const kHowToEN =
 const wchar_t* const kHowToJA =
 	L"【検索（Find in Document / Find in Book）】\n"
 	L"・検索する文字は 編集 > 検索と置換 に検索内容を入力します。このプラグインは検索入力欄を持ちません。\n"
-	L"・Text / GREP / Glyph の3つのタブで検索できます。\n"
+	L"・Text / GREP / Glyph / Transliterate の4つのタブで検索できます。\n"
+	L"・Transliterate（文字種変換）のタブには、検索する文字の入力欄がありません。そのタブで選んだ文字種（半角カタカナ、全角ひらがな など）が検索条件になり、置換側で選んだ文字種へ変換します。\n"
 	L"・編集 > 検索と置換の Search:（Document / Story など）は使いません。常にドキュメント全体（ブックなら各章の全体）を検索します。\n"
 	L"・オブジェクト／カラーの各タブは対象外です。\n"
 	L"\n"
@@ -123,7 +124,7 @@ const wchar_t* const kHowToJA =
 	L"【パネルの見た目】\n"
 	L"・Translucent Panel: ON にすると、パネルが浮いている（フロート）あいだ半透明になり、ポインタを乗せているあいだは元の濃さに戻ります。ドッキングして開いているときは効きません。Windows のみ。\n"
 	L"・Translucent Find/Change: InDesign 本体の 検索と置換 ダイアログにも同じことをします。Windows のみ。\n"
-	L"・どちらも InDesign を起動するたびに OFF から始まります。Save Panel Settings を実行しておくと、次回の起動でもその状態で開きます。\n"
+	L"・どちらも InDesign を起動するたびに OFF から始まります。Save Panel Settings を実行しておくと、この2つと Hide Previous Chapter が、次回の起動でも同じ状態で開きます。\n"
 	L"\n"
 	L"【制限】\n"
 	L"・パネルに出るのは先頭5000行までです（内部にはすべて保持しているので、チェックや置換、書き出しが表示数で制限されることはありません）。\n"
@@ -177,10 +178,10 @@ void AppendJSEscaped(std::string& out, const wchar_t* text)
 
 void KBSHowTo::Show()
 {
-	// Japanese InDesign gets the Japanese reference, everything else the English one - the split
-	// the string tables make for the replace prompts.
-	const wchar_t* const text =
-		(LocaleSetting::GetLocale().GetUserInterfaceId() == k_jaJP) ? kHowToJA : kHowToEN;
+	// Japanese InDesign gets the Japanese reference, everything else the English one - the same split
+	// KBSLoc makes for the replace prompts and the About box, asked through the same one function.
+	// This file spelled the LocaleSetting test out for itself until 2026-08-08.
+	const wchar_t* const text = KBSLoc::JapaneseUI() ? kHowToJA : kHowToEN;
 
 	Utils<IExtendScriptUtils> esUtils;
 	if (esUtils.Exists())

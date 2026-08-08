@@ -694,6 +694,19 @@ void KBSResultTree::GetLastStatus(PMString& outMessage)
 	outMessage.SetTranslatable(kFalse);
 }
 
+void KBSResultTree::ShutdownCleanup()
+{
+	// The one static this file keeps, emptied for the reason KBSResultModel empties its four: a
+	// PMString still holding storage when the .pln unloads runs its destructor against an application
+	// that has already torn itself down (the KESCL ShutdownCleanup rule).
+	//
+	// Added on 2026-08-08. It had been standing since the status line was first kept in the module,
+	// through both of the earlier sweeps that wrote that rule down - KBSResultModel's list even says
+	// "when a static is added above, it is added here too", and KBSSearchEngine's names "a static
+	// PMString" as the example. Neither of them was looking in this file.
+	gLastStatus.Clear();
+}
+
 namespace
 {
 

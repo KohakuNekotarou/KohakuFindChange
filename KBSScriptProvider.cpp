@@ -32,6 +32,7 @@
 
 // Interface includes:
 #include "IScript.h"
+#include "IScriptErrorUtils.h"	// SetReadOnlyPropertyErrorData - how the base class refuses a put
 #include "IScriptRequestData.h"
 
 // General includes:
@@ -68,10 +69,15 @@ ErrorCode KBSScriptProvider::AccessProperty(ScriptID propID, IScriptRequestData*
 		return kFailure;
 
 	// Read-only. The declaration in KBS.fr says kReadOnly, so the engine should refuse an assignment
-	// before it ever reaches here; this is the backstop, and it fails rather than quietly accepting
+	// before it ever reaches here; this is the backstop, and it refuses rather than quietly accepting
 	// a value that would then not be there on the next read.
+	//
+	// Refused the way the base class refuses a put on the read-only properties IT owns:
+	// CScriptProvider.cpp:369 (parent), :1096 (object), :1116 (id) and :1135 (index) all end with this
+	// same call. A bare kFailure reaches the script as a failure that says nothing about why; this
+	// names the property and the reason (IScriptErrorUtils.h:67-73).
 	if (data->IsPropertyPut())
-		return kFailure;
+		return Utils<IScriptErrorUtils>()->SetReadOnlyPropertyErrorData(data, propID);
 
 	if (!data->IsPropertyGet())
 		return CScriptProvider::AccessProperty(propID, data, script);
