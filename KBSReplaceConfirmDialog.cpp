@@ -43,9 +43,8 @@
 #include "KBSLoc.h"			// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSReplaceConfirmDialog.h"
 #include "KBSResultModel.h"		// which chapters are ticked, and what they are called
-#include "KBSEditStamp.h"		// ...and whether any of them has been edited since the search
-#include "IDocument.h"			// the chapter, found by file rather than by a stale UIDRef
-#include "IDocumentList.h"		// FindDoc(IDFile) - is this chapter open RIGHT NOW?
+// (KBSEditStamp.h, IDocument.h and IDocumentList.h were here on 2026-08-08, for the one function
+// that asked whether a chapter had been edited since the search. It moved to KBSReplaceEngine.)
 
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
@@ -232,99 +231,11 @@ PMString KBSReplaceConfirmDialog::BuildCountLine(int32 checkedCount)
 	return line;
 }
 
-/* BuildEditedSinceLine
-*/
-PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
-{
-	// Only the chapters this run is about to WRITE to. A chapter with nothing ticked is not at
-	// risk from an edit, and a warning that fires for one would teach the user to read past this
-	// line - which is the one line here that can save their text.
-	int32 editedCount = 0;
-	PMString firstName;
-	const int32 chapterCount = KBSResultModel::GetChapterCount();
-	for (int32 c = 0; c < chapterCount; ++c)
-	{
-		if (KBSResultModel::GetChapterCheckedCount(c) <= 0)
-			continue;
-
-		UIDRef docRef;
-		IDFile file;
-		if (!KBSResultModel::GetChapterLocation(c, docRef, file))
-			continue;
-
-		// ***** THE CHAPTER IS FOUND BY ITS FILE, NOT BY THE UIDRef THE SEARCH RECORDED. *****
-		// A book search closes each chapter as it finishes with it, so by the time this runs that
-		// UIDRef's database is very likely gone - and reading it would be undefined behaviour, not
-		// a nil check (KBSBookScope::IsDocStillOpen exists to say so without dereferencing).
-		//
-		// Testing it with IsDocStillOpen is not enough either: when the user REOPENS a chapter to
-		// edit it - the one case this whole feature is about - the reopened document has a new
-		// UIDRef, and the recorded one still reads as closed. Measured 2026-08-08: the warning
-		// never appeared on the book path until this asked by file instead.
-		//
-		// The stamp itself does not care: it holds story UIDs and counters, which are the same
-		// values in the reopened document (measured 2026-08-08).
-		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
-		if (docList == nil)
-			continue;
-
-		// "Search to see if one (whatFile) is already open. If so, return it" - IDocumentList.h:64-69.
-		// nil means the chapter is not open now, and a chapter nobody can see cannot have been
-		// edited, so it is passed over rather than reported.
-		IDocument* liveDoc = docList->FindDoc(file);
-		if (liveDoc == nil)
-			continue;
-
-		if (KBSEditStamp::IsChapterCurrent(c, ::GetUIDRef(liveDoc)))
-			continue;
-
-		// The name is only needed when exactly one chapter turns out to be edited, but it has to
-		// be taken here, while its index is in hand.
-		if (editedCount == 0)
-		{
-			int32 hitCount = 0;
-			KBSResultModel::GetChapterDisplay(c, firstName, hitCount);
-			firstName.SetTranslatable(kFalse);
-		}
-		++editedCount;
-	}
-
-	// ***** Nothing to say, so say NOTHING. ***** Empty means the line is hidden rather than drawn
-	// blank - SetOptionalLine does that for the glyph layout, and the Text / GREP caller leaves out
-	// its separators. A standing disclaimer stood here until 2026-08-08 and was shown on every
-	// prompt, because nothing knew whether the text had been edited. KBSEditStamp knows.
-	if (editedCount == 0)
-		return PMString();
-
-	// The opening names WHAT was edited; the ending is the same in all three cases. Each key is
-	// translated before anything is put into it, and what goes in is marked untranslatable first -
-	// the reasoning BuildCountLine spells out above applies unchanged.
-	PMString line;
-	if (!KBSResultModel::IsFromBook())
-	{
-		line = KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
-	}
-	else if (editedCount == 1)
-	{
-		line = KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
-		::ReplaceStringParameters(&line, firstName);
-	}
-	else
-	{
-		PMString countStr;
-		countStr.AppendNumber(editedCount);
-		countStr.SetTranslatable(kFalse);
-		line = KBSLoc::Text(kKBSConfirmEditedManyKey, KBSJa::kConfirmEditedMany);
-		::ReplaceStringParameters(&line, countStr);
-	}
-
-	// A break rather than a space: English wants one between the two sentences and Japanese does
-	// not, and a line end is right in both.
-	line.Append(kLineSeparatorString);
-	line.Append(KBSLoc::Text(kKBSConfirmEditedTailKey, KBSJa::kConfirmEditedTail));
-	line.SetTranslatable(kFalse);
-	return line;
-}
+// ***** A BuildEditedSinceLine STOOD HERE ON 2026-08-08 AND HAS MOVED TO THE REPLACE ENGINE. *****
+// It asked KBSEditStamp whether any ticked chapter had been edited since the search and returned a
+// line for this prompt. From here it could only reach the chapters that were OPEN - see the header
+// for the case that made that fatal, and for where the question is asked now. It took this file's
+// only readers of IDocumentList, IDocument and KBSEditStamp with it.
 
 /* BuildUnsavedLine
 */
@@ -526,7 +437,9 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, !textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmUnsavedWidgetID, !textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmCareWidgetID, !textLayout);
-	this->ShowOrHide(kKBSReplaceConfirmEditedWidgetID, !textLayout);
+	// (kKBSReplaceConfirmEditedWidgetID was shown here too until 2026-08-08. The widget came off
+	// KBS.fr with the line it carried; the id stays reserved in KBSID.h, the way the "Don't show
+	// again" box's did - and unlike that one, nothing writes to it any more either.)
 
 	if (textLayout)
 	{
@@ -566,12 +479,9 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID,
 		KBSReplaceConfirmDialog::BuildCountLine(KBSReplaceConfirmDialog::GetCheckedCount()));
 
-	// Whether the text was actually edited since the search - between the glyphs and the closing
-	// lines, the same place the Text / GREP layout puts it. SetOptionalLine, not
-	// SetTextControlData: the line is empty when nothing was edited, and an empty line drawn on
-	// the prompt reads as a fault (2026-08-08, when this stopped being a standing disclaimer).
-	this->SetOptionalLine(kKBSReplaceConfirmEditedWidgetID,
-		KBSReplaceConfirmDialog::BuildEditedSinceLine());
+	// (A line saying whether the text had been edited since the search sat here for one afternoon on
+	// 2026-08-08, between the glyphs and the closing lines. It went with BuildEditedSinceLine - see
+	// the note where that function stood, above.)
 
 	// The closing sentence.
 	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID,

@@ -1568,29 +1568,15 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 			kEVEAlignLeft | kEVELargeSpaceAfter,
 		),
 
-		// ----- "If the text has been edited since the search..." -----
-		// The GLYPH layout's copy of the warning; the Text / GREP one carries the same sentence
-		// inside the wrapped block above (KBSActionComponent assembles it).
+		// ***** A WIDGET FOR "the text has been edited since the search" STOOD HERE ON 2026-08-08.
+		// ***** Both layouts carried that sentence - this one on a line of its own, the Text / GREP
+		// one inside the wrapped block above - and it left the prompt entirely the same day: from
+		// here only the chapters that happen to be OPEN can be asked about, and a chapter the user
+		// opened, edited, saved and closed cannot. The replace asks each chapter as it opens it now,
+		// and its Cancel stops the whole run (KBSReplaceEngine::AskEditedChapter).
 		//
-		// MULTI-line, unlike the two single-line widgets below it: this sentence is about twice
-		// their length and wraps at 340px in both languages. A single-line widget would have
-		// ellipsized it, and this is the one line on the prompt that must be read in full.
-		EVEStaticMultiLineTextWidget
-		(
-			kKBSReplaceConfirmEditedWidgetID, kSysStaticTextPMRsrcId,
-			kBindNone,
-			Frame(0, 0, 340, 40)			// EVE grows it to fit the text
-			kTrue, kTrue, kAlignLeft,
-			kDontEllipsize, kFalse,
-			// StaticMultiLineTextAttr
-			0,								// fScrollBarWidgetID
-			kDialogWindowFontId;			// fFontID
-			3,								// fNumPixelsBetweenLines
-			0, 0,							// fInset
-			"",								// the controller fills it
-
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
+		// kKBSReplaceConfirmEditedWidgetID is commented out in KBSID.h, its number not reused - the
+		// way the "Don't show again" box's id was before it.
 
 		// ----- "When a replace covers several documents in a book, every document it changes is
 		//        left open and UNSAVED." -----

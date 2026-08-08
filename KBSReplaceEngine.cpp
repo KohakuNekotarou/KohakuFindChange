@@ -29,13 +29,16 @@
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
 #include "WalkerScopeOptions.h"
+#include "CAlert.h"					// the edited-chapter warning, asked as each chapter is opened
 #include "CmdUtils.h"				// commands and command sequences
+#include "CoreResTypes.h"			// kLineSeparatorString - that alert composes its own line breaks
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 // (ITextModel.h was here for GetTextChangeCount, which fed the trusted-story fast path. Removed
 // 2026-08-03 with that path - see the note over MatchStillStandsHere.)
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
+#include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
 #include <map>
@@ -44,6 +47,9 @@
 
 // Project includes:
 #include "KBSReplaceEngine.h"
+#include "KBSEditStamp.h"		// has this chapter been edited since the search walked it?
+#include "KBSID.h"				// the string keys the edited-chapter warning is worded from
+#include "KBSLoc.h"				// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
@@ -164,6 +170,17 @@ struct PendingChapter
 	// straight back, because it is holding its .indd locked for no reason at all.
 	bool	tookReplacement;
 
+	// Has this chapter's text been edited since the search walked it (KBSEditStamp)?
+	//
+	// ***** READ IN THE RESOLVE PASS, AND THAT IS THE ONLY PLACE IT CAN BE READ FOR EVERY CHAPTER.
+	// ***** IsChapterCurrent needs the chapter OPEN, and a book search closes each one as it finishes
+	// with it - so before the resolve pass, a chapter the user had closed cannot be asked at all. The
+	// confirmation prompt could only ever ask about the chapters that happened to be open, which is
+	// why the question moved here on 2026-08-08 (user's decision) and left the prompt entirely.
+	//
+	// Read after the chapter is a live document again and before a character is written to it.
+	bool	editedSinceSearch;
+
 	// This chapter's checked, not-yet-replaced hits, counted ONCE where the run is sized and read
 	// from here after that (how far this chapter's slice moves the bar). The number cannot change
 	// in between: the panel's actions are greyed out for the whole run, the bar is modal, and a
@@ -172,7 +189,7 @@ struct PendingChapter
 	int32	checkedCount;
 
 	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false),
-		checkedCount(0) {}
+		editedSinceSearch(false), checkedCount(0) {}
 };
 
 // ***** A CountCheckedInChapter STOOD HERE UNTIL 2026-08-08, AND THE MODEL ALREADY ANSWERED IT.
@@ -922,6 +939,96 @@ void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pendin
 	}
 }
 
+// ***** THE WAY OUT WHEN THE RUN IS STOPPED BEFORE IT HAS WRITTEN ANYTHING. *****
+//
+// Both exits from the resolve pass come through here: the progress bar's Cancel while the chapters
+// are being opened, and a Cancel on an edited chapter's warning. Neither has a command sequence to
+// abort - it opens after that pass - and neither has a row backup to drop, which is taken after it
+// as well. What IS owed is the chapters the pass opened: each holds its .indd locked and has no
+// window it could be closed through.
+//
+// The wording is BuildSummary's, not this function's: a cancel means one thing to the user wherever
+// it was pressed, and a second spelling of it here is how the two come to differ.
+// @return 0, always - the number of replacements the run made.
+int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, RunTotals& totals,
+	PMString& outSummary)
+{
+	std::vector<PMString> unclosed;
+	HandBackChaptersWithNothingInThem(pending, unclosed);
+
+	// Belt and braces, the same reading the cancel inside the run takes: nothing here raises the
+	// error state deliberately (WasCancelled is asked with kFalse, and the alert raises nothing at
+	// all), but the pass this leaves behind OPENS DOCUMENTS, and a chapter that would not open can
+	// leave one standing. It must not outlive this function - a raised error state fails whatever
+	// the application does next.
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
+	totals.cancelled = true;
+	BuildSummary(totals, outSummary);
+	// The chapters that would not close, at the end, the way every other exit says it.
+	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
+	return 0;
+}
+
+// ***** THE TEXT THIS CHAPTER'S ROWS WERE FOUND IN IS NOT THE TEXT THAT IS THERE NOW. *****
+//
+// The run walks the chapter again and gives the Nth match to the Nth checked row, so an edit that
+// added or removed a match between the search and now moves every row after it onto a match the
+// user never ticked. Nothing in the walk can see that; only the counters can (KBSEditStamp), and
+// this is where what they say is put to the user.
+//
+// Asked ONE CHAPTER AT A TIME (user's decision, 2026-08-08), and with the progress bar DOWN: the
+// resolve pass closes its own bar before the first of these goes up, so a modal alert never stands
+// over a modal bar.
+//
+// ***** CANCEL STOPS THE WHOLE RUN, AND HERE THAT COSTS NOTHING TO UNDO. ***** This is asked before
+// the command sequence opens, so a cancel returns with not one character written: there is no
+// rollback to do and no chapter left half replaced. (Once the run is under way a cancel is
+// AbortCommandSequence instead - see the sequence in ReplaceChecked.)
+//
+// Cancel is the DEFAULT button, the decision the glyph confirmation records for itself (KBS.fr,
+// 2026-07-31): Enter must not start a rewrite.
+// @param chapterIdx the chapter's index in KBSResultModel.
+// @return false when the user stops the run.
+bool AskEditedChapter(int32 chapterIdx)
+{
+	PMString msg;
+
+	// A DOCUMENT-scope run has one "chapter" and it is the front document, which has no name to put
+	// here - the book wording would name a chapter of a book that is not there.
+	if (!KBSResultModel::IsFromBook())
+		msg = KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
+	else
+	{
+		// The model's display name for the chapter row, marked untranslatable BEFORE it goes into a
+		// translated string - the order every other line of this prompt takes (BuildCountLine).
+		PMString name;
+		int32 chapterHits = 0;
+		KBSResultModel::GetChapterDisplay(chapterIdx, name, chapterHits);
+		name.SetTranslatable(kFalse);
+		msg = KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
+		::ReplaceStringParameters(&msg, name);
+	}
+
+	// What it can cost, and then what Cancel does. The line breaks are ours: the platform breaks an
+	// alert where it sees fit, and these are three separate sentences (CAlert.h:116-122).
+	msg.Append(kLineSeparatorString);
+	msg.Append(KBSLoc::Text(kKBSConfirmEditedTailKey, KBSJa::kConfirmEditedTail));
+	msg.Append(kLineSeparatorString);
+	msg.Append(KBSLoc::Text(kKBSConfirmEditedCancelAllKey, KBSJa::kConfirmEditedCancelAll));
+	// Finished text: every part was translated as it was taken, so the alert must not look the
+	// result up again (CAlert translates the message it is handed).
+	msg.SetTranslatable(kFalse);
+
+	const int16 answer = CAlert::ModalAlert(msg,
+		kOKString,				// 1 - go on with the replace
+		kCancelString,			// 2 - stop the whole run
+		kNullString,			// no third button
+		2,						// ...and 2 is the DEFAULT
+		CAlert::eWarningIcon);
+	return (answer == 1);
+}
+
 } // anonymous namespace
 
 bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
@@ -1203,35 +1310,19 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		totalCheckedHits += checkedHere;
 	}
 
-	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request), matching the
-	// search. It used to be book scope only, on the reasoning that a one-document replace is a
-	// single step with nothing to cancel between - but the bar is sized in HITS, not chapters, so a
-	// single document with thousands of them takes just as long and had no way to be stopped.
+	// ***** THE TITLE BOTH OF THE RUN'S BARS CARRY. ***** They are two objects - see the resolve
+	// pass below - but one run, and one title is what says so on screen.
 	//
-	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters and once
-	// more when the loop ends, never inside a chapter - the walk holds the walker's critical section
-	// and must not pump UI work (see the section in ReplaceInChapter). So a Cancel pressed during a
-	// ONE-CHAPTER run does not break off the work: the chapter is replaced to the end, and then the
-	// whole sequence is aborted and every character put back. The button is honoured - nothing is
-	// left changed - but it is honoured at the end rather than at the moment it is pressed.
-	// DisableChildProgressBars keeps the chapter opens in the resolve pass below from raising bars
-	// of their own.
+	// A bar is shown for BOTH scopes since 2026-07-31 (user's request), matching the search. It used
+	// to be book scope only, on the reasoning that a one-document replace is a single step with
+	// nothing to cancel between - but the bar is sized in HITS, not chapters, so a single document
+	// with thousands of them takes just as long and had no way to be stopped.
 	//
-	// SIZED IN HITS, not chapters, and moved by ReplaceInChapter as it goes (progressBase below).
-	// The walker will not report progress for us: ITextWalkerProgressMonitor is only a place to PARK
-	// a bar - the client's own OnNextPosition is what calls SetPosition on it, and the stock
-	// kFindChangeClientBoss does not (measured 2026-07-31: registered fine, 5270 replacements, zero
-	// calls). spellpanel gets its moving bar because it walks with a client it wrote itself. So KBS
-	// counts its own work, which it can do better than the walker anyway: the number of checked hits
-	// is known before the run starts.
-	//
-	// showImmediate = kTrue for the reason the search learned the hard way: with the default
-	// the bar waits out an internal delay, and a fast run beats that delay - so the cancel
+	// showImmediate = kTrue on both, for the reason the search learned the hard way: with the
+	// default the bar waits out an internal delay, and a fast run beats that delay - so the cancel
 	// button, the one thing the bar is really there for, never reaches the screen.
 	PMString progressTitle("Replacing...");
 	progressTitle.SetTranslatable(kFalse);
-	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
-	progressBar.DisableChildProgressBars(kTrue);
 
 	// FIRST PASS, deliberately OUTSIDE the command sequence: turn every chapter in the list into a
 	// live document, reopening the ones the user has closed since the search.
@@ -1246,8 +1337,42 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// A chapter that cannot be opened STAYS in the list, unopened: it is a step the bar was sized
 	// with, and dropping it is what used to leave the bar short of its own total, stopping at
 	// 4 of 5 with nothing left to do.
+	//
+	// ***** THIS PASS HAS A BAR OF ITS OWN, IN A SCOPE OF ITS OWN, SINCE 2026-08-08. ***** One bar
+	// covered both passes until then, which cannot work now that a chapter found to be EDITED puts a
+	// modal alert up between them: the bar is modal too, and the two must not stand at once (user's
+	// decision). Ending the scope takes the bar down, the questions are asked, and the replace's own
+	// bar goes up after them.
+	//
+	// Sized in CHAPTERS here - this pass opens documents, it does not replace anything - where the
+	// replace's bar below is sized in hits. Until the split, the opening moved no bar at all: it was
+	// the slow part of a run with nothing on screen to show for it.
+	bool cancelledWhileOpening = false;
+	{
+	RangeProgressBar openBar(progressTitle, 0, static_cast<int32>(pending.size()), kTrue, kTrue);
+	openBar.DisableChildProgressBars(kTrue);
+
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
+		// The bar carries the chapters ALREADY opened, so it is set at the top of the pass rather
+		// than the bottom: three of the paths below leave by continue, and a step written after them
+		// would be the step they skip.
+		openBar.SetPosition(static_cast<int32>(pi));
+
+		// Cancel, asked between chapters exactly as the replace loop below asks it, and answered by
+		// the bar having just been moved (WasCancelled only reads a flag - something has to have
+		// given the button a chance to set it).
+		//
+		// kFalse: do NOT raise the global error state, the same reading the replace loop takes.
+		// Nothing has been written at this point - the sequence does not open until this pass is
+		// over - so a cancel here is answered by handing the chapters back and returning, with no
+		// rollback to do at all.
+		if (openBar.WasCancelled(kFalse))
+		{
+			cancelledWhileOpening = true;
+			break;
+		}
+
 		PendingChapter& chapter = pending[pi];
 		const int32 ci = chapter.chapterIdx;
 
@@ -1328,7 +1453,74 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			IDataBase* const chapterDB = docRef.GetDataBase();
 			chapter.wasModified = (chapterDB != nil) && (chapterDB->IsModified() != kFalse);
 		}
+
+		// ...and whether the TEXT has moved on since the search walked it. Read before this run
+		// writes anything, for the same reason as the flag above, and asked HERE rather than at the
+		// confirmation prompt because here is the only point where EVERY chapter can be asked:
+		// IsChapterCurrent needs the document open, and this one has just been opened.
+		//
+		// docRef, not the UIDRef the search recorded: this one was resolved BY FILE just above,
+		// while the recorded one may name a database that has since been closed and its address
+		// reused (the resolve above is entirely about that). The stamp holds story UIDs and
+		// counters, which read the same in the reopened document (measured 2026-08-08).
+		chapter.editedSinceSearch = !KBSEditStamp::IsChapterCurrent(ci, docRef);
 	}
+
+	// ASK ONCE MORE, now that the pass is over: the reading at the top only ever sees a cancel that
+	// arrived while an EARLIER chapter was opening, and one pressed during the last chapter's open
+	// would have no next pass to be noticed in. The same shape, and the same reason, as the reading
+	// at the end of the replace loop below.
+	if (!cancelledWhileOpening && openBar.WasCancelled(kFalse))
+		cancelledWhileOpening = true;
+
+	}	// end of the scope the opening bar lived in - THE BAR IS DOWN FROM HERE
+
+	if (cancelledWhileOpening)
+		return StopBeforeAnythingIsWritten(pending, totals, outSummary);
+
+	// ***** AND THE CHAPTERS THAT HAVE BEEN EDITED SINCE THE SEARCH ARE PUT TO THE USER. *****
+	//
+	// One at a time (user's decision, 2026-08-08), each naming its own chapter, and any one of them
+	// can stop the whole run - which is why they are asked HERE, after the pass that opens the
+	// chapters and before the sequence that writes to them. Every chapter has been opened by now, so
+	// this is the first moment at which the question can be asked about ALL of them rather than
+	// about whichever ones happened to be open.
+	//
+	// Not inside the pass above: the bar is modal and so is the alert, and the two must not stand at
+	// once. The pass has just taken its bar down.
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+	{
+		// A chapter that could not be opened is not asked about. Nothing will be written to it -
+		// it is skipped below and named in the summary - so a warning about its text would be a
+		// question with no consequence attached to either answer.
+		if (!pending[pi].opened || !pending[pi].editedSinceSearch)
+			continue;
+
+		if (!AskEditedChapter(pending[pi].chapterIdx))
+			return StopBeforeAnythingIsWritten(pending, totals, outSummary);
+	}
+
+	// ***** THE REPLACE'S OWN BAR. ***** A second object, not the one the pass above used - see the
+	// note there for why the run cannot carry a single bar across both.
+	//
+	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters and once
+	// more when the loop ends, never inside a chapter - the walk holds the walker's critical section
+	// and must not pump UI work (see the section in ReplaceInChapter). So a Cancel pressed during a
+	// ONE-CHAPTER run does not break off the work: the chapter is replaced to the end, and then the
+	// whole sequence is aborted and every character put back. The button is honoured - nothing is
+	// left changed - but it is honoured at the end rather than at the moment it is pressed.
+	// DisableChildProgressBars keeps anything the replacements raise from putting up bars of their
+	// own (the chapter opens the other bar covers are the same case, and it says so there).
+	//
+	// SIZED IN HITS, not chapters, and moved by ReplaceInChapter as it goes (progressBase below).
+	// The walker will not report progress for us: ITextWalkerProgressMonitor is only a place to PARK
+	// a bar - the client's own OnNextPosition is what calls SetPosition on it, and the stock
+	// kFindChangeClientBoss does not (measured 2026-07-31: registered fine, 5270 replacements, zero
+	// calls). spellpanel gets its moving bar because it walks with a client it wrote itself. So KBS
+	// counts its own work, which it can do better than the walker anyway: the number of checked hits
+	// is known before the run starts.
+	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
+	progressBar.DisableChildProgressBars(kTrue);
 
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
 	// sequence below; this is what lets the PANEL be rolled back with it, so the two cannot end up

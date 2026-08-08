@@ -123,16 +123,20 @@ public:
 	*/
 	static PMString BuildCountLine(int32 checkedCount);
 
-	/** Whether the text has actually been edited since the search, in the user's language.
-
-		Asks KBSEditStamp about every chapter that has something ticked, and names what it finds:
-		the document, the one chapter, or how many chapters. **Returns an EMPTY string when
-		nothing has been edited** - the caller must hide the line rather than draw it blank
-		(SetOptionalLine does this; the Text / GREP caller leaves out its separators).
-
-		Until 2026-08-08 this returned a standing disclaimer on every prompt, phrased in the
-		conditional because nothing knew whether an edit had happened. @see BuildCountLine */
-	static PMString BuildEditedSinceLine();
+	// ***** A BuildEditedSinceLine STOOD HERE FOR ONE AFTERNOON ON 2026-08-08, AND THE QUESTION IT
+	// ***** ASKED COULD NOT BE ASKED FROM HERE.
+	//
+	// It reported whether the text had been edited since the search (KBSEditStamp) as a line on this
+	// prompt. The counters live in the document and need it OPEN to be read - and a book search
+	// closes every chapter as it finishes with it - so from here it could only ever ask about the
+	// chapters that happened to be open when the prompt was drawn. A chapter the user had opened,
+	// edited, SAVED and closed was silently passed over, which is the one case the whole feature is
+	// about.
+	//
+	// On the user's decision the question moved to the only point where every chapter can be asked:
+	// the moment the replace opens each one (KBSReplaceEngine, AskEditedChapter and the resolve
+	// pass). It is a modal alert per chapter now, and Cancel there stops the whole run - which this
+	// prompt could not offer either, its own Cancel having already been answered by then.
 
 	/** What the run leaves behind - documents open and unsaved. @see BuildCountLine
 

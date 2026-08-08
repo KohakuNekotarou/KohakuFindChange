@@ -314,11 +314,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 
 // only: the Text / GREP one carries the same sentence inside its single wrapped block, assembled by
 // KBSActionComponent, which is why there is no second widget for it there.
 DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
-// "If the text has been edited since the search..." - the GLYPH layout's copy of the warning that
-// the plug-in no longer checks whether a match is still the one the row found (2026-08-05). The
-// Text / GREP layout carries the same sentence inside its single wrapped block, so there is no
-// second widget for it there - the same arrangement the line above uses.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmEditedWidgetID, kKBSPrefix + 26)
+// "If the text has been edited since the search..." - the GLYPH layout's copy of that warning, live
+// for one afternoon on 2026-08-08 and off both layouts by the end of it: the question can only be
+// answered where the chapters are OPEN, so it moved to the replace itself (see the string keys
+// below). Commented out rather than deleted, and its number not reused, for the reason given above
+// the two before it.
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmEditedWidgetID, kKBSPrefix + 26)
 // The glyph dialog's three fixed labels ("Find", the arrow, "Change to"). They carry ids so the
 // runtime language switch (KBSLoc) can restamp them Japanese - the jaJP string table that used
 // to do it is gone (2026-08-05).
@@ -416,25 +417,35 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
 #define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
 #define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
-// ***** The one thing this prompt has to say that the panel cannot show. ***** Since 2026-08-05 a
-// replace does NOT check that the match it is about to rewrite is still the one the row was found
-// at: the chapter is walked again and the Nth match takes the Nth checked row's replacement. Edit
-// the text between searching and replacing and that numbering points somewhere else.
+// ***** THE EDITED-CHAPTER WARNING - AND IT IS NOT PART OF THIS PROMPT ANY MORE. ***** Since
+// 2026-08-05 a replace does NOT check that the match it is about to rewrite is still the one the row
+// was found at: the chapter is walked again and the Nth match takes the Nth checked row's
+// replacement. Edit the text between searching and replacing and that numbering points somewhere
+// else.
 //
-// ***** These four replaced a single standing disclaimer on 2026-08-08. ***** That one line was
-// shown on every prompt and could only speak in the conditional - "IF the text has been edited" -
-// because nothing knew whether it had been. KBSEditStamp knows now, so the prompt states a FACT
-// when there is one and says nothing at all when there is not (the line is hidden, not blanked).
+// A standing conditional disclaimer said so on every prompt until 2026-08-08 - "IF the text has been
+// edited" - because nothing knew whether it had been. KBSEditStamp knows, so these state a FACT and
+// appear only when there is one.
 //
-// Three openings and one ending, rather than three whole sentences: what differs between them is
-// only how the edited chapters are named, and the consequence is the same in all three.
+// ***** WHERE THEY ARE SAID CHANGED THE SAME DAY (user's decision). ***** They were a line ON this
+// prompt for one afternoon, and that line could only ask about the chapters that happened to be OPEN
+// when it was drawn: the counters need the document open, and a book search closes every chapter as
+// it finishes with it. So the question moved to the one point where every chapter can be asked - the
+// moment the replace itself opens each one - and is now a modal alert per chapter, with Cancel
+// stopping the whole run (KBSReplaceEngine::AskEditedChapter). The prompt says nothing about it.
 //
-// Translated like the rest of this prompt, and for the same reason: this is where the user
-// authorises a rewrite of their own text. The status line that reports the outcome stays English.
+// Openings that name what was edited, plus two lines that are the same whichever it was: what it can
+// cost, and what Cancel does.
+//   - ...Many is UNUSED since the move: the alert names ONE chapter because it is asked once per
+//     chapter. Kept because the wording is right and the plural is what a summary would need.
+//
+// Translated, and for the same reason the prompt is: this is where the user authorises a rewrite of
+// their own text. The status line that reports the outcome stays English.
 #define kKBSConfirmEditedDocKey		kKBSStringPrefix "kKBSConfirmEditedDocKey"
 #define kKBSConfirmEditedOneKey		kKBSStringPrefix "kKBSConfirmEditedOneKey"
 #define kKBSConfirmEditedManyKey	kKBSStringPrefix "kKBSConfirmEditedManyKey"
 #define kKBSConfirmEditedTailKey	kKBSStringPrefix "kKBSConfirmEditedTailKey"
+#define kKBSConfirmEditedCancelAllKey	kKBSStringPrefix "kKBSConfirmEditedCancelAllKey"
 // The closing line: what the run LEAVES BEHIND.
 //
 // ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by

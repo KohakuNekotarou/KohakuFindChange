@@ -664,23 +664,16 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	// ***** What the run does NOT check. ***** Since 2026-08-05 a replace walks the chapter again
-	// and gives the Nth match the Nth checked row's replacement, without asking whether that match
-	// is still the one the row was found at. Edit the text in between and the numbering points
-	// elsewhere - so it is said here, in the one place the user sees before anything is written.
+	// ***** WHAT THE RUN DOES NOT CHECK USED TO BE SAID HERE, AND IS NOW SAID WHERE IT CAN BE KNOWN.
+	// ***** Since 2026-08-05 a replace walks the chapter again and gives the Nth match the Nth
+	// checked row's replacement, without asking whether that match is still the one the row was found
+	// at. A standing disclaimer sat between the query and the closing lines saying so, and on
+	// 2026-08-08 it became a statement of fact for the chapters that were open (KBSEditStamp).
 	//
-	// Between the query and the closing lines on purpose: what is about to be written, then what
-	// could go wrong with it, then what the run leaves behind.
-	// Empty when nothing has actually been edited (2026-08-08 - it used to be a standing
-	// disclaimer shown every time), and then its separators go with it: two blank lines in the
-	// middle of the prompt read as a fault.
-	const PMString editedLine = KBSReplaceConfirmDialog::BuildEditedSinceLine();
-	if (!editedLine.IsEmpty())
-	{
-		msg.Append(editedLine);
-		msg.Append(kLineSeparatorString);
-		msg.Append(kLineSeparatorString);
-	}
+	// It left this prompt the same day, on the user's decision: from here only the OPEN chapters can
+	// be asked, and the case that matters most - a chapter opened, edited, saved and closed again -
+	// is exactly the one that cannot. The replace asks each chapter as it opens it, and offers a
+	// Cancel that stops the whole run, which this prompt could not (KBSReplaceEngine).
 
 	// What the run leaves behind. It used to name HOW MANY chapters, which is why a count was read
 	// here and carried into the prompt; the sentence states the case instead since 2026-08-07 (the

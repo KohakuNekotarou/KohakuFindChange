@@ -83,13 +83,18 @@ namespace KBSJa
 	const char16_t kConfirmEmptyReplace[]    = u"（空欄：一致した箇所は削除されます）";
 	const char16_t kConfirmFindFormat[]      = u"検索形式";
 	const char16_t kConfirmChangeFormat[]    = u"置換形式";
-	// An opening that names what was edited, plus one shared ending. Shown only when a chapter about
-	// to be written to has actually changed since the search (KBSEditStamp); otherwise the line is
-	// hidden. These four replaced a single standing conditional disclaimer on 2026-08-08.
+	// ***** NOT PART OF THIS PROMPT - they are the replace's own alert. ***** An opening that names
+	// what was edited, then what it can cost, then what Cancel does. Shown once per chapter, at the
+	// moment the replace opens that chapter and finds its counters have moved (KBSEditStamp), which
+	// is the only point where a chapter the user had CLOSED can be asked at all. They were a line on
+	// the confirmation prompt for one afternoon on 2026-08-08; see KBSID.h for why they left it.
+	// ...Many has no caller since that move: the alert names one chapter because it asks once per
+	// chapter.
 	const char16_t kConfirmEditedDoc[]       = u"検索後にテキストが編集されています。";
 	const char16_t kConfirmEditedOne[]       = u"検索後に「^1」のテキストが編集されています。";
 	const char16_t kConfirmEditedMany[]      = u"検索後に ^1 個の章のテキストが編集されています。";
 	const char16_t kConfirmEditedTail[]      = u"意図していない場所が置換される場合が有ります。";
+	const char16_t kConfirmEditedCancelAll[] = u"キャンセルすると、すべての置換を中止します。";
 	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
 	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
 	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";

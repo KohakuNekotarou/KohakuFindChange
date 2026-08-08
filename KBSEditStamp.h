@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Records what each chapter's text looked like when the search walked it, so the replace
-//  confirmation can say whether it has been edited since.
+//  Records what each chapter's text looked like when the search walked it, so the replace can tell
+//  the user - as it opens that chapter - whether it has been edited since.
 //
 //  A same-occurrence test stood in the replace engine until 2026-08-05 and was removed on the
 //  user's decision - it could not be made to work across a BOOK, where a chapter may be closed
@@ -79,9 +79,13 @@ namespace KBSEditStamp
 		against the session's list without ever dereferencing it). A book search closes each
 		chapter as it finishes with it, so this is the ordinary case, not a corner one.
 
-		An UNSTAMPED chapter answers kTrue. This prompt only warns - it does not block the
-		replace - so "not known to have changed" is the answer that keeps it quiet, and the
-		alternative would put a warning on every scan-built result set that was never stamped.
+		The one caller reopens the chapter immediately before asking (KBSReplaceEngine's resolve
+		pass), which settles the question rather than testing it.
+
+		An UNSTAMPED chapter answers kTrue. The warning it feeds does not refuse anything - it
+		states the fact and offers a Cancel - so "not known to have changed" is the answer that
+		keeps it quiet, and the alternative would raise an alert for every scan-built result set
+		that was never stamped.
 		@param chapterIdx the chapter's index in KBSResultModel.
 		@param docRef the chapter's document, freshly resolved by the caller. Deliberately passed
 		       in rather than held here: a UIDRef kept across a close cannot be trusted for

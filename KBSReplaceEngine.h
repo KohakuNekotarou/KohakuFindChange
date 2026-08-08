@@ -54,13 +54,26 @@ namespace KBSReplaceEngine
 	    A machine that cannot hold a whole book open is served by ticking fewer rows instead
 	    (user's decision, 2026-08-05).
 
-	    ***** THE RUN DOES NOT CHECK THAT THE TEXT IS STILL THE TEXT THE SEARCH FOUND. *****
-	    (User's decision, 2026-08-05.) The chapter is walked again with the same query and the Nth
-	    match is replaced for the Nth checked row - so if the document has been edited since the
-	    search in a way that adds or removes a match, a replacement lands somewhere the user never
-	    ticked. Keeping the document steady between the two is the user's responsibility - and since
-	    2026-08-08 the confirmation SAYS whether it was in fact edited, naming the chapters, rather
-	    than warning that it might have been (KBSEditStamp; kKBSConfirmEditedOneKey and siblings).
+	    ***** THE RUN DOES NOT CHECK THAT THE TEXT IS STILL THE TEXT THE SEARCH FOUND. IT ASKS THE
+	    ***** USER INSTEAD. (User's decision, 2026-08-05; the asking, 2026-08-08.)
+	    The chapter is walked again with the same query and the Nth match is replaced for the Nth
+	    checked row - so if the document has been edited since the search in a way that adds or
+	    removes a match, a replacement lands somewhere the user never ticked. Nothing in the walk can
+	    see that: the count still comes out right, and every checked row still finds a match.
+
+	    What CAN see it is KBSEditStamp - every story's change counter, recorded as the search
+	    finished with the chapter and compared as this run opens it again. A chapter that no longer
+	    reads the same raises a modal alert naming it, and Cancel there stops the WHOLE run before a
+	    character is written (AskEditedChapter and the resolve pass, in the .cpp). Keeping the
+	    document steady between the two is still the user's responsibility; they are now told when
+	    they have not.
+
+	    ***** ASKED AS EACH CHAPTER IS OPENED, AND NOWHERE ELSE. ***** It was a line on the
+	    confirmation prompt for one afternoon on 2026-08-08, and from there it could only reach the
+	    chapters that happened to be OPEN: the counters live in the document, and a book search
+	    closes every chapter as it finishes with it. A chapter the user opened, edited, SAVED and
+	    closed again was passed over in silence - which is the case the whole thing is for. This run
+	    opens every chapter it has work in, so this is the one place where all of them can be asked.
 
 	    A same-occurrence test used to stand in that gap, refusing any row whose story, position or
 	    text no longer lined up. See the note above the walk in KBSReplaceEngine.cpp for what it
