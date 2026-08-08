@@ -59,6 +59,7 @@
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
 #include "KBSPanelIcon.h"		// the illustration follows the status line
+#include "KBSEditStamp.h"		// its statics are released beside this file's own
 
 namespace
 {
@@ -705,6 +706,11 @@ void KBSResultTree::ShutdownCleanup()
 	// "when a static is added above, it is added here too", and KBSSearchEngine's names "a static
 	// PMString" as the example. Neither of them was looking in this file.
 	gLastStatus.Clear();
+
+	// Added 2026-08-08 with the stamps themselves, rather than after a fourth sweep found them
+	// standing: KBSEditStamp keeps a static vector of its own, and the rule this comment block
+	// describes covers it exactly.
+	KBSEditStamp::ShutdownCleanup();
 }
 
 namespace

@@ -22,6 +22,7 @@
 
 // Project includes:
 #include "KBSResultModel.h"
+#include "KBSEditStamp.h"		// the stamps describe these rows, so they go when the rows go
 
 namespace
 {
@@ -222,6 +223,10 @@ void KBSResultModel::Clear()
 	gQueryText.Clear();
 	gChangeText.Clear();
 	gWalkSignature.Clear();
+	// The edit stamps are indexed by the chapter positions that just went away. Called from INSIDE
+	// Clear() rather than beside it: the nine callers already have to remember ReleaseSearchedBook
+	// and ForgetSearchedFindFormat, and a third thing to pair by hand is a rule waiting to break.
+	KBSEditStamp::Forget();
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	gContextMenuChapter = kNoContextMenuChapter;
