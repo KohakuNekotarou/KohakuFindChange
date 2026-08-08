@@ -170,6 +170,22 @@ static uint8 KBSEffectiveAlpha(HWND target)
 	return KBSCursorOverWindow(target) ? 255 : kKBSPanelAlphaValue;
 }
 
+// *The same question for InDesign's OWN Find/Change dialog. It had no home of its own until
+//   2026-08-08: the expression stood written out in BOTH of its callers - the applying side and the
+//   hook's test - which is the very split the line above says this file avoids.
+//   *It answers for the toggle being OFF as well, exactly as the panel's does. Both callers happen
+//     to have established that already (the applying side deals with OFF separately, the hook only
+//     asks while ON), so that arm is not reached today - but the point of the function is that the
+//     answer to "what alpha belongs on this window" lives in one place, and a caller that does not
+//     check first must still get the right answer.
+static uint8 KBSEffectiveFindChangeAlpha(HWND target)
+{
+	if (!sFindChangeTranslucent)
+		return 255;
+
+	return KBSCursorOverWindow(target) ? 255 : kKBSPanelAlphaValue;
+}
+
 // *The Win32 event hook goes up and comes down with the toggle (bodies further down).
 static void KBSInstallWinEventHook();
 static void KBSRemoveWinEventHook();
@@ -601,8 +617,9 @@ bool16 KBSApplyFindChangeTranslucency()
 		sFcStyledWnd = h;		// ours to undo
 	}
 
-	// Solid again while the pointer is on it - the same rule as the panel, and the same test.
-	const BYTE alpha = KBSCursorOverWindow(h) ? 255 : kKBSPanelAlphaValue;
+	// Solid again while the pointer is on it - the same rule as the panel, asked in the one place
+	// that holds it (KBSEffectiveFindChangeAlpha).
+	const BYTE alpha = KBSEffectiveFindChangeAlpha(h);
 	return ::SetLayeredWindowAttributes(h, 0, alpha, LWA_ALPHA) ? kTrue : kFalse;
 #else
 	return kFalse;		// Mac: no way to do this
@@ -637,6 +654,16 @@ bool16 KBSApplyFindChangeTranslucency()
 static ICallbackTimer* sReapplyTimer = nil;
 static int32           sReapplyLeft  = 0;			// tries left (0 = stop; the runaway guard)
 
+// **KBSShutdownPanelAlpha has run: never build the timer again (2026-08-08, brought over from
+//   KESCM, which added it in its own 2026-08-06 re-check - two days AFTER this file was ported).
+//   !What it stops: the observer below is detached at shutdown now, but the toggle can still be ON
+//     and a notification can still be in flight when the panel is destroyed during teardown. That
+//     reaches KBSScheduleReapply, which finds sReapplyTimer == nil and CREATES ANOTHER ONE - after
+//     the clean-up has already run. The booking would then be live as the .pln goes down, which is
+//     the exact thing this file's header calls "a crash".
+//   *Belt and braces with the detach: either one alone closes the path, and neither costs anything.
+static bool            sPanelAlphaShutdown = false;
+
 static uint32 KBSReapplyTimerProc(void* refPtr);
 
 // Called from the notification side. (Re)starts the chase while the windows settle.
@@ -649,6 +676,10 @@ static uint32 KBSReapplyTimerProc(void* refPtr);
 //   kKBSPanelAlphaReapplyTries each time, it debounces as a side effect).
 static void KBSScheduleReapply()
 {
+	// **Nothing is ever booked again once the clean-up has run (see sPanelAlphaShutdown above).
+	if (sPanelAlphaShutdown)
+		return;
+
 	sReapplyLeft = kKBSPanelAlphaReapplyTries;	// back to the full count on every notification
 	if (sReapplyLeft <= 0)
 		return;		// the constant is 0 = the chase is turned off
@@ -736,7 +767,7 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 		HWND fc = KBSQueryFindChangeWindow();
 		if (fc != nullptr)
 		{
-			const BYTE fcWant = KBSCursorOverWindow(fc) ? 255 : kKBSPanelAlphaValue;
+			const BYTE fcWant = KBSEffectiveFindChangeAlpha(fc);
 			BYTE  fcCur = 0;
 			DWORD fcKey = 0, fcFlags = 0;
 			if (!::GetLayeredWindowAttributes(fc, &fcKey, &fcCur, &fcFlags) || fcCur != fcWant)
@@ -857,6 +888,7 @@ void KBSShutdownPanelAlpha()
 {
 	// The safety net at plug-in shutdown. Nothing is dereferenced - only stopped and released, which
 	// is safe even mid-teardown.
+	sPanelAlphaShutdown = true;		// **first: from here KBSScheduleReapply can never book again
 	KBSRemoveWinEventHook();		// *a hook still up as the .pln goes down is dangerous
 
 	// Put InDesign's own Find/Change dialog back. The WS_EX_LAYERED on it is OURS, and a style plus
@@ -912,8 +944,16 @@ void        KBSShutdownPanelAlpha() {}
 //
 //   *The observer implementation is aggregated onto kActiveContextBoss in the .fr - the proven
 //     arrangement KESCM uses for its own three observers.
-//   *It is never explicitly detached at shutdown (the application and the boss it lives on have the
-//     session's lifetime, and detaching is itself a crash risk).
+//   **It IS detached at shutdown, by KBSDetachPanelVisibilityObserver (2026-08-08).
+//     !What stood here until then: "it is never explicitly detached (the boss has the session's
+//       lifetime, and detaching is itself a crash risk)". That was this plug-in contradicting
+//       itself - KBSBookWatch.cpp:293-296 attaches with the opposite reason written next to it
+//       ("linksui carries a live bug from attaching and detaching asymmetrically") and has had a
+//       symmetric KBSBookWatchDetach all along. Two subjects, two answers, one plug-in.
+//     *Which one is right is not a matter of taste here: the subject outliving the .pln is the
+//       whole problem. What the session keeps is a pointer into a plug-in that is being unloaded,
+//       and leaving it there is what makes a late notification reach freed code. The three
+//       attachments below are therefore undone in the same three places.
 //========================================================================================
 
 //========================================================================================
@@ -1135,6 +1175,59 @@ void KBSAttachPanelVisibilityObserver()
 	{
 		appSubject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKBSPANELVISIBILITYOBSERVER);
 	}
+}
+
+// The mirror of the above, called from the plug-in's shutdown (2026-08-08). Every attachment the
+// function above can make is undone here, with the SAME attachment type - ISubject.h:288 is the
+// counterpart of the AttachObserver at :280, and a Regular attachment must be released as a Regular
+// one.
+//   *Why it exists: what the session holds while attached is a pointer into this .pln. Leaving it
+//     there means a notification arriving during teardown - the panel being destroyed raises one -
+//     runs Update in code that is going away. Same reasoning, same shape as KBSBookWatchDetach.
+//   *Asked before detached, exactly as the attach side asks before attaching: this is reached once
+//     from Shutdown, but the attach side is called from two places (startup and the panel's
+//     AutoAttach), so "is it actually on?" is the honest question on both sides.
+//   !Order at shutdown: this runs BEFORE KBSShutdownPanelAlpha, so the notifications stop first and
+//     the timer and hook are torn down after. sPanelAlphaShutdown then covers anything still in
+//     flight (KBSPanelAlpha.cpp's timer section).
+void KBSDetachPanelVisibilityObserver()
+{
+	ISession* session = GetExecutionContextSession();
+	IActiveContext* ctx = (session != nil) ? session->GetActiveContext() : nil;
+	if (ctx == nil)
+		return;
+
+	InterfacePtr<IObserver> obs((IObserver*)ctx->QueryInterface(IID_IKBSPANELVISIBILITYOBSERVER));
+	if (obs == nil)
+		return;
+
+	InterfacePtr<IApplication> app(session->QueryApplication());
+	if (app == nil)
+		return;
+
+	// *The panel manager can be down already during teardown; the two application subjects below are
+	//  independent of it, so a nil here must not take them with it - the same lesson the attach side
+	//  learned in its 2026-08-04 audit.
+	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
+	if (panelMgr != nil)
+	{
+		InterfacePtr<ISubject> subject(panelMgr, IID_ISUBJECT);
+		if (subject != nil &&
+			subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKBSPANELVISIBILITYOBSERVER))
+		{
+			subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKBSPANELVISIBILITYOBSERVER);
+		}
+	}
+
+	InterfacePtr<ISubject> appSubject(app, IID_ISUBJECT);
+	if (appSubject == nil)
+		return;
+
+	if (appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKBSPANELVISIBILITYOBSERVER))
+		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IAPPLICATION, IID_IKBSPANELVISIBILITYOBSERVER);
+
+	if (appSubject->IsAttached(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKBSPANELVISIBILITYOBSERVER))
+		appSubject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IWINDOWLIST, IID_IKBSPANELVISIBILITYOBSERVER);
 }
 
 // End, KBSPanelAlpha.cpp.

@@ -100,11 +100,25 @@ void	KBSSetFindChangeTranslucent(bool16 on);
 bool16	KBSApplyFindChangeTranslucency();
 
 // Start listening for the panel being shown, hidden, docked or floated.
-// *Called once at startup (KBSStartupShutdown::Startup). After that, floating the panel again or
-//   re-opening it re-applies the translucency by itself while the toggle is ON.
+// *Called from TWO places, and safe to call again: KBSStartupShutdown::Startup, and the panel's own
+//   AutoAttach (KBSPanelTitle.cpp). !The second one is not belt and braces - the panel manager comes
+//   up partway through the application's startup sequence, so at Startup it can still be nil, and
+//   that subscription is picked up on the AutoAttach pass instead. Each attachment asks IsAttached
+//   first, so repeating the call attaches nothing twice.
+//   (Corrected 2026-08-08: this said "called once at startup". The .cpp had it right all along -
+//    see the note at KBSAttachPanelVisibilityObserver's panel-manager branch.)
 // *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
-//   (identified on a debug build's Spy, 2026-07-29).
+//   (identified on a debug build's Spy, 2026-07-29). Two further subjects hang off kAppBoss - see
+//   the function itself.
 void	KBSAttachPanelVisibilityObserver();
+
+// Undo every attachment the above makes. Called from the plug-in's shutdown, BEFORE
+// KBSShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
+// *Why it exists (2026-08-08): while attached, the session holds a pointer into this .pln, and a
+//   notification arriving during teardown would run the observer in code that is going away. This is
+//   the same reasoning - and the same shape - as KBSBookWatchDetach, which this plug-in has always
+//   had; until now the two subjects were treated in opposite ways.
+void	KBSDetachPanelVisibilityObserver();
 
 // Tear down the one-shot timer and the Win32 event hook. Called from the plug-in's shutdown
 // (KBSStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not

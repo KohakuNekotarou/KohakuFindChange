@@ -62,6 +62,11 @@ public:
 		// must not be what a saved workspace remembers.
 		KBSPanelTitle::Restore();
 		KBSBookWatchDetach();
+		// Stop listening before tearing anything down: while attached, the session holds a pointer
+		// into this .pln, and the panel being destroyed during teardown raises a notification.
+		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what
+		//  KBSBookWatchDetach on the line before has always done for its own subject (2026-08-08).
+		KBSDetachPanelVisibilityObserver();
 		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
 		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
 		// up is a leaked resource - neither may outlive this .pln.
