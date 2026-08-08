@@ -163,7 +163,18 @@ void KBSLoadPanelStateIfPresent()
 	size_t n;
 	while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
 		text.append(buf, n);
+	// *A read that stopped part way through must not be applied. fread returning 0 is how BOTH the
+	//  end of the file and an error look, so without ferror a truncated read is indistinguishable
+	//  from a complete one - and what would then be restored is "the settings that happened to be
+	//  in the part that arrived", the rest silently left at their defaults. All or nothing instead.
+	//  **This is KESCM's own fix (KESCMPanelState.cpp:168-172, 2026-08-06) landing here at last:
+	//    this file was ported from it on 2026-08-04, so it carried the two WRITE-side audit fixes
+	//    (short count, fclose) that were already in - and not this one, which went into KESCM two
+	//    days after the port. A fix made in one sibling does not walk to the other by itself.
+	const bool16 readFailed = (ferror(fp) != 0);
 	fclose(fp);
+	if (readFailed)
+		return;
 	if (text.empty())
 		return;
 
@@ -184,8 +195,12 @@ void KBSLoadPanelStateIfPresent()
 	// it is safe in a way the flag alone does not show: the jump asks ShouldHidePreviousChapter,
 	// which also requires the results to have come from a BOOK, so a restored ON cannot start
 	// closing documents in document scope. The menu greys the toggle out there for the same reason.
-	KBSJump::SetHidePreviousChapter(KBSJsonReadBool(text, "hidePreviousChapter",
-		KBSJump::IsHidePreviousChapterOn() ? kTrue : kFalse) ? true : false);
+	// *bool16 out of the reader, bool into the setter (KBSJump.h:56,62 speak plain bool while the
+	//  two toggles above are bool16) - so the conversion happens once, on its own line, instead of
+	//  as a second ternary wrapped round the call.
+	const bool16 hidePrev = KBSJsonReadBool(text, "hidePreviousChapter",
+		KBSJump::IsHidePreviousChapterOn() ? kTrue : kFalse);
+	KBSJump::SetHidePreviousChapter(hidePrev != kFalse);
 }
 
 // End, KBSPanelState.cpp.

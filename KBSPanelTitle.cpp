@@ -74,6 +74,22 @@ void SetTabLabel(const PMString& label)
 
 	// Non-owning - a Get, not a Query. nil until the panel has been opened once, which is the
 	// ordinary state at startup and the reason every caller may fire blindly.
+	//
+	// ***** WHY THIS DOOR AND NOT THE VISIBLE-ONLY ONES. ***** The rest of the plug-in reaches the
+	// panel through Utils<IPalettePanelUtils>()->QueryPanelByWidgetID (KBSPanelIcon.cpp), which
+	// hands back nil for a panel that is not on screen, and IPanelMgr has GetVisiblePanel
+	// (:115-123) for the same reason - the manager purges panels that are not shown and will not
+	// give out pointers to them. That is right for anything that WRITES INTO the panel: nothing
+	// there needs doing while it cannot be seen, and its next show rebuilds it anyway.
+	//
+	// A TAB NAME is the one thing that is not like that. It belongs to the palette, not to the
+	// panel's contents, and it stays on screen when the panel's contents do not: a minimized
+	// palette counts as not shown (IPanelMgr.h:157-159 says so outright for
+	// IsPanelWithWidgetIDShown), and a minimized palette is exactly a strip of tab names. The
+	// scope can be toggled from the flyout with the palette in that state, so a visible-only door
+	// would refuse the case this function exists for.
+	// *Sibling: KESCL picks between the two per call site for the same kind of reason
+	//  (KESCLReportPanelObserver.cpp:968-969, 1069-1071).
 	IControlView* panelView = panelMgr->GetPanelFromWidgetID(kKBSPanelWidgetID);
 	if (panelView == nil)
 		return;
@@ -122,9 +138,8 @@ namespace
 /** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
     Silently does nothing when the widget is not there, which is the ordinary state while the panel
     is being torn down. */
-void AttachToWidget(IPMUnknown* panelBoss, IObserver* observer, const WidgetID& widgetID, bool attach)
+void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const WidgetID& widgetID, bool attach)
 {
-	InterfacePtr<IPanelControlData> panelData(panelBoss, UseDefaultIID());
 	if (panelData == nil)
 		return;
 
@@ -169,15 +184,25 @@ public:
 	{
 		KBSPanelTitle::Update();
 
+		// ***** THIS OBSERVER IS ON THE PANEL. ***** It is aggregated onto kKBSPanelWidgetBoss, so
+		// the panel everything below works on is simply itself - no need to ask the panel manager
+		// for what we are standing on, and no way for two of these jobs to end up holding different
+		// answers to "which panel". This is the product's own shape:
+		// ConditionalTextUIPanelDetailController.cpp:162 and LayerPanelView.cpp:63 both reach their
+		// own widgets with exactly this line.
+		// *nil is not expected here (the boss carries IPanelControlData), but each callee checks:
+		//  AutoAttach also runs while the panel is being built, and none of this is worth a crash.
+		InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
+
 		// The LAYOUT first, because the two calls below fill in what these frames hold. The .fr
 		// carries the English measurements and a Japanese UI draws the palette font half again as
 		// tall, so on that UI the message box has to be taller or the last line of every message is
 		// cut off mid-glyph (reported 2026-08-06). See KBSPanelMetrics.h.
-		KBSPanelMetrics::Update();
+		KBSPanelMetrics::Update(panelData);
 
 		// The widgets are built fresh every time the panel is shown, so the picture that belongs on
 		// screen has to be written on NOW - the .fr's visible flags are only a starting point.
-		KBSPanelIcon::Update();
+		KBSPanelIcon::Update(panelData);
 
 		// ...and for the same reason, so does the message. The .fr's initial text is used the first
 		// time the panel is ever built and never again: after that the widget carries whatever the
@@ -186,7 +211,7 @@ public:
 		KBSResultTree::RestoreStatusOnPanelShow();
 
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
-			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), true);
+			AttachToWidget(panelData, this, KBSPanelIcon::NthWidgetID(i), true);
 
 		// *At startup (KBSStartupShutdown::Startup) the panel manager may not have come up yet, in
 		// which case the subscription failed - so it is tried again here. IsAttached guards it, so
@@ -205,13 +230,22 @@ public:
 
 	virtual void AutoDetach()
 	{
+		// The same panel, asked for the same way as in AutoAttach - the detach has to reach the
+		// very widgets the attach reached.
+		InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
+
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
-			AttachToWidget(this, this, KBSPanelIcon::NthWidgetID(i), false);
+			AttachToWidget(panelData, this, KBSPanelIcon::NthWidgetID(i), false);
 	}
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& /*protocol*/, void* /*changedBy*/)
 	{
-		// kTrueStateMessage is the button going down; anything else here is not a click.
+		// kTrueStateMessage is the click - the product reads it as the button coming back UP
+		// (linksui/ProblemLinksDialogObserver.cpp:80 "Only respond when the button is going up"),
+		// and every product button observer tests this one message and nothing else
+		// (linksui/ToggleLinkInfoButtonObserver.cpp:99, conditionaltextui's four button observers).
+		// *A TOGGLE would also want kFalseStateMessage - conditionaltextui/ConditionTagEyeball
+		//  Observer.cpp:100 takes both - but these pictures are not toggles.
 		if (theChange != kTrueStateMessage || theSubject == nil)
 			return;
 

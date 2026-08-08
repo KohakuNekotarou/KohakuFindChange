@@ -31,17 +31,27 @@
 
 #include "PMTypes.h"
 
+class IPanelControlData;
+
 namespace KBSPanelMetrics
 {
 	/** Re-place the message block, the illustration and the result tree for the current UI
 	    language.
 
-	    Safe to call with the panel closed (does nothing). Safe to call repeatedly: every
-	    frame is computed as an ABSOLUTE position from the message block's top, never nudged
-	    by a delta, so running it twice leaves exactly what running it once did. That matters
-	    because it runs on every show and a widget's frame is persisted in the workspace -
-	    adding 24px each time would walk the tree off the bottom of the panel. */
-	void Update();
+	    The PANEL IS PASSED IN, and there is no overload that goes looking for it: the one
+	    caller is the panel's own observer (KBSPanelTitle.cpp, AutoAttach), which is aggregated
+	    onto the panel boss and so asks itself with
+	    InterfacePtr<IPanelControlData>(this, UseDefaultIID()) - the shape the product uses in
+	    ConditionalTextUIPanelDetailController.cpp:162 and LayerPanelView.cpp:63. Add the
+	    look-it-up overload if a second caller ever appears; do not put the lookup here for a
+	    caller that is standing on the answer.
+
+	    Does nothing when panelData is nil. Safe to call repeatedly: every frame is computed as
+	    an ABSOLUTE position from the message block's top, never nudged by a delta, so running
+	    it twice leaves exactly what running it once did. That matters because it runs on every
+	    show and a widget's frame is persisted in the workspace - adding 24px each time would
+	    walk the tree off the bottom of the panel. */
+	void Update(IPanelControlData* panelData);
 
 	/** The message block's height in pixels: a whole number of lines IN THE LANGUAGE IT IS USED
 	    FOR. 54 = 18x3 (Japanese); 48 = 12x4 (English). A remainder would leave room for a

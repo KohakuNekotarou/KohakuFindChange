@@ -73,6 +73,14 @@ void KBSPanelIcon::Update()
 	if (panelData == nil)
 		return;
 
+	Update(panelData);
+}
+
+void KBSPanelIcon::Update(IPanelControlData* panelData)
+{
+	if (panelData == nil)
+		return;
+
 	const WidgetID wanted = Choose();
 
 	for (int32 i = 0; i < kIconCount; ++i)

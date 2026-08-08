@@ -1019,12 +1019,16 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 	kBindNone,							// Binding (0=none)
 	Frame(0, 0, 300, 360),				// Default size (207x32 -> 300x360 with the result tree,
 										// Task 2). Resizable (kIsResizable in PanelList), down to a
-										// floor of 224 - KESCM's fixed width, so the two panels
-										// line up when docked together. This is the size the panel
+										// floor of 266 - the width the panel is actually worked at,
+										// measured off the running panel (2026-08-07). *It was 224
+										// for a day, to line up with KESCM when docked together;
+										// that pairing is deliberately GIVEN UP - see the history
+										// in KBSPanelMetrics.cpp. This 300 is the size the panel
 										// OPENS at, where the message takes three lines on a
-										// Japanese UI; narrower it takes four, which is what the
-										// block is sized to hold. Both numbers, and the
-										// measurements behind them, are in KBSPanelMetrics.cpp.
+										// Japanese UI - and three is what the block is sized to
+										// hold, at this width and at the floor alike. Both numbers,
+										// and the measurements behind them, are in
+										// KBSPanelMetrics.cpp.
 	kTrue, kTrue,						// Visible, Enabled
 	kTrue,								// Erase background (kFalse -> kTrue with the tree)
 	kInterfacePaletteFill,				// Erase to color
@@ -1051,9 +1055,11 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// draws 18px lines (measured 2026-08-06 on the running panel: baselines at y=218, 236, 254),
 		// so this 48px box held two and two thirds of them and the last line of every message was
 		// cut off. A resource carries one set of numbers and these are the English set;
-		// KBSPanelMetrics puts the real height on when the panel appears (72 = 18x4 there, the same
-		// four-line budget this 48 is). If this number changes, change that one too - it is stated
-		// against this one.
+		// KBSPanelMetrics puts the real height on when the panel appears - 54 = 18x3 there, which is
+		// a line budget of its OWN (three Japanese lines against four Roman ones, user's call
+		// 2026-08-07: 54px and 48px come to nearly the same block, so the panel looks the same in
+		// both while neither clips). If this number changes, change that one too - the two are
+		// stated against each other.
 		//
 		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
 		// never measured. If the palette font ever changes size, measure again - the rule is the

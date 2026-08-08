@@ -11,11 +11,8 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IApplication.h"		// QueryPanelManager
 #include "IControlView.h"		// GetFrame / SetFrame - the widgets being re-placed
 #include "IPanelControlData.h"	// FindWidget
-#include "IPanelMgr.h"			// GetPanelFromWidgetID
-#include "ISession.h"
 
 // General includes:
 #include "LocaleSetting.h"
@@ -68,9 +65,13 @@ const int32 kGapUnderMessageBlock = 3;
 //     box 216 (panel 265) -> 4 lines      <- where the clipping was reported back when the
 //                                            Japanese block was 48px (2 2/3 lines)
 //
-// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** 224 -> 242 -> 266, each
-// time on the same instruction ("make the minimum width the size it is now") and each time
-// measured off the running panel rather than reasoned about. 266 is 2026-08-07.
+// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** The whole history is
+// 250 -> 224 -> 242 -> 266, and only the last two came from that instruction:
+//
+//     250  2026-08-04  the first floor, in KBSPanelView itself, measured BY EYE (b307ee1)
+//     224  2026-08-06  KESCM's fixed width, to line the two panels up when docked (ee0f870)
+//     242  2026-08-07  "make the minimum width the size it is now" - off the running panel
+//     266  2026-08-07  the same instruction again (aaf1ba2). This is the number here.
 //
 // 224 was KESCM's fixed width (KESCM.fr:1105), put here so the two would line up when docked
 // together. That is GIVEN UP, deliberately: a floor is there to stop the panel being dragged down
@@ -104,24 +105,6 @@ bool IsTallLineUI()
 	return ui == k_jaJP || ui == k_koKR || ui == k_zhCN || ui == k_zhTW;
 }
 
-/** The panel itself, or nil when it has never been opened. Written the way KBSPanelTitle's
-    SetTabLabel reaches the same panel - the interfaces are acquired and released inside one
-    scope, and only the non-owning IControlView* travels. */
-IControlView* GetPanelView()
-{
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	if (app == nil)
-		return nil;
-
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr == nil)
-		return nil;
-
-	// Non-owning - a Get, not a Query. nil until the panel has been opened once, which is the
-	// ordinary state at startup, so every caller may fire blindly.
-	return panelMgr->GetPanelFromWidgetID(kKBSPanelWidgetID);
-}
-
 }
 
 /* MessageBlockHeight
@@ -147,13 +130,8 @@ int32 KBSPanelMetrics::MinimumPanelHeight()
 
 /* Update
 */
-void KBSPanelMetrics::Update()
+void KBSPanelMetrics::Update(IPanelControlData* panelData)
 {
-	IControlView* panelView = GetPanelView();
-	if (panelView == nil)
-		return;
-
-	InterfacePtr<IPanelControlData> panelData(panelView, UseDefaultIID());
 	if (panelData == nil)
 		return;
 
