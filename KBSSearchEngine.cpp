@@ -2741,6 +2741,16 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// and nothing being left behind - from a chapter that is genuinely still standing. Without
 		// it, that ordinary close was counted as "left open with no window" about a chapter that is
 		// not open at all (the scans counted exactly that until 2026-08-08).
+		// ***** READ THE COUNTERS WHILE THE CHAPTER IS STILL OPEN. ***** The release below closes
+		// it, and the comment above says what holds from that point on: everything read afterwards
+		// is plain values, not database work. Asking a story for its change counter IS database
+		// work, so it happens here. (It was placed after the append until 2026-08-08 and crashed
+		// InDesign on every book search - the UIDRef's database was already gone.)
+		//
+		// The index this chapter will occupy is not known yet: a chapter with no hits never reaches
+		// the model. So the reading is held and filed after the append, by CommitPending.
+		KBSEditStamp::CapturePending(chapterDocRef);
+
 		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
 		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
 			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
@@ -2814,7 +2824,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		//
 		// The document comes from targets[] rather than the Chapter: the move above has just
 		// emptied that one. The index is the position the append filled, which is the last.
-		KBSEditStamp::CaptureChapter(KBSResultModel::GetChapterCount() - 1, targets[i].docRef);
+		// File the reading taken further up - while the chapter was still open - under the index
+		// the append has just filled, which is the last.
+		KBSEditStamp::CommitPending(KBSResultModel::GetChapterCount() - 1);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each

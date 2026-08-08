@@ -44,7 +44,8 @@
 #include "KBSReplaceConfirmDialog.h"
 #include "KBSResultModel.h"		// which chapters are ticked, and what they are called
 #include "KBSEditStamp.h"		// ...and whether any of them has been edited since the search
-#include "KBSBookScope.h"		// IsDocStillOpen - a closed chapter's UIDRef must not be read
+#include "IDocument.h"			// the chapter, found by file rather than by a stale UIDRef
+#include "IDocumentList.h"		// FindDoc(IDFile) - is this chapter open RIGHT NOW?
 
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sFind;
 KBSReplaceConfirmDialog::Side	KBSReplaceConfirmDialog::sChange;
@@ -251,19 +252,30 @@ PMString KBSReplaceConfirmDialog::BuildEditedSinceLine()
 		if (!KBSResultModel::GetChapterLocation(c, docRef, file))
 			continue;
 
-		// ***** ASK THIS BEFORE THE UIDRef IS DEREFERENCED. ***** A book search closes each chapter
-		// as it finishes with it, and for a chapter closed since its UIDRef was taken the database
-		// pointer is DANGLING - "asking it anything is undefined behaviour", which is why
-		// KBSBookScope::IsDocStillOpen exists at all (see the comment over it). It compares the
-		// pointer against the session's document list and never dereferences it.
+		// ***** THE CHAPTER IS FOUND BY ITS FILE, NOT BY THE UIDRef THE SEARCH RECORDED. *****
+		// A book search closes each chapter as it finishes with it, so by the time this runs that
+		// UIDRef's database is very likely gone - and reading it would be undefined behaviour, not
+		// a nil check (KBSBookScope::IsDocStillOpen exists to say so without dereferencing).
 		//
-		// A chapter that is not open now cannot be judged, and an unjudged chapter is not reported:
-		// the user cannot have edited a document they cannot see. If they reopen it and edit it,
-		// it is open again by the time this runs.
-		if (!KBSBookScope::IsDocStillOpen(docRef))
+		// Testing it with IsDocStillOpen is not enough either: when the user REOPENS a chapter to
+		// edit it - the one case this whole feature is about - the reopened document has a new
+		// UIDRef, and the recorded one still reads as closed. Measured 2026-08-08: the warning
+		// never appeared on the book path until this asked by file instead.
+		//
+		// The stamp itself does not care: it holds story UIDs and counters, which are the same
+		// values in the reopened document (measured 2026-08-08).
+		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		if (docList == nil)
 			continue;
 
-		if (KBSEditStamp::IsChapterCurrent(c, docRef))
+		// "Search to see if one (whatFile) is already open. If so, return it" - IDocumentList.h:64-69.
+		// nil means the chapter is not open now, and a chapter nobody can see cannot have been
+		// edited, so it is passed over rather than reported.
+		IDocument* liveDoc = docList->FindDoc(file);
+		if (liveDoc == nil)
+			continue;
+
+		if (KBSEditStamp::IsChapterCurrent(c, ::GetUIDRef(liveDoc)))
 			continue;
 
 		// The name is only needed when exactly one chapter turns out to be edited, but it has to

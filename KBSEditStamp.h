@@ -48,15 +48,28 @@
 */
 namespace KBSEditStamp
 {
-	/** Record every story's change counter for one chapter. Called once per chapter, as the
-		Find/Change search finishes with it. The chapter's document must be OPEN.
+	/** Read every story's change counter for the chapter just walked, and hold it.
+
+		***** THIS MUST RUN BEFORE THE CHAPTER IS HANDED BACK. ***** A book search closes each
+		chapter the moment its walk ends (KBSSearchEngine, at the ReleaseHeldDoc call), and the
+		comment there states the rule this obeys: everything read AFTER that point is plain values,
+		not database work. Reading the counters IS database work, so it happens before.
+
+		That is why capturing is split in two. The index the chapter will occupy is not known yet
+		at that moment - chapters with no hits are skipped further down - so the reading is held
+		here and CommitPending files it once the chapter has actually been appended.
 
 		A chapter whose document cannot be read is left UNSTAMPED rather than stamped empty: an
 		empty stamp would compare equal to nothing and report every chapter as edited.
-		@param chapterIdx the chapter's index in KBSResultModel.
-		@param docRef the chapter's document.
+		@param docRef the chapter's document, still open.
 	*/
-	void CaptureChapter(int32 chapterIdx, const UIDRef& docRef);
+	void CapturePending(const UIDRef& docRef);
+
+	/** File what CapturePending read under the index the chapter was given. Discards the pending
+		reading either way, so a chapter that ends up not appended leaves nothing behind.
+		@param chapterIdx the chapter's index in KBSResultModel.
+	*/
+	void CommitPending(int32 chapterIdx);
 
 	/** Does this chapter read exactly as its stamp left it?
 

@@ -43,6 +43,10 @@ struct ChapterStamp
 // so nothing here has to be remembered at the nine call sites that clear the results.
 std::vector<ChapterStamp> gStamps;
 
+// What the last CapturePending read, waiting for the index it belongs to. One is enough: the
+// search walks one chapter at a time and commits before moving on.
+ChapterStamp gPending;
+
 void EnsureRoom(int32 chapterIdx)
 {
 	const size_t wanted = static_cast<size_t>(chapterIdx) + 1;
@@ -52,15 +56,11 @@ void EnsureRoom(int32 chapterIdx)
 
 } // anonymous namespace
 
-/* CaptureChapter
+/* CapturePending
 */
-void KBSEditStamp::CaptureChapter(int32 chapterIdx, const UIDRef& docRef)
+void KBSEditStamp::CapturePending(const UIDRef& docRef)
 {
-	if (chapterIdx < 0)
-		return;
-
-	EnsureRoom(chapterIdx);
-	ChapterStamp& slot = gStamps[static_cast<size_t>(chapterIdx)];
+	ChapterStamp& slot = gPending;
 	slot.stamped = false;
 	slot.stories.clear();
 
@@ -82,6 +82,22 @@ void KBSEditStamp::CaptureChapter(int32 chapterIdx, const UIDRef& docRef)
 	}
 
 	slot.stamped = true;
+}
+
+/* CommitPending
+*/
+void KBSEditStamp::CommitPending(int32 chapterIdx)
+{
+	if (chapterIdx >= 0)
+	{
+		EnsureRoom(chapterIdx);
+		gStamps[static_cast<size_t>(chapterIdx)] = gPending;
+	}
+
+	// Cleared whether or not it was filed. A reading left standing would be committed against the
+	// NEXT chapter's index if that one could not be read at all.
+	gPending.stamped = false;
+	gPending.stories.clear();
 }
 
 /* IsChapterCurrent
@@ -128,6 +144,10 @@ bool KBSEditStamp::IsChapterCurrent(int32 chapterIdx, const UIDRef& docRef)
 void KBSEditStamp::Forget()
 {
 	gStamps.clear();
+	// The pending reading belongs to the run that is being discarded too. A chapter that turned out
+	// to hold no hits leaves one standing, and it must not survive into the next search.
+	gPending.stamped = false;
+	gPending.stories.clear();
 }
 
 /* ShutdownCleanup
