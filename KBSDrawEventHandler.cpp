@@ -31,7 +31,6 @@
 #include "IViewPortAttributes.h"
 #include "IShape.h"
 #include "ISpread.h"
-#include "IGeometry.h"
 #include "IApplication.h"
 #include "IDocumentList.h"
 #include "IDataBase.h"
@@ -43,13 +42,13 @@
 #include "AutoGSave.h"
 #include "SDKFileHelper.h"		// the marker's document, named by its file - see KBSMarkerDocPath
 #include "PersistUtils.h"		// ::GetDataBase
-#include "TransformUtils.h"		// ::InnerToSpreadMatrix / ::InnerToPasteboardMatrix
+// (Transform::PasteboardCoordinates / SpreadCoordinates come in with ISpread.h, which includes
+// TransformTypes.h - the same way snapshot/SnapTracker.cpp gets them.)
 #include "ILayoutUIUtils.h"
 #include "ILayoutUtils.h"		// InvalidateViews (reliable overlay repaint)
 #include "IDocument.h"
 #include "ISession.h"
 #include "Utils.h"
-#include "PMMatrix.h"
 #include "PMPoint.h"
 #include "PMReal.h"
 #include "GraphicTypes.h"		// kPMBlendDifference / kPMBlendExclusion (Phase A probe)
@@ -256,47 +255,40 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 		}
 	}
 
-	const int32 np = spread->GetNumPages();
-	if (np < 1)
+	if (spread->GetNumPages() < 1)
 		return kFalse;
 
-	// Pasteboard->spread offset for this spread: map the same inner origin through
-	// InnerToSpread and InnerToPasteboard; the difference is the offset. spread = pasteboard - offset.
-	InterfacePtr<IGeometry> pg0(db, spread->GetNthPageUID(0), UseDefaultIID());
-	if (pg0 == nil)
-		return kFalse;
+	// ***** ONE CALL ANSWERS BOTH QUESTIONS. ***** ISpread::GetPagesAndItemsBounds returns the same
+	// box in whichever coordinate space is asked for (ISpread.h:229-238), so:
+	//   * the pasteboard one decides whether the marker belongs to this spread (PMRect::PointIn), and
+	//   * the difference between the two IS the pasteboard->spread offset, because they are the same
+	//     box measured twice - the offset that the rectangle below is shifted by.
+	// The worked example is snapshot/SnapTracker.cpp:599-603, which asks for both spaces the same
+	// way and hit-tests with PointIn. Until the block 12 API audit (2026-08-08) this was thirty lines
+	// that built two matrices off page 0 to derive the offset, then walked every page transforming
+	// its bounding box to test containment by hand - see the api-official-examples ledger, which
+	// already said the SDK owns both of those.
+	//
+	// ***** AND-ITEMS, not GetPagesBounds. ***** The pages-only box is what the hand-written walk
+	// tested against, so a hit in a frame sitting on the PASTEBOARD (outside every page) failed the
+	// test and its marker was never drawn - the jump scrolled there correctly and then pointed at
+	// nothing. This box includes "any page items sitting on the pasteboard", so those hits are
+	// marked too. Guides are left out (includeGuides defaults to kFalse): a guide cannot hold text.
+	const PMRect pbBounds     = spread->GetPagesAndItemsBounds(Transform::PasteboardCoordinates());
+	const PMRect spreadBounds = spread->GetPagesAndItemsBounds(Transform::SpreadCoordinates());
 	{
-		PMMatrix mS = ::InnerToSpreadMatrix(pg0);
-		PMMatrix mP = ::InnerToPasteboardMatrix(pg0);
-		PMPoint ps(0.0, 0.0), pp(0.0, 0.0);
-		mS.Transform(&ps);
-		mP.Transform(&pp);
-		const PMReal offX = pp.X() - ps.X();
-		const PMReal offY = pp.Y() - ps.Y();
-
-		// Is the marker inside this spread? Test its centre against each page's pasteboard bounds.
-		// Spreads do not overlap in pasteboard space, so only the owning spread passes.
-		const PMReal cx = (sMarkerPb.Left() + sMarkerPb.Right()) / PMReal(2.0);
-		const PMReal cy = (sMarkerPb.Top()  + sMarkerPb.Bottom()) / PMReal(2.0);
-		bool16 inThisSpread = kFalse;
-		for (int32 i = 0; i < np; ++i)
-		{
-			InterfacePtr<IGeometry> pgi(db, spread->GetNthPageUID(i), UseDefaultIID());
-			if (pgi == nil)
-				continue;
-			PMRect pr = pgi->GetPathBoundingBox();
-			PMMatrix mp = ::InnerToPasteboardMatrix(pgi);
-			mp.Transform(&pr);
-			if (cx >= pr.Left() && cx <= pr.Right() && cy >= pr.Top() && cy <= pr.Bottom())
-			{
-				inThisSpread = kTrue;
-				break;
-			}
-		}
-		if (!inThisSpread)
+		// Spreads do not overlap in pasteboard space, so only the owning spread passes. The marker's
+		// centre is the point tested, as before - a rectangle drawn across a spread boundary belongs
+		// to the spread holding most of it.
+		const PMPoint centre((sMarkerPb.Left() + sMarkerPb.Right()) / PMReal(2.0),
+			(sMarkerPb.Top() + sMarkerPb.Bottom()) / PMReal(2.0));
+		if (!pbBounds.PointIn(centre))
 			return kFalse;
 
-		// Marker rectangle in this spread's coordinates.
+		// Marker rectangle in this spread's coordinates. spread = pasteboard - offset.
+		const PMReal offX = pbBounds.Left() - spreadBounds.Left();
+		const PMReal offY = pbBounds.Top()  - spreadBounds.Top();
+
 		const PMReal left   = sMarkerPb.Left()   - offX;
 		const PMReal top    = sMarkerPb.Top()    - offY;
 		const PMReal right  = sMarkerPb.Right()  - offX;

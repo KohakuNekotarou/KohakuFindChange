@@ -25,8 +25,19 @@
 static const uint32 kKBSMarkerLifetimeMs = 1000;
 
 // ---- Shared state (private to this translation unit) ----
+//
+// ***** THERE IS NO "IS IT RUNNING" FLAG HERE, AND THERE MUST NOT BE. ***** Whether the task is
+// sitting in the idle queue is the BASE CLASS's business: CIdleTask keeps it in fCurrentlyInstalled
+// (CIdleTask.h:64) and InstallTask / UninstallTask maintain it. A second copy in this file could
+// only ever disagree with it - and disagreeing in one direction is illegal, not merely untidy:
+// IIdleTaskMgr.h:84 says "it is illegal to add the same task twice", which is what a stale "not
+// running" would lead to. Calling UninstallTask when nothing is installed is free: RemoveTask
+// "returns kEndOfTime" when "the task wasn't installed or it is currently running"
+// (IIdleTaskMgr.h:95-98) and does nothing else. So every entry point below simply uninstalls first
+// and asks no questions - the shape Adobe's own re-arming code uses
+// (spellpanel/DynSpellCheckEventWatcher.cpp:138,145 on every keystroke, :178 to stop).
+// A flag lived here until the block 12 API audit, 2026-08-08.
 static IIdleTask* sTask     = nil;		// the task object (created once, reused). Released in Shutdown
-static bool16     sRunning  = kFalse;	// is the task currently sitting in the idle queue?
 static bool16     sShutdown = kFalse;	// set at application shutdown: never create/schedule again
 
 //========================================================================================
@@ -47,10 +58,13 @@ CREATE_PMINTERFACE(KBSMarkerExpiryTask, kKBSMarkerExpiryIdleTaskImpl)
 
 uint32 KBSMarkerExpiryTask::RunTask(uint32 /*flags*/, IdleTimer* /*idleTimer*/)
 {
-	// Take ourselves off the queue BEFORE clearing: ClearMarker calls back into
-	// KBSMarkerExpiryIdleTask::Stop(), and clearing sRunning first makes that a no-op instead of a
-	// second UninstallTask.
-	sRunning = kFalse;
+	// Take ourselves off the queue, then clear. CIdleTask.h:36-38 asks for exactly this - "Don't
+	// return kEndOfTime from RunTask, instead you would call UninstallTask and return any value
+	// from RunTask as it will be ignored".
+	//
+	// ClearMarker calls back into Stop(), which uninstalls again. That second call is harmless by
+	// the contract quoted at the top of this file (a task that is not installed, or is currently
+	// running, costs a return value and nothing more).
 	this->UninstallTask();
 
 	if (!sShutdown)
@@ -73,20 +87,17 @@ void KBSMarkerExpiryIdleTask::Start()
 		return;		// no timer; the marker simply stays up until the next jump/search clears it.
 
 	// Restart rather than let a running countdown stand: the marker was just (re)shown, so it is
-	// owed the full lifetime from now. InstallTask on an already-installed task does nothing, so
-	// the pending one has to come off first.
-	if (sRunning)
-		sTask->UninstallTask();
-
+	// owed the full lifetime from now. Uninstall unconditionally - a pending booking has to come off
+	// before a new one goes on ("it is illegal to add the same task twice"), and if there is no
+	// pending booking this costs nothing.
+	sTask->UninstallTask();
 	sTask->InstallTask(kKBSMarkerLifetimeMs);
-	sRunning = kTrue;
 }
 
 void KBSMarkerExpiryIdleTask::Stop()
 {
-	if (sTask != nil && sRunning)
+	if (sTask != nil)
 		sTask->UninstallTask();
-	sRunning = kFalse;
 }
 
 void KBSMarkerExpiryIdleTask::Shutdown()
@@ -94,9 +105,7 @@ void KBSMarkerExpiryIdleTask::Shutdown()
 	sShutdown = kTrue;	// no re-arming from here on
 	if (sTask != nil)
 	{
-		if (sRunning)
-			sTask->UninstallTask();
-		sRunning = kFalse;
+		sTask->UninstallTask();
 		sTask->Release();
 		sTask = nil;
 	}

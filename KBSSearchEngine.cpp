@@ -2288,6 +2288,13 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
+// NOT EditableFrameForMatch: that one climbs out to the frame carrying the "+" when a position is
+// overset, which is exactly the case this has to answer TRUE for. The raw walk is the answer here.
+bool KBSSearchEngine::IsPositionOverset(const UIDRef& storyRef, TextIndex pos)
+{
+	return FrameUIDForPosition(storyRef, pos) == kInvalidUID;
+}
+
 void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
 	PMString& outPre, PMString& outMatch, PMString& outPost)
 {

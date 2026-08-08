@@ -325,6 +325,26 @@ namespace KBSSearchEngine
 	UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos);
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
+	/** Is the text at this position OVERSET - composed, but placed in no frame?
+
+	    The official answer, and the reason this lives here rather than beside its one caller:
+	    ITextParcelList.h:87-101 states that "if the TextIndex is in overset an invalid ParcelKey
+	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
+	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
+	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
+	    the same statement.
+
+	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
+	          THREAD (and is the only test that answers for a table cell overflowing on its own -
+	          see KBSOversetScanEngine). This one is about a single position.
+
+	    @return true when the position has no frame of its own. Anything that cannot be resolved -
+	            no text model, no parcel list - reads the same way, exactly as FrameUIDForPosition
+	            folds its query failures into kInvalidUID for every other caller. The jump does
+	            nothing useful in either case: the overset locator and the wax geometry both fail
+	            on the same nil, so the marker is cleared and the view stays put. */
+	bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos);
+
 	/** The whole of a match, boiled down to one 64-bit number.
 
 	    WHAT IT REPLACED: a CopyMatchText that handed the matched characters back as a PMString,

@@ -4,13 +4,14 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Jump-to-hit navigation implementation. The move-to-location helpers (scroll, overset test,
-//  marker rectangle, bring-document-frontmost with zoom carry) are ported from KESCL's
-//  KESCLFindInDoc (KESCL left untouched); the driver JumpToHit is simplified to a static snapshot:
-//  it reads the stored (docRef, file, story, range) for one hit and goes there, with no match-list
-//  navigation, edit-repair or reverse mode. Read-only geometry work sits inside a
-//  SaveRestoreModifiedState dirty guard so a (possibly windowless) chapter never comes out
-//  modified.
+//  Jump-to-hit navigation implementation. The move-to-location helpers (scroll, marker rectangle,
+//  bring-document-frontmost with zoom carry) are ported from KESCL's KESCLFindInDoc (KESCL left
+//  untouched); the driver JumpToHit is simplified to a static snapshot: it reads the stored
+//  (docRef, file, story, range) for one hit and goes there, with no match-list navigation,
+//  edit-repair or reverse mode. Whether a position is overset is asked of KBSSearchEngine, which
+//  resolved every hit's frame in the first place. Once a hit's database is in hand, everything that
+//  follows happens inside a SaveRestoreModifiedState dirty guard - composing, opening a window,
+//  changing spread - so a (possibly windowless) chapter never comes out modified.
 //
 //========================================================================================
 
@@ -33,9 +34,7 @@
 #include "IOpenLayoutCmdData.h"		// SetPerspective_ - the inherited zoom rides the open command
 #include "IPageList.h"
 #include "IPanorama.h"
-#include "IParcelList.h"			// GetParcelFrameUID
 #include "ITextModel.h"
-#include "ITextParcelList.h"		// GetParcelContaining
 #include "IWaxStrand.h"
 #include "IWaxIterator.h"
 #include "IWaxLine.h"
@@ -44,7 +43,6 @@
 #include "ISession.h"
 
 // General includes:
-#include "ParcelKey.h"				// ParcelKey::IsValid
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
 #include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
@@ -66,7 +64,8 @@
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
-#include "KBSSearchEngine.h"		// MatchIsSameOccurrence - the jump is its only caller since 2026-08-05
+#include "KBSSearchEngine.h"		// MatchIsSameOccurrence (the jump is its only caller since
+									// 2026-08-05) / EditableFrameForMatch / IsPositionOverset
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 
 namespace
@@ -101,6 +100,11 @@ namespace
 	//------------------------------------------------------------------------------------
 
 	// Scroll the front layout view so the given pasteboard point is centred. Does not select.
+	//
+	// ScrollContentLocationToFrameCenter, not ScrollViewCenterTo: IPanorama.h:141-145 calls the
+	// latter "an obsolete name" for this one and says new code should call this, "but this function
+	// will go away in a future release". The old name is an inline that calls the new one
+	// (IPanorama.h:135-138), so nothing about the behaviour changes.
 	void ScrollFrontViewToPoint(const PBPMPoint& pbPoint)
 	{
 		InterfacePtr<IControlView> view(Utils<ILayoutUIUtils>()->QueryFrontView());
@@ -109,25 +113,38 @@ namespace
 		InterfacePtr<IPanorama> pano(view, UseDefaultIID());
 		if (pano == nil)
 			return;
-		pano->ScrollViewCenterTo(pbPoint, kTrue /*forceRedraw*/);
+		pano->ScrollContentLocationToFrameCenter(pbPoint, kTrue /*forceRedraw*/);
 	}
 
-	// True if text position 'pos' in storyRef is overset (composed but not placed in any frame).
-	bool IsTextIndexOverset(const UIDRef& storyRef, TextIndex pos)
+	/** Bring this story's composition up to date, so that what is read below is the CURRENT
+	    composition rather than the one left over from before the last edit.
+
+	    ***** IT COVERS THE OVERSET TEST AS WELL AS THE GEOMETRY. ***** Both are readings of the
+	    RESULT of composition, and the recompose used to sit inside the geometry helper alone - so
+	    the question "is this position overset" was answered from the old composition and the
+	    rectangle was measured from the new one, in that order, inside one jump. Being overset is
+	    exactly what changes when text is recomposed, so that was the wrong way round.
+
+	    The recipe is the SDK's: IFrameList::GetFirstDamagedFrameIndex() != -1 ->
+	    IFrameListComposer::RecomposeThruLastFrame (SnpInspectTextModel.cpp:724-733). Called inside
+	    the caller's SaveRestoreModifiedState guard, because composing dirties the document. */
+	void RecomposeIfDamaged(const UIDRef& storyRef)
 	{
 		InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 		if (textModel == nil)
-			return false;
-		InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
-		if (tpl == nil)
-			return true;
-		const ParcelKey key = tpl->GetParcelContaining(pos);
-		if (!key.IsValid())
-			return true;
-		InterfacePtr<IParcelList> pl(tpl, UseDefaultIID());
-		if (pl == nil)
-			return false;
-		return (pl->GetParcelFrameUID(key) == kInvalidUID);
+			return;
+
+		InterfacePtr<IWaxStrand> waxStrand((IWaxStrand*)textModel->QueryStrand(kFrameListBoss, IID_IWAXSTRAND));
+		if (waxStrand == nil)
+			return;
+
+		InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
+		if (frameList != nil && frameList->GetFirstDamagedFrameIndex() != -1)
+		{
+			InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
+			if (composer != nil)
+				composer->RecomposeThruLastFrame();
+		}
 	}
 
 	// x (in the wax run's local coords) and the run's to-pasteboard matrix for a text offset within
@@ -155,6 +172,10 @@ namespace
 
 	// Pasteboard rectangle around the FIRST chunk of the match [start, end): the part on the wax
 	// line containing 'start'. Returns false if the position is overset or geometry is unavailable.
+	//
+	// Assumes the caller has already run RecomposeIfDamaged on this story - the wax read below is a
+	// reading of the composition, and so is the overset test the caller made before choosing to come
+	// here, so both have to be looking at the same one.
 	bool GetFirstChunkPasteboardRect(const UIDRef& storyRef, TextIndex start, TextIndex end, PMRect& outRect)
 	{
 		InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
@@ -164,14 +185,6 @@ namespace
 		InterfacePtr<IWaxStrand> waxStrand((IWaxStrand*)textModel->QueryStrand(kFrameListBoss, IID_IWAXSTRAND));
 		if (waxStrand == nil)
 			return false;
-
-		InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
-		if (frameList != nil && frameList->GetFirstDamagedFrameIndex() != -1)
-		{
-			InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
-			if (composer != nil)
-				composer->RecomposeThruLastFrame();
-		}
 
 		K2::scoped_ptr<IWaxIterator> waxIter(waxStrand->NewWaxIterator());
 		if (waxIter == nil)
@@ -314,7 +327,16 @@ namespace
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// the scroll still runs; do not poison later commands
 	}
 
-	// Accepts every presentation (a local accept-all predicate).
+	/** Accepts every presentation. The twin of KBSBookScope's predicate of the same name, kept
+	    separate because each file's is private to it (both sit in an anonymous namespace).
+
+	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock one exists and is named
+	    FindPresCriteria::accept_all (DocumentPresFindCriteria.h:82), but that file's own preamble
+	    (:40-46) says its implementations "are found in the WidgetBin shared library, so you cannot
+	    use them from a model only plugin. Should the need arise you can create local
+	    implementations" - and prints a two-line example of exactly this shape. So this is the
+	    documented route, not a stand-in for one. (The reasoning was written into the BookScope copy
+	    on 2026-08-08 and not into this one, which is the sort of split this comment now closes.) */
 	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
 	{
 		return true;
@@ -496,22 +518,44 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	IDFile file;
 	UID storyUID = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	// ***** A JUMP THAT GOES NOWHERE TAKES THE OLD MARKER WITH IT. ***** Every exit below that does
+	// not move the view clears it, and these two used to be the exceptions - leaving the previous
+	// hit's marker standing over a row that had just refused to go anywhere. It expires by itself
+	// within the second either way; what is being made consistent is what the panel is SAYING.
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
+	{
+		KBSDrawEventHandler::ClearMarker();
 		return;
+	}
 
 	// The chapter may have been closed since the search (the user can close a held window). Bring
 	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
+	{
+		KBSDrawEventHandler::ClearMarker();	// it has already said why through the status line
 		return;
+	}
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
+	{
+		KBSDrawEventHandler::ClearMarker();
 		return;
+	}
 	const UIDRef storyRef(db, storyUID);
 
-	// The overset test and marker geometry recompose text on demand - read-only work that must not
-	// leave a (possibly windowless) chapter modified, or closing it later would want a save.
+	// Everything from here on happens inside the dirty guard. Recomposing text dirties a document,
+	// and so - harmlessly but visibly - can opening a window on it or changing which spread it
+	// shows; none of that is the user's edit, and a chapter this plug-in opened windowless must not
+	// come out wanting to be saved. IDataBase.h:389-412: this does not "keep it clean", it puts back
+	// the flag the document had on the way in.
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+
+	// Compose first, then read. The overset test below, the overset locator and the wax rectangle are
+	// all readings of the RESULT of composition. The recompose used to live inside the geometry
+	// helper alone, which put it AFTER the overset test had already been answered - so the two could
+	// be looking at different compositions, and being overset is precisely what recomposing changes.
+	RecomposeIfDamaged(storyRef);
 
 	// Is the text at this position still the text this row describes? The stored position is an
 	// offset into the story, so ANY edit earlier in that story moves it - and that is exactly the
@@ -537,7 +581,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		|| KBSSearchEngine::MatchIsSameOccurrence(
 			storyRef, start, end, storyUID, start, end, expectHash);
 
-	const bool overset = IsTextIndexOverset(storyRef, start);
+	// Asked of the search engine, which is where every hit's frame was resolved in the first place
+	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
+	// used). This file wrote that walk out by hand until the block 12 API audit, 2026-08-08, and its
+	// copy answered "not overset" to the failures the original folds into "no frame of its own".
+	const bool overset = KBSSearchEngine::IsPositionOverset(storyRef, start);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, report the match without moving the view.
