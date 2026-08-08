@@ -130,9 +130,12 @@ void KBSSavePanelState()
 		return;
 	}
 
-	// The full path, so the file can be found, backed up or deleted. The panel's status line wraps,
-	// so unlike KESCM's narrower one this can afford a word in front of it.
-	PMString msg("Settings saved: ");
+	// The full path and nothing else, so the file can be found, backed up or deleted (user's call
+	// 2026-08-08). It said "Settings saved: " in front until then; the line is the answer to "where
+	// did it go", and a path is long enough to be worth the whole width of the panel. KESCM says the
+	// same thing the same way, though it arrived there for a different reason - its status line is
+	// narrow enough that a label in front would have pushed the end of the path out of sight.
+	PMString msg;
 	msg.SetTranslatable(kFalse);
 	msg.Append(FileUtils::SysFileToPMString(file));
 	KBSResultTree::ShowStatus(msg);
