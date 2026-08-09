@@ -554,6 +554,24 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKBSResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
 
+// ***** HOW TALL ONE ROW OF THE RESULT TREE IS. *****
+//
+// One number, read from BOTH SIDES: KBS.fr gives it to the two row resources above and to the
+// tree's four scroll increments, and KBSResultListWidgetMgr answers GetNodeWidgetHeight with it.
+// It was written out six times until 2026-08-09, and the panel now ROUNDS ITS OWN HEIGHT to a
+// multiple of it (KBSPanelView::ConstrainDimensions), so a copy that drifted would leave the
+// framework rounding to one number while the rows were drawn at another - a half row at the
+// bottom, which is the very thing the rounding exists to prevent.
+//
+// A dimension constant that a .fr and its C++ both read is the shape Adobe uses:
+// StdHeightWidthConstants.h (public/libs/widgetbin/includes) is nothing but this, and nine
+// product .fr files #include it - LinksUIViews.fr and TimingPanelViews.fr among them.
+//
+// ! It is NOT kCC2016PanelTreeNodeHeight. That constant is 22 and this is 19: the number here was
+//   measured on this panel's own rows, which carry a palette font at a size the stock tree node
+//   was not laid out for. Adobe's constant is the right SHAPE to copy, not the right VALUE.
+#define kKBSResultRowHeight		19
+
 // PNG resource IDs. Their own number space (PNGA/PNGR), so they do not have to dodge the view
 // resource ids above. 1001 is where KESCM and KESCL start theirs.
 #define kKBSIconResID			1001	// the illustration shown before anything has been run

@@ -1148,10 +1148,10 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kHideRootNode,					// Options: the root is not a row
 			kFalse,							// Use H scroll bar
 			kTrue,							// Use V scroll bar
-			19,								// fVScrollButtonIncrement (one row)
-			19,								// fVThumbScrollIncrement
-			19,								// fHScrollButtonIncrement (unused, no H bar)
-			19,								// fHThumbScrollIncrement
+			kKBSResultRowHeight,			// fVScrollButtonIncrement (one row)
+			kKBSResultRowHeight,			// fVThumbScrollIncrement
+			kKBSResultRowHeight,			// fHScrollButtonIncrement (unused, no H bar)
+			kKBSResultRowHeight,			// fHThumbScrollIncrement
 			1,								// Items selectable: 1 = single selection
 			kFalse,							// Allow children from multiple parents to be selected
 			kFalse,							// Allow discontiguous selection
@@ -1174,7 +1174,7 @@ resource KBSResultNodeWidget(kKBSResultChapterNodeWidgetRsrcID + index_enUS)
 	__FILE__, __LINE__,
 	kKBSResultChapterNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 	kBindLeft | kBindRight,				// Frame binding: follow the list's width
-	Frame(0, 0, 296, 19),				// Frame (left, top, right, bottom)
+	Frame(0, 0, 296, kKBSResultRowHeight),	// Frame (left, top, right, bottom)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
@@ -1224,7 +1224,7 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 	__FILE__, __LINE__,
 	kKBSResultHitNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 	kBindLeft | kBindRight,				// Frame binding: follow the list's width
-	Frame(0, 0, 296, 19),				// Frame (left, top, right, bottom)
+	Frame(0, 0, 296, kKBSResultRowHeight),	// Frame (left, top, right, bottom)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{

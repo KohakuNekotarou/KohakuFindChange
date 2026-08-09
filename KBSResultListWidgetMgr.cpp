@@ -102,10 +102,12 @@ namespace
 	// Find/Change result is laid out exactly as it was.
 	const PMReal kFontLevelIndent = 8.0;
 
-	// Every row of this tree is this tall - the height both row resources declare in KBS.fr. Stated
-	// here as well because the tree asks for it (GetNodeWidgetHeight), and because it is the fact
-	// that lets Rebuild() promise ChangeRoot a constant widget height.
-	const PMReal kRowHeight = 19.0;
+	// Every row of this tree is this tall. THE NUMBER IS NOT HERE: it is kKBSResultRowHeight in
+	// KBSID.h, which KBS.fr reads as well - the row resources' frames and the tree's scroll
+	// increments are the same fact, and the panel rounds its own height to a multiple of it
+	// (KBSPanelView::ConstrainDimensions). This is where the tree asks for it (GetNodeWidgetHeight),
+	// and it is the fact that lets Rebuild() promise ChangeRoot a constant widget height.
+	const PMReal kRowHeight = kKBSResultRowHeight;
 
 	// Put 'text' into a row's static-text cell. Row widgets are recycled as the tree scrolls, so
 	// every cell is written on every apply. No manual repaint: the tree draws the row right after.
