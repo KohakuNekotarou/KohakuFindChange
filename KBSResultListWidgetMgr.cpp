@@ -710,8 +710,12 @@ void KBSResultTree::ShutdownCleanup()
 	gLastStatus.Clear();
 
 	// Added 2026-08-08 with the stamps themselves, rather than after a fourth sweep found them
-	// standing: KBSEditStamp keeps a static vector of its own, and the rule this comment block
-	// describes covers it exactly.
+	// standing: KBSEditStamp keeps statics of its own, and the rule this comment block describes
+	// covers them exactly.
+	//
+	// It keeps TWO, and this line said "a static vector" until 2026-08-09 - the file's own
+	// ShutdownCleanup had been written to match that count and released only the first of them.
+	// Corrected in both places rather than one: an undercount here is what let the miss stand.
 	KBSEditStamp::ShutdownCleanup();
 }
 

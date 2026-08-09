@@ -825,6 +825,16 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// changes what the user GETS: a selection over text they never searched for, ready to be typed
 	// over. So this one refuses. The jump has already put its own message up in this case; this adds
 	// nothing and would only overwrite it.
+	//
+	// ! THE HASH IS THE ONLY ARM THAT DOES ANY WORK HERE, and the three values above it are fetched
+	//   only because GetHitMatchIdentity hands all four back together. This side asks about the very
+	//   range the row recorded - so the story, position and length arms of MatchIsSameOccurrence
+	//   compare the recorded values against themselves and are trivially satisfied. What can still
+	//   differ is the TEXT at that range, which is what the hash carries. (The row's drawn match
+	//   string cannot answer it: that is capped at 500 characters, so it only ever compared the
+	//   first 500 of a long GREP match - 2026-08-04.) JumpToHit:578-589 makes the identical call for
+	//   the identical reason; this note is its twin, added 2026-08-09 because without it the three
+	//   unused locals read as an oversight.
 	UID expectStory = kInvalidUID;
 	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
 	uint64 expectHash = 0;

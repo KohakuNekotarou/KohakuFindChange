@@ -157,6 +157,15 @@ void KBSEditStamp::ShutdownCleanup()
 	// clear() would leave the vector holding its buffer. Swapping with an empty one hands the
 	// storage back before the .pln unloads, which is what the model's own ShutdownCleanup is for.
 	std::vector<ChapterStamp>().swap(gStamps);
+
+	// ***** THIS FILE KEEPS TWO STATICS, NOT ONE. ***** The pending reading holds a vector of its
+	// own, and neither Forget() nor CommitPending() does more than clear() it - which is exactly the
+	// case the line above exists for. Any book search leaves it holding its buffer, so it reached
+	// the unload still owning storage until this was added (2026-08-09, the file's first API audit).
+	// The caller that invokes this function describes it as "a static vector of its own", singular
+	// (KBSResultListWidgetMgr.cpp), which is how the second one went uncounted.
+	gPending.stamped = false;
+	std::vector<std::pair<UID, uint32> >().swap(gPending.stories);
 }
 
 // End, KBSEditStamp.cpp.
