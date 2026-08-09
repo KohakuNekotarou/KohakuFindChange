@@ -519,7 +519,7 @@ void KBSJump::SetHidePreviousChapter(bool on)
 	gHidePrevChapterOn = on;
 }
 
-void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
+void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles)
 {
 	UIDRef docRef;
 	IDFile file;
@@ -642,7 +642,16 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// whose text is missing it frames whatever stands at that position now rather than the
 			// match - which is the useful thing: it shows WHERE the hit used to be. That it is not
 			// there any more is said by the status line and by the word on the row itself.
-			KBSDrawEventHandler::SetMarker(db, pbRect);
+			//
+			// From the MOUSE it is BOOKED rather than raised: this jump may be the first half of a
+			// double click, and the selection that a double click makes would take the marker straight
+			// back down again - a red flash of something that was never meant to be seen (user's call,
+			// 2026-08-09). Booking it means it simply never appears in that case. Both calls take the
+			// old marker down first, so the two behave alike in every other way.
+			if (deferMarkerUntilClickSettles)
+				KBSDrawEventHandler::SetMarkerAfterClickSettles(db, pbRect);
+			else
+				KBSDrawEventHandler::SetMarker(db, pbRect);
 		}
 		else
 		{
@@ -902,12 +911,15 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	return true;
 }
 
-void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
+void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles)
 {
 	// One door for every row, so a click and a keyboard walk can never drift apart - the reason
-	// this exists at all is that there are now two callers.
+	// this exists at all is that there are now two callers. What they legitimately differ on is
+	// carried as a parameter rather than left to each of them: only a mouse click can be half of a
+	// double click. It is spelled out at both call sites (no default) so that neither can acquire the
+	// other's answer by accident.
 	if (hitIdx >= 0)
-		JumpToHit(chapterIdx, hitIdx);
+		JumpToHit(chapterIdx, hitIdx, deferMarkerUntilClickSettles);
 	else if (chapterIdx >= 0)
 		ShowChapter(chapterIdx);
 	else if (chapterIdx == -1)

@@ -11,7 +11,11 @@
 //  the match, VS-style. ***** A DOUBLE click does (2026-08-09): SelectHitText switches to the Type
 //  tool and highlights the match, for when pointing is not what was wanted. The two are deliberately
 //  different - a single click can be spent freely because it changes nothing in the document, and
-//  that is only true while it does not select. With "Hide Previous Chapter" ON, every other displayed clean document is
+//  that is only true while it does not select. ***** FROM THE MOUSE THE MARKER IS BOOKED, NOT RAISED
+//  (2026-08-09): the move happens at once, but the marker waits until the click is known not to have
+//  been the first half of a double click, so a double click that selects never shows one. The
+//  deferMarkerUntilClickSettles parameter below carries that, and
+//  KBSDrawEventHandler::SetMarkerAfterClickSettles is where it is explained. With "Hide Previous Chapter" ON, every other displayed clean document is
 //  closed as the jump lands. Ported from KESCL's jump machinery (KESCL left untouched), simplified
 //  to a static snapshot (no match-list navigation, no edit-repair, no reverse mode).
 //
@@ -26,8 +30,16 @@ namespace KBSJump
 	    to the match, raise the marker. Does not select. No-op on a bad index; an unreachable chapter
 	    (missing / locked file) reports through the status line. An overset match has no on-page
 	    location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is
-	    raised - those pixels belong to the indicator, not to the text. */
-	void JumpToHit(int32 chapterIdx, int32 hitIdx);
+	    raised - those pixels belong to the indicator, not to the text.
+
+	    @param deferMarkerUntilClickSettles kTrue from the MOUSE, where this jump may turn out to be
+	           the first half of a double click. The move itself is never deferred - the document
+	           fronts and the view scrolls at once - but the MARKER waits out the double-click
+	           interval, so a double click that goes on to select never shows one
+	           (KBSDrawEventHandler::SetMarkerAfterClickSettles, which explains why it cannot simply
+	           be tested for). kFalse from the keyboard walk: there is no double arrow-key, so it has
+	           nothing to wait for and its marker appears at once, as it always has. */
+	void JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles);
 
 	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if
 	    the user closed it since the search. Does NOT scroll and raises no marker - a chapter row
@@ -45,8 +57,11 @@ namespace KBSJump
 	    document, the book row activates its book. Called by the row click and by the keyboard
 	    walk, which is why it exists - two callers must not drift apart.
 	    @param chapterIdx the chapter index, or -1 for the book row.
-	    @param hitIdx the hit index, or -1 when the row is not a hit row. */
-	void ActivateNode(int32 chapterIdx, int32 hitIdx);
+	    @param hitIdx the hit index, or -1 when the row is not a hit row.
+	    @param deferMarkerUntilClickSettles passed straight to JumpToHit - see there. The one thing
+	           the two callers differ on, and the reason it is spelled out at both of them rather than
+	           defaulted: a mouse click may be half of a double click, an arrow key never is. */
+	void ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles);
 
 	/** SELECT the match in the document: switch to the Type tool and highlight the hit's own range,
 	    so the user can edit or copy it straight away. The DOUBLE-CLICK half of a hit row - a single

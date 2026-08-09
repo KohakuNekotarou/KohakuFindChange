@@ -46,14 +46,43 @@ public:
 										// all there is, as before).
 
 	// Set / clear the current marker and repaint. SetMarker also starts the marker's countdown to
-	// clearing itself; ClearMarker cancels that countdown. Called by KBSJump.
+	// clearing itself; ClearMarker cancels that countdown AND any booking made by
+	// SetMarkerAfterClickSettles below. Called by KBSJump.
 	static void SetMarker(IDataBase* db, const PMRect& pbRect);
 	static void ClearMarker();
 
-	/** Application-shutdown cleanup: forget the marker WITHOUT repainting or touching any document.
+	/** Put the marker up only once the click that asked for it is KNOWN to have been a SINGLE click:
+	    take the old marker down now, and book this one for the double-click interval from now. A
+	    second click landing inside that interval means the marker is never raised at all.
+
+	    ***** WHY A BOOKING AND NOT A TEST. ***** A double click arrives as LButtonDn, LButtonUp,
+	    ButtonDblClk, LButtonUp (KBSResultNodeEH.cpp), so at the first button-UP - where the jump runs -
+	    there is nothing to ask: ButtonDblClk has not happened yet, and IEvent carries no click count
+	    (its double click is a separate event type, IEvent.h:212-302). The only way to know a click was
+	    single is to let the interval pass without a second one. That is what this books.
+
+	    ***** WHO CANCELS IT. ***** Nothing here: ClearMarker does, so every existing path that takes
+	    the marker down takes the booking with it. Which gives the two double-click outcomes for free:
+	      * the selection SUCCEEDS - SelectHitText ends in ClearMarker, so the booking dies and the
+	        marker is never seen (the point of the whole thing: an inversion under a highlight);
+	      * the selection is REFUSED (overset, locked, hidden, stale) - it returns before that
+	        ClearMarker, so the booking stands and the marker appears as it always did, which is the
+	        rule that says a refusal still gets pointed at.
+
+	    For the MOUSE only. The keyboard walk (KBSResultTreeEH) calls SetMarker through the ordinary
+	    path: there is no such thing as a double arrow-key, so it has nothing to wait for.
+
+	    @param db the marker's document - held as an address, and never dereferenced until the booking
+	              fires and the document has been found on the document list again. */
+	static void SetMarkerAfterClickSettles(IDataBase* db, const PMRect& pbRect);
+
+	/** Application-shutdown cleanup: forget the marker WITHOUT repainting or touching any document,
+	    and stop and release the booking timer.
 	    ClearMarker is the wrong call there - it invalidates the views of the marker's document, which
 	    by then may be half torn down - and sMarkerDocPath is a static PMString, so it has to be
-	    emptied for the same reason KBSResultModel::ShutdownCleanup empties its own. */
+	    emptied for the same reason KBSResultModel::ShutdownCleanup empties its own. The timer must go
+	    for the harder reason: *ICallbackTimer's callback is a raw function pointer that is not
+	    reference counted, so a booking left live as this .pln goes down is a crash. */
 	static void ShutdownCleanup();
 };
 

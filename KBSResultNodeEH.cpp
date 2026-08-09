@@ -28,6 +28,15 @@
 //  (KBSJump.h). Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
 //  note explains why it cannot simply be done inside ButtonDblClk.
 //
+//  ***** AND THE FIRST CLICK'S MARKER WAITS TO SEE WHETHER IT WAS ONE. ***** Because the jump runs on
+//  the first button-up, a double click used to jump (marker up) and then select (marker down), showing
+//  a red flash of a marker that was never meant to be seen. The jump from here therefore BOOKS its
+//  marker for the double-click interval instead of raising it - the move is immediate, only the
+//  marker waits - and the ordinary ClearMarker at the end of a successful SelectHitText is what calls
+//  the booking off. Nothing in this file cancels it, deliberately: a double click that is REFUSED
+//  (overset, locked, hidden, stale) never reaches that ClearMarker, so its marker still appears,
+//  which is the rule that a refusal is still pointed at. See KBSDrawEventHandler.h.
+//
 //  The row's "replace me" check box is a real widget of its own (kKBSResultCheckWidgetBoss) that
 //  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
 //  KBSResultCheckObserver.
@@ -185,7 +194,10 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	}
 	else
 	{
-		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
+		// kTrue = this click may still turn out to be the first half of a double click, so the jump's
+		// MARKER is booked rather than raised (KBSJump.h). The move itself is not deferred: the
+		// document fronts and the view scrolls now, as it always did.
+		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit(), /*deferMarkerUntilClickSettles*/ true);
 	}
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
