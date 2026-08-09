@@ -22,6 +22,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSDrawEventHandler.h"	// the jump marker's static state, emptied at shutdown
+#include "KBSEditStamp.h"		// the chapters' change counters: two statics of its own
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
@@ -79,6 +80,13 @@ public:
 		KBSDrawEventHandler::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
+		// ...and the edit stamps that belong to those results. On this list in its own right since
+		// 2026-08-09: it was reached through KBSResultTree::ShutdownCleanup until then, and a
+		// clean-up nested inside another one cannot be found by READING this list - which is the
+		// only way anyone ever checks whether a static has an emptier. That nesting is exactly how
+		// one of its two statics came to stand: the call site described it as "a static vector",
+		// singular, and KBSEditStamp::ShutdownCleanup had been written to match that count.
+		KBSEditStamp::ShutdownCleanup();
 		// ...and the line the panel last reported: a static PMString of exactly the kind the marker
 		// holds. It joined this list on 2026-08-08, having stood through both of the sweeps that
 		// wrote the rule down (see KBSResultTree::ShutdownCleanup).

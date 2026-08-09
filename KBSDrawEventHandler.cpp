@@ -254,13 +254,22 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
 
 void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, const PMRect& pbRect)
 {
+	// ***** ONCE ShutdownCleanup HAS RUN, NOTHING AT ALL - not even the clear. ***** ClearMarker
+	// repaints the marker's document, and that is precisely what this file's ShutdownCleanup says
+	// must not happen from then on: the document may be half torn down by the time teardown reaches
+	// here. Asked BEFORE the clear rather than beside the nil test after it, so this function cannot
+	// do the one thing the header forbids (2026-08-09 re-check). No path is known to arrive after
+	// shutdown - the mouse is not being dispatched by then - and one line makes it impossible.
+	if (sMarkerShutdown)
+		return;
+
 	// ***** THE OLD MARKER GOES NOW, not when the booking fires. ***** The view has just jumped
 	// somewhere else, so a marker left standing over the previous hit for half a second would be
 	// pointing at a place the user has left. This is also what cancels any booking still outstanding
 	// (ClearMarker calls KBSCancelPendingMarker), so the newest click always wins.
 	ClearMarker();
 
-	if (sMarkerShutdown || db == nil)
+	if (db == nil)
 		return;
 
 	if (sPendingTimer == nil)

@@ -59,7 +59,6 @@
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
 #include "KBSPanelIcon.h"		// the illustration follows the status line
-#include "KBSEditStamp.h"		// its statics are released beside this file's own
 
 namespace
 {
@@ -709,14 +708,12 @@ void KBSResultTree::ShutdownCleanup()
 	// PMString" as the example. Neither of them was looking in this file.
 	gLastStatus.Clear();
 
-	// Added 2026-08-08 with the stamps themselves, rather than after a fourth sweep found them
-	// standing: KBSEditStamp keeps statics of its own, and the rule this comment block describes
-	// covers them exactly.
-	//
-	// It keeps TWO, and this line said "a static vector" until 2026-08-09 - the file's own
-	// ShutdownCleanup had been written to match that count and released only the first of them.
-	// Corrected in both places rather than one: an undercount here is what let the miss stand.
-	KBSEditStamp::ShutdownCleanup();
+	// (KBSEditStamp::ShutdownCleanup was called from here between 2026-08-08 and 2026-08-09. It is
+	//  on KBSStartupShutdown's own list now, beside every other emptier. A clean-up nested inside
+	//  another one cannot be found by reading that list, and reading that list is the only way
+	//  anyone checks - which is how one of KBSEditStamp's two statics came to stand: the call that
+	//  used to be here called it "a static vector", singular, and that file's ShutdownCleanup had
+	//  been written to match. Nothing about this file's own static changes.)
 }
 
 namespace
