@@ -47,7 +47,6 @@
 
 // Project includes:
 #include "KBSReplaceEngine.h"
-#include "KBSEditStamp.h"		// has this chapter been edited since the search walked it?
 #include "KBSID.h"				// the string keys the edited-chapter warning is worded from
 #include "KBSLoc.h"				// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSResultModel.h"
@@ -170,20 +169,10 @@ struct PendingChapter
 	// straight back, because it is holding its .indd locked for no reason at all.
 	bool	tookReplacement;
 
-	// Has this chapter changed since the search walked it (KBSEditStamp) - and along which axis:
-	// the text itself, or a walk gate (a layer shown/hidden or locked/unlocked, a story's lock)
-	// the search's scope switches watch? The prompt names the axis, so the answer is the enum,
-	// not a bool.
-	//
-	// ***** READ IN THE RESOLVE PASS, AND THAT IS THE ONLY PLACE IT CAN BE READ FOR EVERY CHAPTER.
-	// ***** QueryChapterChange needs the chapter OPEN, and a book search closes each one as it
-	// finishes with it - so before the resolve pass, a chapter the user had closed cannot be asked
-	// at all. The confirmation prompt could only ever ask about the chapters that happened to be
-	// open, which is why the question moved here on 2026-08-08 (user's decision) and left the
-	// prompt entirely.
-	//
-	// Read after the chapter is a live document again and before a character is written to it.
-	KBSEditStamp::ChapterChange	changeSinceSearch;
+	// (A changeSinceSearch stood here from 2026-08-08 to 2026-08-10, carrying KBSEditStamp's
+	//  verdict on this chapter from the resolve pass to a prompt further down. The resolve pass
+	//  now WALKS each chapter instead and checks the ticked positions themselves, and a mismatch
+	//  ends the run there and then - so there is nothing to carry.)
 
 	// This chapter's checked, not-yet-replaced hits, counted ONCE where the run is sized and read
 	// from here after that (how far this chapter's slice moves the bar). The number cannot change
@@ -193,7 +182,7 @@ struct PendingChapter
 	int32	checkedCount;
 
 	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false),
-		changeSinceSearch(KBSEditStamp::kUnchanged), checkedCount(0) {}
+		checkedCount(0) {}
 };
 
 // ***** A CountCheckedInChapter STOOD HERE UNTIL 2026-08-08, AND THE MODEL ALREADY ANSWERED IT.
@@ -285,14 +274,21 @@ struct RunTotals
 // and replacing is the USER's responsibility. What it could not do was work across a BOOK, where a
 // chapter may be closed between the search and the replace.
 //
-// ***** Since 2026-08-08 the edit is DETECTED, though still not refused. ***** KBSEditStamp records
-// every story's ITextModel::GetChangeCount() as the search walks a chapter, and those counters live
-// in the FILE - so a chapter that was closed and reopened, even across a restart, still answers.
-// That is what defeated the test removed here. The confirmation names the chapters that changed and
-// the user decides. NOTHING stands in the way of the write itself - an all-or-nothing rollback was
-// considered the same day and deliberately not taken. What the walk finds when a checked hit's turn
-// comes is what gets rewritten, and a run that reaches fewer hits than it was given still commits
-// the ones it managed; the summary reports the shortfall, as it always has.
+// ***** SINCE 2026-08-10 THE SAME QUESTION IS ASKED BEFORE THE RUN STARTS, AND IT REFUSES. *****
+// The resolve pass walks every chapter it is about to write to - verifyOnly below - and checks that
+// each ticked hit still BEGINS in the same story at the same index. It is the test removed here,
+// moved to the one moment where it is both answerable and free: nothing has been written, so the
+// positions are the ones the search recorded, with no replacements of ours to cancel out (that is
+// what the posDelta map was for) - and a mismatch stops the run with not one character to take back.
+//
+// A per-chapter fingerprint (KBSEditStamp: every story's ITextModel::GetChangeCount, recorded as
+// the search walked) did this job from 2026-08-08 to 2026-08-10, warning rather than refusing. It
+// went because it answered a DIFFERENT question - "does this chapter look untouched?" - which has
+// to enumerate the ways a document can move (text, stories, layers, locks, conditions...) and is
+// never finished. Walking asks about the thing itself.
+//
+// So the walk below no longer needs a same-occurrence test of its own: by the time it runs, every
+// ticked position has been confirmed and nothing has moved since (the verify pass writes nothing).
 //
 // KBSSearchEngine::MatchIsSameOccurrence and the hash behind it are NOT gone - the JUMP still asks
 // them, which is how clicking a row can answer "the replacement is no longer here" instead of
@@ -328,15 +324,35 @@ struct RunTotals
 //                  and handed to every chapter alike - the same shape CollectHitsInDoc takes
 //                  them in, and the same necessity: this walk has to visit exactly what the
 //                  search's walk visited or the walk orders stop lining up.
+//
+// ***** verifyOnly - THE SAME WALK, WRITING NOTHING. ***** Every ticked row carries the position
+// the search found it at, and this walk visits the same matches in the same order, so the two can
+// simply be compared: at each ticked walk order, does the match still BEGIN in the same story at
+// the same index? If one does not - or if the walk ends with ticked rows it never reached - the
+// document is not the one the results describe, and the caller stops the whole run before a
+// character is written (2026-08-10, the user's design).
+//
+// It is a MODE of this function rather than a function of its own, deliberately: the verify pass
+// has to visit exactly what the replace pass will visit, and the surest way to promise that is
+// for both to be the same code. In this mode nothing is written, no row is marked, no counter is
+// touched and the bar is not moved; the answer comes back in outChanged.
+//
+// The END of the match is not compared, and neither is its text - the start alone is the test
+// (the user's decision). A match that still begins where it began is the occurrence that was
+// found there; length and content belong to the query, which RefuseChangedQuery has already
+// established has not changed.
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked, bool& outWalkFailed,
-	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported)
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
+	bool verifyOnly = false, bool* outChanged = nil)
 {
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
 	outNotWalked = false;
 	outWalkFailed = false;
+	if (outChanged != nil)
+		*outChanged = false;
 
 	// walkOrder -> row index, plus the set of walk orders to replace. The rows are stored in PAGE
 	// order and the walk runs in DOCUMENT order, so walkOrder is the only thing joining them.
@@ -365,6 +381,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			// asks nothing about walk orders - and in no counter at all.
 			if (haveFlags && checked && !replaced)
 			{
+				// In verify, a ticked row that no walk can ever reach is reported as a change and
+				// nothing is marked: the pass writes nothing at all, outcomes included, and the
+				// run is about to be stopped anyway.
+				if (verifyOnly)
+				{
+					if (outChanged != nil)
+						*outChanged = true;
+					return 0;
+				}
 				++outMissing;
 				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
 			}
@@ -526,8 +551,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		// inside the walk too - SpellReplaceWalker.cpp:496 - so this is where Adobe puts it as well.)
 		// The call itself is SetPosition, not the DoTask this comment used to name - see
 		// KBSAdvanceProgress, which is the one place any KBS bar is moved.
-		KBSAdvanceProgress(progressBar, ioProgressReported,
-			progressBase + (targetsAtStart - static_cast<int32>(targets.size())));
+		//
+		// The verify pass runs under the OPENING bar, which its caller moves per chapter - it is
+		// not sized in hits and must not be driven from in here.
+		if (!verifyOnly)
+			KBSAdvanceProgress(progressBar, ioProgressReported,
+				progressBase + (targetsAtStart - static_cast<int32>(targets.size())));
 
 		// ALWAYS find first: the replace command does not search on its own, it only acts on the
 		// match a find has just made current.
@@ -568,6 +597,34 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		{
 			const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
 			const int32 hitIdx = (row != rowByWalkOrder.end()) ? row->second : -1;
+
+			// ***** VERIFY: DOES THIS MATCH STILL BEGIN WHERE THE SEARCH FOUND IT? *****
+			// The whole of the verify pass is these few lines - everything above and below is the
+			// walk itself, which is why the two passes share it. The story is compared as well as
+			// the index: an index means nothing without the story it counts into.
+			//
+			// A ticked row whose identity cannot be read is treated as changed. It is the same
+			// judgement the rest of this pass makes - we are about to rewrite the user's text on
+			// the strength of these positions, so "cannot tell" is not good enough to proceed on.
+			if (verifyOnly)
+			{
+				UID expectStory = kInvalidUID;
+				TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
+				uint64 expectHash = 0;
+				const bool haveIdentity = (hitIdx >= 0)
+					&& KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory,
+							expectStart, expectEnd, expectHash);
+				if (!haveIdentity || story.GetUID() != expectStory || start != expectStart)
+				{
+					if (outChanged != nil)
+						*outChanged = true;
+					return 0;
+				}
+				targets.erase(walkIndex);
+				++walkIndex;
+				continue;
+			}
+
 			// May this text be rewritten at all? The Find/Change dialog can be told to SEARCH
 			// locked layers and locked stories, but InDesign gives no way to CHANGE what it finds
 			// there, so neither does KBS. The match had to be walked to keep the walk order lined
@@ -671,6 +728,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 
 	if (walker->IsWalking())
 		walker->Halt();
+
+	// ***** THE VERIFY PASS ENDS HERE, and what is left in targets is the answer. ***** A ticked
+	// row the walk never reached is as much a change as one that moved: the match the results
+	// promise is not there to be replaced. Nothing below this line runs in verify - no row is
+	// re-read, no outcome is marked, nothing is counted.
+	if (verifyOnly)
+	{
+		if (!targets.empty() && outChanged != nil)
+			*outChanged = true;
+		return 0;
+	}
 
 	// The chapter has stopped changing, so now each replaced row is given the line it ended up on.
 	//
@@ -1043,81 +1111,66 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 	return 0;
 }
 
-// ***** THE TEXT THIS CHAPTER'S ROWS WERE FOUND IN IS NOT THE TEXT THAT IS THERE NOW. *****
+// ***** THE MATCHES THESE ROWS DESCRIBE ARE NOT WHERE THEY WERE. *****
 //
-// The run walks the chapter again and gives the Nth match to the Nth checked row, so an edit that
-// added or removed a match between the search and now moves every row after it onto a match the
-// user never ticked. Nothing in the walk can see that; only the counters can (KBSEditStamp), and
-// this is where what they say is put to the user.
+// The run walks each chapter again and gives the Nth match to the Nth ticked row, so anything that
+// adds, removes or moves a match between the search and now would hand a replacement to an
+// occurrence the user never ticked. The verify walk in the resolve pass has just found exactly
+// that, and the run is over before it started - this only tells them.
 //
-// Asked ONE CHAPTER AT A TIME (user's decision, 2026-08-08), and with the progress bar DOWN: the
-// resolve pass closes its own bar before the first of these goes up, so a modal alert never stands
-// over a modal bar.
+// ***** IT IS A STATEMENT, NOT A QUESTION (user's decision, 2026-08-10). ***** There is no "carry
+// on anyway": a work list that has come apart cannot be replaced safely whatever anyone answers.
+// A per-chapter "the text has been edited - OK / Cancel?" prompt stood here from 2026-08-08 until
+// then, resting on KBSEditStamp's per-chapter fingerprint.
 //
-// ***** CANCEL STOPS THE WHOLE RUN, AND HERE THAT COSTS NOTHING TO UNDO. ***** This is asked before
-// the command sequence opens, so a cancel returns with not one character written: there is no
-// rollback to do and no chapter left half replaced. (Once the run is under way a cancel is
-// AbortCommandSequence instead - see the sequence in ReplaceChecked.)
+// Shown with the progress bar DOWN - the resolve pass closes its own bar before this goes up, so a
+// modal alert never stands over a modal bar - and before the command sequence opens, so not one
+// character has been written when it appears.
 //
-// Cancel is the DEFAULT button, the decision the glyph confirmation records for itself (KBS.fr,
-// 2026-07-31): Enter must not start a rewrite.
-//
-// ***** AND THAT DECIDES WHAT HAPPENS WHEN NOBODY IS THERE. ***** With userInteractionLevel at
-// NEVER_INTERACT the alert is never drawn and ModalAlert hands back the DEFAULT button, so a
-// scripted run STOPS at the first edited chapter and says why through app.kfcStatus ("Replace
-// cancelled - nothing was changed."). Measured 2026-08-08.
-//
-// ⚠ Not symmetrical with the confirmation prompt, which is simply skipped while interaction is
-// suppressed and lets the replace run - and the asymmetry is deliberate (user's decision,
-// 2026-08-08). An unattended run that has been told the document moved under it should stop, and
-// the status line is there to be read afterwards. ***** Do not "fix" this by making OK the default:
-// that would trade an unattended stop for an unattended rewrite, and it would also hand the Enter
-// key the one thing this dialog exists to keep it away from.
-// @param chapterIdx the chapter's index in KBSResultModel.
-// @return false when the user stops the run.
-bool AskEditedChapter(int32 chapterIdx, KBSEditStamp::ChapterChange cause)
+// With userInteractionLevel at NEVER_INTERACT the alert is never drawn (CAlert.h:178-183) and the
+// run stops all the same: the caller returns through StopBeforeAnythingIsWritten either way, and a
+// scripted run reads what happened off app.kfcStatus.
+// @param chapterIdx the chapter the mismatch was found in, or -1.
+void TellResultsWentStale(int32 chapterIdx)
 {
-	PMString msg;
-
-	// The axis first: "the text has been edited" and "a layer or a lock has changed" call for
-	// different second looks, and the stamp knows which it saw (KBSEditStamp::ChapterChange).
-	const bool gateMoved = (cause == KBSEditStamp::kScopeStateChanged);
-
 	// A DOCUMENT-scope run has one "chapter" and it is the front document, which has no name to put
 	// here - the book wording would name a chapter of a book that is not there.
-	if (!KBSResultModel::IsFromBook())
-		msg = gateMoved ? KBSLoc::Text(kKBSConfirmGatesDocKey, KBSJa::kConfirmGatesDoc)
-						: KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
+	PMString msg;
+	if (chapterIdx < 0 || !KBSResultModel::IsFromBook())
+		msg = KBSLoc::Text(kKBSStaleResultsDocKey, KBSJa::kStaleResultsDoc);
 	else
 	{
 		// The model's display name for the chapter row, marked untranslatable BEFORE it goes into a
-		// translated string - the order every other line of this prompt takes (BuildCountLine).
+		// translated string - the order every other line of this plug-in's prompts takes.
 		PMString name;
 		int32 chapterHits = 0;
 		KBSResultModel::GetChapterDisplay(chapterIdx, name, chapterHits);
 		name.SetTranslatable(kFalse);
-		msg = gateMoved ? KBSLoc::Text(kKBSConfirmGatesOneKey, KBSJa::kConfirmGatesOne)
-						: KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
+		msg = KBSLoc::Text(kKBSStaleResultsOneKey, KBSJa::kStaleResultsOne);
 		::ReplaceStringParameters(&msg, name);
 	}
 
-	// What it can cost, and then what Cancel does. The line breaks are ours: the platform breaks an
-	// alert where it sees fit, and these are three separate sentences (CAlert.h:116-122).
+	// ...and what to do about it. The line break is ours: the platform breaks an alert where it
+	// sees fit, and these are two separate sentences (CAlert.h:116-122).
 	msg.Append(kLineSeparatorString);
-	msg.Append(KBSLoc::Text(kKBSConfirmEditedTailKey, KBSJa::kConfirmEditedTail));
-	msg.Append(kLineSeparatorString);
-	msg.Append(KBSLoc::Text(kKBSConfirmEditedCancelAllKey, KBSJa::kConfirmEditedCancelAll));
+	msg.Append(KBSLoc::Text(kKBSStaleResultsTailKey, KBSJa::kStaleResultsTail));
 	// Finished text: every part was translated as it was taken, so the alert must not look the
 	// result up again (CAlert translates the message it is handed).
 	msg.SetTranslatable(kFalse);
 
-	const int16 answer = CAlert::ModalAlert(msg,
-		kOKString,				// 1 - go on with the replace
-		kCancelString,			// 2 - stop the whole run
-		kNullString,			// no third button
-		2,						// ...and 2 is the DEFAULT
-		CAlert::eWarningIcon);
-	return (answer == 1);
+	// ***** ModalAlert with ONE button rather than WarningAlert. ***** On screen they are the same
+	// thing - a warning icon and an OK - and this is the shape IAlertHandler::HandleAlert takes
+	// (message plus three button labels plus the default), which is the interface KT's alert
+	// recorder implements.
+	//
+	// ⚠ It still does NOT reach app.ktLastAlert, measured both ways on 2026-08-10: under
+	// NEVER_INTERACT the alert is answered without the handler being asked, so an automated run
+	// can see that the replace stopped and read WHY off the status line, but cannot read the alert
+	// itself. Confirming the alert appears is a job for the eye. (KT's recorder was armed and
+	// answering - app.ktAlertAnswer read back "1" - so this is CAlert's own suppression, not KT.)
+	//
+	// The answer is discarded: one button, nothing to decide.
+	CAlert::ModalAlert(msg, kOKString, kNullString, kNullString, 1, CAlert::eWarningIcon);
 }
 
 } // anonymous namespace
@@ -1439,6 +1492,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// replace's bar below is sized in hits. Until the split, the opening moved no bar at all: it was
 	// the slow part of a run with nothing on screen to show for it.
 	bool cancelledWhileOpening = false;
+	// Set by the verify walk inside the pass - see it for what it asks and why it asks it there.
+	bool changedSinceSearch = false;
+	int32 changedChapterIdx = -1;
 	{
 	RangeProgressBar openBar(progressTitle, 0, static_cast<int32>(pending.size()), kTrue, kTrue);
 	openBar.DisableChildProgressBars(kTrue);
@@ -1545,17 +1601,43 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			chapter.wasModified = (chapterDB != nil) && (chapterDB->IsModified() != kFalse);
 		}
 
-		// ...and whether the chapter has moved on since the search walked it - the text, or a walk
-		// gate the scope switches watch. Read before this run writes anything, for the same reason
-		// as the flag above, and asked HERE rather than at the confirmation prompt because here is
-		// the only point where EVERY chapter can be asked: QueryChapterChange needs the document
-		// open, and this one has just been opened.
+		// ***** AND THE CHAPTER IS WALKED AGAIN, WRITING NOTHING, TO SEE WHETHER THE RESULTS STILL
+		// DESCRIBE IT. ***** Every ticked row carries the position the search found it at; this
+		// walk visits the same matches in the same order, so if one of them no longer BEGINS where
+		// it began, the document has moved under the results and the Nth-match join would hand a
+		// replacement to an occurrence the user never ticked. Whatever the cause - text edited, a
+		// story added or deleted, a layer hidden or locked, a condition switched - the effect is
+		// the same and it is the effect that is measured (2026-08-10, the user's design; it
+		// replaced KBSEditStamp, which tried to enumerate the causes instead).
+		//
+		// ***** HERE, and here is the only place it can be. ***** The chapter has just become a
+		// live document, and NOT ONE CHARACTER has been written by this run - the command sequence
+		// does not open until this pass is over. So a chapter found to have changed is stopped
+		// with nothing to roll back at all.
+		//
+		// The first chapter that has changed ends the pass: the run is all-or-nothing, so there is
+		// nothing to learn from opening the rest.
 		//
 		// docRef, not the UIDRef the search recorded: this one was resolved BY FILE just above,
 		// while the recorded one may name a database that has since been closed and its address
-		// reused (the resolve above is entirely about that). The stamp holds story UIDs and
-		// counters, which read the same in the reopened document (measured 2026-08-08).
-		chapter.changeSinceSearch = KBSEditStamp::QueryChapterChange(ci, docRef);
+		// reused (the resolve above is entirely about that).
+		{
+			int32 vMissing = 0, vLocked = 0, vRefused = 0;
+			bool vNotWalked = false, vWalkFailed = false, vChanged = false;
+			int32 vReported = 0;
+			ReplaceInChapter(ci, docRef, scopeOptions, vMissing, vLocked, vRefused,
+				vNotWalked, vWalkFailed, nil /*no bar of its own*/, 0, vReported,
+				true /*verifyOnly*/, &vChanged);
+			// A chapter that could not be WALKED is not a chapter that has changed - it is the
+			// case the run already reports by name (chaptersNotWalked), and the replace pass will
+			// meet it again and say so. Only a real mismatch stops the run.
+			if (vChanged)
+			{
+				changedSinceSearch = true;
+				changedChapterIdx = ci;
+				break;
+			}
+		}
 	}
 
 	// ASK ONCE MORE, now that the pass is over: the reading at the top only ever sees a cancel that
@@ -1572,28 +1654,22 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	if (cancelledWhileOpening)
 		return StopBeforeAnythingIsWritten(pending, totals, outSummary, false /*resultsAreStale*/);
 
-	// ***** AND THE CHAPTERS THAT HAVE BEEN EDITED SINCE THE SEARCH ARE PUT TO THE USER. *****
+	// ***** THE DOCUMENT MOVED UNDER THE RESULTS - SO THE RUN DOES NOT START. *****
 	//
-	// One at a time (user's decision, 2026-08-08), each naming its own chapter, and any one of them
-	// can stop the whole run - which is why they are asked HERE, after the pass that opens the
-	// chapters and before the sequence that writes to them. Every chapter has been opened by now, so
-	// this is the first moment at which the question can be asked about ALL of them rather than
-	// about whichever ones happened to be open.
+	// The verify walk in the pass above found a ticked hit that no longer begins where the search
+	// found it. It is NOT put to the user as a question: a work list that has come apart cannot be
+	// replaced safely whatever they answer, so the run is simply stopped and they are told (the
+	// user's decision, 2026-08-10 - it replaced a per-chapter "carry on / cancel?" prompt).
 	//
-	// Not inside the pass above: the bar is modal and so is the alert, and the two must not stand at
-	// once. The pass has just taken its bar down.
-	for (size_t pi = 0; pi < pending.size(); ++pi)
+	// Said here rather than inside the pass because the opening bar is modal and so is the alert,
+	// and the two must not stand at once. The pass has just taken its bar down.
+	//
+	// kTrue: the rows go with the run. They describe text that is not there any more, and the
+	// status line says so and asks for another search (see StopBeforeAnythingIsWritten).
+	if (changedSinceSearch)
 	{
-		// A chapter that could not be opened is not asked about. Nothing will be written to it -
-		// it is skipped below and named in the summary - so a warning about its text would be a
-		// question with no consequence attached to either answer.
-		if (!pending[pi].opened || pending[pi].changeSinceSearch == KBSEditStamp::kUnchanged)
-			continue;
-
-		// kTrue: THIS cancel is the stale one. The user has just been told that this chapter has
-		// changed since the search and has chosen to stop, so the rows go with the run.
-		if (!AskEditedChapter(pending[pi].chapterIdx, pending[pi].changeSinceSearch))
-			return StopBeforeAnythingIsWritten(pending, totals, outSummary, true /*resultsAreStale*/);
+		TellResultsWentStale(changedChapterIdx);
+		return StopBeforeAnythingIsWritten(pending, totals, outSummary, true /*resultsAreStale*/);
 	}
 
 	// ***** THE REPLACE'S OWN BAR. ***** A second object, not the one the pass above used - see the

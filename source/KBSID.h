@@ -417,39 +417,31 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
 #define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
 #define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
-// ***** THE EDITED-CHAPTER WARNING - AND IT IS NOT PART OF THIS PROMPT ANY MORE. ***** Since
-// 2026-08-05 a replace does NOT check that the match it is about to rewrite is still the one the row
-// was found at: the chapter is walked again and the Nth match takes the Nth checked row's
-// replacement. Edit the text between searching and replacing and that numbering points somewhere
-// else.
+// ***** NOT PART OF THE CONFIRMATION PROMPT - the replace's own alert, shown INSTEAD of running.
 //
-// A standing conditional disclaimer said so on every prompt until 2026-08-08 - "IF the text has been
-// edited" - because nothing knew whether it had been. KBSEditStamp knows, so these state a FACT and
-// appear only when there is one.
+// A replace walks the chapter again and gives the Nth match the Nth ticked row's replacement, so
+// the numbering only means what the rows say while the matches are where the search left them.
+// Since 2026-08-10 the run makes sure of that before it writes anything (the verify walk in
+// KBSReplaceEngine's resolve pass) and stops if they are not.
 //
-// ***** WHERE THEY ARE SAID CHANGED THE SAME DAY (user's decision). ***** They were a line ON this
-// prompt for one afternoon, and that line could only ask about the chapters that happened to be OPEN
-// when it was drawn: the counters need the document open, and a book search closes every chapter as
-// it finishes with it. So the question moved to the one point where every chapter can be asked - the
-// moment the replace itself opens each one - and is now a modal alert per chapter, with Cancel
-// stopping the whole run (KBSReplaceEngine::AskEditedChapter). The prompt says nothing about it.
+// The wording history, because it explains why the strings look the way they do: a standing
+// conditional disclaimer ("IF the text has been edited") sat on every confirmation prompt until
+// 2026-08-08, when a per-chapter fingerprint made it a statement of fact; that became a
+// per-chapter "carry on / cancel?" alert; and on 2026-08-10 it became this - no question at all,
+// because a work list that has come apart cannot be replaced safely whatever anyone answers.
 //
-// Openings that name what was edited, plus two lines that are the same whichever it was: what it can
-// cost, and what Cancel does.
-//   - ...Many is UNUSED since the move: the alert names ONE chapter because it is asked once per
-//     chapter. Kept because the wording is right and the plural is what a summary would need.
+// Translated, for the reason the confirmation prompt is: it is about the user's own text. The
+// status line that reports the outcome stays English.
+// ***** The run STOPPED because the results no longer describe the document. ***** Not a question:
+// the verify walk found a ticked match that no longer begins where the search left it, and nothing
+// has been written (KBSReplaceEngine::TellResultsWentStale). One wording names the chapter, one
+// does not - a document-scope run has no chapter to name.
 //
-// Translated, and for the same reason the prompt is: this is where the user authorises a rewrite of
-// their own text. The status line that reports the outcome stays English.
-#define kKBSConfirmEditedDocKey		kKBSStringPrefix "kKBSConfirmEditedDocKey"
-#define kKBSConfirmEditedOneKey		kKBSStringPrefix "kKBSConfirmEditedOneKey"
-// ...and the same two, for the OTHER axis the stamp watches (KBSEditStamp::kScopeStateChanged):
-// nothing edited, but a layer or a lock changed while the scope switches exclude that state.
-#define kKBSConfirmGatesDocKey		kKBSStringPrefix "kKBSConfirmGatesDocKey"
-#define kKBSConfirmGatesOneKey		kKBSStringPrefix "kKBSConfirmGatesOneKey"
-#define kKBSConfirmEditedManyKey	kKBSStringPrefix "kKBSConfirmEditedManyKey"
-#define kKBSConfirmEditedTailKey	kKBSStringPrefix "kKBSConfirmEditedTailKey"
-#define kKBSConfirmEditedCancelAllKey	kKBSStringPrefix "kKBSConfirmEditedCancelAllKey"
+// (Five kKBSConfirmEdited*/kKBSConfirmGates* keys stood here until 2026-08-10. They belonged to a
+//  per-chapter "the text has been edited - carry on?" prompt, which the verify walk replaced.)
+#define kKBSStaleResultsDocKey		kKBSStringPrefix "kKBSStaleResultsDocKey"
+#define kKBSStaleResultsOneKey		kKBSStringPrefix "kKBSStaleResultsOneKey"
+#define kKBSStaleResultsTailKey		kKBSStringPrefix "kKBSStaleResultsTailKey"
 // The closing line: what the run LEAVES BEHIND.
 //
 // ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by

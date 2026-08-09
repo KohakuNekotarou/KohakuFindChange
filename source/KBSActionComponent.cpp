@@ -669,16 +669,17 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	msg.Append(kLineSeparatorString);
 	msg.Append(kLineSeparatorString);
 
-	// ***** WHAT THE RUN DOES NOT CHECK USED TO BE SAID HERE, AND IS NOW SAID WHERE IT CAN BE KNOWN.
-	// ***** Since 2026-08-05 a replace walks the chapter again and gives the Nth match the Nth
-	// checked row's replacement, without asking whether that match is still the one the row was found
-	// at. A standing disclaimer sat between the query and the closing lines saying so, and on
-	// 2026-08-08 it became a statement of fact for the chapters that were open (KBSEditStamp).
+	// ***** NOTHING HERE ABOUT THE DOCUMENT HAVING MOVED SINCE THE SEARCH - the run makes sure of
+	// ***** that itself. ***** A disclaimer sat between the query and the closing lines until
+	// 2026-08-08 ("if the text has been edited, a replacement can land somewhere you did not
+	// intend"), and this prompt was never the place for it: from here only the chapters that
+	// happen to be OPEN can be asked anything, and the case that matters most - a chapter opened,
+	// edited, saved and closed again - is exactly the one that cannot.
 	//
-	// It left this prompt the same day, on the user's decision: from here only the OPEN chapters can
-	// be asked, and the case that matters most - a chapter opened, edited, saved and closed again -
-	// is exactly the one that cannot. The replace asks each chapter as it opens it, and offers a
-	// Cancel that stops the whole run, which this prompt could not (KBSReplaceEngine).
+	// Since 2026-08-10 the replace walks every chapter before writing and checks that each ticked
+	// match still begins where the search left it, stopping the whole run if one has moved
+	// (KBSReplaceEngine). There is nothing left to warn about: the prompt asks about the
+	// replacement itself, and the run guarantees the rest (user's decision, 2026-08-10).
 
 	// What the run leaves behind. It used to name HOW MANY chapters, which is why a count was read
 	// here and carried into the prompt; the sentence states the case instead since 2026-08-07 (the

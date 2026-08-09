@@ -91,15 +91,11 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // They were a line on this prompt for one afternoon on 2026-08-08; KBSID.h says why
                 // they left it. ...Many has had no caller since (the alert names one chapter,
                 // because it asks once per chapter).
-                kKBSConfirmEditedDocKey,		"The text has been edited since the search.",
-                kKBSConfirmEditedOneKey,		"The text of ^1 has been edited since the search.",
-                // The other axis (KBSEditStamp::kScopeStateChanged): nothing edited, but a layer
-                // or a lock changed while the scope switches exclude that state.
-                kKBSConfirmGatesDocKey,			"A layer or a lock has changed since the search.",
-                kKBSConfirmGatesOneKey,			"A layer or a lock of ^1 has changed since the search.",
-                kKBSConfirmEditedManyKey,		"The text of ^1 chapters has been edited since the search.",
-                kKBSConfirmEditedTailKey,		"A replacement can land somewhere you did not intend.",
-                kKBSConfirmEditedCancelAllKey,	"Cancel stops the whole replace.",
+                // The run stopped before writing anything: the verify walk found a ticked match
+                // that no longer begins where the search left it.
+                kKBSStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
+                kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
+                kKBSStaleResultsTailKey,		"Please search again.",
                 // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
                 // box below", because a "save after replace" box underneath could make them false.
                 // That box is gone with its feature, so a run has only one outcome left to state.

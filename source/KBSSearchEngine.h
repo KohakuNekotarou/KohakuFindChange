@@ -325,16 +325,6 @@ namespace KBSSearchEngine
 	UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos);
 	bool IsFrameEditable(const UIDRef& storyRef, UID frameUID);
 
-	/** The two per-frame states that decide whether the WALK visits a frame's text at all when
-	    the matching scope switch is off - hidden (its layer's eye, or the item's own
-	    Object > Hide: the pair the Find/Change dialog reports as "Hidden Item"), and sitting on
-	    a locked layer. One call, both answers, forwarded to the same file-local tests every hit
-	    is built with, so KBSEditStamp's fingerprint and the rows describe a frame identically.
-	    @param db the document's database; @param frameUID a frame off the story's IFrameList.
-	    @param outHidden / @param outOnLockedLayer the two gates; false when unresolvable, on
-	           both sides alike (the stamp compares readings, so only agreement matters). */
-	void GetFrameWalkGates(IDataBase* db, UID frameUID, bool& outHidden, bool& outOnLockedLayer);
-
 	/** Is the text at this position OVERSET - composed, but placed in no frame?
 
 	    The official answer, and the reason this lives here rather than beside its one caller:

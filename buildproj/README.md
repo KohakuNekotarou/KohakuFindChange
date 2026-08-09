@@ -1,4 +1,4 @@
-# _buildproj — build files backup
+# buildproj — build files backup
 
 The real build files live in the InDesign SDK build tree at `build/win/prj/`, which is **outside
 this repository**. This folder keeps a copy of them so the project's build customizations are not
@@ -13,9 +13,11 @@ editing a build file there, copy it back here and commit.
 
 ## Restore into a clean SDK checkout
 1. Copy the four files above into `build/win/prj/`.
-2. Copy the plugin sources (this repo's `.cpp` / `.h` / `.fr` / `.rc`) into
-   `source/sdksamples/KBS/`. The source folder keeps the short name - it is not renamed along with
-   the project, and the `.vcxproj` and the ODFRC `-i` flag both point at `KBS`.
+2. Copy the plugin sources (this repo's `source/` folder - `.cpp` / `.h` / `.fr` / `.rc` / `.png`)
+   into `source/sdksamples/KBS/source/`. The SDK folder keeps the short name `KBS` - it is not
+   renamed along with the project, and the `.vcxproj` and the ODFRC `-i` flag both point at
+   `KBS\source` (the sources moved a level down on 2026-08-10; everything they include resolves
+   against their own folder, so they all have to stay together).
 3. Register the project in `build/win/prj/SDKSamples.sln`:
    - a `Project(...) = "KohakuFindChange", "KohakuFindChange.vcxproj", "{DD125A1E-99DD-4D59-B001-DEB4D37D34C5}"` / `EndProject` block, and
    - eight `{DD125A1E-99DD-4D59-B001-DEB4D37D34C5}.<Debug|Release>|<x64|x86>.<ActiveCfg|Build.0>` lines in `GlobalSection(ProjectConfigurationPlatforms)`.

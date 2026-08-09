@@ -84,22 +84,16 @@ namespace KBSJa
 	const char16_t kConfirmEmptyReplace[]    = u"（空欄：一致した箇所は削除されます）";
 	const char16_t kConfirmFindFormat[]      = u"検索形式";
 	const char16_t kConfirmChangeFormat[]    = u"置換形式";
-	// ***** NOT PART OF THIS PROMPT - they are the replace's own alert. ***** An opening that names
-	// what was edited, then what it can cost, then what Cancel does. Shown once per chapter, at the
-	// moment the replace opens that chapter and finds its counters have moved (KBSEditStamp), which
-	// is the only point where a chapter the user had CLOSED can be asked at all. They were a line on
-	// the confirmation prompt for one afternoon on 2026-08-08; see KBSID.h for why they left it.
-	// ...Many has no caller since that move: the alert names one chapter because it asks once per
-	// chapter.
-	const char16_t kConfirmEditedDoc[]       = u"検索後にテキストが編集されています。";
-	const char16_t kConfirmEditedOne[]       = u"検索後に「^1」のテキストが編集されています。";
-	// The other axis (KBSEditStamp::kScopeStateChanged): nothing edited, but a layer or a lock
-	// changed while the search's scope switches exclude that state.
-	const char16_t kConfirmGatesDoc[]        = u"検索後にレイヤーやロックの状態が変更されています。";
-	const char16_t kConfirmGatesOne[]        = u"検索後に「^1」のレイヤーやロックの状態が変更されています。";
-	const char16_t kConfirmEditedMany[]      = u"検索後に ^1 個の章のテキストが編集されています。";
-	const char16_t kConfirmEditedTail[]      = u"意図していない場所が置換される場合が有ります。";
-	const char16_t kConfirmEditedCancelAll[] = u"キャンセルすると、すべての置換を中止します。";
+	// ***** NOT PART OF THIS PROMPT - the replace's own alert, shown INSTEAD of running. *****
+	// The run stopped before writing anything: the verify walk found a ticked match that no longer
+	// begins where the search left it (KBSReplaceEngine::TellResultsWentStale). An opening that
+	// names the chapter where there is one to name, then what it means for the user.
+	// See KBSID.h for how this came to be a statement rather than a question.
+	const char16_t kStaleResultsDoc[]        = u"検索結果に変化を確認しましたので、置換を中止しました。";
+	const char16_t kStaleResultsOne[]        = u"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
+	// "Nothing was replaced" stood at the front of this line until 2026-08-10 (user's call): the
+	// sentence above already says the replace was stopped, so it only said the same thing twice.
+	const char16_t kStaleResultsTail[]       = u"検索し直してください。";
 	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
 	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
 	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";

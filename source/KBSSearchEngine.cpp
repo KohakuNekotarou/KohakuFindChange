@@ -107,7 +107,6 @@
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
-#include "KBSEditStamp.h"		// stamp each chapter while its document is open
 
 namespace
 {
@@ -2297,16 +2296,11 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
-void KBSSearchEngine::GetFrameWalkGates(IDataBase* db, UID frameUID,
-	bool& outHidden, bool& outOnLockedLayer)
-{
-	// The two file-local tests every hit is built with (IsFrameHidden folds the layer's eye and
-	// the item's own Object > Hide together; the pair is what the dialog reports as "Hidden
-	// Item"). Forwarded rather than re-spelled so the edit stamp and the rows describe a frame
-	// identically - two spellings of one question is how they come to disagree.
-	outHidden = IsFrameHidden(db, frameUID);
-	outOnLockedLayer = IsFrameOnLockedLayer(db, frameUID);
-}
+// (GetFrameWalkGates stood here for one day, 2026-08-09 to 2026-08-10: it forwarded IsFrameHidden
+//  and IsFrameOnLockedLayer so KBSEditStamp could fingerprint every frame's hidden / locked-layer
+//  state and notice a layer being switched between the search and the replace. The replace asks a
+//  question that covers that one and every other cause besides - does each ticked hit still BEGIN
+//  where the search left it - so the fingerprint, and this accessor with it, are gone.)
 
 // NOT EditableFrameForMatch: that one climbs out to the frame carrying the "+" when a position is
 // overset, which is exactly the case this has to answer TRUE for. The raw walk is the answer here.
@@ -2769,18 +2763,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// and nothing being left behind - from a chapter that is genuinely still standing. Without
 		// it, that ordinary close was counted as "left open with no window" about a chapter that is
 		// not open at all (the scans counted exactly that until 2026-08-08).
-		// ***** READ THE COUNTERS WHILE THE CHAPTER IS STILL OPEN. ***** The release below closes
-		// it, and the comment above says what holds from that point on: everything read afterwards
-		// is plain values, not database work. Asking a story for its change counter IS database
-		// work, so it happens here. (It was placed after the append until 2026-08-08 and crashed
-		// InDesign on every book search - the UIDRef's database was already gone.)
-		//
-		// The index this chapter will occupy is not known yet: a chapter with no hits never reaches
-		// the model. So the reading is held and filed after the append, by CommitPending.
-		// The scope switches ride along: an OFF switch makes its state part of the walk's
-		// universe, and the stamp watches exactly those states (KBSEditStamp.h).
-		KBSEditStamp::CapturePending(chapterDocRef, scopeOptions);
-
+		// (A KBSEditStamp::CapturePending stood here from 2026-08-08 to 2026-08-10, reading every
+		//  story's change counter before the release below closed the chapter. The replace no
+		//  longer asks whether a chapter LOOKS the same - it walks it again and checks that each
+		//  ticked hit still begins where this search left it, which is the same question answered
+		//  by the thing it is actually about. Nothing needs recording here now.)
 		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
 		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
 			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
@@ -2847,16 +2834,6 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// the handover - and it is the point of the swap() four lines up, which used to be undone by
 		// a copy on this line (2026-08-08).
 		KBSResultModel::AppendChapter(std::move(chapter));
-
-		// Stamp the chapter NOW, while its document is certainly open. The replace may run long
-		// afterwards, with the chapter closed and reopened in between - which is exactly the case
-		// the stamp is built to survive, but only if it was taken while there was something to read.
-		//
-		// The document comes from targets[] rather than the Chapter: the move above has just
-		// emptied that one. The index is the position the append filled, which is the last.
-		// File the reading taken further up - while the chapter was still open - under the index
-		// the append has just filled, which is the last.
-		KBSEditStamp::CommitPending(KBSResultModel::GetChapterCount() - 1);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each

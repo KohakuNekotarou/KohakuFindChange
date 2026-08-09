@@ -220,7 +220,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSEditStamp.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListWidgetMgr.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.cpp"/>
@@ -270,7 +269,6 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSEditStamp.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultTree.h"/>

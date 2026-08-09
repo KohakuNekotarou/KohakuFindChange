@@ -54,31 +54,37 @@ namespace KBSReplaceEngine
 	    A machine that cannot hold a whole book open is served by ticking fewer rows instead
 	    (user's decision, 2026-08-05).
 
-	    ***** THE RUN DOES NOT CHECK THAT THE TEXT IS STILL THE TEXT THE SEARCH FOUND. IT ASKS THE
-	    ***** USER INSTEAD. (User's decision, 2026-08-05; the asking, 2026-08-08.)
+	    ***** THE RUN CHECKS THAT THE MATCHES ARE STILL WHERE THE SEARCH FOUND THEM, AND REFUSES TO
+	    ***** START IF THEY ARE NOT. (User's design, 2026-08-10.)
 	    The chapter is walked again with the same query and the Nth match is replaced for the Nth
-	    checked row - so if the document has been edited since the search in a way that adds or
-	    removes a match, a replacement lands somewhere the user never ticked. Nothing in the walk can
-	    see that: the count still comes out right, and every checked row still finds a match.
+	    checked row - so if the document has moved since the search in a way that adds, removes or
+	    shifts a match, a replacement would land somewhere the user never ticked. The count alone
+	    cannot see that: it still comes out right, and every checked row still finds a match.
 
-	    What CAN see it is KBSEditStamp - every story's change counter, recorded as the search
-	    finished with the chapter and compared as this run opens it again. A chapter that no longer
-	    reads the same raises a modal alert naming it, and Cancel there stops the WHOLE run before a
-	    character is written (AskEditedChapter and the resolve pass, in the .cpp). Keeping the
-	    document steady between the two is still the user's responsibility; they are now told when
-	    they have not.
+	    So each chapter is walked TWICE. The first walk writes nothing: at every ticked walk order it
+	    asks whether the match still BEGINS in the same story at the same index, which is what the
+	    row recorded when the search found it. One mismatch - or one ticked row the walk never
+	    reaches - and the whole run stops, with an alert saying so and the results cleared
+	    (TellResultsWentStale, and the verify pass in the resolve loop). Only if every chapter passes
+	    does the second walk open a command sequence and write.
 
-	    ***** ASKED AS EACH CHAPTER IS OPENED, AND NOWHERE ELSE. ***** It was a line on the
-	    confirmation prompt for one afternoon on 2026-08-08, and from there it could only reach the
-	    chapters that happened to be OPEN: the counters live in the document, and a book search
-	    closes every chapter as it finishes with it. A chapter the user opened, edited, SAVED and
-	    closed again was passed over in silence - which is the case the whole thing is for. This run
-	    opens every chapter it has work in, so this is the one place where all of them can be asked.
+	    ***** IN THE RESOLVE PASS, AND NOWHERE ELSE. ***** That is the one moment where the question
+	    is both answerable and free: the chapter has just been reopened, and NOT ONE CHARACTER has
+	    been written yet - so the positions are still the ones the search recorded (no replacements
+	    of this run's own to cancel out) and a refusal has nothing to roll back.
 
-	    A same-occurrence test used to stand in that gap, refusing any row whose story, position or
-	    text no longer lined up. See the note above the walk in KBSReplaceEngine.cpp for what it
-	    did, what it cost, and what remains of it (the JUMP still asks it, so a click on a row can
-	    still answer "the replacement is no longer here").
+	    ***** WHY POSITIONS RATHER THAN A FINGERPRINT OF THE CHAPTER. ***** From 2026-08-08 to
+	    2026-08-10 this was a per-chapter record of every story's change counter (KBSEditStamp),
+	    warning rather than refusing. It answered "does this chapter look untouched?", which means
+	    enumerating every way a document can move - text, stories added or deleted, layers hidden or
+	    locked, conditions, master pages - and that list is never finished. Comparing the positions
+	    asks about the thing itself: whatever the cause, if a ticked match is not where it was, the
+	    walk order no longer means what the rows say it means.
+
+	    The same test used to stand INSIDE the replacing walk, per hit, until 2026-08-05. See the
+	    note above the walk in KBSReplaceEngine.cpp for why it could not work there and what remains
+	    of it (the JUMP still asks it, so a click on a row can still answer "the replacement is no
+	    longer here").
 
 	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
 	    allowed to make the total quietly come up short. Three ways that happens:
@@ -136,21 +142,19 @@ namespace KBSReplaceEngine
 	    IFindChangeOptions - so a query edited between the search and the replace makes the Nth match a
 	    different occurrence entirely.
 
-	    ***** SINCE 2026-08-05 THIS IS THE ONLY DOOR IN FRONT OF THE RUN. ***** It used to be the
-	    lesser of two: a per-hit same-occurrence test compared every row against the text before
-	    writing it, and this question existed only so the user was told WHY, instead of watching a
-	    whole run come back "missing". That test was removed on the user's decision (see
-	    ReplaceChecked above), so what is left divides like this:
+	    ***** ONE OF TWO DOORS, and they divide the ways a run can be wrong between them. *****
 
-	      - the QUERY changing between the search and the replace is caught, here, and the run is
-	        refused before a character is written;
-	      - the DOCUMENT being edited between the two is not REFUSED, but since 2026-08-08 it is
-	        DETECTED: the confirmation names the chapters that changed (KBSEditStamp). The run still
-	        goes ahead if the user approves it - holding the document steady stays theirs to do.
+	      - the QUERY changing between the search and the replace is caught HERE, before a chapter
+	        is even opened, and the run is refused;
+	      - the DOCUMENT moving between the two is caught by the verify walk in the resolve pass
+	        (see ReplaceChecked above), which is the only place the document itself can be asked.
 
-	    The difference is that this one can be asked from outside: the dialog's own settings are
-	    readable, and BuildWalkSignature turns them into something comparable. Whether the user
-	    retyped a paragraph is not.
+	    Both refuse before a character is written. This one is first because it is far cheaper - the
+	    dialog's own settings are readable and BuildWalkSignature turns them into something
+	    comparable, where the other has to walk every chapter.
+
+	    From 2026-08-05 to 2026-08-10 this was the ONLY door: the document side was first left
+	    entirely to the user, then merely detected and warned about (KBSEditStamp).
 
 	    ***** TWO SIDE EFFECTS, both deliberate. ***** It STATES the tab (KBSSearchEngine::
 	    CommitSearchMode - the walk needs that whatever the answer is, and the comparison has to be
