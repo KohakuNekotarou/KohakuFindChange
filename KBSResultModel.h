@@ -530,6 +530,17 @@ namespace KBSResultModel
 	    2026-07-30 with no callers left - every asker wants the other two flags in the same breath.) */
 	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked);
 
+	/** The two flags that say the match IS in the document but is out of the user's reach there:
+	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no
+	    way to change it) and HIDDEN (a switched-off layer - the text is composed and can be jumped
+	    to, but draws nothing). false = index out of range.
+
+	    Separate from GetHitFlags, which answers "what does this row's check box do?". These two
+	    answer "can the user work on this match where it is?" - the question the double-click asks
+	    before it selects (KBSJump::SelectHitText). isLocked appears in both because it is a fact
+	    that bears on both questions; the DECISIONS made from it stay one per place. */
+	bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden);
+
 	/** Select / deselect EVERY hit in every chapter - Check All / Uncheck All over the tree's BOOK
 	    row. Applies to all stored hits, including those past the panel's display cap - the display cap
 	    must not silently shrink what a replace touches. Replaced and locked hits are skipped. */

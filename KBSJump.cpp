@@ -34,7 +34,12 @@
 #include "IOpenLayoutCmdData.h"		// SetPerspective_ - the inherited zoom rides the open command
 #include "IPageList.h"
 #include "IPanorama.h"
+#include "ISelectionManager.h"		// DeselectAll / SelectionExists - clearing before selecting
+#include "ISelectionUtils.h"		// GetActiveSelection - the front document's selection manager
 #include "ITextModel.h"
+#include "ITextSelectionSuite.h"	// SetTextSelection - the double-click's whole point
+#include "ITool.h"					// IsTextTool - is a text tool already active?
+#include "IToolBoxUtils.h"			// QueryActiveTool / QueryTool / SetActiveTool
 #include "IWaxStrand.h"
 #include "IWaxIterator.h"
 #include "IWaxLine.h"
@@ -43,6 +48,8 @@
 #include "ISession.h"
 
 // General includes:
+#include "RangeData.h"				// the range handed to SetTextSelection
+#include "TextEditorID.h"			// kIBeamToolBoss - the Type tool the double-click switches to
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
 #include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
@@ -735,6 +742,164 @@ void KBSJump::ShowBook()
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
 	}
+}
+
+bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
+{
+	UIDRef docRef;
+	IDFile file;
+	UID storyUID = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
+		return false;
+
+	// ***** OUT OF THE USER'S REACH: move there and mark it, but do not select. *****
+	// (user's call, 2026-08-09.) A LOCKED match is on a locked layer or in a locked story - InDesign
+	// can search locked content but offers no way to change it, so a selection would be an offer it
+	// cannot keep. A HIDDEN match is on a switched-off layer: it is composed and can be jumped to,
+	// but it draws nothing, so a selection over it would be invisible.
+	//
+	// Asked FIRST because it costs nothing - no database, no composition - and because there is no
+	// point doing any of that work for a row that is going to be refused.
+	//
+	// ***** THE MARKER STAYS UP. ***** It is taken down only when a selection replaces it (see the
+	// foot of this function). Here nothing replaces it, so it remains what it always was: the answer
+	// to "where is it?" - which is the whole of what a double click on these rows can give.
+	bool hitLocked = false, hitHidden = false;
+	KBSResultModel::GetHitReach(chapterIdx, hitIdx, hitLocked, hitHidden);
+	if (hitLocked || hitHidden)
+	{
+		PMString message(hitLocked
+			? "That match is locked - it cannot be selected."
+			: "That match is on a hidden layer - it cannot be selected.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return false;
+	}
+
+	// The jump that ran a moment ago already brought this chapter back if it had been closed, and
+	// already fronted its window. Asked again anyway: this is a public function, and a caller that
+	// reached it another way must not select into a database that is not there.
+	if (!EnsureChapterReachable(chapterIdx, docRef, file))
+		return false;
+
+	IDataBase* db = docRef.GetDataBase();
+	if (db == nil)
+		return false;
+	const UIDRef storyRef(db, storyUID);
+
+	// Same guard the jump puts round everything it does: making a selection recomposes and can dirty
+	// a document that this plug-in only opened to look at. IDataBase.h:389-412 - it restores the flag
+	// the document came in with rather than forcing it clean.
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+
+	// ***** OVERSET: move there, but do not select. ***** (Same rule as locked and hidden above -
+	// user's call, 2026-08-09.) There is no on-page text to highlight, and the row's match segment
+	// holds the scan's own words ("Frame (370)") rather than story text, so there is not even a
+	// range that means what the row says. The jump has the same split and scrolls to the "+"
+	// indicator instead.
+	//
+	// The marker is left exactly as the jump left it - which for an overset row means there is none
+	// (JumpToHit clears it: those pixels belong to the "+" indicator, not to the text). Nothing is
+	// done about it here either way; this function only takes the marker down when a SELECTION
+	// replaces it.
+	if (KBSSearchEngine::IsPositionOverset(storyRef, start))
+	{
+		PMString message("An overset match has no text on the page to select.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return false;
+	}
+
+	// STALE: the same hash test the jump makes. There the answer only changes what the panel SAYS -
+	// the view still moves, which is useful, because it shows where the hit used to be. Here it
+	// changes what the user GETS: a selection over text they never searched for, ready to be typed
+	// over. So this one refuses. The jump has already put its own message up in this case; this adds
+	// nothing and would only overwrite it.
+	UID expectStory = kInvalidUID;
+	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
+	uint64 expectHash = 0;
+	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
+		expectHash);
+	if (KBSResultModel::MatchTextIsLiveText()
+		&& !KBSSearchEngine::MatchIsSameOccurrence(storyRef, start, end, storyUID, start, end,
+			expectHash))
+	{
+		return false;
+	}
+
+	// From here the shape is the official one: gotolasttextedit's GTTxtEdtUtils::ActivateStory
+	// (:99-140) = clear the selection, make sure a text tool is active, then SetTextSelection.
+
+	// A range past the end of the story cannot be selected. The story is the live one and the range
+	// is the recorded one; the hash test above says the TEXT still matches, which makes this a
+	// belt-and-braces clamp rather than a live case - but the official recipe clamps too, and a bad
+	// RangeData is an assert rather than a refusal.
+	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
+	if (textModel == nil)
+		return false;
+	const TextIndex total = textModel->TotalLength();
+	if (start >= total)
+		return false;
+	if (end > total)
+		end = total;
+	if (end <= start)
+		return false;
+
+	ISelectionManager* selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
+	if (selectionManager == nil)
+		return false;
+
+	// ***** The Type tool, because this is an invitation to EDIT. ***** A text selection made while
+	// the Selection tool is active is not somewhere the user can start typing, which is the whole
+	// point of the double-click. The official recipe does exactly this and in this order (tool
+	// first, selection second). ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is
+	// written down in How to Use for that reason.
+	InterfacePtr<ITool> activeTool(Utils<IToolBoxUtils>()->QueryActiveTool());
+	if (activeTool == nil || !activeTool->IsTextTool())
+	{
+		InterfacePtr<ITool> iBeamTool(Utils<IToolBoxUtils>()->QueryTool(kIBeamToolBoss));
+		if (iBeamTool == nil)
+			return false;
+		if (!Utils<IToolBoxUtils>()->SetActiveTool(iBeamTool))
+			return false;
+	}
+
+	// Clear whatever was selected first (the sample and typekitinspector both do; a page-item
+	// selection left standing is a second selection in a different CSB).
+	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
+		selectionManager->DeselectAll(nil);
+
+	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
+	if (textSelectionSuite == nil)
+		return false;
+
+	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong
+	//   selects from the match to a point measured from the start of the STORY.
+	//
+	// kDontScrollSelection: the jump has already centred the match with
+	// IPanorama::ScrollContentLocationToFrameCenter, which puts it in the middle of the window.
+	// kScrollIntoView would only guarantee it is somewhere on screen, and asking for it here would
+	// undo the better answer that has just been given.
+	if (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end),
+			Selection::kDontScrollSelection, nil) == kFalse)
+	{
+		return false;
+	}
+
+	// ***** TAKE THE JUMP'S MARKER BACK DOWN. ***** (user's call, 2026-08-09)
+	//
+	// The first click of this double click raised the marker, which INVERTS the pixels under the
+	// match (KBSDrawEventHandler.h:7) - a pointer saying "it is here". The selection now says the
+	// same thing, better: it names the exact range rather than a rectangle, and it is what the user
+	// is about to type over. Leaving both up puts an inversion on top of a highlight, so the text
+	// the user came here to read is the one thing on screen that cannot be read.
+	//
+	// Only on SUCCESS. Every refusal above returns before this, and there the marker is the only
+	// feedback the click produced - taking it down as well would leave a double click that appears
+	// to do nothing.
+	KBSDrawEventHandler::ClearMarker();
+	return true;
 }
 
 void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)

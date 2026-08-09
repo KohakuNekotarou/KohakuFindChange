@@ -22,6 +22,12 @@
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
+//  DOUBLE-click on a hit row (2026-08-09) adds the other half: after the jump has pointed at the
+//  match, it SELECTS it - Type tool, match highlighted - so the user can edit or copy without
+//  hunting for it with the mouse. Single click still only points; that was and remains the design
+//  (KBSJump.h). Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
+//  note explains why it cannot simply be done inside ButtonDblClk.
+//
 //  The row's "replace me" check box is a real widget of its own (kKBSResultCheckWidgetBoss) that
 //  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
 //  KBSResultCheckObserver.
@@ -54,20 +60,78 @@
 #include "KBSJump.h"
 #include "KBSResultModel.h"		// SetContextMenuChapter - which row the menu is about to act on
 
+namespace
+{
+
+// ***** THE DOUBLE-CLICK'S ONE BIT OF STATE, AND WHY IT IS NEEDED. *****
+//
+// A double click arrives as FOUR events, in this order:
+//
+//     LButtonDn   LButtonUp   ButtonDblClk   LButtonUp
+//
+// - so the FIRST up has already jumped by the time the double click is announced, and a SECOND up
+// comes after it. Doing the selecting inside ButtonDblClk therefore does not work: the trailing up
+// would run the jump a second time and take the keyboard focus back to the tree, undoing it.
+//
+// So ButtonDblClk only RAISES A FLAG, and the trailing up reads it and selects instead of jumping.
+//
+// ! The flag is cleared in LButtonDn, which is what makes it safe. Every click begins with a down,
+//   so a flag that was set but never consumed (if a trailing up ever failed to arrive) cannot
+//   survive into the next click and turn an ordinary single click into a selection.
+//
+// A file static, not a member: the rows' widgets are recycled as the tree scrolls, and this belongs
+// to "the click going on right now" rather than to any one row. One click happens at a time.
+bool gSelectOnNextButtonUp = false;
+
+}
+
 class KBSResultNodeEH : public TreeNodeEventHandler
 {
 public:
 	KBSResultNodeEH(IPMUnknown* boss) : TreeNodeEventHandler(boss) {}
 	virtual ~KBSResultNodeEH() {}
 
+	virtual bool16 LButtonDn(IEvent* e);
 	virtual bool16 LButtonUp(IEvent* e);
+	virtual bool16 ButtonDblClk(IEvent* e);
 	virtual bool16 RButtonDn(IEvent* e);
 };
 
 CREATE_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 
+// Nothing of this plug-in's own happens on the way DOWN (see the note at the head of this file for
+// why the jump rides the button coming up). The one job here is to start every click with the
+// double-click flag down.
+bool16 KBSResultNodeEH::LButtonDn(IEvent* e)
+{
+	gSelectOnNextButtonUp = false;
+	return TreeNodeEventHandler::LButtonDn(e);
+}
+
+// The second click of a double click. Only a HIT row has anything extra to offer: a chapter or book
+// row's double click is the tree's own expand / collapse, which the base handler does.
+bool16 KBSResultNodeEH::ButtonDblClk(IEvent* e)
+{
+	const bool16 result = TreeNodeEventHandler::ButtonDblClk(e);
+	if (result || e->ShiftKeyDown() || e->CmdKeyDown())
+		return result;
+
+	InterfacePtr<ITreeNodeIDData> nodeData(this, UseDefaultIID());
+	if (nodeData == nil)
+		return result;
+	TreeNodePtr<KBSResultNodeID> nodeID(nodeData->Get());
+	if (nodeID != nil && nodeID->IsHitRow())
+		gSelectOnNextButtonUp = true;
+
+	return result;
+}
+
 bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 {
+	// Consumed here, on the way in, so that every path out of this function leaves it down.
+	const bool selectRatherThanJump = gSelectOnNextButtonUp;
+	gSelectOnNextButtonUp = false;
+
 	// Let the stock handler finish the click (selection, expand / collapse, the end of a drag).
 	const bool16 result = TreeNodeEventHandler::LButtonUp(e);
 	if (result || e->ShiftKeyDown() || e->CmdKeyDown())
@@ -91,7 +155,38 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	if (treeController == nil || !treeController->IsSelected(node))
 		return result;
 
-	KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
+	// ***** The second click of a double click SELECTS instead of jumping again. *****
+	// The first click already did the jump (fronted the document, centred the match, raised the
+	// marker), so repeating it would only re-do all of that. What is added is putting the user IN
+	// the match - Type tool, match highlighted.
+	if (selectRatherThanJump)
+	{
+		if (KBSJump::SelectHitText(nodeID->GetChapter(), nodeID->GetHit()))
+		{
+			// ***** AND GIVE THE KEYBOARD BACK. ***** The FIRST click of this double click ended in
+			// the AcquireKeyFocus at the foot of this function, so the TREE is holding the keyboard
+			// at this moment. Left that way, the caret would sit in the text while the arrow keys
+			// walked the panel and typing went nowhere - which is the one thing a user who asked
+			// for this wants to do. Relinquishing hands the keyboard back to whatever InDesign
+			// would otherwise give it to, which is the document window the jump just fronted.
+			//
+			// This is the deliberate difference between the two clicks: a single click LEAVES the
+			// keyboard on the tree so the arrows keep walking the results, and a double click gives
+			// it up because it is a request to stop reading and start editing.
+			InterfacePtr<IEventHandler> treeEH(treeController, UseDefaultIID());
+			InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+			InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+			if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() == treeEH)
+				keyBoard->RelinquishKeyFocus();
+			return result;
+		}
+		// It refused (overset, or the text has moved) and has said why. Fall through: the first
+		// click's jump already happened, and the arrows below still want the tree.
+	}
+	else
+	{
+		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
+	}
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
 	// (KBSResultTreeEH). Two things happen in this one call, and BOTH are needed:

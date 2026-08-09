@@ -941,6 +941,20 @@ bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecke
 	return true;
 }
 
+bool KBSResultModel::GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden)
+{
+	outLocked = false;
+	outHidden = false;
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	outLocked = c.hits[hitIdx].isLocked;
+	outHidden = c.hits[hitIdx].isHidden;
+	return true;
+}
+
 void KBSResultModel::SetAllChecked(bool checked)
 {
 	// Nothing on a list that offers no work is selectable. A short cut, not a second opinion: the
