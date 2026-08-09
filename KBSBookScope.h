@@ -66,14 +66,26 @@ namespace KBSBookScope
 	    opened, listed or held. */
 	bool HasActiveBook();
 
-	/** Is there anything for the CURRENT scope to run on - the active book while Book Scope is ON,
-	    a front document while it is OFF? Asked by the menu's enablement (KBSActionComponent's
-	    UpdateActionStates) so the three commands that start a run go grey when there is nothing to
-	    run them against, rather than starting and reporting "No open document to search."
+	/** Is there a book for a book-scope run to TARGET - the book panel's book (what
+	    ListBookChapters will actually search), or failing that the active book (its fallback)?
 
-	    It asks exactly what the engines ask when they resolve their own scope - HasActiveBook() and
+	    The one answer to "would a book run have a book", asked by the menu gate (HasScopeTarget)
+	    and by all three engines' front doors. Until 2026-08-09 those four asked HasActiveBook alone
+	    while the run resolved the PANEL's book - the same question answered two ways, so a book on
+	    show in the panel with no active book behind it was turned away at every door the run has,
+	    even though the run itself could have searched it. */
+	bool HasTargetBook();
+
+	/** Is there anything for the CURRENT scope to run on - a targetable book while Book Scope is
+	    ON (HasTargetBook), a front document while it is OFF? Asked by the menu's enablement
+	    (KBSActionComponent's UpdateActionStates) so the three commands that start a run go grey
+	    when there is nothing to run them against, rather than starting and reporting "No open
+	    document to search."
+
+	    It asks exactly what the engines ask when they resolve their own scope - HasTargetBook() and
 	    ILayoutUIUtils::GetFrontDocument() - so the grey state and the run cannot disagree. Cheap
-	    enough for a menu hook: neither call opens, lists or holds anything.
+	    enough for a menu hook: nothing here opens, lists or holds anything (the panel-book half
+	    reads a palette's file field and one IBookManager lookup).
 
 	    NOT a substitute for the engines' own checks. This answers for the menu; a script reaching
 	    an action directly still meets the engine's guard. */

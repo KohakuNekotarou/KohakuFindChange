@@ -1127,8 +1127,12 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	if (scanner == nil)
 		return;
 
-	// The leading context comes from the paragraph the match STARTS in; excludeEOS (default) trims
-	// the paragraph terminator.
+	// The leading context comes from the paragraph the match STARTS in. NOTE what excludeEOS does
+	// and does not do (IComposeScanner.h:88-94): it decides whether the STORY END counts when a
+	// paragraph ends at the end of the story with no CR - it does NOT trim a paragraph's own CR.
+	// A CR-terminated paragraph's length includes its CR, so the trailing segment below carries it
+	// and the row draws a pilcrow at the line's end. Deliberately left that way: the search and the
+	// replace's row rebuild both come through here, so the two can never disagree about it.
 	int32 paraLen = 0;
 	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
 	if (paraStart < 0 || paraLen <= 0)
@@ -1229,7 +1233,9 @@ uint64 HashRangeWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex
 // segment stopped at the cap, and the hash is the one that must cover every character.
 //
 // A story with no text model leaves the hit as it came: three empty segments and a hash of 0,
-// which is what every caller already reads as "this position could not be read".
+// which is what every caller already reads as "this position could not be read". A ZERO-WIDTH
+// match (start == end) also stores 0 - MatchIsSameOccurrence accepts those on the length arm
+// without ever consulting the hash, so the two meanings of 0 never collide (2026-08-09).
 void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResultModel::Hit& outHit)
 {
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
@@ -1246,7 +1252,9 @@ void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResu
 }
 
 // Fill a hit from one match (story, [start, end)): its jump anchors, and the containing
-// paragraph's text split into (before / matched / after) at the exact UTF-16 offsets.
+// paragraph's text split into (before / matched / after). The offsets are CODE POINTS, not UTF-16
+// units - see the note at the head of this file, which retracted the UTF-16 wording this comment
+// used to carry.
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	FrameFactsCache& frameFacts, KBSResultModel::Hit& outHit)
 {
@@ -2329,6 +2337,15 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 	if ((end - start) != (expectEnd - expectStart))
 		return false;
 
+	// ***** A ZERO-WIDTH MATCH HAS NO TEXT TO COMPARE. ***** GREP's ^ / $ / lookarounds match at a
+	// position, not over characters, and the walker hands those through as start == end (measured
+	// 2026-08-09: ^ returns one hit per paragraph). Their stored hash is 0 - the same number
+	// HashRangeWithScanner answers for "could not read" - so without this step the test below
+	// called every one of them missing forever, on a document nobody had touched. The story, start
+	// and length arms have all agreed by now, and an empty range has nothing left to disagree about.
+	if (start == end)
+		return true;
+
 	// ***** THE TEXT, WHOLE. ***** Not the drawn 500 characters (see GetHitMatchIdentity): the
 	// stored hash covers the entire match, so a rewrite anywhere inside it is caught however long
 	// it is. A stored 0 means the search could not read that match - nothing to compare against,
@@ -2455,7 +2472,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// The same two questions KBSBookScope::HasScopeTarget asks for the menu's grey state; asked
 	// separately here because each one has its own sentence to say.
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
-	if (fromBook && !KBSBookScope::HasActiveBook())
+	if (fromBook && !KBSBookScope::HasTargetBook())
 	{
 		outSummary.Append("Book Scope is on, but no book is open.");
 		return 0;
@@ -2931,6 +2948,13 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	AppendSearchErrorNote(outSummary, brokeOff);
 	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
+
+	// Recorded for the saved report's "Summary:" heading, and BEFORE the right-click offer below:
+	// the offer is screen furniture, not a statement about the results, and a report has no rows to
+	// right-click. Everything above it - counts, caps, skipped and unclosed chapters - is what a
+	// heading should carry. (The report read the panel's status line until 2026-08-09, and a tick
+	// between the search and the save made the heading say "P1(2)  checked".)
+	KBSResultModel::NoteRunSummary(outSummary);
 
 	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - they moved
 	// off the panel flyout on 2026-08-01, because a flyout has no row to ask about and those two have

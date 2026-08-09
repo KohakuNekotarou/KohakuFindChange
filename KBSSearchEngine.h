@@ -358,7 +358,11 @@ namespace KBSSearchEngine
 	    is the one direction this plug-in must not fail in.
 
 	    @return the hash, or 0 when the text could not be read at all. 0 is treated as "cannot
-	            vouch for this" by MatchIsSameOccurrence - it never compares equal. */
+	            vouch for this" by MatchIsSameOccurrence - it never compares equal. A ZERO-WIDTH
+	            range also answers 0, but never reaches that test: MatchIsSameOccurrence accepts an
+	            empty range on its length arm alone, since there is no text left to disagree about
+	            (GREP's ^ / $ / lookarounds hand through start == end; found the hard way
+	            2026-08-09, when every ^ hit read as missing on an untouched document). */
 	uint64 HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end);
 
 	/** The line around [start, end), in the three segments a hit row paints: the text before the

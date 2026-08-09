@@ -108,7 +108,9 @@ namespace KBSResultModel
 		// The WHOLE match, as one number - what the same-occurrence test compares against.
 		// matchText below is capped at 500 characters for drawing, so it cannot answer "is this
 		// still the same text" for a long GREP match; this can. 0 = never computed, or the text
-		// could not be read, and it never compares equal (see MatchIsSameOccurrence).
+		// could not be read, and it never compares equal (see MatchIsSameOccurrence). A zero-width
+		// match (GREP ^ / $ / lookarounds) also stores 0, and is accepted on its length arm
+		// instead - an empty range has no text for the hash to vouch for.
 		uint64		matchHash;
 
 		// --- replace support ---
@@ -327,6 +329,22 @@ namespace KBSResultModel
 	    until 2026-08-08 with no callers at all. */
 	void SetQueryText(const PMString& query);
 
+	/** The sentence the run that produced these results reported - what DoAction shows on the
+	    status line the moment a run returns ("9 hit(s) in 3 of 3 chapter(s)...").
+
+	    Recorded because the STATUS LINE cannot be trusted to still say it by save time: ticking a
+	    row overwrites it with "P1(2)  checked", toggling the translucent panel writes its own
+	    sentence, and the saved report's "Summary:" heading then carried whichever of those came
+	    last (found 2026-08-09). Cleared by Clear() like every other line the report reads, so it
+	    can never outlive the results it describes.
+
+	    @param summary the run's finished summary sentence (already untranslatable). */
+	void NoteRunSummary(const PMString& summary);
+
+	/** The recorded run summary, for the saved report's heading - empty when no run has reported
+	    since the last Clear(). @see NoteRunSummary */
+	PMString GetRunSummary();
+
 	/** What the replace was told to WRITE, as one ready-made line - the change string plus its Change
 	    Format, or the Glyph tab's replacement glyph. See KBSSearchEngine::DescribeCurrentChange.
 
@@ -496,10 +514,11 @@ namespace KBSResultModel
 	    "\n" is noise - so here the same characters are FLATTENED TO A SPACE instead (a match can run
 	    across a paragraph break, and a real newline in a cell splits the row).
 
-	    @param summaryLine the panel's status line, written into the heading as "Summary:" - passed in
-	           rather than fetched, because the model does not know the panel. Empty = leave the line
-	           out. Handing it in is also what keeps the heading's wording identical to the panel's for
-	           every kind of run, without the model counting anything a second time. */
+	    @param summaryLine the RUN's summary sentence (GetRunSummary), written into the heading as
+	           "Summary:". Until 2026-08-09 the caller passed the panel's status line here, and a
+	           tick between the run and the save made the heading say "P1(2)  checked". Empty =
+	           leave the line out. Passed in rather than fetched only so this stays a pure
+	           formatter. */
 	void BuildReportText(const PMString& summaryLine, PMString& out);
 
 	/** A hit node's display: the page locator and the three line segments to paint. false = index

@@ -519,6 +519,29 @@ void KBSJump::SetHidePreviousChapter(bool on)
 	gHidePrevChapterOn = on;
 }
 
+namespace
+{
+
+// One activation at a time, across BOTH public doors (a click and a keyboard walk share
+// ActivateNode; the double click's selection is the other entry). A landing opens documents, and
+// opening a document RUNS THE MESSAGE LOOP - so the next click, or the trailing half of a double
+// click, can be dispatched while the previous landing is still inside its own open, and would then
+// select or jump from a state that landing has not finished making. The keyboard walk has guarded
+// itself this way since 2026-08-01 (KBSResultTreeEH's gWalking, which also guards its own selection
+// step and therefore stays); the mouse path had no equivalent until the 2026-08-09 sweep. Kept HERE
+// rather than in each event handler so the doors cannot drift apart and a future caller is covered
+// on arrival.
+bool gActivating = false;
+
+class ActivationGuard
+{
+public:
+	ActivationGuard() { gActivating = true; }
+	~ActivationGuard() { gActivating = false; }
+};
+
+}
+
 void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles)
 {
 	UIDRef docRef;
@@ -755,6 +778,14 @@ void KBSJump::ShowBook()
 
 bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 {
+	// A previous landing is still inside its own document-open (see gActivating above JumpToHit).
+	// Selecting NOW would put a caret into a state that landing has not finished making - refused
+	// instead, silently: the refusal leaves the click behaving as the single click whose jump is
+	// still under way, which is also why no status line is written over that jump's own.
+	if (gActivating)
+		return false;
+	ActivationGuard activationGuard;
+
 	UIDRef docRef;
 	IDFile file;
 	UID storyUID = kInvalidUID;
@@ -928,6 +959,13 @@ void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntil
 	// carried as a parameter rather than left to each of them: only a mouse click can be half of a
 	// double click. It is spelled out at both call sites (no default) so that neither can acquire the
 	// other's answer by accident.
+
+	// A previous landing is still inside its own document-open - the click is dropped, exactly as
+	// the keyboard walk drops its key (see gActivating above JumpToHit).
+	if (gActivating)
+		return;
+	ActivationGuard activationGuard;
+
 	if (hitIdx >= 0)
 		JumpToHit(chapterIdx, hitIdx, deferMarkerUntilClickSettles);
 	else if (chapterIdx >= 0)

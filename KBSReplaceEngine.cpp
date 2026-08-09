@@ -908,9 +908,18 @@ void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pendin
 
 		if (!pending[pi].wasModified)
 		{
-			IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
-			if (chapterDB != nil)
-				chapterDB->SetModified(kFalse);
+			// IsDocStillOpen FIRST - the order ReleaseHeldDoc itself spells out ("asked first, and
+			// the order is the whole point"): docRef is only (IDataBase*, UID), and for a chapter
+			// closed under the run - the very case the three questions below allow for - that
+			// pointer is dangling, and SetModified through it is undefined behaviour. This deref
+			// stood in FRONT of any liveness test until 2026-08-09, while the release two steps
+			// down asked the question properly.
+			if (KBSBookScope::IsDocStillOpen(pending[pi].docRef))
+			{
+				IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
+				if (chapterDB != nil)
+					chapterDB->SetModified(kFalse);
+			}
 		}
 
 		// closeNow: a scheduled close does not run until the current tick has unwound, and this run
@@ -1768,9 +1777,21 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	if (seq != nil)
 	{
 		if (totals.cancelled)
+		{
 			CmdUtils::AbortCommandSequence(seq);
+		}
 		else
+		{
+			// ***** INSURANCE, NOT A PATH ANYTHING IS KNOWN TO TAKE. ***** Every failure inside the
+			// run clears the error state where it happens (RunWalkerCmd's two doors, the cancel's
+			// own clear below) - but a command that REPORTED success while leaving an error standing
+			// would reach this line with the state still up, and a sequence that ends that way rolls
+			// back everything it did, silently, while the summary still says "N replaced" (the
+			// 2026-07-31 measurement, seen from the other direction). One clear here costs nothing
+			// and turns that catastrophe into nothing at all (2026-08-09 sweep).
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 			CmdUtils::EndCommandSequence(seq);
+		}
 		seq = nil;
 	}
 
@@ -1888,6 +1909,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The chapters the hand-back could not close, at the end the way the scans say it - it appends
 	// nothing in the ordinary case.
 	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
+
+	// The saved report's heading, recorded on THIS exit alone: the panel is the replace's report
+	// now (KeepCheckedRows above), so this sentence is what describes its rows. The two cancel
+	// exits deliberately do not record - they leave the SEARCH's rows standing (rolled back, or
+	// never written to), and the search's own summary keeps describing those.
+	KBSResultModel::NoteRunSummary(outSummary);
 	return totals.replaced;
 }
 

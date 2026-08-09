@@ -174,10 +174,18 @@ static uint32 KBSDoubleClickInterval()
 #endif
 }
 
-// Call the booking off. ClearMarker is the ONLY caller, deliberately - see the header for what that
-// buys on a double click that is refused.
+// Call the booking off. Two callers, each one door of "the newest display wins": ClearMarker
+// (whose place in the double-click machinery the header explains) and SetMarker (the keyboard
+// walk's immediate marker, which must not be overwritten by a booking an earlier mouse click left
+// armed - 2026-08-09).
 static void KBSCancelPendingMarker()
 {
+	// Nothing armed, nothing to stop. This is not just a shortcut: the timer's own callback clears
+	// sHasPending and then raises the marker through SetMarker, and this early exit is what keeps
+	// that path from calling StopTimer on the very timer it is running inside.
+	if (!sHasPending)
+		return;
+
 	if (sPendingTimer != nil)
 		sPendingTimer->StopTimer();
 	sHasPending = kFalse;
@@ -222,6 +230,14 @@ static uint32 KBSPendingMarkerProc(void* /*refPtr*/)
 
 void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
 {
+	// ***** AN OUTSTANDING BOOKING DIES HERE TOO. ***** The immediate marker's one caller is the
+	// keyboard walk (JumpToHit with defer off), and an arrow key pressed within the double-click
+	// interval of a mouse click used to leave that click's booking armed - it fired half a second
+	// later and stamped the PREVIOUS row's rectangle over the row the user had walked to (found in
+	// the 2026-08-09 pre-submission sweep). The deferred sibling below has always cancelled through
+	// its leading ClearMarker; this is the same rule at the other door: the newest display wins.
+	KBSCancelPendingMarker();
+
 	sMarkerDB  = db;
 	sMarkerPb  = pbRect;
 	sHasMarker = kTrue;

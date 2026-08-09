@@ -729,7 +729,7 @@ void KBSGlyphScanEngine::Run()
 	// A run that is turned away has to leave the panel exactly as it found it. These two tests used
 	// to sit BELOW the Clear() just under them, so "Book Scope is on, but no book is open." also
 	// threw away whatever the panel was showing (found 2026-08-03 in the defect audit).
-	if (fromBook && !KBSBookScope::HasActiveBook())
+	if (fromBook && !KBSBookScope::HasTargetBook())
 	{
 		summary.Append("Book Scope is on, but no book is open.");
 		KBSResultTree::ShowStatus(summary);
@@ -980,6 +980,9 @@ void KBSGlyphScanEngine::Run()
 	// not be closed again. Both append nothing in the ordinary case.
 	KBSBookScope::AppendUnopenableNote(summary, unopenable);
 	KBSBookScope::AppendUnclosedNote(summary, unclosed);
+	// The saved report's heading - recorded here, where the results were committed, so a status
+	// line overwritten later (a jump's message, a panel toggle) cannot become the report's summary.
+	KBSResultModel::NoteRunSummary(summary);
 	KBSResultTree::ShowStatus(summary);
 }
 

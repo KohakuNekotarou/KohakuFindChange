@@ -185,6 +185,22 @@ void KBSReplaceConfirmDialog::ReleaseSides()
 	sChange = Side();
 }
 
+/* ShutdownCleanup
+*/
+void KBSReplaceConfirmDialog::ShutdownCleanup()
+{
+	// Every non-POD static this file keeps, counted one by one (the KBSEditStamp lesson, 2026-08-09:
+	// the list is checked against the STATICS, not against the file). Five stand at the top of this
+	// file: sFind and sChange (a borrowed font reference and two PMStrings each - ReleaseSides is
+	// already their emptier, and the Resolve/ReleaseSides pairing leaves them empty between
+	// prompts), sMessage (the last Text / GREP prompt's full text, which NOTHING cleared until
+	// 2026-08-09 - the fifth static found still holding storage into DLL unload, after gChangeText,
+	// gSearchedFindAttrs, gLastStatus and KBSEditStamp's gPending), and the two PODs sAccepted /
+	// sCheckedCount, whose destructors are nothing and need no line here.
+	ReleaseSides();
+	sMessage.Clear();
+}
+
 /* GetFindSide
 */
 const KBSReplaceConfirmDialog::Side& KBSReplaceConfirmDialog::GetFindSide()

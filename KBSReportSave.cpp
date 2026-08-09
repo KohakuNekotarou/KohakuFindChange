@@ -200,9 +200,14 @@ void KBSResultTree::SaveResultsAsText()
 		return;
 	}
 
-	// The panel's own summary sentence goes into the heading - see BuildReportText.
-	PMString summary;
-	KBSResultTree::GetLastStatus(summary);
+	// The RUN's own summary sentence goes into the heading - not the panel's status line, which
+	// anything may have overwritten since (a tick writes "P1(2)  checked" there; that was the
+	// shipped heading until 2026-08-09). Every run records its sentence as it commits its results
+	// (KBSResultModel::NoteRunSummary), so with rows standing there is always one; the status line
+	// stands in only if a future path ever leaves results without recording.
+	PMString summary = KBSResultModel::GetRunSummary();
+	if (summary.IsEmpty())
+		KBSResultTree::GetLastStatus(summary);
 
 	PMString report;
 	KBSResultModel::BuildReportText(summary, report);

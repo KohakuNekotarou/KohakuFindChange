@@ -13,11 +13,14 @@
 //
 //      the user closes the searched document -> the panel goes back to empty.
 //
-//  Book scope is deliberately left alone here. A book chapter carries its .indd file, so it can
-//  be reopened (KBSBookScope::ReopenChapterDoc) and dropping twenty chapters' results because one
-//  chapter was closed would throw away work. Book results are retired by the book-side responder
-//  instead, which is a separate step (IID_ICLOSEBOOKMSG has no example anywhere in the SDK, so it
-//  gets its own round of testing).
+//  Book scope is deliberately left alone here - for the RESULTS. A book chapter carries its .indd
+//  file, so it can be reopened (KBSBookScope::ReopenChapterDoc) and dropping twenty chapters'
+//  results because one chapter was closed would throw away work. Book results are retired by the
+//  book-side responder instead, which is a separate step (IID_ICLOSEBOOKMSG has no example
+//  anywhere in the SDK, so it gets its own round of testing).
+//
+//  One piece of bookkeeping DOES run for every close, whatever the scope: the closing document
+//  comes off the held-chapter list (ForgetHeldDoc, 2026-08-09) - see the comment in Respond.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
@@ -82,24 +85,6 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (signalMgr == nil)
 		return;
 
-	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
-	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
-	// release, the Hide Previous Chapter sweep) can land here from inside one. The run puts its own
-	// results up when it finishes, so nothing stale survives being skipped here. Same rule as the
-	// book-close watcher's, asked the same way (KBSRunGuard).
-	if (KBSRunGuard::IsAnyRunning())
-		return;
-
-	// Book results survive a chapter closing - see the file header.
-	if (KBSResultModel::IsFromBook())
-		return;
-
-	// Nothing on display, nothing to retire. Also the common case: this signal fires for every
-	// document close in the session, so it leaves as early as it can.
-	const int32 chapterCount = KBSResultModel::GetChapterCount();
-	if (chapterCount <= 0)
-		return;
-
 	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,
 	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL: this test used to
 	// say "an unsaved document being closed carries no reference to compare against", and that was
@@ -119,6 +104,36 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	const UIDRef closingDocRef = signalData->GetDocument();
 	if (closingDocRef == UIDRef::gNull)
+		return;
+
+	// ***** THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. ***** Until
+	// 2026-08-09 nothing took a held chapter off gHeldDocs when someone ELSE closed it (the user,
+	// after the book panel windowed it; a script), so its (IDataBase*, UID) stayed on the list
+	// dangling - and a reused address can make IsDocStillOpen answer YES about a DIFFERENT
+	// windowless document, which a later ReleaseHeldDocs would then close (the same address-reuse
+	// fault [[uidref-reuse-after-close]] records, aimed at somebody else's document). Forgetting it
+	// here removes the stale entry at its source. Safe on every path: ForgetHeldDoc does nothing
+	// when the document is not held, and the closes KBS schedules itself come off the list BEFORE
+	// their Close call, so this is a no-op for them - which is why it may run even while a run of
+	// ours is going (the guard below).
+	KBSBookScope::ForgetHeldDoc(closingDocRef);
+
+	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
+	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
+	// release, the Hide Previous Chapter sweep) can land here from inside one. The run puts its own
+	// results up when it finishes, so nothing stale survives being skipped here. Same rule as the
+	// book-close watcher's, asked the same way (KBSRunGuard).
+	if (KBSRunGuard::IsAnyRunning())
+		return;
+
+	// Book results survive a chapter closing - see the file header.
+	if (KBSResultModel::IsFromBook())
+		return;
+
+	// Nothing on display, nothing to retire. This signal fires for every document close in the
+	// session, so past the held-list bookkeeping above it leaves as early as it can.
+	const int32 chapterCount = KBSResultModel::GetChapterCount();
+	if (chapterCount <= 0)
 		return;
 
 	// A document-scope result set is one chapter - the searched document - but compare against

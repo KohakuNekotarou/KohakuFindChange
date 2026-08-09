@@ -28,6 +28,7 @@
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
+#include "KBSReplaceConfirmDialog.h"	// the last prompt's text and fonts, emptied at shutdown
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
@@ -87,6 +88,10 @@ public:
 		// belongs here rather than in a static destructor at DLL unload. It was the one piece of
 		// module state with no cleanup of its own until 2026-08-08.
 		KBSSearchEngine::ShutdownCleanup();
+		// ...and the replace confirmation's: the fonts its last prompt resolved (already empty
+		// between prompts) and the prompt text itself, which had no emptier at all until the
+		// 2026-08-09 sweep found it - the fifth static PMString this list has gained one by one.
+		KBSReplaceConfirmDialog::ShutdownCleanup();
 	}
 };
 

@@ -71,6 +71,11 @@ public:
 	/** Drop the fonts taken in Resolve(). Safe when Resolve() failed or never ran. */
 	static void ReleaseSides();
 
+	/** Empty every non-POD static this module keeps (the fonts via ReleaseSides, and the last
+	    prompt's message text), so nothing is left for a static destructor at DLL unload. Called
+	    from KBSStartupShutdown, alongside every other module's ShutdownCleanup. */
+	static void ShutdownCleanup();
+
 	/** The side being searched for. Meaningful between Resolve() and ReleaseSides(). */
 	static const Side& GetFindSide();
 

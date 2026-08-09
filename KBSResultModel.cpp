@@ -52,6 +52,13 @@ namespace
 	// set - as one opaque key. See KBSResultModel::SetWalkSignature.
 	PMString gWalkSignature;
 
+	// The sentence the RUN that produced these results reported ("9 hit(s) in 3 of 3 chapter(s)...").
+	// Kept apart from the panel's status line, which anything may overwrite - ticking a row writes
+	// "P1(2)  checked" there - because the saved report's heading wants the run's own summary, not
+	// whatever the panel happened to say last (found 2026-08-09: a search-tick-save sequence wrote
+	// "Summary: P1(2)  checked" at the head of the file). See KBSResultModel::NoteRunSummary.
+	PMString gRunSummary;
+
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
 	bool gShowingOutcome = false;
@@ -223,6 +230,7 @@ void KBSResultModel::Clear()
 	gQueryText.Clear();
 	gChangeText.Clear();
 	gWalkSignature.Clear();
+	gRunSummary.Clear();
 	// The edit stamps are indexed by the chapter positions that just went away. Called from INSIDE
 	// Clear() rather than beside it: the nine callers already have to remember ReleaseSearchedBook
 	// and ForgetSearchedFindFormat, and a third thing to pair by hand is a rule waiting to break.
@@ -301,6 +309,19 @@ int32 KBSResultModel::GetSearchMode()
 // The two recorded lines are READ inside this file only - BuildReportText writes them into the
 // saved report's heading and nothing else asks for them. Getters for them lived here until
 // 2026-08-08 and had no callers at all.
+void KBSResultModel::NoteRunSummary(const PMString& summary)
+{
+	gRunSummary = summary;
+	gRunSummary.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetRunSummary()
+{
+	PMString summary(gRunSummary);
+	summary.SetTranslatable(kFalse);
+	return summary;
+}
+
 void KBSResultModel::SetQueryText(const PMString& query)
 {
 	gQueryText = query;
@@ -348,13 +369,15 @@ void KBSResultModel::ShutdownCleanup()
 	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
 	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
 	//
-	// ALL FOUR of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one
+	// ALL FIVE of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one
 	// string that is only ever filled by a replace was the one left holding storage at unload. When
-	// a static is added above, it is added here too - that is what this list is.
+	// a static is added above, it is added here too - that is what this list is (gRunSummary joined
+	// with its line already written, 2026-08-09).
 	gBookName.Clear();
 	gQueryText.Clear();
 	gChangeText.Clear();
 	gWalkSignature.Clear();
+	gRunSummary.Clear();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
 	// one would leave copies behind, and these hold PMStrings like the chapters do.

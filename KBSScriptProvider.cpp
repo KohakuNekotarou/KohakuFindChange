@@ -45,6 +45,7 @@
 #include "KBSScriptingDefs.h"
 #include "KBSResultTree.h"
 #include "KBSResultModel.h"		// DescribeAllRows - the rows behind the status line
+#include "KBSRunGuard.h"		// never read the model out from under a run of ours
 
 /** Serves this plug-in's scripting additions. One property, on the application object. */
 class KBSScriptProvider : public CScriptProvider
@@ -81,6 +82,25 @@ ErrorCode KBSScriptProvider::AccessProperty(ScriptID propID, IScriptRequestData*
 
 	if (!data->IsPropertyGet())
 		return CScriptProvider::AccessProperty(propID, data, script);
+
+	// ***** NOT WHILE A RUN OF OURS IS GOING. ***** A run stands behind a modal progress bar, and
+	// that bar PUMPS EVENTS - so a COM read of these properties can be dispatched mid-run, the same
+	// way a script's action invoke can reach an engine mid-run (which is why every engine has its
+	// own front-door guard). Read then, kfcStatus still says the PREVIOUS run's sentence and
+	// kfcResults is the block the run is appending to - either of which a polling harness reads as
+	// "finished". The same door SaveResultsAsText has had since 2026-08-02 (KBSReportSave.cpp),
+	// answered the same way: the busy sentence, which tells the poller exactly what is happening.
+	// (Found as a split decision in the 2026-08-09 sweep - one module read the model behind the
+	// guard, the other read it bare.)
+	if (KBSRunGuard::IsAnyRunning())
+	{
+		PMString busy(KBSRunGuard::BusyMessage());
+		busy.SetTranslatable(kFalse);
+		ScriptData busyData;
+		busyData.SetWideString(WideString(busy));
+		data->AppendReturnData(script, propID, busyData);
+		return kSuccess;
+	}
 
 	// The status line is one sentence about the last run; the result block is every row behind it.
 	// Both are read the same way and neither can be written, so they share this one handler.

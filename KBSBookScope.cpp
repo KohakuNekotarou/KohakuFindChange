@@ -360,6 +360,12 @@ void KBSBookScope::ReleaseHeldDocs()
 			continue;
 		}
 		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+
+		// Close returns nothing (IDocFileHandler.h:101), so a failure inside it can only speak
+		// through the global error state - and an error state left standing fails every command
+		// after it (the rule every Open in this file already follows, and Close did not until
+		// 2026-08-09). Cleared per document, so one refusal cannot shadow the next.
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
 }
 
@@ -478,6 +484,11 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// its .indd, until the whole run was over. Measured 2026-08-04 on a four-chapter saving replace.
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
+	// Same as ReleaseHeldDocs' loop: Close reports nothing back, so whatever it raised is cleared
+	// before the caller's next command walks into it - this one matters most, because a run calls
+	// this with kProcess BETWEEN chapters, and an error left here would fail the next chapter's
+	// whole walk (2026-08-09).
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return true;
 }
 
@@ -729,7 +740,12 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (docFileHandler == nil)
 			continue;
 		if (docFileHandler->CanClose(toClose[i]))
+		{
 			docFileHandler->Close(toClose[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
+			// Same as ReleaseHeldDocs' loop: Close reports nothing back, and this sweep runs in
+			// the middle of a jump - an error left standing would fail the jump's next step.
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		}
 	}
 }
 
@@ -741,13 +757,31 @@ bool KBSBookScope::HasActiveBook()
 	return bookMgr->GetCurrentActiveBook() != nil;	// non-owning pointer - no release
 }
 
+bool KBSBookScope::HasTargetBook()
+{
+	// The SAME two-step answer ListBookChapters gives, asked without building the chapter list: the
+	// book PANEL's book first, the active book as the fallback. Until 2026-08-09 the menu gate and
+	// the three engines' front doors all asked HasActiveBook alone while the run itself resolved
+	// the panel's book - the same question answered two ways, which is the shape this plug-in keeps
+	// being bitten by. A book on show in the panel with no active book behind it read as "no book
+	// is open" at every door the run has, while the run itself could have searched it.
+	IDFile panelBookFile;
+	if (GetPanelBookFile(panelBookFile))
+	{
+		SDKFileHelper panelHelper(panelBookFile);
+		if (FindOpenBookByPath(panelHelper.GetPath()) != nil)
+			return true;
+	}
+	return HasActiveBook();
+}
+
 bool KBSBookScope::HasScopeTarget()
 {
 	// The same two questions the engines ask when they resolve their scope (KBSSearchEngine.cpp,
 	// and the two scans beside it), asked here so the menu can go grey BEFORE a run that would only
 	// report that there was nothing to run on.
 	if (IsBookScopeOn())
-		return HasActiveBook();
+		return HasTargetBook();
 
 	// GetFrontDocument, not "is any document open": a book search opens its chapters WINDOWLESS and
 	// this is the document-scope branch, where the front layout window is exactly what gets searched.
@@ -991,11 +1025,22 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 
 	IDFile panelBookFile;
 	if (GetPanelBookFile(panelBookFile))
-		book = bookMgr->FindOpenBookByName(panelBookFile);	// nil = that file is not open
+	{
+		// FindOpenBookByPath, not a bare FindOpenBookByName: the path lookup adds the IsOpen()
+		// test that keeps a book still broadcasting its close off the list - the reason that
+		// function itself documents. This was the one lookup in the module still asking bare
+		// (found 2026-08-09, the one-question-one-place sweep).
+		SDKFileHelper panelHelper(panelBookFile);
+		book = FindOpenBookByPath(panelHelper.GetPath());	// nil = not open, or already closing
+	}
 
-	// GetCurrentActiveBook hands out a non-owning pointer - no release. Same for FindOpenBookByName.
+	// GetCurrentActiveBook hands out a non-owning pointer - no release. Same for the lookup above.
 	if (book == nil)
+	{
 		book = bookMgr->GetCurrentActiveBook();
+		if (book != nil && !book->IsOpen())
+			book = nil;		// the same closing-book door the panel-side lookup has
+	}
 	if (book == nil)
 		return false;
 
