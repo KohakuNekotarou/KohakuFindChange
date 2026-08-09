@@ -817,6 +817,20 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
+	// ***** A ZERO-WIDTH MATCH HAS NOTHING TO SELECT. ***** GREP's ^, $ and the lookarounds match at
+	// a POSITION rather than over characters, so such a row names a place, not text (measured
+	// 2026-08-09: ^ returns one hit per paragraph). The clamp further down refuses the empty range
+	// anyway - but silently, and a double click that appears to do nothing is the one refusal this
+	// function must not make when every other one says why. Asked up here with the other tests that
+	// cost nothing, before any database work is done for a row that is going to be turned away.
+	if (start == end)
+	{
+		PMString message("That match has no width (^, $ or a lookaround) - there is nothing to select.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return false;
+	}
+
 	// The jump that ran a moment ago already brought this chapter back if it had been closed, and
 	// already fronted its window. Asked again anyway: this is a public function, and a caller that
 	// reached it another way must not select into a database that is not there.
