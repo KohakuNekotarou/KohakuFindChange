@@ -4,6 +4,9 @@ Searches the front document, or every chapter of the active book (.indb) at once
 Only the occurrences you tick are replaced, across as many chapters as you like.
 The same panel also lists missing glyphs and overset text over the same scope.
 
+## Discussions 掲示板
+https://github.com/KohakuNekotarou/KohakuChangeMarker/discussions
+
 ## About Creation
 This plugin was designed and implemented by **KohakuNekotarou** in collaboration with Anthropic's AI, **Claude (Claude Code)**.
 
