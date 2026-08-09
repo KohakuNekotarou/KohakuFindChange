@@ -807,10 +807,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKBSHidePrevChapterActionID)
 		{
-			// Only meaningful in book scope (it closes the chapter a previous jump landed in), so
-			// it is greyed out in document scope. The check mark stays visible through the lock
+			// Reachable whenever the sweep it gates can RUN - which is the sweep's own question,
+			// KBSJump's ShouldHidePreviousChapter, asked of the results on screen (IsFromBook) -
+			// and also while Book Scope is on, so it can be set up before the search. It asked
+			// IsBookScopeOn() ALONE until 2026-08-09: after a book search with the scope since
+			// switched off, the sweep kept closing documents on every jump while the menu that
+			// stops it sat grey - the same lock-out the 2026-08-03 note in KBSJump.cpp records
+			// closing from the other side. The check mark stays visible through the lock
 			// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
-			int16 actionState = KBSBookScope::IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
+			const bool reachable = KBSBookScope::IsBookScopeOn() || KBSResultModel::IsFromBook();
+			int16 actionState = reachable ? kEnabledAction : kDisabled_Unselected;
 			if (KBSJump::IsHidePreviousChapterOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);

@@ -93,6 +93,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // because it asks once per chapter).
                 kKBSConfirmEditedDocKey,		"The text has been edited since the search.",
                 kKBSConfirmEditedOneKey,		"The text of ^1 has been edited since the search.",
+                // The other axis (KBSEditStamp::kScopeStateChanged): nothing edited, but a layer
+                // or a lock changed while the scope switches exclude that state.
+                kKBSConfirmGatesDocKey,			"A layer or a lock has changed since the search.",
+                kKBSConfirmGatesOneKey,			"A layer or a lock of ^1 has changed since the search.",
                 kKBSConfirmEditedManyKey,		"The text of ^1 chapters has been edited since the search.",
                 kKBSConfirmEditedTailKey,		"A replacement can land somewhere you did not intend.",
                 kKBSConfirmEditedCancelAllKey,	"Cancel stops the whole replace.",

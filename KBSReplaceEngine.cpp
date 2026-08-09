@@ -170,16 +170,20 @@ struct PendingChapter
 	// straight back, because it is holding its .indd locked for no reason at all.
 	bool	tookReplacement;
 
-	// Has this chapter's text been edited since the search walked it (KBSEditStamp)?
+	// Has this chapter changed since the search walked it (KBSEditStamp) - and along which axis:
+	// the text itself, or a walk gate (a layer shown/hidden or locked/unlocked, a story's lock)
+	// the search's scope switches watch? The prompt names the axis, so the answer is the enum,
+	// not a bool.
 	//
 	// ***** READ IN THE RESOLVE PASS, AND THAT IS THE ONLY PLACE IT CAN BE READ FOR EVERY CHAPTER.
-	// ***** IsChapterCurrent needs the chapter OPEN, and a book search closes each one as it finishes
-	// with it - so before the resolve pass, a chapter the user had closed cannot be asked at all. The
-	// confirmation prompt could only ever ask about the chapters that happened to be open, which is
-	// why the question moved here on 2026-08-08 (user's decision) and left the prompt entirely.
+	// ***** QueryChapterChange needs the chapter OPEN, and a book search closes each one as it
+	// finishes with it - so before the resolve pass, a chapter the user had closed cannot be asked
+	// at all. The confirmation prompt could only ever ask about the chapters that happened to be
+	// open, which is why the question moved here on 2026-08-08 (user's decision) and left the
+	// prompt entirely.
 	//
 	// Read after the chapter is a live document again and before a character is written to it.
-	bool	editedSinceSearch;
+	KBSEditStamp::ChapterChange	changeSinceSearch;
 
 	// This chapter's checked, not-yet-replaced hits, counted ONCE where the run is sized and read
 	// from here after that (how far this chapter's slice moves the bar). The number cannot change
@@ -189,7 +193,7 @@ struct PendingChapter
 	int32	checkedCount;
 
 	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false),
-		editedSinceSearch(false), checkedCount(0) {}
+		changeSinceSearch(KBSEditStamp::kUnchanged), checkedCount(0) {}
 };
 
 // ***** A CountCheckedInChapter STOOD HERE UNTIL 2026-08-08, AND THE MODEL ALREADY ANSWERED IT.
@@ -1031,7 +1035,7 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 		KBSResultModel::Clear();
 		KBSBookScope::ReleaseSearchedBook();
 		KBSSearchEngine::ForgetSearchedFindFormat();
-		outSummary.Append(" The results have been cleared - the text has changed since the search. Search again.");
+		outSummary.Append(" The results have been cleared - the document has changed since the search. Search again.");
 	}
 
 	// The chapters that would not close, at the end, the way every other exit says it.
@@ -1071,14 +1075,19 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 // key the one thing this dialog exists to keep it away from.
 // @param chapterIdx the chapter's index in KBSResultModel.
 // @return false when the user stops the run.
-bool AskEditedChapter(int32 chapterIdx)
+bool AskEditedChapter(int32 chapterIdx, KBSEditStamp::ChapterChange cause)
 {
 	PMString msg;
+
+	// The axis first: "the text has been edited" and "a layer or a lock has changed" call for
+	// different second looks, and the stamp knows which it saw (KBSEditStamp::ChapterChange).
+	const bool gateMoved = (cause == KBSEditStamp::kScopeStateChanged);
 
 	// A DOCUMENT-scope run has one "chapter" and it is the front document, which has no name to put
 	// here - the book wording would name a chapter of a book that is not there.
 	if (!KBSResultModel::IsFromBook())
-		msg = KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
+		msg = gateMoved ? KBSLoc::Text(kKBSConfirmGatesDocKey, KBSJa::kConfirmGatesDoc)
+						: KBSLoc::Text(kKBSConfirmEditedDocKey, KBSJa::kConfirmEditedDoc);
 	else
 	{
 		// The model's display name for the chapter row, marked untranslatable BEFORE it goes into a
@@ -1087,7 +1096,8 @@ bool AskEditedChapter(int32 chapterIdx)
 		int32 chapterHits = 0;
 		KBSResultModel::GetChapterDisplay(chapterIdx, name, chapterHits);
 		name.SetTranslatable(kFalse);
-		msg = KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
+		msg = gateMoved ? KBSLoc::Text(kKBSConfirmGatesOneKey, KBSJa::kConfirmGatesOne)
+						: KBSLoc::Text(kKBSConfirmEditedOneKey, KBSJa::kConfirmEditedOne);
 		::ReplaceStringParameters(&msg, name);
 	}
 
@@ -1535,16 +1545,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			chapter.wasModified = (chapterDB != nil) && (chapterDB->IsModified() != kFalse);
 		}
 
-		// ...and whether the TEXT has moved on since the search walked it. Read before this run
-		// writes anything, for the same reason as the flag above, and asked HERE rather than at the
-		// confirmation prompt because here is the only point where EVERY chapter can be asked:
-		// IsChapterCurrent needs the document open, and this one has just been opened.
+		// ...and whether the chapter has moved on since the search walked it - the text, or a walk
+		// gate the scope switches watch. Read before this run writes anything, for the same reason
+		// as the flag above, and asked HERE rather than at the confirmation prompt because here is
+		// the only point where EVERY chapter can be asked: QueryChapterChange needs the document
+		// open, and this one has just been opened.
 		//
 		// docRef, not the UIDRef the search recorded: this one was resolved BY FILE just above,
 		// while the recorded one may name a database that has since been closed and its address
 		// reused (the resolve above is entirely about that). The stamp holds story UIDs and
 		// counters, which read the same in the reopened document (measured 2026-08-08).
-		chapter.editedSinceSearch = !KBSEditStamp::IsChapterCurrent(ci, docRef);
+		chapter.changeSinceSearch = KBSEditStamp::QueryChapterChange(ci, docRef);
 	}
 
 	// ASK ONCE MORE, now that the pass is over: the reading at the top only ever sees a cancel that
@@ -1576,12 +1587,12 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// A chapter that could not be opened is not asked about. Nothing will be written to it -
 		// it is skipped below and named in the summary - so a warning about its text would be a
 		// question with no consequence attached to either answer.
-		if (!pending[pi].opened || !pending[pi].editedSinceSearch)
+		if (!pending[pi].opened || pending[pi].changeSinceSearch == KBSEditStamp::kUnchanged)
 			continue;
 
-		// kTrue: THIS cancel is the stale one. The user has just been told that this chapter's text
-		// has changed since the search and has chosen to stop, so the rows go with the run.
-		if (!AskEditedChapter(pending[pi].chapterIdx))
+		// kTrue: THIS cancel is the stale one. The user has just been told that this chapter has
+		// changed since the search and has chosen to stop, so the rows go with the run.
+		if (!AskEditedChapter(pending[pi].chapterIdx, pending[pi].changeSinceSearch))
 			return StopBeforeAnythingIsWritten(pending, totals, outSummary, true /*resultsAreStale*/);
 	}
 
@@ -1866,6 +1877,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		for (size_t pi = 0; pi < pending.size(); ++pi)
 		{
 			if (!pending[pi].opened || pending[pi].wasModified)
+				continue;
+			// IsDocStillOpen FIRST - the same rule, spelled the same way, as this loop's twin in
+			// HandBackChaptersWithNothingInThem: docRef is only (IDataBase*, UID), and for a
+			// chapter closed under the run that pointer is dangling, so SetModified through it is
+			// undefined behaviour. The twin got its guard on 2026-08-09; this was the one deref of
+			// the pair that the same sweep missed (found in the pre-submission re-check).
+			if (!KBSBookScope::IsDocStillOpen(pending[pi].docRef))
 				continue;
 			IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
 			if (chapterDB != nil)

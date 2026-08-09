@@ -94,6 +94,12 @@ namespace
 	    even be reached to be turned off (found 2026-08-03 in the defect audit). The menu and the
 	    behaviour now answer the same question.
 
+	    The same lock-out came back through the other door and was closed on 2026-08-09: the menu
+	    asked the LIVE Book Scope toggle alone, so book results with the scope since switched off
+	    had the sweep running on every jump while the menu sat grey. The menu now also asks
+	    IsFromBook - the very question below - so wherever the sweep can run, the toggle can be
+	    reached.
+
 	    Asked of the RESULTS rather than of the live Book Scope toggle, for the reason the model
 	    records that flag at all: flipping the scope after a search must not change how the results
 	    already on screen behave. */

@@ -2297,6 +2297,17 @@ bool KBSSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 	return IsEditableInFrame(storyRef, frameUID);
 }
 
+void KBSSearchEngine::GetFrameWalkGates(IDataBase* db, UID frameUID,
+	bool& outHidden, bool& outOnLockedLayer)
+{
+	// The two file-local tests every hit is built with (IsFrameHidden folds the layer's eye and
+	// the item's own Object > Hide together; the pair is what the dialog reports as "Hidden
+	// Item"). Forwarded rather than re-spelled so the edit stamp and the rows describe a frame
+	// identically - two spellings of one question is how they come to disagree.
+	outHidden = IsFrameHidden(db, frameUID);
+	outOnLockedLayer = IsFrameOnLockedLayer(db, frameUID);
+}
+
 // NOT EditableFrameForMatch: that one climbs out to the frame carrying the "+" when a position is
 // overset, which is exactly the case this has to answer TRUE for. The raw walk is the answer here.
 bool KBSSearchEngine::IsPositionOverset(const UIDRef& storyRef, TextIndex pos)
@@ -2766,7 +2777,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		//
 		// The index this chapter will occupy is not known yet: a chapter with no hits never reaches
 		// the model. So the reading is held and filed after the append, by CommitPending.
-		KBSEditStamp::CapturePending(chapterDocRef);
+		// The scope switches ride along: an OFF switch makes its state part of the walk's
+		// universe, and the stamp watches exactly those states (KBSEditStamp.h).
+		KBSEditStamp::CapturePending(chapterDocRef, scopeOptions);
 
 		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
 		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)

@@ -93,6 +93,10 @@ namespace KBSJa
 	// chapter.
 	const char16_t kConfirmEditedDoc[]       = u"検索後にテキストが編集されています。";
 	const char16_t kConfirmEditedOne[]       = u"検索後に「^1」のテキストが編集されています。";
+	// The other axis (KBSEditStamp::kScopeStateChanged): nothing edited, but a layer or a lock
+	// changed while the search's scope switches exclude that state.
+	const char16_t kConfirmGatesDoc[]        = u"検索後にレイヤーやロックの状態が変更されています。";
+	const char16_t kConfirmGatesOne[]        = u"検索後に「^1」のレイヤーやロックの状態が変更されています。";
 	const char16_t kConfirmEditedMany[]      = u"検索後に ^1 個の章のテキストが編集されています。";
 	const char16_t kConfirmEditedTail[]      = u"意図していない場所が置換される場合が有ります。";
 	const char16_t kConfirmEditedCancelAll[] = u"キャンセルすると、すべての置換を中止します。";

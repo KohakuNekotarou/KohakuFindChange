@@ -443,6 +443,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // their own text. The status line that reports the outcome stays English.
 #define kKBSConfirmEditedDocKey		kKBSStringPrefix "kKBSConfirmEditedDocKey"
 #define kKBSConfirmEditedOneKey		kKBSStringPrefix "kKBSConfirmEditedOneKey"
+// ...and the same two, for the OTHER axis the stamp watches (KBSEditStamp::kScopeStateChanged):
+// nothing edited, but a layer or a lock changed while the scope switches exclude that state.
+#define kKBSConfirmGatesDocKey		kKBSStringPrefix "kKBSConfirmGatesDocKey"
+#define kKBSConfirmGatesOneKey		kKBSStringPrefix "kKBSConfirmGatesOneKey"
 #define kKBSConfirmEditedManyKey	kKBSStringPrefix "kKBSConfirmEditedManyKey"
 #define kKBSConfirmEditedTailKey	kKBSStringPrefix "kKBSConfirmEditedTailKey"
 #define kKBSConfirmEditedCancelAllKey	kKBSStringPrefix "kKBSConfirmEditedCancelAllKey"

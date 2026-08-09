@@ -617,6 +617,16 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	if (db == nil)
 		return false;
 
+	// Still open? Asked the way IsDocStillOpen asks everything - the pair against the session's
+	// list, no dereference - because the callers hand over chapters their run recorded EARLIER in
+	// the same tick, and the run's progress bars pump events: a scheduled close (a script's, or
+	// one of this module's own from a previous cue) can land in between. Every question below
+	// this line reads the document; this is the door that keeps a dangling (IDataBase*, UID) away
+	// from all of them (2026-08-09, the pre-submission re-check). False is also the true answer:
+	// a chapter nobody has open cannot be given a window.
+	if (!IsDocStillOpen(docRef))
+		return false;
+
 	// Does it already have a window - front, or behind another tab? Then leave it alone. Asked
 	// through DocHasAnyWindow, which is where this module keeps that question (it wrote the search
 	// out by hand here until the block 11 API audit, 2026-08-08, making three copies of it in one
