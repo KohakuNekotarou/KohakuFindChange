@@ -950,8 +950,18 @@ void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pendin
 // The wording is BuildSummary's, not this function's: a cancel means one thing to the user wherever
 // it was pressed, and a second spelling of it here is how the two come to differ.
 // @return 0, always - the number of replacements the run made.
+// Both ways out of a run that stops BEFORE the command sequence opens: the opening bar's Cancel,
+// and a Cancel on the "this chapter has been edited" alert. Neither has written a character, so
+// there is nothing to roll back - what is left is handing the chapters back and saying so.
+//
+// resultsAreStale says WHICH of the two it was, in terms of what it means rather than where it came
+// from: the edited-chapter alert only appears because the document no longer holds the text these
+// rows describe, and a list that no longer describes anything must not be left on screen offering
+// to replace things (user's call, 2026-08-09). A Cancel on the bar is the other case entirely -
+// nothing has changed, the rows are still true, and throwing them away would lose a search the user
+// may have waited a long time for.
 int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, RunTotals& totals,
-	PMString& outSummary)
+	PMString& outSummary, bool resultsAreStale)
 {
 	std::vector<PMString> unclosed;
 	HandBackChaptersWithNothingInThem(pending, unclosed);
@@ -965,6 +975,28 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 
 	totals.cancelled = true;
 	BuildSummary(totals, outSummary);
+
+	// ***** BACK TO BEFORE THE SEARCH. ***** The rows were found in text that is not there any more,
+	// which is the whole reason the user was asked and the whole reason they said no. Leaving them
+	// up invites a second run against a list that describes the old text - the same reasoning, and
+	// the same three calls, as RefuseChangedQuery above.
+	//
+	// The three go together, always: ReleaseSearchedBook because "every KBSResultModel::Clear() is
+	// paired with one" (KBSBookScope.cpp:81), and ForgetSearchedFindFormat because the format the
+	// replace's door compares against belongs to the rows going away here.
+	//
+	// The PANEL is not touched from here: the caller redraws the tree and writes this summary to the
+	// status line (KBSActionComponent.cpp:344-345), and the illustration follows the model by itself
+	// - Clear() puts HasRun back down, so KBSPanelIcon::Choose returns the picture the panel had
+	// before anything was run.
+	if (resultsAreStale)
+	{
+		KBSResultModel::Clear();
+		KBSBookScope::ReleaseSearchedBook();
+		KBSSearchEngine::ForgetSearchedFindFormat();
+		outSummary.Append(" The results have been cleared - the text has changed since the search. Search again.");
+	}
+
 	// The chapters that would not close, at the end, the way every other exit says it.
 	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return 0;
@@ -1487,8 +1519,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 
 	}	// end of the scope the opening bar lived in - THE BAR IS DOWN FROM HERE
 
+	// kFalse: the bar's Cancel says "not now", not "these rows are wrong". Nothing has been edited
+	// and nothing has been written, so the results stay exactly as they were.
 	if (cancelledWhileOpening)
-		return StopBeforeAnythingIsWritten(pending, totals, outSummary);
+		return StopBeforeAnythingIsWritten(pending, totals, outSummary, false /*resultsAreStale*/);
 
 	// ***** AND THE CHAPTERS THAT HAVE BEEN EDITED SINCE THE SEARCH ARE PUT TO THE USER. *****
 	//
@@ -1508,8 +1542,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		if (!pending[pi].opened || !pending[pi].editedSinceSearch)
 			continue;
 
+		// kTrue: THIS cancel is the stale one. The user has just been told that this chapter's text
+		// has changed since the search and has chosen to stop, so the rows go with the run.
 		if (!AskEditedChapter(pending[pi].chapterIdx))
-			return StopBeforeAnythingIsWritten(pending, totals, outSummary);
+			return StopBeforeAnythingIsWritten(pending, totals, outSummary, true /*resultsAreStale*/);
 	}
 
 	// ***** THE REPLACE'S OWN BAR. ***** A second object, not the one the pass above used - see the
