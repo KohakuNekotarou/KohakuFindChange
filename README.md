@@ -1,8 +1,6 @@
 # Kohaku Find/Change
 Adobe InDesign C++ SDK Plug-In.
-Searches the front document, or every chapter of the active book (.indb) at once — the book-wide search the built-in Find/Change cannot do — using the Find/Change dialog's own query, and lists what it found in a tree panel you can jump from.
-Only the occurrences you tick are replaced, across as many chapters as you like.
-The same panel also lists missing glyphs and overset text over the same scope.
+Searches the front document, or every chapter of the active book (.indb) at once.
 
 ## Sponsors 支援
 https://github.com/sponsors/KohakuNekotarou
