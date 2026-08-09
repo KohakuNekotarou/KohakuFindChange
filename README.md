@@ -4,6 +4,9 @@ Searches the front document, or every chapter of the active book (.indb) at once
 Only the occurrences you tick are replaced, across as many chapters as you like.
 The same panel also lists missing glyphs and overset text over the same scope.
 
+## sponsors 支援
+https://github.com/sponsors/KohakuNekotarou
+
 ## Discussions 掲示板
 https://github.com/KohakuNekotarou/KohakuChangeMarker/discussions
 
@@ -18,6 +21,3 @@ We cannot be held responsible for any issues that may arise; please use this ser
 お仕事のお依頼は
 kohaku.nekotarou@gmail.com
 まで、日本国内のみ対応します。
-
-## sponsors
-https://github.com/sponsors/KohakuNekotarou
