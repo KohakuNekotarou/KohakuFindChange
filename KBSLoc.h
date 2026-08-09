@@ -4,8 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace confirmations,
-//  the Glyph-tab confirmation dialog's labels, and the About box.
+//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace confirmations and
+//  the Glyph-tab confirmation dialog's labels. (The About box was one of these until 2026-08-09;
+//  it now reads the same in every language, so it needs nothing from this file.)
 //
 //  There is no jaJP string TABLE any more (2026-08-05, user's call). Every locale reads the
 //  enUS table, and the Japanese is switched in HERE at run time instead, so no CP932 resource
@@ -112,17 +113,10 @@ namespace KBSJa
 	const char16_t kGlyphDontShow[]    = u"次回から表示しない";
 
 	// ----- About box -----
-	// Unprefixed macro pieces (the display name, the version, the repo URL) concatenate into
-	// the u"" literal by the usual adjacent-literal rule.
-	const char16_t kAboutBox[] =
-		u"" kKBSDisplayName u"、version " kKBSVersion u"\n\n"
-		u"Adobe InDesign C++ SDK プラグイン。\n"
-		u"InDesign 標準の検索/置換ダイアログで設定したクエリを使い、前面のドキュメント、"
-		u"またはアクティブなブック（.indb）の全章を一度に検索して、ヒットをツリーに一覧します。"
-		u"行をクリックするとその場所へジャンプし、チェックした行だけを置換できます。\n\n"
-		u"本プラグインは KohakuNekotarou が、Anthropic の AI Claude（Claude Code）と協働して"
-		u"設計・実装しました。\n\n"
-		u"ソース: " kKBSRepoURL;
+	// GONE on 2026-08-09 (user's call): the About box now reads the same in every UI language -
+	// the plug-in's name and version, and nothing else - so there is no Japanese wording of it to
+	// switch in. KBSActionComponent::DoAbout asks the string table directly instead of coming
+	// through Text() above. The English entry is KBS_enUS.fr's kKBSAboutBoxStringKey.
 }
 
 #endif // __KBSLoc_h__

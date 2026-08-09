@@ -417,8 +417,13 @@ void KBSActionComponent::DoAbout()
 {
 	CAlert::ModalAlert
 	(
-		// Finished text, not a key: Japanese on a Japanese UI, the enUS entry otherwise.
-		KBSLoc::Text(kKBSAboutBoxStringKey, KBSJa::kAboutBox),
+		// ***** THE ONE STRING KBS DOES NOT TRANSLATE. ***** The About box is the plug-in's name
+		// and version, and it reads the same in every UI language (user's call, 2026-08-09), so it
+		// comes straight from the string table rather than through KBSLoc::Text. The name and the
+		// version are not words - translating them would be translating an identifier. Same call
+		// the localization sample makes for a key (basiclocalization/BscL10NDialogController.cpp:115)
+		// and the same shape as KESCM's About (KESCMActionComponent.cpp:647).
+		PMString(kKBSAboutBoxStringKey, PMString::kTranslateDuringCall),
 		kOKString, 						// OK button
 		kNullString, 						// No second button
 		kNullString, 						// No third button
