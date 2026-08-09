@@ -238,20 +238,30 @@ struct RunTotals
 	bool		haveFirstNotWalked;
 	bool		haveFirstWalkFailed;
 
-	// The user stopped the run from the progress bar. The whole run is one command sequence, so
-	// this means the sequence was aborted and nothing at all was written - see BuildSummary.
+	// The run ended without committing anything. The whole run is one command sequence, so this
+	// means the sequence was aborted and nothing at all was written - see BuildSummary. TWO things
+	// raise it: the user stopping the run from the progress bar, and the error state being found
+	// standing at the moment the sequence was about to be committed (stoppedByError, below).
 	bool		cancelled;
+
+	// ...and WHICH of the two it was. A failure the run never noticed is not the user changing
+	// their mind, and calling it "cancelled" would send them looking for a button nobody pressed.
+	// errorText is InDesign's own wording for it and may be empty - it is only ever shown when it
+	// is not (2026-08-09).
+	bool		stoppedByError;
+	PMString	errorText;
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
 		  chaptersNotWalked(0), chaptersNoWindow(0), chaptersWalkFailed(0),
 		  missing(0), locked(0), refused(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstWalkFailed(false),
-		  cancelled(false)
+		  cancelled(false), stoppedByError(false)
 	{
 		firstSkipped.SetTranslatable(kFalse);
 		firstNotWalked.SetTranslatable(kFalse);
 		firstWalkFailed.SetTranslatable(kFalse);
+		errorText.SetTranslatable(kFalse);
 	}
 };
 
@@ -745,6 +755,24 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// could not be taken back, so the count had to be stated. Nothing reaches the disk now.)
 	if (t.cancelled)
 	{
+		// ***** NOT "cancelled" WHEN NOBODY CANCELLED. ***** The sequence was about to be committed
+		// with the error state standing, which would have rolled every replacement back on its own -
+		// the difference is that the run now says so, instead of reporting a count of replacements
+		// that no longer exist. InDesign's own wording for the failure is quoted when there is one:
+		// it is the only description of what went wrong that anybody has.
+		if (t.stoppedByError)
+		{
+			outSummary.Append("Replace stopped - InDesign reported an error, so nothing was changed");
+			if (!t.errorText.IsEmpty())
+			{
+				outSummary.Append(" (\"");
+				outSummary.Append(t.errorText);
+				outSummary.Append("\")");
+			}
+			outSummary.Append(".");
+			return;
+		}
+
 		outSummary.Append("Replace cancelled - nothing was changed.");
 		return;
 	}
@@ -1776,22 +1804,39 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// (ICommandSequence.h:153).
 	if (seq != nil)
 	{
+		// ***** A COMMAND CAN REPORT SUCCESS AND STILL LEAVE THE ERROR STATE UP. ***** Ending a
+		// sequence in that state rolls back everything it did - silently - while the summary would
+		// go on saying "N replaced" (the 2026-07-31 measurement, seen from the other direction).
+		// Every failure the run KNOWS about clears the state where it happens (RunWalkerCmd's two
+		// doors, and the cancel's own clear below), so anything still standing at this line is a
+		// failure that nothing reported.
+		//
+		// ***** WHICH IS WHY IT IS READ, NOT CLEARED. ***** A clear stood here for one day
+		// (2026-08-09) and was replaced the same day on the user's call: clearing commits whatever
+		// half-written state that unreported failure left behind, and says nothing about it -
+		// trading a rollback the user can SEE for a corruption they cannot. A standing error means
+		// this run must not be committed, which is exactly what a cancel already means and already
+		// does below: abort, roll the rows back, restore the modified flags, hand the chapters back.
+		// The only thing that has to be added is telling the user WHY.
+		//
+		// Asked BEFORE either ending, and before the abort raises anything of its own. Reading the
+		// global error code after work that reports nothing back is the SDK's own idiom - the
+		// closest match is textimportfilter/TxtImpFilter.cpp:435-441, where ITextModel::Insert
+		// returns void and the code is the only answer there is (also xmldataupdater:470,
+		// xmlcataloghandler:237, xdocbookworkflow:272).
+		if (!totals.cancelled && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		{
+			totals.stoppedByError = true;
+			totals.errorText = ErrorUtils::PMGetGlobalErrorString();
+			totals.errorText.SetTranslatable(kFalse);
+			// Everything a cancel does, this needs too - so it IS one from here on.
+			totals.cancelled = true;
+		}
+
 		if (totals.cancelled)
-		{
 			CmdUtils::AbortCommandSequence(seq);
-		}
 		else
-		{
-			// ***** INSURANCE, NOT A PATH ANYTHING IS KNOWN TO TAKE. ***** Every failure inside the
-			// run clears the error state where it happens (RunWalkerCmd's two doors, the cancel's
-			// own clear below) - but a command that REPORTED success while leaving an error standing
-			// would reach this line with the state still up, and a sequence that ends that way rolls
-			// back everything it did, silently, while the summary still says "N replaced" (the
-			// 2026-07-31 measurement, seen from the other direction). One clear here costs nothing
-			// and turns that catastrophe into nothing at all (2026-08-09 sweep).
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 			CmdUtils::EndCommandSequence(seq);
-		}
 		seq = nil;
 	}
 
