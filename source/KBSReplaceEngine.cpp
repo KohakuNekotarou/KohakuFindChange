@@ -33,7 +33,7 @@
 #include "CmdUtils.h"				// commands and command sequences
 #include "CoreResTypes.h"			// kLineSeparatorString - that alert composes its own line breaks
 #include "CreateObject.h"
-#include "ErrorUtils.h"				// PMSetGlobalErrorCode
+#include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
 // (ITextModel.h was here for GetTextChangeCount, which fed the trusted-story fast path. Removed
 // 2026-08-03 with that path - see the note over MatchStillStandsHere.)
 #include "PreferenceUtils.h"		// QuerySessionPreferences
@@ -475,8 +475,11 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
 	{
-		// ***** THE ONE EXIT THAT IS PAST Initialize. ***** Every refusal above this line is before
-		// the walker was given anything to walk, so there is nothing to stop; this one is after. A
+		// ***** ONE OF THE TWO EXITS THAT ARE PAST Initialize. ***** Every refusal above this line
+		// is before the walker was given anything to walk, so there is nothing to stop; this one is
+		// after, and so is the verify pass's refusal in the walk below - both halt before they
+		// return, and this comment said "the one exit" until the verify pass was added (2026-08-10),
+		// which is how the second one came to be written without a halt at all. A
 		// walker left walking is not merely untidy: the next caller that guards its Initialize with
 		// IsWalking CONTINUES it, and that is what InDesign's own Find/Change does
 		// (SnpFindAndReplace.cpp:772). The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask
@@ -616,6 +619,18 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 							expectStart, expectEnd, expectHash);
 				if (!haveIdentity || story.GetUID() != expectStory || start != expectStart)
 				{
+					// ***** HALT BEFORE LEAVING. ***** This return is PAST Initialize, so the
+					// walker is still walking - the same case, and the same two lines, as the
+					// selUtils exit above and the end of the walk below. The walker comes from
+					// the session's service registry, so it is not ours to leave in that state:
+					// the next caller that guards its own Initialize with IsWalking CONTINUES
+					// this walk instead of starting one, which is what InDesign's own
+					// Find/Change does (SnpFindAndReplace.cpp:772). KBS itself would not have
+					// noticed - the top of this function halts before it starts - but a refusal
+					// here is the ordinary way a replace ends when the user has edited the
+					// document, so it is the LIKELIEST exit of the three, not the rarest.
+					if (walker->IsWalking())
+						walker->Halt();
 					if (outChanged != nil)
 						*outChanged = true;
 					return 0;
@@ -1158,19 +1173,25 @@ void TellResultsWentStale(int32 chapterIdx)
 	// result up again (CAlert translates the message it is handed).
 	msg.SetTranslatable(kFalse);
 
-	// ***** ModalAlert with ONE button rather than WarningAlert. ***** On screen they are the same
-	// thing - a warning icon and an OK - and this is the shape IAlertHandler::HandleAlert takes
-	// (message plus three button labels plus the default), which is the interface KT's alert
-	// recorder implements.
+	// ***** WarningAlert - THE OFFICIAL CALL FOR EXACTLY THIS: a message and a warning icon. *****
+	// CAlert.h:75-79 ("Modal alert, displaying text plus eWarningIcon"). It is what the product uses
+	// to make this kind of statement: spellpanel says "Change All cannot run" this way
+	// (SpellChangeAllObserver.cpp:292), and so do SpellSkipObserver.cpp:519,543 and
+	// PrivateSpellingUtils.cpp:816.
 	//
-	// ⚠ It still does NOT reach app.ktLastAlert, measured both ways on 2026-08-10: under
-	// NEVER_INTERACT the alert is answered without the handler being asked, so an automated run
-	// can see that the replace stopped and read WHY off the status line, but cannot read the alert
-	// itself. Confirming the alert appears is a job for the eye. (KT's recorder was armed and
-	// answering - app.ktAlertAnswer read back "1" - so this is CAlert's own suppression, not KT.)
+	// ***** A ONE-BUTTON ModalAlert STOOD HERE, and its reason was already dead when it was written
+	// ***** (found in the API audit, 2026-08-10). ***** The reason given was that ModalAlert is the
+	// shape IAlertHandler::HandleAlert takes - message plus three button labels plus a default - and
+	// so the shape KT's alert recorder implements, which would let an automated run read the alert
+	// back. Measured the same day, BOTH ways: it does not reach app.ktLastAlert either way, because
+	// under NEVER_INTERACT CAlert answers without asking the handler at all. (KT's recorder was armed
+	// and answering - app.ktAlertAnswer read back "1" - so the suppression is CAlert's own, not KT's.)
+	// With nothing to gain, the all-powerful call was only carrying a default-button argument that
+	// means nothing when there is one button, and a return value with nothing to decide.
 	//
-	// The answer is discarded: one button, nothing to decide.
-	CAlert::ModalAlert(msg, kOKString, kNullString, kNullString, 1, CAlert::eWarningIcon);
+	// So an automated run can see that the replace stopped and read WHY off the status line, but not
+	// the alert itself: confirming that it appears is a job for the eye.
+	CAlert::WarningAlert(msg);
 }
 
 } // anonymous namespace
@@ -1496,6 +1517,29 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	bool changedSinceSearch = false;
 	int32 changedChapterIdx = -1;
 	{
+	// ***** THIS PASS HANDS THE ERROR STATE BACK THE WAY IT FOUND IT. ***** It opens documents and,
+	// since 2026-08-10, walks every chapter to verify the ticked positions - work that can raise the
+	// global error state without any of it being a failure of this run. What makes that matter is
+	// what comes after: the command sequence below decides between committing and rolling back by
+	// READING that state (the abort at the end of this function), so an error left standing by this
+	// pass would throw away a replace that went through perfectly.
+	//
+	// ***** PRESERVE, THEN CLEAR - and it is Adobe's own base class that spells the pair out. *****
+	// CDialogObserver.cpp:392-394 ("GlobalErrorStatePreserver followed by setting global error to
+	// success"); also CPathCreationTracker.cpp:666. The contract is ErrorUtils.h:115-117 - the
+	// constructor saves the caller's error state and the destructor puts it back, here at the closing
+	// brace of this pass. The clear is the other half: the pass should not START on an error either,
+	// since a standing one fails whatever it does next (opening a chapter, above all).
+	//
+	// Clearing WITHOUT preserving is what stood here for one hour on 2026-08-10, as a single
+	// PMSetGlobalErrorCode in front of the sequence. It worked, but it decided for this function's
+	// CALLER that their error state did not matter, and it guarded only the one path that reaches
+	// the sequence - the pass's early exits leaked. This guards every way out of the pass, including
+	// the two that return through StopBeforeAnythingIsWritten (which keeps a clear of its own: it
+	// closes documents after this scope has already ended).
+	GlobalErrorStatePreserver passErrorState;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
 	RangeProgressBar openBar(progressTitle, 0, static_cast<int32>(pending.size()), kTrue, kTrue);
 	openBar.DisableChildProgressBars(kTrue);
 
@@ -1628,9 +1672,23 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			ReplaceInChapter(ci, docRef, scopeOptions, vMissing, vLocked, vRefused,
 				vNotWalked, vWalkFailed, nil /*no bar of its own*/, 0, vReported,
 				true /*verifyOnly*/, &vChanged);
-			// A chapter that could not be WALKED is not a chapter that has changed - it is the
-			// case the run already reports by name (chaptersNotWalked), and the replace pass will
-			// meet it again and say so. Only a real mismatch stops the run.
+			// ***** WHAT "CHANGED" COVERS HERE, EXACTLY - the two walk failures do not divide the
+			// ***** way this comment claimed until 2026-08-10 ("a chapter that could not be walked
+			// ***** is not a chapter that has changed" - true of one of them, not of both).
+			//
+			// A walk that never STARTED (no database, no scope, no walker: vNotWalked) answers
+			// false, and rightly: nothing was compared, nothing will be written either, and the
+			// replace pass meets the chapter again and names it in the summary (chaptersNotWalked).
+			//
+			// A walk that started and then BROKE OFF (vWalkFailed) answers true - through the
+			// ticked rows it never reached, which are left in its target set. That is deliberate
+			// and it is the safe answer: this run will not write to positions it could not check.
+			// ⚠ It is not a "the document moved" answer, though, and the alert says the results
+			// changed whichever it was. Wording the two apart would need a second string and a
+			// failure nothing has been able to construct, so it is recorded here instead.
+			//
+			// vMissing / vLocked / vRefused are not read: the verify pass counts nothing at all
+			// (see verifyOnly), and the replace pass counts them for real immediately afterwards.
 			if (vChanged)
 			{
 				changedSinceSearch = true;
@@ -1726,6 +1784,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// That is what Adobe's own Change All does (spellpanel/SpellReplaceWalker.cpp:896-902), and the
 	// header points at this class for exactly this case. It costs performance - the header says to
 	// use it only where necessary - which is why it is here and not around every chapter.
+	// ***** THE ERROR STATE THIS SEQUENCE READS AT ITS END IS ITS OWN - see the resolve pass, which
+	// ***** hands its own back before this line is reached (GlobalErrorStatePreserver, up there).
+	// How this sequence ends is decided by reading the global error code (the abort at the bottom of
+	// this function): anything standing there is taken as a failure nothing reported, and the whole
+	// run is rolled back and the user told why. That reading is only honest about failures from
+	// INSIDE the sequence, and the pass above - which opens documents and walks every chapter - is
+	// outside it. Nothing between the two runs a command: a progress bar is built and the rows are
+	// backed up, and neither touches the error state.
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
 	// DELIBERATELY UNNAMED (user's call, 2026-07-28). SetName is what Edit > Undo would say after
 	// the word "Undo"; leaving it unset lets InDesign word the step the way it words its own.
