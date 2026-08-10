@@ -62,18 +62,23 @@ namespace KBSBookScope
 	    chapter the user closed since reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
-	/** Is there an active book right now? A cheap look at IBookManager only - nothing is
-	    opened, listed or held. */
-	bool HasActiveBook();
-
 	/** Is there a book for a book-scope run to TARGET - the book panel's book (what
-	    ListBookChapters will actually search), or failing that the active book (its fallback)?
+	    ListBookChapters will actually search), or failing that the active book (its fallback)? A
+	    cheap look: nothing is opened, listed or held.
 
 	    The one answer to "would a book run have a book", asked by the menu gate (HasScopeTarget)
-	    and by all three engines' front doors. Until 2026-08-09 those four asked HasActiveBook alone
-	    while the run resolved the PANEL's book - the same question answered two ways, so a book on
-	    show in the panel with no active book behind it was turned away at every door the run has,
-	    even though the run itself could have searched it. */
+	    and by all three engines' front doors. Until 2026-08-09 those four asked only whether a book
+	    was ACTIVE, while the run resolved the PANEL's book - the same question answered two ways, so
+	    a book on show in the panel with no active book behind it was turned away at every door the
+	    run has, even though the run itself could have searched it.
+
+	    ***** And it asks that through the run's own resolver, not a copy of it. ***** The 2026-08-09
+	    fix spelled those two steps out a second time here, and the second spelling came out of the
+	    same commit one door short: it accepted an active book that was already broadcasting its
+	    close, which the run drops. Both go through ResolveTargetBook since the block 11 re-audit
+	    (2026-08-10) - see the .cpp. (KBSBookScope::HasActiveBook was removed with that change: its
+	    last caller was the fallback here, and "is a book active" is not a question anything in this
+	    plug-in wants the answer to.) */
 	bool HasTargetBook();
 
 	/** Is there anything for the CURRENT scope to run on - a targetable book while Book Scope is

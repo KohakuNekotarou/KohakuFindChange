@@ -41,7 +41,8 @@
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
 // General includes:
-#include "ErrorUtils.h"			// PMSetGlobalErrorCode - a failed Open must not poison later commands
+#include "ErrorUtils.h"			// GlobalErrorStatePreserver / PMSetGlobalErrorCode - an open or a close
+								// that is allowed to fail must not poison the caller's next command
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
 #include "CmdUtils.h"
 #include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
@@ -259,6 +260,46 @@ namespace
 		// above answers a different question from the one this function is asked.
 		return book->IsOpen() ? book : nil;
 	}
+
+	/** The book a book-scope run would be against: the book the BOOK PANEL is showing, and failing
+	    that the active book. Nil when neither can be had.
+
+	    ***** ONE DEFINITION, because two callers have to give the SAME answer. ***** The run resolves
+	    its book here (ListBookChapters) and the menu's grey state asks whether there would be one
+	    (HasTargetBook); if those two ever disagree, either a command greys out over a book the run
+	    could have searched or it starts a run that reports "no book" - which is the shape this
+	    plug-in keeps being bitten by.
+
+	    They were written as two spellings of the same two steps on 2026-08-09, and the second step
+	    came out differently: the run dropped an active book that was already closing (IsOpen), and
+	    the menu gate did not (found in the block 11 re-audit, 2026-08-10). Both now read this. */
+	IBook* ResolveTargetBook()
+	{
+		// The panel's book first. Selecting a book's tab switches the panel but does NOT make that
+		// book active (measured 2026-07-27), so a user who picks a tab and runs a search would
+		// otherwise get whatever book was active before - see the long note in ListBookChapters.
+		IDFile panelBookFile;
+		if (KBSBookScope::GetPanelBookFile(panelBookFile))
+		{
+			SDKFileHelper panelHelper(panelBookFile);
+			IBook* panelBook = FindOpenBookByPath(panelHelper.GetPath());	// nil = not open, or closing
+			if (panelBook != nil)
+				return panelBook;
+		}
+
+		// The fallback: the active book, which is what the user expects when no book panel can be
+		// reached (it is iconised, or its palette is closed).
+		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+		if (bookMgr == nil)
+			return nil;
+
+		// GetCurrentActiveBook hands out a non-owning pointer - no release. The IsOpen() test is the
+		// same closing-book door FindOpenBookByPath documents and applies to the panel-side answer:
+		// a book still broadcasting its close is on every list there is, and is not a book anything
+		// may be run against.
+		IBook* activeBook = bookMgr->GetCurrentActiveBook();
+		return (activeBook != nil && activeBook->IsOpen()) ? activeBook : nil;
+	}
 }
 
 bool KBSBookScope::IsBookScopeOn()
@@ -325,6 +366,21 @@ void KBSBookScope::ReleaseHeldDocs()
 	// document in the middle of one is the wrong context. That helper is written for InDesign's own
 	// TOC / index commands, which run from a command, not from a notification. Do not "improve"
 	// this back to it. (docs/ai-notes/book-api.md)
+	//
+	// ***** THESE CLOSES HAND THE ERROR STATE BACK THE WAY THEY FOUND IT. ***** Close reports
+	// nothing at all (IDocFileHandler.h:101), so a failure inside it can only speak through the
+	// global error state - and one left standing fails every command after it, starting with the
+	// next chapter's close. PRESERVE, THEN CLEAR is the pair Adobe's own base class spells out
+	// (CDialogObserver.cpp:392-394; the contract is ErrorUtils.h:115-117): the preserver puts the
+	// CALLER's state back when this function returns, and the clear before each close keeps one
+	// chapter's failure from shadowing the next.
+	//
+	// A bare PMSetGlobalErrorCode(kSuccess) after each Close stood here from 2026-08-09 to
+	// 2026-08-10. It cleared whatever the caller had standing as well, which is not this function's
+	// to decide - the same correction the replace's resolve pass took on 2026-08-10, which had not
+	// walked over to the three closes in this file (found in the block 11 re-audit).
+	GlobalErrorStatePreserver closeErrorState;
+
 	for (int32 i = 0; i < static_cast<int32>(held.size()); ++i)
 	{
 		if (!IsDocStillOpen(held[i]))
@@ -359,13 +415,10 @@ void KBSBookScope::ReleaseHeldDocs()
 			gHeldDocs.push_back(held[i]);
 			continue;
 		}
-		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
-
-		// Close returns nothing (IDocFileHandler.h:101), so a failure inside it can only speak
-		// through the global error state - and an error state left standing fails every command
-		// after it (the rule every Open in this file already follows, and Close did not until
-		// 2026-08-09). Cleared per document, so one refusal cannot shadow the next.
+		// Cleared before the close, not after it: a standing error would fail this one (see the
+		// preserver above for whose error state is being taken away here, and whose is not).
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
 	}
 }
 
@@ -467,6 +520,16 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// able to find it again. The unsaved door above has always kept its chapter listed so a later
 	// call can hand it back; a refusal is the same situation with a different cause, so it keeps
 	// the claim the same way.
+	//
+	// ***** AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN. ***** Preserve, then clear -
+	// the same pair, and for the same reasons, as the loop in ReleaseHeldDocs (see the long note
+	// there; the contract is ErrorUtils.h:115-117). The preserver covers every exit below, not just
+	// the close: a refusal that raised something on its way out would otherwise leave it standing.
+	// This one matters most of the three, because a run calls it with kProcess BETWEEN chapters,
+	// and an error left here would fail the next chapter's whole walk.
+	GlobalErrorStatePreserver closeErrorState;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
 	if (docFileHandler == nil)
 		return false;
@@ -482,13 +545,17 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// the first (see the header): a scheduled close does not happen until the current tick unwinds,
 	// and a run is that tick - so every chapter it "handed back" was still open, and still locking
 	// its .indd, until the whole run was over. Measured 2026-08-04 on a four-chapter saving replace.
+	//
+	// ***** AND kProcess IS ONLY LEGAL BECAUSE THE WINDOW TEST ABOVE HAS ALREADY RUN. ***** Closing
+	// a document that HAS a window with kProcess is a stated error: the standard handler asserts on
+	// it outright - "Close() illegal with open document windows and cmdMode == kProcess"
+	// (incopyfileactions/utils/InCopyDocUtils.cpp:1376-1383, which is IDocFileHandler::Close's own
+	// implementation). The DocHasAnyWindow door above returns before this line for every one of
+	// them, so what reaches here is windowless by construction. Keep that order if either test is
+	// ever moved (recorded in the block 11 re-audit, 2026-08-10 - the contract was being met, but
+	// nothing here said so).
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
-	// Same as ReleaseHeldDocs' loop: Close reports nothing back, so whatever it raised is cleared
-	// before the caller's next command walks into it - this one matters most, because a run calls
-	// this with kProcess BETWEEN chapters, and an error left here would fail the next chapter's
-	// whole walk (2026-08-09).
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return true;
 }
 
@@ -596,14 +663,30 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	}
 
 	// The windowless, UI-suppressed open - by FILE (the book may be closed).
+	//
+	// ***** THIS OPEN IS ALLOWED TO FAIL, so what it raises must not leave this scope. ***** A
+	// chapter that will not open is reported to the user as a skipped chapter (the caller builds
+	// that list), not as a failure of whatever command runs next - and an error left standing fails
+	// all of them. Preserve, then clear: only what the open raised is taken away, and the caller's
+	// own state comes back at the closing brace (ErrorUtils.h:115-117).
+	//
+	// ***** AND THAT IS THE SHAPE THE SDK USES FOR THIS EXACT OPERATION. ***** The lines this
+	// function names above as its model - a windowless, UI-suppressed open whose result is then
+	// looked up with IDocumentList::FindDoc - wrap that open in a preserver:
+	// buttonui/actiondatapanels/gotoanchor/GoToAnchorPanelObserver.cpp:395-401. This file copied the
+	// FindDoc half and not the preserver half, and cleared the state bare on the failure path
+	// instead (found in the block 11 re-audit, 2026-08-10): one exit guarded, and the caller's error
+	// thrown away along with the open's.
 	UIDRef docRef;
-	const ErrorCode err = Utils<IDocumentCommands>()->Open(&docRef, file, kSuppressUI,
-		IOpenFileCmdData::kOpenDefault, IOpenFileCmdData::kUseLockFile, kFalse /*showInWindow*/);
-	if (err != kSuccess || docRef == UIDRef::gNull)
+	ErrorCode err = kFailure;
 	{
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a failed open must not poison later commands
-		return false;
+		GlobalErrorStatePreserver openErrorState;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		err = Utils<IDocumentCommands>()->Open(&docRef, file, kSuppressUI,
+			IOpenFileCmdData::kOpenDefault, IOpenFileCmdData::kUseLockFile, kFalse /*showInWindow*/);
 	}
+	if (err != kSuccess || docRef == UIDRef::gNull)
+		return false;
 
 	// Held, so ReleaseHeldDocs closes it later.
 	gHeldDocs.push_back(docRef);
@@ -650,6 +733,16 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 
 	// Windowless (the search opened it that way): give it a real layout window so the user can
 	// see the replacement, undo it by hand, and decide about saving. Nothing is saved here.
+	//
+	// ***** THE WINDOW IS ALLOWED NOT TO APPEAR - this function's false says so - so its error
+	// state stays in here. ***** Preserve, then clear, exactly as the open in ReopenChapterDoc does
+	// (see that note for the SDK's own shape and the contract at ErrorUtils.h:115-117). Placed
+	// ahead of the command rather than inside the failure branch so that all THREE ways this can
+	// end without a window are covered: the command that would not build, the one that failed, and
+	// the one that reported success without producing a presentation.
+	GlobalErrorStatePreserver windowErrorState;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kOpenLayoutCmdBoss));
 	if (cmd == nil)
 		return false;
@@ -668,10 +761,7 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 		return false;
 
 	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
-	{
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a failed open must not poison later commands
-		return false;
-	}
+		return false;		// whatever it raised goes back with the preserver above
 
 	// Did a window actually appear? SDKLayoutHelper::OpenLayoutWindow (the SDK's own recipe for this
 	// command) does not stop at the return code: it reads GetResultingPresentation() and checks an
@@ -738,12 +828,29 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		toClose.push_back(ref);
 	}
 
+	// The same preserve-then-clear pair the two held-chapter releases use (the long note is in
+	// ReleaseHeldDocs): Close reports nothing back, and this sweep runs in the MIDDLE of a jump -
+	// an error left standing would fail the jump's next step, while clearing the caller's own
+	// would be deciding for the jump that its error state did not matter.
+	GlobalErrorStatePreserver closeErrorState;
+
 	for (int32 i = 0; i < static_cast<int32>(toClose.size()); ++i)
 	{
-		// Drop it from the held list first (a closed held chapter must come off before its close),
-		// through ForgetHeldDoc - which is the function for exactly that and whose own comment said
-		// it was built to "the same shape CloseDisplayedDocsIfClean uses", i.e. it knew the loop was
-		// written twice (block 11 API audit, 2026-08-08).
+		// ***** IT COMES OFF THE HELD LIST BECAUSE IT HAS A WINDOW, not because it is about to be
+		// closed. ***** Everything in toClose passed DocHasAnyWindow above, and a window makes a
+		// chapter the user's whoever raised it - the same verdict ReleaseHeldDocs reaches, where a
+		// windowed chapter is DROPPED from the list rather than put back on it. So the claim goes
+		// whether or not the close below goes through.
+		//
+		// Which is why this is NOT the "erased before a refused close" fault the two held-chapter
+		// releases had to correct on 2026-08-08. There, a chapter whose close was refused fell off
+		// the one list that could ever hand it back and sat windowless with its .indd locked; here
+		// a refusal leaves a document the user can see and close themselves. The note here used to
+		// give the other reason ("a closed held chapter must come off before its close"), which is
+		// the reason KESCL's sweep states for the OPPOSITE order - handler and CanClose first, so a
+		// document that will not be closed stays listed (KESCLBookScope.cpp:272-278). That order is
+		// right there, because that sweep can take windowless documents as well; it is not what
+		// this one does (block 11 re-audit, 2026-08-10).
 		KBSBookScope::ForgetHeldDoc(toClose[i]);
 
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(toClose[i]));
@@ -751,38 +858,30 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 			continue;
 		if (docFileHandler->CanClose(toClose[i]))
 		{
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a standing error would fail this close
 			docFileHandler->Close(toClose[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
-			// Same as ReleaseHeldDocs' loop: Close reports nothing back, and this sweep runs in
-			// the middle of a jump - an error left standing would fail the jump's next step.
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		}
 	}
 }
 
-bool KBSBookScope::HasActiveBook()
-{
-	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-	if (bookMgr == nil)
-		return false;
-	return bookMgr->GetCurrentActiveBook() != nil;	// non-owning pointer - no release
-}
-
 bool KBSBookScope::HasTargetBook()
 {
-	// The SAME two-step answer ListBookChapters gives, asked without building the chapter list: the
-	// book PANEL's book first, the active book as the fallback. Until 2026-08-09 the menu gate and
-	// the three engines' front doors all asked HasActiveBook alone while the run itself resolved
-	// the panel's book - the same question answered two ways, which is the shape this plug-in keeps
-	// being bitten by. A book on show in the panel with no active book behind it read as "no book
-	// is open" at every door the run has, while the run itself could have searched it.
-	IDFile panelBookFile;
-	if (GetPanelBookFile(panelBookFile))
-	{
-		SDKFileHelper panelHelper(panelBookFile);
-		if (FindOpenBookByPath(panelHelper.GetPath()) != nil)
-			return true;
-	}
-	return HasActiveBook();
+	// ***** THE BOOK THE RUN WOULD RESOLVE, asked through the very function the run resolves it
+	// with. ***** ListBookChapters calls ResolveTargetBook too, so the menu's grey state and the
+	// run itself cannot come to different answers - which is the whole reason this exists. Nothing
+	// here opens, lists or holds anything: it reads a palette's file field and asks IBookManager.
+	//
+	// It was written on 2026-08-09 as its own copy of those two steps ("the SAME two-step answer
+	// ListBookChapters gives", the note here said), and the copy came out a door short: it took an
+	// active book that was already broadcasting its close, which the run drops. Same day, same
+	// commit, one of the two spellings updated - so the gate built to end that split had quietly
+	// re-opened it (block 11 re-audit, 2026-08-10). There is one spelling now.
+	//
+	// (KBSBookScope::HasActiveBook stood beside this until then; its last caller was the fallback
+	// that used to be written out here, and it went with it. The bare "is a book active" question
+	// has no user left: every door in this plug-in wants the book a run would TARGET, and those are
+	// not the same question.)
+	return ResolveTargetBook() != nil;
 }
 
 bool KBSBookScope::HasScopeTarget()
@@ -1016,10 +1115,6 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	outDocs.clear();
 	outBookName.Clear();
 
-	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-	if (bookMgr == nil)
-		return false;
-
 	// Which book to search: the one the BOOK PANEL is showing, not the "active" one.
 	//
 	// Selecting a book's tab switches the panel but does NOT make that book active - only touching
@@ -1027,30 +1122,14 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// gets whatever book was active before, silently. For a search that is confusing; for Change
 	// Checked it would rewrite the wrong book, which is unacceptable. Adobe splits the two ideas in
 	// IBookUIUtils itself (GetBookFileFromBookPanel vs "the active book"), so the panel's own book
-	// is the right thing to ask for.
+	// is the right thing to ask for. It falls back to the active book when the panel cannot be
+	// reached, which keeps the old behaviour rather than failing outright.
 	//
-	// Falls back to the active book when the panel cannot be reached, which keeps the old
-	// behaviour rather than failing outright.
-	IBook* book = nil;
-
-	IDFile panelBookFile;
-	if (GetPanelBookFile(panelBookFile))
-	{
-		// FindOpenBookByPath, not a bare FindOpenBookByName: the path lookup adds the IsOpen()
-		// test that keeps a book still broadcasting its close off the list - the reason that
-		// function itself documents. This was the one lookup in the module still asking bare
-		// (found 2026-08-09, the one-question-one-place sweep).
-		SDKFileHelper panelHelper(panelBookFile);
-		book = FindOpenBookByPath(panelHelper.GetPath());	// nil = not open, or already closing
-	}
-
-	// GetCurrentActiveBook hands out a non-owning pointer - no release. Same for the lookup above.
-	if (book == nil)
-	{
-		book = bookMgr->GetCurrentActiveBook();
-		if (book != nil && !book->IsOpen())
-			book = nil;		// the same closing-book door the panel-side lookup has
-	}
+	// Both steps - and the closing-book door on each of them - live in ResolveTargetBook, which the
+	// menu's grey state asks as well (HasTargetBook). They were two copies of the same two steps
+	// until the block 11 re-audit (2026-08-10), and the copies had already drifted by one test.
+	// Non-owning pointer, whichever step answered: nothing here is released.
+	IBook* book = ResolveTargetBook();
 	if (book == nil)
 		return false;
 
