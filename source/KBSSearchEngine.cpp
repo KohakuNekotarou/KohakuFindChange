@@ -586,8 +586,19 @@ PMString DescribeGlyphQuery(IFindChangeOptions* opts, bool findSide)
 	}
 	description.Append(")");
 
-	// The Unicode is a bonus: an ALTERNATE form has none to give, and writing U+0000 there would be a
-	// lie.
+	// The Unicode is a bonus, not a requirement: the header says plainly that this call "May return 0"
+	// (IGlyphUtils.h:281), and writing U+0000 in its place would be a lie.
+	//
+	// ***** NOT THE ALTERNATE-FORM CASE THIS NAMED UNTIL 2026-08-10. ***** That is Adobe's note
+	// against the LOWER call, GlyphToCharacter (SnpInsertGlyph.cpp:291-299), and the call made here is
+	// the upper one: "Uses GlyphToCharacter to get its work done. Will also get a unicode value for
+	// glyphs in OpenType features" (IGlyphUtils.h:277-278) - which is the whole reason it is the one
+	// asked. The old sentence explained the empty line by the very case this API is chosen to answer.
+	//
+	// ***** THE SAME SENTENCE STOOD IN THE SIBLING AND WAS CORRECTED THERE ON 2026-08-08. *****
+	// KBSReplaceConfirmDialog::ResolveSide is named four lines above as the shape this follows, and
+	// the correction did not travel along that citation - the reading that found it opened the file
+	// this one points AT, which is where the answer already was.
 	//
 	// The face is taken through an InterfacePtr, which is how Adobe takes it every time
 	// (SnpModifyLayoutGrid.cpp:1050, SnpInspectLayoutGrid.cpp:465) - QueryFace hands back a reference

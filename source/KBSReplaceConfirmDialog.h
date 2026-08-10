@@ -139,9 +139,17 @@ public:
 	// about.
 	//
 	// On the user's decision the question moved to the only point where every chapter can be asked:
-	// the moment the replace opens each one (KBSReplaceEngine, AskEditedChapter and the resolve
-	// pass). It is a modal alert per chapter now, and Cancel there stops the whole run - which this
-	// prompt could not offer either, its own Cancel having already been answered by then.
+	// the resolve pass of KBSReplaceEngine::ReplaceChecked, as each chapter is opened.
+	//
+	// ***** AND SINCE 2026-08-10 IT IS NOT A QUESTION AT ALL. ***** It was a per-chapter "the text
+	// has been edited - OK / Cancel?" alert (AskEditedChapter) for two days; the whole approach was
+	// then replaced. The resolve pass now WALKS each chapter and compares the ticked positions
+	// themselves, and one that has moved stops the run outright and merely states it
+	// (TellResultsWentStale). AskEditedChapter no longer exists.
+	//
+	// This note described it in the present tense until 2026-08-10, and KBS.fr carried the same
+	// sentence: the engine corrected its own history that day, and nothing walked the correction over
+	// to the two files that point AT the engine.
 
 	/** What the run leaves behind - documents open and unsaved. @see BuildCountLine
 

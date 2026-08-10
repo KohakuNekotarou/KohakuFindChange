@@ -1577,8 +1577,10 @@ resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
 		// ***** Both layouts carried that sentence - this one on a line of its own, the Text / GREP
 		// one inside the wrapped block above - and it left the prompt entirely the same day: from
 		// here only the chapters that happen to be OPEN can be asked about, and a chapter the user
-		// opened, edited, saved and closed cannot. The replace asks each chapter as it opens it now,
-		// and its Cancel stops the whole run (KBSReplaceEngine::AskEditedChapter).
+		// opened, edited, saved and closed cannot. The replace WALKS each chapter as it opens it now
+		// and compares the ticked positions themselves; one that has moved stops the whole run and is
+		// stated rather than asked about (KBSReplaceEngine's resolve pass and TellResultsWentStale).
+		// A per-chapter OK / Cancel alert stood in between, from 2026-08-08 to 2026-08-10.
 		//
 		// kKBSReplaceConfirmEditedWidgetID is commented out in KBSID.h, its number not reused - the
 		// way the "Don't show again" box's id was before it.
