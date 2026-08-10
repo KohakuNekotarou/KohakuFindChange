@@ -81,6 +81,7 @@
 #include "TextAttrID.h"				// kTextAttrFontUIDBoss / kTextAttrFontStyleBoss
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
+#include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "ProgressBar.h"			// RangeProgressBar - the search's progress + cancel (both scopes)
@@ -143,8 +144,9 @@ const int32 kKBSChapterProgressSpan = 10000;
     count, so nothing is loaded here (contrast with adding up their lengths, which would have to
     fetch every story before the search had even started).
 
-    USER-ACCESSIBLE ones only, which is exactly the walk's own population - IStoryList.h:36-39 says
-    internal stories "are not subject to search through find change". */
+    USER-ACCESSIBLE ones only, which is exactly the walk's own population - IStoryList.h:40-42 says
+    internal stories "are not subject to search through find change". (Cited as :36-39 until the
+    fifth audit of this block, 2026-08-10, which read the lines it named.) */
 int32 CountSearchableStories(const UIDRef& docRef)
 {
 	InterfacePtr<IStoryList> storyList(docRef, UseDefaultIID());
@@ -1064,7 +1066,7 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 // ***** FIFTY, TOTAL, MATCH FIRST - the user's numbers (2026-08-10). ***** The match takes what
 // it needs up to the whole budget; what is left is split evenly between the two contexts, and a
 // side with less to say than its half hands the remainder to the other side. Every cut end is
-// marked with an ellipsis (kKBSCutMark below), so a line that was CUT is never mistaken for a
+// marked with an ellipsis (kTextChar_Ellipse), so a line that was CUT is never mistaken for a
 // line that ENDS. The arithmetic lives in SplitLineWithScanner and nowhere else.
 //
 // DISPLAY AND REPORT ONLY. The same-occurrence test reads none of the three segments - it
@@ -1073,11 +1075,22 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 // cap bound the test itself before then, which is why it sat far out at 500.)
 const int32 kKBSMaxLineChars = 50;
 
-// U+2026 HORIZONTAL ELLIPSIS - the mark a cut end carries. A named UTF32TextChar rather than a
-// character in a string literal, the way KBSResultModel names its break marks (kKBSReturnArrow),
-// and with one more reason here: it keeps this file ASCII, and a bare UTF-8 symbol in this very
-// file has been garbled to CP932 noise twice in one day already (2026-08-04).
-const UTF32TextChar kKBSCutMark = 0x2026;
+// (A local kKBSCutMark = 0x2026 stood here until 2026-08-10. The SDK names that character -
+//  kTextChar_Ellipse, TextChar.h:188 - so the three AppendW calls below take it from there, which
+//  is what the product does for this very job: ConditionalTextTips.cpp:117-126 reads a story
+//  through IComposeScanner::CopyText, stops at a character limit, and appends kTextChar_Ellipse if
+//  it stopped early. SnpPerformKinsokuTable.cpp:557 appends it with the same cast.
+//
+//  ***** THE PATTERN THIS FILE CITED WAS THE OTHER HALF OF THE SAME RULE. ***** The note here said
+//  it was naming the character locally "the way KBSResultModel names its break marks
+//  (kKBSReturnArrow)". That one is named locally BECAUSE TextChar.h carries no constant for U+21B5,
+//  and its own comment says so on the line above it - while the pilcrow beside it in the same
+//  expression comes straight from TextChar.h (KBSResultModel.cpp:739-742, :776). What was copied
+//  was the naming; what was not was looking first.
+//
+//  The reason for naming it at all still holds and is still met: a bare UTF-8 symbol in this file
+//  was garbled to CP932 noise twice in one day (2026-08-04), and a constant - the SDK's or ours -
+//  keeps the file ASCII either way.)
 
 // Where the drawn match stops. Capped at the SAME number the whole line is budgeted with: a match
 // that long owns the entire line, and the contexts' arithmetic in SplitLineWithScanner then comes
@@ -1180,7 +1193,7 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// characters read. It is drawn in the match's own colour, which is the truth being told:
 	// what follows the mark is more MATCH.
 	if (matchEnd != end)
-		outMatch.AppendW(kKBSCutMark);
+		outMatch.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
 
 	// ----- then the two contexts, out of what the match left -----
 	// How much text each side HAS is measured before the budget is dealt out, so a side with less
@@ -1239,7 +1252,7 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 		WideString w;
 		scanner->CopyText(preFrom, preBudget, &w);
 		if (preFrom > paraStart)
-			outPre.AppendW(kKBSCutMark);	// cut at its head, marked at its head
+			outPre.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));	// cut at its head, marked at its head
 		outPre.Append(PMString(w));
 		outPre.SetTranslatable(kFalse);
 	}
@@ -1251,7 +1264,7 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 		scanner->CopyText(matchEnd, postBudget, &p);
 		outPost.Append(PMString(p));
 		if (postBudget < postAvail)
-			outPost.AppendW(kKBSCutMark);	// cut at its tail, marked at its tail
+			outPost.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));	// cut at its tail, marked at its tail
 		outPost.SetTranslatable(kFalse);
 	}
 }

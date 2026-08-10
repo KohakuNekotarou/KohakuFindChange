@@ -327,12 +327,19 @@ namespace KBSSearchEngine
 
 	/** Is the text at this position OVERSET - composed, but placed in no frame?
 
-	    The official answer, and the reason this lives here rather than beside its one caller:
+	    The official answer, and the reason this lives here rather than beside the jump that asks it:
 	    ITextParcelList.h:87-101 states that "if the TextIndex is in overset an invalid ParcelKey
 	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
 	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
 	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
 	    the same statement.
+
+	    (This said "its ONE caller" from the day it arrived - 2026-08-08, block 12's audit, when
+	    that was true - until the fifth audit of this block, 2026-08-10. There are TWO: the jump
+	    itself (KBSJump.cpp:624) and the double click that selects the match (:866), which arrived
+	    on 2026-08-09 and did not come back to the sentence that had counted its callers. Sharing
+	    one answer between them is the whole point, so the second caller strengthens the reason
+	    rather than weakening it - but a count in a comment is a claim like any other.)
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
 	          THREAD (and is the only test that answers for a table cell overflowing on its own -
@@ -425,12 +432,20 @@ namespace KBSSearchEngine
 	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
 
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
-	    all of which must answer yes:
+	    asked in this order, none of which may answer no:
 
 	      - same story          (a match in another story is never the one the row means)
 	      - same position       (start == expectStart)
 	      - same LENGTH         (end - start == expectEnd - expectStart)
 	      - same text, WHOLE    (the stored hash covers every character of the match)
+
+	    ***** THE FOURTH IS NOT ASKED OF A ZERO-WIDTH MATCH. ***** A match with start == end - what
+	    GREP's ^ / $ / lookarounds hand back - has no text for the fourth question to be about, and
+	    its stored hash is 0, which that question reads as "could not vouch for this" and refuses.
+	    So an empty range that has satisfied the first three is accepted there and then (2026-08-09,
+	    after every ^ hit read as missing on a document nobody had touched). This list said "all of
+	    which must answer yes" until the fifth audit of this block, 2026-08-10 - the fix went into
+	    HashMatchText's @return and into the .cpp, and stopped one door short of here.
 
 	    ***** THE JUMP IS THE ONLY CALLER, AND HAS BEEN SINCE 2026-08-05. ***** A click on a row asks
 	    this about the very range that row recorded, so the first three questions are satisfied by
