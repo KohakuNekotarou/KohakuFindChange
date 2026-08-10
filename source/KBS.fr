@@ -1024,10 +1024,11 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 										// for a day, to line up with KESCM when docked together;
 										// that pairing is deliberately GIVEN UP - see the history
 										// in KBSPanelMetrics.cpp. This 300 is the size the panel
-										// OPENS at, where the message takes three lines on a
-										// Japanese UI - and three is what the block is sized to
-										// hold, at this width and at the floor alike. Both numbers,
-										// and the measurements behind them, are in
+										// OPENS at, where the opening message takes three lines on
+										// a Japanese UI - and FOUR is what the block is sized to
+										// hold, at this width and at the floor alike, because the
+										// longest message the panel can put up needs them (2026-08-10).
+										// Both numbers, and the measurements behind them, are in
 										// KBSPanelMetrics.cpp.
 	kTrue, kTrue,						// Visible, Enabled
 	kTrue,								// Erase background (kFalse -> kTrue with the tree)
@@ -1055,11 +1056,15 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// draws 18px lines (measured 2026-08-06 on the running panel: baselines at y=218, 236, 254),
 		// so this 48px box held two and two thirds of them and the last line of every message was
 		// cut off. A resource carries one set of numbers and these are the English set;
-		// KBSPanelMetrics puts the real height on when the panel appears - 54 = 18x3 there, which is
-		// a line budget of its OWN (three Japanese lines against four Roman ones, user's call
-		// 2026-08-07: 54px and 48px come to nearly the same block, so the panel looks the same in
-		// both while neither clips). If this number changes, change that one too - the two are
+		// KBSPanelMetrics puts the real height on when the panel appears - 72 = 18x4 there, so that
+		// both languages get FOUR lines. If this number changes, change that one too - the two are
 		// stated against each other.
+		//
+		// ***** IT WAS 54 = 18x3 UNTIL 2026-08-10, AND THAT WAS MEASURABLY TOO SHORT. ***** Three
+		// lines were sized against the OPENING message; the line a stopped replace leaves is 128
+		// characters and drew only as far as "the document has", losing the sentence that says what
+		// to do. The block grew a line and the messages were cut to fit it - see KBSPanelMetrics.cpp,
+		// which carries the measurement.
 		//
 		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
 		// never measured. If the palette font ever changes size, measure again - the rule is the
@@ -1076,7 +1081,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			// of the change - and a "..." would throw it away again on the last line.
 			kAlignLeft, kDontEllipsize, kTrue,
 			// StaticMultiLineTextAttr: scroll bar widget, font, pixels between lines, inset.
-			// No scroll bar: three lines are the budget, and one that appeared would sit on top of
+			// No scroll bar: four lines are the budget, and one that appeared would sit on top of
 			// the illustration. The rest are KESCM's values for the same kind of box.
 			kInvalidWidgetID,
 			kPaletteWindowFontId,

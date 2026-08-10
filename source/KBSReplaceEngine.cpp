@@ -1118,7 +1118,14 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 		KBSResultModel::Clear();
 		KBSBookScope::ReleaseSearchedBook();
 		KBSSearchEngine::ForgetSearchedFindFormat();
-		outSummary.Append(" The results have been cleared - the document has changed since the search. Search again.");
+		// ***** SHORT ENOUGH TO BE READ WHOLE. ***** This follows BuildSummary's own cancel sentence,
+		// so what the panel draws is both of them - and at the panel's floor the two used to come to
+		// 128 characters against a box that held about 88: the line stopped at "the document has" and
+		// the reader never saw that they were being asked to search again (measured on the running
+		// panel, 2026-08-10). The block is four lines now (KBSPanelMetrics) and this says the same
+		// thing in half the room. WHY the document no longer matches is the alert's job
+		// (TellResultsWentStale), which has a whole dialog to say it in.
+		outSummary.Append(" Results cleared - the document changed. Search again.");
 	}
 
 	// The chapters that would not close, at the end, the way every other exit says it.
@@ -1212,7 +1219,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 		const int32 currentMode = (modeOpts != nil) ? static_cast<int32>(modeOpts->GetSearchMode()) : -1;
 		if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
 		{
-			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran - search again before replacing.");
+			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran. Search again.");
 			return true;
 		}
 	}
@@ -1226,7 +1233,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 		&& searchedMode != IFindChangeOptions::kGlyphSearch
 		&& searchedMode != IFindChangeOptions::kTransliterateSearch)
 	{
-		outSummary.Append("These results did not come from a text tab, so they cannot be replaced here - InDesign's own Find/Change can change them.");
+		outSummary.Append("These results did not come from a text tab - use InDesign's own Find/Change to change them.");
 		return true;
 	}
 
@@ -1257,7 +1264,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	// them, so this refuses the way every other door in this plug-in does and leaves the panel be.
 	if (!KBSSearchEngine::CommitSearchMode())
 	{
-		outSummary.Append("The Find/Change tab could not be set, so nothing was changed. Try again, or reopen Edit > Find/Change.");
+		outSummary.Append("The Find/Change tab could not be set - nothing was changed. Try reopening Edit > Find/Change.");
 		return true;
 	}
 
@@ -1325,7 +1332,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 			KBSResultModel::Clear();
 			KBSBookScope::ReleaseSearchedBook();
 			KBSSearchEngine::ForgetSearchedFindFormat();
-			outSummary.Append("The Find/Change query has changed since this search ran, so these results no longer describe it - they have been cleared. Search again.");
+			outSummary.Append("The Find/Change query has changed since this search - the results have been cleared. Search again.");
 			return true;
 		}
 	}

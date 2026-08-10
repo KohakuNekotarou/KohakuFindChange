@@ -2486,7 +2486,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		PMString tabName(SearchModeName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
-		outSummary.Append(" tab, which searches objects rather than text. This panel lists text, so use InDesign's own Find/Change for that.");
+		// Short enough to be read whole at the panel's floor - this one composes a tab name into the
+		// middle of it, so it is longer than it looks here (see KBSPanelMetrics on the four-line
+		// budget, and what a message that outgrew it cost in 2026-08-10's shipping code).
+		outSummary.Append(" tab. This panel lists text - use InDesign's own Find/Change.");
 		return 0;
 	}
 
@@ -2514,10 +2517,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	else if (!HasFindQuery())
 	{
 		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
-		// query on another tab is no help and saying so avoids a hunt. The Glyph and Transliterate
-		// tabs are worded for what they actually want - a glyph picked from a grid, a character
-		// type chosen from a dropdown - because "type what to find" points at a field neither
-		// tab has.
+		// query on another tab is no help and saying so avoids a hunt.
+		//
+		// The HEAD names what is missing, one wording per tab. The TAIL says how to supply it, and
+		// there it is CHOOSE against TYPE rather than a wording per tab: the Glyph and Transliterate
+		// tabs both offer a thing to pick (a glyph from a grid, a character type from a dropdown)
+		// where Text and GREP have a field to type into, and "type what to find" points at a field
+		// neither of the first two has. Naming the thing twice - once in the head and again in the
+		// tail - is what ran these past what the panel can draw (2026-08-10; see KBSPanelMetrics for
+		// the four-line budget and for what a message that outgrew it cost in shipping code).
 		const bool glyphTab = (tab == IFindChangeOptions::kGlyphSearch);
 		const bool translitTab = (tab == IFindChangeOptions::kTransliterateSearch);
 		outSummary.Append(glyphTab ? "No glyph set on the "
@@ -2525,11 +2533,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		PMString tabName(SearchModeName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
-		outSummary.Append(glyphTab
-			? " tab. Choose the glyph to find in Edit > Find/Change, then run the search from the panel flyout."
-			: (translitTab
-				? " tab. Choose the character type to find in Edit > Find/Change, then run the search from the panel flyout."
-				: " tab. Type what to find in Edit > Find/Change, then run the search from the panel flyout."));
+		outSummary.Append((glyphTab || translitTab)
+			? " tab. Choose one in Edit > Find/Change, then search again."
+			: " tab. Type what to find in Edit > Find/Change, then search again.");
 		return 0;
 	}
 
@@ -2565,7 +2571,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// it up changes nothing the user can see: it writes back the value it has just read.
 	if (!KBSSearchEngine::CommitSearchMode(overrideFindGlyph))
 	{
-		outSummary.Append("The Find/Change tab could not be set, so nothing was searched. Try again, or reopen Edit > Find/Change.");
+		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
 	}
 

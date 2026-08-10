@@ -30,24 +30,42 @@ namespace
 // The message block's height in each UI. Each is a WHOLE NUMBER OF LINES in the language it
 // is used for - that is the rule, and it is why they are two numbers rather than one: a
 // single value cannot divide by both 12 and 18 without being 36, 72, 108...  Because each
-// language reads only its own line, 54 is fine here (18x3) even though it would be four and
-// a half Roman lines - no Roman UI ever gets it.
+// language reads only its own line, 72 is fine here (18x4) even though it would be six Roman
+// lines - no Roman UI ever gets it.
 //
-// The two languages get DIFFERENT line budgets, and that is the point of having two numbers:
-// four Roman lines and THREE Japanese ones (user's call, 2026-08-07) come to nearly the same
-// block - 48px against 54px - so the panel looks the same in both while neither clips.
+// ***** FOUR LINES ON A JAPANESE UI SINCE 2026-08-10, AND THE THIRD WAS NOT A ROUNDING ERROR.
+// ***** It was 54 (18x3) from 2026-08-07, sized against the OPENING message - which draws 535px
+// wide on a Japanese UI and therefore takes 2.8 lines in the 217px box the floor gives it. The
+// note that stood here said so, and the .fr's said the same thing with the warning attached:
+// "that is one message, though, not a promise about every message - a longer one takes a fourth
+// line and the fourth is clipped."
 //
-// Why three is enough at the floor: the opening message DRAWS 535px wide on a Japanese UI and
-// the box at the floor is 193px (see below), so it takes 2.8 lines. Four was carried from
-// 2026-08-06, when the floor was 260 and the arithmetic was measured against a different width;
-// the third line has been the last one with ink on it ever since the floor moved to 242.
+// It was clipped. MEASURED on the running panel (2026-08-10, PrintWindow over the status widget):
+// the line a stopped replace leaves - "Replace cancelled - nothing was changed. The results have
+// been cleared - the document has changed since the search. Search again." - drew three lines and
+// STOPPED AT "the document has". What the user lost was the end of the sentence, which is the
+// part that says what to do about it. 128 characters against a box that holds about 88.
+//
+// So both halves were fixed together (user's call): this block grew a line, and every refusal
+// that has to be read whole was cut to fit four - about 117 characters at the floor. The
+// messages are the half that matters; this is the headroom that keeps a long one from being
+// silently truncated again.
+//
+// ***** THE ROMAN BLOCK IS LEFT AT FOUR, and that is not an oversight (user's instruction was to
+// ***** raise it too "if the English version also has a problem"). It has not: the SAME box holds
+// four 12px lines there, and a 12px palette font puts appreciably more characters on each of them
+// than an 18px one does - so four Roman lines hold strictly more text than the four Japanese ones
+// this file now budgets for. The messages were cut to fit the Japanese four, which is the tighter
+// of the two. NOT measured on this machine, which runs a Japanese UI and cannot draw the Roman
+// one; if a Roman UI is ever seen to clip, this is the number to raise (to 60 = 12x5) and
+// kMinimumHeightRoman moves with it.
 //
 // The block and the floor are a pair: the width decides how many lines a message takes, and this
 // decides how many there is room to draw. Narrow the floor without raising this and the last
 // line is clipped.
 const int32 kMessageHeightRoman = 48;	// 12px x 4 lines
-const int32 kMessageHeightCJK   = 54;	// 18px x 3 lines  (= four and a half Roman lines, which
-										// no Roman UI ever gets - see the note above)
+const int32 kMessageHeightCJK   = 72;	// 18px x 4 lines  (= six Roman lines, which no Roman UI
+										// ever gets - see the note above)
 
 // The gap between the message block and the tree, as the .fr has always had it.
 const int32 kGapUnderMessageBlock = 3;
@@ -60,8 +78,11 @@ const int32 kGapUnderMessageBlock = 3;
 //     box 301 (panel 350) -> 2 lines      <- pointlessly wide
 //     box 251 (panel 300) -> 3 lines      <- what the panel opens at
 //     box 217 (panel 266) -> 3 lines      <- ***** the floor *****, and MEASURED there: the
-//                                            opening message drew three 18px lines in the 54px
-//                                            block with nothing clipped (2026-08-07, Japanese UI)
+//                                            opening message drew three 18px lines with nothing
+//                                            clipped (2026-08-07, Japanese UI). ***** THAT IS THE
+//                                            OPENING MESSAGE AND ONLY IT ***** - a stopped
+//                                            replace's line needs five at this width, which is
+//                                            what the block being 3 lines tall cost (2026-08-10)
 //     box 216 (panel 265) -> 4 lines      <- where the clipping was reported back when the
 //                                            Japanese block was 48px (2 2/3 lines)
 //
@@ -78,17 +99,19 @@ const int32 kGapUnderMessageBlock = 3;
 // to where it cannot be read, and the width it is read at is this one. Lining up with a sibling
 // was a second job asked of the same number, and the two wanted different answers.
 //
-// ! The floor and the block are now measured AT THE SAME WIDTH: the opening message takes three
-//   18px lines in a 54px block at box 217, with nothing clipped. That is one message, though, not
-//   a promise about every message - a longer one takes a fourth line and the fourth is clipped.
+// ! The floor and the block are measured AT THE SAME WIDTH, and the block is now sized against the
+//   LONGEST message rather than the opening one: four 18px lines in a 72px block at box 217, which
+//   is about 117 characters. Every refusal that has to be read whole is kept under that (see
+//   KBSReplaceEngine::RefuseChangedQuery and the search's own refusals). Sizing it against the
+//   opening message is exactly what let a 128-character line be cut off in shipping code.
 //   The floor is how small the panel MAY be made.
 //
 // Same floor in both languages: a Roman UI draws the same message in 12px lines, so it simply
 // has room to spare rather than a layout of its own.
 //
-// ! It is the WIDTH that decides the line count, and the block above holds four Roman lines or
-//   three Japanese ones (see kMessageHeightRoman / kMessageHeightCJK). The two numbers are a pair
-//   with this one - neither is meaningful without the other.
+// ! It is the WIDTH that decides the line count, and the block above holds four lines in either
+//   language (see kMessageHeightRoman / kMessageHeightCJK - 48px of them Roman, 72px Japanese).
+//   The two numbers are a pair with this one - neither is meaningful without the other.
 //
 // Height: stated against the Roman block so that a taller block simply moves it. The floor is
 // there to keep about five 19px result rows visible, which has nothing to do with language.
