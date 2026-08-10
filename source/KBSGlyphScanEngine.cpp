@@ -328,6 +328,23 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 	if (waxIter == nil)
 		return;
 
+	// ***** ICompositionUtils::PregenerateWaxRuns WAS MEASURED HERE AND IS NOT USED. *****
+	// The product makes that call at exactly this point - PrivateSpellingUtils.cpp:377, inside the
+	// very function this walk is modelled on - and its header offers what a scan of every line of a
+	// book would want: an "Experimental routine that will try to use multiple threads to generate
+	// the runs for multiple lines in parallel" (ICompositionUtils.h:119-122).
+	//
+	// It changes nothing here. A/B builds, 2026-08-10, 60 pages / 171,090 characters, the document
+	// closed and reopened before every run so each one composes cold: MEDIAN 677 ms with the call
+	// (n=10) against 681 ms without (n=12). The reason is a dozen lines above - this function
+	// recomposes the frame list before reading it, so by the time the iterator exists the runs are
+	// made and there is nothing left to pregenerate. The spelling code does NOT recompose first,
+	// which is why the call earns its place there and not here.
+	//
+	// ***** MEASURE IT WARM. ***** The same A/B read as 677 against 1257 ms - a false 1.9x - while
+	// the "without" build was being measured from a freshly started application and the "with" build
+	// was not. Every one of these numbers halves over the first few runs of a session.
+
 	int32 lines = 0;
 	int32 offset = 0;
 	const IWaxLine* line = waxIter->GetFirstWaxLine(0, &offset);

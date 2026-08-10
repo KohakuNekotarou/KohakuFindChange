@@ -305,6 +305,35 @@ bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
 	return found;
 }
 
+//----------------------------------------------------------------------------------------
+// ***** ITextParcelList::GetParcelContainsOversetContent WAS MEASURED AGAINST THE WALK ABOVE AND
+// IS NOT USED. *****
+//
+// It answers "does this parcel hold complex content - Tables and Footnotes - that is overset?" in
+// one call (ITextParcelList.h:705-713), and the SDK declares it without ever calling it: one line,
+// no use anywhere. A probe build ran both over every story of five documents, 2026-08-10:
+//
+//     overset-shapes      4 stories   cells 2   parcels 2   agree
+//     pushed-table        2 stories   cells 0   parcels 0   agree
+//     overset-bigtable    1 story     cells 1   parcels 1   agree
+//     many-overset      500 stories   cells 0   parcels 0   agree
+//     footnote-overset    1 story     cells 0   parcels 1   DIFFER
+//
+// ***** The one disagreement is the interesting one, and it changes no answer. ***** The API does
+// see an overflowing FOOTNOTE, which the walk above cannot - that one only visits dictionaries
+// carrying an ITableModel, so a footnote thread is passed over. But a footnote that does not fit
+// makes the FRAME LIST overset: measured with 4,183 characters of footnote under 64 characters of
+// body, the last frame answered overflows=true and this scan reported the place. So question (1)
+// of StoryHasAnyOverset - ITextUtils::IsOverset - has already said yes before the cell walk is
+// reached, exactly as it has for a pushed-out table.
+//
+// Nor is it faster where it would matter. Microseconds either way, and the ordering flips with the
+// document: 500 stories with no table in them cost 70 us for the walk against 1,540 us for the
+// parcels (the walk leaves at once when the hierarchy holds no ITableModel, while every parcel has
+// to be asked), and one story holding a table of 861 overset cells cost 53 us for the walk against
+// 24 us for the parcels. Against a scan that takes 700 ms, neither is visible.
+//----------------------------------------------------------------------------------------
+
 /** Scan one document and turn every overset place into a result row.
 
     @param outOffPage  incremented for a place whose "+" sits on no page - a frame on the
@@ -640,6 +669,15 @@ bool KBSOversetScanEngine::StoryHasAnyOverset(ITextModel* model)
 	// frame holding that table is overset, which (1) above has already said yes to. Nothing is lost
 	// from the glyph scan's "part of this document could not be looked at" either, for the same
 	// reason - that text is inside the overflow (1) reported.
+	//
+	// ***** A FOOTNOTE that overflowed is not counted here either, and it costs no answer for the
+	// same reason (measured 2026-08-10). ***** CollectOversetCells only visits dictionaries that
+	// carry an ITableModel, so a footnote thread never reaches it at all. But a footnote that does
+	// not fit makes the FRAME LIST overset: with 4,183 characters of footnote under 64 characters of
+	// body the last frame answered overflows=true and the scan reported the place, so (1) above has
+	// already said yes. The probe that established this ran
+	// ITextParcelList::GetParcelContainsOversetContent beside the cell walk - that API DOES see the
+	// footnote, and the note over ScanOneDocument records why it is still not used.
 	//
 	// nil = collect nothing and stop at the first one; only the yes or no is wanted here. The place
 	// bound goes unread on that path for the same reason - there is no list to bound.
