@@ -10,6 +10,21 @@
 //  Ported from KESCM's KESCMPanelState.cpp, including its two audit fixes: the write is checked
 //  for a short count AND for fclose failing, so a full disk cannot be reported as "saved".
 //
+//  ***** WHY stdio AND NOT IPMStream. ***** (Settled 2026-08-10; do not re-open without reading
+//  this.) The SDK's usual way to read or write a file's bytes is
+//  StreamUtil::CreateFileStreamRead / CreateFileStreamWrite -> IPMStream, used in dozens of
+//  samples and in the product's own libs; SnpShareAppResources.cpp, the very snippet this file
+//  cites below for WHERE the file goes, opens it that way (:182, :187). FileUtils::OpenFile is a
+//  public, documented API (FileUtils.h:449-455) but has no user anywhere in the SDK.
+//
+//  Two of the three things guarded here move across cleanly - a short write is XferByte's return
+//  value, and a truncated read is GetStreamState() == kStreamStateFailure, which is what ferror
+//  is doing below. The THIRD DOES NOT: IPMStream::Close() and IPMStream::Flush() both return void
+//  (IPMStream.h:321, 368), so a write that fails while being flushed - the full disk, which is
+//  the case the 2026-07-25 audit added the check for - has no documented way of being noticed.
+//  fclose reports it. Moving to the mainstream API would quietly weaken the one check that keeps
+//  this from saying "saved" when nothing was.
+//
 //========================================================================================
 
 #include "VCPlugInHeaders.h"

@@ -13,16 +13,34 @@
 //  box no longer shows a half-drawn line (KBS.fr sizes it to a whole number of lines), but the text
 //  that no longer fits is text the user cannot read at all.
 //
-//  This is KESCL's KESCLReportPanelView, which has had the same floor since 2026-07-17 and is the
-//  only Kohaku panel that did (KESCM has none). The one difference is where the width comes from:
-//  KESCL measures a widget it moves at runtime, whereas every widget here sits where the .fr put
-//  it, so a constant says it and names its parts.
+//  All three Kohaku panels have a floor, and each gets its width from somewhere else:
+//    KESCL   KESCLReportPanelView.cpp:98-127  (2026-07-20) MEASURES the filter row it places at
+//                                             runtime, over a fixed floor
+//    KESCM   KESCMPanelView.cpp:68-103                     a constant - and a maximum HEIGHT too,
+//                                             because a closed section leaves nothing to show
+//    KBS     here                                          a constant, because every widget sits
+//                                             where the .fr put it
+//  (This file said KESCL was the only one and KESCM had none. It was written when that was true.)
 //
 //  Why the rounding exists. The floor stops the panel getting too small; it says nothing about
 //  where it stops in between. Dragged to any height the framework likes, the tree ends on a part
 //  row - a strip of clipped letters along the bottom edge that reads as a result the panel is
 //  hiding. Rounding the panel's own height down to a multiple of the row height means the last row
-//  drawn is always a whole one.
+//  drawn is a whole one.
+//
+//  ***** WHAT THAT DOES NOT COVER: ANY HEIGHT THE USER DID NOT DRAG TO. ***** The framework asks
+//  this only when it is about to resize, so a height that arrives another way is never rounded:
+//
+//    * the size the panel OPENS at (KBS.fr, 360). 360 - 61 of fixed part = 299, and 299 / 19 is
+//      15.7 rows.
+//    * the moment KBSPanelMetrics::Update moves the tree's top down for a Japanese UI: the tree
+//      loses 24px out of a height that was rounded against the 48px block, so a panel that WAS
+//      whole stops being so (275 / 19 = 14.5 at the opening size).
+//
+//  One drag puts it right, and that is where this is left. The fix would be to resize the panel
+//  from KBSPanelMetrics::Update - but a docked panel's height belongs to the dock, and a plug-in
+//  that writes it back on every show is arguing with the thing that owns it. A part row at the
+//  bottom edge until the user drags is the smaller of the two costs.
 //
 //========================================================================================
 

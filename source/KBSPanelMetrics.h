@@ -54,14 +54,25 @@ namespace KBSPanelMetrics
 	void Update(IPanelControlData* panelData);
 
 	/** The message block's height in pixels: a whole number of lines IN THE LANGUAGE IT IS USED
-	    FOR. 54 = 18x3 (Japanese); 48 = 12x4 (English). A remainder would leave room for a
-	    part-line, which is drawn as a sliver of chopped-off letters - and each language only
-	    ever reads its own number, so 54 not dividing by 12 costs nothing. */
+	    FOR, and FOUR lines in both. 72 = 18x4 (Japanese); 48 = 12x4 (English). A remainder would
+	    leave room for a part-line, which is drawn as a sliver of chopped-off letters - and each
+	    language only ever reads its own number, so the two need not agree on a common multiple.
+
+	    ***** THE JAPANESE NUMBER WAS 54 = 18x3 UNTIL 2026-08-10. ***** Three lines were sized
+	    against the OPENING message; the line a stopped replace leaves is 128 characters and was
+	    measurably cut off. The block grew a line and the messages were cut to fit it - the
+	    measurement, and the reasoning for leaving the Roman block at four, are in
+	    KBSPanelMetrics.cpp over the two constants. **This sentence is the one KBS.fr:1060 means
+	      by "if this number changes, change that one too": the .fr, the .cpp and THIS LINE are
+	      three statements of one fact, and this line is the one that was left behind in both of
+	      the changes so far (2026-08-08, 2026-08-10). */
 	int32 MessageBlockHeight();
 
-	/** The floor under a drag. The width is what the panel measures at its usual size
-	    (user's call, 2026-08-06); the height moves with the message block, so a taller block
-	    does not eat the result rows the floor exists to protect. */
+	/** The floor under a drag. The width is what the panel measures at its usual size (measured
+	    off the running panel on 2026-08-07, which is where the number 266 comes from - the
+	    instruction was given twice and the full four-step history is in KBSPanelMetrics.cpp);
+	    the height moves with the message block, so a taller block does not eat the result rows
+	    the floor exists to protect. */
 	int32 MinimumPanelWidth();
 	int32 MinimumPanelHeight();
 }
