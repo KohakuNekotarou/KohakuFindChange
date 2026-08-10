@@ -95,7 +95,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // that no longer begins where the search left it.
                 kKBSStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
                 kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
-                kKBSStaleResultsTailKey,		"Please search again.",
                 // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
                 // box below", because a "save after replace" box underneath could make them false.
                 // That box is gone with its feature, so a run has only one outcome left to state.

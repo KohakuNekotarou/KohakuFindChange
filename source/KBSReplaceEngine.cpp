@@ -1172,10 +1172,9 @@ void TellResultsWentStale(int32 chapterIdx)
 		::ReplaceStringParameters(&msg, name);
 	}
 
-	// ...and what to do about it. The line break is ours: the platform breaks an alert where it
-	// sees fit, and these are two separate sentences (CAlert.h:116-122).
-	msg.Append(kLineSeparatorString);
-	msg.Append(KBSLoc::Text(kKBSStaleResultsTailKey, KBSJa::kStaleResultsTail));
+	// ***** ONE sentence since 2026-08-10 (user's call). ***** A second line saying "please search
+	// again" stood under this one. The alert's job is to state that the replace stopped and that
+	// nothing was written; what to do next is on the status line the panel is left showing.
 	// Finished text: every part was translated as it was taken, so the alert must not look the
 	// result up again (CAlert translates the message it is handed).
 	msg.SetTranslatable(kFalse);
@@ -1196,8 +1195,12 @@ void TellResultsWentStale(int32 chapterIdx)
 	// With nothing to gain, the all-powerful call was only carrying a default-button argument that
 	// means nothing when there is one button, and a return value with nothing to decide.
 	//
-	// So an automated run can see that the replace stopped and read WHY off the status line, but not
-	// the alert itself: confirming that it appears is a job for the eye.
+	// So an automated run cannot read this alert THROUGH KT. It can read it through Win32, which is
+	// how it is tested now (measured 2026-08-10, correcting the line that stood here saying the eye
+	// was the only way): left at INTERACT_WITH_ALL the alert is drawn for real, and a real CAlert is
+	// a #32770 whose body sits in a hidden Edit child that answers WM_GETTEXT. The wording, the
+	// warning icon and the untouched document are all checked by
+	// work/kbs-selftest/run-stale-alert-shot.ps1.
 	CAlert::WarningAlert(msg);
 }
 

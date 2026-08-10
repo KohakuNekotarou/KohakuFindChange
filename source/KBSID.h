@@ -441,7 +441,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 //  per-chapter "the text has been edited - carry on?" prompt, which the verify walk replaced.)
 #define kKBSStaleResultsDocKey		kKBSStringPrefix "kKBSStaleResultsDocKey"
 #define kKBSStaleResultsOneKey		kKBSStringPrefix "kKBSStaleResultsOneKey"
-#define kKBSStaleResultsTailKey		kKBSStringPrefix "kKBSStaleResultsTailKey"
+// (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
+//  the alert states the outcome in one sentence and the status line carries what to do next.)
 // The closing line: what the run LEAVES BEHIND.
 //
 // ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by

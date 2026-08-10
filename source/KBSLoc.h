@@ -91,9 +91,10 @@ namespace KBSJa
 	// See KBSID.h for how this came to be a statement rather than a question.
 	const char16_t kStaleResultsDoc[]        = u"検索結果に変化を確認しましたので、置換を中止しました。";
 	const char16_t kStaleResultsOne[]        = u"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
-	// "Nothing was replaced" stood at the front of this line until 2026-08-10 (user's call): the
-	// sentence above already says the replace was stopped, so it only said the same thing twice.
-	const char16_t kStaleResultsTail[]       = u"検索し直してください。";
+	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
+	//  replaced - please search again" and lost its first half that morning for saying what the
+	//  sentence above already said; the user's call the same day took the rest, leaving the alert
+	//  to state the outcome and the status line to carry what to do next.)
 	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
 	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
 	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";
