@@ -21,7 +21,7 @@
 #include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
 #include "IBookUtils.h"			// FindDocFromContentUID, GetBookContentStatus
 #include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
-#include "IDataBase.h"			// IsModified - HasUnsavedChanges asks it before every close here
+#include "IDataBase.h"			// the IDataBase* a UIDRef carries, and GetSysFile
 #include "IDocFileHandler.h"
 #include "IDocument.h"
 #include "IDocumentCommands.h"	// Open by file (windowless reopen)
@@ -185,12 +185,35 @@ namespace
 	    releases did not, which is what let a replace that the user chose NOT to save disappear when
 	    the next run reclaimed the chapter it was in.
 
-	    A document with no database reads as "nothing to lose": there is no modification flag to
-	    consult, and refusing to close on that basis would strand the chapter for the session. */
+	    ***** ASKED THE WAY THE SDK ASKS IT - CanSave, NOT IDataBase::IsModified. ***** Those are two
+	    different questions, and the difference is a whole class of document:
+
+	      IsModified()  = "has been modified since LAST SAVE"   (IDataBase.h:253-256)
+	      CanSave()     = "is modified OR UNSAVED"              (IDocFileHandler.h:62-63)
+
+	    A document that has never been saved AT ALL - the untitled one the user just made with
+	    Ctrl+N - answers NO to the first and YES to the second. This function asked the first until
+	    2026-08-10, so the hide-previous-chapter sweep took such a document for clean and closed it
+	    with kSuppressUI: no prompt, and nothing on disk to reopen. MEASURED on the running
+	    application that day (work/kbs-selftest/run-untitled-sweep-test.ps1), which also drew the
+	    line either side of it: a fresh document is modified=false, and it turns dirty the moment
+	    ANYTHING is added to it - so what was being closed was always empty, and no work was ever
+	    lost. Corrected anyway: a window that shuts by itself is its own kind of wrong, and the
+	    official question was right there. (The official close sequence asks them in this order as
+	    well - CanSave, then CanClose, then Close: SDKLayoutHelper.cpp:200-217.)
+
+	    ***** A document this cannot be asked about is NOT closed. ***** No file handler means no
+	    answer, and the safe answer to "would closing this lose something" is yes. It reads the
+	    opposite way round from the note that stood here before ("a document with no database reads
+	    as nothing to lose"), and it changes nothing at any of the three call sites: each one
+	    already refuses to close a document whose handler will not come (they simply refused a few
+	    lines further down). Verified call site by call site, 2026-08-10. */
 	bool HasUnsavedChanges(const UIDRef& docRef)
 	{
-		IDataBase* db = docRef.GetDataBase();
-		return (db != nil) && (db->IsModified() != kFalse);
+		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
+		if (docFileHandler == nil)
+			return true;
+		return docFileHandler->CanSave(docRef) != kFalse;
 	}
 
 	/** Accepts every presentation.
@@ -811,12 +834,17 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (ref == exceptDoc)
 			continue;	// the document the jump just landed in stays
 
-		// A dirty document would want a save - leave it to the user. Asked through the same
-		// HasUnsavedChanges the held-chapter releases ask: this tested db == nil || IsModified()
-		// by hand and so answered "do not close" for a document with no database, while
-		// HasUnsavedChanges answers "nothing to lose" for that same document - one module, two
-		// opposite verdicts on one state (block 11 API audit, 2026-08-08). Nothing changes on
-		// screen: a document with no database has no window either, so the test below drops it.
+		// A document with something to save would want saving - leave it to the user. Asked
+		// through the same HasUnsavedChanges the held-chapter releases ask; this tested
+		// db == nil || IsModified() by hand until the block 11 API audit (2026-08-08), which is
+		// one module holding two opinions about one state.
+		//
+		// ***** THIS LOOP IS THE ONE THE QUESTION ITSELF WAS WRONG FOR. ***** Unlike the two
+		// held-chapter releases - whose documents were all opened from a chapter file - this walks
+		// EVERY open document, so it meets the one kind that has never been saved at all: the
+		// untitled document the user just made. IsModified() reads that as clean and this closed
+		// it, without a prompt (measured 2026-08-10). Since that day the shared question is
+		// IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
 		if (HasUnsavedChanges(ref))
 			continue;
 
