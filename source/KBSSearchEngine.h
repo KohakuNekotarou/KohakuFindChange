@@ -348,7 +348,7 @@ namespace KBSSearchEngine
 	/** The whole of a match, boiled down to one 64-bit number.
 
 	    WHAT IT REPLACED: a CopyMatchText that handed the matched characters back as a PMString,
-	    capped at 500 (kKBSMaxMatchChars) because a row only ever draws one line. The
+	    capped at 500 characters because a row only ever draws one line. The
 	    same-occurrence test compared that capped copy - so a GREP match of 2000 characters was
 	    judged on its first 500, and a rewrite past that point went through as "the same
 	    occurrence" (found 2026-08-04). This reads the match WHOLE and keeps nothing but the hash,
@@ -366,21 +366,24 @@ namespace KBSSearchEngine
 	uint64 HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end);
 
 	/** The line around [start, end), in the three segments a hit row paints: the text before the
-	    match (from the start of the paragraph the match BEGINS in), the matched text itself, and the
-	    text after it (to the end of the paragraph the match ENDS in - a different paragraph once the
-	    match spans a break).
+	    match, the matched text itself, and the text after it - never reaching outside the
+	    paragraphs the match starts and ends in (a different paragraph once the match spans a break).
 
-	    The match is carried WHOLE however many paragraphs it crosses, up to the 500-character cap
-	    (KBSCapMatchEnd). Past that cap no trailing segment is written at all: what follows the cut is
-	    more of the MATCH, and this segment is drawn in the normal colour, so writing it would show
-	    the rest of the match as though it lay outside it.
+	    ***** ONE LINE BUDGET, MATCH FIRST - kKBSMaxLineChars = 50, the user's numbers
+	    (2026-08-10). ***** The three segments carry at most fifty characters BETWEEN THEM: the
+	    match takes what it needs up to the whole budget, and what is left is split evenly between
+	    the two contexts, a side with less to say than its half handing the remainder to the other.
+	    So a paragraph with no breaks in it cannot make every hit carry the whole paragraph, which
+	    is what the segments did until the 2026-08-10 re-check (F-8).
 
-	    The two CONTEXT segments are capped as well, at kKBSMaxContextChars = 20 a side
-	    (2026-08-10, the user's number): the pre keeps its TAIL and the post its HEAD - the ends
-	    nearest the match, which are the ends the cell keeps when it ellipsizes - so a paragraph
-	    with no breaks in it cannot make every hit carry the whole paragraph twice over. Display
-	    and report only; the same-occurrence test reads none of the three segments (it compares
-	    the whole match through HashMatchText).
+	    ***** EVERY CUT END IS MARKED with an ellipsis. ***** The pre at its head (it keeps its
+	    TAIL, the end nearest the match, which is the end the cell keeps when it ellipsizes); the
+	    post at its tail (it keeps its HEAD); and a match longer than the budget at its own tail,
+	    drawn in the match colour - with no post at all then, because what follows that cut is more
+	    MATCH, and a normal-coloured segment there would show it as text lying outside it.
+
+	    Display and report only; the same-occurrence test reads none of the three segments (it
+	    compares the whole match through HashMatchText).
 
 	    Any of the three may come back empty; all three are empty when the position cannot be read.
 

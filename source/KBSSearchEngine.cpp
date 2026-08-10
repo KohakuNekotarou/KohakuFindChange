@@ -1050,50 +1050,44 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 // so what the search stored and what those two read can never be computed differently.
 //------------------------------------------------------------------------------------
 
-// The most characters a match segment carries, and the ONE place that limit is applied.
+// The most characters a hit row's three segments carry BETWEEN THEM - leading context, match and
+// trailing context, as ONE line budget - and the one place that limit is applied.
 //
-// A format-only search matches every unbroken run of text carrying the format, which can be dozens
-// of paragraphs. Copying all of it per hit and holding it for the life of the result set would cost
-// far more than the single line a row can ever draw, so it is capped. The cap is far past what any
-// cell shows, so what is dropped was never going to be read - and the row still shows that the
-// match continues, because the break marks are inside what IS kept.
+// Everything the segments exist for is a single drawn row and the matching line of the saved
+// report, so what is kept is sized for reading, not for the paragraph it came from. They used to
+// run to their paragraph boundaries (the match to 500), and a paragraph is only "one line" until
+// somebody pastes text with no breaks in it: a 10,000-character paragraph searched for one
+// character stored paragraph-times-hits characters - hundreds of megabytes inside the 10,000-hit
+// ceiling, every one of which the colour cell also MEASURED on every repaint (the 2026-08-10
+// re-check's F-8).
 //
-// !! DISPLAY ONLY since 2026-08-04. The cap used to bind the same-occurrence test as well:
-// SplitLineAroundMatch and a CopyMatchText beside it had to cut in the SAME place, or a match cut
-// differently on the two sides read as "the text moved since the search ran" and every replace was
-// refused with 'missing'. That test now compares the match WHOLE, through a hash taken with no cap
-// at all (HashMatchText), so nothing but the drawn row passes through here - and a row that is
-// clipped for drawing can no longer cost a replace.
-const int32 kKBSMaxMatchChars = 500;
+// ***** FIFTY, TOTAL, MATCH FIRST - the user's numbers (2026-08-10). ***** The match takes what
+// it needs up to the whole budget; what is left is split evenly between the two contexts, and a
+// side with less to say than its half hands the remainder to the other side. Every cut end is
+// marked with an ellipsis (kKBSCutMark below), so a line that was CUT is never mistaken for a
+// line that ENDS. The arithmetic lives in SplitLineWithScanner and nowhere else.
+//
+// DISPLAY AND REPORT ONLY. The same-occurrence test reads none of the three segments - it
+// compares the match WHOLE, through a hash taken with no cap at all (HashMatchText) - so a row
+// clipped for drawing can never cost a replace. (That separation is dated 2026-08-04; the display
+// cap bound the test itself before then, which is why it sat far out at 500.)
+const int32 kKBSMaxLineChars = 50;
 
-// The most characters either CONTEXT segment carries - the text before and after the match - and
-// the ONE place that limit is applied (2026-08-10, the search-path re-check's F-8).
-//
-// The cap above states its own reason - holding per hit what a row can never draw - and for eight
-// weeks that reason was applied to the match alone. The context segments run to their paragraph
-// boundaries, and a paragraph is only "one line" until somebody pastes text that has no breaks in
-// it: a single 10,000-character paragraph searched for one character stores paragraph-times-hits
-// characters (hundreds of megabytes inside the 10,000-hit ceiling), every one of which the colour
-// cell also MEASURES on every repaint (KBSColorTextView measures pre and post whole before it
-// ellipsizes). The match cap saved none of that, because pre and post carry the same paragraph.
-//
-// A constant of its own rather than reusing kKBSMaxMatchChars: the two caps answer different
-// questions, and their answers differ. The MATCH is what the user searched for - 500, so a long
-// GREP match can still be recognised as itself - while the context only has to orient the eye,
-// and twenty characters a side do that on the panel and in the saved report alike. The number is
-// the user's own (2026-08-10: "at most 20 each side is plenty" - a sensible panel amount).
-//
-// DISPLAY ONLY, like the match cap: the same-occurrence test reads none of the three segments
-// (it compares the whole match through HashMatchText), so nothing but the drawn row - and the
-// saved report's line, which carries at most this much context on each side - passes through here.
-const int32 kKBSMaxContextChars = 20;
+// U+2026 HORIZONTAL ELLIPSIS - the mark a cut end carries. A named UTF32TextChar rather than a
+// character in a string literal, the way KBSResultModel names its break marks (kKBSReturnArrow),
+// and with one more reason here: it keeps this file ASCII, and a bare UTF-8 symbol in this very
+// file has been garbled to CP932 noise twice in one day already (2026-08-04).
+const UTF32TextChar kKBSCutMark = 0x2026;
 
+// Where the drawn match stops. Capped at the SAME number the whole line is budgeted with: a match
+// that long owns the entire line, and the contexts' arithmetic in SplitLineWithScanner then comes
+// out at zero by itself.
 TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
 {
 	if (end < start)
 		return start;
-	if (end - start > kKBSMaxMatchChars)
-		return start + kKBSMaxMatchChars;
+	if (end - start > kKBSMaxLineChars)
+		return start + kKBSMaxLineChars;
 	return end;
 }
 
@@ -1132,9 +1126,11 @@ uint64 HashOfWideString(const WideString& text)
 // KBSSearchEngine::SplitLineAroundMatch, which this implements.
 //
 // outMatchWide hands the matched characters back as they were read, so a caller that also wants
-// them hashed does not have to copy them out of the story a second time. It is the CAPPED match:
-// equal to (end - start) characters only when the match fitted inside kKBSMaxMatchChars, which is
-// exactly the test a caller has to make before hashing it.
+// them hashed does not have to copy them out of the story a second time. It is the CAPPED match,
+// and NEVER carries the cut mark (the mark goes on the drawn PMString alone - a mark in here
+// would hash a character the document does not hold): equal to (end - start) characters only
+// when the match fitted inside kKBSMaxLineChars, which is exactly the test a caller has to make
+// before hashing it.
 //
 // A nil scanner is allowed and answers like an unreadable position: all three segments empty.
 void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex end,
@@ -1154,8 +1150,8 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// A CR-terminated paragraph's length includes its CR, so the trailing segment below carries it
 	// and the row draws a pilcrow at the line's end. Deliberately left that way: the search and the
 	// replace's row rebuild both come through here, so the two can never disagree about it.
-	// (A post past the context cap loses that CR along with the rest of its tail - by then the line
-	// is running far off the cell anyway.)
+	// (A post cut by the line budget loses that CR along with the rest of its tail - the cut mark
+	// stands where it ended.)
 	int32 paraLen = 0;
 	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
 	if (paraStart < 0 || paraLen <= 0)
@@ -1171,23 +1167,7 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// KBSColorTextView, which turns CR into a pilcrow and a forced line break into a return arrow.
 	const TextIndex matchEnd = KBSCapMatchEnd(start, end);
 
-	if (start > paraStart)
-	{
-		// ***** THE TAIL IS KEPT, NOT THE HEAD. ***** The leading context is capped from the FRONT:
-		// what survives is the text nearest the match, which is the end the reader actually uses -
-		// and it is the end the cell keeps anyway, because an overflowing pre is ellipsized from the
-		// beginning (kEllipsizeBeginning in KBSColorTextView). So a capped pre and an uncapped one
-		// that merely does not fit look identical on the row. Safe to cut at an arbitrary index:
-		// a TextIndex counts code points, so the cut cannot land inside a surrogate pair (the note
-		// at the head of this file).
-		TextIndex preFrom = paraStart;
-		if (start - preFrom > kKBSMaxContextChars)
-			preFrom = start - kKBSMaxContextChars;
-		WideString w;
-		scanner->CopyText(preFrom, static_cast<int32>(start - preFrom), &w);
-		outPre = PMString(w);
-		outPre.SetTranslatable(kFalse);
-	}
+	// ----- the match first: it owns the line budget -----
 	if (matchEnd > start)
 	{
 		// Read into the caller's buffer, so the hash can be taken from these very characters.
@@ -1195,39 +1175,84 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 		outMatch = PMString(outMatchWide);
 		outMatch.SetTranslatable(kFalse);
 	}
+	// A capped match was CUT, and the row says so. The mark goes on the drawn string ONLY, never
+	// into outMatchWide - that buffer is the hash shortcut's material and has to stay exactly the
+	// characters read. It is drawn in the match's own colour, which is the truth being told:
+	// what follows the mark is more MATCH.
+	if (matchEnd != end)
+		outMatch.AppendW(kKBSCutMark);
+
+	// ----- then the two contexts, out of what the match left -----
+	// How much text each side HAS is measured before the budget is dealt out, so a side with less
+	// to say than its half can hand the remainder to the other side - a match at the head of its
+	// paragraph still fills the line to the right, instead of spending half the budget on a
+	// context one character long.
+	const int32 preAvail = (start > paraStart) ? static_cast<int32>(start - paraStart) : 0;
 
 	// The trailing context comes from the paragraph the match ENDS in, which is a DIFFERENT
 	// paragraph from the one it started in once the match spans a break. Probed at matchEnd - 1 so
 	// a match ending exactly on a paragraph terminator answers with the paragraph it ended, not the
 	// one after it.
 	//
-	// !ONLY when the match was not capped (2026-08-04). Past the cap, what follows matchEnd is more
+	// !NONE when the match was capped (2026-08-04). Past the cap, what follows matchEnd is more
 	// of the MATCH - and this segment is drawn in the normal colour, so writing it here would show
-	// the rest of the match as though it were text lying outside it. Nothing is lost by leaving it
-	// out: a capped match is 500 characters, already far wider than the cell, so the row ellipsizes
-	// inside the match itself and the reader can see that it continues.
-	if (matchEnd != end)
-		return;
-
-	int32 endParaLen = 0;
-	const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
-	const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);
-	if (endParaStart >= 0 && endParaLen > 0)
+	// the rest of the match as though it were text lying outside it. (The budget arithmetic below
+	// comes out at zero for a capped match anyway - KBSCapMatchEnd caps at the very number the
+	// line is budgeted with - but the reason is kept apart from the arithmetic: it is about what
+	// a post MEANS, not about how much room is left.)
+	int32 postAvail = 0;
+	if (matchEnd == end)
 	{
-		const TextIndex endParaEnd = endParaStart + endParaLen;
-		if (endParaEnd > matchEnd)
-		{
-			// The HEAD is kept here - the mirror of the pre cap above, and for the mirrored
-			// reason: this end of the line is ellipsized from its tail, so what a reader (and the
-			// cell) uses is the text nearest the match.
-			int32 postLen = static_cast<int32>(endParaEnd - matchEnd);
-			if (postLen > kKBSMaxContextChars)
-				postLen = kKBSMaxContextChars;
-			WideString p;
-			scanner->CopyText(matchEnd, postLen, &p);
-			outPost = PMString(p);
-			outPost.SetTranslatable(kFalse);
-		}
+		int32 endParaLen = 0;
+		const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
+		const TextIndex endParaStart = scanner->FindSurroundingParagraph(probe, &endParaLen);
+		if (endParaStart >= 0 && endParaLen > 0 && endParaStart + endParaLen > matchEnd)
+			postAvail = static_cast<int32>(endParaStart + endParaLen - matchEnd);
+	}
+
+	int32 remaining = kKBSMaxLineChars - static_cast<int32>(matchEnd - start);
+	if (remaining < 0)
+		remaining = 0;	// unreachable while KBSCapMatchEnd caps at kKBSMaxLineChars; kept so the two cannot come apart in silence
+	int32 preBudget = remaining / 2;
+	int32 postBudget = remaining - preBudget;
+	if (preAvail < preBudget)
+	{
+		postBudget += preBudget - preAvail;
+		preBudget = preAvail;
+	}
+	if (postAvail < postBudget)
+	{
+		preBudget += postBudget - postAvail;
+		postBudget = postAvail;
+		if (preBudget > preAvail)
+			preBudget = preAvail;
+	}
+
+	if (preBudget > 0)
+	{
+		// ***** THE TAIL IS KEPT, NOT THE HEAD. ***** What survives is the text nearest the match,
+		// which is the end the reader actually uses - and the end the cell keeps anyway, because an
+		// overflowing pre is ellipsized from the beginning (kEllipsizeBeginning in KBSColorTextView).
+		// Safe to cut at an arbitrary index: a TextIndex counts code points, so the cut cannot land
+		// inside a surrogate pair (the note at the head of this file).
+		const TextIndex preFrom = start - preBudget;
+		WideString w;
+		scanner->CopyText(preFrom, preBudget, &w);
+		if (preFrom > paraStart)
+			outPre.AppendW(kKBSCutMark);	// cut at its head, marked at its head
+		outPre.Append(PMString(w));
+		outPre.SetTranslatable(kFalse);
+	}
+
+	if (postBudget > 0)
+	{
+		// The HEAD is kept here - the mirror of the pre above, for the mirrored reason.
+		WideString p;
+		scanner->CopyText(matchEnd, postBudget, &p);
+		outPost.Append(PMString(p));
+		if (postBudget < postAvail)
+			outPost.AppendW(kKBSCutMark);	// cut at its tail, marked at its tail
+		outPost.SetTranslatable(kFalse);
 	}
 }
 
@@ -1238,9 +1263,9 @@ uint64 HashRangeWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex
 	if (scanner == nil || end <= start)
 		return 0;
 
-	// ***** NO CAP HERE, and that is the whole point. ***** The drawn segment stops at
-	// kKBSMaxMatchChars because what it produces is held for the life of the result set; this holds
-	// nothing but the 64 bits below, so the match is read in full however long it is.
+	// ***** NO CAP HERE, and that is the whole point. ***** The drawn segments stop at the
+	// kKBSMaxLineChars budget because what they produce is held for the life of the result set;
+	// this holds nothing but the 64 bits below, so the match is read in full however long it is.
 	//
 	// Read in blocks rather than in one call: a single CopyText of an enormous match would build
 	// one WideString that size, and nothing here needs the whole match in memory at once.
@@ -1267,9 +1292,9 @@ uint64 HashRangeWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex
 // Both text reads for one hit, through one scanner.
 //
 // The hash is taken from the characters the split just read whenever those ARE the whole match,
-// which is every match up to the 500-character display cap - so the ordinary hit copies its text
-// out of the story exactly once. A longer match falls back on reading itself in blocks: the drawn
-// segment stopped at the cap, and the hash is the one that must cover every character.
+// which is every match up to the line budget (kKBSMaxLineChars) - so the ordinary hit copies its
+// text out of the story exactly once. A longer match falls back on reading itself in blocks: the
+// drawn segment stopped at the cap, and the hash is the one that must cover every character.
 //
 // A story with no text model leaves the hit as it came: three empty segments and a hash of 0,
 // which is what every caller already reads as "this position could not be read". A ZERO-WIDTH
@@ -2391,7 +2416,7 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 	if (start == end)
 		return true;
 
-	// ***** THE TEXT, WHOLE. ***** Not the drawn 500 characters (see GetHitMatchIdentity): the
+	// ***** THE TEXT, WHOLE. ***** Not the drawn, capped text (see GetHitMatchIdentity): the
 	// stored hash covers the entire match, so a rewrite anywhere inside it is caught however long
 	// it is. A stored 0 means the search could not read that match - nothing to compare against,
 	// so nothing is written.

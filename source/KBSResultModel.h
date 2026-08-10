@@ -106,8 +106,9 @@ namespace KBSResultModel
 		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
 
 		// The WHOLE match, as one number - what the same-occurrence test compares against.
-		// matchText below is capped at 500 characters for drawing, so it cannot answer "is this
-		// still the same text" for a long GREP match; this can. 0 = never computed, or the text
+		// matchText below is capped for drawing (the line budget, kKBSMaxLineChars in
+		// KBSSearchEngine.cpp), so it cannot answer "is this still the same text" for a long
+		// GREP match; this can. 0 = never computed, or the text
 		// could not be read, and it never compares equal (see MatchIsSameOccurrence). A zero-width
 		// match (GREP ^ / $ / lookarounds) also stores 0, and is accepted on its length arm
 		// instead - an empty range has no text for the hash to vouch for.
@@ -636,10 +637,10 @@ namespace KBSResultModel
 	/** What the same-occurrence test asks of a row: the story it was found in, where the match
 	    started and ENDED, and the whole of its text as one number.
 
-	    !! The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped at
-	    500 characters for the row, so comparing it judged a long GREP match on its first 500 and
-	    let a rewrite past that point through as "the same occurrence" (found 2026-08-04). The hash
-	    covers the match whole - see KBSSearchEngine::HashMatchText.
+	    !! The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped
+	    for the row (500 characters at the time), so comparing it judged a long GREP match on its
+	    first 500 and let a rewrite past that point through as "the same occurrence"
+	    (found 2026-08-04). The hash covers the match whole - see KBSSearchEngine::HashMatchText.
 
 	    Its own getter because it runs once per checked hit, and the two getters it replaces carry
 	    freight it does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies
@@ -711,7 +712,7 @@ namespace KBSResultModel
 	    the hash took over as the thing compared (see KBSSearchEngine::HashMatchText), the update
 	    did not follow it here, and every replaced row lost its jump. Splitting display from
 	    comparison was
-	    right - the drawn text is capped at 500 characters and cannot vouch for a long match - but
+	    right - the drawn text is capped and cannot vouch for a long match - but
 	    they are still written at the same moment, from the same range.
 
 	    @param newMatchHash KBSSearchEngine::HashMatchText over the range the replace command

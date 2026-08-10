@@ -604,8 +604,8 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 	// scan's own words there - "Frame (370)" - so the comparison could never agree, and every click
 	// on one was answering a jump that had just landed correctly with "Not found - the text is no
 	// longer where the search left it" and stamping the row 'missing' (2026-08-02).
-	// The stored HASH, not the drawn text: the row's match string is capped at 500 characters, so
-	// asking it about a long GREP match only ever compared the first 500 (2026-08-04). The story,
+	// The stored HASH, not the drawn text: the row's match string is capped for drawing, so
+	// asking it about a long GREP match only ever compared its first stretch (2026-08-04). The story,
 	// position and length arms are all trivially satisfied here - this side asks about the very
 	// range the row recorded - so what does the work is the hash.
 	UID expectStory = kInvalidUID;
@@ -882,8 +882,8 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	//   range the row recorded - so the story, position and length arms of MatchIsSameOccurrence
 	//   compare the recorded values against themselves and are trivially satisfied. What can still
 	//   differ is the TEXT at that range, which is what the hash carries. (The row's drawn match
-	//   string cannot answer it: that is capped at 500 characters, so it only ever compared the
-	//   first 500 of a long GREP match - 2026-08-04.) JumpToHit:578-589 makes the identical call for
+	//   string cannot answer it: that is capped for drawing, so it only ever compared the
+	//   first stretch of a long GREP match - 2026-08-04.) JumpToHit:578-589 makes the identical call for
 	//   the identical reason; this note is its twin, added 2026-08-09 because without it the three
 	//   unused locals read as an oversight.
 	UID expectStory = kInvalidUID;
