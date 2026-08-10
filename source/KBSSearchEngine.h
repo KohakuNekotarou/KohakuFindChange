@@ -375,6 +375,13 @@ namespace KBSSearchEngine
 	    more of the MATCH, and this segment is drawn in the normal colour, so writing it would show
 	    the rest of the match as though it lay outside it.
 
+	    The two CONTEXT segments are capped as well, at kKBSMaxContextChars = 20 a side
+	    (2026-08-10, the user's number): the pre keeps its TAIL and the post its HEAD - the ends
+	    nearest the match, which are the ends the cell keeps when it ellipsizes - so a paragraph
+	    with no breaks in it cannot make every hit carry the whole paragraph twice over. Display
+	    and report only; the same-occurrence test reads none of the three segments (it compares
+	    the whole match through HashMatchText).
+
 	    Any of the three may come back empty; all three are empty when the position cannot be read.
 
 	    Used by the search when a hit is collected, and again by the replace pass to rebuild a

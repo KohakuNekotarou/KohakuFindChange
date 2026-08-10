@@ -1066,6 +1066,28 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 // clipped for drawing can no longer cost a replace.
 const int32 kKBSMaxMatchChars = 500;
 
+// The most characters either CONTEXT segment carries - the text before and after the match - and
+// the ONE place that limit is applied (2026-08-10, the search-path re-check's F-8).
+//
+// The cap above states its own reason - holding per hit what a row can never draw - and for eight
+// weeks that reason was applied to the match alone. The context segments run to their paragraph
+// boundaries, and a paragraph is only "one line" until somebody pastes text that has no breaks in
+// it: a single 10,000-character paragraph searched for one character stores paragraph-times-hits
+// characters (hundreds of megabytes inside the 10,000-hit ceiling), every one of which the colour
+// cell also MEASURES on every repaint (KBSColorTextView measures pre and post whole before it
+// ellipsizes). The match cap saved none of that, because pre and post carry the same paragraph.
+//
+// A constant of its own rather than reusing kKBSMaxMatchChars: the two caps answer different
+// questions, and their answers differ. The MATCH is what the user searched for - 500, so a long
+// GREP match can still be recognised as itself - while the context only has to orient the eye,
+// and twenty characters a side do that on the panel and in the saved report alike. The number is
+// the user's own (2026-08-10: "at most 20 each side is plenty" - a sensible panel amount).
+//
+// DISPLAY ONLY, like the match cap: the same-occurrence test reads none of the three segments
+// (it compares the whole match through HashMatchText), so nothing but the drawn row - and the
+// saved report's line, which carries at most this much context on each side - passes through here.
+const int32 kKBSMaxContextChars = 20;
+
 TextIndex KBSCapMatchEnd(TextIndex start, TextIndex end)
 {
 	if (end < start)
@@ -1132,6 +1154,8 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// A CR-terminated paragraph's length includes its CR, so the trailing segment below carries it
 	// and the row draws a pilcrow at the line's end. Deliberately left that way: the search and the
 	// replace's row rebuild both come through here, so the two can never disagree about it.
+	// (A post past the context cap loses that CR along with the rest of its tail - by then the line
+	// is running far off the cell anyway.)
 	int32 paraLen = 0;
 	const TextIndex paraStart = scanner->FindSurroundingParagraph(start, &paraLen);
 	if (paraStart < 0 || paraLen <= 0)
@@ -1149,8 +1173,18 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 
 	if (start > paraStart)
 	{
+		// ***** THE TAIL IS KEPT, NOT THE HEAD. ***** The leading context is capped from the FRONT:
+		// what survives is the text nearest the match, which is the end the reader actually uses -
+		// and it is the end the cell keeps anyway, because an overflowing pre is ellipsized from the
+		// beginning (kEllipsizeBeginning in KBSColorTextView). So a capped pre and an uncapped one
+		// that merely does not fit look identical on the row. Safe to cut at an arbitrary index:
+		// a TextIndex counts code points, so the cut cannot land inside a surrogate pair (the note
+		// at the head of this file).
+		TextIndex preFrom = paraStart;
+		if (start - preFrom > kKBSMaxContextChars)
+			preFrom = start - kKBSMaxContextChars;
 		WideString w;
-		scanner->CopyText(paraStart, static_cast<int32>(start - paraStart), &w);
+		scanner->CopyText(preFrom, static_cast<int32>(start - preFrom), &w);
 		outPre = PMString(w);
 		outPre.SetTranslatable(kFalse);
 	}
@@ -1183,8 +1217,14 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 		const TextIndex endParaEnd = endParaStart + endParaLen;
 		if (endParaEnd > matchEnd)
 		{
+			// The HEAD is kept here - the mirror of the pre cap above, and for the mirrored
+			// reason: this end of the line is ellipsized from its tail, so what a reader (and the
+			// cell) uses is the text nearest the match.
+			int32 postLen = static_cast<int32>(endParaEnd - matchEnd);
+			if (postLen > kKBSMaxContextChars)
+				postLen = kKBSMaxContextChars;
 			WideString p;
-			scanner->CopyText(matchEnd, static_cast<int32>(endParaEnd - matchEnd), &p);
+			scanner->CopyText(matchEnd, postLen, &p);
 			outPost = PMString(p);
 			outPost.SetTranslatable(kFalse);
 		}
