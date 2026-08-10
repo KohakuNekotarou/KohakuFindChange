@@ -54,7 +54,8 @@
 #include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
 #include "SpreadID.h"				// kSetSpreadCmdBoss - put a spread in the layout view
-#include "ErrorUtils.h"				// PMSetGlobalErrorCode
+#include "ErrorUtils.h"				// GlobalErrorStatePreserver / PMSetGlobalErrorCode - a window or a
+									// spread change can raise an error state that is not this run's
 #include "CmdUtils.h"
 #include "PersistUtils.h"			// ::GetUIDRef
 #include "IDataBase.h"				// SaveRestoreModifiedState
@@ -112,15 +113,28 @@ namespace
 	// Move-to-location helpers (ported from KESCLFindInDoc)
 	//------------------------------------------------------------------------------------
 
-	// Scroll the front layout view so the given pasteboard point is centred. Does not select.
+	// Scroll the GIVEN layout view so the given pasteboard point is centred. Does not select.
+	//
+	// ***** THE VIEW IS PASSED IN, NOT LOOKED UP HERE. ***** It used to ask
+	// ILayoutUIUtils::QueryFrontView for itself, while EnsureSpreadInView below asked
+	// QueryFrontLayoutData for its own - and THE TWO ARE NOT THE SAME QUESTION:
+	//
+	//   QueryFrontView / GetFrontDocument -> "the frontmost LAYOUT presentation"  (ILayoutUIUtils.h:89-98)
+	//   QueryFrontLayoutData              -> "the FRONT MOST presentation"'s layout part (:127-133)
+	//
+	// With a Story Editor window in front of its own document's layout window, the second one is nil
+	// while the first still hands back the layout view behind it. The spread was then never changed
+	// and this scroll ran anyway - landing on empty pasteboard for any hit on another spread, which
+	// is the master-page symptom of 2026-08-05 arriving through a second door (measured on the
+	// running application, 2026-08-10: the active spread stayed put while the jump reported nothing
+	// wrong). One view is now looked up ONCE by the caller and handed to both.
 	//
 	// ScrollContentLocationToFrameCenter, not ScrollViewCenterTo: IPanorama.h:141-145 calls the
 	// latter "an obsolete name" for this one and says new code should call this, "but this function
 	// will go away in a future release". The old name is an inline that calls the new one
 	// (IPanorama.h:135-138), so nothing about the behaviour changes.
-	void ScrollFrontViewToPoint(const PBPMPoint& pbPoint)
+	void ScrollViewToPoint(IControlView* view, const PBPMPoint& pbPoint)
 	{
-		InterfacePtr<IControlView> view(Utils<ILayoutUIUtils>()->QueryFrontView());
 		if (view == nil)
 			return;
 		InterfacePtr<IPanorama> pano(view, UseDefaultIID());
@@ -229,12 +243,19 @@ namespace
 		// How tall to make the rectangle: proportions of the line height, measured from the baseline
 		// (the wax run's local y origin), which is the space mLeft / mRight map from.
 		//
-		// WARNING: do NOT "improve" this with IWaxLineShape::GetSelectionLine. That was tried 2026-07-31
-		// and reverted the same day: its documented job is to CONSTRAIN a highlight's height so
-		// adjacent lines do not overlap (IWaxLineHilite.h:53-54 calls it maxTopBottom, "used to
-		// prevent double XOR problems when waxLines are too close together"), not to report this
-		// line's ascent and descent, and its coordinate space is nowhere stated. There is no call
-		// site for it anywhere in the SDK. Measure it on a real document before trusting it.
+		// CAREFUL with IWaxLineShape::GetSelectionLine here. It was tried 2026-07-31 and reverted the
+		// same day, and the reason recorded then was wrong: the note said its documented job is to
+		// CONSTRAIN a highlight rather than to report a line's ascent and descent. The header says
+		// the opposite in its first line - "Get the selection line (top/bottom) for this line"
+		// (IWaxLineShape.h:142-148) - and the constraining is what OTHER calls do with the value once
+		// they have it (IWaxRunShape.h:124: "each run's Selection Line ... is presented to this run as
+		// maxTopBottom"). The IWaxLineHilite.h:53-54 line the old note quoted describes an ARGUMENT of
+		// GetHighlightBounds, not this function. (Corrected in the block 12 re-audit, 2026-08-10.)
+		//
+		// What still stands, and is why the proportions below are kept: the returned PMLineSeg's
+		// COORDINATE SPACE is nowhere stated, and the rectangle here is assembled in a wax RUN's local
+		// space through that run's to-pasteboard matrix. There is no call site for GetSelectionLine
+		// anywhere in the SDK to settle it from. Measure it on a real document before trusting it.
 		const PMReal h       = waxLine->GetLineHeight();
 		const PMReal ascent  = h * PMReal(0.95);
 		const PMReal descent = h * PMReal(0.2);
@@ -302,14 +323,20 @@ namespace
 	    That a layout view can show a master spread at all is stated by
 	    ILayoutUIUtils::GetVisibleMasterSpreadUID (ILayoutUIUtils.h:220).
 
+	    ***** THE VIEW IS THE ONE THAT WILL BE SCROLLED. ***** It is handed in rather than looked up,
+	    because this used to ask ILayoutUIUtils::QueryFrontLayoutData while the scroll asked
+	    QueryFrontView - two different questions (see ScrollViewToPoint above for the contract lines
+	    and for what a Story Editor window did with the difference). Asking the view we are about to
+	    scroll is the only way the two can never disagree.
+
 	    Silent when it cannot do it: the scroll that follows is no worse off than before. */
-	void EnsureSpreadInView(const UIDRef& storyRef, TextIndex pos)
+	void EnsureSpreadInView(IControlView* view, const UIDRef& storyRef, TextIndex pos)
 	{
 		const UID targetSpread = SpreadForMatch(storyRef, pos);
 		if (targetSpread == kInvalidUID)
 			return;
 
-		InterfacePtr<ILayoutControlData> layout(Utils<ILayoutUIUtils>()->QueryFrontLayoutData());
+		InterfacePtr<ILayoutControlData> layout(view, IID_ILAYOUTCONTROLDATA);
 		if (layout == nil)
 			return;
 		if (layout->GetSpreadRef().GetUID() == targetSpread)
@@ -326,6 +353,17 @@ namespace
 		if (::GetDataBase(viewDoc) != storyRef.GetDataBase())
 			return;
 
+		// ***** PRESERVE, THEN CLEAR - the caller's error state goes back the way it came. *****
+		// A bare PMSetGlobalErrorCode(kSuccess) after the command stood here until the block 12
+		// re-audit (2026-08-10). It decided for this function's CALLER that their error state did
+		// not matter (KBSReplaceEngine.cpp:1548-1553 spells out why that is overreach), and it only
+		// guarded the one exit it sat on - the early returns below it leaked whatever
+		// CreateCommand had raised. The pair is Adobe's own (CDialogObserver.cpp:392-394;
+		// contract at ErrorUtils.h:115-137). The clear is the other half: a standing error fails
+		// whatever is attempted next, and what is attempted next is this very command.
+		GlobalErrorStatePreserver spreadErrorState;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
 		InterfacePtr<ICommand> setSpreadCmd(CmdUtils::CreateCommand(kSetSpreadCmdBoss));
 		if (setSpreadCmd == nil)
 			return;
@@ -336,23 +374,64 @@ namespace
 		// view, and the document it is showing is the one that answers for it.
 		cmdData->Set(::GetUIDRef(viewDoc), layout);
 		setSpreadCmd->SetItemList(UIDList(::GetDataBase(viewDoc), targetSpread));
-		if (CmdUtils::ProcessCommand(setSpreadCmd) != kSuccess)
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// the scroll still runs; do not poison later commands
+		CmdUtils::ProcessCommand(setSpreadCmd);		// the scroll still runs either way
 	}
 
-	/** Accepts every presentation. The twin of KBSBookScope's predicate of the same name, kept
-	    separate because each file's is private to it (both sit in an anonymous namespace).
+	/** Accepts a presentation that HAS A LAYOUT IN IT, and no other.
 
-	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock one exists and is named
-	    FindPresCriteria::accept_all (DocumentPresFindCriteria.h:82), but that file's own preamble
-	    (:40-46) says its implementations "are found in the WidgetBin shared library, so you cannot
-	    use them from a model only plugin. Should the need arise you can create local
+	    ***** A DOCUMENT'S WINDOWS ARE NOT ALL LAYOUT WINDOWS. ***** A Story Editor window is a
+	    presentation of the same document (kStoryEditorPresentationBoss, WritingModeUIID2.h:117), and
+	    the predicate that stood here accepted EVERYTHING - so a document being edited in one could
+	    have that window made active by a jump, after which every single thing the jump does next
+	    (scroll, spread, marker) is addressed at a LAYOUT view that was never brought forward.
+	    Adobe's own worked example for this search orders its candidates with prefer-criteria such as
+	    is_layout (DocumentPresFindCriteria.h:60-77); this asks the same question in the accept half,
+	    where a "no" is the useful answer - no layout presentation means the else branch below opens
+	    one, which is exactly right.
+
+	    The test is Utils<ILayoutUIUtils>()->QueryLayoutData(presentation) (ILayoutUIUtils.h:125,
+	    "the layout widget data associated with the presentation") rather than a ClassID comparison:
+	    it asks for the thing we actually need out of the window instead of naming a boss that may
+	    be one of several (kLayoutPresentationBoss / kWasmLayoutPresentationBoss / whatever comes
+	    next).
+
+	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock ones exist and are named
+	    FindPresCriteria::accept_all / is_layout (DocumentPresFindCriteria.h:82-86), but that file's
+	    own preamble (:40-46) says their implementations "are found in the WidgetBin shared library,
+	    so you cannot use them from a model only plugin. Should the need arise you can create local
 	    implementations" - and prints a two-line example of exactly this shape. So this is the
-	    documented route, not a stand-in for one. (The reasoning was written into the BookScope copy
-	    on 2026-08-08 and not into this one, which is the sort of split this comment now closes.) */
-	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
+	    documented route, not a stand-in for one. The twin in KBSBookScope is kept separate because
+	    each file's is private to it (both sit in an anonymous namespace). */
+	bool KBSAcceptLayoutPresentation(IDocumentPresentation* p)
 	{
-		return true;
+		if (p == nil)
+			return false;
+		InterfacePtr<ILayoutControlData> layoutData(Utils<ILayoutUIUtils>()->QueryLayoutData(p));
+		return layoutData != nil;
+	}
+
+	/** Is the window in front RIGHT NOW a layout window showing this document?
+
+	    ***** NOT ILayoutUIUtils::GetFrontDocument, WHICH ANSWERS A WEAKER QUESTION. ***** That one
+	    returns "the document associated with the frontmost LAYOUT presentation" (ILayoutUIUtils.h:95-98)
+	    - so with a Story Editor window in front of its own document's layout window it still names
+	    that document, and a jump asking it concluded the document was already frontmost and stopped.
+	    Measured on the running application 2026-08-10: the Story Editor stayed in front, the layout
+	    never changed spread, and the panel reported nothing wrong.
+
+	    QueryFrontLayoutData is about "the FRONT MOST presentation" (:127-133) and hands back its
+	    layout part, so it is nil exactly when the window in front is not a layout - which is the
+	    question this function is named for.
+
+	    ONE place asks it, and both the entry test and the did-it-take test below call here: they are
+	    the same question and drifted apart the moment they were written out twice. */
+	bool LayoutOfDocIsFrontmost(const UIDRef& docRef)
+	{
+		InterfacePtr<ILayoutControlData> frontLayout(Utils<ILayoutUIUtils>()->QueryFrontLayoutData());
+		if (frontLayout == nil)
+			return false;
+		IDocument* const doc = frontLayout->GetDocument();
+		return doc != nil && ::GetUIDRef(doc) == docRef;
 	}
 
 	// Bring the given document's layout window to the front. A windowless chapter gets its first
@@ -364,8 +443,7 @@ namespace
 	// note beside that call at the foot of this function.
 	bool EnsureDocFrontmost(const UIDRef& docRef)
 	{
-		IDocument* front = Utils<ILayoutUIUtils>()->GetFrontDocument();
-		if (front != nil && ::GetUIDRef(front) == docRef)
+		if (LayoutOfDocIsFrontmost(docRef))
 		{
 			KBSBookScope::ForgetHeldDoc(docRef);	// already in front and visible - see below
 			return true;
@@ -374,6 +452,15 @@ namespace
 		IDataBase* db = docRef.GetDataBase();
 		if (db == nil)
 			return false;
+
+		// ***** PRESERVE, THEN CLEAR. ***** Same pair, and for the same reason, as EnsureSpreadInView
+		// above: two bare clears sat on two of this function's exits until 2026-08-10, leaving every
+		// other way out to hand the caller an error state raised by work that was not theirs -
+		// MakeActive() reports nothing at all, and a standing error would then fail the zoom command
+		// below it and the spread command after it. The destructor at the closing brace puts the
+		// caller's own state back untouched (ErrorUtils.h:115-137).
+		GlobalErrorStatePreserver frontErrorState;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
 		// The zoom to inherit, read BEFORE the switch (monitor-PPI corrected effective scale).
 		PMReal srcZoom(-1.0);
@@ -389,15 +476,17 @@ namespace
 
 		bool openedWindow = false;
 		FindPresentation_PreferCriteria noPreference;
+		// LAYOUT presentations only - see KBSAcceptLayoutPresentation. "None" here means this
+		// document has no layout window at all, which is what the else branch is for.
 		IDocumentPresentation* pres = Utils<IDocumentUIUtils>()->FindPresentationForDocument(
-			db, KBSAcceptAnyPresentation, noPreference);
+			db, KBSAcceptLayoutPresentation, noPreference);
 		if (pres != nil)
 		{
 			pres->MakeActive();
 		}
 		else
 		{
-			// No window yet: open the document's first layout window (which also makes it active).
+			// No layout window yet: open the document's first one (which also makes it active).
 			InterfacePtr<ICommand> openWinCmd(CmdUtils::CreateCommand(kOpenLayoutCmdBoss));
 			if (openWinCmd == nil)
 				return false;
@@ -409,16 +498,12 @@ namespace
 					openData->SetPerspective_(srcZoom, srcZoom, PMPoint(0, 0), ILayoutControlData::kFitNone);
 			}
 			if (CmdUtils::ProcessCommand(openWinCmd) != kSuccess)
-			{
-				ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 				return false;
-			}
 			openedWindow = true;
 		}
 
-		// Verify the switch took.
-		front = Utils<ILayoutUIUtils>()->GetFrontDocument();
-		if (front == nil || ::GetUIDRef(front) != docRef)
+		// Verify the switch took - the same question the entry test asked, asked in one place.
+		if (!LayoutOfDocIsFrontmost(docRef))
 			return false;
 
 		// Hand an ALREADY-OPEN incoming view the outgoing view's zoom (a freshly opened window got
@@ -437,8 +522,8 @@ namespace
 					if (diff > PMReal(0.001))
 					{
 						InterfacePtr<ICommand> zoomCmd(Utils<ILayoutUIUtils>()->MakeZoomCmd(destView, srcZoom));
-						if (zoomCmd != nil && CmdUtils::ProcessCommand(zoomCmd) != kSuccess)
-							ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+						if (zoomCmd != nil)
+							CmdUtils::ProcessCommand(zoomCmd);	// carried over as a courtesy; never fatal
 					}
 				}
 			}
@@ -642,10 +727,16 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 	if (ShouldHidePreviousChapter())
 		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
 
+	// ***** ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW. ***** The spread change and the
+	// scroll used to find their own view through two different calls that do not mean the same
+	// thing (ILayoutUIUtils.h:89-98 vs :127-133 - see ScrollViewToPoint). Taken here, after the
+	// document has been fronted and before any geometry is read.
+	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
+
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
 	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
 	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
-	EnsureSpreadInView(storyRef, start);
+	EnsureSpreadInView(frontView, storyRef, start);
 
 	// A visible match scrolls to its wax rectangle AND gets a red marker rectangle. An overset match
 	// has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator, which
@@ -656,7 +747,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 	{
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
 		if (loc.found)
-			ScrollFrontViewToPoint(loc.outportPb);	// scroll only - no marker on the "+" locator
+			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KBSDrawEventHandler::ClearMarker();
 	}
 	else
@@ -664,7 +755,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 		PMRect pbRect;
 		if (GetFirstChunkPasteboardRect(storyRef, start, end, pbRect))
 		{
-			ScrollFrontViewToPoint(PBPMPoint(
+			ScrollViewToPoint(frontView, PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
 				(pbRect.Top() + pbRect.Bottom()) / PMReal(2.0)));
 			// The marker goes up either way, and in the same colour (user call, 2026-07-28). On a row
@@ -883,9 +974,10 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	//   compare the recorded values against themselves and are trivially satisfied. What can still
 	//   differ is the TEXT at that range, which is what the hash carries. (The row's drawn match
 	//   string cannot answer it: that is capped for drawing, so it only ever compared the
-	//   first stretch of a long GREP match - 2026-08-04.) JumpToHit:578-589 makes the identical call for
-	//   the identical reason; this note is its twin, added 2026-08-09 because without it the three
-	//   unused locals read as an oversight.
+	//   first stretch of a long GREP match - 2026-08-04.) JumpToHit makes the identical call for the
+	//   identical reason; this note is its twin, added 2026-08-09 because without it the three unused
+	//   locals read as an oversight. (It named JumpToHit's line numbers until 2026-08-10, by which
+	//   time they were pointing eleven lines short of the call - a function name cannot go stale.)
 	UID expectStory = kInvalidUID;
 	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
 	uint64 expectHash = 0;
@@ -920,13 +1012,32 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (selectionManager == nil)
 		return false;
 
+	// Clear whatever was selected first (a page-item selection left standing is a second selection in
+	// a different CSB). BEFORE the tool switch, which is the order both official recipes keep:
+	// gotolasttextedit deselects and then switches (GTTxtEdtUtils.cpp:113-128), typekitinspector
+	// deselects and never switches (TKITreeWidgetObserver.cpp:136-140, which is where the
+	// SelectionExists test comes from). Switching first hands the incoming tool a selection it will
+	// convert, only for the next line to throw the result away.
+	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
+		selectionManager->DeselectAll(nil);
+
 	// ***** The Type tool, because this is an invitation to EDIT. ***** A text selection made while
 	// the Selection tool is active is not somewhere the user can start typing, which is the whole
-	// point of the double-click. The official recipe does exactly this and in this order (tool
-	// first, selection second). ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is
+	// point of the double-click. ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is
 	// written down in How to Use for that reason.
+	//
+	// ***** IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ***** ITool.h:178-183 says IsTextTool
+	// "could be more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and
+	// Hand tools return kTrue from it as well - then names this call as the one to use "for
+	// traditional 'text' tools that select text". Measured on the running application 2026-08-10:
+	// with the Hand, Zoom or Gradient tool active, a double click left that tool in place and made
+	// the selection anyway - text highlighted in a window the user cannot type into, which is the
+	// one outcome the paragraph above says must not happen. (The Selection tool was the control
+	// group and switched correctly, before and after.)
+	// ⚠ Every SDK sample uses IsTextTool here, gotolasttextedit included; the header is what they
+	//   are all not reading. There is no call to IsToolOfType anywhere in the SDK to copy from.
 	InterfacePtr<ITool> activeTool(Utils<IToolBoxUtils>()->QueryActiveTool());
-	if (activeTool == nil || !activeTool->IsTextTool())
+	if (activeTool == nil || !activeTool->IsToolOfType(ITool::kTextSelectionTool))
 	{
 		InterfacePtr<ITool> iBeamTool(Utils<IToolBoxUtils>()->QueryTool(kIBeamToolBoss));
 		if (iBeamTool == nil)
@@ -934,11 +1045,6 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		if (!Utils<IToolBoxUtils>()->SetActiveTool(iBeamTool))
 			return false;
 	}
-
-	// Clear whatever was selected first (the sample and typekitinspector both do; a page-item
-	// selection left standing is a second selection in a different CSB).
-	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
-		selectionManager->DeselectAll(nil);
 
 	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
 	if (textSelectionSuite == nil)
