@@ -176,8 +176,21 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 			// the AcquireKeyFocus at the foot of this function, so the TREE is holding the keyboard
 			// at this moment. Left that way, the caret would sit in the text while the arrow keys
 			// walked the panel and typing went nowhere - which is the one thing a user who asked
-			// for this wants to do. Relinquishing hands the keyboard back to whatever InDesign
-			// would otherwise give it to, which is the document window the jump just fronted.
+			// for this wants to do.
+			//
+			// ! WHERE IT GOES IS NOT CHOSEN HERE. IKeyBoard.h:49-53 says Relinquish "restores key
+			//   focus to the PREVIOUS HOLDER" - it is a pop, not a hand-off to whoever should have
+			//   it. What makes that the right holder is the ORDER of the first click: the jump
+			//   fronted the document window and only then did the tree acquire, so the holder
+			//   underneath is that window. If anything ever comes to hold the focus between those
+			//   two - another palette, an edit box of ours - this hands the keyboard to THAT
+			//   instead, and it will look like the double click stopped working.
+			//   *The product does not lean on the pop when it cares where the focus lands: it
+			//    remembers the handler itself and calls AcquireKeyFocus(saved) to put it back
+			//    (spellpanel/SpellCheckWalker.cpp:95-139, SaveKeyboardEventHandler). That shape is
+			//    available here if this ever needs to name the window it wants.
+			//   *The bool16 both calls return (kFalse = the current holder would not let go) is
+			//    ignored, as it is at every product call site.
 			//
 			// This is the deliberate difference between the two clicks: a single click LEAVES the
 			// keyboard on the tree so the arrows keep walking the results, and a double click gives

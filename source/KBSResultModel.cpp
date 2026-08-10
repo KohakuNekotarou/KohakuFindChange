@@ -154,8 +154,13 @@ namespace
 		//
 		// !! That rests on the hits being NEW. A caller that ever hands over hits carried across from
 		// an earlier result set has to reset the pair itself - the alternative is this loop back, and
-		// it costs one pass over every hit of every ungrouped chapter to defend against a caller that
-		// does not exist.
+		// it costs one pass over every hit of every ungrouped chapter for the sake of one caller.
+		//
+		// ***** THERE IS ONE SUCH CALLER, AND IT RESETS THEM ITSELF: KeepCheckedRows. ***** This note
+		// read "to defend against a caller that does not exist" from 2026-08-08, when the loop-back
+		// was dropped, until 2026-08-10 - and that caller had been there since 2026-08-07, one day
+		// OLDER than the sentence denying it. Whoever writes the next one: reset the pair there, or
+		// put the loop back here.
 		if (!anyFont)
 			return;
 
@@ -1046,23 +1051,8 @@ int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
 	return count;
 }
 
-int32 KBSResultModel::GetCheckedChapterCount()
-{
-	int32 count = 0;
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		const std::vector<Hit>& hits = gChapters[ci].hits;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			if (hits[hi].checked && !hits[hi].replaced)
-			{
-				++count;
-				break;		// this chapter counts once, however many of its hits are checked
-			}
-		}
-	}
-	return count;
-}
+// (GetCheckedChapterCount was defined here until 2026-08-10 - see the note where it was declared
+// in KBSResultModel.h.)
 
 int32 KBSResultModel::GetCheckableCount()
 {
@@ -1376,6 +1366,26 @@ int32 KBSResultModel::KeepCheckedRows()
 			// The source vector is thrown away at the swap below, so the hit is moved out rather
 			// than copied - a Hit carries six PMStrings.
 			Hit hit = std::move(hits[hi]);
+
+			// ***** THE FONT PAIR GOES BACK TO "UNSET" BEFORE THE REGROUP BELOW. ***** BuildFontGroups
+			// reads -1 as unset and, for a chapter whose hits name NO font, returns without writing
+			// the pair back - which is only safe when the hits are newly built, and its own note says
+			// so ("a caller that ever hands over hits carried across from an earlier result set has to
+			// reset the pair itself"). THESE HITS ARE EXACTLY THAT CALLER: they are the search's own
+			// hits, carried across, and they hold the group numbers that search gave them.
+			//
+			// Without this, a chapter that HAD groups and keeps only hits that name no font would
+			// come out of the regroup with an empty fontGroups vector and rows still pointing into
+			// it - and KBSResultNodeID::Create(chapter, hit) takes a node's font FROM the hit
+			// (KBSResultNodeID.h:74-90), so the same row would be handed out under two identities.
+			// That is the one thing that header says must never happen.
+			//
+			// Not reachable today, for the reason written over the regroup below; this keeps the
+			// regroup able to deliver what it was put there to promise, which is that the model is
+			// consistent when this returns. (The note over BuildFontGroups says the defending caller
+			// "does not exist" - it was written on 2026-08-08, and this is it.)
+			hit.fontGroup = -1;
+			hit.fontGroupPos = -1;
 
 			keep.push_back(std::move(hit));
 		}
