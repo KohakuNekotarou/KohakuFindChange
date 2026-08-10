@@ -4,7 +4,17 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Scripting: app.kfcStatus - the last message the panel put on its status line, read-only.
+//  Scripting: TWO read-only properties on the application object.
+//
+//      app.kfcStatus   the last message the panel put on its status line - one sentence.
+//      app.kfcResults  every stored row behind that sentence, as one tab-separated block
+//                      (KBSResultModel::DescribeAllRows).
+//
+//  *This file, its class comment and KBS.fr's own preamble all said "one property" until
+//   2026-08-11. app.kfcResults was added three hours after that sentence was written (c4190a9,
+//   2026-07-31 16:32, against 990cfbe at 13:34) and none of the three places that COUNT the
+//   properties was one of the places the new one had to be declared in - so nothing made them
+//   disagree out loud.
 //
 //  WHY THIS EXISTS
 //
@@ -47,7 +57,8 @@
 #include "KBSResultModel.h"		// DescribeAllRows - the rows behind the status line
 #include "KBSRunGuard.h"		// never read the model out from under a run of ours
 
-/** Serves this plug-in's scripting additions. One property, on the application object. */
+/** Serves this plug-in's scripting additions: the two read-only properties above, both on the
+    application object. */
 class KBSScriptProvider : public CScriptProvider
 {
 public:

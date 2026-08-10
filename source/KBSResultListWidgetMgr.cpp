@@ -698,7 +698,9 @@ void KBSResultTree::GetLastStatus(PMString& outMessage)
 
 void KBSResultTree::ShutdownCleanup()
 {
-	// The one static this file keeps, emptied for the reason KBSResultModel empties its four: a
+	// The one static this file keeps, emptied for the reason KBSResultModel empties its five (four
+	// when this line was written; gRunSummary joined them on 2026-08-09 and that list says "ALL
+	// FIVE" - counted again here 2026-08-11): a
 	// PMString still holding storage when the .pln unloads runs its destructor against an application
 	// that has already torn itself down (the KESCL ShutdownCleanup rule).
 	//

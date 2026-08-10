@@ -50,7 +50,7 @@
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
 #include "GraphicsID.h"		// IID_IDRWEVTHANDLER - the red-marker draw handler (Task 3)
-// kApplicationObjectScriptElement (:427) - the object app.kfcStatus is put on at the end of this
+// kApplicationObjectScriptElement (:427) - the object both of our properties are put on at the end
 // file. The official scripting sample credits this header with exactly that (BPI.fr:55). It is NOT
 // where IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl come from, which the note here
 // claimed until 2026-08-06 - those are ShuksanID.h:376 and :824.
@@ -62,7 +62,7 @@
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSScriptingDefs.h"	// p_KBSStatus - the four-character ID behind app.kfcStatus
+#include "KBSScriptingDefs.h"	// p_KBSStatus / p_KBSResults - the IDs behind the two properties
 
 // GenericID.h, TextID.h, TextWalkerServiceProviderID.h and a SECOND copy of ShuksanID.h stood here
 // until 2026-08-06. Nothing in this file ever named a symbol from any of them: the search's own ids
@@ -399,9 +399,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Scripting provider: serves app.kfcStatus. Derives from kBaseScriptProviderBoss, which brings
-	 * the machinery that dispatches script requests; all this boss adds is our own handler. The
-	 * property itself is declared in the VersionedScriptElementInfo resource at the end of this file.
+	 * Scripting provider: serves app.kfcStatus and app.kfcResults. Derives from
+	 * kBaseScriptProviderBoss, which brings the machinery that dispatches script requests; all this
+	 * boss adds is our own handler. The properties themselves are declared in the
+	 * VersionedScriptElementInfo resource at the end of this file.
 	 */
 	Class
 	{
@@ -1261,12 +1262,18 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 
 
 /*
- * Scripting: app.kfcStatus - the panel's status line, readable from a script.
+ * Scripting: app.kfcStatus and app.kfcResults - the panel's own account of a run, readable from a
+ * script.
  *
- * One read-only string property on the application object. What it is for is verification: the
- * panel reports what a search or a replace did in a single line, and without this the only way to
- * read that line is to look at the screen. With it, a script - or PowerShell over COM - can run the
- * command and then read the answer:
+ * TWO read-only string properties on the application object: the status line's sentence, and the
+ * rows behind it (declared one after the other below). *This preamble said "one" until 2026-08-11 -
+ * the second property was added three hours after this paragraph was written (c4190a9 against
+ * 990cfbe, both 2026-07-31) and landed in the Elements list below without the count above it being
+ * counted again. The same sentence stood in KBSScriptProvider.cpp, corrected the same day.
+ *
+ * What they are for is verification: the panel reports what a search or a replace did in a single
+ * line, and without this the only way to read that line is to look at the screen. With it, a script
+ * - or PowerShell over COM - can run the command and then read the answer:
  *
  *     app.menuActions.itemByName("Search").invoke();
  *     app.kfcStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
@@ -1321,7 +1328,7 @@ resource VersionedScriptElementInfo(1)
 			kNoAttributeClass,					// attribute class ID
 		}
 
-		// Puts the property ON the application object.
+		// Puts both properties ON the application object.
 		//
 		// Object{}, not Parent{}. They are different questions: Object names an EXISTING scripting
 		// object to add members to, while Parent hangs a NEW object underneath one (which is what a

@@ -16,8 +16,14 @@
 //  (the rows routinely carry Japanese text, so the encoding must be explicit).
 //
 //  Only what went WRONG reaches the panel's status line. A save that worked says nothing - the file is
-//  where the user put it - and a cancelled chooser does nothing, silently. This is KESCL's
-//  KESCLReportSave.cpp, which this file follows step for step.
+//  where the user put it - and a cancelled chooser does nothing, silently.
+//
+//  It was written FROM KESCL's KESCLReportSave.cpp, step for step, and the two are still the same
+//  shape. *They are no longer the same code, so read that one as the origin rather than as the
+//  reference (counted 2026-08-11): this file has since gained the run guard's front door, a stream
+//  state check on the newly created stream, and a length cap on the name parts. The stream check is
+//  the one that matters - KESCLReportSave.cpp:151 still tests nil alone, so a stream that comes back
+//  in a failed state is written to there and reported as saved. Reported to KESCL, not fixed here.
 //
 //========================================================================================
 
@@ -82,7 +88,18 @@ std::wstring SanitizeForFileName(const std::wstring& part)
 		}
 	}
 	if (out.size() > kMaxNamePart)
-		out.erase(kMaxNamePart);
+	{
+		// Never through the middle of a surrogate PAIR. wchar_t is a UTF-16 code UNIT on Windows, so
+		// a character outside the BMP - a rare kanji, an emoji in a document name - is two of them,
+		// and a cut between the two leaves a lone high surrogate in the name the save chooser shows.
+		// Backing up one unit is enough: the pair is the only multi-unit sequence UTF-16 has.
+		// (Nothing official to borrow here - PMString::Truncate counts the same platform units, and
+		// StringUtils::PMEllipsizeString measures WIDTH and wants a graphics context.)
+		size_t cut = kMaxNamePart;
+		if (cut > 0 && out[cut - 1] >= 0xD800 && out[cut - 1] <= 0xDBFF)
+			--cut;
+		out.erase(cut);
+	}
 	return out;
 }
 
