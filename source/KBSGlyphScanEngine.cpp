@@ -162,11 +162,23 @@ bool ByPosition(const NotdefGlyph& a, const NotdefGlyph& b)
 
 /** The run's font, named the way the user sees it in the font menu.
 
-    Family + style is how the OFFICIAL preflight rule names a font
-    (preflightrule/PreflightFontRuleVisitor.cpp:262-263). IWaxRenderData::GetFontName would answer
-    too, but it gives the PostScript name ("KozMinPr6N-Regular") - correct, and no help at all to
-    someone about to go and fix the box. It is kept as the fallback for a run whose font object
-    cannot be had. */
+    ***** FAMILY AND STYLE - AND THE STYLE IS THIS SCAN'S OWN ADDITION, NOT THE PREFLIGHT RULE'S.
+    ***** This note read "Family + style is how the OFFICIAL preflight rule names a font
+    (preflightrule/PreflightFontRuleVisitor.cpp:262-263)" until 2026-08-10, and those lines do not
+    say that: the official rule names a font by its FAMILY ALONE (:263, and :346 for the embedded
+    one - AppendStyleName appears nowhere in that sample).
+
+    The pair IS a shape Adobe writes, and one of the places it writes it is a GLYPH one:
+    SnpInsertGlyph.cpp:576-582 takes family and style into separate strings off the same IPMFont, as
+    do watermarkui/WatermarkUIDialogObserver.cpp:434 and buttonui's FormFieldUIFactory.cpp:236.
+
+    The style is kept because of what this scan reports. The notdef id belongs to the FACE, not to
+    the family - IFindChangeUtils.h:40 states that "GetNotDefinedGlyph is different across different
+    fonts" - so a family name on its own does not name the thing that has to be changed.
+
+    IWaxRenderData::GetFontName would answer too, but it gives the PostScript name
+    ("KozMinPr6N-Regular") - correct, and no help at all to someone about to go and fix the box. It
+    is kept as the fallback for a run whose font object cannot be had. */
 void AppendFontDisplayName(IPMFont* font, IWaxRenderData* render, PMString& out)
 {
 	out.Clear();
@@ -218,8 +230,10 @@ void CollectNotdefsOnLine(const IWaxLine* line, std::vector<NotdefGlyph>& out)
 	PMString fontName;
 	fontName.SetTranslatable(kFalse);
 
-	// Reset() leaves the iterator ON the first glyph - KESCMPageNumberMarker.cpp:194-195 reads the
+	// Reset() leaves the iterator ON the first glyph - KESCMPageNumberMarker.cpp:210-214 reads the
 	// container straight after one - so the container is tested first and Advance() moves on.
+	// (Cited as :194-195 until 2026-08-10; that is the same file's IsDestroyed guard, a different
+	// point of a different walk. The fact was right, the line was not.)
 	for (IWaxGlyphs* glyphs = git->GetWaxGlyphsContainer(); glyphs != nil; glyphs = git->Advance())
 	{
 		IWaxRun* run = git->GetWaxRun();	// NOT reference counted - IWaxGlyphIterator.h:116-124

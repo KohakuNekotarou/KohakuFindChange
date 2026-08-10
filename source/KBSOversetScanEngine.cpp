@@ -51,6 +51,7 @@
 #include "TextID.h"				// kTextStoryBoss - the boss ITableModelList sits on
 #include "Utils.h"
 
+#include <algorithm>			// std::min - the preview stops at the end of the thread
 #include <vector>
 #include <utility>				// std::move - a finished chapter is handed to the model, not copied
 
@@ -78,10 +79,18 @@ struct ScanningFlagGuard
 	~ScanningFlagGuard()	{ gScanning = false; }
 };
 
-// How much of the overset text a row shows. Overset runs to hundreds of characters - the official
-// preflight reported 370 for one frame in the test document - and handing the whole range to
-// BuildHitForRange would put all of it in the model and in app.kfcResults, when the row only ever
-// draws one line. 60 is comfortably more than a row can show.
+// How much of the overset text a row's preview READS. Overset runs to hundreds of characters - the
+// official preflight reported 370 for one frame in the test document - and handing the whole range
+// to BuildHitForRange would put all of it in the model and in app.kfcResults, when the row only
+// ever draws one line.
+//
+// ***** IT BOUNDS THE READ, NOT WHAT IS DRAWN - AND IT IS NO LONGER THE SMALLER OF THE TWO. *****
+// This said "60 is comfortably more than a row can show", which was true when it was written. Since
+// 2026-08-10 SplitLineWithScanner budgets all three drawn segments together at kKBSMaxLineChars = 50
+// and KBSCapMatchEnd cuts the match at that very number, so what a row shows is decided over there
+// and this constant no longer decides anything about it. What it still does is keep the read short.
+//
+// The overflow's OWN length wins whenever it is shorter - see the preview range below.
 const int32 kOversetPreviewChars = 60;
 
 // How much of the progress bar one CHAPTER gets. Every chapter gets the same slice, because the run
@@ -456,7 +465,17 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		KBSResultModel::Hit hit;
 		hit.checked = false;		// a scan is a report, not a work list: no row is selectable
 
-		const TextIndex previewEnd = places[p].start + kOversetPreviewChars;
+		// ***** NEVER PAST THE END OF THE THREAD. ***** The overflow's own length is already in hand -
+		// ThreadOverset measured it, and the row states it a few lines below as "Table cell (3)" - so
+		// a thread that overflowed by three characters has exactly three to preview. Reading a flat
+		// sixty from there walks out of the thread and into whatever the model holds next: the
+		// following cell, a footnote, the body. This is ONE ITextModel, so those characters read
+		// perfectly well and land in the row and in app.kfcResults as though the cell had overflowed
+		// by sixty (found 2026-08-10, the block 10 re-check; the range fed the drawn text only - the
+		// stale test short-circuits on an overset row, MatchTextIsLiveText, so nothing was misjudged
+		// by it).
+		const TextIndex previewEnd = places[p].start
+			+ std::min(places[p].count, kOversetPreviewChars);
 		KBSSearchEngine::BuildHitForRange(docRef, places[p].storyRef,
 			places[p].start, previewEnd, cache, hit);
 
