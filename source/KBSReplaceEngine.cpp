@@ -1693,9 +1693,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			// A walk that started and then BROKE OFF (vWalkFailed) answers true - through the
 			// ticked rows it never reached, which are left in its target set. That is deliberate
 			// and it is the safe answer: this run will not write to positions it could not check.
-			// ⚠ It is not a "the document moved" answer, though, and the alert says the results
-			// changed whichever it was. Wording the two apart would need a second string and a
-			// failure nothing has been able to construct, so it is recorded here instead.
+			// ***** It is not a "the document moved" answer, though. ***** The alert says the
+			// results changed whichever it was. Wording the two apart would need a second string
+			// and a failure nothing has been able to construct, so it is recorded here instead.
 			//
 			// vMissing / vLocked / vRefused are not read: the verify pass counts nothing at all
 			// (see verifyOnly), and the replace pass counts them for real immediately afterwards.

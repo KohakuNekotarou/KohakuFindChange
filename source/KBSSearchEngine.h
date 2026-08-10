@@ -443,9 +443,10 @@ namespace KBSSearchEngine
 	    difference was left was the USER's editing. Both went together (KBSReplaceEngine::
 	    ReplaceChecked): with no caller that moves text, nothing is left to cancel out.
 
-	    ★ The last two questions arrived on 2026-08-04. Until then the text was compared through
-	    the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters was
-	    judged on its first 500, and neither a rewrite past the cap nor a change of length was seen.
+	    ***** The last two questions arrived on 2026-08-04. ***** Until then the text was compared
+	    through the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters
+	    was judged on its first 500, and neither a rewrite past the cap nor a change of length was
+	    seen.
 
 	    expectHash 0 means the search could not read that match, so nothing can be vouched for and
 	    the answer is false - the safe answer: when in doubt, do not write. */

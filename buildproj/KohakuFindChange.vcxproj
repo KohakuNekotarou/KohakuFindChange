@@ -313,6 +313,7 @@
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
       </CustomBuild>
+      <None Include="..\..\..\source\sdksamples\KBS\source\KBS_enUS.fr" />
    </ItemGroup>
    <ItemGroup>
       <ResourceCompile Include="..\..\..\source\sdksamples\KBS\source\KBS.rc">

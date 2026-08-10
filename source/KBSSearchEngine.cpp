@@ -1987,8 +1987,8 @@ const char* KBSSearchEngine::CharacterTypeName(int32 characterType)
 // IntersectionContainsDifferences - and "the operator is private" was read as "the question cannot
 // be asked".
 //
-// ⚠ Adobe calls neither IsEqual nor IntersectionContainsDifferences anywhere in the SDK, so the
-// header's contract is all there is to go on. Measured instead: see the audit note for the two
+// ***** Adobe calls neither IsEqual nor IntersectionContainsDifferences anywhere in the SDK. *****
+// The header's contract is all there is to go on. Measured instead: see the audit note for the two
 // searches - identical but for one attribute's value - that this was checked with.
 void KBSSearchEngine::RememberFindFormat()
 {

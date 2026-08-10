@@ -228,5 +228,8 @@
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">
          <Filter>Resource Files</Filter>
       </CustomBuild>
+      <None Include="..\..\..\source\sdksamples\KBS\source\KBS_enUS.fr">
+         <Filter>Resource Files</Filter>
+      </None>
    </ItemGroup>
 </Project>
