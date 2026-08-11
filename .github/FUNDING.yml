@@ -1,0 +1,5 @@
+# Puts the Sponsor button on this repository's page.
+# The space after "github:" is required - without it the line is a plain scalar, not a
+# key and a value, and GitHub drops the whole file (which is what happened on
+# KohakuChangeMarker until 2026-08-12).
+github: KohakuNekotarou
