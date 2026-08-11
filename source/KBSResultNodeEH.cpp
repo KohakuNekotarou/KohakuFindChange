@@ -8,7 +8,9 @@
 //  IID_IEVENTHANDLER on the result tree's node boss (kKBSResultNodeWidgetBoss). Derives from the
 //  stock TreeNodeEventHandler so ordinary tree behaviour (select, expand/collapse, drag) is kept;
 //  only the button-UP is extended. EVERY row now has somewhere to go - KBSJump::ActivateNode sorts
-//  out which: a hit row jumps, a chapter row shows its document, the book row activates its book.
+//  out which: a hit row jumps, a chapter row shows its document, a FONT row shows the document it
+//  sits in (it names no hit, so it falls to the same arm as its chapter), the book row activates
+//  its book.
 //  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button

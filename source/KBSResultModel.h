@@ -428,9 +428,13 @@ namespace KBSResultModel
 	    cap. 0 for an index out of range, and for a group the cap cut off entirely. */
 	int32 GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx);
 
-	/** A font node's display: the font's name and its FULL hit count (uncapped, so the row can say
-	    "shown / total" the way a chapter row does). A group whose font could not be named answers
-	    "(unknown font)" rather than an empty label. false = index out of range. */
+	/** A font node's display: the font's name and its FULL hit count - uncapped, like every other
+	    number the tree reads out: what a row holds, not what the panel drew of it. (This said
+	    "so the row can say 'shown / total' the way a chapter row does" until 2026-08-11. Both rows
+	    stopped saying that on 2026-08-05 - a count of what is DRAWN was the panel talking about
+	    itself - and the reason outlived the thing it was the reason for.) A group whose font could
+	    not be named answers "(unknown font)" rather than an empty label. false = index out of
+	    range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
 
 	/** The 'nth' hit of one font group, as an index into the CHAPTER's hits - the translation the
@@ -453,13 +457,20 @@ namespace KBSResultModel
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
 		PMString		postText;
-		PMString		fontName;	// drawn at the row's right edge; empty on a Find/Change row
+		PMString		fontName;	// the font that had no glyph for this text; empty on a Find/Change
+									// row. NOT drawn on the row any more - the tree says it once on
+									// the FONT row above the group (2026-08-02). Still handed out
+									// because app.kfcResults reports it per hit (DescribeAllRows).
 		bool			checked;
 		bool			replaced;
 		bool			locked;
 		ChangeOutcome	outcome;
+		bool			hasCheckBox;	// does THIS row carry a check box? RowHasCheckBox's own answer,
+										// so the panel does not have to re-derive it from the four
+										// fields above - see GetHitRow.
 
-		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone) {}
+		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
+					   hasCheckBox(false) {}
 	};
 
 	/** One row's worth of everything, in a single call.
@@ -467,6 +478,14 @@ namespace KBSResultModel
 	    display strings, the flags, the outcome and the accent word - each one walking to the same
 	    hit to hand back one part of it. Only the rows on screen are ever laid out, so this was
 	    never expensive; it is simply four questions where the row has one.
+
+	    ***** hasCheckBox IS THE MODEL'S ANSWER, NOT A HINT. ***** It is RowHasCheckBox - the same
+	    function SetHitChecked, SetAllChecked and SetChapterChecked take their orders from - so the
+	    box the panel draws and the box the model will accept a tick from are one decision. The
+	    drawing side spelled the rule out itself (replaced || locked || outcome || the whole list has
+	    none) until 2026-08-11: it agreed to the letter, but a sixth reason to withhold a box would
+	    have had to be remembered in two files, and the one that forgot would have drawn a box whose
+	    click SetHitChecked then refuses in silence.
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 

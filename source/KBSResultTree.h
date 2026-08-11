@@ -30,9 +30,14 @@ namespace KBSResultTree
 	    only what a row DRAWS - the check boxes behind Check All / Uncheck All - where the tree's
 	    shape (which chapters, how many hits) is untouched.
 
-	    Costs one notification per CHAPTER, not per hit: NodeChanged carries childrenChangedAlso, so
-	    the framework refreshes each chapter's hit rows itself. Rebuild() by contrast tears the whole
-	    tree down and re-expands it, which is what made a large result set expensive.
+	    Costs one notification per BRANCH row, not per hit: NodeChanged carries childrenChangedAlso,
+	    so the framework refreshes a node's children itself. That is the book row (when there is
+	    one), each chapter, and each of that chapter's FONT rows - the hit rows under a font level
+	    are grandchildren, so the chapter's own call does not reach them. A chapter has a handful of
+	    fonts, not a few thousand, so it stays a handful of calls. ("one per CHAPTER" here until
+	    2026-08-11, which was the count before the font level and the book row.) Rebuild() by
+	    contrast tears the whole tree down and re-expands it, which is what made a large result set
+	    expensive.
 
 	    It also KEEPS the expansion state, so a chapter the user collapsed stays collapsed (Rebuild
 	    re-expands everything). Safe to call when the panel is closed (does nothing then). */

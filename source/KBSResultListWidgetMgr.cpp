@@ -4,13 +4,20 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  ITreeViewWidgetMgr for the result tree. Two ROW SHAPES, three node kinds:
+//  ITreeViewWidgetMgr for the result tree. Two ROW SHAPES, four node kinds (BOOK, CHAPTER, FONT,
+//  HIT - "three" here until 2026-08-11, which was one short from the day it was written: the count
+//  was updated for the font level on 2026-08-02 and the book row had been there since 07-28, and
+//  the list right below it named all four the whole time):
 //
 //    * BRANCH rows (from kKBSResultChapterNodeWidgetRsrcID): an expander arrow and a label. The
 //      BOOK row, the CHAPTER rows ("<name>  (N)") and the FONT rows ("<font>  (N)") are all this
 //      one shape, at three different indents - so the font level needed no resource of its own.
-//      The expander is hidden on a row with no children (never happens - only chapters with hits
-//      are in the model - but the guard mirrors KESCL's).
+//      The expander is hidden on a row with no children, which DOES happen: a book search that
+//      finds nothing still draws its book row (the adapter gives the root one child whenever the
+//      results came from a book), and that row has no chapters under it. Measured by the user on
+//      2026-07-30 and written down in KBSBookWatch, which is where this file's own "never happens"
+//      was finally read against a fact - it had stood since 2026-07-23, when there was no book row
+//      to make it false. The guard also mirrors KESCL's.
 //    * HIT rows (from kKBSResultHitNodeWidgetRsrcID): one match's line, drawn by the custom
 //      colour cell (KBSColorTextView) with the matched part highlighted. No expander (a leaf);
 //      indented past its branch row.
@@ -244,13 +251,21 @@ public:
 		// ApplyIndentToWidget moves this row's children by the total.
 		//
 		// That DOES run here - the kHierarchical constructor sets the V2 option flag, so the base's
-		// ApplyNodeIDToWidget calls it on every row (CTreeViewWidgetMgr.cpp:212-218) - and it
-		// rewrites the frame.Left of every child bound on BOTH sides, which is the hit row's colour
-		// cell and the chapter row's label. What makes the framework indent invisible in this panel
-		// is NOT that it is switched off: it is that the Apply*Row methods run AFTER it and set
-		// every frame themselves. That is the whole reason the base call has to stay FIRST (see
-		// ApplyNodeIDToWidget). These values are kept in step with what those methods draw, so the
-		// two can never pull a row in different directions.
+		// ApplyNodeIDToWidget calls it on every row (CTreeViewWidgetMgr.cpp:212-218) - and it moves
+		// TWO kinds of child: the ones bound on BOTH sides (the hit row's colour cell, the chapter
+		// row's label) and the ones bound on NEITHER (this row's expander arrow, kBindNone in
+		// KBS.fr). Only a child bound on one side alone is left where it is - the hit row's check
+		// box. What makes the framework indent invisible in this panel is NOT that it is switched
+		// off: it is that the Apply*Row methods run AFTER it and set every one of those frames
+		// themselves. That is the whole reason the base call has to stay FIRST (see
+		// ApplyNodeIDToWidget).
+		//
+		// ! These values do NOT add up to what the panel draws, and are not meant to. The book
+		//   level's 8px step is not here at all (a document row answers 0 whether or not it hangs
+		//   under a book row), because the Apply*Row methods carry it themselves in LevelShift().
+		//   The two can only pull a row in different directions if one of those methods ever stops
+		//   setting a frame - which is the invariant to keep, rather than "keep these numbers in
+		//   step", which is what this note claimed until 2026-08-11.
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
@@ -336,11 +351,21 @@ private:
 		// Both numbers are UNCAPPED - every stored hit, not the rows on screen. That is what Check
 		// All ticks and what a replace would rewrite.
 		//
-		// ***** ONLY ON A LIST THAT HAS BOXES. ***** A scan and a replace's report have none at all,
-		// so "checked" is a word about nothing there and the count is 0 by definition: this row read
-		// "(0/120 checked)" over a missing-glyph scan from 2026-08-05 until NoRowHasCheckBox was
-		// given a home in the model. Those lists go back to the plain total, which is what this row
-		// has always said when there was no work to offer.
+		// ***** ONLY ON A LIST THAT HAS BOXES, AND ONLY ON A LIST THAT HAS ROWS. ***** A scan and a
+		// replace's report have no boxes at all, so "checked" is a word about nothing there and the
+		// count is 0 by definition: this row read "(0/120 checked)" over a missing-glyph scan from
+		// 2026-08-05 until NoRowHasCheckBox was given a home in the model. Those lists go back to
+		// the plain total, which is what this row has always said when there was no work to offer.
+		//
+		// ***** AND A BOOK SEARCH THAT FOUND NOTHING IS THE SAME SENTENCE ABOUT NOTHING. ***** This
+		// row is drawn even when the search found no hits at all - the hierarchy adapter gives the
+		// root one child whenever the results came from a book, which is deliberate: it is how the
+		// panel goes on naming the book it just searched. With no hits and a Find/Change kind
+		// NoRowHasCheckBox is false, so the row read "book.indb  (0/0 checked)" from 2026-08-05 to
+		// 2026-08-11 - the "(0/120 checked)" fault over again, in the one case its fix did not
+		// count. Found by reading KBSBookWatch, which describes this row as saying "book.indb  (0)"
+		// and had the user's own measurement of it (2026-07-30) to say so; the wording changed
+		// underneath that note and nothing brought the two back together. Back to "(0)".
 		//
 		// M counts LOCKED hits too, though Check All cannot tick them (RowHasCheckBox turns them
 		// away) - so a fully checked chapter of locked-and-free hits reads short of its own total on
@@ -349,7 +374,7 @@ private:
 		PMString label(KBSResultModel::GetBookName());
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (KBSResultModel::NoRowHasCheckBox())
+		if (KBSResultModel::NoRowHasCheckBox() || KBSResultModel::GetTotalHitCount() == 0)
 		{
 			label.AppendNumber(KBSResultModel::GetTotalHitCount());
 			label.Append(")");
@@ -386,6 +411,11 @@ private:
 		//
 		// And, exactly as on the book row, only where there are boxes to count: a scan and a
 		// replace's report fall back to the plain total. See ApplyBookRow for the whole of it.
+		//
+		// The book row's OTHER fall-back - an empty result set - has no case here and gets no test:
+		// a chapter is only ever appended with at least one hit (KBSResultModel::AppendChapter), so
+		// a document row with fullCount 0 does not exist. A gate nothing can reach reads as a case
+		// that happens.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
@@ -450,7 +480,12 @@ private:
 		if (!KBSResultModel::GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
 			return;
 
-		// Reasons a row has NOTHING to select, all handled identically from here on:
+		// Reasons a row has NOTHING to select. THE MODEL ANSWERS ALL OF THEM IN ONE FIELD
+		// (row.hasCheckBox = RowHasCheckBox), and what follows is the list of what that covers -
+		// not a second copy of the rule. Written out here until 2026-08-11, where it agreed with
+		// the model to the letter; what it could not do was stay agreed, since a sixth reason
+		// added over there would have gone on drawing a box here that SetHitChecked then refuses
+		// without a word.
 		//   replaced - it has been changed already, and cannot be changed again
 		//   locked   - InDesign gives no way to change locked content, so a box would offer an
 		//              action that quietly does nothing (the locator says lock)
@@ -481,10 +516,12 @@ private:
 		// Both halves live in KBSResultModel::NoRowHasCheckBox now - the branch rows above ask the
 		// same question to decide whether "checked" is a word their label may use at all, and three
 		// rows of one tree must not be able to disagree about it.
+		//
+		// Asked HERE as well as through row.hasCheckBox because the two want different things: the
+		// row wants to know whether IT has a box, and the cell's frame below wants to know whether
+		// the WHOLE LIST has none (only then may the column move).
 		const bool everyRowLostBox = KBSResultModel::NoRowHasCheckBox();
-		const bool noCheckBox = row.replaced || row.locked
-			|| row.outcome != KBSResultModel::kOutcomeNone
-			|| everyRowLostBox;
+		const bool noCheckBox = !row.hasCheckBox;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
 		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
@@ -580,8 +617,9 @@ void KBSResultTree::Rebuild()
 		return;
 
 	// ClearTree(kTrue) forgets the old expansion state (rebuilt by the priming below);
-	// ChangeRoot(kTrue) says every row widget has the same height, which they do (chapter and
-	// hit rows are both 19px).
+	// ChangeRoot(kTrue) says every row widget has the same height, which they do - both row
+	// resources are kKBSResultRowHeight tall and GetNodeWidgetHeight answers that for every node.
+	// (The number itself is not spelled out here, for the reason kRowHeight gives at the top.)
 	treeMgr->ClearTree(kTrue);
 	treeMgr->ChangeRoot(kTrue);
 

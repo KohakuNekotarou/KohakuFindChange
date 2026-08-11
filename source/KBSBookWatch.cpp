@@ -165,6 +165,12 @@ void RetireBookResultsIfGone()
 	// chapter-count test in here, closing the book after a 0-hit search released the chapters but
 	// left that row sitting there and the panel said nothing at all - which also made it impossible
 	// to tell from the screen whether the close had even been noticed.)
+	//
+	// ! "(0)" is what that row says again as of 2026-08-11. It read "(0/0 checked)" in between: the
+	//   rows started reading out "(N/M checked)" on 2026-08-05 and the fall-back to a plain total,
+	//   added 35 minutes later, covered the lists with no boxes and not the list with no rows. This
+	//   sentence is the only place in the plug-in that describes what that row shows, and it is the
+	//   only reason the wording was noticed at all - so it is worth keeping exact.
 	const bool showingThatBooksResults = KBSResultModel::IsFromBook();
 
 	// The chapters go back FIRST, and unconditionally: leaving them open would strand hidden

@@ -13,8 +13,9 @@
 //       never once step inside a chapter. Opening on arrival means holding the down arrow tours
 //       the whole book: land on a chapter, it opens, the next press is its first hit.
 //    2. The landing runs the row's action - KBSJump::ActivateNode, exactly what a click on that
-//       row would do: a hit row jumps, a chapter row shows its document, the book row activates
-//       its book.
+//       row would do: a hit row jumps, a chapter row shows its document, a FONT row shows the
+//       document it sits in (it names no hit, so it takes the chapter's arm), the book row
+//       activates its book.
 //
 //  WHERE THE ROW ARITHMETIC WENT (2026-08-01)
 //

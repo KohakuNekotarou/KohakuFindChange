@@ -22,8 +22,9 @@
 #include "KBSID.h"
 
 /** The parts a hit row's colour cell paints: the page LOCATOR ("P1(2)", drawn at the full theme
-    text colour and followed by a tab-stop gap), then the line split around the match - the text
-    before it, the matched text (full colour), and the text after (before/after are drawn faded).
+    text colour), the FLAG word that follows it when the row has one ("missing" / "refused", drawn
+    in the theme's accent), then a gap, then the line split around the match - the text before it,
+    the matched text (full colour), and the text after (before/after are drawn faded).
     Set by the widget manager on every apply, read by KBSColorTextView::Draw. Non-persistent.
 
     The row's check box is NOT drawn here - it is a real check box widget beside this cell

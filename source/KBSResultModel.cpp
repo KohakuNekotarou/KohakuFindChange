@@ -544,6 +544,11 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
+	// The same call SetHitChecked makes before it accepts a tick, so the panel cannot draw a box the
+	// model would refuse. The flags above are handed over as well - the row still says WHY it was
+	// left alone ("locked" in the locator, "missing" / "refused" in the accent word) - but nothing
+	// outside this file has to add them up into this answer any more.
+	out.hasCheckBox = RowHasCheckBox(h);
 	return true;
 }
 

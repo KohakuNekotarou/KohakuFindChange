@@ -6,8 +6,9 @@
 //
 //  KBSColorTextView: a self-drawing tree cell that paints a hit line with the matched part in a
 //  highlight colour (VS "Find in Files" style). A stock StaticText draws one colour per row, so
-//  the hit rows use this DVControlView-derived cell instead, drawing three runs left to right
-//  (before / matched / after). KBSRowData is the tiny data holder aggregated on the same boss.
+//  the hit rows use this DVControlView-derived cell instead, drawing up to FIVE runs left to right:
+//  the page locator, the accent-coloured flag word, then the line split around the match (before /
+//  matched / after). KBSRowData is the tiny data holder aggregated on the same boss.
 //
 //  Recipe: the multi-colour cell draw proven against customdatalinkui's DVControlView -
 //  AGMGraphicsContext + StringUtils::PMDrawString / PMDrawStringRGB, the palette SYSTEM SCRIPT
@@ -91,11 +92,17 @@ static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, c
 //  step - the same reason BuildHitLocator is one function serving two callers.)
 
 //----------------------------------------------------------------------------------------
-// KBSRowData - the per-row data holder (three text segments)
+// KBSRowData - the per-row data holder (five strings)
 //----------------------------------------------------------------------------------------
 
-/** Non-persistent holder for a hit row's three text segments, aggregated on the colour cell's
-    boss beside the view. Written by the widget manager on every apply. */
+/** Non-persistent holder for a hit row's five strings - locator, flag, and the line split into
+    before / matched / after - aggregated on the colour cell's boss beside the view. Written by the
+    widget manager on every apply.
+
+    (Both of these said "three text segments" until 2026-08-11. It was true at the initial import;
+     the locator became a string of its own on 2026-07-23 and the flag word on 2026-07-28, and
+     neither commit came back to the sentence that counted them - the count is in a comment, and
+     nothing makes you edit a comment to add a field.) */
 class KBSRowData : public CPMUnknown<IKBSRowData>
 {
 public:
@@ -171,10 +178,15 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	KBSResultModel::MarkUpBreaksForDisplay(post);
 
 	// The palette window's SYSTEM SCRIPT font - the same one every OTHER row of this tree already
-	// draws in: KBS.fr's chapter label declares kPaletteWindowSystemScriptFontId for both its
-	// normal and its hilite font (KBS.fr:1205), and the branch rows are stock static texts that
-	// take it from there. This cell asked for kPaletteWindowFontId until 2026-08-07, which left one
-	// row of one tree wanting a different font from the rows above it.
+	// draws in: the chapter row resource's label widget (kKBSResultChapterLabelWidgetID, in KBS.fr's
+	// KBSResultNodeWidget for kKBSResultChapterNodeWidgetRsrcID) declares
+	// kPaletteWindowSystemScriptFontId for both its normal and its hilite font, and the branch rows
+	// are stock static texts that take it from there. This cell asked for kPaletteWindowFontId until
+	// 2026-08-07, which left one row of one tree wanting a different font from the rows above it.
+	// (Named rather than cited as "KBS.fr:1205", which is what stood here from 2026-08-07 until
+	//  2026-08-11: that line was exact when written and the resource has since grown by 22 lines, so
+	//  the number now lands on the expander's frame INSIDE THE SAME RESOURCE - close enough to read
+	//  as right. Same lesson as block 12's: quote by name, since names move with the thing.)
 	//
 	// It is also what the shipping panels reach for whenever a widget has to show text that came
 	// out of a DOCUMENT, or that a user typed: the layer panel stamps it on the layer-name cell

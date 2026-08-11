@@ -17,10 +17,17 @@
 //  itself rather than in a status line that the next message overwrites. A document-scope search
 //  has no book row, so its tree is one level shallower.
 //
-//  The FONT level (2026-08-02) exists because a box means "this font has no glyph for this
-//  character": the font is the unit a fix applies to, so it is the unit the panel groups by and
-//  the unit Check All reaches. Only a missing-glyph scan names fonts - a Find/Change result names
-//  none, its chapters have no groups, and its tree is the three levels it has always had.
+//  The FONT level (2026-08-02) exists because a notdef box in the text means "this font has no
+//  glyph for this character": the font is the unit a fix applies to, so it is the unit the panel
+//  groups by. Only a missing-glyph scan names fonts - a Find/Change result names none, its
+//  chapters have no groups, and its tree is the three levels it has always had.
+//
+//  ! It is NOT a unit Check All reaches, which this said until 2026-08-11 and was never true.
+//    Check All / Uncheck All act on the row the menu was popped over, and that row is resolved to
+//    a chapter or to the whole book (KBSResultNodeEH::RButtonDn) - a font row means its chapter.
+//    On a missing-glyph scan they do not act at all: the scan is report-only, so no row carries a
+//    box (KBSResultModel::RowHasCheckBox) and both commands come up grey. A font-level Check All
+//    has never existed in this plug-in - the model has no such setter and never had one.
 //
 //  ***** hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
