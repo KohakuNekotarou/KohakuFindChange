@@ -75,7 +75,7 @@
 // The window is rebuilt AFTER the notification arrives, so the alpha is written again once the
 // events have gone round:
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
-#include "CreateObject.h"		// ::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER)
+#include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
 
 // To go opaque again while the pointer is on the panel:
 #include "CPMUnknown.h"			// the implementation base
@@ -387,6 +387,13 @@ bool16 KBSApplyPanelTranslucency()
 	//   makes uniform alpha and per-pixel alpha exclusive - set the former once and it will not go
 	//   back to per-pixel drawing even at 255, leaving an unnatural block of a shadow when the toggle
 	//   goes OFF. Showing and hiding does not touch how it is drawn, so it is safe.
+	//   *Microsoft says the same thing, and says how far it goes (checked 2026-08-11): "once
+	//     SetLayeredWindowAttributes has been called for a layered window, subsequent
+	//     UpdateLayeredWindow calls will fail **until the layering style bit is cleared and set
+	//     again**". So it is not that the window can never be soft again - it is that **only taking
+	//     WS_EX_LAYERED off and putting it back would undo it**, and this file will not do that to a
+	//     window InDesign owns (the header: removing that style breaks the application's own drawing).
+	//     Which leaves it a one-way door for us, exactly as measured.
 	//   ?SW_SHOWNA = show without activating (the shadow window is WS_EX_NOACTIVATE; it must not
 	//     come forward).
 	//   ?When a drawer's ("OWL.FrameDrawer") owner is not a ShadowView, the test below just skips.
@@ -573,6 +580,10 @@ static void KBSRestoreOurFindChangeStyle()
 
 	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ::GetWindowLongPtr(h, GWL_EXSTYLE) & ~WS_EX_LAYERED);
+	// *These four flags are the combination Microsoft prescribes for making a SetWindowLongPtr style
+	//  change take: SetWindowPos's Remarks name SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+	//  SWP_FRAMECHANGED literally. SWP_NOACTIVATE is ours, so removing the style cannot pull a
+	//  dialog forward. (The ADDING side deliberately does not do this - see the note there.)
 	::SetWindowPos(h, nullptr, 0, 0, 0, 0,
 				   SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 	::RedrawWindow(h, nullptr, nullptr,
@@ -613,6 +624,23 @@ bool16 KBSApplyFindChangeTranslucency()
 		if (sFcStyledWnd != h)
 			KBSRestoreOurFindChangeStyle();
 
+		// **NO SetWindowPos HERE - and that is a decision, not an oversight (settled 2026-08-11).**
+		//   Microsoft's SetWindowLongPtr Remarks say "certain window data is cached, so changes you
+		//   make using SetWindowLongPtr will not take effect until you call the SetWindowPos
+		//   function", and KBSRestoreOurFindChangeStyle DOES call it when taking the style off, with
+		//   the exact flag combination SetWindowPos's own Remarks prescribe. So the two sides differ.
+		//   *Measured rather than argued (work/kbs-selftest/run-findchange-style-probe.ps1):
+		//     switching the toggle on reads back EXSTYLE=0x00080180, layered=True, alpha=77 - the
+		//     add takes effect with no SetWindowPos at all. WS_EX_LAYERED is evidently not among the
+		//     "certain window data" that is cached; SetLayeredWindowAttributes on the next line is
+		//     what commits it.
+		//   *Why not add it anyway, for symmetry: SWP_FRAMECHANGED sends WM_NCCALCSIZE to a dialog
+		//     that is OPEN IN FRONT OF THE USER, so it would buy nothing and risk a reflow. Removing
+		//     the style is different - there the window has to be told to redraw without it, which is
+		//     why that side has both SetWindowPos and RedrawWindow.
+		//   *Also measured the same day: this dialog's window class is 0x00000008 (CS_DBLCLKS only).
+		//     It carries neither CS_CLASSDC nor CS_PARENTDC, the two class styles MSDN names as
+		//     making WS_EX_LAYERED unsafe to set - so adding it here is within the contract.
 		::SetWindowLongPtr(h, GWL_EXSTYLE, ex | WS_EX_LAYERED);
 		sFcStyledWnd = h;		// ours to undo
 	}
@@ -685,7 +713,7 @@ static void KBSScheduleReapply()
 		return;		// the constant is 0 = the chase is turned off
 
 	if (sReapplyTimer == nil)
-		sReapplyTimer = (ICallbackTimer*)::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+		sReapplyTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	if (sReapplyTimer == nil)
 		return;
 
@@ -767,6 +795,9 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 		HWND fc = KBSQueryFindChangeWindow();
 		if (fc != nullptr)
 		{
+			// *The failing arm means "apply", for the reason set out at the panel's own read below: a
+			//   dialog just opened has had nothing written to it by us, and the read is documented to
+			//   work only on a window the application itself has already written to.
 			const BYTE fcWant = KBSEffectiveFindChangeAlpha(fc);
 			BYTE  fcCur = 0;
 			DWORD fcKey = 0, fcFlags = 0;
@@ -827,6 +858,16 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	//   NOT what it should be (measured: 1477 events, 1 actual write).
 
 	// (1) is the alpha what it should be? (with the pointer on it, "what it should be" is opaque)
+	// **The FAILING arm is not defensive padding - it is the documented state of this very window
+	//   before we have ever written to it. Microsoft: "GetLayeredWindowAttributes can be called only
+	//   if the application has previously called SetLayeredWindowAttributes on the window. The
+	//   function will fail if the layered window was setup with UpdateLayeredWindow."
+	//   *WS_EX_LAYERED on OWL.Dock is INDESIGN'S doing, not ours (see the file header), so until our
+	//     first write this call can legitimately answer nothing at all - and "cannot read it" has to
+	//     mean "apply", never "it is already right". Treating a failure as agreement would leave a
+	//     freshly built Dock opaque with the toggle on.
+	//   *Once we have written to it the read works, which is why the measurement behind the comment
+	//     below (1477 events, 1 write) holds in the steady state.
 	const BYTE want = KBSEffectiveAlpha(target);
 	BYTE  cur = 0;
 	DWORD key = 0, flags = 0;
@@ -875,12 +916,25 @@ static void KBSInstallWinEventHook()
 									  WINEVENT_OUTOFCONTEXT);		// *nothing injected
 }
 
+// ***THE HANDLE IS ONLY FORGOTTEN IF THE HOOK REALLY CAME DOWN.*** (2026-08-11.)
+//   !What this used to do: call UnhookWinEvent and set the handle to nullptr regardless. Microsoft
+//     documents three ways that call fails - the handle is invalid, the hook was already removed, or
+//     **it is called from a thread other than the one that installed it** - and on the third one the
+//     hook is STILL LIVE. Dropping the handle there loses the only thing that can ever take it down:
+//     KBSShutdownPanelAlpha would find nullptr, report itself done, and the .pln would go down with
+//     the OS still holding KBSWinEventProc - a raw function pointer into unloaded code.
+//   *That is the very thing this file guards for ICallbackTimer, twice over (the shutdown flag and
+//     the observer detach). The hook is the same kind of booking and had no check at all.
+//   *Keeping the handle costs nothing and leaves the door open: KBSInstallWinEventHook sees a live
+//     handle and does not install a second one, and the next call here tries again.
+//   !All the callers are on the main thread today (the menu item, and Shutdown), which is why this
+//     has never been seen to fail - the point is that failure is now visible rather than swallowed.
 static void KBSRemoveWinEventHook()
 {
 	if (sWinEventHook != nullptr)
 	{
-		::UnhookWinEvent(sWinEventHook);
-		sWinEventHook = nullptr;
+		if (::UnhookWinEvent(sWinEventHook))
+			sWinEventHook = nullptr;
 	}
 }
 
@@ -1000,10 +1054,35 @@ private:
 
 CREATE_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)
 
+// ***NOTHING IS TOUCHED WHILE THE TOGGLE IS OFF.*** (Corrected 2026-08-11.)
+//   !What stood here: "rejected inside while OFF". **KBSApplyPanelTranslucency does not reject OFF** -
+//     it rejects "no panel", "docked" and Mac. While OFF it still writes alpha 255 to the top-level
+//     window AND shows the shadow with SW_SHOWNA, on every pass of the pointer.
+//   *Two things that costs:
+//     . **another panel's translucency is cancelled**. A floating GROUP of panels shares ONE OWL.Dock,
+//       so if this panel is grouped with one whose own translucency is ON - KESCM's, or a future one
+//       of ours - the 255 written here lands on the very window carrying that panel's 77.
+//     . a shadow the user never asked for is forced out. That is the 2026-07-29 defect's shape:
+//       InDesign does not move a shadow mid-drag, so one shown at the wrong moment is left behind.
+//   ***KESCM had the identical fault and fixed it on 2026-08-07 (48f0a6b, "Leave the OFF target alone
+//     when reapplying translucency") - four days after this file was ported from it. That is the THIRD
+//     time a fix landed in the source file after the port and did not walk over
+//     (the others: the ferror check, block 4 A-2; the re-arming guard, block 14 A-1).
+//   *Where the guard belongs: **in the callers, not inside KBSApplyPanelTranslucency** - the same
+//     conclusion KESCM reached and wrote down. Switching the toggle OFF has to write 255 and put the
+//     shadow back, and that is done by calling this very function from the menu handler
+//     (KBSActionComponent.cpp:218). A guard inside would kill the restore.
+//   *The other three callers - the timer, the Win32 hook and the visibility observer - have asked
+//     this question all along. These two and the panel's AutoAttach (KBSPanelTitle.cpp) were the
+//     three that did not.
 void KBSPanelRollOver::MouseEnter(const PMPoint& localMousePos)
 {
 	fLastPos = localMousePos;
-	KBSApplyPanelTranslucency();		// -> measures, and goes opaque (rejected inside while OFF)
+
+	if (!KBSGetPanelTranslucent())
+		return;
+
+	KBSApplyPanelTranslucency();		// -> measures where the pointer is, and goes opaque
 }
 
 void KBSPanelRollOver::MouseOver(const PMPoint& localMousePos)
@@ -1015,6 +1094,10 @@ void KBSPanelRollOver::MouseOver(const PMPoint& localMousePos)
 
 void KBSPanelRollOver::MouseLeave()
 {
+	// *Same guard as MouseEnter above, for the same reasons (2026-08-11).
+	if (!KBSGetPanelTranslucent())
+		return;
+
 	KBSApplyPanelTranslucency();		// -> measures, and goes back to translucent
 }
 

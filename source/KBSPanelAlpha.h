@@ -28,6 +28,12 @@
 // *77 is about 30% - the user's figure, settled on in KESCM after 128 (50%) read as too solid.
 // Putting the pointer on the panel brings it back to opaque, so the resting state can afford to be
 // faint. There is no slider and no steps: changing how faint it is means changing this one line.
+// **...but not to 0, and not to anything near it (Microsoft's contract, read 2026-08-11): "hit
+//   testing of a layered window is based on the shape and transparency of the window ... the areas
+//   of the window ... whose alpha value is zero will let the mouse messages through". At 0 the panel
+//   would stop receiving the pointer altogether - and this feature relies on the pointer arriving to
+//   put the panel back to opaque, so it would also have no way back. "0 = invisible" above describes
+//   what the parameter means, not a value to put here.
 static const uint8 kKBSPanelAlphaValue = 77;
 
 // How many times, and how far apart, the alpha is written again AFTER the notification that asked

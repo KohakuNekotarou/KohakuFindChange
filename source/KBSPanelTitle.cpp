@@ -219,13 +219,20 @@ public:
 		KBSAttachPanelVisibilityObserver();
 
 		// ...and if "Translucent Panel" is ON, put the alpha back: re-opening the panel gives it a
-		// different top-level window (OWL.Dock), which is what the alpha was on. Safe to call
-		// unconditionally - OFF, docked and Mac are all rejected inside.
+		// different top-level window (OWL.Dock), which is what the alpha was on.
 		// *This is the safety net; the following is really done by the observer in KBSPanelAlpha.cpp
 		//   (kPaletteVisibilityChangedMessage).
 		//   *Note: AutoAttach runs every time the widgets are rebuilt, so it is no place to write a
 		//   fixed default - it only reflects whatever KBSGetPanelTranslucent currently says.
-		KBSApplyPanelTranslucency();
+		// **The OFF test is HERE and not inside (corrected 2026-08-11). This said "safe to call
+		//   unconditionally - OFF, docked and Mac are all rejected inside", and OFF is NOT rejected
+		//   inside: KBSApplyPanelTranslucency writes alpha 255 and shows the shadow when the toggle is
+		//   off, which is how the OFF menu item does its restoring. Calling it from here regardless
+		//   meant every rebuild of the widgets wrote 255 to this panel's top-level window - and a
+		//   floating GROUP shares one OWL.Dock, so that lands on any grouped panel whose own
+		//   translucency is ON. See the note at KBSPanelRollOver::MouseEnter for the whole account.
+		if (KBSGetPanelTranslucent())
+			KBSApplyPanelTranslucency();
 	}
 
 	virtual void AutoDetach()
