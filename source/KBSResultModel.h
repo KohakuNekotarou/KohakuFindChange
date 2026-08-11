@@ -501,9 +501,16 @@ namespace KBSResultModel
 	        Summary: 9 replaced in 3 of 3 chapter(s)
 	        Rows: 9
 
-	        <Document>  <Page>  <Text>  <Font>  <Flags>
-	        ch1.indd    1       ...the cat sat on the...
-	        ch1.indd    2       ...three cats...                    lock
+	        <Document>  <Page>  <No>  <Text>  <Font>  <Flags>
+	        ch1.indd    1             ...the cat sat on the...
+	        ch1.indd    2       2     ...three cats...                    locked
+
+	    !SIX columns, and <No> is the one that goes stale in a written-out example. It carries the
+	     "(2)" of the panel's locator - which hit this is ON ITS PAGE - and without it several matches
+	     in one paragraph write identical lines (see the comment at that column in BuildReportText).
+	     It was added on the same day the file was named after the document, and this example was
+	     still showing the five columns that came before it until 2026-08-11. The flag words are
+	     BuildFlagCell's, which are the locator's own ("locked", not "lock").
 
 	    The format detail in those two lines is written IN FULL, however long it runs (user's
 	    decision, 2026-08-04) - the replace prompt is the one that shortens it. "Change:" appears on
@@ -609,7 +616,15 @@ namespace KBSResultModel
 
 	    Clear() puts it back to kNoContextMenuChapter, so an index taken from one result set can never
 	    name a chapter of the next one; the readers range-check it as well, because a caller that never
-	    went through the menu - a script firing the action - reaches them with whatever is stored. */
+	    went through the menu - a script firing the action - reaches them with whatever is stored.
+
+	    !Clear() is not the only pass that makes a stored index mean something else: KeepCheckedRows
+	     drops the chapters a replace left empty, which renumbers the ones after them, and it does NOT
+	     reset this. It does not have to, because it sets the aftermath flag in the same breath - and
+	     that takes the check box off every row, so both commands that read this go grey and the row
+	     menu does not open at all (an empty popup is not shown). The range check is what stands
+	     behind that for a caller arriving by ActionID instead. Anything that ever drops chapters
+	     WITHOUT the aftermath flag has to reset this the way Clear() does. */
 	enum
 	{
 		kContextMenuBookRow		= -1,	// the BOOK row: the commands reach every chapter

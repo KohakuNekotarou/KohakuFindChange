@@ -87,9 +87,19 @@ namespace KBSResultTree
 	    user is looking - and WHICH row they were asked over is the whole question, since the same
 	    two commands mean "this chapter" or "the whole book" depending on it.
 
-	    Ticking a single box says nothing here (2026-08-05). The book and document rows read out
-	    "(N/M checked)" themselves, so the line would be overwriting the search's own summary to
-	    repeat what is already on screen.
+	    Ticking a single box does not come through HERE - it has a line of its own, one row narrower:
+	    ShowHitCheckStatus below. What went on 2026-08-05 was the COUNT ("<checked> / <total>
+	    checked."), because the book and document rows read that out themselves now; what a single
+	    tick still says is WHICH row it was ("P1(2)  checked").
+
+	    !This paragraph read "Ticking a single box says nothing here (2026-08-05) ... the line would
+	     be overwriting the search's own summary to repeat what is already on screen" until
+	     2026-08-11 - written in the very commit that added ShowHitCheckStatus (d3ffb1c), so it was
+	     never true. And the thing it gave as the reason not to do it is exactly what a single tick
+	     DOES do: overwriting the run's summary on this line is why the summary had to be recorded
+	     separately on 2026-08-09 (KBSResultModel::NoteRunSummary, whose own note states the
+	     behaviour correctly - the saved report's heading had started reading "Summary: P1(2)
+	     checked").
 
 	    @param targetName the row the menu was popped over - a chapter's name, or the book's.
 	    @param nowChecked true = Check All, false = Uncheck All. */
