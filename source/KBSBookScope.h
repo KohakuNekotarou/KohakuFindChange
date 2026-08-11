@@ -41,15 +41,22 @@ namespace KBSBookScope
 	    entry in the book, which OpenChapterDoc needs to ask the book API about it).
 
 	    docRef is null until the chapter is opened. A document-scope target is built by hand with
-	    docRef already set and contentUID left invalid - that is what tells the engines apart. */
+	    docRef already set and contentUID left invalid - that is what tells the engines apart.
+
+	    hasFile is what IBookContent::GetIDFile ANSWERED, kept rather than discarded: the header
+	    says it "returns kTrue if a file can be obtained ... kFalse otherwise"
+	    (IBookContent.h:121-125), so "this entry names no file" is a state the book API allows and
+	    not one this plug-in may assume away. It is false for a document-scope target, which names
+	    no file either. */
 	struct ChapterDoc
 	{
 		UIDRef		docRef;
 		PMString	shortName;
 		IDFile		file;
 		UID			contentUID;
+		bool		hasFile;
 
-		ChapterDoc() : contentUID(kInvalidUID) {}
+		ChapterDoc() : contentUID(kInvalidUID), hasFile(false) {}
 	};
 
 	/** Is the search scope the whole book (ON) or just the front document (OFF)? Session state
@@ -300,15 +307,38 @@ namespace KBSBookScope
 	    or replaced into it since (user, 2026-08-03: "a document the user opened by jumping should
 	    not be closed, even if nothing was replaced in it").
 
-	    Called from wherever a held chapter is given a window: ShowChapterWindow after a replace, and
-	    KBSJump when a jump brings one to the front. Does nothing when the chapter is not held, so it
-	    is safe to call on any document. */
+	    ***** WHO CALLS IT, by name - and it is no longer only "wherever a window is given". *****
+	      * ShowChapterWindow, both exits (it opened one, or it found one already there);
+	      * KBSJump, twice, when a jump brings a chapter to the front;
+	      * CloseDisplayedDocsIfClean, on every document it is about to close - a window makes it the
+	        user's whoever raised it, so the claim goes whether or not the close goes through;
+	      * KBSCloseDocResponder, on EVERY document close in the session (2026-08-09), so a chapter
+	        somebody else closed cannot leave a dangling (IDataBase*, UID) on the held list.
+	    The last two are not "a window was given" at all, which is why the sentence that described
+	    this as window-raising only had drifted: it named two callers when there were five, and the
+	    two it missed are the ones that do not fit its description. Listed by name rather than
+	    counted - a count can be right today and wrong at the next call site, and cannot be checked
+	    without a grep (block 4's decision).
+
+	    Does nothing when the chapter is not held, so it is safe to call on any document. */
 	void ForgetHeldDoc(const UIDRef& docRef);
 
 	/** Does this chapter entry name a FILE at all?
 
-	    A BOOK chapter always does. A DOCUMENT-scope row does not: it is the front document, and it
-	    is carried as a docRef with an empty file beside it.
+	    A DOCUMENT-scope row does not: it is the front document, and it is carried as a docRef with
+	    an empty file beside it. A BOOK chapter is expected to, and MEASURED 2026-08-11 it does even
+	    when the .indd has been deleted behind the book's back - the entry keeps the link and the
+	    book calls it MISSING_DOCUMENT, so IBookContent::GetIDFile still answers kTrue with the path
+	    intact (work/kbs-selftest/run-getidfile-probe.ps1).
+
+	    ***** "Expected to", not "always". ***** That header promises nothing of the kind - it
+	    "returns kTrue if a file can be obtained for the book content, kFalse otherwise"
+	    (IBookContent.h:121-125) - and this line read "A BOOK chapter always does" until the same
+	    day, while naming that very call as its authority. What rests on it is not small: the two
+	    callers below read a false as "this is a document-scope row", and that is the answer allowed
+	    to fall back on a docRef the search left behind. So the answer is now kept where the book
+	    gives it (ChapterDoc::hasFile) rather than assumed here, and the one door that could act on
+	    an unchecked document - OpenChapterDoc's already-open lookup - no longer does.
 
 	    ***** That difference is what tells ReopenChapterDoc's two failures apart. ***** It answers
 	    false both when there was nothing to open BY and when the file would not open, and a caller
@@ -345,8 +375,14 @@ namespace KBSBookScope
 
 	/** The "Hide Previous Chapter" sweep (Task 3): close every OTHER document that HAS a window and
 	    needs no save, on schedule - whoever opened it. The exception document (the one a jump just
-	    landed in) and the windowless held chapters (the reopen cache) survive. Dirty documents stay
-	    (closing them would want a save). */
+	    landed in) and the windowless held chapters (the reopen cache) survive.
+
+	    "Needs no save" is IDocFileHandler::CanSave, "modified OR UNSAVED" - so what stays is not
+	    only the DIRTY document this line used to name, but also the one that has never been saved at
+	    all: the untitled document the user just made with Ctrl+N, which reads as unmodified and was
+	    being closed without a prompt until 2026-08-10. See HasUnsavedChanges in the .cpp for the
+	    measurement. (Said "Dirty documents stay" until 2026-08-11, which is the sentence the fix
+	    made incomplete - the .cpp's own note was corrected on the day and this one was not.) */
 	void CloseDisplayedDocsIfClean(const UIDRef& exceptDoc);
 
 	/** Application-shutdown cleanup (state only, no closing, no UI): forget the held-chapter

@@ -46,8 +46,14 @@
 //    * a book search followed by a DOCUMENT-scope search - IsFromBook() is false by then, so that
 //      gate returned early as well.
 //  The searched-book path survives both. It is set whenever a run resolves a book, whatever that
-//  run goes on to find, and the only way to let it go is ReleaseSearchedBook - which closes the
-//  held chapters in the same breath. So when this gate is false there is nothing of ours left open.
+//  run goes on to find, and the only way to let it go is ReleaseSearchedBook - which hands the held
+//  chapters back in the same breath. So when this gate is false, what is left open is only what
+//  REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
+//  unsaved work or when its close is refused, and those two outlive the path that named their book.
+//  (This said "there is nothing of ours left open", which was written before those two doors
+//  existed - 2026-08-08 - and is the stronger claim of the two.) Nothing is stranded by it: the
+//  next run of any kind calls ReleaseSearchedBook on its way in and tries them again, and a chapter
+//  kept for unsaved work is one a replace has already reported to the user.
 //
 //  (Until 2026-08-02 the gate asked about the HELD CHAPTERS. That was honest while a book run kept
 //  every chapter it opened; now a run closes each chapter as soon as it has walked it, so the held

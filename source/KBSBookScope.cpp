@@ -76,9 +76,14 @@ namespace
 	// chapters for": since 2026-08-02 every run closes each chapter as soon as it is done with it,
 	// so the held list is empty most of the time while a full result set is still on screen.
 	//
-	// Two things read this and both are about the RESULTS, not about open documents:
+	// Read from OUTSIDE through GetSearchedBookPath, by two callers, and both ask about the RESULTS:
 	//   * KBSBookWatch - "the book these results name has been closed, retire them"
 	//   * KBSJump::ShowBook - "the book row was clicked, bring that book forward"
+	// And read from INSIDE by OpenChapterDoc, which is not about the results at all: it is how a
+	// chapter finds the book it belongs to, having deliberately not parked an IBook* between calls.
+	// That third reader was standing here while this note said "two things read this ... not about
+	// open documents", one function away.
+	//
 	// Let go through ReleaseSearchedBook, which every KBSResultModel::Clear() is paired with.
 	PMString gSearchedBookPath;
 
@@ -483,11 +488,17 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 		return false;
 
 	// ***** IS IT STILL OPEN? ASKED FIRST, AND THE ORDER IS THE WHOLE POINT. *****
-	// Everything below this line reads the document, and the first of them - HasUnsavedChanges -
-	// DEREFERENCES the database the UIDRef carries (db->IsModified()). A UIDRef is only
-	// (IDataBase*, UID), so for a chapter that has been closed since it was held that pointer is
-	// dangling, and asking it anything at all is undefined behaviour. IsDocStillOpen dereferences
-	// nothing: it compares the pair against the session's open-document list.
+	// Everything below this line reads the document. DocHasAnyWindow takes the database out of the
+	// UIDRef and hands it to IDocumentUIUtils; HasUnsavedChanges hands the UIDRef itself to
+	// QueryDocFileHandler and then to CanSave. A UIDRef is only (IDataBase*, UID), so for a chapter
+	// that has been closed since it was held that pointer is dangling, and handing it to anything at
+	// all is undefined behaviour. IsDocStillOpen is the one question that does not: it compares the
+	// pair against the session's open-document list without following it.
+	//
+	// (This named HasUnsavedChanges as "the first of them" and quoted db->IsModified() as what it
+	// called. Neither is so any more: DocHasAnyWindow went in above it on 2026-08-05, and the
+	// unsaved question became IDocFileHandler::CanSave on 2026-08-10. The DANGER is unchanged, which
+	// is how the sentence survived two edits to the code it describes.)
 	//
 	// ReleaseHeldDocs has always asked in this order (see the loop there). This one asked in the
 	// opposite one until 2026-08-05 - the same two questions, in one module, answered two different
@@ -570,13 +581,18 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// its .indd, until the whole run was over. Measured 2026-08-04 on a four-chapter saving replace.
 	//
 	// ***** AND kProcess IS ONLY LEGAL BECAUSE THE WINDOW TEST ABOVE HAS ALREADY RUN. ***** Closing
-	// a document that HAS a window with kProcess is a stated error: the standard handler asserts on
-	// it outright - "Close() illegal with open document windows and cmdMode == kProcess"
-	// (incopyfileactions/utils/InCopyDocUtils.cpp:1376-1383, which is IDocFileHandler::Close's own
-	// implementation). The DocHasAnyWindow door above returns before this line for every one of
-	// them, so what reaches here is windowless by construction. Keep that order if either test is
-	// ever moved (recorded in the block 11 re-audit, 2026-08-10 - the contract was being met, but
-	// nothing here said so).
+	// a document that HAS a window with kProcess is called out as an error by the only Close
+	// implementation this SDK ships - InCopy's - which asserts on it outright: "Close() illegal with
+	// open document windows and cmdMode == kProcess" (InCopyDocUtils::DoClose, at
+	// incopyfileactions/utils/InCopyDocUtils.cpp:1376-1383). That is InCopy's document file handler,
+	// NOT the layout handler that will take our chapters; this note called it "the standard handler
+	// ... IDocFileHandler::Close's own implementation" until 2026-08-11, which is more than the
+	// source shows (a grep for the assert text finds this one site and nothing else). It is still
+	// the only statement anyone has made about that combination, and it is not a rule worth testing:
+	// the DocHasAnyWindow door above returns before this line for every windowed chapter, so what
+	// reaches here is windowless by construction. Keep that order if either test is ever moved
+	// (recorded in the block 11 re-audit, 2026-08-10 - the contract was being met, but nothing here
+	// said so).
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
 	return true;
@@ -1086,9 +1102,16 @@ bool KBSBookScope::ActivateBook(const PMString& bookPath)
 	//    AcquireCurrentBook does (source/open/includes/layout/AcquireCurrentBook.h:72,87), which is
 	//    the only worked example in the SDK. kSetCurrentActiveBookCmdBoss exists but has no call
 	//    site anywhere in the SDK, and this is session UI state rather than document data.
+	//    A nil manager is answered with false rather than carried past, because the header states
+	//    outright that a true return means the active book WAS set - and this used to walk on to the
+	//    tab and return true having set nothing. It cannot happen: FindOpenBookByPath above took the
+	//    same interface off the same session to find this book at all, so reaching here with a book
+	//    in hand means the manager came. Made to match the promise anyway - a door that cannot open
+	//    is the cheapest kind to shut (block 11 defect re-check, 2026-08-11).
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-	if (bookMgr != nil)
-		bookMgr->SetCurrentActiveBook(book);
+	if (bookMgr == nil)
+		return false;
+	bookMgr->SetCurrentActiveBook(book);
 
 	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
 	//    panel is found by walking the list and asking each candidate which book it belongs to -
@@ -1168,9 +1191,19 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	if (bookDB == nil)
 		return false;
 
-	// A different book than the one the last run held chapters for? Close those first. Chapters
-	// are normally closed as each run finishes with them, so this only ever finds chapters a JUMP
-	// reopened - which belong to the old book and have no reason to stay.
+	// Hand back whatever the last run left held before recording this one's book. Chapters are
+	// normally handed back as each run finishes with them, so this only ever finds chapters a JUMP
+	// reopened, or ones that refused to close.
+	//
+	// ***** THE "IS IT A DIFFERENT BOOK?" TEST IS ALWAYS TRUE, AND THAT IS NOT A BUG. ***** All
+	// three callers (the search and the two scans) call ReleaseSearchedBook immediately before this
+	// - it is how "every Clear() lets the book go" is kept a rule with no exceptions - and that
+	// clears the path. So the comparison is always against an empty string, and what it guards has
+	// already been done a moment earlier: this call finds an empty list and returns at its first
+	// line. It is kept because it costs nothing and because the guarantee is the caller's, not
+	// this function's - but it does NOT do what it said, which was to keep a second run against the
+	// SAME book from closing chapters it could have reused (found 2026-08-11; the callers took that
+	// possibility away when the release moved up to the commit point).
 	SDKFileHelper bookFileHelper(book->GetBookFileSpec());
 	const PMString bookPath = bookFileHelper.GetPath();
 	if (!(gSearchedBookPath == bookPath))
@@ -1202,7 +1235,15 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 
 		// The chapter's .indd. It is what OpenChapterDoc opens by, and what navigation uses to
 		// reopen the chapter after it has been closed.
-		content->GetIDFile(chapter.file);
+		//
+		// ***** THE ANSWER IS KEPT, NOT DISCARDED. ***** GetIDFile "returns kTrue if a file can be
+		// obtained for the book content, kFalse otherwise" (IBookContent.h:121-125), so a chapter
+		// whose entry names no file is a state the book API allows. This line dropped that answer
+		// until 2026-08-11, while two places in this module declared the case impossible - and one
+		// of them named THIS call as its authority. What the loss costs is at ChapterHasFile: an
+		// entry with no file reads exactly like a DOCUMENT-scope row, which is the one thing that
+		// may fall back on a docRef the search left behind.
+		chapter.hasFile = (content->GetIDFile(chapter.file) != kFalse);
 
 		// The chapter's file name for the read-out, built HERE rather than at open time: a chapter
 		// that cannot be opened still has to be named in the report. Via the UTF-16 buffer
@@ -1290,13 +1331,25 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 		// already here - this very call hands the file back in openSysFile.
 		//
 		// Asked through KBSDocumentLivesInFile, which is what ReopenChapterDoc asks, so the two
-		// cannot come to differ. A chapter entry with no file of its own cannot be checked and is
-		// taken as before: every BOOK chapter names a file (IBookContent::GetIDFile), so that case
-		// does not arise here, and refusing it would only lose a document that is already open.
+		// cannot come to differ.
+		//
+		// ***** AN ENTRY THAT NAMES NO FILE CANNOT BE CHECKED, SO IT IS NOT ACCEPTED. ***** It was
+		// waved through until 2026-08-11 - "every BOOK chapter names a file, so that case does not
+		// arise here" - which made this door the one place where an unverified document could still
+		// be taken for a chapter's own. The claim rested on IBookContent::GetIDFile always
+		// answering kTrue, and the header does not say that: it "returns kTrue if a file can be
+		// obtained ... kFalse otherwise" (IBookContent.h:121-125).
+		//
+		// MEASURED 2026-08-11 (work/kbs-selftest/run-getidfile-probe.ps1): a chapter whose .indd
+		// has been DELETED behind the book's back still answers kTrue with its path intact - the
+		// entry keeps the link, and the book reports it as MISSING_DOCUMENT - so this branch does
+		// not change what happens to any book we can build today. It is closed because the answer
+		// is the book's to give, not ours to assume, and because falling through costs nothing: an
+		// entry with no file cannot be opened either, so the chapter is reported as unopenable,
+		// which is what a chapter nobody can resolve should look like.
 		SDKFileHelper chapterFileHelper(ioChapter.file);
 		const PMString wantedPath = chapterFileHelper.GetPath();
-		if (alreadyOpenDoc != nil
-			&& (wantedPath.empty() || KBSDocumentLivesInFile(alreadyOpenDoc, wantedPath)))
+		if (alreadyOpenDoc != nil && KBSDocumentLivesInFile(alreadyOpenDoc, wantedPath))
 		{
 			// The user's (or an earlier run's) own copy. NOT held: closing a document somebody
 			// else opened would surprise them - the same rule ReopenChapterDoc follows, and the
@@ -1357,6 +1410,7 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 			skipped.reason = PMString("missing plug-in data");
 			skipped.reason.SetTranslatable(kFalse);
 		}
+
 		outSkipped->push_back(skipped);
 	}
 	return false;

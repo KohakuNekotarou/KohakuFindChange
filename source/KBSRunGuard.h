@@ -21,17 +21,25 @@
 //      Its stored UIDRef then carries a dangling IDataBase*, and the next chapter dereferences it.
 //
 //  Guarding each run against ITSELF does not cover either case: both need two DIFFERENT runs. So
-//  the question is asked HERE, about all of them at once, and the three kinds of caller ask this
-//  instead of naming the engines one at a time:
+//  the question is asked HERE, about all of them at once, and every caller asks this instead of
+//  naming the engines one at a time. By name, because a count goes stale where a list does not
+//  (this comment said "the three kinds of caller" while there were six call sites, the three it
+//  omitted having arrived one at a time):
 //
-//    * the panel's action enablement (KBSActionComponent::UpdateActionStates) greys everything out;
-//    * each engine's own front door, for a caller that never went through the menu - a script
-//      firing an action by ID reaches the engine whatever the menu says;
-//    * the book-close watcher (KBSBookWatch), whose deferred question would otherwise release the
-//      chapters a run is walking. It used to ask only about the SEARCH, which left the replace and
-//      both scans unprotected.
+//    * the panel's action enablement (KBSActionComponent, twice) greys everything out;
+//    * each engine's own front door (KBSSearchEngine / KBSReplaceEngine / KBSGlyphScanEngine /
+//      KBSOversetScanEngine), for a caller that never went through the menu - a script firing an
+//      action by ID reaches the engine whatever the menu says;
+//    * the book-close watcher (KBSBookWatch, twice: at the cue and again in the deferred callback),
+//      whose question would otherwise release the chapters a run is walking. It used to ask only
+//      about the SEARCH, which left the replace and both scans unprotected;
+//    * the document-close responder (KBSCloseDocResponder), which would otherwise throw away the
+//      result model a run is still filling;
+//    * the report writer (KBSReportSave), which would otherwise save a half-filled result set;
+//    * the script provider (KBSScriptProvider), so app.kfcStatus / app.kfcResults answer "busy"
+//      rather than a partial reading.
 //
-//  A fifth run added later is one line in this file rather than a fault nobody notices in three.
+//  A fifth run added later is one line in this file rather than a fault nobody notices in four.
 //
 //========================================================================================
 

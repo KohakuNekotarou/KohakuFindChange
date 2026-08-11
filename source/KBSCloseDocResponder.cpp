@@ -36,11 +36,16 @@
 //  does not apply on this path. Worth having measured rather than reasoned about: a panel that
 //  emptied itself while its document stayed open would read as work lost at random.
 //
-//  No "was it us who closed it?" guard is needed at document scope. KBS closes documents in
-//  exactly two places, and neither can close the searched document: ReleaseHeldDocs only closes
-//  chapters a BOOK search opened windowless (document scope holds none), and the Hide Previous
-//  Chapter sweep passes the jumped-to document as its exception. A guard becomes necessary when
-//  book results start being retired - it belongs with that step, not this one.
+//  No "was it us who closed it?" guard is needed at document scope. KBS calls IDocFileHandler::Close
+//  in three places - all of them in KBSBookScope - and none can close the searched document:
+//    * ReleaseHeldDocs and ReleaseHeldDoc close only chapters a BOOK search opened windowless, and
+//      document scope holds none (nothing goes on the held list without a chapter file to open by);
+//    * the Hide Previous Chapter sweep (CloseDisplayedDocsIfClean) passes the jumped-to document as
+//      its exception.
+//  This said "exactly two places" while there were three - the single-chapter release was left out,
+//  and it is the one a run calls between chapters - so the places are named rather than counted.
+//  A guard becomes necessary when book results start being retired: it belongs with that step, not
+//  this one.
 //
 //========================================================================================
 
