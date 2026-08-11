@@ -721,9 +721,19 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Change Checked. kCustomEnabling so UpdateActionStates can grey it out while nothing is
-		// checked - the same flag the toggles need. Guarding it against closed documents has to
-		// happen in UpdateActionStates (per-hit, via KBSBookScope::IsDocStillOpen), NOT with
-		// kDisableIfNoFrontDocument: replacing in windowless book chapters is a supported case.
+		// checked - the same flag the toggles need. NOT kDisableIfNoFrontDocument: replacing in
+		// windowless book chapters is a supported case, and a book search leaves no document window
+		// open at all, so that flag would grey out the very run this panel exists for.
+		// !Nothing here and nothing in UpdateActionStates asks whether a hit's document is still
+		//  OPEN, and nothing should. A closed chapter is REOPENED by the replace itself
+		//  (KBSReplaceEngine -> KBSBookScope::ReopenChapterDoc), and a document-scope result set is
+		//  retired the moment its document closes (KBSCloseDocResponder) - both cases are answered
+		//  before this command can be reached.
+		// !This note read "guarding it against closed documents has to happen in UpdateActionStates
+		//  (per-hit, via KBSBookScope::IsDocStillOpen)" from the day it was written until
+		//  2026-08-11. That call has never existed in KBSActionComponent.cpp - checked against the
+		//  whole history of the file, not just today's - and it must not: a per-hit door there is
+		//  exactly the one that would grey out a book-wide replace.
 		kKBSActionComponentBoss,
 		kKBSReplaceCheckedActionID,
 		kKBSReplaceCheckedMenuKey,		// "Change Checked"

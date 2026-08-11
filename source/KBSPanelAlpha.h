@@ -84,8 +84,18 @@ bool16	KBSApplyPanelTranslucency();
 //   correct and usable (user's check, 2026-08-04).
 //
 //   *"DroverLord - Window Class" is a GENERIC class - a document window's canvas is one too, and
-//    so is every other dialog - so the class alone cannot identify it. The search adds: top-level,
-//    owner is the main frame, and the title is one of the known Find/Change titles.
+//    so is every other dialog - so the class alone cannot identify it. That is why this window is
+//    NOT looked for from Win32 at all: the lookup walks the SDK's IWindowList and takes the dialog
+//    whose panel answers kFindChangeParentWidgetID - a NUMBER, so no UI language can change it.
+//    See the block comment over KBSQueryFindChangeIWindow in KBSPanelAlpha.cpp for the full route.
+//
+//    !This said "the search adds: top-level, owner is the main frame, and the title is one of the
+//     known Find/Change titles" until 2026-08-11. That was the plan the probe above was run for,
+//     never the code that followed it: the .cpp rejects a title list by name ("the title is
+//     translated, so a list of candidate titles would silently miss on any build nobody thought
+//     of"), and the menu command that calls this has always said "never by its title, which is
+//     translated" (KBSActionComponent.cpp). A reader of this header alone would have concluded the
+//     feature cannot work on a translated build - which is the build this is developed on.
 //----------------------------------------------------------------------------------------
 
 // The toggle's current state (*OFF by default).

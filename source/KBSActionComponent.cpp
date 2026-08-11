@@ -429,7 +429,12 @@ void KBSActionComponent::DoAbout()
 		// (candlechartui/CdlChtUIActionComponent.cpp:192, and the same line in every other
 		// Dolly-generated component). It used to arrive here already translated, through a
 		// PMString(key, kTranslateDuringCall) built one line up - the same answer by a longer
-		// road. KESCM's About (KESCMActionComponent.cpp:647) is still written that way.
+		// road.
+		// !KESCM was named here as "still written that way" until 2026-08-11, and it is not:
+		//  KESCMActionComponent.cpp:647 hands over PMString(kKESCMAboutBoxStringKey) with NO
+		//  translate flag, and the comment above it says the alert translates it - the same shape as
+		//  this line, one redundant wrapper apart. The LINE NUMBER was right and the claim about what
+		//  is on it was not, which is the harder half of a citation to check.
 		kKBSAboutBoxStringKey,					// Alert string
 		kOKString, 						// OK button
 		kNullString, 						// No second button
@@ -760,12 +765,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// long after it had only one reader left (the replace command, since 2026-08-07): a right-click
 	// menu, which holds nothing but these two commands, was walking every stored hit to answer a
 	// question no action on it asks. It is taken inside that one branch now.
+	//
+	// ***** BOTH READERS ARE ON THE RIGHT-CLICK MENU, AND THIS HOOK ALSO RUNS FOR THE FLYOUT. *****
+	// So the count is taken lazily: whichever of the pair is reached first pays for it, the other
+	// reads it, and a menu that holds neither never asks. It was taken unconditionally here until
+	// 2026-08-11, which made every opening of the flyout - nine commands, none of them a reader -
+	// walk the context row's hits, up to kKBSCollectHitLimit of them. That is the 2026-08-08 finding
+	// above seen from the other menu: hoisting is justified by two readers, and the readers have to
+	// be on the LIST BEING ENABLED. Only the walk moved; the answer is the same one it always was.
 	const int32 contextChapter = KBSResultModel::GetContextMenuChapter();
-	int32 contextCheckable = 0;
-	if (contextChapter == KBSResultModel::kContextMenuBookRow)
-		contextCheckable = KBSResultModel::GetCheckableCount();
-	else if (contextChapter != KBSResultModel::kNoContextMenuChapter)
-		contextCheckable = KBSResultModel::GetChapterCheckableCount(contextChapter);
+	int32 contextCheckable = -1;		// not counted yet - see the two commands at the end of the loop
 
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
 	{
@@ -872,10 +881,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			//
 			// Same shape as the block 6 finding, in the same model: a question with one home, and a
 			// caller answering half of it for itself. Worse here, because the hand-written half used
-			// the very spelling the model warns against: KBSResultModel.cpp:259-263 states that the
-			// report-only kinds are LISTED rather than written as "not kResultFindChange" so that a
-			// new kind which DOES offer work has to be a decision instead of quietly losing its
+			// the very spelling the model warns against: KBSResultModel::IsReportOnlyKind states that
+			// the report-only kinds are LISTED rather than written as "not kResultFindChange" so that
+			// a new kind which DOES offer work has to be a decision instead of quietly losing its
 			// boxes - and this was the "not kResultFindChange" the model was guarding against.
+			// !Named by FUNCTION, not by line. This read "KBSResultModel.cpp:259-263", which was
+			//  correct on the day it was written (2026-08-08, where the definition sat at :257) and
+			//  pointed at HasRun() by 2026-08-11: the same definition had moved to :273 as that file
+			//  grew. A line number is the part of a citation that goes stale without anybody touching
+			//  either end of it - the same swap block 12 made in KBSJump.cpp.
 			//
 			// Walks every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling
 			// rather than the smaller number the panel displays. Taken here rather than above the
@@ -909,6 +923,19 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// clicking a row while the panel shows a replace's report therefore does nothing visible,
 			// which the user accepted as the better behaviour. It also proves this hook runs for the
 			// popup menu, which is what lets the enablement follow the right-clicked row at all.
+			//
+			// The count these two share, taken on whichever of them the loop reaches first. Nothing
+			// between the two visits can change it - this method reads the model, it never writes to
+			// it - so the second reader gets the same answer the first paid for. See the note above
+			// the declaration for why it is not taken before the loop.
+			if (contextCheckable < 0)
+			{
+				contextCheckable = 0;
+				if (contextChapter == KBSResultModel::kContextMenuBookRow)
+					contextCheckable = KBSResultModel::GetCheckableCount();
+				else if (contextChapter != KBSResultModel::kNoContextMenuChapter)
+					contextCheckable = KBSResultModel::GetChapterCheckableCount(contextChapter);
+			}
 			const bool16 haveCheckable = (contextCheckable > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);
 		}
