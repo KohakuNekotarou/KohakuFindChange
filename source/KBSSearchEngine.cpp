@@ -275,15 +275,23 @@ bool gSearching = false;
 // KBSResultModel::Clear() calls KBSSearchEngine::ForgetSearchedFindFormat() beside it, which is
 // the rule KBSBookScope::ReleaseSearchedBook already follows and for the same reason.
 //
-// This comment said the model was cleared at "the two points on this path" until 2026-08-08. There
-// are NINE, in six files: the two on this path (the commit point and the cancelled exit), the same
-// two in each of the two scans, the replace's "the query has changed" exit, and one each in the
-// close-document responder and the book watch - and the seven outside this file left the memory
-// standing over a result set it had nothing to do with.
+// This comment said the model was cleared at "the two points on this path" until 2026-08-08.
+// ***** NAMED, NOT COUNTED - every one of them, so that adding an eleventh means editing this list
+// ***** rather than noticing a number. In six files:
 //
-// (That sentence was written saying EIGHT. The nine were counted mechanically on the fourth audit
-// of this block; every one of them does have its pairing, so what was wrong was the count in the
-// comment and not the code. Counting by hand is how the "two" got there in the first place.)
+//   KBSSearchEngine.cpp     the commit point in SearchBook, and its cancelled exit
+//   KBSGlyphScanEngine.cpp  the same two
+//   KBSOversetScanEngine.cpp  the same two
+//   KBSReplaceEngine.cpp    RefuseChangedQuery's "the query has changed" exit, and
+//                           StopBeforeAnythingIsWritten's stale exit (the verify walk's refusal)
+//   KBSCloseDocResponder.cpp  one
+//   KBSBookWatch.cpp        one
+//
+// Every one of them does have its pairing; what kept going wrong was the COUNT. It was written
+// EIGHT, corrected to NINE by a mechanical count on the fourth audit of this block (2026-08-08),
+// and was wrong again by 2026-08-10 - the verify pass gave the replace its second exit and no
+// number in any comment moved. Counting by hand is how the "two" got there in the first place;
+// counting at all is how the rest did.
 boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 
 // The attribute database that list's UIDs are in. Kept beside it because a UID means nothing

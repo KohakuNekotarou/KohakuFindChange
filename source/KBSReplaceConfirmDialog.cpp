@@ -151,7 +151,21 @@ bool KBSReplaceConfirmDialog::Resolve(IFindChangeOptions* opts)
 	if (opts == nil)
 		return false;
 
+	// ***** ASKED BEFORE IT IS HANDED OVER. ***** Both calls below take this database as their
+	// first argument, and IFindChangeOptions.h:463-470 / :497-506 describe it as "the database of
+	// the attributes" without saying a nil one may be passed - so it is turned away here rather
+	// than handed in and judged afterwards. Every reader of the format pane in KBSSearchEngine
+	// (HasFindQuery, HasFormatSet, DescribeGlyphQuery, RememberFindFormat, FindFormatHasChanged,
+	// DescribeFormatSetting, BuildWalkSignature) was given this order on 2026-08-08 and on the
+	// fourth audit of that block; this one is in another file and was not counted with them.
+	//
+	// False is the honest answer: no font can be resolved without the attribute database, which is
+	// exactly what the caller reads as "ask with the Text / GREP layout instead". ResolveSide
+	// already refuses a nil database, so nothing below this line changes behaviour.
 	IDataBase* const db = opts->GetUIDAttrDB();
+	if (db == nil)
+		return false;
+
 	const bool okFind = KBSReplaceConfirmDialog::ResolveSide(opts->GetFindGlyphID(),
 		opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch), db, sFind);
 	const bool okChange = KBSReplaceConfirmDialog::ResolveSide(opts->GetReplaceGlyphID(),

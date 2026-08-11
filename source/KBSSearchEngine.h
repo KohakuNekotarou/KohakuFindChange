@@ -275,9 +275,14 @@ namespace KBSSearchEngine
 	    (a scan's results are not a Find/Change query, and the search's own commit point overwrites
 	    the memory a moment later anyway): that is the same reasoning KBSCloseDocResponder gives for
 	    calling ReleaseSearchedBook on a document-scope result set. Until 2026-08-08 this was kept in
-	    step by hand at two of the NINE places that clear the model, and the comment in the .cpp said
-	    there were only those two. (The pairing was put right that day; the COUNT here and in the .cpp
-	    said EIGHT until it was checked mechanically on the fourth audit of this block.) */
+	    step by hand at two of the places that clear the model, and the comment in the .cpp said
+	    there were only those two. (The pairing was put right that day.)
+
+	    ***** THE PLACES ARE NAMED IN THE .cpp, NOT COUNTED HERE. ***** This sentence said EIGHT,
+	    then NINE, and was wrong both times - the second time because 2026-08-10's verify pass gave
+	    the replace a SECOND clearing exit and no number in any comment moved. A count is the one
+	    kind of claim that goes stale without anybody editing the line it is on, so the list lives
+	    in one place and is spelled by name (the same decision block 4 took for KBSPanelMetrics). */
 	void ForgetSearchedFindFormat();
 
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
@@ -335,11 +340,15 @@ namespace KBSSearchEngine
 	    the same statement.
 
 	    (This said "its ONE caller" from the day it arrived - 2026-08-08, block 12's audit, when
-	    that was true - until the fifth audit of this block, 2026-08-10. There are TWO: the jump
-	    itself (KBSJump.cpp:624) and the double click that selects the match (:866), which arrived
-	    on 2026-08-09 and did not come back to the sentence that had counted its callers. Sharing
-	    one answer between them is the whole point, so the second caller strengthens the reason
-	    rather than weakening it - but a count in a comment is a claim like any other.)
+	    that was true - until the fifth audit of this block, 2026-08-10. There are TWO:
+	    KBSJump::JumpToHit and KBSJump::SelectHitText, the double click that selects the match,
+	    which arrived on 2026-08-09 and did not come back to the sentence that had counted its
+	    callers. Sharing one answer between them is the whole point, so the second caller
+	    strengthens the reason rather than weakening it - but a count in a comment is a claim like
+	    any other. Named rather than cited by line: both citations here read :624 and :866 until
+	    2026-08-11, by which time the calls were at :709 and :957. The file they point at says so
+	    itself - "a function name cannot go stale" - and that decision had not travelled back
+	    along the citation.)
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
 	          THREAD (and is the only test that answers for a table cell overflowing on its own -
@@ -447,10 +456,18 @@ namespace KBSSearchEngine
 	    which must answer yes" until the fifth audit of this block, 2026-08-10 - the fix went into
 	    HashMatchText's @return and into the .cpp, and stopped one door short of here.
 
-	    ***** THE JUMP IS THE ONLY CALLER, AND HAS BEEN SINCE 2026-08-05. ***** A click on a row asks
-	    this about the very range that row recorded, so the first three questions are satisfied by
-	    construction and the hash is what does the work - the answer being how the panel can say "the
-	    replacement is no longer here" instead of scrolling to whatever took its place.
+	    ***** ASKED FROM KBSJump AND NOWHERE ELSE, AND SO IT HAS BEEN SINCE 2026-08-05. ***** TWO
+	    callers, the same pair that share IsPositionOverset above: KBSJump::JumpToHit and
+	    KBSJump::SelectHitText, the double click that selects the match. Each asks about the very
+	    range its row recorded, so the first three questions are satisfied by construction and the
+	    hash is what does the work - the answer being how the panel can say "the replacement is no
+	    longer here" instead of scrolling to whatever took its place, and how the double click
+	    refuses to hand the user a selection over text they never searched for.
+
+	    (This said "THE JUMP IS THE ONLY CALLER" until 2026-08-11. The second caller arrived on
+	    2026-08-09 and the sentence 110 lines above - which counts the same two for the same
+	    reason - was corrected for it on 2026-08-10 while this one was not. One place being right
+	    is not a reason to believe its neighbour.)
 
 	    The REPLACE asked it too until that date, of every row before writing it, and that is what
 	    the position arm was for. It carried a posDelta alongside - how far the replace pass had
