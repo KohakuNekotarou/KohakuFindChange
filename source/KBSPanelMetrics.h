@@ -63,9 +63,14 @@ namespace KBSPanelMetrics
 	    measurably cut off. The block grew a line and the messages were cut to fit it - the
 	    measurement, and the reasoning for leaving the Roman block at four, are in
 	    KBSPanelMetrics.cpp over the two constants. **This sentence is the one KBS.fr:1060 means
-	      by "if this number changes, change that one too": the .fr, the .cpp and THIS LINE are
-	      three statements of one fact, and this line is the one that was left behind in both of
-	      the changes so far (2026-08-08, 2026-08-10). */
+	      by "if this number changes, change that one too". *****FOUR PLACES STATE THIS ONE FACT,
+	      NOT THREE.***** They are: KBS.fr:1060, this line, KBSPanelMetrics.cpp (the constants
+	      kMessageHeightRoman / kMessageHeightCJK and the note at :113), and
+	      KBSPanelView.cpp:151, which explains why it SUBTRACTS the fixed part instead of adding
+	      it up. This line was left behind in both changes so far (2026-08-08, 2026-08-10) - and
+	      the count above said "three" until 2026-08-11, when the defect re-check found
+	      KBSPanelView.cpp still saying 54px for a block that had been 72 since 08-10. A sentence
+	      that counts the places it has to be kept in step with is worth no more than its count. */
 	int32 MessageBlockHeight();
 
 	/** The floor under a drag. The width is what the panel measures at its usual size (measured

@@ -148,7 +148,7 @@ PMPoint KBSPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 	// ! The product implementations ADD UP the fixed parts by name (control strip + indicators +
 	//   sets area). This one SUBTRACTS instead - the panel's current height less the tree's - and
 	//   the difference is deliberate. The fixed part of this panel is the message block, and its
-	//   height DEPENDS ON THE UI LANGUAGE (48px Roman, 54px Japanese; KBSPanelMetrics decides and
+	//   height DEPENDS ON THE UI LANGUAGE (48px Roman, 72px Japanese; KBSPanelMetrics decides and
 	//   moves the tree to match). Adding it up here would state that fact a second time, in a
 	//   second place, in a way that has to be kept in step by hand. The tree is the only widget
 	//   that stretches, so what is left when it is taken away IS the fixed part, whatever the
