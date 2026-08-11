@@ -35,6 +35,7 @@
 
 // General includes:
 #include "PMString.h"
+#include "TextCharBuffer.h"		// IsHighSurrogate - never cut a name part through a surrogate pair
 #include "StreamUtil.h"
 #include "SDKFileHelper.h"		// SDKFileSaveChooser (sdksamples/common)
 
@@ -93,10 +94,13 @@ std::wstring SanitizeForFileName(const std::wstring& part)
 		// a character outside the BMP - a rare kanji, an emoji in a document name - is two of them,
 		// and a cut between the two leaves a lone high surrogate in the name the save chooser shows.
 		// Backing up one unit is enough: the pair is the only multi-unit sequence UTF-16 has.
-		// (Nothing official to borrow here - PMString::Truncate counts the same platform units, and
-		// StringUtils::PMEllipsizeString measures WIDTH and wants a graphics context.)
+		// The TEST is the SDK's own - IsHighSurrogate, TextCharBuffer.h:32, the same one the SDK's
+		// own character-at-a-time walk over a WideString uses (TextCharBuffer::RemoveFirst, :90-95).
+		// It is only the CUTTING that has nothing official to borrow: PMString::Truncate counts the
+		// same platform units, and StringUtils::PMEllipsizeString measures WIDTH and wants a
+		// graphics context.
 		size_t cut = kMaxNamePart;
-		if (cut > 0 && out[cut - 1] >= 0xD800 && out[cut - 1] <= 0xDBFF)
+		if (cut > 0 && IsHighSurrogate(static_cast<UTF16TextChar>(out[cut - 1])))
 			--cut;
 		out.erase(cut);
 	}

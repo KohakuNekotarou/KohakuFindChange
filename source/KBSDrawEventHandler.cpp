@@ -56,7 +56,7 @@
 
 // A marker asked for by the MOUSE is booked rather than raised - see SetMarkerAfterClickSettles:
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
-#include "CreateObject.h"		// ::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER)
+#include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
 #include "ShuksanID.h"			// kCallbackTimerBoss / IID_ICALLBACKTIMER
 
 // Project includes:
@@ -273,7 +273,7 @@ void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, const PMRect
 		return;
 
 	if (sPendingTimer == nil)
-		sPendingTimer = (ICallbackTimer*)::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+		sPendingTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	if (sPendingTimer == nil)
 	{
 		// No timer to be had: raise it now rather than lose it. A marker that flashes on a double

@@ -101,6 +101,7 @@
 #include "CObserver.h"
 
 // ID.h files:
+#include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
 #include "BookID.h"				// kCloseBookCmdBoss, IID_IBOOKCONTENT
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
 
@@ -217,7 +218,7 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 void ArmRetireTimer()
 {
 	if (gRetireTimer == nil)
-		gRetireTimer = static_cast<ICallbackTimer*>(::CreateObject(kCallbackTimerBoss, IID_ICALLBACKTIMER));
+		gRetireTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 
 	if (gRetireTimer == nil)
 	{
