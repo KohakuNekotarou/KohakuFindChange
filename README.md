@@ -2,6 +2,9 @@
 Adobe InDesign C++ SDK Plug-In.
 Searches the front document, or every chapter of the active book (.indb) at once.
 
+## Adobe Exchange
+https://exchange.adobe.com/apps/cc/205698/kohakufindchange
+
 ## Sponsors 支援
 https://github.com/sponsors/KohakuNekotarou
 
