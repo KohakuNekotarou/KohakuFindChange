@@ -88,7 +88,7 @@ namespace
 	PMString gSearchedBookPath;
 
 	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
-	// gBookSearchOn: OFF searches the front document, ON the whole active book.
+	// gBookSearchOn: OFF searches the front document, ON the whole target book (ResolveTargetBook).
 	bool gBookScopeOn = false;
 
 	// kBookPanelBoss lives in BOOK PANEL.APLN and is declared in no public header, so the number
@@ -1264,7 +1264,7 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// ***** NO CHAPTERS = NO SEARCHED BOOK. *****
 	// gSearchedBookPath has to be written before the loop - the entries are read out of the book it
 	// names - but it means "the panel is showing THIS book's results", and a caller that gets false
-	// here puts nothing on the panel at all (every run answers "The active book has no chapters."
+	// here puts nothing on the panel at all (every run answers "That book has no chapters."
 	// and returns). Leaving the path standing left that statement true about a book with no results
 	// behind it, which is the one thing the two readers of this value - KBSBookWatch and
 	// KBSJump::ShowBook - are not allowed to be told.

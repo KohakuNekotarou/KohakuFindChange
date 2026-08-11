@@ -800,7 +800,9 @@ void KBSOversetScanEngine::Run()
 			// summary to KBSActionComponent, which rebuilds the tree unconditionally afterwards. A
 			// scan puts its own summary up, so every one of its exits has to say this for itself.
 			KBSResultTree::Rebuild();
-			summary.Append("The active book has no chapters.");
+			// "That book" - the run is against the BOOK PANEL's book, with the active one only as a
+			// fallback (KBSBookScope::ResolveTargetBook, 2026-08-09). See the same line in the search.
+			summary.Append("That book has no chapters.");
 			KBSResultTree::ShowStatus(summary);
 			return;
 		}

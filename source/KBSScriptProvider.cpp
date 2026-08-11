@@ -84,10 +84,11 @@ ErrorCode KBSScriptProvider::AccessProperty(ScriptID propID, IScriptRequestData*
 	// before it ever reaches here; this is the backstop, and it refuses rather than quietly accepting
 	// a value that would then not be there on the next read.
 	//
-	// Refused the way the base class refuses a put on the read-only properties IT owns:
-	// CScriptProvider.cpp:369 (parent), :1096 (object), :1116 (id) and :1135 (index) all end with this
-	// same call. A bare kFailure reaches the script as a failure that says nothing about why; this
-	// names the property and the reason (IScriptErrorUtils.h:67-73).
+	// Refused the way the base class refuses a put on the read-only properties IT owns: every one of
+	// CScriptProvider's own read-only refusals ends with this same call - parent, object, id, index
+	// and one more this note used to leave out while saying "all" of them (five sites, 2026-08-11).
+	// A bare kFailure reaches the script as a failure that says nothing about why; this names the
+	// property and the reason (IScriptErrorUtils.h:67-73).
 	if (data->IsPropertyPut())
 		return Utils<IScriptErrorUtils>()->SetReadOnlyPropertyErrorData(data, propID);
 

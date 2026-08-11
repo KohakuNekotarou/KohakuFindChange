@@ -144,7 +144,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSSearchBookActionID:
 		{
-			// Search the active book (or the front document) with the user's current Find/Change
+			// Search the target book - the Book panel's, or the active one as a fallback
+			// (KBSBookScope::ResolveTargetBook) - or the front document, with the user's current Find/Change
 			// query. The engine fills KBSResultModel with the hits (grouped by chapter) behind a
 			// modal progress bar; the tree is drawn here, once, when it returns.
 			//
@@ -184,7 +185,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSScopeBookActionID:
 		{
-			// Toggle the search scope: the whole active book, or just the front document. Just the
+			// Toggle the search scope: the whole target book (see ResolveTargetBook), or just the front document. Just the
 			// flag - nothing is closed and the current results stay put. Its check mark and the
 			// search command's name are drawn in UpdateActionStates.
 			KBSBookScope::SetBookScopeOn(!KBSBookScope::IsBookScopeOn());
@@ -743,7 +744,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		return;
 	}
 
-	// Is there anything for the current scope to run on at all - the active book while Book Scope is
+	// Is there anything for the current scope to run on at all - the target book while Book Scope is
 	// ON, a front document while it is OFF? The three commands that START a run share the answer, so
 	// it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
 	// ask, so a command that is offered can always run and one that cannot is visibly grey rather

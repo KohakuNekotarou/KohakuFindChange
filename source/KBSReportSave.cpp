@@ -22,8 +22,10 @@
 //  shape. *They are no longer the same code, so read that one as the origin rather than as the
 //  reference (counted 2026-08-11): this file has since gained the run guard's front door, a stream
 //  state check on the newly created stream, and a length cap on the name parts. The stream check is
-//  the one that matters - KESCLReportSave.cpp:151 still tests nil alone, so a stream that comes back
-//  in a failed state is written to there and reported as saved. Reported to KESCL, not fixed here.
+//  the one that matters - KESCL's SaveResultsAsText still tests the stream for nil alone, so a
+//  stream that comes back in a failed state is written to there and reported as saved. Reported to
+//  KESCL, not fixed here. (Named rather than numbered: the line reference had drifted three lines,
+//  and a line in ANOTHER repository cannot be kept honest from this one.)
 //
 //========================================================================================
 

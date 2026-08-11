@@ -52,7 +52,7 @@ const wchar_t* const kHowToEN =
 	L"- The Object and Colour tabs are not supported.\n"
 	L"\n"
 	L"[Scope (Book Scope)]\n"
-	L"- Book Scope: ON means every chapter of the active book.\n"
+	L"- Book Scope: ON means every chapter of the book the Book panel is showing - the book whose tab is in front. If no Book panel can be reached, the active book is used instead.\n"
 	L"- Closed chapters are opened invisibly to be read.\n"
 	L"\n"
 	L"[Find Missing Glyphs]\n"
@@ -103,7 +103,7 @@ const wchar_t* const kHowToJA =
 	L"・オブジェクト／カラーの各タブは対象外です。\n"
 	L"\n"
 	L"【検索範囲（Book Scope）】\n"
-	L"・Book Scope: ON＝アクティブなブックの全章。\n"
+	L"・Book Scope: ON＝ブックパネルに表示しているブック（タブが手前にあるブック）の全章。ブックパネルが見つからないときは、アクティブなブックを対象にします。\n"
 	L"・閉じている章は非表示で開いて調べます。\n"
 	L"\n"
 	L"【欠落グリフの検索（Find Missing Glyphs）】\n"
@@ -228,6 +228,12 @@ void KBSHowTo::Show()
 	// borrow: its bar says "Adobe InDesign", and the text would start mid-reference with nothing
 	// naming what it belongs to. Same wording as the window title, in both languages, so the two
 	// routes are recognisably the same document.
+	//
+	// ! WINDOWS-SHAPED, and the one thing in this file that a Mac port has to change. The cast below
+	//   works because wchar_t IS a UTF-16 code unit on Windows, which is what AppendW wants. On the
+	//   Mac wchar_t is 32-bit, so the same cast walks the text at half speed reading garbage. The
+	//   ScriptUI route above has no such problem - AppendJSEscaped reads the wide string a character
+	//   at a time and emits ASCII - so it is only this fallback that would need converting first.
 	PMString fallback;
 	fallback.SetTranslatable(kFalse);
 	fallback.Append("Kohaku Find/Change - How to Use\n\n");

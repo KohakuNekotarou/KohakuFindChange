@@ -5,7 +5,9 @@
 //  KohakuBookSearch (KBS)
 //
 //  The search engine: walks the user's CURRENT Find/Change query across the scope the Book Scope
-//  toggle selects - every chapter of the active book when it is ON, just the front document when it
+//  toggle selects - every chapter of the TARGET book when it is ON (the book the Book panel is
+//  showing, or the active book when no panel can be reached: KBSBookScope::ResolveTargetBook), just
+//  the front document when it
 //  is OFF, never a silent fallback between them - and collects the matches into
 //  KBSResultModel, grouped by chapter. Unlike KESCL - which supplied its own literal text and
 //  pinned the mode to plain text - KBS touches nothing on the Find/Change panel: it walks with
@@ -42,7 +44,8 @@ void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, 
 
 namespace KBSSearchEngine
 {
-	/** Resolve the scope from the Book Scope toggle (the active book's chapters when it is ON, the
+	/** Resolve the scope from the Book Scope toggle (the TARGET book's chapters when it is ON - see
+	    the head of this file for which book that is - the
 	    front document when it is OFF - never a silent fallback between them), walk the user's
 	    current Find/Change query across it, fill KBSResultModel with the hits (grouped by
 	    chapter, only chapters with >=1 hit), and build a one-line status summary. Releases any

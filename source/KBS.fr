@@ -614,7 +614,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		// The search command. kCustomEnabling is what lets UpdateActionStates rename it to
 		// "Find in Book" / "Find in Document" as the Book Scope toggle flips; without it that hook
 		// is never called for this action.
-		// NOT kDisableIfNoFrontDocument: a book search runs off IBookManager's active book and opens
+		// NOT kDisableIfNoFrontDocument: a book search runs off the Book panel's book (or the active
+		// book as a fallback - KBSBookScope::ResolveTargetBook) and opens
 		// its chapters windowless, so "a book is open but no document window is" is a normal, working
 		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
 		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.

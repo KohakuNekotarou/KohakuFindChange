@@ -112,8 +112,11 @@ namespace KBSBookScope
 		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
 	};
 
-	/** List the active book's chapters WITHOUT opening anything. Each entry comes back with its
-	    file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
+	/** List the TARGET book's chapters WITHOUT opening anything - the book the BOOK PANEL is showing,
+	    or the active book when no panel can be reached (ResolveTargetBook). It said "the active
+	    book's chapters" until 2026-08-11, naming the fallback as though it were the rule - while
+	    HasTargetBook, fourteen declarations above, had the order right. Each entry comes back with
+	    its file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
 	    in. Also resolves WHICH book the run is against (see GetSearchedBookPath) and releases
 	    chapters still held for a different one.
 

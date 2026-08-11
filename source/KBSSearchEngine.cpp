@@ -2630,7 +2630,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// summary reports the ones that could not, after the walk.
 		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
-			outSummary.Append("The active book has no chapters.");
+			// "That book", not "the active book": since 2026-08-09 a run is against the book the BOOK
+			// PANEL is showing, and only falls back to the active one when no panel can be reached
+			// (KBSBookScope::ResolveTargetBook). Three status lines and both How to Use texts were
+			// still naming the active book - the wording the change was made to stop being true.
+			outSummary.Append("That book has no chapters.");
 			return 0;
 		}
 	}
