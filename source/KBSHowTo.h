@@ -20,7 +20,11 @@
 namespace KBSHowTo
 {
 	/** Show the operating reference. Japanese on a Japanese InDesign, English otherwise - the same
-	    split the enUS / jaJP string tables make for the replace prompts. */
+	    split KBSLoc makes for the replace prompts and the About box, asked through the one function
+	    KBSLoc::JapaneseUI().
+	    *This said "the same split the enUS / jaJP STRING TABLES make" until 2026-08-12. There has
+	     been no jaJP table since 2026-08-05; the .cpp's own note was corrected on 2026-08-08 and
+	     this one, in the other half of the same pair of files, was not. */
 	void Show();
 }
 

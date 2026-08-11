@@ -21,11 +21,16 @@
 //  It was written FROM KESCL's KESCLReportSave.cpp, step for step, and the two are still the same
 //  shape. *They are no longer the same code, so read that one as the origin rather than as the
 //  reference (counted 2026-08-11): this file has since gained the run guard's front door, a stream
-//  state check on the newly created stream, and a length cap on the name parts. The stream check is
-//  the one that matters - KESCL's SaveResultsAsText still tests the stream for nil alone, so a
-//  stream that comes back in a failed state is written to there and reported as saved. Reported to
-//  KESCL, not fixed here. (Named rather than numbered: the line reference had drifted three lines,
-//  and a line in ANOTHER repository cannot be kept honest from this one.)
+//  state check on the newly created stream, and a length cap on the name parts.
+//  *What that stream check buys is SMALLER than this note claimed until 2026-08-12. KESCL's
+//   KESCLReportPanel::SaveReportAsText does test the new stream for nil alone - but it reads
+//   GetStreamState after its Flush just as this file does, and says so on failure, so a write that
+//   goes wrong IS reported there. The difference is only whether a stream that arrives broken is
+//   written to before anyone notices, not whether the user is told. Two earlier versions of this
+//   note said KESCL "reports it as saved", and that was never true: the claim rode through a
+//   re-check that corrected the LINE REFERENCE (it had drifted three lines) without opening the
+//   file the reference pointed at. Named rather than numbered now - a line in ANOTHER repository
+//   cannot be kept honest from this one - and the claim itself is what needed the checking.
 //
 //========================================================================================
 
