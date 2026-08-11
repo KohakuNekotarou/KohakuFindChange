@@ -59,14 +59,25 @@ static const uint32 kKBSPanelAlphaReapplyDelayMillis = 50;	// 50ms x 8 = about 4
 // The toggle's current state (*OFF by default).
 bool16	KBSGetPanelTranslucent();
 
-// Set the toggle. *Updates the flag only - the window is not touched here (the two are kept apart
-// because there is a caller, at startup, with no panel to touch yet).
+// Set the toggle. *No WINDOW is touched here (the two are kept apart because there is a caller, at
+// startup, with no panel to touch yet) - but this is not a plain setter either: it puts the Win32
+// event hook up, or takes it down when both toggles end up off. Applying is KBSApplyPanelTranslucency.
 void	KBSSetPanelTranslucent(bool16 on);
 
 // Write the current flag onto the panel's window.
+//  ***IT DOES NOT CHECK THE TOGGLE - THE CALLER MUST.*** While OFF this writes alpha 255 and shows
+//    the shadow again, because that IS the restoring the OFF menu item does. Anything that calls it
+//    on some other cue (the pointer arriving, the widgets being rebuilt) has to ask
+//    KBSGetPanelTranslucent first, or it will cancel the translucency of ANY OTHER panel grouped
+//    with this one - a floating group shares one OWL.Dock - and force out a shadow nobody asked for.
+//    !Three callers did not, until 2026-08-11, each saying in a comment that OFF was "rejected
+//     inside". See the note over KBSPanelRollOver::MouseEnter in the .cpp for the whole account.
 //  - Does nothing (and does NOT report an error) when the panel is absent or docked
-//  - Callers: the menu item (KBSActionComponent.cpp), and the panel's AutoAttach and the
-//    palette-visibility observer below
+//  - Callers, all seven: the menu item (KBSActionComponent.cpp), the panel's AutoAttach
+//    (KBSPanelTitle.cpp), and five in KBSPanelAlpha.cpp itself - the palette-visibility observer,
+//    the chase timer, the Win32 event hook, and KBSPanelRollOver's MouseEnter and MouseLeave.
+//    (Named rather than counted: this list said "the menu item, the AutoAttach and the observer"
+//     while the .cpp's own account of the same set correctly named six of them.)
 //  - Returns kTrue when an alpha actually reached a window; kFalse when there is no panel, when it
 //    is docked, or on Mac. The menu uses that to say "it is on" or "it is on but the panel is
 //    docked", rather than leaving a click with no visible result unexplained.
@@ -101,7 +112,10 @@ bool16	KBSApplyPanelTranslucency();
 // The toggle's current state (*OFF by default).
 bool16	KBSGetFindChangeTranslucent();
 
-// Set the toggle. Updates the flag; the window is left to KBSApplyFindChangeTranslucency below.
+// Set the toggle. The window is left to KBSApplyFindChangeTranslucency below; what this does do
+// besides the flag is drop whatever was cached about where the dialog is (a toggle press is exactly
+// when "not open", established at some earlier moment, must not be allowed to answer), and put the
+// Win32 event hook up or take it down.
 void	KBSSetFindChangeTranslucent(bool16 on);
 
 // Write the current flag onto the Find/Change window.
@@ -136,10 +150,17 @@ void	KBSAttachPanelVisibilityObserver();
 //   had; until now the two subjects were treated in opposite ways.
 void	KBSDetachPanelVisibilityObserver();
 
-// Tear down the one-shot timer and the Win32 event hook. Called from the plug-in's shutdown
+// Tear down everything this file has put anywhere. Called from the plug-in's shutdown
 // (KBSStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not
 // reference counted, so leaving a booking live while this .pln goes down is a crash. Implemented in
-// KBSPanelAlpha.cpp (empty on Mac).
+// KBSPanelAlpha.cpp (empty on Mac). In order:
+//   . the one-shot timer, and the flag that stops another timer or hook being made afterwards
+//   . the Win32 event hook
+//   . ***InDesign's own Find/Change dialog, put back as it was*** - the WS_EX_LAYERED on it is OURS,
+//     and a style plus an alpha left on a window nobody maintains any more would outlive this
+//     plug-in. This one is easy to overlook, being the only thing here that touches somebody else's
+//     window (this comment did overlook it until 2026-08-12).
+//   . the remembered window handles
 void	KBSShutdownPanelAlpha();
 
 #endif // __KBSPanelAlpha_h__
