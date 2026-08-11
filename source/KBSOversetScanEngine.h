@@ -10,8 +10,10 @@
 //  COMPOSED result and asks each run of glyphs whether it came out as notdef; this one asks what
 //  was not composed at all.
 //
-//  Design: docs/superpowers/specs/2026-08-02-kbs-book-overset-scan-design.md
-//  Plan:   docs/superpowers/plans/2026-08-02-kbs-book-overset-scan.md
+//  Design: docs/superpowers/specs/_done/2026-08-02-kbs-book-overset-scan-design.md
+//  Plan:   docs/superpowers/plans/_done/2026-08-02-kbs-book-overset-scan.md
+//          (both moved into _done/ when the work finished; the paths here pointed at nothing from
+//           then until 2026-08-11)
 //
 //========================================================================================
 

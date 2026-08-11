@@ -15,7 +15,7 @@
 //  lined up with the hit whose walkOrder is N (KBSResultModel::Hit::walkOrder).
 //
 //  The command behaviour below was measured on the real application (2026-07-25 probe, recorded
-//  in docs/superpowers/specs/2026-07-25-kbs-replace-checked-design.md section 10.1):
+//  in docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-design.md section 10.1):
 //    * kTWReplaceTextCmdBoss does NOT search on its own. Fired without a preceding
 //      kFindTextCmdBoss it returns kFailure with an invalid range. So every step here is
 //      find-then-maybe-replace, exactly like the application's own Find / Change button pair.

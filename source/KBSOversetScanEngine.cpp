@@ -222,7 +222,13 @@ bool ThreadHasPlacedParcel(ITextModel* model, TextIndex pos)
                 only counts ROWS lets this walk collect without bound first and throw the surplus
                 away second, which is the opposite of what a safety ceiling is for: the document it
                 exists for - a book of overset table cells - is exactly the one where the collecting
-                itself is the cost. The glyph scan bounds its own walk the same way.
+                itself is the cost.
+                ***** THE GLYPH SCAN DOES NOT DO THIS, AND THIS LINE SAID IT DID UNTIL 2026-08-11.
+                ***** That one collects every notdef of a story into one vector and applies its
+                ceiling to the ROWS afterwards (KBSGlyphScanEngine's ScanOneDocument), so a story
+                whose every character is a box is held whole before the surplus is dropped. It is
+                bounded per story, and its walk has to visit every glyph anyway to know which ones
+                are boxes - so the shape has never been worth changing. It is simply not this one.
     @return whether any overset cell was found at all. */
 bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<OversetPlace>* out,
 	size_t maxPlaces)
@@ -254,8 +260,16 @@ bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
 		if (table == nil)
 			continue;
 
-		// The model's own iterator visits ANCHOR cells - a merged cell comes past once, not once
-		// per grid square it covers - which is exactly one visit per thread.
+		// ***** ONE VISIT PER CELL THREAD - and it is the nil test below that makes it so, not the
+		// iterator. ***** begin()/end() traverse GRID ADDRESSES (ITableModel.h:391-406) and every
+		// element of the grid has a GridID of its own (:188-196), while a cell's thread is filed
+		// under its ANCHOR's GridID alone - QueryThread being a keyed lookup, "Private unique key
+		// that identifies which ITextStoryThread to instantiate" (ITextStoryThreadDict.h:78-83). So
+		// an element that is not an anchor answers nil and falls out, and a merged cell is reported
+		// once however many squares it covers. The official walk is these same three lines without
+		// the test (SnpIterTableUseDictHier.cpp:247-262).
+		// (This note read "the iterator visits ANCHOR cells" until 2026-08-11. Nothing in the
+		//  headers says that, and IsAnchor() exists precisely because an address may not be one.)
 		for (ITableModel::const_iterator it(table->begin()), last(table->end()); it != last; ++it)
 		{
 			const GridID gridID = table->GetGridID(*it);
@@ -336,11 +350,11 @@ bool CollectOversetCells(const UIDRef& storyRef, ITextModel* model, std::vector<
 
 /** Scan one document and turn every overset place into a result row.
 
-    @param outOffPage  incremented for a place whose "+" sits on no page - a frame on the
-                       pasteboard. Those are counted but not listed: a row that cannot be jumped to
-                       is worse than a number, and the official preflight does not report them at
-                       all (measured 2026-08-02), so saying how many there were is already more
-                       than InDesign itself offers.
+    @param outOffPage  incremented for a place with NOTHING PLACED ANYWHERE to point at - no page,
+                       no spread, no ancestor frame carrying the "+". Those are counted but not
+                       listed: a row that cannot be jumped to is worse than a number. Master pages
+                       and the pasteboard used to land here too and no longer do (2026-08-11) - see
+                       the test at the head of the row loop.
     @param maxRows       stop once this chapter has collected this many PLACES - what is left of the
                          run's whole-run ceiling (KBSResultModel::kKBSCollectHitLimit). Every row
                          comes from a place, so bounding the places bounds the rows as well, and it
@@ -412,7 +426,8 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		// story edited since it last composed can report overflow the user has already fixed, or
 		// stay silent about overflow that has just appeared. Official route:
 		// SnpInspectTextModel.cpp:724-733 (damaged index, then RecomposeThruLastFrame); the same
-		// three lines KBSJump.cpp:143-149 runs before reading this story's wax. Composing the frame
+		// three lines KBSJump's RecomposeIfDamaged runs before reading this story's wax (cited by
+		// line number until 2026-08-11, by which time they had moved). Composing the frame
 		// list settles the tables in it too, so the cell pass below reads a settled story as well.
 		InterfacePtr<IFrameList> frameList(model->QueryFrameList());
 		if (frameList != nil && frameList->GetFirstDamagedFrameIndex() != -1)
@@ -508,12 +523,33 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 		KBSSearchEngine::BuildHitForRange(docRef, places[p].storyRef,
 			places[p].start, previewEnd, cache, hit);
 
-		// Is there a PAGE to point at? pageIndex is the page's plain document order, and it stays
-		// -1 when there is none. The page STRING is no use for this: a frame on the pasteboard has
-		// no page, but the lookup falls back to the spread and GetPageString spells that "PB", so
-		// the string is non-empty for exactly the case being excluded here (measured 2026-08-02 -
-		// the first run listed the pasteboard frame as "PPBov").
-		if (hit.pageIndex < 0)
+		// ***** IS THERE ANYWHERE AT ALL TO POINT AT? ***** Asked of the page STRING, which BuildHit
+		// leaves empty only when the locator found nothing placed - not of pageIndex.
+		//
+		// ***** IT USED TO ASK pageIndex < 0, AND THAT DROPPED MASTER PAGES. ***** The note here said
+		// the index "is non-empty for exactly the case being excluded" - the pasteboard - and it was
+		// not: IPageList::GetPageIndex counts pages within the pub and a MASTER page is not one of
+		// them, so it answers negative for those too (KESCM measured that and wrote it into
+		// KESCMStoryList.cpp:304-307). Measured here 2026-08-11 on work/kbs-selftest/
+		// masterpage-overset.indd - two frames overset, one on page 1 and one on master A:
+		//    Find Overset  "1 overset place.  1 not on a page."   master frame NOT listed
+		//    the search    the same frame's hit listed as "PA"
+		//    the glyph scan a notdef box in that frame listed as "PA"
+		// - three parts of one plug-in answering differently about one frame, which is the fault
+		// this file's own history calls "two scans of one plug-in disagreeing" twice over.
+		//
+		// So the filter is gone (user's call, 2026-08-11) and a place is listed wherever it sits: on
+		// a page, on a master page, out on the pasteboard. It is what the shared hit builder already
+		// argues for in so many words - "a match out on the pasteboard should say where it is rather
+		// than drop out of the list" (KBSSearchEngine.cpp, GetFramePageString) - and what the other
+		// two commands have always done. It reports MORE than InDesign's own preflight, which was
+		// measured on the same document the same day and named only the page-1 frame; the glyph scan
+		// has taken that line since it was written.
+		//
+		// What is still counted rather than listed: a place with nothing placed ANYWHERE - no page,
+		// no spread, no ancestor frame - which no row could point at. Rare by construction, since
+		// the locator climbs out of a pushed-out table to the frame that holds it.
+		if (hit.pageString.IsEmpty())
 		{
 			++outOffPage;
 			continue;
@@ -571,10 +607,9 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 	if (places == 0)
 	{
 		// ***** Which sentence depends on whether the one below it is coming. ***** "No overset
-		// text." followed by "1 not on a page." is the panel contradicting itself in two sentences:
-		// the scan DID find overflow, it just had no row to offer for it. Only the pasteboard case
-		// can produce it, which is why the plain wording survived the first measurements.
-		out.Append(offPage > 0 ? "No overset text on a page." : "No overset text.");
+		// text." followed by "1 place has nowhere to point at." is the panel contradicting itself in
+		// two sentences: the scan DID find overflow, it just had no row to offer for it.
+		out.Append(offPage > 0 ? "No overset text that can be shown." : "No overset text.");
 	}
 	else
 	{
@@ -599,11 +634,15 @@ void BuildSummary(int32 places, int32 chaptersWithHits, int32 chapterTotal, bool
 		out.Append(".");
 	}
 
+	// Places with nothing placed ANYWHERE - no page, no spread, no ancestor frame - so no row could
+	// be clicked. It read "N not on a page." while master pages and the pasteboard were dropped here
+	// as well (until 2026-08-11); both are listed now, so this counts only what genuinely cannot be
+	// pointed at, and the sentence had to stop saying "page".
 	if (offPage > 0)
 	{
 		out.Append("  ");
 		out.AppendNumber(offPage);
-		out.Append(" not on a page.");
+		out.Append(offPage == 1 ? " place has nowhere to point at." : " places have nowhere to point at.");
 	}
 
 	// ***** THE LIST IS NOT THE WHOLE STORY - SAY SO. ***** A scan reads as "here is every place
@@ -785,9 +824,12 @@ void KBSOversetScanEngine::Run()
 		targets.push_back(single);
 	}
 
-	// All four AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
-	// takes the check boxes off every row and narrows the column they stood in - a scan is a
-	// report, not a work list.
+	// The KIND, the SCOPE, the BOOK NAME and the RUN FLAG - every one of them AFTER Clear(), which
+	// puts them back to their Find/Change defaults. The kind is what takes the check boxes off every
+	// row and narrows the column they stood in - a scan is a report, not a work list.
+	//
+	// Named rather than counted, though the count here happens to be right: the glyph scan's copy of
+	// this sentence said "All three" for nine days after a fourth line joined it (2026-08-11).
 	KBSResultModel::SetResultKind(KBSResultModel::kResultOverset);
 	KBSResultModel::SetFromBook(fromBook);
 	KBSResultModel::SetBookName(bookName);

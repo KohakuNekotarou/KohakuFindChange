@@ -10,8 +10,10 @@
 //  through a text walker, this one reads the COMPOSED result and asks each run of glyphs whether
 //  it came out as notdef.
 //
-//  Design: docs/superpowers/specs/2026-08-01-kbs-missing-glyph-search-design.md
-//  Plan:   docs/superpowers/plans/2026-08-01-kbs-missing-glyph-search.md
+//  Design: docs/superpowers/specs/_done/2026-08-01-kbs-missing-glyph-search-design.md
+//  Plan:   docs/superpowers/plans/_done/2026-08-01-kbs-missing-glyph-search.md
+//          (both moved into _done/ when the work finished; the paths here pointed at nothing from
+//           then until 2026-08-11)
 //
 //========================================================================================
 

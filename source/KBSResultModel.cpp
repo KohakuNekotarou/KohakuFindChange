@@ -858,10 +858,15 @@ void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
 			AppendFlattenedUTF8(buf, chapter.name);
 			buf += "\t";
 			// The page NUMBER alone, so a spreadsheet can sort on it - the "overset" / "locked" that
-			// ride the panel's locator are in the Flags cell instead. A hit that is on no page at all
-			// (pasteboard, or overset with nothing placed anywhere) leaves the cell empty rather than
-			// writing the "PB" the page list spells for it: an empty cell sorts and filters, two
-			// letters in a number column do not.
+			// ride the panel's locator are in the Flags cell instead. A hit with no page NUMBER
+			// leaves the cell empty rather than writing what the page list spells for it: an empty
+			// cell sorts and filters, "PB" or a master's name in a number column does not.
+			//
+			// THREE things answer a negative index, not one: the pasteboard (the lookup falls back
+			// to the spread), a MASTER PAGE (GetPageIndex counts pages within the pub and a master
+			// is not one of them), and a hit with nothing placed anywhere. This note named only the
+			// first until 2026-08-11, when Find Overset stopped dropping the other two and they
+			// started reaching this file (block 10 of the defect re-check).
 			if (hit.pageIndex >= 0)
 				AppendFlattenedUTF8(buf, hit.pageString);
 			buf += "\t";

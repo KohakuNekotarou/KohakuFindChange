@@ -286,8 +286,11 @@ void ScanStoryWax(ITextModel* model, std::vector<NotdefGlyph>& out, bool& outHas
 		// back glyphs that are no longer on the page - a box the user has already fixed, or none
 		// where one has just appeared - so the scan would report the document as it used to be.
 		// This is the official route (SnpInspectTextModel.cpp:724-733: ask the frame list for a
-		// damaged index, then RecomposeThruLastFrame) and the one KBSJump.cpp:143-149 already takes
-		// before reading this very wax. The two scans were the only readers that skipped it.
+		// damaged index, then RecomposeThruLastFrame) and the one KBSJump's RecomposeIfDamaged
+		// already takes before reading this very wax. The two scans were the only readers that
+		// skipped it. (Cited as KBSJump.cpp:143-149 until 2026-08-11 - the block 12 audit lifted
+		// those lines into a function of their own on 2026-08-08 and :143 is a scroll call now.
+		// A function name cannot drift, which is that audit's own decision arriving here.)
 		if (frameList->GetFirstDamagedFrameIndex() != -1)
 		{
 			InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
@@ -611,6 +614,13 @@ int32 ScanOneDocument(const UIDRef& docRef, const PMString& chapterName,
 			// Stopping mid-story is deliberate: the alternative is to finish "just this story",
 			// which on the very document the ceiling exists for (one whose every character is a
 			// box) is exactly the unbounded case being guarded against.
+			//
+			// ***** IT BOUNDS THE ROWS, NOT THE COLLECTING. ***** ScanStoryWax and MergeIntoRuns have
+			// already run for this whole story by the time this test is reached, so the boxes of one
+			// story are held in full before the surplus is dropped. Accepted, not overlooked: the wax
+			// walk has to visit every glyph anyway to know which ones are boxes, the vector dies with
+			// the story, and kMaxWaxLines caps the walk. The overset scan is the other way round - it
+			// bounds the WALK, because there the collecting itself is the expensive part.
 			if (static_cast<int32>(outChapter.hits.size()) >= maxRows)
 			{
 				outHitCeiling = true;
@@ -830,9 +840,14 @@ void KBSGlyphScanEngine::Run()
 		targets.push_back(single);
 	}
 
-	// All three AFTER Clear(), which puts them back to their Find/Change defaults. The kind is what
-	// takes the check boxes off every row and greys Change Checked out - a scan is a report, not a
-	// work list.
+	// The KIND, the SCOPE, the RUN FLAG and the BOOK NAME - every one of them AFTER Clear(), which
+	// puts them back to their Find/Change defaults. The kind is what takes the check boxes off every
+	// row and greys Change Checked out - a scan is a report, not a work list.
+	//
+	// Named rather than counted. This line read "All three" from the moment it was written
+	// (2026-08-02 09:07) and NoteRun() joined the block at 16:18 the same day without the sentence
+	// being touched - while the overset scan, written 15 minutes after that, says "all four" and is
+	// right. A list can be added to and be seen to be short; a number cannot.
 	KBSResultModel::SetResultKind(KBSResultModel::kResultMissingGlyph);
 	KBSResultModel::SetFromBook(fromBook);
 	KBSResultModel::NoteRun();		// the panel's illustration changes once anything has been run

@@ -7,10 +7,17 @@
 //  Locate the overset "+" indicator for an overset text position. InDesign exposes no public API
 //  for the red "+" (frame) / red dot (table cell) overset locator, so we approximate it: the "+"
 //  sits at the outport (bottom-right, horizontal text) of the LAST frame the thread is placed in.
-//  Shared by two callers so the geometry is computed one way only:
-//    * KBSJump  - scrolls the view to the "+" point (no marker) when a jumped-to hit is overset.
-//    * KBSSearchEngine - names the page the "+" sits on so an overset hit lists as "P<page>(n) overset"
-//      and sorts into that page instead of being pushed to the end.
+//  Shared by three call sites so the geometry is computed one way only:
+//    * KBSJump::JumpToHit - scrolls the view to the "+" point (no marker) when a jumped-to hit is
+//      overset.
+//    * KBSSearchEngine's BuildHit - names the page the "+" sits on so an overset hit lists as
+//      "P<page>(n) overset" and sorts into that page instead of being pushed to the end.
+//    * KBSSearchEngine::EditableFrameForMatch - answers WHICH FRAME speaks for an overset match, so
+//      the editable / locked-layer test asks about the frame carrying the "+" - and with it whether
+//      the row gets a check box and whether the replace refuses it.
+//      (This list said "two callers" from 2026-07-23 until 2026-08-11. The third arrived on
+//       2026-07-28 and is the one with a DIFFERENT question, which is what makes sharing the
+//       geometry worth doing: name the callers, so a new one has somewhere to be added.)
 //
 //  When the position's own thread has nothing placed (a table or one of its rows is pushed out of
 //  its frame, so the cell itself is gone), the walk climbs the table-anchor chain out of any nested
