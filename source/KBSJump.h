@@ -38,7 +38,13 @@ namespace KBSJump
 	           interval, so a double click that goes on to select never shows one
 	           (KBSDrawEventHandler::SetMarkerAfterClickSettles, which explains why it cannot simply
 	           be tested for). kFalse from the keyboard walk: there is no double arrow-key, so it has
-	           nothing to wait for and its marker appears at once, as it always has. */
+	           nothing to wait for and its marker appears at once, as it always has.
+
+	    @note NOTHING OUTSIDE THIS FILE CALLS THIS (measured 2026-08-11): both doors - the row click
+	          and the keyboard walk - go through ActivateNode, which is where the "one activation at a
+	          time" guard lives. Kept public because it is the operation this file is named for and
+	          reads as the header's subject; but a new caller reaching it directly would bypass that
+	          guard, so go through ActivateNode. */
 	void JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles);
 
 	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if

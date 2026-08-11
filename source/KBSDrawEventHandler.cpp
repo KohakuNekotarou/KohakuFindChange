@@ -79,6 +79,7 @@ bool16     KBSDrawEventHandler::sHasMarker = kFalse;
 PMRect     KBSDrawEventHandler::sMarkerPb  = PMRect(0, 0, 0, 0);
 IDataBase* KBSDrawEventHandler::sMarkerDB  = nil;
 PMString   KBSDrawEventHandler::sMarkerDocPath;
+UID        KBSDrawEventHandler::sMarkerSpread = kInvalidUID;
 
 // The file a database's document lives in - empty when it has none (never saved) or cannot be asked.
 //
@@ -145,15 +146,18 @@ static void KBSRepaintViews(IDataBase* db)
 //
 // File statics rather than members, like the marker they belong to: this is one booking for "the
 // click going on right now", and one click happens at a time.
-static ICallbackTimer* sPendingTimer = nil;
-static bool16          sHasPending   = kFalse;
-static IDataBase*      sPendingDB    = nil;					// an ADDRESS - see sPendingDocPath
-static PMRect          sPendingPb    = PMRect(0, 0, 0, 0);
+static ICallbackTimer* sPendingTimer  = nil;
+static bool16          sHasPending    = kFalse;
+static IDataBase*      sPendingDB     = nil;				// an ADDRESS - see sPendingDocPath
+static PMRect          sPendingPb     = PMRect(0, 0, 0, 0);
 static PMString        sPendingDocPath;						// the file that document lived in when booked
+static UID             sPendingSpread = kInvalidUID;		// the spread, carried through the wait
 
 // **Never book again once ShutdownCleanup has run - belt and braces with the release it does. The
 //   callback below is a raw function pointer into this .pln, and nothing may be holding one as the
-//   module goes down (KBSPanelAlpha.cpp:657-665 keeps the same guard for the same reason).
+//   module goes down (KBSPanelAlpha.cpp's sPanelAlphaShutdown keeps the same guard for the same
+//   reason - named rather than numbered, the line reference having drifted to a paragraph about a
+//   removed diagnostic).
 static bool16          sMarkerShutdown = kFalse;
 
 // Windows' default, used where the real setting cannot be had.
@@ -188,8 +192,9 @@ static void KBSCancelPendingMarker()
 
 	if (sPendingTimer != nil)
 		sPendingTimer->StopTimer();
-	sHasPending = kFalse;
-	sPendingDB  = nil;
+	sHasPending    = kFalse;
+	sPendingDB     = nil;
+	sPendingSpread = kInvalidUID;
 	sPendingDocPath.Clear();
 }
 
@@ -197,15 +202,18 @@ static void KBSCancelPendingMarker()
 static uint32 KBSPendingMarkerProc(void* /*refPtr*/)
 {
 	// *Do not Release the timer in here - releasing itself from inside its own callback is
-	//  self-destruction. The release is in ShutdownCleanup and nowhere else (as KBSPanelAlpha.cpp:699).
+	//  self-destruction. The release is in ShutdownCleanup and nowhere else (the same rule
+	//  KBSShutdownPanelAlpha follows for its own timer).
 	if (!sHasPending)
 		return IIdleTask::kEndOfTime;
 
-	IDataBase*     db   = sPendingDB;
-	const PMRect   pb   = sPendingPb;
-	const PMString path = sPendingDocPath;
-	sHasPending = kFalse;
-	sPendingDB  = nil;
+	IDataBase*     db     = sPendingDB;
+	const PMRect   pb     = sPendingPb;
+	const PMString path   = sPendingDocPath;
+	const UID      spread = sPendingSpread;
+	sHasPending    = kFalse;
+	sPendingDB     = nil;
+	sPendingSpread = kInvalidUID;
 	sPendingDocPath.Clear();
 
 	// ***** THE DOCUMENT MAY HAVE GONE IN THE MEANTIME. ***** Half a second is ample time to close
@@ -221,15 +229,22 @@ static uint32 KBSPendingMarkerProc(void* /*refPtr*/)
 	if (!(KBSMarkerDocPath(db) == path))
 		return IIdleTask::kEndOfTime;		// same address wearing a different document
 
-	KBSDrawEventHandler::SetMarker(db, pb);
+	KBSDrawEventHandler::SetMarker(db, spread, pb);
 
 	// **kEndOfTime, not 0. The return value is IIdleTask::RunTask's reschedule, and **0 means "call
 	//   me again immediately"** - which has frozen InDesign before (KESCM's tracker, 2026-07-26).
 	return IIdleTask::kEndOfTime;
 }
 
-void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
+void KBSDrawEventHandler::SetMarker(IDataBase* db, UID spreadUID, const PMRect& pbRect)
 {
+	// Nothing at all once ShutdownCleanup has run - this repaints, and the marker's document may be
+	// half torn down by then. Same door SetMarkerAfterClickSettles has kept since 2026-08-09; it is
+	// here now because the rule belongs to the functions that touch a document, not to one of them.
+	// See ClearMarker for how the same guarantee was being made from outside instead.
+	if (sMarkerShutdown)
+		return;
+
 	// ***** AN OUTSTANDING BOOKING DIES HERE TOO. ***** The immediate marker's one caller is the
 	// keyboard walk (JumpToHit with defer off), and an arrow key pressed within the double-click
 	// interval of a mouse click used to leave that click's booking armed - it fired half a second
@@ -238,9 +253,10 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
 	// its leading ClearMarker; this is the same rule at the other door: the newest display wins.
 	KBSCancelPendingMarker();
 
-	sMarkerDB  = db;
-	sMarkerPb  = pbRect;
-	sHasMarker = kTrue;
+	sMarkerDB     = db;
+	sMarkerPb     = pbRect;
+	sMarkerSpread = spreadUID;
+	sHasMarker    = kTrue;
 	// Taken NOW, while the document is certainly alive - the jump has just been in it. See
 	// KBSMarkerDocPath for what it is for.
 	sMarkerDocPath = KBSMarkerDocPath(db);
@@ -252,7 +268,7 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, const PMRect& pbRect)
 	KBSMarkerExpiryIdleTask::Start();
 }
 
-void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, const PMRect& pbRect)
+void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, UID spreadUID, const PMRect& pbRect)
 {
 	// ***** ONCE ShutdownCleanup HAS RUN, NOTHING AT ALL - not even the clear. ***** ClearMarker
 	// repaints the marker's document, and that is precisely what this file's ShutdownCleanup says
@@ -278,12 +294,13 @@ void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, const PMRect
 	{
 		// No timer to be had: raise it now rather than lose it. A marker that flashes on a double
 		// click is the behaviour this replaced; a marker that never appears would be worse than both.
-		SetMarker(db, pbRect);
+		SetMarker(db, spreadUID, pbRect);
 		return;
 	}
 
 	sPendingDB      = db;
 	sPendingPb      = pbRect;
+	sPendingSpread  = spreadUID;
 	sPendingDocPath = KBSMarkerDocPath(db);	// taken NOW, while the document is certainly alive
 	sHasPending     = kTrue;
 	sPendingTimer->StartTimer(KBSPendingMarkerProc, KBSDoubleClickInterval(), nil);
@@ -291,6 +308,18 @@ void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, const PMRect
 
 void KBSDrawEventHandler::ClearMarker()
 {
+	// ***** NOTHING ONCE ShutdownCleanup HAS RUN. ***** This file's own header says ClearMarker is
+	// the wrong call at teardown because it repaints the marker's document, and that document may be
+	// going away - yet the only thing stopping it from being called then was a SECOND shutdown flag,
+	// owned by the expiry task and tested at its call site
+	// (KBSMarkerExpiryIdleTask.cpp: "if (!sShutdown) ClearMarker()"). One rule, guarded in two
+	// places, by two flags: whichever of them a future caller failed to know about, the guarantee
+	// would be gone. The rule lives here now, where the repaint is (block 12 defect re-check,
+	// 2026-08-11). The task keeps its own test as well - it is free, and it also stops the task
+	// doing anything else on the way past.
+	if (sMarkerShutdown)
+		return;
+
 	// ***** THE BOOKING GOES FIRST. ***** Taking an outstanding marker off here, rather than at the
 	// place that knows about double clicks, is what lets every existing caller of ClearMarker do the
 	// right thing without being changed - including the two that decide a double click's outcome. See
@@ -302,8 +331,9 @@ void KBSDrawEventHandler::ClearMarker()
 	KBSMarkerExpiryIdleTask::Stop();
 
 	IDataBase* db = sMarkerDB;	// remember the document to repaint before we forget it
-	sHasMarker = kFalse;
-	sMarkerDB  = nil;
+	sHasMarker    = kFalse;
+	sMarkerDB     = nil;
+	sMarkerSpread = kInvalidUID;
 	sMarkerDocPath.Clear();
 	KBSRepaintViews(db);
 }
@@ -321,16 +351,18 @@ void KBSDrawEventHandler::ShutdownCleanup()
 		sPendingTimer->Release();		// the reference ::CreateObject handed over
 		sPendingTimer = nil;
 	}
-	sHasPending = kFalse;
-	sPendingDB  = nil;
+	sHasPending    = kFalse;
+	sPendingDB     = nil;
+	sPendingSpread = kInvalidUID;
 	sPendingDocPath.Clear();			// a static PMString - emptied for the reason sMarkerDocPath is
 
 	// State only - no repaint, nothing asked of any document. See the header: at this point the
 	// marker's document may already be going away, and KBSRepaintViews would go looking for it.
 	// The idle task that would otherwise clear the marker has been retired just before this
 	// (KBSMarkerExpiryIdleTask::Shutdown), so nothing is left to fire either.
-	sHasMarker = kFalse;
-	sMarkerDB  = nil;
+	sHasMarker    = kFalse;
+	sMarkerDB     = nil;
+	sMarkerSpread = kInvalidUID;
 	sMarkerDocPath.Clear();
 }
 
@@ -432,37 +464,58 @@ bool16 KBSDrawEventHandler::HandleDrawEvent(ClassID eventID, void* eventData)
 	if (spread->GetNumPages() < 1)
 		return kFalse;
 
-	// ***** ONE CALL ANSWERS BOTH QUESTIONS. ***** ISpread::GetPagesAndItemsBounds returns the same
-	// box in whichever coordinate space is asked for (ISpread.h:229-238), so:
-	//   * the pasteboard one decides whether the marker belongs to this spread (PMRect::PointIn), and
-	//   * the difference between the two IS the pasteboard->spread offset, because they are the same
-	//     box measured twice - the offset that the rectangle below is shifted by.
-	// The worked example is snapshot/SnapTracker.cpp:599-603, which asks for both spaces the same
-	// way and hit-tests with PointIn. Until the block 12 API audit (2026-08-08) this was thirty lines
-	// that built two matrices off page 0 to derive the offset, then walked every page transforming
-	// its bounding box to test containment by hand - see the api-official-examples ledger, which
-	// already said the SDK owns both of those.
+	// ***** WHICH SPREAD OWNS THE MARKER IS THE JUMP'S ANSWER, NOT A MEASUREMENT. ***** The jump has
+	// already resolved the match's frame and asked IPasteboardUtils which spread holds it
+	// (KBSJump::SpreadForMatch); that UID rides along in sMarkerSpread, and a UID comparison cannot
+	// be ambiguous.
 	//
-	// ***** AND-ITEMS, not GetPagesBounds. ***** The pages-only box is what the hand-written walk
-	// tested against, so a hit in a frame sitting on the PASTEBOARD (outside every page) failed the
-	// test and its marker was never drawn - the jump scrolled there correctly and then pointed at
-	// nothing. This box includes "any page items sitting on the pasteboard", so those hits are
-	// marked too. Guides are left out (includeGuides defaults to kFalse): a guide cannot hold text.
+	// It WAS a measurement - "is the marker's centre inside this spread's bounding box" - and the
+	// sentence justifying that read "spreads do not overlap in pasteboard space, so only the owning
+	// spread passes". That is true of GetPagesBounds. It stopped being true on 2026-08-08, in the
+	// very change that made this box include items: GetPagesAndItemsBounds encloses "all the pages on
+	// the spread PLUS any page items sitting on the pasteboard" (ISpread.h:229-238), so an item
+	// dragged far enough off its own spread stretches that spread's box over the NEXT one - and both
+	// spreads then paint the same marker, one of them in the wrong place. The reason was written for
+	// the pages-only box and was not re-read when the box changed (block 12 defect re-check,
+	// 2026-08-11).
 	//
-	// Confirmed on the running application 2026-08-08, by eye, on a document holding one hit inside a
-	// page, one on the right-hand page of a facing-pages spread, and one out on the pasteboard: all
-	// three are marked. (By eye because there is no other way - this drawing does not appear in a
-	// screen capture at all, which cost an afternoon to establish. See the audit note.)
+	// kInvalidUID means the jump could not name a spread. The geometric test is kept for that case
+	// alone: it is what the marker had before, so nothing that used to be drawn stops being drawn.
 	const PMRect pbBounds     = spread->GetPagesAndItemsBounds(Transform::PasteboardCoordinates());
 	const PMRect spreadBounds = spread->GetPagesAndItemsBounds(Transform::SpreadCoordinates());
 	{
-		// Spreads do not overlap in pasteboard space, so only the owning spread passes. The marker's
-		// centre is the point tested, as before - a rectangle drawn across a spread boundary belongs
-		// to the spread holding most of it.
-		const PMPoint centre((sMarkerPb.Left() + sMarkerPb.Right()) / PMReal(2.0),
-			(sMarkerPb.Top() + sMarkerPb.Bottom()) / PMReal(2.0));
-		if (!pbBounds.PointIn(centre))
-			return kFalse;
+		if (sMarkerSpread != kInvalidUID)
+		{
+			if (::GetUID(spread) != sMarkerSpread)
+				return kFalse;
+		}
+		else
+		{
+			// The marker's centre is the point tested - a rectangle lying across a spread boundary
+			// belongs to the spread holding most of it.
+			const PMPoint centre((sMarkerPb.Left() + sMarkerPb.Right()) / PMReal(2.0),
+				(sMarkerPb.Top() + sMarkerPb.Bottom()) / PMReal(2.0));
+			if (!pbBounds.PointIn(centre))
+				return kFalse;
+		}
+
+		// ***** THE TWO BOXES ARE STILL BOTH NEEDED - for the OFFSET. ***** ISpread returns the same
+		// box in whichever coordinate space is asked for, so the difference between them IS the
+		// pasteboard->spread offset: the same box measured twice. That is unaffected by which box is
+		// used (any box measured in both spaces gives the same difference), so it stays on the
+		// and-items one. The worked example for asking both ways is snapshot/SnapTracker.cpp:599-603.
+		// Until the block 12 API audit (2026-08-08) this was thirty lines building two matrices off
+		// page 0 and walking every page by hand - see the api-official-examples ledger.
+		//
+		// ***** AND-ITEMS, not GetPagesBounds - which is why the marker appears on the pasteboard at
+		// all. ***** The pages-only box is what the hand-written walk tested against, so a hit in a
+		// frame sitting outside every page failed it and its marker was never drawn: the jump
+		// scrolled there correctly and then pointed at nothing. Guides are left out (includeGuides
+		// defaults to kFalse): a guide cannot hold text. Confirmed on the running application
+		// 2026-08-08, by eye, on a document holding one hit inside a page, one on the right-hand page
+		// of a facing-pages spread, and one out on the pasteboard: all three are marked. (By eye
+		// because there is no other way - this drawing does not appear in a screen capture at all,
+		// which cost an afternoon to establish.)
 
 		// Marker rectangle in this spread's coordinates. spread = pasteboard - offset.
 		const PMReal offX = pbBounds.Left() - spreadBounds.Left();

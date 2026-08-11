@@ -9,10 +9,13 @@
 //  only CIdleTask - the single justified exception to "avoid idle tasks" (a marker has to expire on
 //  wall-clock time, which nothing else in this plug-in needs).
 //
-//  ***** WHY NOT ICallbackTimer, WHICH KBS USES TWICE ELSEWHERE. ***** The header used to say an
+//  ***** WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. ***** The header used to say an
 //  idle task was the SDK's only main-thread "call me back in n ms". It is not: ICallbackTimer is
-//  one too (ICallbackTimer.h:38 - it derives from IIdleTask) and KBSBookWatch.cpp:220 and
-//  KBSPanelAlpha.cpp:657 both use it. It is not taken here because its callback is a plain function
+//  one too (ICallbackTimer.h:38 - it derives from IIdleTask) and KBSBookWatch's ArmRetireTimer,
+//  KBSPanelAlpha's reapply chase and KBSDrawEventHandler's own click-settles booking all use it.
+//  (Named rather than numbered: both line references here were pointing at the wrong lines by
+//  2026-08-11 - one of them at a closing brace - and the count "twice" had become three.)
+//  It is not taken here because its callback is a plain function
 //  pointer that nothing reference-counts - its own header spends six words on "Danger!" saying the
 //  supplying plug-in must not be unloaded while that pointer is in the timer, and KBSPanelAlpha.h:110
 //  records the same hazard from experience. A CIdleTask is an interface on a boss: it can be

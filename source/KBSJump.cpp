@@ -1,4 +1,4 @@
-//========================================================================================
+﻿//========================================================================================
 //
 //  Owner: KohakuNekotarou
 //
@@ -131,8 +131,14 @@ namespace
 	//
 	// ScrollContentLocationToFrameCenter, not ScrollViewCenterTo: IPanorama.h:141-145 calls the
 	// latter "an obsolete name" for this one and says new code should call this, "but this function
-	// will go away in a future release". The old name is an inline that calls the new one
-	// (IPanorama.h:135-138), so nothing about the behaviour changes.
+	// will go away in a future release".
+	//
+	// The two reach the same code, so nothing about the behaviour changes - but note which way round
+	// that is, because this line had it backwards until 2026-08-11: the NEW name is the inline, and
+	// it calls the OLD one, which is the pure virtual (IPanorama.h:135-138 vs :145). So the release
+	// that finally removes ScrollViewCenterTo has to rewrite the inline as well; calling the new name
+	// is right because that is where Adobe will keep the entry point, not because it is the one with
+	// an implementation behind it today.
 	void ScrollViewToPoint(IControlView* view, const PBPMPoint& pbPoint)
 	{
 		if (view == nil)
@@ -244,13 +250,16 @@ namespace
 		// (the wax run's local y origin), which is the space mLeft / mRight map from.
 		//
 		// CAREFUL with IWaxLineShape::GetSelectionLine here. It was tried 2026-07-31 and reverted the
-		// same day, and the reason recorded then was wrong: the note said its documented job is to
-		// CONSTRAIN a highlight rather than to report a line's ascent and descent. The header says
-		// the opposite in its first line - "Get the selection line (top/bottom) for this line"
-		// (IWaxLineShape.h:142-148) - and the constraining is what OTHER calls do with the value once
-		// they have it (IWaxRunShape.h:124: "each run's Selection Line ... is presented to this run as
-		// maxTopBottom"). The IWaxLineHilite.h:53-54 line the old note quoted describes an ARGUMENT of
-		// GetHighlightBounds, not this function. (Corrected in the block 12 re-audit, 2026-08-10.)
+		// same day, and the reasons written down since have twice been more confident than the header
+		// warrants. What the header actually says, both sentences (IWaxLineShape.h:142-148):
+		//   1. "Get the selection line (top/bottom) for this line" - so it DOES report a top and a
+		//      bottom, which the 2026-07-31 note denied;
+		//   2. "This is typically used to determine the constraints on the height of the highlight
+		//      for this waxLine" - so constraining a highlight IS its stated typical use, which the
+		//      2026-08-10 correction denied in turn, moving that role onto "OTHER calls" (the value
+		//      does also travel on as maxTopBottom - IWaxRunShape.h:124 - but that is downstream of
+		//      what this sentence says, not instead of it).
+		// Neither sentence rules the function out here; both were quoted one at a time.
 		//
 		// What still stands, and is why the proportions below are kept: the returned PMLineSeg's
 		// COORDINATE SPACE is nowhere stated, and the rectangle here is assembled in a wax RUN's local
@@ -329,10 +338,15 @@ namespace
 	    and for what a Story Editor window did with the difference). Asking the view we are about to
 	    scroll is the only way the two can never disagree.
 
+	    ***** THE SPREAD IS RESOLVED BY THE CALLER AND HANDED IN. ***** It used to call SpreadForMatch
+	    itself, which was fine while this was the only thing that wanted the answer. The marker now
+	    wants it too - it is what tells the draw handler which spread owns the marker, instead of the
+	    geometric guess it used to make - and "which spread is this match on" asked twice is the shape
+	    this plug-in has had to unpick again and again. Asked once in JumpToHit, handed to both.
+
 	    Silent when it cannot do it: the scroll that follows is no worse off than before. */
-	void EnsureSpreadInView(IControlView* view, const UIDRef& storyRef, TextIndex pos)
+	void EnsureSpreadInView(IControlView* view, const UIDRef& storyRef, UID targetSpread)
 	{
-		const UID targetSpread = SpreadForMatch(storyRef, pos);
 		if (targetSpread == kInvalidUID)
 			return;
 
@@ -384,16 +398,21 @@ namespace
 	    the predicate that stood here accepted EVERYTHING - so a document being edited in one could
 	    have that window made active by a jump, after which every single thing the jump does next
 	    (scroll, spread, marker) is addressed at a LAYOUT view that was never brought forward.
-	    Adobe's own worked example for this search orders its candidates with prefer-criteria such as
-	    is_layout (DocumentPresFindCriteria.h:60-77); this asks the same question in the accept half,
-	    where a "no" is the useful answer - no layout presentation means the else branch below opens
-	    one, which is exactly right.
+	    Adobe's own worked examples for this search order their candidates with prefer-criteria such
+	    as is_layout (DocumentPresFindCriteria.h:54-58 - the reference here said :60-77 until
+	    2026-08-11, which is the NEXT example along and prefers is_active instead); this asks the same
+	    question in the accept half, where a "no" is the useful answer - no layout presentation means
+	    the else branch below opens one, which is exactly right.
 
-	    The test is Utils<ILayoutUIUtils>()->QueryLayoutData(presentation) (ILayoutUIUtils.h:125,
-	    "the layout widget data associated with the presentation") rather than a ClassID comparison:
-	    it asks for the thing we actually need out of the window instead of naming a boss that may
-	    be one of several (kLayoutPresentationBoss / kWasmLayoutPresentationBoss / whatever comes
-	    next).
+	    ***** THE TEST IS THE SDK'S OWN PREDICATE FOR IT. ***** ILayoutUIUtils::IsLayoutPresentation,
+	    "Test to see if the given presentation contains ILayoutControlData" (ILayoutUIUtils.h:112-115)
+	    - which is this function's whole question, under that name. It asked QueryLayoutData and
+	    tested the result for nil until 2026-08-11: the same answer by hand, and not wrong, but the
+	    ledger's rule is to use the call that is named for the question. (Neither is a ClassID
+	    comparison, deliberately: naming a boss means naming all of them - kLayoutPresentationBoss,
+	    kWasmLayoutPresentationBoss, whatever comes next.) ⚠ Found by the defect re-check, not by
+	    either pass of the API audit that went over this same function - a predicate one page above
+	    the call being copied is easy for both to miss.
 
 	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock ones exist and are named
 	    FindPresCriteria::accept_all / is_layout (DocumentPresFindCriteria.h:82-86), but that file's
@@ -406,8 +425,7 @@ namespace
 	{
 		if (p == nil)
 			return false;
-		InterfacePtr<ILayoutControlData> layoutData(Utils<ILayoutUIUtils>()->QueryLayoutData(p));
-		return layoutData != nil;
+		return Utils<ILayoutUIUtils>()->IsLayoutPresentation(p);
 	}
 
 	/** Is the window in front RIGHT NOW a layout window showing this document?
@@ -733,10 +751,18 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 	// document has been fronted and before any geometry is read.
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
 
+	// ***** ONE SPREAD, RESOLVED ONCE, USED BY BOTH THINGS THAT NEED IT. ***** The view has to be put
+	// on it before anything is scrolled, and the marker has to be told which spread it belongs to -
+	// the draw handler used to work that out for itself by testing whether the marker's centre fell
+	// inside the spread's bounding box, and those boxes can overlap once page items on the pasteboard
+	// are counted in (see KBSDrawEventHandler::HandleDrawEvent). kInvalidUID when the match has no
+	// frame at all, which both sides handle.
+	const UID matchSpread = SpreadForMatch(storyRef, start);
+
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
 	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
 	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
-	EnsureSpreadInView(frontView, storyRef, start);
+	EnsureSpreadInView(frontView, storyRef, matchSpread);
 
 	// A visible match scrolls to its wax rectangle AND gets a red marker rectangle. An overset match
 	// has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator, which
@@ -769,9 +795,9 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 			// 2026-08-09). Booking it means it simply never appears in that case. Both calls take the
 			// old marker down first, so the two behave alike in every other way.
 			if (deferMarkerUntilClickSettles)
-				KBSDrawEventHandler::SetMarkerAfterClickSettles(db, pbRect);
+				KBSDrawEventHandler::SetMarkerAfterClickSettles(db, matchSpread, pbRect);
 			else
-				KBSDrawEventHandler::SetMarker(db, pbRect);
+				KBSDrawEventHandler::SetMarker(db, matchSpread, pbRect);
 		}
 		else
 		{
@@ -840,6 +866,16 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 	// Showing a chapter is NOT jumping to a match: the view is left exactly where the user had it
 	// and no marker is raised. The row says "this document", so the answer is that document, not a
 	// place inside it. (KESCL's document rows behave the same way.)
+	//
+	// ***** AND THE STANDING MARKER IS NOT TAKEN DOWN, unlike every exit of JumpToHit. ***** The
+	// asymmetry is real and it is harmless, which is worth saying so that nobody "fixes" it: a
+	// marker belongs to one database (HandleDrawEvent draws for that one only), so bringing a
+	// DIFFERENT chapter forward stops it being painted without anything being cleared, and bringing
+	// forward the chapter it is already in leaves it pointing at the same place, since this does not
+	// scroll. ShowBook is the same case again - it moves a panel tab, not a view. Either way it
+	// expires within the second. JumpToHit clears on its dead ends for a different reason: there the
+	// view HAS been asked to move and has not, so a marker left up would be describing a place the
+	// panel has just refused to go to.
 	if (!EnsureDocFrontmost(docRef))
 	{
 		PMString message("Cannot bring that chapter's window to the front.");

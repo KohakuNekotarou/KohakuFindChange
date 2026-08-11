@@ -44,11 +44,22 @@ public:
 										// a reused address can be told from the real thing. Empty for
 										// a document that has never been saved (then the address is
 										// all there is, as before).
+	static UID        sMarkerSpread;	// WHICH SPREAD the marker belongs to. kInvalidUID when the
+										// jump could not name one, which falls back to the geometric
+										// test - see HandleDrawEvent.
 
 	// Set / clear the current marker and repaint. SetMarker also starts the marker's countdown to
 	// clearing itself; ClearMarker cancels that countdown AND any booking made by
 	// SetMarkerAfterClickSettles below. Called by KBSJump.
-	static void SetMarker(IDataBase* db, const PMRect& pbRect);
+	//
+	// @param spreadUID the spread the match sits on, which the caller has already resolved. It is
+	//        asked for rather than worked out here because "which spread does this rectangle belong
+	//        to" cannot be answered from the rectangle alone: the drawing side used to decide it by
+	//        testing whether the marker's centre fell inside the spread's bounding box, and those
+	//        boxes CAN overlap - ISpread::GetPagesAndItemsBounds grows to enclose page items sitting
+	//        out on the pasteboard, so an item pulled far enough reaches the next spread's box and
+	//        both spreads then paint the same marker. Pass kInvalidUID when there is no answer.
+	static void SetMarker(IDataBase* db, UID spreadUID, const PMRect& pbRect);
 	static void ClearMarker();
 
 	/** Put the marker up only once the click that asked for it is KNOWN to have been a SINGLE click:
@@ -73,8 +84,9 @@ public:
 	    path: there is no such thing as a double arrow-key, so it has nothing to wait for.
 
 	    @param db the marker's document - held as an address, and never dereferenced until the booking
-	              fires and the document has been found on the document list again. */
-	static void SetMarkerAfterClickSettles(IDataBase* db, const PMRect& pbRect);
+	              fires and the document has been found on the document list again.
+	    @param spreadUID the spread the match sits on - see SetMarker, which this eventually calls. */
+	static void SetMarkerAfterClickSettles(IDataBase* db, UID spreadUID, const PMRect& pbRect);
 
 	/** Application-shutdown cleanup: forget the marker WITHOUT repainting or touching any document,
 	    and stop and release the booking timer.
