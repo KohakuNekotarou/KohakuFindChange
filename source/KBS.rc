@@ -21,6 +21,22 @@
 //  
 //========================================================================================
 
+// ***** READ THIS FILE AS CP1252, NOT AS THE MACHINE'S ANSI CODE PAGE. ***** (2026-08-11.)
+//
+// Without this line the copyright sign comes out as a halfwidth katakana on a Japanese Windows.
+// The SDK writes the sign as a raw byte - CC21BuildNumber.h:107 is
+//     #define kCC21ShortCopyRightStr "\xa9 1999-2025 Adobe. All rights reserved."
+// - and 0xA9 is the copyright sign only in CP1252. rc.exe defaults to the SYSTEM's ANSI code page,
+// which on this machine is CP932, where 0xA9 is U+FF69 (halfwidth katakana small U). So the .pln's
+// LegalCopyright read "ｩ 1999-2025 Adobe..." while InDesign's own binaries, built on an English
+// system, read "© 1999-2025 Adobe..." - measured on both, 2026-08-11.
+//
+// *It affects nothing but the string Windows shows under file Properties > Details. It is here
+//  because this plug-in is submitted to Adobe Exchange, and because the SDK's own text was never
+//  meant to say that.
+// *KESCM, KESCL and KT carry the same fault - they share this template.
+#pragma code_page(1252)
+
 #include "WinRezFlags.h"
 #include "BuildNumber.h"
 #include "KBSID.h"
