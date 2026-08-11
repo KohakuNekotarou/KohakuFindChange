@@ -64,7 +64,23 @@ const char* const kKBSPlainPanelName = kKBSDisplayName;
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */
 void SetTabLabel(const PMString& label)
 {
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	// ***** THE SESSION CAN BE GONE DURING SHUTDOWN. ***** (2026-08-11.)
+	//   This used to write GetExecutionContextSession()->QueryApplication() straight out, which
+	//   dereferences whatever that call returns. KBSPanelAlpha.cpp says of the same function
+	//   "can be nil during shutdown" (:56) and takes the pointer into a variable before using it,
+	//   in all four of its callers.
+	//   *Why this one matters and the dozen others do not: KBSPanelTitle::Restore is called from
+	//    KBSStartupShutdown::Shutdown (:64) - it is the only entry here that runs during teardown.
+	//    The rest of this plug-in reaches the session from inside UI events (a click, a key, a
+	//    draw), where it is certainly alive.
+	//   !No failure has been seen: the tab is restored FIRST in Shutdown, "while the UI is still
+	//    standing", and the teardown test passes. This is the Shutdown path being made to look
+	//    like the other Shutdown path rather than a fix for an observed crash.
+	ISession* session = GetExecutionContextSession();
+	if (session == nil)
+		return;
+
+	InterfacePtr<IApplication> app(session->QueryApplication());
 	if (app == nil)
 		return;
 
