@@ -129,6 +129,28 @@ void	KBSSetFindChangeTranslucent(bool16 on);
 //     no clean-up at all and left the record standing against a handle the OS can recycle.
 bool16	KBSApplyFindChangeTranslucency();
 
+// InDesign's OWN Find/Change dialog's platform window, or nullptr when it is not open.
+// *Shared with KBSFindChangeMinimize.cpp (2026-08-12) so that "which window is the Find/Change
+//  dialog" is decided in ONE place. It is not a trivial question - the window class is generic and
+//  the title is translated - and the answer walks the SDK's window list for the dialog whose panel
+//  answers kFindChangeParentWidgetID, a NUMBER. See the block comment over KBSQueryFindChangeIWindow
+//  in the .cpp. (KBSQueryFindChangeIWindow itself stays private: nothing outside needs the IWindow.)
+// The contract:
+//   . the result is CACHED, and the cache is dropped by the window-list observer whenever a window
+//     is added or removed - so ask again rather than keeping the handle
+//   . ***do not hold the returned HWND across events.*** The OS recycles handles, and a stale one
+//     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
+//   . nullptr means "not open", and also "open, but the platform window does not exist yet"
+#ifdef WINDOWS
+// *HWND is named here WITHOUT pulling windows.h into this header, which five .cpp files include and
+//  only two of which have any business with Win32. This is the declaration windows.h itself makes
+//  (DECLARE_HANDLE expands to exactly this), so the two can appear in either order.
+struct HWND__;
+typedef struct HWND__* HWND;
+
+HWND	KBSQueryFindChangeWindow();
+#endif
+
 // Start listening for the panel being shown, hidden, docked or floated.
 // *Called from TWO places, and safe to call again: KBSStartupShutdown::Startup, and the panel's own
 //   AutoAttach (KBSPanelTitle.cpp). !The second one is not belt and braces - the panel manager comes

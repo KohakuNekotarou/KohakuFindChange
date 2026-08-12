@@ -534,7 +534,7 @@ static bool16 sFcLookedUp = kFalse;
 
 // nullptr when the dialog is not open, or when the SDK has no platform window for it (a document
 // window answers nil to GetSysWindow, so this is not merely theoretical).
-static HWND KBSQueryFindChangeWindow()
+HWND KBSQueryFindChangeWindow()
 {
 	if (sFcWnd != nullptr && ::IsWindow(sFcWnd))
 		return sFcWnd;
