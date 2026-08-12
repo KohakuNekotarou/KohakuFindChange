@@ -248,8 +248,9 @@ DECLARE_PMID(kActionIDSpace, kKBSTranslucentPanelActionID, kKBSPrefix + 19)
 // "Save Panel Settings": write the flyout's SETTINGS toggles to a JSON file of our own in the user's
 // preferences folder, read back at startup (KBSPanelState.cpp). A plain command, not a toggle - and
 // an explicit one, the way KESCM has it: settings are saved when asked for, never behind the user's
-// back. The file holds three settings - Translucent Panel, Translucent Find/Change and Hide Previous
-// Chapter. *Book Scope is deliberately not among them; the reason is in KBSPanelState.h.
+// back. The file holds four settings - Translucent Panel, Translucent Find/Change, Minimizable
+// Find/Change and Hide Previous Chapter. *Book Scope is deliberately not among them; the reason is
+// in KBSPanelState.h.
 DECLARE_PMID(kActionIDSpace, kKBSSavePanelSettingsActionID, kKBSPrefix + 20)
 // "Translucent Find/Change": the same treatment for InDesign's OWN Find/Change dialog. Check-mark
 // toggle, Windows only, OFF by default. The dialog is found through the SDK's window list, not by
@@ -258,7 +259,11 @@ DECLARE_PMID(kActionIDSpace, kKBSTranslucentFindChangeActionID, kKBSPrefix + 21)
 // The flyout's fourth rule, below the toggle block (2026-08-04, when the blocks were rearranged and
 // three separators no longer parted five blocks). MenuDef only, no ActionDef - like the three above.
 DECLARE_PMID(kActionIDSpace, kKBSSeparator4ActionID, kKBSPrefix + 22)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 23)
+// "Minimizable Find/Change": put a MINIMIZE BOX on InDesign's own Find/Change dialog, so it can be
+// sent to the taskbar instead of being closed. Check-mark toggle, Windows only, OFF by default.
+// The same window as the toggle above, reached the same way; what differs is that this one changes
+// the window's STYLE rather than its alpha. See KBSFindChangeMinimize.cpp.
+DECLARE_PMID(kActionIDSpace, kKBSMinimizableFindChangeActionID, kKBSPrefix + 23)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 24)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 25)
 
@@ -354,6 +359,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSTranslucentPanelMenuKey		kKBSStringPrefix "kKBSTranslucentPanelMenuKey"
 // "Translucent Find/Change": the same, for InDesign's own Find/Change dialog.
 #define kKBSTranslucentFindChangeMenuKey	kKBSStringPrefix "kKBSTranslucentFindChangeMenuKey"
+// "Minimizable Find/Change": the same window again - a minimize box on InDesign's own dialog.
+#define kKBSMinimizableFindChangeMenuKey	kKBSStringPrefix "kKBSMinimizableFindChangeMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
 // Replace feature menu item keys.
@@ -518,12 +525,14 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSReplaceCheckedMenuItemPosition	1.6
 #define kKBSSeparator3MenuItemPosition		2.0
 
-// Block 3 - the four check-mark toggles. Book Scope leads: it is the one that decides what the
-// commands in block 1 run on. Then Hide Previous Chapter, and the two Translucent toggles last -
-// one idea applied to two windows, so they read as a pair (Find/Change first, this panel second).
+// Block 3 - the five check-mark toggles. Book Scope leads: it is the one that decides what the
+// commands in block 1 run on. Then Hide Previous Chapter. The last three are window appearance: the
+// two that act on InDesign's OWN Find/Change dialog first (translucency, then the minimize box),
+// and this panel's own translucency last.
 #define kKBSBookScopeMenuItemPosition		2.2
 #define kKBSHidePrevChapterMenuItemPosition	2.4
 #define kKBSTranslucentFindChangeMenuItemPosition	2.6
+#define kKBSMinimizableFindChangeMenuItemPosition	2.7
 #define kKBSTranslucentPanelMenuItemPosition	2.8
 #define kKBSSeparator4MenuItemPosition		3.0
 

@@ -511,6 +511,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSTranslucentFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
+		// Find/Change dialog, so it can be sent to the taskbar instead of closed. Directly under
+		// the translucency toggle - the two act on the same window. *Windows only.
+		kKBSMinimizableFindChangeActionID,
+		kKBSTargetMenuPath
+		kKBSMinimizableFindChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Translucent Panel: the same idea applied to this panel - drawn faint while it floats, and
 		// back to solid while the pointer is on it. Directly under the one above; the two read as a
 		// pair. *Windows only.
@@ -698,6 +706,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSTranslucentFindChangeActionID,
 		kKBSTranslucentFindChangeMenuKey,	// "Translucent Find/Change" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Minimizable Find/Change. kCustomEnabling for the check mark, like the toggle above it.
+		// Not greyed out while the dialog is closed, for the same reason: the flag is what the user
+		// is setting, and it applies the moment the dialog opens.
+		kKBSActionComponentBoss,
+		kKBSMinimizableFindChangeActionID,
+		kKBSMinimizableFindChangeMenuKey,	// "Minimizable Find/Change" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

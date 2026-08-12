@@ -57,6 +57,7 @@
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
+#include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -250,6 +251,32 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				msg = "Translucent Find/Change: on.";
 			else
 				msg = "Translucent Find/Change: on - applies when the Find/Change dialog is open.";
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+			break;
+		}
+
+		// "Minimizable Find/Change": a minimize box on InDesign's OWN Find/Change dialog, so it can
+		// be put on the taskbar instead of closed. The same window as the toggle above, found the
+		// same way (never by its title, which is translated). *Windows only, OFF by default.
+		// What it takes is two bits - see KBSFindChangeMinimize.h for why one of them is not the
+		// obvious one.
+		case kKBSMinimizableFindChangeActionID:
+		{
+			const bool16 on = !KBSGetFindChangeMinimizable();
+			KBSSetFindChangeMinimizable(on);
+
+			// As with the two toggles above, the wording follows whether a window was actually
+			// reached. Toggling it with the dialog closed is legitimate - it applies when the
+			// dialog opens - so that case is stated rather than left looking broken.
+			const bool16 applied = KBSApplyFindChangeMinimizable();
+			PMString msg;
+			if (!on)
+				msg = "Minimizable Find/Change: off.";
+			else if (applied)
+				msg = "Minimizable Find/Change: on.";
+			else
+				msg = "Minimizable Find/Change: on - applies when the Find/Change dialog is open.";
 			msg.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(msg);
 			break;
@@ -856,6 +883,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// it applies the moment the window exists. DoAction says which case it was.
 			int16 actionState = kEnabledAction;
 			if (KBSGetFindChangeTranslucent())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSMinimizableFindChangeActionID)
+		{
+			// Selectable whether or not the dialog is open, exactly like the toggle above: what is
+			// being set is the preference, and it applies the moment the window exists.
+			int16 actionState = kEnabledAction;
+			if (KBSGetFindChangeMinimizable())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}

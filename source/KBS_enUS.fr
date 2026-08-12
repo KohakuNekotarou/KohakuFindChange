@@ -46,6 +46,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
                 kKBSTranslucentPanelMenuKey,	"Translucent Panel",
                 kKBSTranslucentFindChangeMenuKey,	"Translucent Find/Change",
+                kKBSMinimizableFindChangeMenuKey,	"Minimizable Find/Change",
                 kKBSSavePanelSettingsMenuKey,	"Save Panel Settings",
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
