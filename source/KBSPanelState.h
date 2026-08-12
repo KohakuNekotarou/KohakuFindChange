@@ -23,6 +23,10 @@
 //      Find/Change dialog is certainly not open at startup, and the window-list observer puts the
 //      alpha on the moment it is. **This line was missing from the list until 2026-08-04, when it
 //      was already being saved and restored - the code was right and the note was not.)
+//    - Minimizable Find/Change (*Windows only, and the flag alone once more, for the reason given
+//      on the line above: the dialog is not open at startup, and the same window-list observer puts
+//      the style on the moment it is. Added 2026-08-12 with the feature - and added HERE at the same
+//      time, because the line above records what it costs to leave this list behind.)
 //    - Hide Previous Chapter (the user's call, 2026-08-04). It closes chapter windows as a jump
 //      lands, which is why it was left out at first - but a restored ON cannot act on its own:
 //      the jump asks ShouldHidePreviousChapter, which ALSO requires the results to have come from

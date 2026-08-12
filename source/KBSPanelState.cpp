@@ -41,6 +41,7 @@
 #include "KBSPanelState.h"
 #include "KBSResultTree.h"		// ShowStatus - where the result, or the failure, is reported
 #include "KBSPanelAlpha.h"		// the get / set of BOTH translucency toggles (panel and Find/Change)
+#include "KBSFindChangeMinimize.h"	// the get / set of the minimize-box toggle
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 
 // The file name, in the roaming preferences folder itself.
@@ -125,6 +126,7 @@ void KBSSavePanelState()
 	json += "  \"version\": 1,\n";
 	json += "  \"translucentPanel\": ";       json += KBSBoolLiteral(KBSGetPanelTranslucent());           json += ",\n";
 	json += "  \"translucentFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeTranslucent());      json += ",\n";
+	json += "  \"minimizableFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeMinimizable());      json += ",\n";
 	json += "  \"hidePreviousChapter\": ";    json += KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn()); json += "\n";
 	json += "}\n";
 
@@ -208,6 +210,11 @@ void KBSLoadPanelStateIfPresent()
 	// certainly not open at startup - and the observer on the application's window list puts the
 	// alpha on the moment it is opened (KBSPanelAlpha.cpp).
 	KBSSetFindChangeTranslucent(KBSJsonReadBool(text, "translucentFindChange", KBSGetFindChangeTranslucent()));
+
+	// The minimize box on that same dialog. Nothing is applied here either, and for the same reason:
+	// the dialog is certainly not open at startup, and the window-list observer puts the style on the
+	// moment it is opened (KBSPanelAlpha.cpp).
+	KBSSetFindChangeMinimizable(KBSJsonReadBool(text, "minimizableFindChange", KBSGetFindChangeMinimizable()));
 
 	// Hide Previous Chapter (the user's call, 2026-08-04, after the first cut left it out). Restoring
 	// it is safe in a way the flag alone does not show: the jump asks ShouldHidePreviousChapter,
