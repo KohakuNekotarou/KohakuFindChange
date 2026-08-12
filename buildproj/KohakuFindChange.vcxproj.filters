@@ -81,6 +81,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -183,6 +186,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h">

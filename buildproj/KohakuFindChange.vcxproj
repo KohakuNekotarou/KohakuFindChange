@@ -237,6 +237,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp"/>
@@ -279,6 +280,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h"/>
