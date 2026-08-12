@@ -27,6 +27,7 @@
 #include "KBSBookWatch.h"
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
+#include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSReplaceConfirmDialog.h"	// the last prompt's text and fonts, emptied at shutdown
 #include "KBSResultModel.h"
@@ -72,6 +73,11 @@ public:
 		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
 		// up is a leaked resource - neither may outlive this .pln.
 		KBSShutdownPanelAlpha();
+		// InDesign's OWN Find/Change dialog again - its window STYLE this time. The same reason as
+		// the WS_EX_LAYERED on the line above: it is somebody else's window, and what we put on it
+		// must not outlive us. *It also restores a MINIMISED dialog before undoing anything - see
+		//  KBSRestoreFindChangeStyle for why that order is not optional.
+		KBSShutdownFindChangeMinimize();
 		KBSMarkerExpiryIdleTask::Shutdown();
 		// After the task that would clear it, and state-only - the marker holds a static PMString
 		// (its document's file) as well as a raw IDataBase*, and neither may still be standing at
