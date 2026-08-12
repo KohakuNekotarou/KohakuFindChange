@@ -48,6 +48,7 @@
 
 // Project includes:
 #include "KBSPanelAlpha.h"		// kKBSPanelAlphaValue and the chase constants
+#include "KBSFindChangeMinimize.h"	// the minimize box rides the same window-list notification
 #include "KBSID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
 
 // For the observer that follows the panel being shown, hidden, docked or floated:
@@ -1229,6 +1230,13 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 		KBSForgetFindChangeWindow();
 		if (KBSGetFindChangeTranslucent())
 			KBSApplyFindChangeTranslucency();
+		// *The minimize box goes on the same window, on the same cue, for the same reason: the
+		//  dialog's window is BUILT AFRESH every time it is opened - the handle changes with it
+		//  (measured: 0x1F06EC one time, 0x1D0AF4 the next) - so a style written once does not
+		//  survive a close and reopen. Two features, one notification; the order does not matter,
+		//  they touch different bits of the same window (2026-08-12).
+		if (KBSGetFindChangeMinimizable())
+			KBSApplyFindChangeMinimizable();
 		return;		// nothing here concerns the panel
 	}
 
