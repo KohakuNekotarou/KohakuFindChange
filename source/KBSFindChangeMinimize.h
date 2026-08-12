@@ -37,6 +37,20 @@
 
 #include "BaseType.h"
 
+// How many times, and how far apart, the style is written again after a cue that found NO WINDOW.
+//  *****WHY A CHASE IS NEEDED AT ALL.***** The only cue this feature gets is the application's
+//    window list saying a window was added - and the dialog can be "open" at that moment while its
+//    platform window does not exist yet. KBSQueryFindChangeWindow is written for exactly that state
+//    (it does not record the walk as done, so the next ask looks again) - but SOMEBODY HAS TO ASK
+//    AGAIN. The translucency side is asked again constantly by its Win32 mouse hook; this side has
+//    no such traffic, so without a chase the button simply never appears.
+//    !MEASURED, not theorised (2026-08-12): opening the dialog from the same script that switched
+//     the toggle on left it unstyled, while doing the two as separate steps applied it in 15ms.
+//  *8 x 50ms = about 400ms, the figure the panel side settled on for the same kind of settling
+//   (kKBSPanelAlphaReapplyTries in KBSPanelAlpha.h). The count bounds it, so it always stops.
+static const int32  kKBSMinimizeRetryTries       = 8;
+static const uint32 kKBSMinimizeRetryDelayMillis = 50;
+
 // The toggle's current state (*OFF by default).
 bool16	KBSGetFindChangeMinimizable();
 
@@ -54,9 +68,16 @@ void	KBSSetFindChangeMinimizable(bool16 on);
 //    on, which need not be a window that is open now, and may be no window at all.
 bool16	KBSApplyFindChangeMinimizable();
 
-// Put the dialog back as it was and forget it. Called from the plug-in's shutdown.
+// Apply, and if there is no window yet, keep trying for a short while (see the constants above).
+// *This is what the window-list observer calls, not KBSApplyFindChangeMinimizable directly.
+void	KBSApplyFindChangeMinimizableWithRetry();
+
+// Put the dialog back as it was, stop the chase and release the timer. Called from the plug-in's
+// shutdown.
 // *A style left on somebody else's window would outlive this plug-in - the same reason
-//  KBSShutdownPanelAlpha takes its WS_EX_LAYERED back off.
+//  KBSShutdownPanelAlpha takes its WS_EX_LAYERED back off. **And ICallbackTimer's callback is a raw
+//  function pointer that is not reference counted, so a live booking as this .pln goes down is a
+//  crash - the same hazard, and the same remedy, as the panel side's chase.
 void	KBSShutdownFindChangeMinimize();
 
 #endif // __KBSFindChangeMinimize_h__

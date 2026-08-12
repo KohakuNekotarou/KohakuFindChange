@@ -191,7 +191,11 @@ static uint8 KBSEffectiveFindChangeAlpha(HWND target)
 static void KBSInstallWinEventHook();
 static void KBSRemoveWinEventHook();
 // *Drops what was cached about where InDesign's own Find/Change dialog is (body further down).
-static void KBSForgetFindChangeWindow();
+//  !NOT static: it is declared in KBSPanelAlpha.h and used by KBSFindChangeMinimize.cpp. **Leaving
+//   the `static` HERE is enough to keep the whole function internal even though the body says
+//   otherwise - the first declaration decides the linkage - and the only symptom is LNK2019 from
+//   the other file (2026-08-12).
+void KBSForgetFindChangeWindow();
 // *The same for our own panel's window (body further down).
 static void KBSForgetPaletteWindow();
 #endif
@@ -565,7 +569,9 @@ HWND KBSQueryFindChangeWindow()
 }
 
 // Called when the window list changes: the next ask looks the dialog up again.
-static void KBSForgetFindChangeWindow()
+// *Not static since 2026-08-12: the minimize toggle needs it for the same reason the translucency
+//  toggle does - see the declaration in KBSPanelAlpha.h.
+void KBSForgetFindChangeWindow()
 {
 	sFcWnd = nullptr;
 	sFcLookedUp = kFalse;
@@ -1011,7 +1017,7 @@ void KBSShutdownPanelAlpha()
 #else	// Mac: nothing is ever applied, so there is nothing to book and nothing to clean up
 
 static void KBSScheduleReapply() {}
-static void KBSForgetFindChangeWindow() {}
+void        KBSForgetFindChangeWindow() {}		// *not static - see the declaration in the header
 static void KBSForgetPaletteWindow() {}
 void        KBSShutdownPanelAlpha() {}
 
@@ -1235,8 +1241,11 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 		//  (measured: 0x1F06EC one time, 0x1D0AF4 the next) - so a style written once does not
 		//  survive a close and reopen. Two features, one notification; the order does not matter,
 		//  they touch different bits of the same window (2026-08-12).
+		// **WithRetry, not the plain Apply: the dialog can be open at this moment with no platform
+		//   window built yet, and unlike the translucency above there is no mouse hook asking again
+		//   a moment later. Measured - see the chase note in KBSFindChangeMinimize.h.
 		if (KBSGetFindChangeMinimizable())
-			KBSApplyFindChangeMinimizable();
+			KBSApplyFindChangeMinimizableWithRetry();
 		return;		// nothing here concerns the panel
 	}
 

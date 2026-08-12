@@ -151,6 +151,18 @@ typedef struct HWND__* HWND;
 HWND	KBSQueryFindChangeWindow();
 #endif
 
+// Throw away what is cached about where the dialog is, so the NEXT ask walks the window list again.
+// *****THIS IS NOT OPTIONAL FOR ANYONE WAITING FOR THE DIALOG TO APPEAR.***** The lookup above
+//   records "looked, found nothing" and then answers nullptr WITHOUT LOOKING AGAIN - which is right
+//   for its ordinary caller (it stops a walk of every window on every mouse move) and useless for a
+//   caller whose whole purpose is to ask the same question until the answer changes.
+//   !MEASURED 2026-08-12: a retry loop that did not call this ran its full count against the cached
+//    "no" and never saw the window that had appeared in the meantime.
+// *The translucency toggle has always done this from its own setter, for the stated reason that "a
+//  toggle press is exactly when 'not open', established at some earlier moment, must not be allowed
+//  to answer". The minimize toggle needs it in both places: its setter, and every turn of its chase.
+void	KBSForgetFindChangeWindow();
+
 // Start listening for the panel being shown, hidden, docked or floated.
 // *Called from TWO places, and safe to call again: KBSStartupShutdown::Startup, and the panel's own
 //   AutoAttach (KBSPanelTitle.cpp). !The second one is not belt and braces - the panel manager comes
