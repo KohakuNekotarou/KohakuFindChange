@@ -35,7 +35,32 @@
 #define kKBSPluginName	"KohakuBookSearch"			// Internal name: the ID system and the .rc InternalName. NEVER change it. It is NOT what the .pln on disk is called - that is kKBSFileName below - and the .fr never spells it out either (PluginVersion carries kKBSPluginID, and the ExtraPluginInfo that documents do store is the company, the URL and the alert text), so the file on disk can be renamed without it moving. Same split as KESCM's kKESCMPluginName.
 #define kKBSDisplayName	"Kohaku Find/Change"		// Display name: the About menu item, the About box, the panel and its tab, and the .rc FileDescription. THE one definition - both string tables put it under kKBSPanelTitleKey and KBSPanelTitle.cpp restores the tab from it, so the copies cannot drift apart. The slash is safe here and ONLY here: menu paths are delimited with ":" (SDKDef.h kSDKDefDelimitMenuPath) and this string is a string table VALUE, never a path segment - the paths above are built from kKBSPanelTitleKey and friends, which are prefix-number keys. Do not put a ":" or a bare "&" in it.
 #define kKBSFileName	"KohakuFindChange"			// Base name of the build output: KohakuFindChange.pln, its "(KohakuFindChange Resources)" folder, and the .rc OriginalFilename. MUST match the vcxproj TargetName, which is $(ProjectName) - so the VS project carries this name too. No spaces and no slash, unlike kKBSDisplayName: this one IS a file name. Same three-way split as KESCM (kKESCMPluginName / kKESCMFileName / kKESCMDisplayName).
-#define kKBSPrefixNumber	0x205698 		// Unique prefix number for this plug-in(*Must* be obtained from Adobe Developer Support).
+#define kKBSPrefixNumber	0x1EA600 		// Unique prefix number for this plug-in(*Must* be obtained from Adobe Developer Support).
+													// ★★★2026-08-15: Adobe が発行した正規の prefix に差し替えた。原文＝
+													// 「Following Prefix ID has been registered as per your request below : **0x1EA600 - 0x1EA6FF** .」
+													// ＝**各 ID 空間 256 枠が予約された**(KESCM の 0x1EA500-0x1EA5FF に続く2本目の帯)。
+													// ⚠旧値 0x205698 は **Adobe Developer Console のプラグイン ID(10進 205698)に 0x を付けて
+													//   16進として読み替えただけの数値**で、**Adobe の採番体系とは無関係＝1枠も予約されていなかった**
+													//   (KESCM が旧 0x205515 で踏んだのと同じ形)。⚠**Exchange の URL に出る 205698 は Console の ID
+													//   であって prefix ではない**ので、この差し替えでは変わらない(kKBSVersion の行を参照)。
+													// ★**オフセットは1つも動かしていない**——全 ID が kKBSPrefix + N のままで、prefix だけが動いた。
+													// ★差し替え前に実測した2点(KESCM で通した手順と同じ):
+													//   ①**文書に永続データを書いていない**＝KBS.fr の AddIn の宛先は kSessionBoss と
+													//     kActiveContextBoss の2つだけで、kDocBoss / kDocWorkspaceBoss / kWorkspaceBoss はゼロ。
+													//     ⇒ **既存の .indd は壊れない**(失うのはショートカット割り当てとパネル配置だけ)。
+													//   ②**前半 128 枠に収まる**＝最大オフセットは kWidgetIDSpace の **+30**、
+													//     ActionID/ClassID/ImplID/IID はいずれも **+25**。⇒ 後半を UI 側に空けておける。
+													// ★★**model/UI 分割のときは、この帯を前半・後半で割る**(KESCM と同じ形):
+													//     model(KBS) = 0x1EA600 (+0..127) / UI = **0x1EA680** (+128..255)
+													//   1 本の帯を 2 プラグインで分けるのは Adobe 自身のやり方
+													//   (customdatalink 0xb3300 / customdatalinkui 0xb3380 が両方 0xb33xx に収まっている)
+													//   ＝**ID の一意性はプラグイン単位ではなく「値」で決まる**。
+													//   ⚠**ID スペースごとに 128 枠**(widget と action は別勘定)。
+													// ⚠**利用者側の影響**＝ActionID の値が変わるので、**割り当て済みのキーボードショートカットと
+													//   パネル配置がリセットされる**(ガイド vol1-06「Note about moving ActionIDs」)。
+													//   **次の Exchange 提出のリリースノートに書くこと。**
+													// ⇒ 一次資料＝memory の [[id-prefix-256-slot-budget]] と
+													//   docs/superpowers/plans/2026-08-13-kescm-model-ui-split-stage2.md。
 #define kKBSRepoURL		"https://github.com/KohakuNekotarou/KohakuFindChange"	// Where this plug-in is published. Shown as the panel icon's tooltip (KBSIconTip.cpp) and opened by the panel title (KBSPanelTitle.cpp). It was also at the foot of the About box until 2026-08-09, when that box became name-and-version only. If the repo is ever renamed again, this line has to follow it - nothing else in the build does.
 #define kKBSVersion		"1.0.0"						// Version of this plug-in. Shows up in three places: the About box, the .rc FileVersion, and the PluginVersion resource. First Adobe Exchange submission = 1.0.0 (2026-07-30), APPROVED AND PUBLISHED 2026-08-11 at https://exchange.adobe.com/apps/cc/205698/kohakufindchange. ***** WHAT IS PUBLISHED IS THE 2026-07-30 BUILD, NOT THIS SOURCE. ***** The tree has moved 189 commits (+24,581/-8,129) since, so this line and the store now name two different plug-ins - raise it BEFORE the next submission, or nothing on disk can tell them apart. (KESCM learned this the expensive way: "the version number in a history comment does not describe what was submitted" - memory kescm-cpp-panel.) Was kSDKDefPluginVersionString, the SDK template's own version, which said nothing about this plug-in.
 
