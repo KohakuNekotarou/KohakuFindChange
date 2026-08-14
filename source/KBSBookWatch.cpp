@@ -212,9 +212,35 @@ void RetireBookResultsIfGone()
     (KESCMTracker.cpp, KESCMHudTimerProc): the timer is released in ONE place, and it is not here. */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
-	// A run of ours is walking the very chapters this would hand back - wait it out. A POSITIVE
-	// return value is "call me again in this many milliseconds", so the cue is deferred rather than
-	// dropped, and it re-arms without calling StartTimer from inside the callback.
+	// A run of ours is walking the very chapters this would hand back - wait it out by returning a
+	// POSITIVE value, which re-arms without calling StartTimer from inside the callback.
+	//
+	// ***** THAT RE-ARM IS AN OBSERVED BEHAVIOUR, NOT A PROMISE - and this line said otherwise
+	// ***** until 2026-08-12. ***** IIdleTask::RunTask documents its return as "the number of
+	// milliseconds to sleep before running again" (IIdleTask.h:195) and ICallbackTimer derives from
+	// IIdleTask, but the timer's OWN header describes what it registers as "a one time only
+	// callback" (ICallbackTimer.h:42) and says nothing about what the callback's return value does
+	// with it.
+	//
+	// ***** AND THE SDK'S ONE WORKED EXAMPLE NEVER TAKES THIS PATH. ***** ICallbackTimer has exactly
+	// one caller in the whole SDK - publiclib/links/HTTPAssetLinkResourceHandler.cpp - and its
+	// callback returns ~(uint32)0, which IS kEndOfTime, on every exit (:621). When Adobe wants that
+	// timer to fire again they do it from OUTSIDE the callback: StopTimer, Release, build another and
+	// StartTimer it (:645-658). So the one example that exists exercises the "remove me" return and
+	// nothing else, and the positive-value re-arm below is used by nobody but this plug-in.
+	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.)
+	//
+	// KBSPanelAlpha's re-apply chain rests on the same inference and has always said so in as many
+	// words; this side stated it as fact, which is one question answered two ways in one plug-in.
+	//
+	// ***** WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. ***** The cue is dropped and this book's
+	// chapters are not handed back HERE - but the next search or scan calls ReleaseSearchedBook on
+	// its way in and hands them back then (KBSSearchEngine.cpp, KBSGlyphScanEngine.cpp,
+	// KBSOversetScanEngine.cpp, each beside its own KBSResultModel::Clear()). A REPLACE does not:
+	// it keeps the searched book on purpose, its results being still on the panel. So the worst case
+	// is a book's results left on the panel, and any chapter that refused to close left locked,
+	// until the next search or scan - not a permanent strand. Named rather than assumed, because a
+	// fallback nobody has written down is one the next change can remove without noticing.
 	if (KBSRunGuard::IsAnyRunning())
 		return kKBSBookRetireDelayMs;
 

@@ -487,6 +487,23 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	if (heldIndex < 0)
 		return false;
 
+	// ***** AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN. ***** Preserve, then clear -
+	// the same pair, and for the same reasons, as the loop in ReleaseHeldDocs (see the long note
+	// there; the contract is ErrorUtils.h:115-117). This one matters most of the three, because a
+	// run calls it with kProcess BETWEEN chapters, and an error left here would fail the next
+	// chapter's whole walk.
+	//
+	// ***** IT COVERS THE THREE TESTS BELOW AS WELL, not just the close. ***** It stood beneath
+	// them until 2026-08-12, so the three exits they own - no longer open, has a window, holds
+	// unsaved work - returned with whatever those tests had raised still standing. They are not
+	// silent readings: DocHasAnyWindow goes through IDocumentUIUtils and HasUnsavedChanges through
+	// QueryDocFileHandler + CanSave, and NONE of the three reports a failure back, which is the
+	// very property the preserver exists for. The bulk sibling has always covered its own copies of
+	// the same three (ReleaseHeldDocs takes the preserver before its loop); this is the same
+	// function written twice, and only one of them was covered - the shape this plug-in keeps being
+	// bitten by. The clear stays where it was, immediately in front of the close.
+	GlobalErrorStatePreserver closeErrorState;
+
 	// ***** IS IT STILL OPEN? ASKED FIRST, AND THE ORDER IS THE WHOLE POINT. *****
 	// Everything below this line reads the document. DocHasAnyWindow takes the database out of the
 	// UIDRef and hands it to IDocumentUIUtils; HasUnsavedChanges hands the UIDRef itself to
@@ -555,13 +572,9 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// call can hand it back; a refusal is the same situation with a different cause, so it keeps
 	// the claim the same way.
 	//
-	// ***** AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN. ***** Preserve, then clear -
-	// the same pair, and for the same reasons, as the loop in ReleaseHeldDocs (see the long note
-	// there; the contract is ErrorUtils.h:115-117). The preserver covers every exit below, not just
-	// the close: a refusal that raised something on its way out would otherwise leave it standing.
-	// This one matters most of the three, because a run calls it with kProcess BETWEEN chapters,
-	// and an error left here would fail the next chapter's whole walk.
-	GlobalErrorStatePreserver closeErrorState;
+	// Cleared immediately in front of the close, exactly as the bulk sibling clears in front of
+	// each of its own - a standing error would fail this one. WHOSE state is being taken away here
+	// and whose is not: see the preserver at the top of this function.
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
