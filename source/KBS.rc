@@ -34,7 +34,8 @@
 // *It affects nothing but the string Windows shows under file Properties > Details. It is here
 //  because this plug-in is submitted to Adobe Exchange, and because the SDK's own text was never
 //  meant to say that.
-// *KESCM, KESCL and KT carry the same fault - they share this template.
+// *KESCM's model half was fixed the same way on 2026-08-15 (audit B1). Its UI half (KCMUI.rc),
+//  KESCL and KT still carry the same fault - they share this template.
 #pragma code_page(1252)
 
 #include "WinRezFlags.h"
