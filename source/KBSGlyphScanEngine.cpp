@@ -155,9 +155,35 @@ struct NotdefRun
 	NotdefRun() : start(kInvalidTextIndex), end(kInvalidTextIndex), glyphs(0) {}
 };
 
+/** Position order, and - when two glyphs share a position - font name order.
+
+    ***** THE TIE IS BROKEN SO THAT TWO SCANS OF ONE DOCUMENT CANNOT DISAGREE. ***** The same
+    TextIndex arrives more than once by design: IWaxGlyphIterator.h:151-156 warns that the indices
+    "may not be monotonically increasing nor will they necessarily change for every call to
+    Advance()", because one character can produce several glyphs. std::sort is NOT stable, so which
+    of two same-position glyphs landed first was left to the implementation - and it decides which
+    FONT NAME the row carries, because MergeIntoRuns keeps the first and skips the rest
+    (g.pos < last.end). Comparing the font name makes the order a property of the DATA rather than
+    of the sort, so the same document scanned twice produces the same rows.
+
+    KESCM had the identical problem and solved it the same way: KESCMStoryList's RowIsBefore breaks
+    its page-order tie on the story UID, "so that comparing the same two documents twice lists the
+    rows in the same order". This is that fix arriving in the other direction (2026-08-16).
+
+    ***** AND IT IS PREVENTIVE, NOT A FIX FOR ANYTHING SEEN. ***** Measured the day it was written:
+    a counter on the skip in MergeIntoRuns - the only place a same-position pair can show up -
+    reported ZERO across all seven glyph test documents (glyph, glyphscan-table, glyphscan-notable,
+    glyphscan-para, glyphscan-shapes, glyphscan-threadboundary, glyph-big), and two consecutive
+    scans of the same document returned byte-identical rows both before and after. So the second
+    line below has never yet been reached. It stays because the header's warning is the contract and
+    the cost is one comparison that never runs - but it is stated plainly so the next reader does
+    not go hunting for the bug this "fixed". */
 bool ByPosition(const NotdefGlyph& a, const NotdefGlyph& b)
 {
-	return a.pos < b.pos;
+	if (a.pos != b.pos)
+		return a.pos < b.pos;
+
+	return a.fontName.Compare(kTrue, b.fontName) < 0;
 }
 
 /** The run's font, named the way the user sees it in the font menu.
@@ -498,6 +524,12 @@ void MergeIntoRuns(ITextModel* model, std::vector<NotdefGlyph>& found, std::vect
 			NotdefRun& last = out.back();
 			if (g.pos < last.end)
 				continue;		// this character was already taken (several glyphs, one character)
+								// ***** MEASURED 2026-08-16: THIS LINE NEVER FIRED. ***** A counter on
+								// it across all seven glyph test documents (glyph, table, notable,
+								// para, shapes, threadboundary, big) reported 0 every time, so
+								// "several glyphs, one character" is what the header warns about
+								// (IWaxGlyphIterator.h:151-156), not something these documents show.
+								// Kept because the warning is the contract; see ByPosition.
 			// The thread test is asked LAST, and deliberately: it is the only one of the three that
 			// costs a call into the model, and by here the cheap two have already ruled out every box
 			// that is not a neighbour of this run. last.end - 1 is the run's last BOX (a swallowed
