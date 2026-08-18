@@ -31,6 +31,12 @@
 //   re-check that corrected the LINE REFERENCE (it had drifted three lines) without opening the
 //   file the reference pointed at. Named rather than numbered now - a line in ANOTHER repository
 //   cannot be kept honest from this one - and the claim itself is what needed the checking.
+//  *Smaller AGAIN as of 2026-08-18 (found by KESCM's bug recheck B10). The state check was
+//   justified further down by pointing at SnipRunScriptProvider.cpp:488 as "the way the SDK's own
+//   writer does" - but that snippet calls CreateFileStreamWriteLazy, a DIFFERENT function whose
+//   lazy open cannot report an unwritable path as nil, leaving the state as its only check. What
+//   StreamUtil.h:152 documents for the non-lazy call is exactly the nil test KESCL and KESCM use.
+//   So this file is not more careful than they are: it carries one extra test that costs nothing.
 //
 //========================================================================================
 
@@ -272,8 +278,18 @@ void KBSResultTree::SaveResultsAsText()
 	}
 
 	// The stream comes back OPEN - IPMStream.h:359-365 states that Open "gets called for you by the
-	// StreamUtils functions" - so it is asked for its state straight away, the way the SDK's own
-	// writer does (SnipRunScriptProvider.cpp:488), rather than after the bytes have gone in.
+	// StreamUtils functions" - so its state can be asked for straight away, rather than after the
+	// bytes have gone in. The nil half of the test is the DOCUMENTED one: StreamUtil.h:152 promises
+	// "the new stream, or nil if the file couldn't be opened". The state half is belt and braces on
+	// top of it and costs nothing.
+	//
+	// *This note used to justify the state check by saying it is "the way the SDK's own writer does
+	//  (SnipRunScriptProvider.cpp:488)". That reference was measured on 2026-08-18 (during KESCM's
+	//  bug recheck B10) and the justification does not hold: that snippet calls
+	//  CreateFileStreamWriteLazy - the LAZY variant, which does not open the file on creation, so it
+	//  cannot return nil for an unwritable path and the state check is the ONLY check available to
+	//  it. Two functions whose names start the same do not share a contract. KESCL and KESCM test
+	//  nil alone; that is the documented contract being followed, not a check they forgot.
 	InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(
 		chooser.GetIDFile(), kOpenOut | kOpenTrunc, 'TEXT', 'CWIE'));
 	if (stream == nil || stream->GetStreamState() != kStreamStateGood)
