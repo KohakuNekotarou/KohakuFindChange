@@ -342,6 +342,17 @@ static HWND sPaletteWnd = nullptr;
 //    ours, and switching the toggle on would have written 77 - and hidden the shadow - on somebody
 //    else's panel. The sentence above has described the fix rather than the code ever since it was
 //    written, on 2026-08-07, alongside the WidgetID lookup it explains.
+//   !***THE EXAMPLE IN BRACKETS IS NOT MEASURED, AND WAS NOT REPRODUCIBLE*** (2026-08-19, from
+//    KESCM's bug recheck B-U9, which was deciding whether to port this guard). On 21.0.2.2 a
+//    diagnostic build printed the cached HWND beside the one IPanelMgr answers with, and the two
+//    NEVER disagreed: closing and reopening the panel, switching workspace (Essentials J ->
+//    Advanced J -> Essentials J) and RESETTING the workspace all left the OWL.Palette handle
+//    untouched, and InDesign's own Pages panel kept its palette window - live, same class, same
+//    title - after the panel itself was closed. Palettes appear to be built once at start-up (the
+//    55-56 hidden pairs KESCM's file header has described since 2026-07-29) and not destroyed
+//    again within a session. So keep the guard - it costs nothing and the two tests above genuinely
+//    cannot tell a recycled handle from ours - but do not quote "a workspace change rebuilds them"
+//    as something that was seen.
 static HWND KBSQueryPaletteWindow()
 {
 	if (sPaletteWnd != nullptr && ::IsWindow(sPaletteWnd) && KBSClassIs(sPaletteWnd, L"OWL.Palette"))
