@@ -1,0 +1,139 @@
+Kohaku Find/Change — Source-Available License
+Kohaku Find/Change — ソース公開ライセンス
+
+Copyright (c) 2026 KohakuNekotarou. All rights reserved.
+
+
+================================================================================
+ENGLISH
+================================================================================
+
+0. Why this source is public
+
+   This repository exists to show what can be built with the Adobe InDesign C++
+   SDK. It is a worked example, not a distribution channel for the product. The
+   product itself is distributed through Adobe Exchange.
+
+1. Definitions
+
+   "This Software" means the source code in this repository, excluding the parts
+   covered by section 5.
+
+   "Official Binary" means a build published by the copyright holder through
+   Adobe Exchange.
+
+2. What you may do
+
+   a. Read, study and learn from This Software.
+
+   b. Reuse portions of This Software in your own plug-ins or other programs,
+      including commercial ones, with or without modification, and with no
+      obligation to credit the author. Sharing techniques and excerpts is
+      exactly what this repository is here for.
+
+   c. Build This Software and run it on machines you control, to see how it
+      behaves.
+
+3. What you may not do
+
+   a. Distribute a binary built from This Software, modified or not. The
+      Official Binaries on Adobe Exchange are the only builds intended for
+      other people's machines.
+
+   b. Distribute a derivative work that keeps this plug-in's identity. If you
+      distribute a derivative, you must change ALL of the following first:
+
+        - the display name ("Kohaku Find/Change")
+        - the plug-in file name ("KohakuFindChange.pln") and the internal
+          plug-in name ("KohakuBookSearch")
+        - the company name ("KohakuNekotarou")
+        - the ID prefix range 0x1EA600-0x1EA6FF. Adobe registered that range to
+          the copyright holder; no one else may build on it. Request your own
+          range from Adobe.
+
+   c. Report a problem with your own build to Adobe. A build you made is not an
+      Official Binary, but a crash report from it names this plug-in whether or
+      not this plug-in caused the crash. Report it on the Discussions board, or
+      to the author.
+
+4. No warranty
+
+   This Software is provided "as is", without warranty of any kind, express or
+   implied. The copyright holder is not liable for any claim, damage or other
+   liability arising from This Software or from its use.
+
+5. Adobe InDesign SDK material
+
+   This Software is written against the Adobe InDesign C++ SDK and cannot be
+   built without it. Files derived from Adobe's SDK templates still carry
+   Adobe's own copyright header. Those parts remain subject to the Adobe SDK
+   license agreement and are not licensed by this document. Building anything
+   here requires your own copy of the SDK, obtained from Adobe under Adobe's
+   terms.
+
+
+================================================================================
+日本語
+================================================================================
+
+0. なぜソースを公開しているか
+
+   この repository は、Adobe InDesign C++ SDK で何が作れるのかを知って
+   いただくために公開しています。実例として置いてあるものであって、製品の
+   配布経路ではありません。製品そのものは Adobe Exchange で配布しています。
+
+1. 用語
+
+   「本ソフトウェア」とは、この repository のソースコードのうち、第5項の
+   対象となる部分を除いたものをいいます。
+
+   「公式バイナリ」とは、著作権者が Adobe Exchange を通じて公開したビルドを
+   いいます。
+
+2. していただいてよいこと
+
+   a. 本ソフトウェアを読む、学ぶ、参考にする。
+
+   b. 本ソフトウェアの一部を、ご自分のプラグインやその他のプログラムに
+      取り込む。商用・非商用を問わず、改変の有無も問いません。作者名の表示も
+      不要です。手法やコード片を共有すること自体が、この repository を公開して
+      いる目的です。
+
+   c. 本ソフトウェアをビルドし、ご自分の管理下のマシンで動かして挙動を
+      確かめる。
+
+3. ご遠慮いただきたいこと
+
+   a. 本ソフトウェアからビルドしたバイナリを配布すること（改変の有無を
+      問いません）。他の方のマシンに入れることを想定しているのは、Adobe
+      Exchange の公式バイナリだけです。
+
+   b. このプラグインの同一性を保ったまま派生物を配布すること。派生物を配布
+      される場合は、配布の前に次のすべてを変更してください。
+
+        - 表示名（"Kohaku Find/Change"）
+        - プラグインのファイル名（"KohakuFindChange.pln"）と、内部プラグイン名
+          （"KohakuBookSearch"）
+        - 会社名（"KohakuNekotarou"）
+        - ID プレフィックス範囲 0x1EA600-0x1EA6FF。これは Adobe が著作権者に
+          対して登録した範囲であり、他の方が使うことはできません。ご自分の
+          範囲を Adobe へ申請してください。
+
+   c. ご自分でビルドされたものの不具合を Adobe へ報告すること。ご自分の
+      ビルドは公式バイナリではありませんが、クラッシュレポートには、原因が
+      このプラグインであるかどうかに関わらずこのプラグインの名前が載ります。
+      掲示板（Discussions）または作者までご連絡ください。
+
+4. 無保証
+
+   本ソフトウェアは現状有姿で提供され、明示・黙示を問わずいかなる保証も
+   ありません。著作権者は、本ソフトウェアまたはその使用に起因するいかなる
+   請求・損害・その他の責任も負いません。
+
+5. Adobe InDesign SDK に由来する部分
+
+   本ソフトウェアは Adobe InDesign C++ SDK を前提に書かれており、SDK なしには
+   ビルドできません。Adobe の SDK テンプレートに由来するファイルには、Adobe
+   自身の著作権表示が残っています。それらの部分は Adobe の SDK ライセンス契約に
+   従うものであり、この文書がライセンスするものではありません。ビルドには、
+   Adobe から Adobe の条件のもとで入手されたご自分の SDK が必要です。
