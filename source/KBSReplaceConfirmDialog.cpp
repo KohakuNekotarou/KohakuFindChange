@@ -249,50 +249,14 @@ const KBSReplaceConfirmDialog::Side* KBSReplaceConfirmDialog::GetSideForWidget(c
 	return nil;
 }
 
-/* BuildCountLine
-*/
-PMString KBSReplaceConfirmDialog::BuildCountLine(int32 checkedCount)
-{
-	// The key is translated BEFORE the count goes in - a key only translates while it is the WHOLE
-	// string - and the count itself is data, so it is marked untranslatable first: a number that
-	// happened to match a table entry would otherwise come back as somebody else's translation.
-	PMString countStr;
-	countStr.AppendNumber(checkedCount);
-	countStr.SetTranslatable(kFalse);
-
-	PMString line(checkedCount == 1
-		? KBSLoc::Text(kKBSConfirmReplaceOneKey, KBSJa::kConfirmReplaceOne)
-		: KBSLoc::Text(kKBSConfirmReplaceManyKey, KBSJa::kConfirmReplaceMany));
-	::ReplaceStringParameters(&line, countStr);
-	line.SetTranslatable(kFalse);
-	return line;
-}
+// (BuildCountLine, BuildUnsavedLine and BuildCareLine stood here until 2026-09-26 - the prompt's
+//  opening question and its two closing lines. See the note where they were declared.)
 
 // ***** A BuildEditedSinceLine STOOD HERE ON 2026-08-08 AND HAS MOVED TO THE REPLACE ENGINE. *****
 // It asked KBSEditStamp whether any ticked chapter had been edited since the search and returned a
 // line for this prompt. From here it could only reach the chapters that were OPEN - see the header
 // for the case that made that fatal, and for where the question is asked now. It took this file's
 // only readers of IDocumentList, IDocument and KBSEditStamp with it.
-
-/* BuildUnsavedLine
-*/
-PMString KBSReplaceConfirmDialog::BuildUnsavedLine()
-{
-	// No count and no parameter: the sentence states what a book-wide replace leaves behind rather
-	// than numbering the chapters, so one string serves every run (2026-08-07, user's wording).
-	PMString line(KBSLoc::Text(kKBSConfirmUnsavedKey, KBSJa::kConfirmUnsaved));
-	line.SetTranslatable(kFalse);
-	return line;
-}
-
-/* BuildCareLine
-*/
-PMString KBSReplaceConfirmDialog::BuildCareLine()
-{
-	PMString line(KBSLoc::Text(kKBSConfirmCareKey, KBSJa::kConfirmCare));
-	line.SetTranslatable(kFalse);
-	return line;
-}
 
 /* SetAccepted
 */
@@ -471,9 +435,12 @@ void KBSReplaceConfirmDialogController::InitializeDialogFields(IActiveContext* /
 
 	this->ShowOrHide(kKBSReplaceConfirmMessageWidgetID, textLayout);
 	this->ShowOrHide(kKBSReplaceConfirmGlyphBlockWidgetID, !textLayout);
-	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, !textLayout);
-	this->ShowOrHide(kKBSReplaceConfirmUnsavedWidgetID, !textLayout);
-	this->ShowOrHide(kKBSReplaceConfirmCareWidgetID, !textLayout);
+	// The opening question and the two closing lines are off BOTH layouts since 2026-09-26 (user's
+	// call: the prompt says what is about to be written and nothing else). The widgets stay in the
+	// resource, hidden and disabled, so a sentence can come back without touching the layout.
+	this->ShowOrHide(kKBSReplaceConfirmCountWidgetID, false);
+	this->ShowOrHide(kKBSReplaceConfirmUnsavedWidgetID, false);
+	this->ShowOrHide(kKBSReplaceConfirmCareWidgetID, false);
 	// (kKBSReplaceConfirmEditedWidgetID was shown here too until 2026-08-08. The widget came off
 	// KBS.fr with the line it carried; the id stays reserved in KBSID.h, the way the "Don't show
 	// again" box's did - and unlike that one, nothing writes to it any more either.)
@@ -509,24 +476,8 @@ void KBSReplaceConfirmDialogController::FillGlyphLayout()
 	this->SetTextControlData(kKBSGlyphConfirmChangeLabelWidgetID,
 		KBSLoc::Text(kKBSGlyphConfirmChangeLabelKey, KBSJa::kGlyphChangeLabel));
 
-	// ***** THE FOUR SENTENCES THE OTHER LAYOUT SAYS TOO, FROM THE ONE PLACE THAT SPELLS THEM. *****
-	// All this layout decides is which widget each one lands on; the keys, the singular/plural and
-	// the parameter go through Build*Line (see the header). Until 2026-08-07 they were written out
-	// here as well as in KBSActionComponent::ConfirmReplace - the same four sentences, twice.
-	this->SetTextControlData(kKBSReplaceConfirmCountWidgetID,
-		KBSReplaceConfirmDialog::BuildCountLine(KBSReplaceConfirmDialog::GetCheckedCount()));
-
-	// (A line saying whether the text had been edited since the search sat here for one afternoon on
-	// 2026-08-08, between the glyphs and the closing lines. It went with BuildEditedSinceLine - see
-	// the note where that function stood, above.)
-
-	// The closing sentence.
-	this->SetTextControlData(kKBSReplaceConfirmUnsavedWidgetID,
-		KBSReplaceConfirmDialog::BuildUnsavedLine());
-
-	// ...and the warning under it, WHATEVER the count (user, 2026-08-05).
-	this->SetTextControlData(kKBSReplaceConfirmCareWidgetID,
-		KBSReplaceConfirmDialog::BuildCareLine());
+	// (The opening question and the two closing lines were stamped here until 2026-09-26, through
+	//  Build*Line. They are off both layouts now - see InitializeDialogFields.)
 
 	// The four lines under the two frames. All optional: an empty Change To box has no font to name
 	// and no Unicode to give, and GetUnicodeForGlyphID "May return 0" for a glyph of any kind

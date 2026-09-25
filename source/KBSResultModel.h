@@ -611,7 +611,7 @@ namespace KBSResultModel
 	// (GetCheckedChapterCount - how many CHAPTERS hold at least one checked, unreplaced hit - stood
 	//  here. Its one caller was the confirmation prompt's closing line, which named the number;
 	//  that line has stated the case instead of counting it since 2026-08-07
-	//  (KBSReplaceConfirmDialog::BuildUnsavedLine), and nothing has read the count since. It was
+	//  (KBSReplaceConfirmDialog::BuildUnsavedLine - itself gone since 2026-09-26), and nothing has read the count since. It was
 	//  kept for three days as "a real question about the model, cheap to answer" and removed on
 	//  2026-08-10 for the reason DropChapter was removed above it: a function nobody runs is a
 	//  guess about what a future caller will want, and this file had already decided that once.

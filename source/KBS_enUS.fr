@@ -76,7 +76,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSConfirmReplaceOneKey,		"Change 1 checked hit?",
                 kKBSConfirmReplaceManyKey,		"Change ^1 checked hits?",
                 kKBSConfirmFindKey,				"Find: ^1",
-                kKBSConfirmChangeToKey,			"Change to: ^1",
+                kKBSConfirmChangeToKey,			"Change: ^1",
                 kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
                 // The Find/Change dialog's own names for its two format panes. Shown when a format
                 // is set: "cat  + Find Format", or alone when the box beside it is empty (a search

@@ -533,11 +533,11 @@ static void SpaceIfEmpty(PMString& str)
 
 // Append the dialog's name for the format pane to one side of the prompt, as the user asked it to
 // read: "cat  + Find Format" when both are set, "Find Format" on its own when the box is empty.
-// Translated - this prompt is the one place KBS translates (see the note in ConfirmReplace).
-static void AppendFormatNote(PMString& str, const char* formatKey, const char16_t* formatJa,
-	const PMString& detail)
+// In English on every UI since 2026-09-26 - the prompt was the one place KBS translated until the
+// user asked for it in English (see the note at the head of the prompt in ConfirmReplace).
+static void AppendFormatNote(PMString& str, const char* formatKey, const PMString& detail)
 {
-	PMString note(KBSLoc::Text(formatKey, formatJa));
+	PMString note(KBSLoc::English(formatKey));	// English on every UI since 2026-09-26 - see ConfirmReplace
 	if (str.IsEmpty())
 		str = note;
 	else
@@ -610,28 +610,23 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// could not be resolved (a ROS-group query carries none), and a confirmation that cannot be
 	// DRAWN is never a reason the replace cannot RUN.
 
-	// The prompt speaks the user's language: each piece comes through KBSLoc::Text, which answers
-	// Japanese on a Japanese UI and the enUS string-table entry otherwise (the jaJP table itself
-	// is gone - 2026-08-05). This is the one place where the user authorises a rewrite of their
-	// text, so it is the one place worth translating; the panel, its menu and its status line
-	// stay English on purpose, echoing the official Find/Change wording.
+	// ***** TWO LINES, IN ENGLISH ON EVERY UI (user's call, 2026-09-26). *****
+	//     Find: <the find string>  + Find Format (<what is set>)     (GREP)
+	//     Change: <the change string>  + Change Format (<what is set>)
+	// The prompt says what is about to be written and nothing else. It used to open with "Change N
+	// checked hits?" and close with two lines about a book-wide replace leaving its documents open
+	// and unsaved, and it spoke Japanese on a Japanese UI (KBSLoc::Text); all of that went on the
+	// user's word. Kept, as the user agreed: the format on the same line when one is set (a format-only
+	// replace would otherwise read "Find:" with nothing after it), and the sentence that says an empty
+	// Change box deletes the matches (the one blank that is easier to press OK on than to notice).
 	//
-	// Each piece is translated BEFORE it is appended: a key only translates while it is the WHOLE
-	// string, and what the alert receives is a concatenation. Everything pushed into a ^1 is real
-	// data (a count, the user's own find / change string) and is marked untranslatable first - a
-	// search for a word that happens to match a built-in phrase would otherwise come back as
-	// somebody else's translation.
+	// Each piece is looked up BEFORE it is appended: a key only translates while it is the WHOLE
+	// string, and what the prompt receives is a concatenation. Everything pushed into a ^1 is real
+	// data (the user's own find / change string) and is marked untranslatable first - a search for a
+	// word that happens to match a built-in phrase would otherwise come back as somebody else's
+	// translation.
 	PMString msg;
 	msg.SetTranslatable(kFalse);
-
-	// ***** THE OPENING SENTENCE COMES FROM THE PROMPT, NOT FROM HERE. ***** It and the three below
-	// are the sentences the GLYPH layout says as well, and both layouts used to spell them out
-	// separately - same keys, same singular/plural test, same ::ReplaceStringParameters, written
-	// twice (until 2026-08-07). What differs between the layouts is where a sentence goes; what it
-	// says is KBSReplaceConfirmDialog::Build*Line.
-	msg.Append(KBSReplaceConfirmDialog::BuildCountLine(checkedCount));
-	msg.Append(kLineSeparatorString);
-	msg.Append(kLineSeparatorString);
 
 	// Not seeded from GetFindString on the Transliterate tab. IFindChangeOptions.h:690-691 calls
 	// that tab's find string "irrelevant" - irrelevant, not guaranteed empty - so anything left in
@@ -658,9 +653,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// glyph id names nothing without them - so the list is never empty there and the note would be
 	// on every glyph prompt, saying nothing. That tab states its query by DRAWING the glyphs.
 	if (!glyphMode && KBSSearchEngine::HasFindFormatSet())
-		AppendFormatNote(findStr, kKBSConfirmFindFormatKey, KBSJa::kConfirmFindFormat,
+		AppendFormatNote(findStr, kKBSConfirmFindFormatKey,
 			KBSSearchEngine::DescribeFormatSetting(true /*findSide*/, true /*limited*/));
-	PMString findLine(KBSLoc::Text(kKBSConfirmFindKey, KBSJa::kConfirmFind));
+	PMString findLine(KBSLoc::English(kKBSConfirmFindKey));
 	SpaceIfEmpty(findStr);
 	::ReplaceStringParameters(&findLine, findStr);
 	msg.Append(findLine);
@@ -705,7 +700,7 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	{
 		// An empty change string is a legitimate request - it deletes every match - so it is
 		// spelled out instead of leaving a blank line for the user to interpret.
-		PMString empty(KBSLoc::Text(kKBSConfirmEmptyReplaceKey, KBSJa::kConfirmEmptyReplace));
+		PMString empty(KBSLoc::English(kKBSConfirmEmptyReplaceKey));
 		replaceStr = empty;
 		replaceStr.SetTranslatable(kFalse);
 	}
@@ -714,14 +709,12 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&replaceStr);
 	// "dog  + Change Format", or "Change Format" on its own when the box is empty.
 	if (changeHasFormat)
-		AppendFormatNote(replaceStr, kKBSConfirmChangeFormatKey, KBSJa::kConfirmChangeFormat,
+		AppendFormatNote(replaceStr, kKBSConfirmChangeFormatKey,
 			KBSSearchEngine::DescribeFormatSetting(false /*findSide*/, true /*limited*/));
-	PMString changeLine(KBSLoc::Text(kKBSConfirmChangeToKey, KBSJa::kConfirmChangeTo));
+	PMString changeLine(KBSLoc::English(kKBSConfirmChangeToKey));
 	SpaceIfEmpty(replaceStr);
 	::ReplaceStringParameters(&changeLine, replaceStr);
 	msg.Append(changeLine);
-	msg.Append(kLineSeparatorString);
-	msg.Append(kLineSeparatorString);
 
 	// ***** NOTHING HERE ABOUT THE DOCUMENT HAVING MOVED SINCE THE SEARCH - the run makes sure of
 	// ***** that itself. ***** A disclaimer sat between the query and the closing lines until
@@ -735,17 +728,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	// (KBSReplaceEngine). There is nothing left to warn about: the prompt asks about the
 	// replacement itself, and the run guarantees the rest (user's decision, 2026-08-10).
 
-	// What the run leaves behind. It used to name HOW MANY chapters, which is why a count was read
-	// here and carried into the prompt; the sentence states the case instead since 2026-08-07 (the
-	// user's wording), so nothing on this path needs the number any more.
-	msg.Append(KBSReplaceConfirmDialog::BuildUnsavedLine());
-
-	// ...and the warning that follows it, on its own line and WHATEVER the count (user, 2026-08-05).
-	// On a one-chapter run it reads as notice of what a bigger one will do, which is the point: the
-	// plug-in no longer offers to save, so a book-wide replace leaves every chapter it touched
-	// standing open, and that is better said before the run than discovered after it.
-	msg.Append(kLineSeparatorString);
-	msg.Append(KBSReplaceConfirmDialog::BuildCareLine());
+	// (Two closing lines followed here until 2026-09-26: a book-wide replace leaves every chapter it
+	//  touched open and unsaved, and "Please take care." They went with the opening question on the
+	//  user's word - see the head of this prompt.)
 
 	// ONE prompt for every tab (2026-08-02). It used to be CAlert::ModalAlert here and the glyph
 	// dialog above; both are the same dialog now. The box that forced the move - "save after

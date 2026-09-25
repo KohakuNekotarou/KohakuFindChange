@@ -100,33 +100,23 @@ public:
 		tick can remove it for good.
 
 		(A chapter COUNT was passed here as well until 2026-08-07, for a closing sentence that named
-		it. That sentence now states the case instead of counting - see BuildUnsavedLine - so the
-		number had no reader left.)
+		it. That sentence stated the case instead of counting from then on, and went altogether on
+		2026-09-26 - see the note where the Build*Line functions stood.)
 
-		@param checkedCount how many hits will be rewritten (the opening sentence, glyph layout).
+		@param checkedCount how many hits will be rewritten. Kept for GetCheckedCount; no sentence
+		                    on the prompt says it since 2026-09-26.
 		@param message      the whole prompt, for the Text / GREP layout. Empty = glyph layout.
 		@return true when the user approved the rewrite.
 	*/
 	static bool Ask(int32 checkedCount, const PMString& message);
 
-	/** ***** THE FOUR SENTENCES BOTH LAYOUTS SAY, SPELLED IN ONE PLACE. *****
-
-		The prompt has two layouts and they differ only in where a sentence GOES: the Text / GREP
-		one assembles a single wrapped block (KBSActionComponent::ConfirmReplace), the Glyph one
-		puts a widget on each line (FillGlyphLayout, in this file's .cpp). Until 2026-08-07 each of
-		them also chose its own string-table key, made its own singular/plural decision and ran its
-		own ::ReplaceStringParameters - four sentences written twice. Nothing had drifted, but the
-		wording of one prompt was two edits away from disagreeing with the other, about a rewrite
-		the user is being asked to authorise. What a sentence SAYS belongs here; where it goes
-		belongs to the caller.
-
-		Each comes back FINISHED - translated for the UI language and with its number already in -
-		and marked untranslatable, so nothing downstream can take it for a key.
-
-		@param checkedCount how many hits will be rewritten (decides singular / plural).
-		@return the opening sentence.
-	*/
-	static PMString BuildCountLine(int32 checkedCount);
+	// ***** BuildCountLine, BuildUnsavedLine AND BuildCareLine STOOD HERE UNTIL 2026-09-26. *****
+	// The opening question ("Change N checked hits?") and the two closing lines (a book-wide replace
+	// leaves its documents open and unsaved / "Please take care.") that both layouts said. The user
+	// cut the prompt down to what is about to be written - "Find:" and "Change:", in English on every
+	// UI - so the three sentences went from both layouts at once, and with them the only reason for
+	// this file to spell them. The widgets that carried them in the glyph layout stay in KBS.fr,
+	// hidden, so a sentence can come back as a resource change.
 
 	// ***** A BuildEditedSinceLine STOOD HERE FOR ONE AFTERNOON ON 2026-08-08, AND THE QUESTION IT
 	// ***** ASKED COULD NOT BE ASKED FROM HERE.
@@ -150,17 +140,6 @@ public:
 	// This note described it in the present tense until 2026-08-10, and KBS.fr carried the same
 	// sentence: the engine corrected its own history that day, and nothing walked the correction over
 	// to the two files that point AT the engine.
-
-	/** What the run leaves behind - documents open and unsaved. @see BuildCountLine
-
-		Took a chapter count until 2026-08-07 and chose between a singular and a plural string with
-		it. The wording states the case now ("when a replace covers several documents in a book..."),
-		so there is no number in it, one string does for every run, and nothing here inflects.
-	*/
-	static PMString BuildUnsavedLine();
-
-	/** The warning under it, shown whatever the count. @see BuildCountLine */
-	static PMString BuildCareLine();
 
 	/** The controller's way back: OK sets it, Ask() reads it. */
 	static void SetAccepted(bool accepted);

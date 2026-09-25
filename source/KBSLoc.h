@@ -70,20 +70,28 @@ namespace KBSLoc
 		s.SetTranslatable(kFalse);
 		return s;
 	}
+
+	/** The enUS string-table entry, whatever the UI language - for the strings that are English on
+		purpose. The replace confirmation became one of them on 2026-09-26 (user's call: "Find:" and
+		"Change:", in English). Same finishing as Text(): translated from its key, then marked
+		untranslatable so nothing downstream takes the finished text for a key. */
+	inline PMString English(const char* englishKey)
+	{
+		PMString s(englishKey, PMString::kTranslateDuringCall);
+		s.SetTranslatable(kFalse);
+		return s;
+	}
 }
 
 // The Japanese the jaJP table used to carry, one constant per retired table entry. The keys
 // these pair with live on in KBSID.h and the enUS table - they ARE the English path.
 namespace KBSJa
 {
-	// ----- Change Checked confirmation (CAlert layout and glyph-dialog layout both) -----
-	const char16_t kConfirmReplaceOne[]      = u"チェックした 1 件を置換しますか？";
-	const char16_t kConfirmReplaceMany[]     = u"チェックした ^1 件を置換しますか？";
-	const char16_t kConfirmFind[]            = u"検索文字列: ^1";
-	const char16_t kConfirmChangeTo[]        = u"置換文字列: ^1";
-	const char16_t kConfirmEmptyReplace[]    = u"（空欄：一致した箇所は削除されます）";
-	const char16_t kConfirmFindFormat[]      = u"検索形式";
-	const char16_t kConfirmChangeFormat[]    = u"置換形式";
+	// ----- Change Checked confirmation: NO JAPANESE ANY MORE (2026-09-26, user's call). -----
+	// The prompt is two English lines on every UI - "Find:" and "Change:" - through KBSLoc::English,
+	// and its opening question and closing lines are gone. The Japanese that stood here (the count
+	// question, 検索文字列 / 置換文字列, the empty-box note, 検索形式 / 置換形式, and the unsaved-book
+	// and ご注意下さい lines below) went with it.
 	// ***** NOT PART OF THIS PROMPT - the replace's own alert, shown INSTEAD of running. *****
 	// The run stopped before writing anything: the verify walk found a ticked match that no longer
 	// begins where the search left it (KBSReplaceEngine::TellResultsWentStale). An opening that
@@ -95,12 +103,6 @@ namespace KBSJa
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert
 	//  to state the outcome and the status line to carry what to do next.)
-	// ONE string since 2026-08-07 (user's wording). It states the case rather than counting the
-	// chapters, so the singular/plural pair it replaced is gone and no ^1 is left in it.
-	const char16_t kConfirmUnsaved[]         = u"ブックで複数のドキュメントを置換する場合、置換されたドキュメントは未保存のまま開かれた状態になります。";
-	// Just the warning since 2026-08-07 (user's wording): the line above states the condition it
-	// used to name, so repeating it here only made the closing line the longest one on the prompt.
-	const char16_t kConfirmCare[]            = u"ご注意下さい。";
 
 	// ----- Glyph confirmation dialog chrome -----
 	const char16_t kGlyphFindLabel[]   = u"検索";
