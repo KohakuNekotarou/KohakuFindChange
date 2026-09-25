@@ -6,8 +6,9 @@
 //
 //  Jump-to-hit navigation (Task 3). A hit-row click asks JumpToHit(chapter, hit) to: resolve the
 //  hit's stored location (reopening the chapter windowless if the user closed it), bring that
-//  chapter's window to the front, scroll the view so the match is centred, and raise the red
-//  marker (KBSDrawEventHandler) which fades itself out. It does NOT select the text - it points at
+//  chapter's window to the front, scroll the view so the match is centred, and raise the marker
+//  on the match's characters (KBSHitMarker - a global text adornment since 2026-09-26) which takes
+//  itself down after about a second. It does NOT select the text - it points at
 //  the match, VS-style. ***** A DOUBLE click does (2026-08-09): SelectHitText switches to the Type
 //  tool and highlights the match, for when pointing is not what was wanted. The two are deliberately
 //  different - a single click can be spent freely because it changes nothing in the document, and

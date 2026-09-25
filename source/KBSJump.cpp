@@ -68,7 +68,7 @@
 
 // Project includes:
 #include "KBSJump.h"
-#include "KBSDrawEventHandler.h"
+#include "KBSHitMarker.h"
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
@@ -663,7 +663,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// within the second either way; what is being made consistent is what the panel is SAYING.
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
-		KBSDrawEventHandler::ClearMarker();
+		KBSHitMarker::ClearMarker();
 		return;
 	}
 
@@ -671,14 +671,14 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 	{
-		KBSDrawEventHandler::ClearMarker();	// it has already said why through the status line
+		KBSHitMarker::ClearMarker();	// it has already said why through the status line
 		return;
 	}
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
 	{
-		KBSDrawEventHandler::ClearMarker();
+		KBSHitMarker::ClearMarker();
 		return;
 	}
 	const UIDRef storyRef(db, storyUID);
@@ -732,7 +732,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	{
 		// Same rule as the failed reopen above: the view did not move, so the panel says why rather
 		// than leaving a click that appears to do nothing.
-		KBSDrawEventHandler::ClearMarker();
+		KBSHitMarker::ClearMarker();
 		PMString message("Cannot bring that chapter's window to the front.");
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
@@ -751,12 +751,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// document has been fronted and before any geometry is read.
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
 
-	// ***** ONE SPREAD, RESOLVED ONCE, USED BY BOTH THINGS THAT NEED IT. ***** The view has to be put
-	// on it before anything is scrolled, and the marker has to be told which spread it belongs to -
-	// the draw handler used to work that out for itself by testing whether the marker's centre fell
-	// inside the spread's bounding box, and those boxes can overlap once page items on the pasteboard
-	// are counted in (see KBSDrawEventHandler::HandleDrawEvent). kInvalidUID when the match has no
-	// frame at all, which both sides handle.
+	// ***** ONE SPREAD, RESOLVED ONCE. ***** The view has to be put on it before anything is scrolled.
+	// (Until 2026-09-26 the marker was told which spread it belonged to as well: it was a rectangle the
+	// Draw Event handler painted per spread, and "which spread owns this rectangle" could not be
+	// answered from the rectangle. The marker is drawn on the characters now - KBSHitMarker - and the
+	// text engine only draws them where they are.) kInvalidUID when the match has no frame at all.
 	const UID matchSpread = SpreadForMatch(storyRef, start);
 
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
@@ -764,17 +763,21 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
 	EnsureSpreadInView(frontView, storyRef, matchSpread);
 
-	// A visible match scrolls to its wax rectangle AND gets a red marker rectangle. An overset match
-	// has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator, which
-	// also climbs out of a pushed-out table to the main frame's "+") but is NOT marked - the pixels
-	// there belong to the "+" indicator, not the text, so a rectangle would only clutter it. If no
-	// geometry can be produced, just clear.
+	// A visible match scrolls to its first wax line AND gets the marker on its characters. An overset
+	// match has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator,
+	// which also climbs out of a pushed-out table to the main frame's "+") but is NOT marked - there
+	// are no drawn characters to put it on. If no geometry can be produced, just clear.
+	//
+	// ***** THE RECTANGLE BELOW IS FOR SCROLLING ONLY since 2026-09-26. ***** It was the marker as
+	// well - the first line of the match, in pasteboard coordinates - which is why a match running
+	// over several lines was only ever marked on its first. The marker is a global text adornment
+	// now (KBSHitMarker), handed the story and the whole range, and drawn on every line of it.
 	if (overset)
 	{
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
-		KBSDrawEventHandler::ClearMarker();
+		KBSHitMarker::ClearMarker();
 	}
 	else
 	{
@@ -795,11 +798,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// came up about half a second after the view had moved, which is what was asked to go. A
 			// double click now shows the marker for that moment and SelectHitText's ClearMarker takes
 			// it down when the selection is made - exactly what KCM does ("THE MARK COMES DOWN").
-			KBSDrawEventHandler::SetMarker(db, matchSpread, pbRect);
+			KBSHitMarker::SetMarker(db, storyUID, start, end);
 		}
 		else
 		{
-			KBSDrawEventHandler::ClearMarker();
+			KBSHitMarker::ClearMarker();
 		}
 	}
 
@@ -1100,15 +1103,14 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// ***** TAKE THE JUMP'S MARKER BACK DOWN. ***** (user's call, 2026-08-09)
 	//
 	// The first click of this double click raised the marker, which INVERTS the pixels under the
-	// match (KBSDrawEventHandler.h:7) - a pointer saying "it is here". The selection now says the
-	// same thing, better: it names the exact range rather than a rectangle, and it is what the user
-	// is about to type over. Leaving both up puts an inversion on top of a highlight, so the text
+	// match (KBSHitMarker.h) - a pointer saying "it is here". The selection now says the same thing,
+	// and it is what the user is about to type over. Leaving both up puts an inversion on top of a highlight, so the text
 	// the user came here to read is the one thing on screen that cannot be read.
 	//
 	// Only on SUCCESS. Every refusal above returns before this, and there the marker is the only
 	// feedback the click produced - taking it down as well would leave a double click that appears
 	// to do nothing.
-	KBSDrawEventHandler::ClearMarker();
+	KBSHitMarker::ClearMarker();
 	return true;
 }
 

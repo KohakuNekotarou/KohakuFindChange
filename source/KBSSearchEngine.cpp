@@ -3127,7 +3127,7 @@ void KBSSearchEngine::ShutdownCleanup()
 	// destructor should be doing against an application that has already torn itself down.
 	//
 	// The same rule, and the same reason, as the three cleanups beside this one in
-	// KBSStartupShutdown::Shutdown: KBSDrawEventHandler's marker holds a static PMString and a raw
+	// KBSStartupShutdown::Shutdown: KBSHitMarker's marker holds a static PMString and a raw
 	// IDataBase*, KBSBookScope holds its chapters, KBSResultModel holds the rows. This file joined
 	// them on 2026-08-08 - the list arrived on 2026-08-07 and nothing was added here for it, so it
 	// was the one piece of module state with no controlled point to be let go at.

@@ -18,7 +18,7 @@
 
 #include "KBSID.h"
 #include "KBSMarkerExpiryIdleTask.h"
-#include "KBSDrawEventHandler.h"
+#include "KBSHitMarker.h"
 
 // How long the marker stays up. Short on purpose: it points at the hit, and the view has already
 // been scrolled so the hit is on screen anyway.
@@ -68,7 +68,7 @@ uint32 KBSMarkerExpiryTask::RunTask(uint32 /*flags*/, IdleTimer* /*idleTimer*/)
 	this->UninstallTask();
 
 	if (!sShutdown)
-		KBSDrawEventHandler::ClearMarker();
+		KBSHitMarker::ClearMarker();
 
 	return 0;	// one-shot: nothing more to do
 }

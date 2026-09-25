@@ -504,7 +504,7 @@ namespace KBSSearchEngine
 	    attributes, which is database work, and doing it from a static destructor means doing it
 	    after the application has torn down.
 
-	    Called from KBSStartupShutdown::Shutdown, beside the same call on KBSDrawEventHandler,
+	    Called from KBSStartupShutdown::Shutdown, beside the same call on KBSHitMarker,
 	    KBSBookScope and KBSResultModel. */
 	void ShutdownCleanup();
 }

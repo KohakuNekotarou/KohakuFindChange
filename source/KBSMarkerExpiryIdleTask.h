@@ -5,7 +5,7 @@
 //  KohakuBookSearch (KBS)
 //
 //  One-shot timer that takes the jump marker back off the screen shortly after it appears.
-//  Driven by KBSDrawEventHandler: SetMarker arms it, ClearMarker disarms it. This is the plugin's
+//  Driven by KBSHitMarker (KBSDrawEventHandler until 2026-09-26): SetMarker arms it, ClearMarker disarms it. This is the plugin's
 //  only CIdleTask - the single justified exception to "avoid idle tasks" (a marker has to expire on
 //  wall-clock time, which nothing else in this plug-in needs).
 //
@@ -31,7 +31,7 @@
 #ifndef __KBSMarkerExpiryIdleTask_h__
 #define __KBSMarkerExpiryIdleTask_h__
 
-/** Jump-marker expiry timer. Only KBSDrawEventHandler should drive this - going through
+/** Jump-marker expiry timer. Only KBSHitMarker should drive this - going through
     SetMarker / ClearMarker keeps the marker state and the timer in step. */
 namespace KBSMarkerExpiryIdleTask
 {

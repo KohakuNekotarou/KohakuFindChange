@@ -26,9 +26,9 @@ REGISTER_PMINTERFACE(KBSResultListAdapter, kKBSResultListAdapterImpl)
 REGISTER_PMINTERFACE(KBSResultListWidgetMgr, kKBSResultListWidgetMgrImpl)
 REGISTER_PMINTERFACE(KBSColorTextView, kKBSColorTextViewImpl)
 REGISTER_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
-// Task 3: jump + red marker + startup/shutdown.
-REGISTER_PMINTERFACE(KBSDrawEventSrvc, kKBSDrawEventSrvcImpl)
-REGISTER_PMINTERFACE(KBSDrawEventHandler, kKBSDrawEventHandlerImpl)
+// Task 3: jump + marker + startup/shutdown. (KBSDrawEventSrvc / KBSDrawEventHandler stood here until
+// 2026-09-26; the marker is the global text adornment below - KBSHitMarker.cpp.)
+REGISTER_PMINTERFACE(KBSHitMarkerAdornment, kKBSHitMarkerAdornmentImpl)
 REGISTER_PMINTERFACE(KBSMarkerExpiryTask, kKBSMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 // The result LIST's own handler: up / down arrows that open the row they land on. A boss in the

@@ -83,9 +83,11 @@ DECLARE_PMID(kClassIDSpace, kKBSPanelWidgetBoss, kKBSPrefix + 1)
 DECLARE_PMID(kClassIDSpace, kKBSResultListWidgetBoss, kKBSPrefix + 2)
 DECLARE_PMID(kClassIDSpace, kKBSResultNodeWidgetBoss, kKBSPrefix + 3)
 DECLARE_PMID(kClassIDSpace, kKBSColorTextWidgetBoss, kKBSPrefix + 4)
-// Task 3 (jump + red marker): the draw-event service/handler boss, the marker-expiry idle task
-// boss, and the startup/shutdown service boss (retires the idle task + clears module state).
-DECLARE_PMID(kClassIDSpace, kKBSDrawEventServiceBoss, kKBSPrefix + 5)
+// Task 3 (jump + red marker): the marker-expiry idle task boss, and the startup/shutdown service
+// boss (retires the idle task + clears module state).
+// +5 was kKBSDrawEventServiceBoss, the Draw Event marker, retired 2026-09-26 when the marker became
+// a global text adornment (kKBSHitMarkerBoss, +17). NOT reused - a class id that once shipped stays spent.
+//DECLARE_PMID(kClassIDSpace, kKBSDrawEventServiceBoss, kKBSPrefix + 5)
 DECLARE_PMID(kClassIDSpace, kKBSMarkerExpiryIdleTaskBoss, kKBSPrefix + 6)
 DECLARE_PMID(kClassIDSpace, kKBSStartupShutdownBoss, kKBSPrefix + 7)
 // Replace feature: the hit row's check box. A stock check box (kCheckBoxWidgetBoss, drawn by the
@@ -122,7 +124,9 @@ DECLARE_PMID(kClassIDSpace, kKBSBookPanelServiceBoss, kKBSPrefix + 15)
 // manager's subject (measured 2026-09-25 - neither kAboutToClosePaletteMsg nor a visibility message
 // arrives), so the only moment the panel can still be measured is just BEFORE kCloseBookCmdBoss runs.
 DECLARE_PMID(kClassIDSpace, kKBSBookPanelCmdWatchBoss, kKBSPrefix + 16)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 17)
+// The jump marker (2026-09-26): a global text adornment service - IID_IK2SERVICEPROVIDER =
+// kGlobalTextAdornmentServiceImpl + our IGlobalTextAdornment (KBSHitMarker.cpp). Replaces +5.
+DECLARE_PMID(kClassIDSpace, kKBSHitMarkerBoss, kKBSPrefix + 17)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 18)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 19)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 20)
@@ -184,10 +188,12 @@ DECLARE_PMID(kImplementationIDSpace, kKBSResultListAdapterImpl, kKBSPrefix + 1)
 DECLARE_PMID(kImplementationIDSpace, kKBSResultListWidgetMgrImpl, kKBSPrefix + 2)
 DECLARE_PMID(kImplementationIDSpace, kKBSColorTextViewImpl, kKBSPrefix + 3)
 DECLARE_PMID(kImplementationIDSpace, kKBSRowDataImpl, kKBSPrefix + 4)
-// Task 3: draw-event service provider + draw handler (marker), marker-expiry idle task, the hit
-// row's event handler (click -> jump), and the startup/shutdown service.
-DECLARE_PMID(kImplementationIDSpace, kKBSDrawEventSrvcImpl, kKBSPrefix + 5)
-DECLARE_PMID(kImplementationIDSpace, kKBSDrawEventHandlerImpl, kKBSPrefix + 6)
+// Task 3: marker-expiry idle task, the hit row's event handler (click -> jump), and the
+// startup/shutdown service.
+// +5 kKBSDrawEventSrvcImpl and +6 kKBSDrawEventHandlerImpl were the Draw Event marker, retired
+// 2026-09-26 (see kKBSHitMarkerAdornmentImpl, +33). NOT reused.
+//DECLARE_PMID(kImplementationIDSpace, kKBSDrawEventSrvcImpl, kKBSPrefix + 5)
+//DECLARE_PMID(kImplementationIDSpace, kKBSDrawEventHandlerImpl, kKBSPrefix + 6)
 DECLARE_PMID(kImplementationIDSpace, kKBSMarkerExpiryIdleTaskImpl, kKBSPrefix + 7)
 DECLARE_PMID(kImplementationIDSpace, kKBSResultNodeEHImpl, kKBSPrefix + 8)
 DECLARE_PMID(kImplementationIDSpace, kKBSStartupShutdownImpl, kKBSPrefix + 9)
@@ -245,6 +251,7 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelObserverImpl, kKBSPrefix + 29)
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefix + 30)
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 31)
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelCmdWatchImpl, kKBSPrefix + 32)
+DECLARE_PMID(kImplementationIDSpace, kKBSHitMarkerAdornmentImpl, kKBSPrefix + 33)	// IGlobalTextAdornment: the jump marker (KBSHitMarker.cpp)
 
 
 // ActionIDs:

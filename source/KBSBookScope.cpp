@@ -418,7 +418,7 @@ bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 		return false;
 
 	// The session's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
-	// plug-in asks this (KBSDrawEventHandler.cpp) and how KESCM asks it everywhere. It replaced a
+	// plug-in asks this (KBSHitMarker.cpp) and how KESCM asks it everywhere. It replaced a
 	// walk of GetDocCount/GetNthDoc comparing UIDRefs (block 11 API audit, 2026-08-08).
 	//
 	// ***** THE DATABASE POINTER IS COMPARED, NEVER DEREFERENCED. ***** For a chapter closed since

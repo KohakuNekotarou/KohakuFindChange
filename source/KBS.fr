@@ -49,7 +49,9 @@
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list (Task 2)
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
-#include "GraphicsID.h"		// IID_IDRWEVTHANDLER - the red-marker draw handler (Task 3)
+#include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
+							// (2026-09-26). It replaced GraphicsID.h, which was here for IID_IDRWEVTHANDLER
+							// alone - the Draw Event marker that went.
 // kApplicationObjectScriptElement (:427) - the object both of our properties are put on at the end
 // file. The official scripting sample credits this header with exactly that (BPI.fr:55). It is NOT
 // where IID_ISTARTUPSHUTDOWN / kLazyStartupShutdownProviderImpl come from, which the note here
@@ -68,8 +70,8 @@
 // until 2026-08-06. Nothing in this file ever named a symbol from any of them: the search's own ids
 // (kFindChangeClientBoss and the walker services) are needed by the .cpp files that walk text, which
 // include those headers themselves - not by the resources. Everything below resolves from
-// ShuksanID.h (included once, above), widgetid.h, GraphicsID.h, TipsID.h, DocumentID.h,
-// AppFrameworkID.h and the .fh type files.
+// ShuksanID.h (included once, above), widgetid.h, TextID.h (back since 2026-09-26, for the jump
+// marker's adornment), TipsID.h, DocumentID.h, AppFrameworkID.h and the .fh type files.
 
 
 #ifdef __ODFRC__
@@ -295,17 +297,19 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Draw-event-handler service boss (Task 3): registers kDrawEventService (via IK2ServiceProvider)
-	 * so the sibling IDrwEvtHandler is hooked into the draw-event dispatcher at startup; it draws
-	 * the translucent red marker rectangle around a jumped-to hit.
+	 * The jump marker (2026-09-26): a global text adornment. Two interfaces, only one of them ours:
+	 * the API ships the provider for kGlobalTextAdornmentService (kGlobalTextAdornmentServiceImpl,
+	 * TextID.h) - the same pair as the product's dynamic spelling squiggle (SpellPanelClass.fr) and
+	 * KCM's Story-mode marker (KCM.fr, kKCMStoryMarkerBoss). It replaced kKBSDrawEventServiceBoss,
+	 * the Draw Event rectangle (KBSHitMarker.h says why).
 	 */
 	Class
 	{
-		kKBSDrawEventServiceBoss,
+		kKBSHitMarkerBoss,
 		kInvalidClass,
 		{
-			IID_IK2SERVICEPROVIDER, kKBSDrawEventSrvcImpl,
-			IID_IDRWEVTHANDLER,     kKBSDrawEventHandlerImpl,
+			IID_IK2SERVICEPROVIDER,   kGlobalTextAdornmentServiceImpl,
+			IID_IGLOBALTEXTADORNMENT, kKBSHitMarkerAdornmentImpl,
 		}
 	},
 

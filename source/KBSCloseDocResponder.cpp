@@ -61,6 +61,7 @@
 
 // Project includes:
 #include "KBSBookScope.h"		// ReleaseSearchedBook - paired with every result Clear()
+#include "KBSHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KBSID.h"
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
@@ -122,6 +123,11 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// their Close call, so this is a no-op for them - which is why it may run even while a run of
 	// ours is going (the guard below).
 	KBSBookScope::ForgetHeldDoc(closingDocRef);
+
+	// The jump marker forgets a closing document too, for every close and ahead of every exit below,
+	// for the same reason as the held list: its address can be handed to the next document opened.
+	// State only - the document is on its way out, so nothing is repainted (KBSHitMarker::ForgetDoc).
+	KBSHitMarker::ForgetDoc(closingDocRef.GetDataBase());
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
 	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
