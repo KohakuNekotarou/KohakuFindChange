@@ -20,8 +20,9 @@
 //  the inversion is what keeps the marker visible on any ground (KCMStoryMarker.cpp records it as
 //  "right for the screen").
 //
-//  Screen only: never when printing or exporting (IShape::kPrinting), never under Overprint
-//  Preview. Shown in the screen's Preview mode (IShape::kPreviewMode) - the user's call of
+//  Screen only: never when printing or exporting (IShape::kPrinting). Shown in every screen mode -
+//  Overprint Preview included (user's call, 2026-09-26; the Draw Event marker hid itself there) and
+//  the screen's Preview mode (IShape::kPreviewMode) - the user's call of
 //  2026-07-31, kept on 2026-09-26 although IGlobalTextAdornment.h:78-83 asks adornments that do
 //  not print to stay out of preview as well: the marker is a pointer for navigation, not artwork.
 //

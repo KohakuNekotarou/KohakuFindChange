@@ -20,7 +20,6 @@
 #include "IGraphicsPort.h"
 #include "IShape.h"					// kPrinting
 #include "ITextModel.h"				// which story a wax run belongs to
-#include "IViewPortAttributes.h"	// Overprint Preview
 #include "IWaxGlyphs.h"
 #include "IWaxLine.h"
 #include "IWaxRenderData.h"
@@ -34,7 +33,6 @@
 #include "GraphicTypes.h"			// kPMBlendDifference
 #include "ILayoutUIUtils.h"
 #include "ILayoutUtils.h"			// InvalidateViews
-#include "OutPrvID.h"				// kSepPrvOPPEnabledVPAttr
 #include "PMRect.h"
 #include "PMString.h"
 #include "SDKFileHelper.h"
@@ -278,10 +276,10 @@ public:
 			return;
 		if ((iShapeFlags & IShape::kPrinting) != 0)
 			return;
-		// Overprint Preview simulates printed output on screen; the marker is a screen-only aid.
-		IViewPortAttributes* vpa = gd->GetViewPortAttributes();
-		if (vpa != nil && vpa->GetAttr(kSepPrvOPPEnabledVPAttr, 0) != 0)
-			return;
+		// ***** EVERY SCREEN MODE, OVERPRINT PREVIEW INCLUDED (user's call, 2026-09-26). ***** The
+		// Draw Event marker hid itself under Overprint Preview (kSepPrvOPPEnabledVPAttr) on the reading
+		// that the preview simulates print; the user asked for the marker after a jump to show in
+		// whatever mode the window is in. Only paper and exports (kPrinting, above) go without it.
 
 		PMRect box;
 		if (!KBSHitMarkerBox(waxRun, renderData, waxGlyphs, box))
