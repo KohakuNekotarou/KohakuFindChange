@@ -507,8 +507,19 @@ static bool AppendWithinLimit(PMString& out, const PMString& piece, bool limited
 
 // A style set in the format pane. Not in the attribute list above - styles are not text attributes
 // (see HasFormatSet) - so they are named separately, and by their FULL path: a style inside a group
-// loses the group from IStyleInfo::GetName, and two groups may hold the same style name
-// (SnpManipulateTextStyle reads GetFullPath everywhere for that reason).
+// loses the group from IStyleInfo::GetName, and two groups may hold the same style name. (This said
+// "SnpManipulateTextStyle reads GetFullPath everywhere" until 2026-09-26; it reads it in one place of
+// four - ChooseStyle - and GetName in the rest.)
+//
+// ***** TRANSLATED, THEN MARKED NOT TO BE TRANSLATED AGAIN - IN THAT ORDER. ***** A built-in style's
+// name is a string KEY, not a name: measured 2026-09-26, the confirmation dialog read "Paragraph
+// style: NormalParagraphStyle" for [Basic Paragraph], because the path was taken untranslated
+// (GetFullPath's argument defaults to kFalse - IStyleGroupHierarchy.h:199-203) and appended to a
+// string already marked not to be translated. ChooseStyle in SnpManipulateTextStyle translates right
+// after GetFullPath; KIDMCP's measured recipe (KIDMCPDefs.cpp, Text) is GetFullPath(kTrue), then
+// Translate, then SetTranslatable(kFalse) - and says why the order matters: clearing the flag first
+// makes Translate a no-op. A user's own style name is stored not translatable (IStyleInfo.h:108-113),
+// so it comes through unchanged.
 static void AppendStyleName(IDataBase* db, const UID& style, const char* label, PMString& out,
 							bool needSeparator)
 {
@@ -525,7 +536,10 @@ static void AppendStyleName(IDataBase* db, const UID& style, const char* label, 
 	out.Append(": ");
 
 	InterfacePtr<IStyleGroupHierarchy> hierarchy(db, style, UseDefaultIID());
-	out.Append((hierarchy != nil) ? hierarchy->GetFullPath() : info->GetName());
+	PMString name((hierarchy != nil) ? hierarchy->GetFullPath(kTrue) : info->GetName());
+	name.Translate();
+	name.SetTranslatable(kFalse);
+	out.Append(name);
 }
 
 // The two public wrappers are defined further down, OUTSIDE this file's anonymous namespace - a
