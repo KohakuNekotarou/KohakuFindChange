@@ -379,6 +379,39 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * "Remember Book Panel Placement" (2026-09-25): the observer that measures InDesign's own Book
+	 * panel as it closes (kAboutToClosePaletteMsg) and puts it back when it appears
+	 * (kPaletteVisibilityChangedMessage) - both on the panel manager's subject, the same subject the
+	 * observer above listens to. On kActiveContextBoss for the same reason as that one. The attach
+	 * itself is in KBSBookPanelPlacement.cpp; this line only puts our IID onto the boss.
+	 * *An AddIn that points at UI code - it moves to the UI plug-in's .fr when KBS is split.
+	 */
+	AddIn
+	{
+		kActiveContextBoss,
+		kInvalidClass,
+		{
+			IID_IKBSBOOKPANELOBSERVER, kKBSBookPanelObserverImpl,
+		}
+	},
+
+	/*
+	 * ...and the service that tells it when to start and stop: kPaletteMgrService, which calls
+	 * PaletteMgrStarted once the palettes are laid out and PaletteMgrAboutToShutdown just before
+	 * they close (IPaletteMgrService.h). InDesign's own Book panel is the one product user of this
+	 * service (kBookPanelStartupShutdownBoss). No stock provider exists for it, hence ours.
+	 */
+	Class
+	{
+		kKBSBookPanelServiceBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kKBSBookPanelServiceProviderImpl,
+			IID_IPALETTEMGRSERVICE, kKBSBookPanelPaletteMgrServiceImpl,
+		}
+	},
+
+	/*
 	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
 	 * is closed - a row naming a closed document would still jump, and Change Checked would still
 	 * reopen it to replace in it. Book results are left to the book-side responder.
@@ -489,7 +522,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 3: the four check-mark toggles ---
+		// --- Block 3: the check-mark toggles (counted in KBSID.h, next to their positions) ---
 
 		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document. Leads the
 		// block because it is what the three commands in block 1 run on.
@@ -525,6 +558,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSTranslucentPanelActionID,
 		kKBSTargetMenuPath
 		kKBSTranslucentPanelMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Remember Book Panel Placement: toggle (check mark). InDesign's own Book panel comes back
+		// where it was closed. Last in the block - it is about a window, like the three above.
+		kKBSRememberBookPanelActionID,
+		kKBSTargetMenuPath
+		kKBSRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between the toggles and the two commands that write a file.
@@ -718,6 +758,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSMinimizableFindChangeActionID,
 		kKBSMinimizableFindChangeMenuKey,	// "Minimizable Find/Change" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Remember Book Panel Placement. kCustomEnabling for the check mark, like the toggles above -
+		// without it the check mark never appears (ActionDefs.h:40). Not greyed out with no book open:
+		// the flag is what is being set, and it acts the next time a book panel closes or opens.
+		kKBSActionComponentBoss,
+		kKBSRememberBookPanelActionID,
+		kKBSRememberBookPanelMenuKey,	// "Remember Book Panel Placement" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

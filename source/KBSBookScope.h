@@ -34,6 +34,8 @@
 
 #include <vector>
 
+class IControlView;
+
 namespace KBSBookScope
 {
 	/** One searchable document: a book chapter (shortName = its file name for the read-out;
@@ -199,6 +201,14 @@ namespace KBSBookScope
 	            closed, or no book is open - leaving outFile untouched. Callers fall back to the
 	            active book in that case. */
 	bool GetPanelBookFile(IDFile& outFile);
+
+	/** Is this registered panel one of InDesign's book panels? The ONE place that answers it - the
+	    ClassID of kBookPanelBoss (in no public header, so compared as a measured number), backed by
+	    the panel's name against the open books in case a future build renumbers that class. Asked by
+	    the walks in this file and by KBSBookPanelPlacement.
+	    @param panelName the name IPanelMgr::GetNthPanelInfo gave; pass an empty one when there is
+	                     none to give - the ClassID alone decides then. */
+	bool IsBookPanel(IControlView* panelView, const PMString& panelName);
 
 	/** Close the chapters this module opened (the originally-closed ones only). Chapters the
 	    user already had open are never touched. The closes are SCHEDULED

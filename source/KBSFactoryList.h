@@ -57,3 +57,9 @@ REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)
 // !The roll-over fails SILENTLY without its line here - CREATE_PMINTERFACE alone is not enough.
 REGISTER_PMINTERFACE(KBSPanelVisibilityObserver, kKBSPanelVisibilityObserverImpl)
 REGISTER_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)
+// "Remember Book Panel Placement": the observer on kActiveContextBoss, and the palette-manager
+// service boss's two halves (KBSBookPanelPlacement.cpp). A boss in the .fr naming an implementation
+// that is not registered here takes InDesign down at load time.
+REGISTER_PMINTERFACE(KBSBookPanelObserver, kKBSBookPanelObserverImpl)
+REGISTER_PMINTERFACE(KBSBookPanelServiceProvider, kKBSBookPanelServiceProviderImpl)
+REGISTER_PMINTERFACE(KBSBookPanelPaletteMgrService, kKBSBookPanelPaletteMgrServiceImpl)

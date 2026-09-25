@@ -114,7 +114,10 @@ DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
 // it says where clicking it goes. Same shape as kLinksUIButtonBoss in open/components/linksui, and
 // as KESCM's kKESCMIconWidgetBoss - which is where the panel this copies got it from.
 DECLARE_PMID(kClassIDSpace, kKBSIconWidgetBoss, kKBSPrefix + 14)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 15)
+// "Remember Book Panel Placement" (2026-09-25): the palette-manager service boss - registered for
+// kPaletteMgrService, the service InDesign's own Book panel hangs off, so it is told when the
+// palettes have been laid out and when they are about to close (KBSBookPanelPlacement.cpp).
+DECLARE_PMID(kClassIDSpace, kKBSBookPanelServiceBoss, kKBSPrefix + 15)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 16)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 17)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 18)
@@ -138,7 +141,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 // docked or floated (kPaletteVisibilityChangedMessage). Its own IID because it is an AddIn onto
 // kActiveContextBoss, which carries observers that are not ours. See KBSPanelAlpha.cpp.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSPANELVISIBILITYOBSERVER, kKBSPrefix + 2)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
+// The observer behind "Remember Book Panel Placement": measures InDesign's Book panel as it closes
+// and puts it back when it appears. Its own IID for the reason the one above has one - it is an
+// AddIn onto kActiveContextBoss, next to that one. See KBSBookPanelPlacement.cpp.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKBSPrefix + 3)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 4)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 5)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 6)
@@ -215,9 +221,12 @@ DECLARE_PMID(kImplementationIDSpace, kKBSPanelViewImpl, kKBSPrefix + 20)
 // the panel. Both in KBSPanelAlpha.cpp.
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelVisibilityObserverImpl, kKBSPrefix + 21)
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelRollOverImpl, kKBSPrefix + 22)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 23)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 24)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 25)
+// "Remember Book Panel Placement" (2026-09-25): the observer on kActiveContextBoss, and the two
+// halves of the palette-manager service boss (its provider and the IPaletteMgrService itself). All
+// three in KBSBookPanelPlacement.cpp.
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelObserverImpl, kKBSPrefix + 23)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefix + 24)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 25)
 
 
 // ActionIDs:
@@ -273,9 +282,9 @@ DECLARE_PMID(kActionIDSpace, kKBSTranslucentPanelActionID, kKBSPrefix + 19)
 // "Save Panel Settings": write the flyout's SETTINGS toggles to a JSON file of our own in the user's
 // preferences folder, read back at startup (KBSPanelState.cpp). A plain command, not a toggle - and
 // an explicit one, the way KESCM has it: settings are saved when asked for, never behind the user's
-// back. The file holds four settings - Translucent Panel, Translucent Find/Change, Minimizable
-// Find/Change and Hide Previous Chapter. *Book Scope is deliberately not among them; the reason is
-// in KBSPanelState.h.
+// back. What the file holds is listed in ONE place, KBSPanelState.h (it said "four settings" here,
+// and then the fifth - Remember Book Panel Placement and its placement - arrived). *Book Scope is
+// deliberately not among them; the reason is there too.
 DECLARE_PMID(kActionIDSpace, kKBSSavePanelSettingsActionID, kKBSPrefix + 20)
 // "Translucent Find/Change": the same treatment for InDesign's OWN Find/Change dialog. Check-mark
 // toggle, Windows only, OFF by default. The dialog is found through the SDK's window list, not by
@@ -289,7 +298,11 @@ DECLARE_PMID(kActionIDSpace, kKBSSeparator4ActionID, kKBSPrefix + 22)
 // The same window as the toggle above, reached the same way; what differs is that this one changes
 // the window's STYLE rather than its alpha. See KBSFindChangeMinimize.cpp.
 DECLARE_PMID(kActionIDSpace, kKBSMinimizableFindChangeActionID, kKBSPrefix + 23)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 24)
+// "Remember Book Panel Placement" on the flyout (2026-09-25): a check-mark toggle. ON = InDesign's
+// own Book panel is measured as it closes (and when InDesign quits) and put back where it was when
+// it next appears. OFF by default. *Unlike the toggles above, flipping it WRITES ITS OWN KEY to the
+// settings file at once (the user's rule) - see KBSBookPanelPlacement.h.
+DECLARE_PMID(kActionIDSpace, kKBSRememberBookPanelActionID, kKBSPrefix + 24)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 25)
 
 
@@ -386,6 +399,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSTranslucentFindChangeMenuKey	kKBSStringPrefix "kKBSTranslucentFindChangeMenuKey"
 // "Minimizable Find/Change": the same window again - a minimize box on InDesign's own dialog.
 #define kKBSMinimizableFindChangeMenuKey	kKBSStringPrefix "kKBSMinimizableFindChangeMenuKey"
+// "Remember Book Panel Placement": InDesign's own Book panel comes back where it was closed.
+#define kKBSRememberBookPanelMenuKey	kKBSStringPrefix "kKBSRememberBookPanelMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
 // Replace feature menu item keys.
@@ -529,7 +544,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 //   ---- 1.3
 //    1.6          Change Checked - the one command that writes to the DOCUMENTS
 //   ---- 2.0
-//    2.2 - 2.8    the four check-mark toggles
+//    2.2 - 2.9    the check-mark toggles (listed under "Block 3" below - counted there, not here)
 //   ---- 3.0
 //    4.0 - 5.0    the two commands that write a FILE of our own
 //   ---- 10.0
@@ -550,15 +565,18 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSReplaceCheckedMenuItemPosition	1.6
 #define kKBSSeparator3MenuItemPosition		2.0
 
-// Block 3 - the five check-mark toggles. Book Scope leads: it is the one that decides what the
-// commands in block 1 run on. Then Hide Previous Chapter. The last three are window appearance: the
+// Block 3 - the six check-mark toggles (the six positions from 2.2 to 2.9; it said "four" at the top of this
+// list and "five" here until 2026-09-25). Book Scope leads: it is the one that decides what the
+// commands in block 1 run on. Then Hide Previous Chapter. The next three are window appearance: the
 // two that act on InDesign's OWN Find/Change dialog first (translucency, then the minimize box),
-// and this panel's own translucency last.
+// and this panel's own translucency. Remember Book Panel Placement closes the block: it is about
+// InDesign's own Book panel, the other window the plug-in looks after.
 #define kKBSBookScopeMenuItemPosition		2.2
 #define kKBSHidePrevChapterMenuItemPosition	2.4
 #define kKBSTranslucentFindChangeMenuItemPosition	2.6
 #define kKBSMinimizableFindChangeMenuItemPosition	2.7
 #define kKBSTranslucentPanelMenuItemPosition	2.8
+#define kKBSRememberBookPanelMenuItemPosition	2.9
 #define kKBSSeparator4MenuItemPosition		3.0
 
 // Block 4 - the two commands that write a file of our own and touch no document: the toggles above

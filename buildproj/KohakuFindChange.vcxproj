@@ -239,6 +239,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.cpp"/>
@@ -282,6 +283,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.h"/>

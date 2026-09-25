@@ -1093,6 +1093,14 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 	return false;
 }
 
+bool KBSBookScope::IsBookPanel(IControlView* panelView, const PMString& panelName)
+{
+	// A door onto the anonymous-namespace test, not a second copy of it: that test is "ONE PLACE,
+	// because the hard-coded ClassID can go stale" (block 11 API audit), and a copy here would be
+	// the second place.
+	return IsBookPanelView(panelView, panelName);
+}
+
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 {
 	// The path walk, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which

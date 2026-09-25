@@ -29,6 +29,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
+#include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSReplaceConfirmDialog.h"	// the last prompt's text and fonts, emptied at shutdown
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// the status line's static PMString
@@ -50,6 +51,9 @@ public:
 		// The saved settings first: restoring "Translucent Panel = ON" is what puts up the Win32
 		// event hook, and doing it before the subscription below keeps the order the same as a
 		// session where the user switches it on by hand.
+		// *Not the only caller: KBSBookPanelPlacement::Start reads it too, and whichever comes first
+		//  does the read (it is guarded to run once). The order above holds either way - the read
+		//  still comes before the subscription below.
 		KBSLoadPanelStateIfPresent();
 		KBSBookWatchAttach();
 		KBSAttachPanelVisibilityObserver();
@@ -69,6 +73,11 @@ public:
 		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what
 		//  KBSBookWatchDetach on the line before has always done for its own subject (2026-08-08).
 		KBSDetachPanelVisibilityObserver();
+		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its one-shot
+		// timer (a raw function pointer into this .pln). Normally already done by the palette
+		// manager's PaletteMgrAboutToShutdown, which is where the quit's placement is written; this
+		// is the backstop for a shutdown that never went through it. Safe to run twice.
+		KBSBookPanelPlacement::ShutdownCleanup();
 		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
 		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
 		// up is a leaked resource - neither may outlive this .pln.

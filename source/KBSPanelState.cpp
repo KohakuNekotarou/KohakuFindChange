@@ -43,6 +43,7 @@
 #include "KBSPanelAlpha.h"		// the get / set of BOTH translucency toggles (panel and Find/Change)
 #include "KBSFindChangeMinimize.h"	// the get / set of the minimize-box toggle
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
+#include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 
 // The file name, in the roaming preferences folder itself.
 static const char* const kKBSPanelStateFileName = "KBSPanelState.json";
@@ -98,6 +99,257 @@ static bool16 KBSJsonReadBool(const std::string& text, const char* key, bool16 d
 	return defVal;
 }
 
+// Find "key" in text and read the integer after the first ':' that follows it. false - out left
+// alone - when the key is not there or what follows is not a number: the book panel's placement is
+// four of these, and a placement with one of them missing is no placement at all (the caller asks for
+// all four before using any).
+static bool KBSJsonReadInt(const std::string& text, const char* key, int32& out)
+{
+	std::string needle("\"");
+	needle += key;
+	needle += "\"";
+
+	const size_t k = text.find(needle);
+	if (k == std::string::npos)
+		return false;
+	const size_t colon = text.find(':', k + needle.size());
+	if (colon == std::string::npos)
+		return false;
+
+	size_t p = colon + 1;
+	while (p < text.size() && (text[p] == ' ' || text[p] == '\t' || text[p] == '\n' || text[p] == '\r'))
+		++p;
+
+	bool negative = false;
+	if (p < text.size() && text[p] == '-')
+	{
+		negative = true;
+		++p;
+	}
+
+	// At most nine digits: every coordinate a screen can have fits, and int32 cannot overflow on the
+	// way (a tenth digit would be a file this plug-in did not write).
+	int32 value = 0;
+	int32 digits = 0;
+	while (p < text.size() && text[p] >= '0' && text[p] <= '9')
+	{
+		if (++digits > 9)
+			return false;
+		value = value * 10 + (text[p] - '0');
+		++p;
+	}
+	if (digits == 0)
+		return false;
+
+	out = negative ? -value : value;
+	return true;
+}
+
+//----------------------------------------------------------------------------------------
+// Rewriting some keys and keeping the rest (KBSPanelStateWriteKeys)
+//
+//   The book panel's placement and its toggle are written WITHOUT "Save Panel Settings" (the user's
+//   rules, 2026-09-25 - see KBSPanelState.h), and writing them must not also write the other
+//   settings as they happen to stand on the flyout right now: those are saved when the user asks,
+//   and a half-way change they have not saved must not be saved behind their back.
+//   So the file is READ, the named keys are replaced (or added), and it is written back. The reader
+//   is a strict one for the only shape this plug-in writes - one flat object of "key": value pairs -
+//   and it refuses anything else rather than guess.
+//----------------------------------------------------------------------------------------
+
+typedef std::vector<std::pair<std::string, std::string> > KBSJsonPairs;	// key, raw value
+
+static void KBSJsonSkipSpace(const std::string& text, size_t& p)
+{
+	while (p < text.size() && (text[p] == ' ' || text[p] == '\t' || text[p] == '\n' || text[p] == '\r'))
+		++p;
+}
+
+// A quoted string starting at text[p] (which is the opening quote): the text between the quotes goes
+// to out, RAW (escapes kept as written), and p ends past the closing quote. false when it never
+// closes.
+static bool KBSJsonScanQuoted(const std::string& text, size_t& p, std::string& out)
+{
+	if (p >= text.size() || text[p] != '"')
+		return false;
+	const size_t start = ++p;
+	while (p < text.size())
+	{
+		if (text[p] == '\\')
+		{
+			p += 2;		// the escaped character, whatever it is, cannot close the string
+			continue;
+		}
+		if (text[p] == '"')
+		{
+			out = text.substr(start, p - start);
+			++p;
+			return true;
+		}
+		++p;
+	}
+	return false;
+}
+
+// Read the flat object. false for anything that is not exactly { "key": value, ... } with scalar
+// values - a nested object or an array is not something this plug-in ever wrote.
+static bool KBSJsonParseFlat(const std::string& text, KBSJsonPairs& out)
+{
+	out.clear();
+	size_t p = 0;
+	KBSJsonSkipSpace(text, p);
+	if (p >= text.size() || text[p] != '{')
+		return false;
+	++p;
+	KBSJsonSkipSpace(text, p);
+
+	if (p < text.size() && text[p] == '}')
+	{
+		++p;	// {} - an empty object is a valid (if useless) file
+	}
+	else
+	{
+		for (;;)
+		{
+			KBSJsonSkipSpace(text, p);
+			std::string key;
+			if (!KBSJsonScanQuoted(text, p, key))
+				return false;
+
+			KBSJsonSkipSpace(text, p);
+			if (p >= text.size() || text[p] != ':')
+				return false;
+			++p;
+			KBSJsonSkipSpace(text, p);
+
+			std::string value;
+			if (p < text.size() && text[p] == '"')
+			{
+				std::string inner;
+				if (!KBSJsonScanQuoted(text, p, inner))
+					return false;
+				value = "\"" + inner + "\"";
+			}
+			else
+			{
+				const size_t start = p;
+				while (p < text.size() && text[p] != ',' && text[p] != '}' &&
+					   text[p] != ' ' && text[p] != '\t' && text[p] != '\n' && text[p] != '\r')
+				{
+					if (text[p] == '{' || text[p] == '[')
+						return false;
+					++p;
+				}
+				value = text.substr(start, p - start);
+				if (value.empty())
+					return false;
+			}
+			out.push_back(std::make_pair(key, value));
+
+			KBSJsonSkipSpace(text, p);
+			if (p < text.size() && text[p] == ',')
+			{
+				++p;
+				continue;
+			}
+			if (p < text.size() && text[p] == '}')
+			{
+				++p;
+				break;
+			}
+			return false;
+		}
+	}
+
+	// Nothing may follow the object but white space.
+	KBSJsonSkipSpace(text, p);
+	return p == text.size();
+}
+
+// The whole file, or false when it could not be read in full (see the read in
+// KBSLoadPanelStateIfPresent for why a partial read is never used).
+static bool KBSReadWholeFile(const IDFile& file, std::string& out)
+{
+	out.clear();
+	FILE* fp = FileUtils::OpenFile(file, "rb");
+	if (fp == nil)
+		return false;
+	char buf[1024];
+	size_t n;
+	while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
+		out.append(buf, n);
+	const bool readFailed = (ferror(fp) != 0);
+	fclose(fp);
+	return !readFailed;
+}
+
+// Write text as the whole file. The byte count AND fclose are checked, as in KBSSavePanelState: a
+// full disk must not be reported as saved. nil when written, otherwise the reason.
+static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text)
+{
+	FILE* fp = FileUtils::OpenFile(file, "wb");
+	if (fp == nil)
+		return "open";
+	const size_t wrote = fwrite(text.data(), 1, text.size(), fp);
+	const int closed = fclose(fp);
+	if (wrote != text.size() || closed != 0)
+		return "write";
+	return nil;
+}
+
+const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues)
+{
+	IDFile file;
+	if (!KBSPanelStateFile(file))
+		return "folder";
+
+	KBSJsonPairs pairs;
+	if (FileUtils::DoesFileExist(file))
+	{
+		std::string text;
+		if (!KBSReadWholeFile(file, text))
+			return "read";
+		if (!KBSJsonParseFlat(text, pairs))
+			return "unreadable file";	// left as it is - see KBSPanelState.h
+	}
+	else
+	{
+		// No file yet: the same "version" line "Save Panel Settings" opens with, and these keys.
+		pairs.push_back(std::make_pair(std::string("version"), std::string("1")));
+	}
+
+	for (size_t u = 0; u < keyValues.size(); ++u)
+	{
+		bool replaced = false;
+		for (size_t i = 0; i < pairs.size(); ++i)
+		{
+			if (pairs[i].first == keyValues[u].first)
+			{
+				pairs[i].second = keyValues[u].second;
+				replaced = true;
+				break;
+			}
+		}
+		if (!replaced)
+			pairs.push_back(keyValues[u]);
+	}
+
+	// Written back in the layout "Save Panel Settings" uses, so the file reads the same whichever of
+	// the two wrote it last.
+	std::string json("{\n");
+	for (size_t i = 0; i < pairs.size(); ++i)
+	{
+		json += "  \"";
+		json += pairs[i].first;
+		json += "\": ";
+		json += pairs[i].second;
+		json += (i + 1 < pairs.size()) ? ",\n" : "\n";
+	}
+	json += "}\n";
+
+	return KBSWriteWholeFile(file, json);
+}
+
 // One place for the failure messages, so every exit says something rather than failing silently.
 static void KBSPanelStateSayFailed(const char* what)
 {
@@ -127,7 +379,24 @@ void KBSSavePanelState()
 	json += "  \"translucentPanel\": ";       json += KBSBoolLiteral(KBSGetPanelTranslucent());           json += ",\n";
 	json += "  \"translucentFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeTranslucent());      json += ",\n";
 	json += "  \"minimizableFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeMinimizable());      json += ",\n";
-	json += "  \"hidePreviousChapter\": ";    json += KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn()); json += "\n";
+	json += "  \"hidePreviousChapter\": ";    json += KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn()); json += ",\n";
+	// "Remember Book Panel Placement" and the placement (2026-09-25). The book panel is measured as
+	// it stands NOW if one is open and floating - an explicit save is a snapshot of the screen - and
+	// otherwise the placement last measured at a close (or read at startup) is written again. With
+	// neither, the four keys are simply left out: KBSLoadPanelStateIfPresent asks for all four.
+	// *KBSBoolLiteral takes a bool16; the toggle is a plain bool, hence the conversion.
+	json += "  \"rememberBookPanelPlacement\": "; json += KBSBoolLiteral(KBSBookPanelPlacement::IsOn() ? kTrue : kFalse);
+	KBSBookPanelPlacement::Placement placement;
+	if (KBSBookPanelPlacement::MeasureOpenBookPanel(placement))
+		KBSBookPanelPlacement::SetRemembered(placement);
+	if (KBSBookPanelPlacement::GetRemembered(placement))
+	{
+		json += ",\n  \"bookPanelLeft\": ";   json += std::to_string(placement.left);
+		json += ",\n  \"bookPanelTop\": ";    json += std::to_string(placement.top);
+		json += ",\n  \"bookPanelWidth\": ";  json += std::to_string(placement.width);
+		json += ",\n  \"bookPanelHeight\": "; json += std::to_string(placement.height);
+	}
+	json += "\n";
 	json += "}\n";
 
 	FILE* fp = FileUtils::OpenFile(file, "wb");
@@ -159,7 +428,8 @@ void KBSSavePanelState()
 }
 
 //----------------------------------------------------------------------------------------
-// Restore (from startup = KBSStartupShutdown::Startup; once per session)
+// Restore (once per session - from KBSStartupShutdown::Startup or KBSBookPanelPlacement::Start,
+// whichever comes first; see KBSPanelState.h)
 //----------------------------------------------------------------------------------------
 
 void KBSLoadPanelStateIfPresent()
@@ -198,12 +468,15 @@ void KBSLoadPanelStateIfPresent()
 	if (text.empty())
 		return;
 
-	// *No window is touched here, and none could be: this runs at startup, before there is a panel.
-	//  What actually puts the alpha on is the panel's AutoAttach and the palette-visibility
-	//  observer (KBSPanelAlpha.cpp).
+	// *No window is touched here. What actually puts the alpha on is the panel's AutoAttach and the
+	//  palette-visibility observer (KBSPanelAlpha.cpp).
 	//  *It is not merely "restore a flag", though: restoring ON makes KBSSetPanelTranslucent put up
-	//   the Win32 event hook. With no panel yet the callback returns immediately, so this has no
-	//   effect on the startup sequence.
+	//   the Win32 event hook. With no panel yet the callback returns immediately.
+	//  !This said "none could be: this runs at startup, before there is a panel" until 2026-09-25.
+	//   That was never measured - the startup service is a LAZY one - and since that day this can
+	//   also run from the palette manager's PaletteMgrStarted, after the palettes are laid out. If
+	//   the panel is already up when the flag is restored, the alpha goes on at the next event the
+	//   hook or the visibility observer sees, not here.
 	KBSSetPanelTranslucent(KBSJsonReadBool(text, "translucentPanel", KBSGetPanelTranslucent()));
 
 	// The same for InDesign's own Find/Change dialog. Nothing is applied here either - the dialog is
@@ -226,6 +499,23 @@ void KBSLoadPanelStateIfPresent()
 	const bool16 hidePrev = KBSJsonReadBool(text, "hidePreviousChapter",
 		KBSJump::IsHidePreviousChapterOn() ? kTrue : kFalse);
 	KBSJump::SetHidePreviousChapter(hidePrev != kFalse);
+
+	// "Remember Book Panel Placement" (2026-09-25). Flag and placement only - nothing is moved here.
+	// What puts the placement on a book panel is KBSBookPanelPlacement, when one appears (and at
+	// PaletteMgrStarted, for one that is already up by then).
+	const bool16 rememberBookPanel = KBSJsonReadBool(text, "rememberBookPanelPlacement",
+		KBSBookPanelPlacement::IsOn() ? kTrue : kFalse);
+	KBSBookPanelPlacement::SetOn(rememberBookPanel != kFalse);
+
+	// All four, or none: a placement with its height missing is not a place to put anything back to.
+	KBSBookPanelPlacement::Placement placement;
+	if (KBSJsonReadInt(text, "bookPanelLeft",   placement.left) &&
+		KBSJsonReadInt(text, "bookPanelTop",    placement.top) &&
+		KBSJsonReadInt(text, "bookPanelWidth",  placement.width) &&
+		KBSJsonReadInt(text, "bookPanelHeight", placement.height))
+	{
+		KBSBookPanelPlacement::SetRemembered(placement);	// refuses a size that is not positive
+	}
 }
 
 // End, KBSPanelState.cpp.

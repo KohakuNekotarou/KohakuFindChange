@@ -59,6 +59,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
+#include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -278,6 +279,19 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			else
 				msg = "Minimizable Find/Change: on - applies when the Find/Change dialog is open.";
 			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+			break;
+		}
+
+		// "Remember Book Panel Placement": InDesign's own Book panel is measured as it closes (and
+		// when InDesign quits) and put back where it was when it next appears. OFF by default.
+		// *Flipping it WRITES ITS OWN KEY to the settings file at once, and the status line says
+		// whether that worked (the user's rules, 2026-09-25) - unlike the toggles above, which wait
+		// for "Save Panel Settings". Everything is in KBSBookPanelPlacement.cpp.
+		case kKBSRememberBookPanelActionID:
+		{
+			PMString msg;
+			KBSBookPanelPlacement::ToggleAndSave(msg);
 			KBSResultTree::ShowStatus(msg);
 			break;
 		}
@@ -892,6 +906,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// being set is the preference, and it applies the moment the window exists.
 			int16 actionState = kEnabledAction;
 			if (KBSGetFindChangeMinimizable())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSRememberBookPanelActionID)
+		{
+			// Selectable with no book open, like the toggles above: the flag is what is being set,
+			// and it acts the next time a book panel closes or appears.
+			int16 actionState = kEnabledAction;
+			if (KBSBookPanelPlacement::IsOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}
