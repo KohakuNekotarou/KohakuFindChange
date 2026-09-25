@@ -168,8 +168,15 @@ bool KBSReplaceConfirmDialog::Resolve(IFindChangeOptions* opts)
 
 	const bool okFind = KBSReplaceConfirmDialog::ResolveSide(opts->GetFindGlyphID(),
 		opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch), db, sFind);
+	// ***** kFalse: READ THE CHANGE LIST, NEVER CREATE IT. ***** The default of this call is kTrue,
+	// "create the attributes if they do not exist" (IFindChangeOptions.h:502,506), so with an EMPTY
+	// Change To box - the one case where there is no list yet - every prompt wrote an empty list into
+	// the user's Find/Change settings, outside any command. Every other reader in this plug-in
+	// passes kFalse (KBSSearchEngine.cpp, seven places), and DescribeGlyphQuery - which names this
+	// function as the shape it follows - was given it on 2026-08-08; this sibling was not
+	// (2026-09-25 re-check, C-1). A nil list is already what ResolveSide reads as "no glyph here".
 	const bool okChange = KBSReplaceConfirmDialog::ResolveSide(opts->GetReplaceGlyphID(),
-		opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch), db, sChange);
+		opts->GetChangeAttributeBossList(db, IFindChangeOptions::kGlyphSearch, kFalse), db, sChange);
 
 	// The FIND side must resolve - without it there is nothing to show at all.
 	//
