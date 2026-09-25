@@ -53,6 +53,14 @@
 //    Collapsed to icons = the TAB PANE's mode, and the width of the icon strip is the tab pane's
 //      "preferred iconic width" (PaletteRefUtils.h:300-312) - both put back last, on a panel that has
 //      already been moved and sized expanded. (Confirmed working by the user, 2026-09-25.)
+//    ***** A FLOATING PALETTE CAN BE SHARED, AND THEN THE PLACE IS NOT THE ANSWER. ***** The user
+//      tabbed the Book panel into the floating KBS panel, closed InDesign and opened a book: the Book
+//      panel came back as a palette of its own, laid exactly on top of KBS's (2026-09-25 - KIDMCP's
+//      panels listing showed the two in different floating docks at one rectangle). Only the dock's
+//      position had been kept, and a new book panel always arrives in a palette of its own. So a
+//      floating book panel's neighbours are measured as a docked one's are - the panel in its tab
+//      group with its tab's place, the nearest panels in the groups above and below - and put back
+//      first; the place and size are what is used when no neighbour's palette is open.
 //
 //  ***** DOCKED: KEPT AS NEIGHBOURS, PUT BACK WITH ReparentPalette. ***** A dock is a list of columns
 //    (tab panes), each a list of tab groups, each a list of tabs (PaletteRef.h:96-101), so a place in
@@ -123,6 +131,14 @@ struct Placement
 	int32	width;			// the book PANEL's size (not the dock's, which adds the title band)
 	int32	height;
 
+	// Floating in a palette SHARED with other panels: WidgetIDs of the nearest non-book panels in
+	// that palette, 0 = none (alone in its palette). Measured with the floating half, and tried before
+	// the place when it is put back (see the file header).
+	int32	floatMate;		// a panel in the same tab group ...
+	int32	floatTabIndex;	// ... and the book panel's tab position in that group
+	int32	floatNextGroup;	// the nearest panel in a tab group below, in the same palette
+	int32	floatPrevGroup;	// ... and above
+
 	// Docked: WidgetIDs of the nearest non-book panels, 0 = none.
 	bool	docked;
 	int32	mate;			// a panel in the same tab group ...
@@ -137,6 +153,7 @@ struct Placement
 	int32	iconicWidth;	// 0 = not known
 
 	Placement() : haveFloat(false), left(0), top(0), width(0), height(0),
+		floatMate(0), floatTabIndex(0), floatNextGroup(0), floatPrevGroup(0),
 		docked(false), mate(0), tabIndex(0), nextGroup(0), prevGroup(0), nextColumn(0), prevColumn(0),
 		iconic(false), iconicWidth(0) {}
 
@@ -175,6 +192,10 @@ const char* const kKeyLeft        = "bookPanelLeft";
 const char* const kKeyTop         = "bookPanelTop";
 const char* const kKeyWidth       = "bookPanelWidth";
 const char* const kKeyHeight      = "bookPanelHeight";
+const char* const kKeyFloatMate      = "bookPanelFloatMate";
+const char* const kKeyFloatTabIndex  = "bookPanelFloatTabIndex";
+const char* const kKeyFloatNextGroup = "bookPanelFloatNextGroup";
+const char* const kKeyFloatPrevGroup = "bookPanelFloatPrevGroup";
 const char* const kKeyIconic      = "bookPanelIconic";
 const char* const kKeyIconicWidth = "bookPanelIconicWidth";
 const char* const kKeyDocked      = "bookPanelDocked";
@@ -366,6 +387,43 @@ void MeasureIconState(const PaletteRef& tabPane, Placement& out)
 		out.iconicWidth = w;
 }
 
+/** The neighbours inside one column: a panel sharing the book panel's tab group (and the book
+    panel's tab place in it), and the nearest panels in the groups below and above. The same
+    question for a dock and for a floating palette - both hold tab groups in a tab pane - so it is
+    asked in one place. Zeros when a neighbour is not there. */
+void MeasureGroupNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, const PaletteRef& group,
+	const PaletteRef& column, int32& mate, int32& tabIndex, int32& nextGroup, int32& prevGroup)
+{
+	tabIndex = IndexOfChild(group, container);
+	// A mate is any OTHER non-book panel in the group - the book panel itself is not a non-book
+	// panel, so it is never picked.
+	mate     = FirstNonBookPanelInGroup(panelMgr, group);
+
+	const int32 gi = IndexOfChild(column, group);
+	const int32 groups = PaletteRefUtils::GetChildCountOfPalette(column);
+	nextGroup = 0;
+	for (int32 i = gi + 1; i < groups && nextGroup == 0; ++i)
+		nextGroup = FirstNonBookPanelInGroup(panelMgr, ChildAtOrEnd(column, i));
+	prevGroup = 0;
+	for (int32 i = gi - 1; i >= 0 && prevGroup == 0; --i)
+		prevGroup = FirstNonBookPanelInGroup(panelMgr, ChildAtOrEnd(column, i));
+}
+
+/** A floating book panel: the other panels in its palette, if it shares one (see the file header).
+    All zeros for a palette of its own - or a tree not shaped as tab group in a tab pane. */
+void MeasureFloatNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, Placement& out)
+{
+	out.floatMate = out.floatTabIndex = out.floatNextGroup = out.floatPrevGroup = 0;
+
+	const PaletteRef group  = ParentOf(container);
+	const PaletteRef column = ParentOf(group);
+	if (!Is(group, &PaletteRefUtils::IsTabGroup) || !Is(column, &PaletteRefUtils::IsTabPane))
+		return;
+
+	MeasureGroupNeighbours(panelMgr, container, group, column,
+		out.floatMate, out.floatTabIndex, out.floatNextGroup, out.floatPrevGroup);
+}
+
 /** A docked book panel: its neighbours. false when the tree is not the shape a dock is supposed to
     have (tab group in a tab pane in a dock). */
 bool MeasureDocked(IPanelMgr* panelMgr, const PaletteRef& container, Placement& out)
@@ -376,20 +434,9 @@ bool MeasureDocked(IPanelMgr* panelMgr, const PaletteRef& container, Placement& 
 	if (!Is(group, &PaletteRefUtils::IsTabGroup) || !Is(column, &PaletteRefUtils::IsTabPane) || !Is(dock, &PaletteRefUtils::IsDock))
 		return false;
 
-	out.docked   = true;
-	out.tabIndex = IndexOfChild(group, container);
-	// A mate is any OTHER non-book panel in the group - the book panel itself is not a non-book
-	// panel, so it is never picked.
-	out.mate     = FirstNonBookPanelInGroup(panelMgr, group);
-
-	const int32 gi = IndexOfChild(column, group);
-	const int32 groups = PaletteRefUtils::GetChildCountOfPalette(column);
-	out.nextGroup = 0;
-	for (int32 i = gi + 1; i < groups && out.nextGroup == 0; ++i)
-		out.nextGroup = FirstNonBookPanelInGroup(panelMgr, ChildAtOrEnd(column, i));
-	out.prevGroup = 0;
-	for (int32 i = gi - 1; i >= 0 && out.prevGroup == 0; --i)
-		out.prevGroup = FirstNonBookPanelInGroup(panelMgr, ChildAtOrEnd(column, i));
+	out.docked = true;
+	MeasureGroupNeighbours(panelMgr, container, group, column,
+		out.mate, out.tabIndex, out.nextGroup, out.prevGroup);
 
 	const int32 ci = IndexOfChild(dock, column);
 	const int32 columns = PaletteRefUtils::GetChildCountOfPalette(dock);
@@ -447,6 +494,7 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 	measured.left   = SysPointH(pos);
 	measured.top    = SysPointV(pos);
 	MeasureIconState(FindAncestor(container, &PaletteRefUtils::IsTabPane), measured);
+	MeasureFloatNeighbours(panelMgr, container, measured);
 
 	// Collapsed to icons, the panel is not on show, and what its frame says then is not a size to
 	// come back to if it is empty. Keep the size known from before - the one it will expand to - and
@@ -495,6 +543,11 @@ void AppendPlacementKeys(const Placement& p, std::vector<std::pair<std::string, 
 		keys.push_back(std::make_pair(std::string(kKeyTop),    std::to_string(p.top)));
 		keys.push_back(std::make_pair(std::string(kKeyWidth),  std::to_string(p.width)));
 		keys.push_back(std::make_pair(std::string(kKeyHeight), std::to_string(p.height)));
+		// Written as zeros too: a palette of its own has to CLEAR a neighbour an earlier close left.
+		keys.push_back(std::make_pair(std::string(kKeyFloatMate),      std::to_string(p.floatMate)));
+		keys.push_back(std::make_pair(std::string(kKeyFloatTabIndex),  std::to_string(p.floatTabIndex)));
+		keys.push_back(std::make_pair(std::string(kKeyFloatNextGroup), std::to_string(p.floatNextGroup)));
+		keys.push_back(std::make_pair(std::string(kKeyFloatPrevGroup), std::to_string(p.floatPrevGroup)));
 	}
 	if (p.docked)
 	{
@@ -674,47 +727,87 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	ApplyIconState(FindAncestor(container, &PaletteRefUtils::IsTabPane), p);
 }
 
-/** Docked: into the dock next to the same neighbours, the closest one that can still be found
-    first. The book panel arrives in a floating palette of its own; what is moved is its TAB (into a
-    mate's group) or its TAB GROUP (into a column), which is the level each neighbour describes. */
+/** Is the palette a neighbour's panel sits in open - its dock, docked or floating, on show? Asked of
+    a FLOATING neighbour before the book panel is put into its palette: a panel the user has closed
+    can still hand back a container (ContainerOfPanel's own note), and a book panel put there would
+    disappear with it. A docked neighbour is not asked this (the dock half is unchanged since it was
+    measured, 2026-09-25). */
+bool NeighbourPaletteIsOpen(IPanelMgr* panelMgr, int32 widgetID)
+{
+	const PaletteRef container = ContainerOfPanel(panelMgr, widgetID);
+	if (!container.IsValid())
+		return false;
+	PaletteRef dock = FindFloatingDock(container);
+	if (!dock.IsValid())
+		dock = FindAncestor(container, &PaletteRefUtils::IsDock);
+	return dock.IsValid() && PaletteRefUtils::IsPaletteVisible(dock) != kFalse;
+}
+
+/** Back beside the same neighbours, the closest one that can still be found first: into a mate's
+    tab group at the old tab place, else just above the group below, else just below the group above.
+    The book panel arrives in a floating palette of its own; what is moved is its TAB (into a mate's
+    group) or its TAB GROUP (into a column), which is the level each neighbour describes. One walk for
+    a dock and for a shared floating palette - the tree has the same shape in both.
+    @param askOpen IN whether a neighbour's palette has to be open to be used (NeighbourPaletteIsOpen).
+    @return true when the book panel was moved. */
+bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate, int32 tabIndex,
+	int32 nextGroupPanel, int32 prevGroupPanel, bool askOpen)
+{
+	const PaletteRef ownGroup = ParentOf(container);
+	if (!Is(ownGroup, &PaletteRefUtils::IsTabGroup))
+		return false;
+
+	// 1. A panel it shared a tab group with: back into that group, at its tab's old place.
+	//    (Measured 2026-09-25: Pages as the mate, the tab back at 0 and at 1.)
+	if (mate != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, mate)))
+	{
+		const PaletteRef mateGroup = ParentOf(ContainerOfPanel(panelMgr, mate));
+		if (Is(mateGroup, &PaletteRefUtils::IsTabGroup))
+		{
+			PaletteRefUtils::ReparentPalette(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex));
+			return true;
+		}
+	}
+
+	// 2. The group below it: its own group goes back in just above that one. (Measured.)
+	if (nextGroupPanel != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, nextGroupPanel)))
+	{
+		const PaletteRef nextGroup = ParentOf(ContainerOfPanel(panelMgr, nextGroupPanel));
+		const PaletteRef column = Is(nextGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(nextGroup) : PaletteRef();
+		if (Is(column, &PaletteRefUtils::IsTabPane))
+		{
+			PaletteRefUtils::ReparentPalette(ownGroup, column, nextGroup);
+			return true;
+		}
+	}
+
+	// 3. The group above it: just below that one. (Measured.)
+	if (prevGroupPanel != 0 && (!askOpen || NeighbourPaletteIsOpen(panelMgr, prevGroupPanel)))
+	{
+		const PaletteRef prevGroup = ParentOf(ContainerOfPanel(panelMgr, prevGroupPanel));
+		const PaletteRef column = Is(prevGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(prevGroup) : PaletteRef();
+		if (Is(column, &PaletteRefUtils::IsTabPane))
+		{
+			PaletteRefUtils::ReparentPalette(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1));
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/** Docked: into the dock next to the same neighbours (JoinNeighbours), and when none can be found, a
+    new column beside the column that was next to it. */
 void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Placement& p)
 {
 	const PaletteRef ownGroup = ParentOf(container);
 	if (!Is(ownGroup, &PaletteRefUtils::IsTabGroup))
 		return;
 
-	// 1. A panel it shared a tab group with: back into that group, at its tab's old place.
-	//    (Measured 2026-09-25: Pages as the mate, the tab back at 0 and at 1.)
-	{
-		const PaletteRef mateGroup = ParentOf(ContainerOfPanel(panelMgr, p.mate));
-		if (Is(mateGroup, &PaletteRefUtils::IsTabGroup))
-		{
-			PaletteRefUtils::ReparentPalette(container, mateGroup, ChildAtOrEnd(mateGroup, p.tabIndex));
-			return;
-		}
-	}
-
-	// 2. The group below it: its own group goes back in just above that one. (Measured.)
-	{
-		const PaletteRef nextGroup = ParentOf(ContainerOfPanel(panelMgr, p.nextGroup));
-		const PaletteRef column = Is(nextGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(nextGroup) : PaletteRef();
-		if (Is(column, &PaletteRefUtils::IsTabPane))
-		{
-			PaletteRefUtils::ReparentPalette(ownGroup, column, nextGroup);
-			return;
-		}
-	}
-
-	// 3. The group above it: just below that one. (Measured.)
-	{
-		const PaletteRef prevGroup = ParentOf(ContainerOfPanel(panelMgr, p.prevGroup));
-		const PaletteRef column = Is(prevGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(prevGroup) : PaletteRef();
-		if (Is(column, &PaletteRefUtils::IsTabPane))
-		{
-			PaletteRefUtils::ReparentPalette(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1));
-			return;
-		}
-	}
+	// 1-3. Beside the same neighbours - see JoinNeighbours. (0 = none, which ContainerOfPanel already
+	//      answered with an invalid ref before this was a function; the explicit test is the same.)
+	if (JoinNeighbours(panelMgr, container, p.mate, p.tabIndex, p.nextGroup, p.prevGroup, false))
+		return;
 
 	// 4. It had a column to itself, so there is no column left to go back into: a new one, beside
 	//    the column that was after it (or before it), in the same icon state and width.
@@ -770,7 +863,11 @@ void RestoreNow()
 
 	if (gRemembered.docked)
 		RestoreDocked(panelMgr, container, gRemembered);
-	else
+	else if (!JoinNeighbours(panelMgr, container, gRemembered.floatMate, gRemembered.floatTabIndex,
+				gRemembered.floatNextGroup, gRemembered.floatPrevGroup, true))
+		// Floating: back into the palette it shared, when that palette is open (see the file header);
+		// its own place and size otherwise. Joined, the place and size are the palette's - nothing
+		// more is put on it.
 		RestoreFloating(bookPanel, container, gRemembered);
 }
 
@@ -1020,6 +1117,12 @@ void KBSBookPanelPlacement::LoadFromSettings(const std::string& text)
 		p.top = top;
 		p.width = width;
 		p.height = height;
+
+		// Its neighbours in a shared palette; a file written before they were kept has none (0).
+		KBSPanelStateReadInt(text, kKeyFloatMate,      p.floatMate);
+		KBSPanelStateReadInt(text, kKeyFloatTabIndex,  p.floatTabIndex);
+		KBSPanelStateReadInt(text, kKeyFloatNextGroup, p.floatNextGroup);
+		KBSPanelStateReadInt(text, kKeyFloatPrevGroup, p.floatPrevGroup);
 	}
 
 	// Docked: the neighbours (a missing one reads as 0 = none). A file written before docking was

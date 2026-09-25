@@ -17,7 +17,11 @@
 //      kCloseBookCmdBoss: a closing book says nothing to the panel manager (measured - the .cpp's
 //      header has the story). "Where" is one of two things:
 //        FLOATING  the floating dock's top-left, the panel's size, and whether it is collapsed to
-//                  icons;
+//                  icons - and, when the floating palette is SHARED with other panels, the same
+//                  kind of neighbours as a dock keeps (a panel in its tab group and its tab's
+//                  place, the nearest panels in the groups above and below). Added 2026-09-25 (the
+//                  user's report): a Book panel tabbed into the floating KBS panel came back as a
+//                  palette of its own laid on top of KBS's, because only the place was kept;
 //        DOCKED    which panels it sits next to - a panel sharing its tab group (and its tab's place
 //                  there), the nearest panels in the tab groups above and below it, and in the
 //                  columns (tab panes) either side - and whether its column is collapsed to icons.
@@ -25,15 +29,18 @@
 //                  what a dock is made of, and a built-in panel's WidgetID does not change between
 //                  launches (the user's request, 2026-09-25: "in the dock, and its order there").
 //    * the moment a book panel appears where there was none (kPaletteVisibilityChangedMessage, zero
-//      book panels before, one or more now), it is put back: moved and sized, or moved into its dock
-//      next to the same neighbours (PaletteRefUtils::ReparentPalette).
+//      book panels before, one or more now), it is put back: moved into its dock next to the same
+//      neighbours (PaletteRefUtils::ReparentPalette); floating, back into the palette of a neighbour
+//      it shared one with if that palette is open, and otherwise moved and sized.
 //
 //  What it deliberately leaves alone:
 //    * a book panel appearing BESIDE another one. It joins that palette as a tab, and moving the
 //      palette would move the book panel the user already has open;
 //    * a book panel InDesign itself put in a dock: that is InDesign's own memory at work;
 //    * a floating placement whose title band would land off every screen (a monitor that has gone),
-//      and a docked one whose neighbours are all gone.
+//      and a docked one whose neighbours are all gone;
+//    * a floating neighbour whose palette is closed: the Book panel is not put into a palette that
+//      cannot be seen - it gets its own place and size instead.
 //
 //  The file: KBSPanelState.json, the one "Save Panel Settings" writes. The toggle itself is written
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of
