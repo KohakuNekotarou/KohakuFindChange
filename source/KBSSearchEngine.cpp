@@ -340,6 +340,15 @@ int32 CurrentSearchModeValue()
 	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
 }
 
+// Is the Find/Change dialog set to search BACKWARDS (for the tab in force)? The walk follows it -
+// see GetKBSWalkerScopeOptions - so the search needs to know, to put a page's rows back in reading
+// order (FinalizeChapterHits). false when the options cannot be read.
+bool CurrentSearchWalksBackwards()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	return (opts != nil) && (opts->GetSearchBackwards(opts->GetSearchMode()) != kFalse);
+}
+
 // Is there anything to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
 {
@@ -1736,8 +1745,18 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 // the page holds more than one match; "overset" for an overset match, which has no page). The locator
 // rides on the front of preText, so the colour cell draws it in the normal colour ahead of the
 // match. Pure string / index work - no recompose, so no dirty guard needed here.
-void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
+//
+// walkedBackwards: the Find/Change dialog was set to search backwards, so the walk handed the hits
+// over last-first. Measured 2026-09-25: the walk follows the dialog's direction whatever the scope
+// options say (see GetKBSWalkerScopeOptions), and the rows of one page then read "cat3, cat2,
+// cat1" - with P1(1) on the LAST occurrence. The hits are turned round first, so the stable sort
+// below leaves them in reading order either way. The walk order stamped on each hit is untouched:
+// that is the replace's key, and the replace walks the same way the search did.
+void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits, bool walkedBackwards = false)
 {
+	if (walkedBackwards)
+		std::reverse(hits.begin(), hits.end());
+
 	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
 	// same page keep their document (walk) order.
 	std::stable_sort(hits.begin(), hits.end(),
@@ -2303,6 +2322,9 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		opts->GetIncludeHiddenLayers(mode),
 		opts->GetIncludeLockedStoriesForFind(mode),
 		opts->GetIncludeFootnotes(mode),
+		// ...and the direction, which decides the ORDER the same matches are numbered in - the
+		// one thing the replace joins rows by (see the header, 2026-09-25).
+		opts->GetSearchBackwards(mode),
 	};
 	outSignature.Append(" o");
 	for (size_t i = 0; i < sizeof(switches) / sizeof(switches[0]); ++i)
@@ -2344,8 +2366,15 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	// Hidden Layers ON still got nothing from a hidden layer (user's report 2026-07-28), and the
 	// three "include" boxes they had switched OFF were ignored just as silently.
 	//
-	// fSearchBackwards is deliberately NOT taken: the walk order is the only key joining a search
-	// to its replace pass, so KBS always walks forward.
+	// fSearchBackwards is not set here, and that does NOT make the walk go forward. This said "KBS
+	// always walks forward" until 2026-09-25, when the dialog's "search backwards" was measured to
+	// turn the walk round all the same - the walker is handed the live options as well as this scope,
+	// and follows the options (cat1 cat2 cat3 came back as cat3, cat2, cat1). What keeps a search
+	// and its replace joined is that BOTH walk the way the dialog says, and that a direction changed
+	// in between is refused by the walk signature, which counts it. The rows are put in reading order
+	// on the page either way (FinalizeChapterHits), and the replace carries the rows it has passed
+	// past every later replacement (KBSReplaceEngine's PassedRow), so neither needs the walk to run
+	// in TextIndex order.
 	//
 	// Two of the five are FIND-only in InDesign - "there is no option to change in locked stories /
 	// on locked layers" (IFindChangeOptions.h:259, 279), which is why the dialog labels them Search
@@ -2713,6 +2742,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	WalkerScopeOptions scopeOptions;
 	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
+	// ...and which way the walk will run - read once for the same reason. The walk follows the
+	// dialog's direction (measured 2026-09-25), so a page's rows come over last-first when it says
+	// backwards, and FinalizeChapterHits turns them back into reading order.
+	const bool walkedBackwards = CurrentSearchWalksBackwards();
+
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
 	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
@@ -2918,7 +2952,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// Page-order the hits and bake the "P<page>(<n>) " locator onto each line. This needs the
 		// WHOLE chapter's hits (page order and the within-page ordinal are only known once the
 		// chapter is complete), which is why the flush unit is the chapter, not a fixed hit count.
-		FinalizeChapterHits(hits);
+		FinalizeChapterHits(hits, walkedBackwards);
 
 		KBSResultModel::Chapter chapter;
 		chapter.name = targets[i].shortName;

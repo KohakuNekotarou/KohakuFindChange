@@ -231,9 +231,16 @@ namespace KBSSearchEngine
 	    see RememberFindFormat / FindFormatHasChanged, which is the pair that answers "same conditions,
 	    different value".
 
-	    fSearchBackwards is deliberately left out - KBS always walks forward, whatever the dialog says
-	    - and so is everything on the CHANGE side, which decides what gets written rather than what
-	    gets found.
+	    ***** THE DIRECTION IS IN IT TOO, since 2026-09-25. ***** It was left out on the belief that
+	    KBS always walks forward whatever the dialog says, because the scope options it builds say
+	    so; measured on that date, the walk follows the dialog's own "search backwards" instead
+	    (the walker is handed the live options). A walk the other way round numbers the same matches
+	    in the opposite order, so a direction flipped between the search and the replace changes
+	    what the stored walk orders mean exactly as a retyped query does - and is now refused as one,
+	    rather than reaching the verify pass and being reported as the DOCUMENT having changed.
+
+	    Everything on the CHANGE side stays out: it decides what gets written rather than what gets
+	    found.
 
 	    Comes back EMPTY when the settings cannot be read at all, which every caller has to treat as
 	    "cannot tell" rather than as "different": refusing a replace because a query could not be

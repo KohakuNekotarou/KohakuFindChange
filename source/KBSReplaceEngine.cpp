@@ -294,6 +294,57 @@ struct RunTotals
 // them, which is how clicking a row can answer "the replacement is no longer here" instead of
 // scrolling to whatever now sits at that position.
 
+// A row the replace walk has passed and that the report will go on showing - one it replaced, or
+// one it reached and left alone (locked, refused) - with the range its text stands at NOW.
+//
+// ***** THE RANGE IS CARRIED FORWARD, BECAUSE THE WALK IS NOT IN TextIndex ORDER. ***** It was
+// believed to be ("the walk only ever moves forward, so every replacement after this row's
+// happened LATER in the story and cannot shift its start"), and measured on 2026-09-25 to hold for
+// body text only:
+//   * a table's cells are visited where the table stands - but their characters live after the
+//     whole body in TextIndex terms (ITableTextContent.h:41-44), so replacing the body text AFTER
+//     the table moved every cell row written before it; and
+//   * the walk follows the Find/Change dialog's own direction - "search backwards" walked
+//     "cat1 cat2 cat3" as cat3, cat2, cat1 although the scope options say forwards - so there
+//     EVERY later replacement moved every row written before it.
+// Either way the row then read its line, and took its hash, from text beside its own: the panel
+// showed "wo<CR>kit" for a cell that read "kitten cell", and a double click SELECTED those wrong
+// characters, the hash having come from the same wrong range. The rows passed and left alone had
+// the same fault from the other side: kept at the range the search found them at, they were
+// jumped to off by the replacements before them and stamped "missing".
+struct PassedRow
+{
+	int32		hitIdx;
+	UID			story;
+	TextIndex	start;
+	TextIndex	end;
+};
+
+// A replacement has just turned [oldStart, oldEnd) of `story` into newLength characters. Every
+// passed row lying AFTER it in the same story moves by the difference; a row before it, or in
+// another story, does not.
+//
+// "After" is start >= oldEnd, NOT start >= oldStart: matches never overlap, so a row either lies
+// wholly past the replaced text or wholly before it - and a zero-width row sitting exactly at
+// oldStart (GREP's ^ before a match that begins at the same place) is BEFORE the text that was
+// replaced and must stay where it is. For a zero-width replacement (oldStart == oldEnd, an
+// insertion) a row starting at that very position is pushed right by the insertion, which is what
+// the text there did.
+void CarryPassedRowsPast(std::vector<PassedRow>& passed, UID story, TextIndex oldStart,
+	TextIndex oldEnd, TextIndex newLength)
+{
+	const TextIndex delta = newLength - (oldEnd - oldStart);
+	if (delta == 0)
+		return;
+	for (size_t i = 0; i < passed.size(); ++i)
+	{
+		if (passed[i].story != story || passed[i].start < oldEnd)
+			continue;
+		passed[i].start += delta;
+		passed[i].end += delta;
+	}
+}
+
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outMissing   = checked hits whose turn never came: the walk ran to the end of the chapter
 //                without them coming up, so the matches the search found are no longer there.
@@ -360,6 +411,20 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	std::set<int32> targets;
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
 
+	// The rows the report will keep, each with the range its text stands at NOW, carried past every
+	// replacement this pass makes (see PassedRow). Their lines are read back once the walk is over,
+	// from these ranges and not from the model's: the model holds where a replacement was WRITTEN,
+	// or where the search FOUND a match, and a later replacement can have moved either. (A list of
+	// replaced row indices stood here until 2026-09-25 and read the model's range back - the "the
+	// walk only moves forward" belief PassedRow corrects.)
+	//
+	// Two ways onto it: a checked row joins as the walk passes it (replaced, locked, refused), and a
+	// LOCKED unchecked row is put on right here, below, at the range the search found it at. That
+	// range is the text as it stands now - the verify pass has just confirmed the chapter has not
+	// moved under the rows - and every replacement carries it from there, so it comes out right
+	// even when the walk ends at the last checked row before ever reaching it.
+	std::vector<PassedRow> passedRows;
+
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
@@ -398,6 +463,21 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		rowByWalkOrder[walkOrder] = i;
 		if (haveFlags && checked && !replaced)
 			targets.insert(walkOrder);
+
+		// A locked row the report will keep (it never had a box, so it is never checked). The verify
+		// pass writes nothing and moves nothing, so it has no use for these.
+		if (!verifyOnly && haveFlags && locked && !replaced && !checked)
+		{
+			UID storyUID = kInvalidUID;
+			TextIndex rowStart = kInvalidTextIndex, rowEnd = kInvalidTextIndex;
+			uint64 rowHash = 0;
+			if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, storyUID, rowStart, rowEnd, rowHash)
+				&& storyUID != kInvalidUID)
+			{
+				const PassedRow seeded = { i, storyUID, rowStart, rowEnd };
+				passedRows.push_back(seeded);
+			}
+		}
 	}
 	if (targets.empty())
 		return 0;
@@ -537,11 +617,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	// story as well as frame because the story carries a lock of its own.
 	std::map<std::pair<UID, UID>, bool> editableFrames;
 
-	// The rows THIS pass replaced. Their lines are read back once the walk is over (see the pass
-	// below it), and this is the list it works from - not "every row in the chapter marked
-	// replaced", which would also pick up rows an EARLIER pass replaced, whose stored ranges this
-	// pass has very likely moved.
-	std::vector<int32> replacedRows;
+	// (passedRows is declared above the row scan at the top of this function, which seeds it with
+	// the locked rows - see there.)
 
 	// How the walk moves forward is the walker's business alone: each find command advances it to
 	// the next match, exactly as the official loop runs it (SnpFindAndReplace), and the walk ends
@@ -590,12 +667,17 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		if (story.GetUID() == lastReplStory && start >= lastReplStart && start < lastReplEnd)
 			continue;
 
-		// An unselected hit is only counted past. Its stored text range is deliberately NOT
-		// refreshed: ReplaceChecked ends by turning the panel into a report of the run
-		// (KeepCheckedRows), which keeps the rows it was ASKED about and drops the ones the user
-		// had unchecked - so a row left alone here is on its way out of the list anyway, and a pass
-		// that replaced nothing has not moved anything to begin with. Its row is not even looked
-		// up - only a checked hit needs one.
+		// An unselected hit is counted past. ReplaceChecked ends by turning the panel into a report
+		// of the run (KeepCheckedRows), which drops the rows the user had unchecked - so such a row
+		// is on its way out of the list and its range is not worth carrying.
+		//
+		// ***** EXCEPT A LOCKED ONE, WHICH THE REPORT KEEPS. ***** It never had a box to tick, it is
+		// kept so the report can account for what the search found and the replace could not touch
+		// (KeepCheckedRows), and it is jumped to by its range like any other row - so its range is
+		// carried with the replaced ones. It is put on passedRows BEFORE the walk, not here: the
+		// walk stops at the last checked row, and a locked row after it would never be passed at
+		// all. (Until 2026-09-25 this said "a row left alone here is on its way out of the list
+		// anyway", and the locked ones were not; see PassedRow.)
 		if (targets.find(walkIndex) != targets.end())
 		{
 			const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
@@ -664,7 +746,13 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			{
 				++outLocked;
 				if (hitIdx >= 0)
+				{
 					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeLocked);
+					// Kept by the report and jumped to by its range - so the range is the one the
+					// walk is standing on, carried past what comes after (see PassedRow).
+					const PassedRow passed = { hitIdx, story.GetUID(), start, end };
+					passedRows.push_back(passed);
+				}
 				targets.erase(walkIndex);
 				++walkIndex;
 				continue;
@@ -723,7 +811,19 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 				// line and its hash read out of unrelated text (see MarkHitReplaced).
 				KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, replacedStory.GetUID(),
 					replacedStart, replacedEnd);
-				replacedRows.push_back(hitIdx);
+
+				// Every row already passed that lies after the text just rewritten moves with it -
+				// in the walk's order that is not only the rows still to come (see PassedRow) - and
+				// THEN this row joins them, at the range the command reports writing. In that order,
+				// so the row is not moved by its own replacement.
+				//
+				// [start, end) is the match as it stood the moment before the command, in the same
+				// state of the text every passed row's range is kept in, which is what makes the
+				// comparison inside CarryPassedRowsPast a comparison of like with like.
+				CarryPassedRowsPast(passedRows, story.GetUID(), start, end,
+					replacedEnd - replacedStart);
+				const PassedRow passed = { hitIdx, replacedStory.GetUID(), replacedStart, replacedEnd };
+				passedRows.push_back(passed);
 			}
 			else
 			{
@@ -733,6 +833,9 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 				// replaced total silently comes up short with nothing to explain it.
 				++outRefused;
 				KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
+				// The report keeps it (its outcome says why), so it is carried like a locked row.
+				const PassedRow passed = { hitIdx, story.GetUID(), start, end };
+				passedRows.push_back(passed);
 			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
@@ -755,7 +858,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		return 0;
 	}
 
-	// The chapter has stopped changing, so now each replaced row is given the line it ended up on.
+	// The chapter has stopped changing, so now each row the report keeps is moved to where its text
+	// ended up and given the line it stands on.
 	//
 	// NOT while the walk was running: matches share paragraphs, and a line read at the moment its
 	// own match was written still shows the LATER matches in that paragraph as they were before.
@@ -763,38 +867,41 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	// "kitten and dog and cat" for good, while the document read "kitten and dog and kitten"
 	// (reported 2026-07-28). Every row now reads the paragraph in its final state.
 	//
-	// The range each row stored is still the one to read: the walk only ever moves forward, so
-	// every replacement after this row's happened LATER in the story and cannot shift its start or
-	// end - true whatever the change string's length. Reading it later is also no more work than
-	// reading it early, being the same one read per replaced row.
+	// ***** FROM THE CARRIED RANGE, NOT THE ONE THE MODEL HOLDS. ***** This said "the range each row
+	// stored is still the one to read: the walk only ever moves forward" until 2026-09-25, and the
+	// walk does not - see PassedRow for the two measured ways it goes back. passedRows has every row
+	// the report will show that sits in this chapter's text (replaced, locked, refused), each carried
+	// past every replacement made after it was taken, so SetHitRange hands the model the range the
+	// text stands at now and the line and the hash are both read from there.
+	//
+	// Nothing to do when nothing was replaced: then nothing moved, and every range is already true.
 	//
 	// Reading, not writing, so it needs no command sequence of its own - and it opens none. It runs
 	// INSIDE whichever sequence the caller has standing (there is no per-chapter sequence any more -
 	// see the note above the walk), which costs nothing, because not one step of it is a command.
 	// A run the user cancels does reach this point, and reads text that is about to be rolled back -
-	// but the rows are rolled back with it (KBSResultModel::RollBackRows), so nothing of it survives.
-	if (!replacedRows.empty())
+	// but the rows are rolled back with it (KBSResultModel::RollBackRows - SetHitRange and
+	// SetHitSegments both back the row up first), so nothing of it survives.
+	if (replacedCount > 0)
 	{
 		IDataBase* const db = docRef.GetDataBase();
-		for (size_t r = 0; r < replacedRows.size(); ++r)
+		for (size_t r = 0; r < passedRows.size(); ++r)
 		{
-			const int32 hi = replacedRows[r];
-			UID rowStory = kInvalidUID;
-			TextIndex rowStart = kInvalidTextIndex, rowEnd = kInvalidTextIndex;
-			if (!KBSResultModel::GetHitReplacedRange(chapterIdx, hi, rowStory, rowStart, rowEnd)
-				|| rowStory == kInvalidUID)
+			const PassedRow& passed = passedRows[r];
+			if (passed.story == kInvalidUID)
 				continue;
+			KBSResultModel::SetHitRange(chapterIdx, passed.hitIdx, passed.story, passed.start, passed.end);
 			// ***** BOTH of the row's descriptions of itself, read from the SAME range, written in
 			// the SAME call. ***** The three segments are what the row DRAWS; the hash is what the
 			// same-occurrence test COMPARES, and a jump into this row runs that test. Reading only
 			// the segments left the hash describing the text that was here BEFORE the replacement,
 			// so every replaced row answered a click with "the replacement is no longer here"
 			// (2026-08-04 to 2026-08-05 - see SetHitSegments).
-			const UIDRef rowStoryRef(db, rowStory);
+			const UIDRef rowStoryRef(db, passed.story);
 			PMString pre, match, post;
-			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, rowStart, rowEnd, pre, match, post);
-			KBSResultModel::SetHitSegments(chapterIdx, hi, pre, match, post,
-				KBSSearchEngine::HashMatchText(rowStoryRef, rowStart, rowEnd));
+			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, passed.start, passed.end, pre, match, post);
+			KBSResultModel::SetHitSegments(chapterIdx, passed.hitIdx, pre, match, post,
+				KBSSearchEngine::HashMatchText(rowStoryRef, passed.start, passed.end));
 		}
 	}
 

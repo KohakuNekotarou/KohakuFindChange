@@ -706,28 +706,49 @@ namespace KBSResultModel
 	    the guarantee: an edit that removes a whole frame between the search and the replace makes the
 	    Nth match a match in a LATER story. The row then held one story with the other story's range,
 	    so the line read back at the end of the chapter, and the hash taken from it, both came from
-	    text that has nothing to do with this row (SetHitSegments, GetHitReplacedRange).
+	    text that has nothing to do with this row (SetHitSegments, SetHitRange).
 
 	    The three displayed segments are deliberately NOT set here: several matches can share one
 	    paragraph, and a line read at the moment ITS match was written still shows the later matches
 	    in that paragraph unreplaced. The replace pass fills them in once the chapter is finished -
-	    see SetHitSegments and GetHitReplacedRange. Until then the row still shows what the search
-	    found, which is why a run that is cancelled between the two can be rolled back as one. */
+	    see SetHitSegments and SetHitRange. Until then the row still shows what the search found,
+	    which is why a run that is cancelled between the two can be rolled back as one.
+
+	    ***** THE RANGE GIVEN HERE IS WHERE THE TEXT WAS WRITTEN, NOT WHERE IT ENDS UP. ***** A later
+	    replacement in the same story can move it - the walk does not go in TextIndex order (see
+	    SetHitRange) - so the replace pass keeps its own copy of the range, carries it forward, and
+	    hands the final one over through SetHitRange before it reads the line. */
 	void MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStoryUID,
 		TextIndex newStart, TextIndex newEnd);
 
-	/** Where a REPLACED row's new text sits: its story and the range MarkHitReplaced recorded.
-	    The replace pass walks its chapter's rows with this at the end of the run to read each
-	    replaced line back in its final state.
-	    @return false for an index out of range, and for any row that was not replaced - so the
-	            caller's loop needs no flag test of its own. */
-	bool GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
-		TextIndex& outEnd);
+	/** Move a row to where its text stands NOW: the story and range the replace pass last saw it at,
+	    carried forward past every later replacement in the same story. Nothing else on the row is
+	    touched; SetHitSegments follows it with the line read from that range.
+
+	    ***** WHY A REPLACE HAS TO MOVE ROWS IT DID NOT WRITE TO. ***** The report a replace leaves
+	    (KeepCheckedRows) keeps the rows it changed AND the ones it left alone - locked, refused - and
+	    every one of them is jumped to by its stored range. A replacement that changes the length of
+	    the text earlier in the same story moves all of those, whether the row was written to or not;
+	    a row left at the range the search found it at was then jumped to off by that much, failed the
+	    same-occurrence test, and was stamped "missing" with "the text is no longer where the search
+	    left it" - about text that was exactly where it had been (measured 2026-09-25: a story
+	    threaded into a locked frame, one replacement in the unlocked frame before it).
+
+	    ***** AND "EARLIER" IS NOT "VISITED EARLIER". ***** The walk visits a table's cells where the
+	    table stands in the text - while the cells' own characters live AFTER the whole body in
+	    TextIndex terms (ITableTextContent.h:41-44) - and it walks backwards when the Find/Change
+	    dialog is set to search backwards. Both measured 2026-09-25; in both, a replacement made
+	    LATER in the walk moved rows written EARLIER, which is what the range carried forward covers.
+
+	    Backed up like every other change a replace makes, so a cancel puts the row back too. */
+	void SetHitRange(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 
 	/** Give a row what it now stands for: the three text segments it DISPLAYS, and the hash the
 	    same-occurrence test COMPARES. The other half of MarkHitReplaced: the replace pass calls it
-	    once per replaced row after the chapter's last replacement, when the paragraphs have stopped
-	    moving. Every other field is left alone.
+	    after the chapter's last replacement, when the paragraphs have stopped moving - for every
+	    replaced row, and since 2026-09-25 for the rows the report keeps without writing to them
+	    (locked, refused), each straight after SetHitRange has moved it. Every other field is left
+	    alone.
 
 	    ***** THE HASH GOES IN THE SAME CALL, AND IT HAS TO. ***** The two describe one fact - what
 	    this row points at now - and a row carrying one of them from before the replacement and the

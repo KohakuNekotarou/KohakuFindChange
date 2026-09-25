@@ -1176,21 +1176,24 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.checked = false;
 }
 
-bool KBSResultModel::GetHitReplacedRange(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
-	TextIndex& outStart, TextIndex& outEnd)
+// (GetHitReplacedRange stood here until 2026-09-25: the replace pass read a replaced row's range
+//  back from the model to fetch its line. The range the model holds is where the text was WRITTEN,
+//  and a later replacement in the same story can move it, so the pass now keeps the range itself,
+//  carries it forward and hands the final one over - SetHitRange, below.)
+
+void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start,
+	TextIndex end)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
+		return;
+	Chapter& c = gChapters[chapterIdx];
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
-	if (!h.replaced)
-		return false;
-	outStoryUID = h.storyUID;
-	outStart = h.textStart;
-	outEnd = h.textEnd;
-	return true;
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.storyUID = storyUID;
+	h.textStart = start;
+	h.textEnd = end;
 }
 
 void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
