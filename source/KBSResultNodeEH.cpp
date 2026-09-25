@@ -30,14 +30,14 @@
 //  (KBSJump.h). Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
 //  note explains why it cannot simply be done inside ButtonDblClk.
 //
-//  ***** AND THE FIRST CLICK'S MARKER WAITS TO SEE WHETHER IT WAS ONE. ***** Because the jump runs on
-//  the first button-up, a double click used to jump (marker up) and then select (marker down), showing
-//  a red flash of a marker that was never meant to be seen. The jump from here therefore BOOKS its
-//  marker for the double-click interval instead of raising it - the move is immediate, only the
-//  marker waits - and the ordinary ClearMarker at the end of a successful SelectHitText is what calls
-//  the booking off. Nothing in this file cancels it, deliberately: a double click that is REFUSED
-//  (overset, locked, hidden, stale) never reaches that ClearMarker, so its marker still appears,
-//  which is the rule that a refusal is still pointed at. See KBSDrawEventHandler.h.
+//  ***** THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. ***** The
+//  jump runs on the first button-up and raises its marker there; a double click then selects, and
+//  the ordinary ClearMarker at the end of a successful SelectHitText takes the marker down. A double
+//  click that is REFUSED (overset, locked, hidden, stale) never reaches that ClearMarker, so its
+//  marker stays up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode
+//  jump keeps, and the user asked for it (2026-09-25). From 2026-08-09 until then the first click's
+//  marker was BOOKED for the double-click interval instead, so a double click never flashed one - at
+//  the price of every single click's marker arriving about half a second after the view had moved.
 //
 //  The row's "replace me" check box is a real widget of its own (kKBSResultCheckWidgetBoss) that
 //  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
@@ -209,10 +209,11 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	}
 	else
 	{
-		// kTrue = this click may still turn out to be the first half of a double click, so the jump's
-		// MARKER is booked rather than raised (KBSJump.h). The move itself is not deferred: the
-		// document fronts and the view scrolls now, as it always did.
-		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit(), /*deferMarkerUntilClickSettles*/ true);
+		// The jump, and its marker, now - even though this click may yet turn out to be the first half
+		// of a double click. Then the second click selects and SelectHitText takes the marker down,
+		// the beat KCM's Story-mode jump keeps (2026-09-25; the marker used to be booked for the
+		// double-click interval - see KBSJump.h).
+		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 	}
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on

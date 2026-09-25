@@ -11,8 +11,9 @@
 //
 //  ***** WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. ***** The header used to say an
 //  idle task was the SDK's only main-thread "call me back in n ms". It is not: ICallbackTimer is
-//  one too (ICallbackTimer.h:38 - it derives from IIdleTask) and KBSBookWatch's ArmRetireTimer,
-//  KBSPanelAlpha's reapply chase and KBSDrawEventHandler's own click-settles booking all use it.
+//  one too (ICallbackTimer.h:38 - it derives from IIdleTask) and KBSBookWatch's ArmRetireTimer and
+//  KBSPanelAlpha's reapply chase both use it (so did KBSDrawEventHandler's click-settles booking,
+//  until it was removed on 2026-09-25).
 //  (Named rather than numbered: both line references here were pointing at the wrong lines by
 //  2026-08-11 - one of them at a closing brace - and the count "twice" had become three.)
 //  It is not taken here because its callback is a plain function

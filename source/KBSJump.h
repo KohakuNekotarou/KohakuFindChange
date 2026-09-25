@@ -11,11 +11,11 @@
 //  the match, VS-style. ***** A DOUBLE click does (2026-08-09): SelectHitText switches to the Type
 //  tool and highlights the match, for when pointing is not what was wanted. The two are deliberately
 //  different - a single click can be spent freely because it changes nothing in the document, and
-//  that is only true while it does not select. ***** FROM THE MOUSE THE MARKER IS BOOKED, NOT RAISED
-//  (2026-08-09): the move happens at once, but the marker waits until the click is known not to have
-//  been the first half of a double click, so a double click that selects never shows one. The
-//  deferMarkerUntilClickSettles parameter below carries that, and
-//  KBSDrawEventHandler::SetMarkerAfterClickSettles is where it is explained. With "Hide Previous Chapter" ON, every other displayed clean document is
+//  that is only true while it does not select. ***** THE MARKER COMES UP AT ONCE, FROM BOTH DOORS
+//  (2026-09-25). ***** From 2026-08-09 a mouse click's marker was booked for the double-click
+//  interval so that a double click never flashed one; the user asked for it on the same beat as
+//  KCM's Story-mode jump instead, which raises its flash straight away and lets the double click's
+//  selection take it back down (SelectHitText ends in ClearMarker). With "Hide Previous Chapter" ON, every other displayed clean document is
 //  closed as the jump lands. Ported from KESCL's jump machinery (KESCL left untouched), simplified
 //  to a static snapshot (no match-list navigation, no edit-repair, no reverse mode).
 //
@@ -32,20 +32,15 @@ namespace KBSJump
 	    location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is
 	    raised - those pixels belong to the indicator, not to the text.
 
-	    @param deferMarkerUntilClickSettles kTrue from the MOUSE, where this jump may turn out to be
-	           the first half of a double click. The move itself is never deferred - the document
-	           fronts and the view scrolls at once - but the MARKER waits out the double-click
-	           interval, so a double click that goes on to select never shows one
-	           (KBSDrawEventHandler::SetMarkerAfterClickSettles, which explains why it cannot simply
-	           be tested for). kFalse from the keyboard walk: there is no double arrow-key, so it has
-	           nothing to wait for and its marker appears at once, as it always has.
+	    The marker comes up at once, whichever door asked (see the note at the head of this header -
+	    the mouse's used to be booked for the double-click interval, and took a parameter to say so).
 
 	    @note NOTHING OUTSIDE THIS FILE CALLS THIS (measured 2026-08-11): both doors - the row click
 	          and the keyboard walk - go through ActivateNode, which is where the "one activation at a
 	          time" guard lives. Kept public because it is the operation this file is named for and
 	          reads as the header's subject; but a new caller reaching it directly would bypass that
 	          guard, so go through ActivateNode. */
-	void JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles);
+	void JumpToHit(int32 chapterIdx, int32 hitIdx);
 
 	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if
 	    the user closed it since the search. Does NOT scroll and raises no marker - a chapter row
@@ -64,10 +59,10 @@ namespace KBSJump
 	    walk, which is why it exists - two callers must not drift apart.
 	    @param chapterIdx the chapter index, or -1 for the book row.
 	    @param hitIdx the hit index, or -1 when the row is not a hit row.
-	    @param deferMarkerUntilClickSettles passed straight to JumpToHit - see there. The one thing
-	           the two callers differ on, and the reason it is spelled out at both of them rather than
-	           defaulted: a mouse click may be half of a double click, an arrow key never is. */
-	void ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles);
+	    (A third parameter said whether the marker should wait out the double-click interval - the
+	    one thing the two callers differed on - until 2026-09-25, when the marker came to be raised
+	    at once from both. See the note at the head of this header.) */
+	void ActivateNode(int32 chapterIdx, int32 hitIdx);
 
 	/** SELECT the match in the document: switch to the Type tool and highlight the hit's own range,
 	    so the user can edit or copy it straight away. The DOUBLE-CLICK half of a hit row - a single

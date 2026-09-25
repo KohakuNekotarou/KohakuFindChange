@@ -651,7 +651,7 @@ public:
 
 }
 
-void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles)
+void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef docRef;
 	IDFile file;
@@ -789,15 +789,13 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilCli
 			// match - which is the useful thing: it shows WHERE the hit used to be. That it is not
 			// there any more is said by the status line and by the word on the row itself.
 			//
-			// From the MOUSE it is BOOKED rather than raised: this jump may be the first half of a
-			// double click, and the selection that a double click makes would take the marker straight
-			// back down again - a red flash of something that was never meant to be seen (user's call,
-			// 2026-08-09). Booking it means it simply never appears in that case. Both calls take the
-			// old marker down first, so the two behave alike in every other way.
-			if (deferMarkerUntilClickSettles)
-				KBSDrawEventHandler::SetMarkerAfterClickSettles(db, matchSpread, pbRect);
-			else
-				KBSDrawEventHandler::SetMarker(db, matchSpread, pbRect);
+			// AT ONCE, from the mouse as from the keyboard - the beat KCM's Story-mode jump flash
+			// keeps (user's request, 2026-09-25). From 2026-08-09 the mouse's marker was booked for
+			// the double-click interval, so that a double click that selects never flashed one; it
+			// came up about half a second after the view had moved, which is what was asked to go. A
+			// double click now shows the marker for that moment and SelectHitText's ClearMarker takes
+			// it down when the selection is made - exactly what KCM does ("THE MARK COMES DOWN").
+			KBSDrawEventHandler::SetMarker(db, matchSpread, pbRect);
 		}
 		else
 		{
@@ -1114,13 +1112,12 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	return true;
 }
 
-void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntilClickSettles)
+void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 {
 	// One door for every row, so a click and a keyboard walk can never drift apart - the reason
-	// this exists at all is that there are now two callers. What they legitimately differ on is
-	// carried as a parameter rather than left to each of them: only a mouse click can be half of a
-	// double click. It is spelled out at both call sites (no default) so that neither can acquire the
-	// other's answer by accident.
+	// this exists at all is that there are now two callers. (They differed in one thing until
+	// 2026-09-25 - whether the marker waited out the double-click interval - and it was carried here
+	// as a parameter. Both raise it at once now; see the note at the head of KBSJump.h.)
 
 	// A previous landing is still inside its own document-open - the click is dropped, exactly as
 	// the keyboard walk drops its key (see gActivating above JumpToHit).
@@ -1129,7 +1126,7 @@ void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx, bool deferMarkerUntil
 	ActivationGuard activationGuard;
 
 	if (hitIdx >= 0)
-		JumpToHit(chapterIdx, hitIdx, deferMarkerUntilClickSettles);
+		JumpToHit(chapterIdx, hitIdx);
 	else if (chapterIdx >= 0)
 		ShowChapter(chapterIdx);
 	else if (chapterIdx == -1)

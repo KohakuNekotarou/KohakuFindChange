@@ -54,21 +54,13 @@
 #include "GraphicTypes.h"		// kPMBlendDifference / kPMBlendExclusion (Phase A probe)
 #include "PMString.h"
 
-// A marker asked for by the MOUSE is booked rather than raised - see SetMarkerAfterClickSettles:
-#include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
-#include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
-#include "ShuksanID.h"			// kCallbackTimerBoss / IID_ICALLBACKTIMER
+// (ICallbackTimer / CreateObject / ShuksanID and <windows.h> stood here for the mouse's booked
+//  marker and ::GetDoubleClickTime, both gone since 2026-09-25 - see the note over sMarkerShutdown.)
 
 // Project includes:
 #include "KBSID.h"
 #include "KBSDrawEventHandler.h"
 #include "KBSMarkerExpiryIdleTask.h"	// the countdown that takes the marker back off the screen
-
-// *windows.h goes AFTER the SDK headers, so its macros cannot collide with SDK names (the same order
-//  KBSPanelAlpha.cpp:84-87 keeps). Wanted here for ::GetDoubleClickTime alone.
-#ifdef WINDOWS
-#include <windows.h>
-#endif
 
 CREATE_PMINTERFACE(KBSDrawEventHandler, kKBSDrawEventHandlerImpl)
 
@@ -133,125 +125,45 @@ static void KBSRepaintViews(IDataBase* db)
 }
 
 //----------------------------------------------------------------------------------------
-// The booking: a marker the MOUSE asked for waits until the click is known to have been single
+// No booking any more: a marker is raised the moment the jump lands (2026-09-25)
 //----------------------------------------------------------------------------------------
 //
-// ***** WHAT THIS EXISTS FOR. ***** A double click on a hit row jumps on the FIRST button-up and
-// selects on the second (KBSResultNodeEH.cpp). The jump raised the marker as it landed and the
-// selection took it straight back down again, so every double click showed a red flash of a marker
-// that was never meant to be seen at all (user's call, 2026-08-09: when a double click selects, the
-// single click's marker should not appear). Whether a click is single cannot be TESTED for at the
-// moment the jump runs - see the header - so the marker waits the double-click interval out instead,
-// and a second click inside that interval calls the wait off.
-//
-// File statics rather than members, like the marker they belong to: this is one booking for "the
-// click going on right now", and one click happens at a time.
-static ICallbackTimer* sPendingTimer  = nil;
-static bool16          sHasPending    = kFalse;
-static IDataBase*      sPendingDB     = nil;				// an ADDRESS - see sPendingDocPath
-static PMRect          sPendingPb     = PMRect(0, 0, 0, 0);
-static PMString        sPendingDocPath;						// the file that document lived in when booked
-static UID             sPendingSpread = kInvalidUID;		// the spread, carried through the wait
+// ***** A MOUSE CLICK'S MARKER USED TO WAIT OUT THE DOUBLE-CLICK INTERVAL. ***** From 2026-08-09
+// the jump booked it on a one-shot timer for ::GetDoubleClickTime (500 ms by default) and raised it
+// only if no second click came, so that a double click that goes on to select never flashed one.
+// The user asked for the marker to come up on the same beat as KCM's Story-mode jump instead
+// (2026-09-25) - and KCM raises its flash at once and takes it back down when the double click's
+// selection succeeds (KCMStoryJump.cpp: "THE MARK COMES DOWN"). That is what this does now: the
+// jump raises the marker straight away (SetMarker), and SelectHitText's ClearMarker takes it down
+// on a successful double click, a refused one leaving it standing as before. The timer, the booked
+// state and SetMarkerAfterClickSettles went with it.
 
-// **Never book again once ShutdownCleanup has run - belt and braces with the release it does. The
-//   callback below is a raw function pointer into this .pln, and nothing may be holding one as the
-//   module goes down (KBSPanelAlpha.cpp's sPanelAlphaShutdown keeps the same guard for the same
-//   reason - named rather than numbered, the line reference having drifted to a paragraph about a
-//   removed diagnostic).
+// **Nothing is set or cleared once ShutdownCleanup has run: both repaint, and the marker's document
+//   may be half torn down by then (see ClearMarker).
 static bool16          sMarkerShutdown = kFalse;
-
-// Windows' default, used where the real setting cannot be had.
-static const uint32 kKBSDoubleClickIntervalFallbackMs = 500;
-
-// How long "not a double click" takes. The USER'S OWN setting: someone who has set a slow double
-// click would otherwise get the marker up in the middle of one, which is the whole thing this is
-// here to stop. A zero would mean "never wait", so it is floored.
-static uint32 KBSDoubleClickInterval()
-{
-#ifdef WINDOWS
-	const uint32 ms = static_cast<uint32>(::GetDoubleClickTime());
-	return (ms > 0) ? ms : kKBSDoubleClickIntervalFallbackMs;
-#else
-	// Mac: the platform's own setting lives behind NSEvent's doubleClickInterval, which is not
-	// reachable from here; the Windows default stands in until this is ported.
-	return kKBSDoubleClickIntervalFallbackMs;
-#endif
-}
-
-// Call the booking off. Two callers, each one door of "the newest display wins": ClearMarker
-// (whose place in the double-click machinery the header explains) and SetMarker (the keyboard
-// walk's immediate marker, which must not be overwritten by a booking an earlier mouse click left
-// armed - 2026-08-09).
-static void KBSCancelPendingMarker()
-{
-	// Nothing armed, nothing to stop. This is not just a shortcut: the timer's own callback clears
-	// sHasPending and then raises the marker through SetMarker, and this early exit is what keeps
-	// that path from calling StopTimer on the very timer it is running inside.
-	if (!sHasPending)
-		return;
-
-	if (sPendingTimer != nil)
-		sPendingTimer->StopTimer();
-	sHasPending    = kFalse;
-	sPendingDB     = nil;
-	sPendingSpread = kInvalidUID;
-	sPendingDocPath.Clear();
-}
-
-// The interval has passed with no second click, so that was a single click after all: up it goes.
-static uint32 KBSPendingMarkerProc(void* /*refPtr*/)
-{
-	// *Do not Release the timer in here - releasing itself from inside its own callback is
-	//  self-destruction. The release is in ShutdownCleanup and nowhere else (the same rule
-	//  KBSShutdownPanelAlpha follows for its own timer).
-	if (!sHasPending)
-		return IIdleTask::kEndOfTime;
-
-	IDataBase*     db     = sPendingDB;
-	const PMRect   pb     = sPendingPb;
-	const PMString path   = sPendingDocPath;
-	const UID      spread = sPendingSpread;
-	sHasPending    = kFalse;
-	sPendingDB     = nil;
-	sPendingSpread = kInvalidUID;
-	sPendingDocPath.Clear();
-
-	// ***** THE DOCUMENT MAY HAVE GONE IN THE MEANTIME. ***** Half a second is ample time to close
-	// one, and sPendingDB is an address that is then free to be handed to the next document opened.
-	// So it is not dereferenced until the document list has been asked for it AND the file agrees -
-	// the two tests HandleDrawEvent below makes, for the same reason and in the same order.
-	if (db == nil)
-		return IIdleTask::kEndOfTime;
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	InterfacePtr<IDocumentList> docList(app ? app->QueryDocumentList() : nil);
-	if (docList == nil || docList->FindDocByDataBase(db) == nil)
-		return IIdleTask::kEndOfTime;		// closed since the click - nothing left to point at
-	if (!(KBSMarkerDocPath(db) == path))
-		return IIdleTask::kEndOfTime;		// same address wearing a different document
-
-	KBSDrawEventHandler::SetMarker(db, spread, pb);
-
-	// **kEndOfTime, not 0. The return value is IIdleTask::RunTask's reschedule, and **0 means "call
-	//   me again immediately"** - which has frozen InDesign before (KESCM's tracker, 2026-07-26).
-	return IIdleTask::kEndOfTime;
-}
 
 void KBSDrawEventHandler::SetMarker(IDataBase* db, UID spreadUID, const PMRect& pbRect)
 {
 	// Nothing at all once ShutdownCleanup has run - this repaints, and the marker's document may be
-	// half torn down by then. Same door SetMarkerAfterClickSettles has kept since 2026-08-09; it is
-	// here now because the rule belongs to the functions that touch a document, not to one of them.
-	// See ClearMarker for how the same guarantee was being made from outside instead.
+	// half torn down by then. The rule belongs to the functions that touch a document, not to their
+	// callers. See ClearMarker for how the same guarantee was once being made from outside instead.
 	if (sMarkerShutdown)
 		return;
 
-	// ***** AN OUTSTANDING BOOKING DIES HERE TOO. ***** The immediate marker's one caller is the
-	// keyboard walk (JumpToHit with defer off), and an arrow key pressed within the double-click
-	// interval of a mouse click used to leave that click's booking armed - it fired half a second
-	// later and stamped the PREVIOUS row's rectangle over the row the user had walked to (found in
-	// the 2026-08-09 pre-submission sweep). The deferred sibling below has always cancelled through
-	// its leading ClearMarker; this is the same rule at the other door: the newest display wins.
-	KBSCancelPendingMarker();
+	// (A pending "booked" marker was cancelled here until 2026-09-25, so that an arrow key pressed
+	//  inside the double-click interval of a mouse click could not be overwritten by that click's
+	//  booking half a second later. Both doors raise the marker at once now - see the note over
+	//  sMarkerShutdown - so there is nothing left pending to overwrite it.)
+
+	// ***** THE PREVIOUS MARKER'S DOCUMENT IS REPAINTED TOO, when the marker leaves it. ***** Only
+	// one marker exists, and the draw side paints it for sMarkerDB alone - so moving it to another
+	// document stops it being PAINTED there, but the pixels already on screen stay until that view is
+	// next redrawn. The mouse's booked marker used to clear first (ClearMarker repaints the old
+	// document) and so never showed this; since the mouse raises its marker here directly
+	// (2026-09-25), the repaint it relied on is made here, for both doors. KBSRepaintViews resolves
+	// the address through the document list before touching it, so an old document that has closed
+	// in the meantime is safe to name.
+	IDataBase* const previousDB = sHasMarker ? sMarkerDB : nil;
 
 	sMarkerDB     = db;
 	sMarkerPb     = pbRect;
@@ -260,6 +172,8 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, UID spreadUID, const PMRect& 
 	// Taken NOW, while the document is certainly alive - the jump has just been in it. See
 	// KBSMarkerDocPath for what it is for.
 	sMarkerDocPath = KBSMarkerDocPath(db);
+	if (previousDB != nil && previousDB != db)
+		KBSRepaintViews(previousDB);
 	KBSRepaintViews(db);
 
 	// The marker is a flash, not a highlight: hand it to the timer that takes it away again.
@@ -268,43 +182,9 @@ void KBSDrawEventHandler::SetMarker(IDataBase* db, UID spreadUID, const PMRect& 
 	KBSMarkerExpiryIdleTask::Start();
 }
 
-void KBSDrawEventHandler::SetMarkerAfterClickSettles(IDataBase* db, UID spreadUID, const PMRect& pbRect)
-{
-	// ***** ONCE ShutdownCleanup HAS RUN, NOTHING AT ALL - not even the clear. ***** ClearMarker
-	// repaints the marker's document, and that is precisely what this file's ShutdownCleanup says
-	// must not happen from then on: the document may be half torn down by the time teardown reaches
-	// here. Asked BEFORE the clear rather than beside the nil test after it, so this function cannot
-	// do the one thing the header forbids (2026-08-09 re-check). No path is known to arrive after
-	// shutdown - the mouse is not being dispatched by then - and one line makes it impossible.
-	if (sMarkerShutdown)
-		return;
-
-	// ***** THE OLD MARKER GOES NOW, not when the booking fires. ***** The view has just jumped
-	// somewhere else, so a marker left standing over the previous hit for half a second would be
-	// pointing at a place the user has left. This is also what cancels any booking still outstanding
-	// (ClearMarker calls KBSCancelPendingMarker), so the newest click always wins.
-	ClearMarker();
-
-	if (db == nil)
-		return;
-
-	if (sPendingTimer == nil)
-		sPendingTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
-	if (sPendingTimer == nil)
-	{
-		// No timer to be had: raise it now rather than lose it. A marker that flashes on a double
-		// click is the behaviour this replaced; a marker that never appears would be worse than both.
-		SetMarker(db, spreadUID, pbRect);
-		return;
-	}
-
-	sPendingDB      = db;
-	sPendingPb      = pbRect;
-	sPendingSpread  = spreadUID;
-	sPendingDocPath = KBSMarkerDocPath(db);	// taken NOW, while the document is certainly alive
-	sHasPending     = kTrue;
-	sPendingTimer->StartTimer(KBSPendingMarkerProc, KBSDoubleClickInterval(), nil);
-}
+// (SetMarkerAfterClickSettles stood here from 2026-08-09 to 2026-09-25 - the mouse's booked marker.
+//  See the note over sMarkerShutdown for why it went, and SetMarker for the one thing it did that
+//  SetMarker now does itself: take the previous marker off a document the jump has left.)
 
 void KBSDrawEventHandler::ClearMarker()
 {
@@ -320,12 +200,6 @@ void KBSDrawEventHandler::ClearMarker()
 	if (sMarkerShutdown)
 		return;
 
-	// ***** THE BOOKING GOES FIRST. ***** Taking an outstanding marker off here, rather than at the
-	// place that knows about double clicks, is what lets every existing caller of ClearMarker do the
-	// right thing without being changed - including the two that decide a double click's outcome. See
-	// SetMarkerAfterClickSettles in the header.
-	KBSCancelPendingMarker();
-
 	// Disarm first - this is also the path the timer itself takes, where Stop() is a no-op
 	// because the task has already come off the queue by then.
 	KBSMarkerExpiryIdleTask::Stop();
@@ -340,21 +214,10 @@ void KBSDrawEventHandler::ClearMarker()
 
 void KBSDrawEventHandler::ShutdownCleanup()
 {
-	// **The booking timer, and no more bookings ever. *Its callback is a raw function pointer into
-	//   this .pln, so a live booking as the module goes down is a crash - the one thing here that is
-	//   not merely tidiness. ClearMarker is still the wrong call (it repaints), so the booking is
-	//   dropped by hand instead.
+	// **No more markers from here on: SetMarker and ClearMarker both repaint, and ClearMarker is the
+	//   wrong call now for that reason. (The booking timer the mouse used was stopped and released
+	//   here too until 2026-09-25, when the booking went - see the note over sMarkerShutdown.)
 	sMarkerShutdown = kTrue;
-	if (sPendingTimer != nil)
-	{
-		sPendingTimer->StopTimer();
-		sPendingTimer->Release();		// the reference ::CreateObject handed over
-		sPendingTimer = nil;
-	}
-	sHasPending    = kFalse;
-	sPendingDB     = nil;
-	sPendingSpread = kInvalidUID;
-	sPendingDocPath.Clear();			// a static PMString - emptied for the reason sMarkerDocPath is
 
 	// State only - no repaint, nothing asked of any document. See the header: at this point the
 	// marker's document may already be going away, and KBSRepaintViews would go looking for it.

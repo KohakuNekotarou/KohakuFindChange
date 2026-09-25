@@ -122,12 +122,10 @@ bool16 KBSResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	if (!node->IsHitRow())
 		treeMgr->ExpandNode(selected[0], kFalse /*expandAllDescendants*/);
 
-	// The row's action - the same one a click on it would run.
-	//
-	// kFalse = raise the marker at once. That is the one thing this does NOT share with the click:
-	// there the marker waits to find out whether a second click is coming, and there is no such thing
-	// as a double arrow-key, so waiting here would only make every step of the walk point late.
-	KBSJump::ActivateNode(node->GetChapter(), node->GetHit(), /*deferMarkerUntilClickSettles*/ false);
+	// The row's action - the same one a click on it would run, marker and all (the click's marker
+	// used to wait out the double-click interval and this one did not; both come up at once since
+	// 2026-09-25 - see KBSJump.h).
+	KBSJump::ActivateNode(node->GetChapter(), node->GetHit());
 
 	// That action activated a document window - or, on a book row, the Book panel - which took the
 	// key focus with it. Take it back, or the NEXT arrow press lands in the document instead of
