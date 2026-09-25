@@ -25,8 +25,9 @@
 //
 //    3. the PALETTE MANAGER SERVICE (IPaletteMgrService, kPaletteMgrService) - what the Book panel
 //       ITSELF hangs off (kBookPanelStartupShutdownBoss is the product's only implementation,
-//       Service_Registry_Memory_Dump.txt:2761). Its PaletteMgrStarted is where the observer and the
-//       interceptor go in (measured: it IS called for a third-party provider), because the startup
+//       Service_Registry_Memory_Dump.txt:2761). Its PaletteMgrStarted is where the observer and -
+//       only while the toggle is ON - the interceptor go in (measured: it IS called for a third-party
+//       provider; the toggle itself puts the interceptor in and out after that), because the startup
 //       service is too early for the panel manager (KBSPanelAlpha.cpp says why); PaletteMgrAboutTo-
 //       Shutdown is where they come out.
 //
@@ -46,6 +47,9 @@
 //      360x420 left the panel inside at 302x224 - the size has to go through OWL, not the window.
 //      *The Book panel rounds its own height: asked for 380x420, it came back 380x400
 //       (ConstrainDimensions). A size the user dragged to already obeys that rule, so it round-trips.
+//      *A size whose bottom would land below the screen at the new place is shortened before it is
+//       put on (FitHeightToScreen - the product's ForceBottomOfPanelOnMonitor, LinksUIUtils.cpp:613-629,
+//       asked of the place to come because OWL moves the dock asynchronously).
 //    Collapsed to icons = the TAB PANE's mode, and the width of the icon strip is the tab pane's
 //      "preferred iconic width" (PaletteRefUtils.h:300-312) - both put back last, on a panel that has
 //      already been moved and sized expanded. (Confirmed working by the user, 2026-09-25.)
@@ -91,6 +95,7 @@
 #include "CPMUnknown.h"
 #include "CreateObject.h"		// ::CreateObject / ::CreateObject2
 #include "CServiceProvider.h"
+#include "IDThreadingPrimitives.h"	// IsMainThreadDomain - the interceptor's gate (see KBSBookPanelCmdWatch)
 #include "PaletteRef.h"
 #include "PaletteRefUtils.h"	// the palette tree: walk it, measure it, move things about in it
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
@@ -538,7 +543,10 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
 /** Would the palette's title band land on a screen if put here? Asked of the screen that holds most
     of the rectangle (IMonitorInfo::GetBestScreenRect handles more than one monitor - KCM's
     KeepPanelOnScreen asks it the same way). "Cannot tell" answers no: a palette left where it
-    opened is a smaller fault than one put where nobody can reach it. */
+    opened is a smaller fault than one put where nobody can reach it.
+    *Only the TOP is judged here, and that is enough for a yes: a bottom edge that would land below
+    the screen is not a reason to give up the whole placement - FitHeightToScreen shortens the panel
+    instead. */
 bool TitleBandIsOnScreen(const Placement& p)
 {
 	ISession* session = GetExecutionContextSession();
@@ -565,6 +573,49 @@ bool TitleBandIsOnScreen(const Placement& p)
 		return false;
 
 	return true;
+}
+
+/** The size to give the book panel so that, at the place it is ABOUT TO BE MOVED TO, its bottom edge
+    stays on the screen. panelLeft / panelTop are where the panel itself (not its dock) will be.
+
+    ***** The product's rule, and the sibling's. ***** linksui's ForceBottomOfPanelOnMonitor
+    (LinksUIUtils.cpp:613-629) runs right after a FLOATING panel is resized (:723 -> :735): ask which
+    screen the panel is on (GetBestScreenRect), and if its bottom is below that screen's, shrink it by
+    the difference plus 2. KCM copied it as KeepPanelOnScreen (KCMStorySection.cpp). This file took
+    only the "which screen" question from there at first and left the shrink behind (API audit,
+    2026-09-25, A-1) - so a height remembered on a tall screen came back, on a shorter one or after
+    the monitors were rearranged, with the panel's bottom and its resize grip out of reach.
+
+    ***** WHY IT IS ASKED OF THE PLACE TO COME, NOT READ OFF THE VIEW AS THE PRODUCT DOES. *****
+    linksui only RESIZES its panel where it stands; this file also MOVES it, and OWL applies a
+    SetPalettePosition asynchronously (PaletteRefUtils.h:40-42). Measured 2026-09-25 with the product's
+    shape (resize, then read GetBBox/WindowToGlobal): the view still stood at the old place - bottom
+    694, on the 728 screen, so nothing was shrunk - and a moment later the dock arrived at the new
+    place with its bottom at 971, well off the screen. Reading after the layout would need
+    ForcePaletteSystemToPerformLayout, which the header reserves for test code ("use sparingly").
+    So the rule is applied to the rectangle the panel is about to occupy, the way TitleBandIsOnScreen
+    judges the top.
+    The shrunk size goes through ConstrainDimensions like every size here: the Book panel rounds its
+    own height and knows its own minimum. At that minimum the bottom can still be past the screen -
+    the product accepts the same, and so does this. */
+PMPoint FitHeightToScreen(IControlView* panelView, SysCoord panelLeft, SysCoord panelTop, const PMPoint& size)
+{
+	ISession* session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
+	if (panelView == nil || app == nil)
+		return size;
+	InterfacePtr<const IMonitorInfo> monInfo(app, UseDefaultIID());
+	if (monInfo == nil)
+		return size;
+
+	SysRect wanted;
+	::SetSysRectLTWH(wanted, panelLeft, panelTop, ::ToInt32(size.X()), ::ToInt32(size.Y()));
+	const GSysRect screen = monInfo->GetBestScreenRect(wanted);
+	if (SysRectBottom(screen) >= SysRectBottom(wanted))
+		return size;		// on the screen - nothing to do
+
+	const PMReal shrinkBy = PMReal(SysRectBottom(wanted) - SysRectBottom(screen) + 2);
+	return panelView->ConstrainDimensions(PMPoint(size.X(), size.Y() - shrinkBy));
 }
 
 /** Put the icon state (and the icon strip's width) on a tab pane. Only switched when it differs: the
@@ -595,6 +646,14 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	if (!TitleBandIsOnScreen(p))
 		return;
 
+	// Where the panel sits inside its floating dock (the title band above it), read BEFORE anything
+	// moves: the dock's position and the panel's global bounds then describe the same settled layout.
+	// FitHeightToScreen needs it to know where the panel's bottom will be once the dock has moved.
+	const SysPoint dockNow  = PaletteRefUtils::GetPalettePosition(dock);
+	const SysRect  panelNow = ::ToSys(bookPanel->WindowToGlobal(bookPanel->GetBBox()));
+	const SysCoord insetLeft = SysRectLeft(panelNow) - SysPointH(dockNow);
+	const SysCoord insetTop  = SysRectTop(panelNow) - SysPointV(dockNow);
+
 	// Where first, then how big: the panel grows from its top-left, so moving it after a resize
 	// would first have grown it somewhere else.
 	PaletteRefUtils::SetPalettePosition(dock, p.left, p.top);
@@ -603,8 +662,11 @@ void RestoreFloating(IControlView* bookPanel, const PaletteRef& container, const
 	// something Resize does on the way in (IControlView.h:174-176) - and it is the book panel's own
 	// view that knows its limits (it rounds its height - see the file header). The product calls it
 	// before resizing a floating panel too (LinksUIUtils.cpp:626-627).
+	// ...and then fitted to the screen at the NEW place (see FitHeightToScreen), so a height
+	// remembered on a taller screen does not leave the bottom edge where it cannot be reached.
 	PMPoint size(PMReal(p.width), PMReal(p.height));
 	size = bookPanel->ConstrainDimensions(size);
+	size = FitHeightToScreen(bookPanel, p.left + insetLeft, p.top + insetTop, size);
 	bookPanel->Resize(size);
 
 	// And last, collapsed to icons or not (the user's request, 2026-09-25). Last because the size is
@@ -802,7 +864,14 @@ ICommandProcessor* QueryCommandProcessor()
 
 /** Put the interceptor in place if it is not there already. The ONE place that installs - the
     interface's own InstallSelf is left empty, as KIDMCP's is: two ways to install one thing is how a
-    pointer gets left behind in the command processor. */
+    pointer gets left behind in the command processor.
+    ***** ONLY WHILE THE TOGGLE IS ON (API audit 2026-09-25, A-3). ***** An interceptor sees every
+    command InDesign processes, and its header asks third-party code to use it "with extreme caution"
+    (ICommandInterceptor.h:37-40). Until that audit it went in at PaletteMgrStarted whatever the
+    toggle said - so every user of KBS, the feature being OFF by default, had every command pass
+    through it for the whole session. Now Start installs it only when the toggle is ON and
+    ToggleAndSave puts it in and takes it out with the tick. (KIDMCP keeps its own resident, and that
+    is right there: recording commands is what that tool is for.) */
 void InstallCmdWatch()
 {
 	if (gCmdWatch != nil)
@@ -884,6 +953,14 @@ void KBSBookPanelPlacement::ToggleAndSave(PMString& outStatus)
 		InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
 		gBookPanelCount = WalkBookPanels(panelMgr, nil);
 	}
+
+	// The interceptor follows the tick (see InstallCmdWatch). This runs from the menu action, never from
+	// inside the interceptor's own InterceptProcessCommand, so UninstallCmdWatch never releases the
+	// object while one of its own calls is on the stack.
+	if (gOn)
+		InstallCmdWatch();
+	else
+		UninstallCmdWatch();
 
 	// The toggle's key, and nothing else (the user's rule, 2026-09-25).
 	std::vector<std::pair<std::string, std::string> > keys;
@@ -973,7 +1050,9 @@ void KBSBookPanelPlacement::Start()
 	KBSLoadPanelStateIfPresent();
 
 	AttachObserver(true);
-	InstallCmdWatch();
+	// Only while ON (see InstallCmdWatch) - ToggleAndSave puts it in when the box is ticked later.
+	if (gOn)
+		InstallCmdWatch();
 
 	// Whatever book panel is open by now has "just appeared" as far as this feature is concerned -
 	// before this call nothing was following - so the count starts from zero. (Measured on 21.0.2:
@@ -1053,7 +1132,23 @@ void KBSBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
     would produce. Everything is inside try/catch - an exception leaving here lands in the middle of
     InDesign's command processing. And the test that runs for every command is one flag and one class
     comparison. At file scope, not in the anonymous namespace, for the reason the other
-    implementations here are. */
+    implementations here are.
+
+    ***** WHY NOT THE OBSERVER KBS ALREADY HAS (API audit 2026-09-25, A-2 - measured). ***** KBSBookWatch
+    hears the same close as kCloseBookCmdBoss @ kSessionBoss (IID_IBOOKCONTENT), and the official way
+    to see a command before it is done is an observer that finds GetCommandState() == kNotDone
+    (persistentlist/PstLstDocObserver.cpp:189-195). That notification does arrive as kNotDone - but
+    kNotDone is "before OR WHILE the command is done" (ICommand.h:119), and it comes WHILE: in the log
+    of all three closes (script, the Book panel's Close Book, quitting) the order was this class's
+    kCloseBookCmdBoss, then kDestroyPanelCmdBoss, then KBSBookWatch - with no book panel left to
+    measure by then. So the interceptor stays, the only door there is; A-3 (installed only while ON)
+    and the main-thread gate below are what the audit asked of it instead.
+
+    ***** MAIN THREAD ONLY. ***** An interceptor is handed commands from whichever thread processes
+    them - KIDMCP's tells the two sides apart for that reason (KIDMCPCmdWatch.cpp, IsMainThreadDomain)
+    - and what this one does on a book close is UI work (the panel manager, the palette tree). A book
+    close off the main thread has never been seen here, and nothing says one cannot happen; the gate
+    is one call per book close, and it keeps this from ever doing UI work on another thread. */
 class KBSBookPanelCmdWatch : public CPMUnknown<ICommandInterceptor>
 {
 public:
@@ -1064,7 +1159,7 @@ public:
 	{
 		try
 		{
-			if (gOn && cmd != nil && ::GetClass(cmd) == kCloseBookCmdBoss)
+			if (gOn && cmd != nil && ::GetClass(cmd) == kCloseBookCmdBoss && IDThreading::IsMainThreadDomain())
 				OnBookAboutToClose();
 		}
 		catch (...)

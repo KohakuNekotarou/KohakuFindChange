@@ -58,9 +58,10 @@ namespace KBSBookPanelPlacement
 	/** The toggle. Session flag; OFF until the settings file says otherwise. */
 	bool IsOn();
 
-	/** The flyout's "Remember Book Panel Placement": flip the flag, write THAT ONE KEY to the settings
-	    file (the user's rule, 2026-09-25), and hand back the line for the panel's status line - the
-	    new state and, like "Save Panel Settings", where the file is. */
+	/** The flyout's "Remember Book Panel Placement": flip the flag, put the command interceptor in or
+	    take it out with it, write THAT ONE KEY to the settings file (the user's rule, 2026-09-25), and
+	    hand back the line for the panel's status line - the new state and, like "Save Panel
+	    Settings", where the file is. */
 	void ToggleAndSave(PMString& outStatus);
 
 	/** For "Save Panel Settings": the toggle and the placement, as keys and RAW JSON values, appended
@@ -74,8 +75,9 @@ namespace KBSBookPanelPlacement
 	void LoadFromSettings(const std::string& text);
 
 	/** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted): start
-	    following the panel manager and put the interceptor in, and treat any book panel already open
-	    as "just appeared". */
+	    following the panel manager, put the interceptor in if the toggle is ON (ToggleAndSave puts it in
+	    and takes it out after that - it sees every command, so it is only there while it is needed), and
+	    treat any book panel already open as "just appeared". */
 	void Start();
 
 	/** The palette manager is about to close its palettes (PaletteMgrAboutToShutdown): stop following.
