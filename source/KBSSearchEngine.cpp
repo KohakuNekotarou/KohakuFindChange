@@ -2373,7 +2373,7 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	// and its replace joined is that BOTH walk the way the dialog says, and that a direction changed
 	// in between is refused by the walk signature, which counts it. The rows are put in reading order
 	// on the page either way (FinalizeChapterHits), and the replace carries the rows it has passed
-	// past every later replacement (KBSReplaceEngine's PassedRow), so neither needs the walk to run
+	// past every later replacement (KBSReplaceEngine's RowNow), so neither needs the walk to run
 	// in TextIndex order.
 	//
 	// Two of the five are FIND-only in InDesign - "there is no option to change in locked stories /
