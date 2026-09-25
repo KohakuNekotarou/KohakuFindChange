@@ -394,7 +394,10 @@ namespace KBSBookScope
 	    all: the untitled document the user just made with Ctrl+N, which reads as unmodified and was
 	    being closed without a prompt until 2026-08-10. See HasUnsavedChanges in the .cpp for the
 	    measurement. (Said "Dirty documents stay" until 2026-08-11, which is the sentence the fix
-	    made incomplete - the .cpp's own note was corrected on the day and this one was not.) */
+	    made incomplete - the .cpp's own note was corrected on the day and this one was not.)
+	    The one exception to CanSave is a CONVERSION of an older InDesign's chapter, which it calls
+	    unsaved from the start: that is asked what was written to it (HasUnsavedWork in the .cpp,
+	    2026-09-25), so a converted chapter a jump opened goes like any other clean one. */
 	void CloseDisplayedDocsIfClean(const UIDRef& exceptDoc);
 
 	/** Application-shutdown cleanup (state only, no closing, no UI): forget the held-chapter

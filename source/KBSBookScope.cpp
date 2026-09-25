@@ -242,7 +242,7 @@ namespace
 	    2026-09-25 on a CC 2017 chapter: IsConverted() true, never saved, no file - so every test in
 	    this module that goes BY FILE answers "a different document" about it, and CanSave answers
 	    "unsaved" whether or not anything was written to it. Both of those used to strand it: each
-	    search opened another copy, and none of them could be closed (see HeldDocHasUnsavedWork and
+	    search opened another copy, and none of them could be closed (see HasUnsavedWork and
 	    KBSDocumentLivesInFile).
 
 	    A converted document the user has since SAVED has a file again and is an ordinary document -
@@ -256,8 +256,9 @@ namespace
 		return doc != nil && doc->IsConverted() != kFalse;
 	}
 
-	/** HasUnsavedChanges, for a chapter THIS MODULE OPENED - the held list, whose chapters are all
-	    windowless and so have never been in the user's hands.
+	/** HasUnsavedChanges, with the one kind of document it answers wrongly for put right: the
+	    question every close in this module asks - the two held-chapter releases and the
+	    hide-previous-chapter sweep.
 
 	    ***** THE ONE DIFFERENCE IS A CONVERTED CHAPTER. ***** CanSave says "modified OR unsaved", and a
 	    conversion is unsaved from the moment it exists, so it read as work to protect after every
@@ -266,8 +267,14 @@ namespace
 	    one would really throw away is only what has been WRITTEN to it - the chapter's own file on
 	    disk is untouched by the conversion - and that is what IsModified answers, because
 	    ReopenChapterDoc marks a conversion it opens clean as it opens it. A replacement that landed
-	    in one sets the flag again, and it is kept like any chapter with work in it. */
-	bool HeldDocHasUnsavedWork(const UIDRef& docRef)
+	    in one sets the flag again, and it is kept like any chapter with work in it.
+
+	    ***** AND THE SWEEP ASKS IT TOO (2026-09-25 re-check). ***** It was first given to the held
+	    releases only, under the name HeldDocHasUnsavedWork, and the sweep went on asking CanSave - so
+	    a converted chapter a jump had put in a window was the one window "Hide Previous Chapter" never
+	    closed. The sweep also meets conversions the USER opened; for those the same answer holds -
+	    closing one loses only what was written to it, and the old file on disk is untouched. */
+	bool HasUnsavedWork(const UIDRef& docRef)
 	{
 		if (IsFilelessConversion(docRef))
 		{
@@ -482,8 +489,8 @@ void KBSBookScope::ReleaseHeldDocs()
 		// list: it is still a chapter this plug-in opened, so once it has been saved a later call
 		// hands it back like any other. Leaving it off the list instead would mean nothing ever
 		// closes it again. See HasUnsavedChanges for what closing it would cost, and
-		// HeldDocHasUnsavedWork for the converted chapter it is asked differently of (2026-09-25).
-		if (HeldDocHasUnsavedWork(held[i]))
+		// HasUnsavedWork for the converted chapter it is asked differently of (2026-09-25).
+		if (HasUnsavedWork(held[i]))
 		{
 			gHeldDocs.push_back(held[i]);
 			continue;
@@ -611,9 +618,9 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// typing in a chapter a jump opened for them", named here until then, cannot get this far: the
 	// window test just above drops it, and a jump takes its chapter off the held list anyway
 	// (ForgetHeldDoc). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges - and
-	// HeldDocHasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by
+	// HasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by
 	// "has never been saved", the thing every conversion is (2026-09-25).
-	if (HeldDocHasUnsavedWork(docRef))
+	if (HasUnsavedWork(docRef))
 		return false;
 
 	// The same close ReleaseHeldDocs uses, one document at a time: kSchedule defers it until the
@@ -842,7 +849,7 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// converted in memory, and the conversion is not the user's work: the chapter's own file is
 	// untouched and closing this copy loses nothing. Marking it unmodified here is what lets the
 	// releases tell a copy that only a walk has read from one a replacement has written to
-	// (HeldDocHasUnsavedWork) - the walks guard the flag, a replacement sets it. (2026-09-25; until
+	// (HasUnsavedWork) - the walks guard the flag, a replacement sets it. (2026-09-25; until
 	// then every such copy counted as unsaved work and was never closed.)
 	if (IsFilelessConversion(docRef))
 	{
@@ -985,7 +992,13 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		// untitled document the user just made. IsModified() reads that as clean and this closed
 		// it, without a prompt (measured 2026-08-10). Since that day the shared question is
 		// IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
-		if (HasUnsavedChanges(ref))
+		//
+		// ***** ASKED THROUGH HasUnsavedWork SINCE 2026-09-25, like the two releases. ***** CanSave
+		// calls every conversion of an older InDesign's chapter "unsaved", so a converted chapter a
+		// jump had opened in a window was the one window this sweep never closed. HasUnsavedWork asks a
+		// conversion what was WRITTEN to it and leaves every other document to CanSave, so the
+		// untitled document above is kept exactly as before.
+		if (HasUnsavedWork(ref))
 			continue;
 
 		// Only documents that HAVE a window go: a windowless held chapter survives as the reopen
