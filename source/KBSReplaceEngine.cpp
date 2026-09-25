@@ -35,7 +35,11 @@
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
 // (ITextModel.h was here for GetTextChangeCount, which fed the trusted-story fast path. Removed
-// 2026-08-03 with that path - see the note over MatchStillStandsHere.)
+// 2026-08-03 with that path - see the note over MatchStillStandsHere. It is back since 2026-09-26
+// for a different job: QueryStoryThread / FindStoryThread, which is how a row's position is kept
+// as "this far into this thread" - see RowNow.)
+#include "ITextModel.h"
+#include "ITextStoryThread.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
@@ -315,38 +319,106 @@ struct RunTotals
 // characters, the hash having come from the same wrong range. The rows passed and left alone had
 // the same fault from the other side: kept at the range the search found them at, they were
 // jumped to off by the replacements before them and stamped "missing".
+//
+// ***** KEPT AS "THIS FAR INTO THIS THREAD", NOT AS A STORY INDEX. ***** A story's text is its body
+// followed by one thread per table cell and per footnote (ITableTextContent.h:41-44), and a
+// replacement can take a whole thread away: deleting a footnote's reference marker deletes the
+// footnote's text with it. Measured 2026-09-26: GREP ~F|cat on "A<fn1> B<fn2>" (fn1 "x one", fn2
+// "cat two"), rows "marker 1" and "cat" of fn2 ticked - the marker's replacement took fn1's six
+// characters out as well, fn2's "cat" came up six places earlier than a story index carried by the
+// replaced length alone, and it was stepped over as a match nobody had listed and reported missing.
+// A thread knows where it starts NOW (ITextModel::FindStoryThread, by the thread's own identity),
+// so an offset into it is carried only by replacements inside that thread, and every other move -
+// a thread before it growing, shrinking or disappearing - comes with the thread's start for free.
 struct RowNow
 {
 	bool		known;		// false: the row's identity could not be read (no story, no range)
 	UID			story;
-	TextIndex	start;
-	TextIndex	end;
+	UID			threadDict;	// the thread the row's text lives in (ITextStoryThread::GetDictUID/Key)
+	uint32		threadKey;
+	TextIndex	offset;		// start, from the start of that thread
+	int32		length;
 
-	RowNow() : known(false), story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex) {}
+	RowNow() : known(false), story(kInvalidUID), threadDict(kInvalidUID), threadKey(0), offset(0),
+		length(0) {}
 };
 
-// A replacement has just turned [oldStart, oldEnd) of `story` into newLength characters. Every
-// row lying AFTER it in the same story moves by the difference; a row before it, or in another
-// story, does not.
-//
-// "After" is start >= oldEnd, NOT start >= oldStart: matches never overlap, so a row either lies
-// wholly past the replaced text or wholly before it - and a zero-width row sitting exactly at
-// oldStart (GREP's ^ before a match that begins at the same place) is BEFORE the text that was
-// replaced and must stay where it is. For a zero-width replacement (oldStart == oldEnd, an
-// insertion) a row starting at that very position is pushed right by the insertion, which is what
-// the text there did.
-void CarryRowsPast(std::vector<RowNow>& rows, UID story, TextIndex oldStart, TextIndex oldEnd,
-	TextIndex newLength)
+// Which thread holds `at` in this story, and where it starts. False when the story or the thread
+// cannot be read.
+bool ThreadAt(IDataBase* db, UID story, TextIndex at, UID& outDict, uint32& outKey,
+	TextIndex& outThreadStart)
 {
-	const TextIndex delta = newLength - (oldEnd - oldStart);
+	if (db == nil)
+		return false;
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	if (model == nil)
+		return false;
+	TextIndex threadStart = kInvalidTextIndex;
+	InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(at, &threadStart, nil));
+	if (thread == nil)
+		return false;
+	outDict = thread->GetDictUID();
+	outKey = thread->GetDictKey();
+	outThreadStart = threadStart;
+	return true;
+}
+
+// Put a row at [start, end) of `story` as the text stands at this moment.
+void SetRowAt(IDataBase* db, RowNow& row, UID story, TextIndex start, TextIndex end)
+{
+	row.known = false;
+	UID dict = kInvalidUID;
+	uint32 key = 0;
+	TextIndex threadStart = kInvalidTextIndex;
+	if (story == kInvalidUID || !ThreadAt(db, story, start, dict, key, threadStart))
+		return;
+	row.known = true;
+	row.story = story;
+	row.threadDict = dict;
+	row.threadKey = key;
+	row.offset = start - threadStart;
+	row.length = end - start;
+}
+
+// Where the row starts now. False when its thread is gone (the replacement that took a footnote
+// away took the rows in it too) or cannot be read.
+bool RowStartNow(IDataBase* db, const RowNow& row, TextIndex& outStart)
+{
+	if (!row.known || db == nil)
+		return false;
+	InterfacePtr<ITextModel> model(db, row.story, UseDefaultIID());
+	if (model == nil)
+		return false;
+	TextIndex threadStart = kInvalidTextIndex;
+	if (!model->FindStoryThread(row.threadDict, row.threadKey, &threadStart, nil))
+		return false;
+	outStart = threadStart + row.offset;
+	return true;
+}
+
+// A replacement has just turned [oldStartOffset, oldEndOffset) of one thread into newLength
+// characters. Every row lying AFTER it in the same thread moves by the difference; a row before
+// it, or in another thread, does not - another thread's move is its start's, which FindStoryThread
+// answers (see RowNow).
+//
+// "After" is offset >= oldEndOffset, NOT >= oldStartOffset: matches never overlap, so a row either
+// lies wholly past the replaced text or wholly before it - and a zero-width row sitting exactly at
+// the start (GREP's ^ before a match that begins at the same place) is BEFORE the text that was
+// replaced and must stay where it is. For a zero-width replacement (an insertion) a row starting
+// at that very position is pushed right by the insertion, which is what the text there did.
+void CarryRowsPast(std::vector<RowNow>& rows, UID story, UID threadDict, uint32 threadKey,
+	TextIndex oldStartOffset, TextIndex oldEndOffset, TextIndex newLength)
+{
+	const TextIndex delta = newLength - (oldEndOffset - oldStartOffset);
 	if (delta == 0)
 		return;
 	for (size_t i = 0; i < rows.size(); ++i)
 	{
-		if (!rows[i].known || rows[i].story != story || rows[i].start < oldEnd)
+		RowNow& row = rows[i];
+		if (!row.known || row.story != story || row.threadDict != threadDict
+			|| row.threadKey != threadKey || row.offset < oldEndOffset)
 			continue;
-		rows[i].start += delta;
-		rows[i].end += delta;
+		row.offset += delta;
 	}
 }
 
@@ -379,20 +451,27 @@ void CarryRowsPast(std::vector<RowNow>& rows, UID story, TextIndex oldStart, Tex
 //
 // Only the start is compared, the same test the verify pass makes: the start is what the search
 // recorded and what the carrying keeps true; the end belongs to the query.
-int32 WalkOrderOfMatch(const std::vector<RowNow>& rowNow, const std::map<int32, int32>& rowByWalkOrder,
-	int32 walkIndex, UID story, TextIndex start)
+//
+// A row whose thread is gone cannot be where the match is, and is passed over like one that does
+// not stand there.
+int32 WalkOrderOfMatch(IDataBase* db, const std::vector<RowNow>& rowNow,
+	const std::map<int32, int32>& rowByWalkOrder, int32 walkIndex, UID story, TextIndex start)
 {
 	std::map<int32, int32>::const_iterator it = rowByWalkOrder.lower_bound(walkIndex);
 	if (it != rowByWalkOrder.end() && it->first == walkIndex)
 	{
 		const RowNow& expected = rowNow[it->second];
-		if (!expected.known || (expected.story == story && expected.start == start))
+		if (!expected.known)
+			return walkIndex;
+		TextIndex expectedStart = kInvalidTextIndex;
+		if (expected.story == story && RowStartNow(db, expected, expectedStart) && expectedStart == start)
 			return walkIndex;
 	}
 	for (; it != rowByWalkOrder.end(); ++it)
 	{
 		const RowNow& later = rowNow[it->second];
-		if (later.known && later.story == story && later.start == start)
+		TextIndex laterStart = kInvalidTextIndex;
+		if (later.known && later.story == story && RowStartNow(db, later, laterStart) && laterStart == start)
 			return it->first;
 	}
 	return -1;
@@ -400,14 +479,10 @@ int32 WalkOrderOfMatch(const std::vector<RowNow>& rowNow, const std::map<int32, 
 
 // The walk has dealt with a row the report keeps (replaced, locked, refused): put it where its text
 // stands now and name it for the read-back after the walk.
-void KeepRowAt(std::vector<RowNow>& rowNow, std::vector<int32>& keptRows, int32 hitIdx, UID story,
-	TextIndex start, TextIndex end)
+void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& keptRows, int32 hitIdx,
+	UID story, TextIndex start, TextIndex end)
 {
-	RowNow& row = rowNow[static_cast<size_t>(hitIdx)];
-	row.known = true;
-	row.story = story;
-	row.start = start;
-	row.end = end;
+	SetRowAt(db, rowNow[static_cast<size_t>(hitIdx)], story, start, end);
 	keptRows.push_back(hitIdx);
 }
 
@@ -542,15 +617,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		UID storyUID = kInvalidUID;
 		TextIndex rowStart = kInvalidTextIndex, rowEnd = kInvalidTextIndex;
 		uint64 rowHash = 0;
-		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, storyUID, rowStart, rowEnd, rowHash)
-			&& storyUID != kInvalidUID)
-		{
-			RowNow& row = rowNow[static_cast<size_t>(i)];
-			row.known = true;
-			row.story = storyUID;
-			row.start = rowStart;
-			row.end = rowEnd;
-		}
+		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, storyUID, rowStart, rowEnd, rowHash))
+			SetRowAt(docRef.GetDataBase(), rowNow[static_cast<size_t>(i)], storyUID, rowStart, rowEnd);
 
 		// A locked row the report will keep (it never had a box, so it is never checked).
 		if (haveFlags && locked && !replaced && !checked && rowNow[static_cast<size_t>(i)].known)
@@ -756,7 +824,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		// search met, and it has its own test (the start of each ticked row) a few lines below.
 		if (!verifyOnly)
 		{
-			const int32 matchWalkOrder = WalkOrderOfMatch(rowNow, rowByWalkOrder, walkIndex,
+			const int32 matchWalkOrder = WalkOrderOfMatch(docRef.GetDataBase(), rowNow, rowByWalkOrder, walkIndex,
 				story.GetUID(), start);
 			if (matchWalkOrder < 0)
 				continue;
@@ -845,7 +913,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeLocked);
 					// Kept by the report and jumped to by its range - so the range is the one the
 					// walk is standing on, carried past what comes after (see RowNow).
-					KeepRowAt(rowNow, keptRows, hitIdx, story.GetUID(), start, end);
+					KeepRowAt(docRef.GetDataBase(), rowNow, keptRows, hitIdx, story.GetUID(), start, end);
 				}
 				targets.erase(walkIndex);
 				++walkIndex;
@@ -879,6 +947,15 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			// the range it wrote, or kFailure), and the command was measured to behave the same way
 			// (see the file header). So there is nothing here to tell apart - anything that is not
 			// kSuccess is the command declining.
+			//
+			// Which thread the match is in, and how far into it, asked BEFORE the command: that is
+			// the state every row's offset is kept in (see CarryRowsPast below).
+			UID matchDict = kInvalidUID;
+			uint32 matchKey = 0;
+			TextIndex matchThreadStart = kInvalidTextIndex;
+			const bool haveMatchThread = ThreadAt(docRef.GetDataBase(), story.GetUID(), start,
+				matchDict, matchKey, matchThreadStart);
+
 			UIDRef replacedStory;
 			TextIndex replacedStart = kInvalidTextIndex, replacedEnd = kInvalidTextIndex;
 			if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, replacedStory, replacedStart, replacedEnd)
@@ -912,11 +989,16 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 				// and THEN this row is put at the range the command reports writing. In that order,
 				// so the row is not moved by its own replacement.
 				//
-				// [start, end) is the match as it stood the moment before the command, in the same
-				// state of the text every row's range is kept in, which is what makes the comparison
-				// inside CarryRowsPast a comparison of like with like.
-				CarryRowsPast(rowNow, story.GetUID(), start, end, replacedEnd - replacedStart);
-				KeepRowAt(rowNow, keptRows, hitIdx, replacedStory.GetUID(), replacedStart, replacedEnd);
+				// [start, end) is the match as it stood the moment before the command, taken as offsets
+				// into its thread as it stood then - the state every row's offset is kept in, which is
+				// what makes the comparison inside CarryRowsPast a comparison of like with like.
+				// Rows in OTHER threads are not touched: their threads' starts move by themselves,
+				// including when this replacement took a whole thread away (see RowNow).
+				if (haveMatchThread)
+					CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
+						end - matchThreadStart, replacedEnd - replacedStart);
+				KeepRowAt(docRef.GetDataBase(), rowNow, keptRows, hitIdx, replacedStory.GetUID(),
+					replacedStart, replacedEnd);
 			}
 			else
 			{
@@ -927,7 +1009,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 				++outRefused;
 				KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
 				// The report keeps it (its outcome says why), so it is carried like a locked row.
-				KeepRowAt(rowNow, keptRows, hitIdx, story.GetUID(), start, end);
+				KeepRowAt(docRef.GetDataBase(), rowNow, keptRows, hitIdx, story.GetUID(), start, end);
 			}
 			// Whether or not the command took, this walk order is dealt with: leaving it in
 			// targets would make the chapter look like it never lined up.
@@ -981,9 +1063,13 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		{
 			const int32 hitIdx = keptRows[r];
 			const RowNow& kept = rowNow[static_cast<size_t>(hitIdx)];
-			if (!kept.known)
+			// A row whose thread is gone - a replacement took the footnote it sat in away - has no
+			// text left to stand at, and keeps what it had.
+			TextIndex keptStart = kInvalidTextIndex;
+			if (!RowStartNow(db, kept, keptStart))
 				continue;
-			KBSResultModel::SetHitRange(chapterIdx, hitIdx, kept.story, kept.start, kept.end);
+			const TextIndex keptEnd = keptStart + kept.length;
+			KBSResultModel::SetHitRange(chapterIdx, hitIdx, kept.story, keptStart, keptEnd);
 			// ***** BOTH of the row's descriptions of itself, read from the SAME range, written in
 			// the SAME call. ***** The three segments are what the row DRAWS; the hash is what the
 			// same-occurrence test COMPARES, and a jump into this row runs that test. Reading only
@@ -992,9 +1078,9 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			// (2026-08-04 to 2026-08-05 - see SetHitSegments).
 			const UIDRef rowStoryRef(db, kept.story);
 			PMString pre, match, post;
-			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, kept.start, kept.end, pre, match, post);
+			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, keptStart, keptEnd, pre, match, post);
 			KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
-				KBSSearchEngine::HashMatchText(rowStoryRef, kept.start, kept.end));
+				KBSSearchEngine::HashMatchText(rowStoryRef, keptStart, keptEnd));
 		}
 	}
 
