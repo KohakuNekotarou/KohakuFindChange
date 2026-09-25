@@ -31,11 +31,14 @@
 //      lands, which is why it was left out at first - but a restored ON cannot act on its own:
 //      the jump asks ShouldHidePreviousChapter, which ALSO requires the results to have come from
 //      a book. In document scope the toggle is greyed out and the sweep never runs.
-//    - Remember Book Panel Placement (2026-09-25), and the placement itself: four integers, the
-//      position and size InDesign's OWN Book panel had when it was last closed.
+//    - Remember Book Panel Placement (2026-09-25), and the placement itself - where InDesign's OWN
+//      Book panel was when it was last closed (floating: place, size, icon state and width; docked:
+//      its neighbours). The keys are named in KBSBookPanelPlacement.cpp and ONLY there - this file
+//      writes what that one hands over (AppendSaveKeys) and hands it the text to read
+//      (LoadFromSettings), so a key added there needs nothing here.
 //      *****THESE ARE THE ONLY KEYS WRITTEN WITHOUT "Save Panel Settings".***** The user's rules
 //      (2026-09-25): flipping the toggle writes the toggle's key, and while it is ticked, a book
-//      panel closing - or InDesign quitting - writes the four placement keys. Nothing else in the
+//      closing - InDesign quitting included - writes the placement keys. Nothing else in the
 //      file is touched by either: KBSPanelStateWriteKeys below rewrites the named keys and leaves
 //      every other key as the FILE has it, not as the flyout currently has it. See
 //      KBSBookPanelPlacement.h.
@@ -48,6 +51,8 @@
 
 #ifndef __KBSPanelState_h__
 #define __KBSPanelState_h__
+
+#include "PMString.h"
 
 #include <string>
 #include <utility>
@@ -77,5 +82,18 @@ void	KBSLoadPanelStateIfPresent();
 //         "read", "unreadable file", "open", "write".
 // Implemented in KBSPanelState.cpp.
 const char*	KBSPanelStateWriteKeys(const std::vector<std::pair<std::string, std::string> >& keyValues);
+
+// The settings file's full path, as "Save Panel Settings" shows it on the status line. false when the
+// folder cannot be had. The toggle that writes its own key shows the same path (the user's call,
+// 2026-09-25: "show where it was saved, the way Save Panel Settings does").
+// Implemented in KBSPanelState.cpp.
+bool	KBSPanelStateFilePath(PMString& outPath);
+
+// The file's readers, for KBSBookPanelPlacement: it names its own keys (all of them, in one place)
+// but reads them with the same lenient readers every other setting goes through. A key that is not
+// there: ReadInt answers false and leaves out alone; ReadBool answers defVal.
+// Implemented in KBSPanelState.cpp.
+bool	KBSPanelStateReadInt(const std::string& text, const char* key, int32& out);
+bool	KBSPanelStateReadBool(const std::string& text, const char* key, bool defVal);
 
 #endif // __KBSPanelState_h__

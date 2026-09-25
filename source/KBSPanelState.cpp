@@ -350,6 +350,16 @@ const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues)
 	return KBSWriteWholeFile(file, json);
 }
 
+bool KBSPanelStateFilePath(PMString& outPath)
+{
+	IDFile file;
+	if (!KBSPanelStateFile(file))
+		return false;
+	// The same call KBSSavePanelState uses for its status line, so the two cannot show different paths.
+	outPath = FileUtils::SysFileToPMString(file);
+	return true;
+}
+
 // One place for the failure messages, so every exit says something rather than failing silently.
 static void KBSPanelStateSayFailed(const char* what)
 {
@@ -379,22 +389,18 @@ void KBSSavePanelState()
 	json += "  \"translucentPanel\": ";       json += KBSBoolLiteral(KBSGetPanelTranslucent());           json += ",\n";
 	json += "  \"translucentFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeTranslucent());      json += ",\n";
 	json += "  \"minimizableFindChange\": ";  json += KBSBoolLiteral(KBSGetFindChangeMinimizable());      json += ",\n";
-	json += "  \"hidePreviousChapter\": ";    json += KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn()); json += ",\n";
-	// "Remember Book Panel Placement" and the placement (2026-09-25). The book panel is measured as
-	// it stands NOW if one is open and floating - an explicit save is a snapshot of the screen - and
-	// otherwise the placement last measured at a close (or read at startup) is written again. With
-	// neither, the four keys are simply left out: KBSLoadPanelStateIfPresent asks for all four.
-	// *KBSBoolLiteral takes a bool16; the toggle is a plain bool, hence the conversion.
-	json += "  \"rememberBookPanelPlacement\": "; json += KBSBoolLiteral(KBSBookPanelPlacement::IsOn() ? kTrue : kFalse);
-	KBSBookPanelPlacement::Placement placement;
-	if (KBSBookPanelPlacement::MeasureOpenBookPanel(placement))
-		KBSBookPanelPlacement::SetRemembered(placement);
-	if (KBSBookPanelPlacement::GetRemembered(placement))
+	json += "  \"hidePreviousChapter\": ";    json += KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn());
+	// "Remember Book Panel Placement" and the placement (2026-09-25). Its keys are named in
+	// KBSBookPanelPlacement.cpp and nowhere else: this only writes out what that file hands over -
+	// the book panel as it stands now if one is open, otherwise the placement last known.
+	std::vector<std::pair<std::string, std::string> > bookPanelKeys;
+	KBSBookPanelPlacement::AppendSaveKeys(bookPanelKeys);
+	for (size_t i = 0; i < bookPanelKeys.size(); ++i)
 	{
-		json += ",\n  \"bookPanelLeft\": ";   json += std::to_string(placement.left);
-		json += ",\n  \"bookPanelTop\": ";    json += std::to_string(placement.top);
-		json += ",\n  \"bookPanelWidth\": ";  json += std::to_string(placement.width);
-		json += ",\n  \"bookPanelHeight\": "; json += std::to_string(placement.height);
+		json += ",\n  \"";
+		json += bookPanelKeys[i].first;
+		json += "\": ";
+		json += bookPanelKeys[i].second;
 	}
 	json += "\n";
 	json += "}\n";
@@ -500,22 +506,24 @@ void KBSLoadPanelStateIfPresent()
 		KBSJump::IsHidePreviousChapterOn() ? kTrue : kFalse);
 	KBSJump::SetHidePreviousChapter(hidePrev != kFalse);
 
-	// "Remember Book Panel Placement" (2026-09-25). Flag and placement only - nothing is moved here.
-	// What puts the placement on a book panel is KBSBookPanelPlacement, when one appears (and at
-	// PaletteMgrStarted, for one that is already up by then).
-	const bool16 rememberBookPanel = KBSJsonReadBool(text, "rememberBookPanelPlacement",
-		KBSBookPanelPlacement::IsOn() ? kTrue : kFalse);
-	KBSBookPanelPlacement::SetOn(rememberBookPanel != kFalse);
+	// "Remember Book Panel Placement" (2026-09-25): the toggle and the placement. Read by
+	// KBSBookPanelPlacement, which owns the keys; nothing is moved here - what puts the placement on
+	// a book panel is that file, when one appears.
+	KBSBookPanelPlacement::LoadFromSettings(text);
+}
 
-	// All four, or none: a placement with its height missing is not a place to put anything back to.
-	KBSBookPanelPlacement::Placement placement;
-	if (KBSJsonReadInt(text, "bookPanelLeft",   placement.left) &&
-		KBSJsonReadInt(text, "bookPanelTop",    placement.top) &&
-		KBSJsonReadInt(text, "bookPanelWidth",  placement.width) &&
-		KBSJsonReadInt(text, "bookPanelHeight", placement.height))
-	{
-		KBSBookPanelPlacement::SetRemembered(placement);	// refuses a size that is not positive
-	}
+//----------------------------------------------------------------------------------------
+// The readers, for KBSBookPanelPlacement (which owns its keys but not the JSON handling)
+//----------------------------------------------------------------------------------------
+
+bool KBSPanelStateReadInt(const std::string& text, const char* key, int32& out)
+{
+	return KBSJsonReadInt(text, key, out);
+}
+
+bool KBSPanelStateReadBool(const std::string& text, const char* key, bool defVal)
+{
+	return KBSJsonReadBool(text, key, defVal ? kTrue : kFalse) != kFalse;
 }
 
 // End, KBSPanelState.cpp.

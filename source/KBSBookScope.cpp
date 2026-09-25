@@ -37,6 +37,7 @@
 // its own ampersands for the whole message, so doubling a chapter name here as well ran it twice -
 // see AppendUnopenableNote.)
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
+#include "IPanelControlData.h"	// what QueryActiveBookPanel hands over - the book panel's class is read off it
 #include "ISession.h"
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
@@ -91,56 +92,67 @@ namespace
 	// gBookSearchOn: OFF searches the front document, ON the whole target book (ResolveTargetBook).
 	bool gBookScopeOn = false;
 
-	// kBookPanelBoss lives in BOOK PANEL.APLN and is declared in no public header, so the number
-	// has to be spelled out. Taken from a live object-model dump and cross-checked against the
-	// running panel list, where every open book's panel came back as kBookPanelBoss (measured
-	// 2026-07-28, docs/ai-notes/book-panel-active-tab.md). Compared as a raw number because there
-	// is no constant to compare against. A future build could renumber it - that is why the name
-	// check below exists, and why a total miss just falls back to the active book.
-	const uint32 kBookPanelBossRawClassID = 0x10101;
+	/** The ClassID of InDesign's book panel as THIS build numbers it, learned from a live one - or
+	    kInvalidClass while none could be asked yet.
 
-	/** Does this panel name belong to a book that is open right now?
-	    Backstop for the hard-coded ClassID above. A book panel is titled with the book's title
-	    name, and when two open books share a name InDesign appends " 2" to the later one - so a
-	    leading match counts too. Cheap enough: there are rarely more than a handful of books. */
-	bool PanelNameMatchesOpenBook(const PMString& panelName)
+	    ***** Why it is learned rather than written down (2026-09-25). ***** kBookPanelBoss lives in
+	    BOOK PANEL.APLN and is declared in no public header, so until this date the file compared
+	    against 0x10101 - a number read off a 20.5 DEBUG build's object-model dump (2026-07-28,
+	    docs/ai-notes/book-panel-active-tab.md) - backed up by matching the panel's NAME against the
+	    open books' titles. Neither held:
+	      * the number is one build's numbering, and nothing promised the release build of another
+	        version kept it;
+	      * the name half could pick the WRONG PANEL: it accepted any panel whose name merely STARTED
+	        with a book's title, so a book called "Book" made the Bookmarks panel a book panel, and a
+	        book called "Info" the Info panel (the user asked "how do you tell them apart - can it not
+	        get it wrong?", and it could).
+	    A wrong answer was cheap while the only callers read a book FILE off the panel; since Remember
+	    Book Panel Placement it would move and resize somebody else's palette. Both are gone - the
+	    number too, at the user's word: no hard-coded fallback.
+	    IBookUIUtils::QueryActiveBookPanel hands over the active book's own panel (IBookUIUtils.h:83-87),
+	    so its class is the book panel's class by construction, whatever the build numbers it.
+	    Learned once and kept: a class does not change within a session. Nothing is asked while no
+	    book is open - there is no book panel to learn from, and no book panel to find either. */
+	ClassID gLearnedBookPanelClass = kInvalidClass;
+
+	ClassID LearnedBookPanelClass()
 	{
-		if (panelName.IsEmpty())
-			return false;
+		if (gLearnedBookPanelClass != kInvalidClass)
+			return gLearnedBookPanelClass;
 
 		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-		if (bookMgr == nil)
-			return false;
+		if (bookMgr == nil || bookMgr->GetBookCount() == 0)
+			return kInvalidClass;
+		if (!Utils<IBookUIUtils>().Exists())
+			return kInvalidClass;
 
-		const int32 bookCount = bookMgr->GetBookCount();
-		for (int32 i = 0; i < bookCount; ++i)
-		{
-			IBook* book = bookMgr->GetNthBook(i);	// non-owning pointer - no release
-			if (book == nil)
-				continue;
+		InterfacePtr<IPanelControlData> activeBookPanel(Utils<IBookUIUtils>()->QueryActiveBookPanel());
+		if (activeBookPanel == nil)
+			return kInvalidClass;	// no active book right now - asked again next time
 
-			const PMString bookTitle = book->GetBookTitleName();
-			if (bookTitle.IsEmpty())
-				continue;
-			if (panelName.Compare(kFalse, bookTitle) == 0)
-				return true;
-			if (panelName.IndexOfString(bookTitle) == 0)		// "Book 1" -> tab "Book 1 2"
-				return true;
-		}
-		return false;
+		gLearnedBookPanelClass = ::GetClass(activeBookPanel);
+		return gLearnedBookPanelClass;
 	}
 
 	/** Is this registered panel one of InDesign's book panels?
 
-	    ***** ONE PLACE, because the hard-coded ClassID above can go stale. ***** Two walks below need
-	    this answer and each spelled the test out for itself, so a renumbered kBookPanelBoss would
-	    have had to be found twice (block 11 API audit, 2026-08-08). */
-	bool IsBookPanelView(IControlView* panelView, const PMString& panelName)
+	    ***** ONE PLACE. ***** Every walk of the panel list in this plug-in asks it here (the two in this
+	    file and KBSBookPanelPlacement's), so how a book panel is recognised is decided once (block 11
+	    API audit, 2026-08-08).
+	    The class learned from a live book panel decides, and nothing else (see LearnedBookPanelClass).
+	    Before one could be asked, the answer is "no": the callers here then fall back to the active
+	    book, and KBSBookPanelPlacement finds no book panel to measure or move. With no book open that
+	    is simply right. With books open but NONE ACTIVE - QueryActiveBookPanel then has nothing to
+	    hand over - their panels go unrecognised until one is; whether InDesign lets that state last
+	    is not measured. */
+	bool IsBookPanelView(IControlView* panelView)
 	{
 		if (panelView == nil)
 			return false;
-		return (::GetClass(panelView).Get() == kBookPanelBossRawClassID)
-			   || PanelNameMatchesOpenBook(panelName);
+		const ClassID learned = LearnedBookPanelClass();
+		if (learned == kInvalidClass)
+			return false;
+		return ::GetClass(panelView) == learned;
 	}
 
 	/** The book file THIS panel is showing; false when the panel could not be resolved.
@@ -1062,12 +1074,11 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 	for (uint32 i = 0; i < panelCount; ++i)
 	{
 		UID panelUID;
-		PMString panelName;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, nil, &panelName))
+		if (!panelMgr->GetNthPanelInfo(i, panelUID))
 			continue;
 
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!IsBookPanelView(panelView, panelName))
+		if (!IsBookPanelView(panelView))
 			continue;
 
 		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
@@ -1093,12 +1104,12 @@ bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
 	return false;
 }
 
-bool KBSBookScope::IsBookPanel(IControlView* panelView, const PMString& panelName)
+bool KBSBookScope::IsBookPanel(IControlView* panelView)
 {
 	// A door onto the anonymous-namespace test, not a second copy of it: that test is "ONE PLACE,
 	// because the hard-coded ClassID can go stale" (block 11 API audit), and a copy here would be
 	// the second place.
-	return IsBookPanelView(panelView, panelName);
+	return IsBookPanelView(panelView);
 }
 
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
@@ -1155,12 +1166,11 @@ bool KBSBookScope::ActivateBook(const PMString& bookPath)
 	{
 		UID panelUID;
 		WidgetID panelWidgetID;
-		PMString panelName;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, &panelWidgetID, &panelName))
+		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, &panelWidgetID))
 			continue;
 
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!IsBookPanelView(panelView, panelName))
+		if (!IsBookPanelView(panelView))
 			continue;
 
 		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is

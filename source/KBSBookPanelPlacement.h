@@ -11,22 +11,33 @@
 //  reopened -> back at (532,252) 304x275, exactly where an untouched one reopens.
 //
 //  What this does, only while the flyout toggle is ticked:
-//    * the moment a book panel is about to close (kAboutToClosePaletteMsg), and when InDesign quits
-//      (IPaletteMgrService::PaletteMgrAboutToShutdown), the FLOATING book panel's position and size
-//      are measured and written to the settings file - those four keys and nothing else;
+//    * the moment a book is about to close - by the Book panel, by a script, or by InDesign quitting
+//      (a quit closes the books first) - where the Book panel is, is measured and written to the
+//      settings file - the Book panel's keys and nothing else. Caught with a command interceptor on
+//      kCloseBookCmdBoss: a closing book says nothing to the panel manager (measured - the .cpp's
+//      header has the story). "Where" is one of two things:
+//        FLOATING  the floating dock's top-left, the panel's size, and whether it is collapsed to
+//                  icons;
+//        DOCKED    which panels it sits next to - a panel sharing its tab group (and its tab's place
+//                  there), the nearest panels in the tab groups above and below it, and in the
+//                  columns (tab panes) either side - and whether its column is collapsed to icons.
+//                  A dock position is kept as NEIGHBOURS rather than coordinates because that is
+//                  what a dock is made of, and a built-in panel's WidgetID does not change between
+//                  launches (the user's request, 2026-09-25: "in the dock, and its order there").
 //    * the moment a book panel appears where there was none (kPaletteVisibilityChangedMessage, zero
-//      book panels before, one or more now), that position and size are put back.
+//      book panels before, one or more now), it is put back: moved and sized, or moved into its dock
+//      next to the same neighbours (PaletteRefUtils::ReparentPalette).
 //
 //  What it deliberately leaves alone:
-//    * a DOCKED book panel. Where it sits in a dock belongs to the dock, and putting it back would
-//      mean re-parenting palettes - nothing is measured and nothing is restored then;
 //    * a book panel appearing BESIDE another one. It joins that palette as a tab, and moving the
 //      palette would move the book panel the user already has open;
-//    * a placement whose title band would land off every screen (a monitor that has since gone).
+//    * a book panel InDesign itself put in a dock: that is InDesign's own memory at work;
+//    * a floating placement whose title band would land off every screen (a monitor that has gone),
+//      and a docked one whose neighbours are all gone.
 //
 //  The file: KBSPanelState.json, the one "Save Panel Settings" writes. The toggle itself is written
-//  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. See
-//  KBSPanelState.h.
+//  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of
+//  this feature is named in the .cpp and only there - KBSPanelState asks this file for them.
 //
 //  *UI code (IPanelMgr, PaletteRefUtils, IControlView): it belongs to the UI half when KBS is split
 //   into model and UI plug-ins.
@@ -38,56 +49,42 @@
 
 #include "PMString.h"
 
+#include <string>
+#include <utility>
+#include <vector>
+
 namespace KBSBookPanelPlacement
 {
-	/** Where a floating book panel was: the floating dock's top-left in global coordinates
-	    (PaletteRefUtils::GetPalettePosition) and the book PANEL's own width and height
-	    (IControlView::GetFrame) - the size the product's own code resizes a floating panel by
-	    (LinksUIUtils.cpp, IControlView::Resize), not the dock's, which adds the title band. */
-	struct Placement
-	{
-		int32	left;
-		int32	top;
-		int32	width;
-		int32	height;
-
-		Placement() : left(0), top(0), width(0), height(0) {}
-	};
-
 	/** The toggle. Session flag; OFF until the settings file says otherwise. */
 	bool IsOn();
 
-	/** Set the flag and nothing else - the startup read uses this. The flyout goes through
-	    ToggleAndSave, which also writes the file and starts following the panels afresh. */
-	void SetOn(bool on);
-
 	/** The flyout's "Remember Book Panel Placement": flip the flag, write THAT ONE KEY to the settings
-	    file (the user's rule, 2026-09-25), and hand back the line for the panel's status line. */
+	    file (the user's rule, 2026-09-25), and hand back the line for the panel's status line - the
+	    new state and, like "Save Panel Settings", where the file is. */
 	void ToggleAndSave(PMString& outStatus);
 
-	/** The placement known this session: read from the file at startup, or measured when a book panel
-	    closed. false when there is none. */
-	bool GetRemembered(Placement& out);
+	/** For "Save Panel Settings": the toggle and the placement, as keys and RAW JSON values, appended
+	    in the order they are to be written. The book panel is measured as it stands NOW if one is
+	    open - an explicit save is a snapshot of the screen - otherwise the placement last measured
+	    (or read at startup) is written again. */
+	void AppendSaveKeys(std::vector<std::pair<std::string, std::string> >& keys);
 
-	/** Record a placement (the startup read, and a measurement). Refused when the size is not
-	    positive - a panel with no size is not a place to put anything back to. */
-	void SetRemembered(const Placement& placement);
-
-	/** Measure the book panel that is open right now, if it floats. false when no book panel is open,
-	    when it is docked, or when its palette cannot be reached. "Save Panel Settings" asks this so the
-	    file gets the panel as it is on screen, not as it was at the last close. */
-	bool MeasureOpenBookPanel(Placement& out);
+	/** At startup: the toggle and the placement from the settings file's text. Nothing is moved here -
+	    what puts the placement on a book panel is this file, when one appears. */
+	void LoadFromSettings(const std::string& text);
 
 	/** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted): start
-	    following the panel manager, and treat any book panel already open as "just appeared". */
+	    following the panel manager and put the interceptor in, and treat any book panel already open
+	    as "just appeared". */
 	void Start();
 
-	/** The palette manager is about to close its palettes (PaletteMgrAboutToShutdown): write the open
-	    book panel's placement if the toggle is ON, then stop following. */
+	/** The palette manager is about to close its palettes (PaletteMgrAboutToShutdown): stop following.
+	    It also measures an open book panel if the toggle is ON - a backstop only: on 21.0.2 a quit
+	    closes the books BEFORE this, and the interceptor has already written the placement. */
 	void Stop();
 
-	/** Application shutdown (KBSStartupShutdown::Shutdown): stop following and give the timer back,
-	    in case Stop was never reached. Safe to call twice. */
+	/** Application shutdown (KBSStartupShutdown::Shutdown): stop following and give the timer and the
+	    interceptor back, in case Stop was never reached. Safe to call twice. */
 	void ShutdownCleanup();
 }
 

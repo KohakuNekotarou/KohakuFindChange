@@ -202,13 +202,12 @@ namespace KBSBookScope
 	            active book in that case. */
 	bool GetPanelBookFile(IDFile& outFile);
 
-	/** Is this registered panel one of InDesign's book panels? The ONE place that answers it - the
-	    ClassID of kBookPanelBoss (in no public header, so compared as a measured number), backed by
-	    the panel's name against the open books in case a future build renumbers that class. Asked by
-	    the walks in this file and by KBSBookPanelPlacement.
-	    @param panelName the name IPanelMgr::GetNthPanelInfo gave; pass an empty one when there is
-	                     none to give - the ClassID alone decides then. */
-	bool IsBookPanel(IControlView* panelView, const PMString& panelName);
+	/** Is this registered panel one of InDesign's book panels? The ONE place that answers it. The
+	    class is LEARNED from a live book panel (IBookUIUtils::QueryActiveBookPanel) and compared -
+	    no name is matched, because a name that merely begins with a book's title picked the wrong
+	    panel ("Book" -> the Bookmarks panel). Asked by the walks in this file and by
+	    KBSBookPanelPlacement. See LearnedBookPanelClass in the .cpp. */
+	bool IsBookPanel(IControlView* panelView);
 
 	/** Close the chapters this module opened (the originally-closed ones only). Chapters the
 	    user already had open are never touched. The closes are SCHEDULED

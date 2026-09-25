@@ -74,9 +74,9 @@ public:
 		//  KBSBookWatchDetach on the line before has always done for its own subject (2026-08-08).
 		KBSDetachPanelVisibilityObserver();
 		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its one-shot
-		// timer (a raw function pointer into this .pln). Normally already done by the palette
-		// manager's PaletteMgrAboutToShutdown, which is where the quit's placement is written; this
-		// is the backstop for a shutdown that never went through it. Safe to run twice.
+		// timer and its command interceptor (both hold raw pointers into this .pln). Normally already
+		// done by the palette manager's PaletteMgrAboutToShutdown; this is the backstop for a
+		// shutdown that never went through it. Safe to run twice.
 		KBSBookPanelPlacement::ShutdownCleanup();
 		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
 		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left

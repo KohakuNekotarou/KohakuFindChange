@@ -379,10 +379,11 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * "Remember Book Panel Placement" (2026-09-25): the observer that measures InDesign's own Book
-	 * panel as it closes (kAboutToClosePaletteMsg) and puts it back when it appears
-	 * (kPaletteVisibilityChangedMessage) - both on the panel manager's subject, the same subject the
-	 * observer above listens to. On kActiveContextBoss for the same reason as that one. The attach
+	 * "Remember Book Panel Placement" (2026-09-25): the observer that puts InDesign's own Book panel
+	 * back where it was when it appears (kPaletteVisibilityChangedMessage, on the panel manager's
+	 * subject - the subject the observer above listens to). Measuring it as it closes is the command
+	 * interceptor's job further down: a closing book says nothing on this subject (measured).
+	 * On kActiveContextBoss for the same reason as the one above. The attach
 	 * itself is in KBSBookPanelPlacement.cpp; this line only puts our IID onto the boss.
 	 * *An AddIn that points at UI code - it moves to the UI plug-in's .fr when KBS is split.
 	 */
@@ -408,6 +409,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_IK2SERVICEPROVIDER, kKBSBookPanelServiceProviderImpl,
 			IID_IPALETTEMGRSERVICE, kKBSBookPanelPaletteMgrServiceImpl,
+		}
+	},
+
+	/*
+	 * ...and the command interceptor that catches a book as it is about to close. Measured
+	 * 2026-09-25: closing a book - by script and by the Book panel's own "Close Book" alike -
+	 * destroys its panel without one notification on the panel manager's subject, so the observer
+	 * above never hears of it. Created by name and handed to ICommandProcessor::InstallInterceptor
+	 * (the shape KIDMCP's command watcher uses); nothing looks it up, so it inherits nothing.
+	 * IID_ICOMMANDINTERCEPTOR is CommandID.h's, included above.
+	 */
+	Class
+	{
+		kKBSBookPanelCmdWatchBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMANDINTERCEPTOR, kKBSBookPanelCmdWatchImpl,
 		}
 	},
 

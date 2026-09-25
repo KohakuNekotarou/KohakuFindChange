@@ -118,7 +118,10 @@ DECLARE_PMID(kClassIDSpace, kKBSIconWidgetBoss, kKBSPrefix + 14)
 // kPaletteMgrService, the service InDesign's own Book panel hangs off, so it is told when the
 // palettes have been laid out and when they are about to close (KBSBookPanelPlacement.cpp).
 DECLARE_PMID(kClassIDSpace, kKBSBookPanelServiceBoss, kKBSPrefix + 15)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 16)
+// ...and its command interceptor: a book closing destroys its Book panel WITHOUT a word to the panel
+// manager's subject (measured 2026-09-25 - neither kAboutToClosePaletteMsg nor a visibility message
+// arrives), so the only moment the panel can still be measured is just BEFORE kCloseBookCmdBoss runs.
+DECLARE_PMID(kClassIDSpace, kKBSBookPanelCmdWatchBoss, kKBSPrefix + 16)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 17)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 18)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 19)
@@ -141,15 +144,19 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 // docked or floated (kPaletteVisibilityChangedMessage). Its own IID because it is an AddIn onto
 // kActiveContextBoss, which carries observers that are not ours. See KBSPanelAlpha.cpp.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSPANELVISIBILITYOBSERVER, kKBSPrefix + 2)
-// The observer behind "Remember Book Panel Placement": measures InDesign's Book panel as it closes
-// and puts it back when it appears. Its own IID for the reason the one above has one - it is an
-// AddIn onto kActiveContextBoss, next to that one. See KBSBookPanelPlacement.cpp.
-DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKBSPrefix + 3)
+// ***** + 3 ... + 7 ARE SPOKEN FOR: the model/UI split plan gives them to its notification and its
+// four facades (docs/superpowers/plans/2026-08-16-kbs-model-ui-split-stage1.md, the ID table). Left
+// commented until that plan lands - do not hand them out to anything else.
+//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 4)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 5)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 6)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 7)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 8)
+// The observer behind "Remember Book Panel Placement" (2026-09-25): measures InDesign's Book panel as
+// it closes and puts it back when it appears. Its own IID for the reason the one above has one - it
+// is an AddIn onto kActiveContextBoss, next to that one. See KBSBookPanelPlacement.cpp. (+ 8, not
+// + 3: see the note above. It was + 3 for an hour, unshipped, until the second re-check caught it.)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKBSPrefix + 8)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 9)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 10)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 11)
@@ -221,12 +228,23 @@ DECLARE_PMID(kImplementationIDSpace, kKBSPanelViewImpl, kKBSPrefix + 20)
 // the panel. Both in KBSPanelAlpha.cpp.
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelVisibilityObserverImpl, kKBSPrefix + 21)
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelRollOverImpl, kKBSPrefix + 22)
+// ***** + 23 ... + 28 ARE SPOKEN FOR: the model/UI split plan gives them to its notification
+// observer, its four facades and the UI side's startup/shutdown service
+// (docs/superpowers/plans/2026-08-16-kbs-model-ui-split-stage1.md). Left commented until that
+// plan lands - do not hand them out to anything else.
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 23)
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 24)
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 25)
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 26)
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 27)
+//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 28)
 // "Remember Book Panel Placement" (2026-09-25): the observer on kActiveContextBoss, and the two
 // halves of the palette-manager service boss (its provider and the IPaletteMgrService itself). All
-// three in KBSBookPanelPlacement.cpp.
-DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelObserverImpl, kKBSPrefix + 23)
-DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefix + 24)
-DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 25)
+// three in KBSBookPanelPlacement.cpp. (+ 29 onwards, not + 23: see the note above.)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelObserverImpl, kKBSPrefix + 29)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefix + 30)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 31)
+DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelCmdWatchImpl, kKBSPrefix + 32)
 
 
 // ActionIDs:
