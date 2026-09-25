@@ -38,6 +38,7 @@
 // see AppendUnopenableNote.)
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "IPanelControlData.h"	// what QueryActiveBookPanel hands over - the book panel's class is read off it
+#include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
 #include "ISession.h"
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
@@ -231,6 +232,49 @@ namespace
 		if (docFileHandler == nil)
 			return true;
 		return docFileHandler->CanSave(docRef) != kFalse;
+	}
+
+	/** Is this document an in-memory CONVERSION of a file an older InDesign saved - one with no file
+	    of its own?
+
+	    That is what opening an old chapter gives: "Templates and converted documents open as new
+	    files which lose information such as file path" (IOpenedFileInfo.h:31-33). Measured
+	    2026-09-25 on a CC 2017 chapter: IsConverted() true, never saved, no file - so every test in
+	    this module that goes BY FILE answers "a different document" about it, and CanSave answers
+	    "unsaved" whether or not anything was written to it. Both of those used to strand it: each
+	    search opened another copy, and none of them could be closed (see HeldDocHasUnsavedWork and
+	    KBSDocumentLivesInFile).
+
+	    A converted document the user has since SAVED has a file again and is an ordinary document -
+	    hence the second test. */
+	bool IsFilelessConversion(const UIDRef& docRef)
+	{
+		IDataBase* const db = docRef.GetDataBase();
+		if (db == nil || db->GetSysFile() != nil)
+			return false;
+		InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+		return doc != nil && doc->IsConverted() != kFalse;
+	}
+
+	/** HasUnsavedChanges, for a chapter THIS MODULE OPENED - the held list, whose chapters are all
+	    windowless and so have never been in the user's hands.
+
+	    ***** THE ONE DIFFERENCE IS A CONVERTED CHAPTER. ***** CanSave says "modified OR unsaved", and a
+	    conversion is unsaved from the moment it exists, so it read as work to protect after every
+	    read-only walk and was never let go (2026-09-25: two searches of a book with one CC 2017
+	    chapter left two windowless copies of it open, and nothing could close them). What closing
+	    one would really throw away is only what has been WRITTEN to it - the chapter's own file on
+	    disk is untouched by the conversion - and that is what IsModified answers, because
+	    ReopenChapterDoc marks a conversion it opens clean as it opens it. A replacement that landed
+	    in one sets the flag again, and it is kept like any chapter with work in it. */
+	bool HeldDocHasUnsavedWork(const UIDRef& docRef)
+	{
+		if (IsFilelessConversion(docRef))
+		{
+			IDataBase* const db = docRef.GetDataBase();
+			return db == nil || db->IsModified() != kFalse;
+		}
+		return HasUnsavedChanges(docRef);
 	}
 
 	/** Accepts every presentation.
@@ -437,8 +481,9 @@ void KBSBookScope::ReleaseHeldDocs()
 		// ***** Unsaved work in it? Then it is not ours to close. ***** Put it BACK on the held
 		// list: it is still a chapter this plug-in opened, so once it has been saved a later call
 		// hands it back like any other. Leaving it off the list instead would mean nothing ever
-		// closes it again. See HasUnsavedChanges for what closing it would cost.
-		if (HasUnsavedChanges(held[i]))
+		// closes it again. See HasUnsavedChanges for what closing it would cost, and
+		// HeldDocHasUnsavedWork for the converted chapter it is asked differently of (2026-09-25).
+		if (HeldDocHasUnsavedWork(held[i]))
 		{
 			gHeldDocs.push_back(held[i]);
 			continue;
@@ -565,8 +610,10 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// known to mean ONE thing: a replace landed in it and its window would not open. "The user
 	// typing in a chapter a jump opened for them", named here until then, cannot get this far: the
 	// window test just above drops it, and a jump takes its chapter off the held list anyway
-	// (ForgetHeldDoc). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges.
-	if (HasUnsavedChanges(docRef))
+	// (ForgetHeldDoc). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges - and
+	// HeldDocHasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by
+	// "has never been saved", the thing every conversion is (2026-09-25).
+	if (HeldDocHasUnsavedWork(docRef))
 		return false;
 
 	// The same close ReleaseHeldDocs uses, one document at a time: kSchedule defers it until the
@@ -653,7 +700,19 @@ void KBSBookScope::ShutdownCleanup()
 // associated with the database" (IDataBase.h:270-274), which is how the SDK's own samples read a
 // document's file (persistentlistui/PstLstUITVHierarchyAdapter.cpp:97).
 //
-// A document that has never been saved has no file and can never be the chapter being looked for.
+// A document that has never been saved has no file and can never be the chapter being looked for -
+// with ONE exception, below.
+//
+// ***** A CONVERSION OF THE CHAPTER'S OWN FILE IS THE CHAPTER. ***** Opening a chapter an older
+// InDesign saved gives an in-memory conversion with no file of its own ("converted documents open
+// as new files which lose information such as file path. At this point, only file path is being
+// preserved" - IOpenedFileInfo.h:31-33): what the document still knows is the file it was OPENED
+// FROM, and that is the chapter. Without this every lookup answered "not open" about it, and each
+// search, jump and replace opened one more copy (measured 2026-09-25: two searches and two jumps
+// left four copies of one CC 2017 chapter, two of them in windows).
+//
+// Asked only of a document with NO file: one the user has saved under another name has a file of
+// its own and is that file's document, not the chapter's, whatever it was opened from.
 static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
 {
 	if (doc == nil)
@@ -662,10 +721,18 @@ static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
 	if (db == nil)
 		return false;
 	const IDFile* docFile = db->GetSysFile();
-	if (docFile == nil)
+	if (docFile != nil)
+	{
+		SDKFileHelper helper(*docFile);
+		return helper.GetPath() == wantedPath;
+	}
+	if (!doc->IsConverted())
 		return false;
-	SDKFileHelper helper(*docFile);
-	return helper.GetPath() == wantedPath;
+	InterfacePtr<IOpenedFileInfo> openedFrom(doc, UseDefaultIID());
+	if (openedFrom == nil)
+		return false;
+	SDKFileHelper openedHelper(openedFrom->GetOpenedFilePath());
+	return !openedHelper.GetPath().empty() && openedHelper.GetPath() == wantedPath;
 }
 
 bool KBSBookScope::ChapterHasFile(const IDFile& file)
@@ -719,6 +786,25 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 				outDocRef = ::GetUIDRef(openDoc);
 				return true;
 			}
+
+			// ***** AND A CONVERSION OF IT, WHICH THE LOOKUP BY FILE CANNOT FIND. ***** An older
+			// InDesign's chapter opens as a document with no file (see KBSDocumentLivesInFile), so
+			// FindDoc answers nil about it even while one stands open - and opening the file again
+			// below made a second conversion every time (2026-09-25). A walk of the open documents
+			// is the only way to ask; it is short, and KBSDocumentLivesInFile does the matching, so
+			// "is this the chapter" is still decided in one place.
+			const int32 openCount = docList->GetDocCount();
+			for (int32 i = 0; i < openCount; ++i)
+			{
+				IDocument* candidate = docList->GetNthDoc(i);
+				if (candidate == nil || candidate == openDoc || !candidate->IsConverted())
+					continue;
+				if (KBSDocumentLivesInFile(candidate, wantedPath))
+				{
+					outDocRef = ::GetUIDRef(candidate);
+					return true;
+				}
+			}
 		}
 		// Not open - or an answer that is not this file, which is treated the same way, since the
 		// open below resolves by file and cannot be confused. ***** NEVER return false from here.
@@ -751,6 +837,19 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	}
 	if (err != kSuccess || docRef == UIDRef::gNull)
 		return false;
+
+	// ***** A CONVERSION STARTS OUT CLEAN. ***** A chapter an older InDesign saved has just been
+	// converted in memory, and the conversion is not the user's work: the chapter's own file is
+	// untouched and closing this copy loses nothing. Marking it unmodified here is what lets the
+	// releases tell a copy that only a walk has read from one a replacement has written to
+	// (HeldDocHasUnsavedWork) - the walks guard the flag, a replacement sets it. (2026-09-25; until
+	// then every such copy counted as unsaved work and was never closed.)
+	if (IsFilelessConversion(docRef))
+	{
+		IDataBase* const openedDB = docRef.GetDataBase();
+		if (openedDB != nil)
+			openedDB->SetModified(kFalse);
+	}
 
 	// Held, so ReleaseHeldDocs closes it later.
 	gHeldDocs.push_back(docRef);
