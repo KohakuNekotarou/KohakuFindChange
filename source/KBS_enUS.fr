@@ -53,6 +53,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSRejectChangeMenuKey,		"Reject Change",
                 kKBSRedoMenuKey,				"Redo",
+                kKBSAcceptAllChangesMenuKey,	"Accept All Changes in This Document",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
                 kKBSSaveResultsMenuKey,			"Save Results...",
                 // The operating reference. English in both tables, like the rest of the flyout.

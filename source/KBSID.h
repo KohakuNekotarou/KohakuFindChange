@@ -333,6 +333,10 @@ DECLARE_PMID(kActionIDSpace, kKBSRememberBookPanelActionID, kKBSPrefix + 24)
 DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKBSPrefix + 25)
 // "Redo" on the same menu: replaces that one row again, with the query the run used.
 DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
+// "Accept All Changes in This Document" on a document row's right-click menu (2026-09-27): accepts
+// every tracked change of KBS's own in that chapter's document (nobody else's) - the name is InDesign's
+// own ($ID/Accept All Changes in This Document).
+DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
 
 
 // WidgetIDs:
@@ -439,6 +443,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // The hit row's own right-click menu (2026-09-26).
 #define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
 #define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"
+#define kKBSAcceptAllChangesMenuKey		kKBSStringPrefix "kKBSAcceptAllChangesMenuKey"
 // "Save Results...": write what the panel is showing to a text file. The trailing "..." is the
 // platform convention for a command that opens a dialog before it does anything.
 #define kKBSSaveResultsMenuKey			kKBSStringPrefix "kKBSSaveResultsMenuKey"
@@ -636,6 +641,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // sat under Change Checked on the flyout.
 #define kKBSCheckAllMenuItemPosition		1.0
 #define kKBSUncheckAllMenuItemPosition		2.0
+#define kKBSAcceptAllChangesMenuItemPosition	3.0		// a document row's only (the book row greys it)
 // The hit row's menu, its own 1 and 2.
 #define kKBSRejectChangeMenuItemPosition	1.0
 #define kKBSRedoMenuItemPosition			2.0

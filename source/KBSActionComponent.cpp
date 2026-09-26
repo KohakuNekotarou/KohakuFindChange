@@ -423,6 +423,27 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSAcceptAllChangesActionID:
+		{
+			// A document row's right-click menu (2026-09-27): KBS's own tracked changes in that chapter's
+			// document. The book row (and nothing stashed - a script firing the action by ID) does nothing.
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
+				break;
+			if (KBSRunGuard::IsAnyRunning())
+			{
+				PMString busy(KBSRunGuard::BusyMessage());
+				busy.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(busy);
+				break;
+			}
+			PMString status;
+			KBSReplaceEngine::AcceptAllInChapter(chapter, status);
+			KBSResultTree::RefreshRows();
+			KBSResultTree::ShowStatus(status);
+			break;
+		}
+
 		case kKBSCheckAllActionID:
 		case kKBSUncheckAllActionID:
 		{
@@ -1003,6 +1024,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				else
 					enable = (KBSResultModel::GetHitOutcome(chapter, hit) == KBSResultModel::kOutcomeRejected);
 			}
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSAcceptAllChangesActionID)
+		{
+			// A document row's menu (2026-09-27): only while that document is open and holds a change
+			// of ours. The book row greys it (the command is about one document).
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			const bool enable = chapter >= 0 && chapter < KBSResultModel::GetChapterCount()
+				&& KBSReplaceEngine::CanAcceptAllInChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)

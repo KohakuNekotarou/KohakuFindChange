@@ -18,6 +18,7 @@
 #include "IRedlineDataStrand.h"
 #include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
+#include "IStoryList.h"			// Accept All Changes in This Document - every text model of it
 #include "IStringData.h"
 #include "ITextModel.h"
 #include "ITrackChangesSettings.h"	// ITrackChangeStorySettings - on kTextStoryBoss
@@ -208,6 +209,90 @@ bool KBSTrackChange::StoryHasOurChanges(const UIDRef& story)
 	std::vector<Record> records;
 	CollectRecords(story, records);
 	return !records.empty();
+}
+
+bool KBSTrackChange::DocumentHasOurChanges(IDataBase* db)
+{
+	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
+	if (storyList == nil)
+		return false;
+	// Every text model, not only the user-accessible ones: a record is ours wherever it stands.
+	const int32 count = storyList->GetAllTextModelCount();
+	for (int32 i = 0; i < count; ++i)
+		if (StoryHasOurChanges(storyList->GetNthTextModelUID(i)))
+			return true;
+	return false;
+}
+
+// One story: accept our records one whole record at a time, the walk started over after each (an
+// accept moves what comes after it, and the iterator it was made from is spent). -1 = one would not go.
+static int32 AcceptOursInStory(const UIDRef& story, PMString& outWhy)
+{
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return 0;
+	std::vector<KBSTrackChange::Record> records;
+	KBSTrackChange::CollectRecords(story, records);
+	int32 done = 0;
+	// Bounded by the records there were: an accept that leaves its record in place must not spin.
+	for (size_t guard = 0; guard <= records.size(); ++guard)
+	{
+		if (!redline->StoryHasChanges())
+			break;
+		RedlineIterator* it = redline->NewRedlineIterator(0);
+		if (it == nil)
+			break;
+		bool found = false;
+		for (bool16 more = kTrue; more; more = it->Increment(kFalse))
+		{
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+			if (record == nil)
+				continue;
+			delete record;
+			if (IsOurs(it))
+			{
+				found = true;
+				break;
+			}
+		}
+		const bool ok = found && it->ProcessAccept(nil, kFalse, kFalse);
+		delete it;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		if (!found)
+			break;
+		if (!ok)
+		{
+			outWhy = "InDesign would not accept one of the changes";
+			return -1;
+		}
+		++done;
+	}
+	if (KBSTrackChange::StoryHasOurChanges(story))
+	{
+		outWhy = "a change of ours was still there after accepting";
+		return -1;
+	}
+	return done;
+}
+
+int32 KBSTrackChange::AcceptOursInDocument(IDataBase* db, PMString& outWhy)
+{
+	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
+	if (storyList == nil)
+	{
+		outWhy = "the document's stories could not be read";
+		return -1;
+	}
+	int32 total = 0;
+	const int32 count = storyList->GetAllTextModelCount();
+	for (int32 i = 0; i < count; ++i)
+	{
+		const int32 n = AcceptOursInStory(storyList->GetNthTextModelUID(i), outWhy);
+		if (n < 0)
+			return -1;
+		total += n;
+	}
+	return total;
 }
 
 int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes, bool wantDelete)

@@ -93,6 +93,16 @@ namespace KBSTrackChange
 	/** True when the story holds at least one record of ours. */
 	bool StoryHasOurChanges(const UIDRef& story);
 
+	/** True when any story of the document holds a record of ours (Accept All Changes in This Document). */
+	bool DocumentHasOurChanges(IDataBase* db);
+
+	/** ***** ACCEPT ALL CHANGES IN THIS DOCUMENT - OURS ONLY (2026-09-27, the user's call A). ***** Every
+	    record signed kAuthor in every story of the document is accepted, one whole record at a time
+	    (RedlineIterator::ProcessAccept - the mirror of RejectAt's ProcessReject); nobody else's record is
+	    touched. Runs inside the caller's command sequence. Returns how many were accepted, or -1 when one
+	    would not be (outWhy says so - the caller rolls the sequence back). Leaves the error state clear. */
+	int32 AcceptOursInDocument(IDataBase* db, PMString& outWhy);
+
 	/** Reject ONE record of ours standing AT `position` - the deletion when `wantDelete`, else the
 	    insertion - except one whose time stamp is in `keepTimes` (an earlier run's, or another row's).
 	    ***** ONE, AND OF THE KIND ASKED (2026-09-26, case touching-mixed). ***** Touching replaces put the

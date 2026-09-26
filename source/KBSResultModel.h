@@ -58,8 +58,11 @@ namespace KBSResultModel
 		kOutcomeRefused,	// InDesign's own replace command would not run there
 		kOutcomeRejected,	// replaced, then taken back with Reject Change (2026-09-26): the row
 							// shows the original text again and can be replaced once more (Redo)
-		kOutcomeDeleted		// ticked, and gone WITH the footnote / table / anchored object another
+		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
 							// ticked row deleted (2026-09-26) - Change All's own result; no place to jump to
+		kOutcomeEndnoteLeft	// ticked, in the endnote story, left alone: a match there ends an endnote,
+							// and InDesign's replace breaks an endnote at its end (2026-09-27, the
+							// user's call - the whole endnote story is left, Change All works by story)
 	};
 
 	/** One match on one line of one chapter. The three text segments are the line split around

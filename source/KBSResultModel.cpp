@@ -613,6 +613,7 @@ namespace
 			case KBSResultModel::kOutcomeRefused:	return "refused";
 			case KBSResultModel::kOutcomeRejected:	return "rejected";
 			case KBSResultModel::kOutcomeDeleted:	return "deleted";
+			case KBSResultModel::kOutcomeEndnoteLeft:	return "not-replaced";
 			case KBSResultModel::kOutcomeNone:		break;
 		}
 		return "";
@@ -673,6 +674,8 @@ namespace
 			AppendWord(flags, "rejected");
 		else if (hit.outcome == KBSResultModel::kOutcomeDeleted)
 			AppendWord(flags, "deleted");
+		else if (hit.outcome == KBSResultModel::kOutcomeEndnoteLeft)
+			AppendWord(flags, "not-replaced");
 		if (hit.replaced)
 			AppendWord(flags, "replaced");
 		return flags;
@@ -1517,8 +1520,11 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
-	else if (hit.outcome == kOutcomeRejected)
-		hit.locator.Append(" rejected");	// the user's own act, not a reason something failed: normal colour
+	else if (hit.outcome == kOutcomeEndnoteLeft)
+		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
+	// A rejected row says nothing (the user, 2026-09-27: "no 'rejected' when I take one back") - it
+	// reads its original text again, which is what the user asked for; the state is still there for
+	// the menu (Redo) and for scripts (app.kfcResults says "rejected").
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 }

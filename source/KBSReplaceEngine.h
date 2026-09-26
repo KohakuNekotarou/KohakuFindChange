@@ -183,6 +183,18 @@ namespace KBSReplaceEngine
 	    the step is rolled back. False = nothing changed; outStatus says why either way. */
 	bool RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
+	/** Accept All Changes in This Document on a document row (2026-09-27, the user's call A): every
+	    tracked change of KBS's own (KBSTrackChange::kAuthor) in that chapter's document is accepted, in
+	    ONE undo step; nobody else's change is touched. All or nothing - any change that will not go rolls
+	    the step back. Rows keep what they show; a replaced row's Reject Change then greys out (its
+	    records are gone), as after an accept in the Track Changes panel. False = nothing changed;
+	    outStatus says why either way. */
+	bool AcceptAllInChapter(int32 chapterIdx, PMString& outStatus);
+
+	/** Is there anything for Accept All Changes in This Document to do: the chapter's document open and
+	    holding at least one change of ours. */
+	bool CanAcceptAllInChapter(int32 chapterIdx);
+
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
 	    search guards against with KBSSearchEngine::IsSearching, and a worse one here: the run holds

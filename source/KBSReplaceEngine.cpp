@@ -38,6 +38,7 @@
 // 2026-08-03 with that path - see the note over MatchStillStandsHere. It is back since 2026-09-26
 // for a different job: QueryStoryThread / FindStoryThread, which is how a row's position is kept
 // as "this far into this thread" - see RowNow.)
+#include "IItemStrand.h"			// a footnote's reference: where it stands, and what stands there now
 #include "ITextModel.h"
 #include "ITextStoryThread.h"
 #include "textiterator.h"			// the object characters a Change All row may hold
@@ -252,10 +253,13 @@ struct RunTotals
 	// All cannot write as asked, so nothing was written at all. errorText says which shape.
 	bool		refusedByShape;
 
+	// Ticked rows in an endnote story that was left alone (2026-09-27): a match there ends an endnote.
+	int32		endnoteLeft;
+
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
 		  chaptersNotWalked(0), chaptersNoWindow(0), chaptersWalkFailed(0),
-		  missing(0), locked(0), refused(0),
+		  missing(0), locked(0), refused(0), endnoteLeft(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstWalkFailed(false),
 		  cancelled(false), stoppedByError(false), stoppedByMismatch(false), refusedByShape(false)
 	{
@@ -549,6 +553,7 @@ struct TrackRow
 	UID			dict;
 	uint32		key;
 	TextIndex	offset;		// into its thread, as the search found it
+	TextIndex	absBefore;	// in the story, before anything was written (a footnote's reference: FootnoteHome)
 	int32		length;
 	int32		newLen;		// filled from the records: the text the replacement wrote (0 = deleted)
 	bool		changed;	// Change All wrote here
@@ -706,6 +711,126 @@ bool AlignFootnoteFrom(const std::vector<UTF32TextChar>& before, const std::vect
 	return false;
 }
 
+// One footnote's rows (rows[i, j), one thread): changed / newLen from its text before and after the
+// write. The footnote gone = its rows are marked gone (it went with its reference, deleted by a
+// ticked row - footnote rows are all ticked) and that is not a failure. False = the text cannot be
+// read or no row accounts for what was written (outWhy says which).
+bool AlignFootnoteRows(IDataBase* db, std::vector<TrackRow>& rows, size_t i, size_t j,
+	const std::map<TrackThreadKey, std::vector<UTF32TextChar> >& threadBefore, PMString& outWhy)
+{
+	const UID story = rows[i].story;
+	std::map<TrackThreadKey, std::vector<UTF32TextChar> >::const_iterator b = threadBefore.find(TrackKeyOf(rows[i]));
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	TextIndex threadStart = kInvalidTextIndex;
+	int32 threadSpan = 0;
+	if (b == threadBefore.end() || model == nil)
+	{
+		outWhy = "a footnote's text could not be read";
+		return false;
+	}
+	if (!model->FindStoryThread(rows[i].dict, rows[i].key, &threadStart, &threadSpan))
+	{
+		for (size_t k = i; k < j; ++k)
+			rows[k].gone = true;
+		return true;
+	}
+	std::vector<UTF32TextChar> after;
+	ReadCodePoints(db, story, threadStart, threadSpan, after);
+	std::vector<std::pair<int32, int32> > rowsOL;
+	for (size_t k = i; k < j; ++k)
+		rowsOL.push_back(std::make_pair(static_cast<int32>(rows[k].offset), rows[k].length));
+	std::vector<int32> newLen(rowsOL.size(), 0);
+	int32 budget = 200000;
+	if (!AlignFootnoteFrom(b->second, after, rowsOL, 0, 0, newLen, budget))
+	{
+		outWhy = "Change All wrote something in a footnote that no row accounts for";
+		return false;
+	}
+	for (size_t k = i; k < j; ++k)
+	{
+		rows[k].gone = false;
+		rows[k].changed = true;
+		rows[k].newLen = newLen[k - i];
+	}
+	return true;
+}
+
+// ***** A FOOTNOTE BROUGHT BACK IS A NEW OBJECT (2026-09-27, measured through the DOM: footnote id
+// 276 before, 285 after the deletion of its reference was rejected). ***** Change All deletes the
+// reference of a footnote whose reference sits in an UNTICKED row; taking that row back brings the
+// footnote back - text and all, including what Change All wrote inside it - but under a new UID, so
+// its rows' thread (dict = the old kFootnoteReferenceBoss) is not found and they read as gone. Where
+// the reference stood is known from before the write (FootnoteHome); here that place is read again
+// and the rows are moved onto the footnote now standing there.
+struct FootnoteHome
+{
+	UID			dict;		// the footnote's kFootnoteReferenceBoss before the write
+	size_t		row;		// the row whose text holds its reference
+	int32		delta;		// where the reference stands in that row's text
+};
+
+// Where a row's text starts now, after this story's write and take-backs: only ticked rows that
+// were written moved anything (the same sum the caller's final loop makes).
+bool RowStartNow(IDataBase* db, const std::vector<TrackRow>& rows, size_t from, size_t row, TextIndex& outAt)
+{
+	TextIndex threadStart = kInvalidTextIndex;
+	if (rows[row].gone || !TrackThreadStart(db, rows[row], threadStart))
+		return false;
+	TextIndex moved = 0;
+	for (size_t k = from; k < row; ++k)
+		if (TrackSameThread(rows[k], rows[row]) && rows[k].target && rows[k].changed)
+			moved += rows[k].newLen - rows[k].length;
+	outAt = threadStart + rows[row].offset + moved;
+	return true;
+}
+
+// The footnotes of rows[from, to) that came back with an unticked row: rows re-pointed and placed.
+// False = one came back but its text does not line up (the caller aborts the run).
+bool RehomeFootnotes(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t to,
+	const std::vector<FootnoteHome>& homes, std::map<TrackThreadKey, std::vector<UTF32TextChar> >& threadBefore,
+	PMString& outWhy)
+{
+	InterfacePtr<ITextModel> model(db, rows[from].story, UseDefaultIID());
+	InterfacePtr<IItemStrand> strand(model != nil
+		? static_cast<IItemStrand*>(model->QueryStrand(kOwnedItemStrandBoss, IID_IITEMSTRAND)) : nil);
+	if (strand == nil)
+		return true;		// nothing owned in the story: no footnote to bring back
+	for (size_t h = 0; h < homes.size(); ++h)
+	{
+		const FootnoteHome& home = homes[h];
+		if (home.row < from || home.row >= to || rows[home.row].target)
+			continue;		// another story's, or its reference went for good with a ticked row
+		size_t i = from;
+		while (i < to && !(rows[i].inFootnote && rows[i].dict == home.dict))
+			++i;
+		if (i == to || !rows[i].gone)
+			continue;		// still standing under its own UID: nothing to do
+		size_t j = i + 1;
+		while (j < to && rows[j].inFootnote && TrackSameThread(rows[i], rows[j]))
+			++j;
+		TextIndex rowAt = kInvalidTextIndex;
+		if (!RowStartNow(db, rows, from, home.row, rowAt))
+			continue;		// left as gone - the final check still holds the text to account
+		const UID now = strand->GetOwnedUID(rowAt + home.delta, kFootnoteReferenceBoss);
+		if (now == kInvalidUID || now == home.dict)
+			continue;
+		const TrackThreadKey oldKey = TrackKeyOf(rows[i]);
+		for (size_t k = i; k < j; ++k)
+			rows[k].dict = now;
+		TextIndex nowStart = kInvalidTextIndex;
+		if (!model->FindStoryThread(now, rows[i].key, &nowStart, nil))
+		{
+			for (size_t k = i; k < j; ++k)
+				rows[k].dict = home.dict;
+			continue;
+		}
+		threadBefore[TrackKeyOf(rows[i])] = threadBefore[oldKey];
+		if (!AlignFootnoteRows(db, rows, i, j, threadBefore, outWhy))
+			return false;
+	}
+	return true;
+}
+
 // One story's rows (rows[from, to), sorted) lined up against the records THIS run's Change All left
 // there (records whose time stamp is in oldTimes are an earlier run's and are not looked at). Fills
 // changed / newLen, and gone for a ticked row whose thread went with an object a ticked row deleted.
@@ -812,41 +937,8 @@ bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t
 		size_t j = i + 1;
 		while (j < to && rows[j].inFootnote && TrackSameThread(rows[i], rows[j]))
 			++j;
-		const TrackThreadKey key = TrackKeyOf(rows[i]);
-		std::map<TrackThreadKey, std::vector<UTF32TextChar> >::const_iterator b = threadBefore.find(key);
-		InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
-		TextIndex threadStart = kInvalidTextIndex;
-		int32 threadSpan = 0;
-		if (b == threadBefore.end() || model == nil)
-		{
-			outWhy = "a footnote's text could not be read";
+		if (!AlignFootnoteRows(db, rows, i, j, threadBefore, outWhy))
 			return false;
-		}
-		if (!model->FindStoryThread(rows[i].dict, rows[i].key, &threadStart, &threadSpan))
-		{
-			// the footnote went with its reference, deleted by a ticked row (footnote rows are all ticked)
-			for (size_t k = i; k < j; ++k)
-				rows[k].gone = true;
-			i = j;
-			continue;
-		}
-		std::vector<UTF32TextChar> after;
-		ReadCodePoints(db, story, threadStart, threadSpan, after);
-		std::vector<std::pair<int32, int32> > rowsOL;
-		for (size_t k = i; k < j; ++k)
-			rowsOL.push_back(std::make_pair(static_cast<int32>(rows[k].offset), rows[k].length));
-		std::vector<int32> newLen(rowsOL.size(), 0);
-		int32 budget = 200000;
-		if (!AlignFootnoteFrom(b->second, after, rowsOL, 0, 0, newLen, budget))
-		{
-			outWhy = "Change All wrote something in a footnote that no row accounts for";
-			return false;
-		}
-		for (size_t k = i; k < j; ++k)
-		{
-			rows[k].changed = true;
-			rows[k].newLen = newLen[k - i];
-		}
 		i = j;
 	}
 
@@ -1027,12 +1119,13 @@ bool CheckOnlyTickedChanged(IDataBase* db, int32 chapterIdx, std::vector<TrackRo
 // caller must abort the run's sequence to take them back.
 bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
-	int32& outReplaced, int32& outMissing, int32& outLocked,
+	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outEndnoteLeft,
 	bool& outCancelled, bool& outFailed, PMString& outWhyNot)
 {
 	outReplaced = 0;
 	outMissing = 0;
 	outLocked = 0;
+	outEndnoteLeft = 0;
 	outCancelled = false;
 	outFailed = false;
 	outWhyNot.Clear();
@@ -1094,6 +1187,7 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			return false;
 		}
 		r.offset = start - threadStart;
+		r.absBefore = start;
 		r.length = end - start;
 		r.before = KBSTrackChange::ReadText(UIDRef(db, r.story), start, r.length);
 		// ***** A ROW IN A FOOTNOTE (measured 2026-09-26 through IDML): Track Changes records nothing
@@ -1128,6 +1222,43 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		rows.push_back(r);
 	}
 	std::sort(rows.begin(), rows.end(), TrackRowBefore);
+
+	// ***** THE ENDNOTE STORY IS LEFT ALONE WHEN A MATCH ENDS AN ENDNOTE (2026-09-27, the user's call). *****
+	// InDesign's replace - Change All, changeText, one write over a range - that writes at the END of an
+	// endnote leaves the endnote's range (IDML EndnoteRange) ending short, and the character before the
+	// overhang can never be deleted again: not by a reject, not by a delete, not after a save or through
+	// IDML (measured, work/kbs-regress/probe-endnote-*-0927.jsx; no Track Changes needed). Every endnote
+	// of a document lives in ONE story (kEndnoteStoryBoss - SnpManipulateTextEndnotes::IsEndnoteStory)
+	// between U+FEFF marks, and Change All runs by story, so that one match cannot be left out: the whole
+	// endnote story is. Any row counts, ticked or not - an unticked row is written too, then taken back.
+	std::set<UID> endnoteStoriesLeft;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		if (endnoteStoriesLeft.count(rows[i].story) != 0)
+			continue;
+		InterfacePtr<ITextModel> model(db, rows[i].story, UseDefaultIID());
+		if (model == nil || ::GetClass(model) != kEndnoteStoryBoss)
+			continue;
+		const TextIndex after = rows[i].absBefore + rows[i].length;
+		if (after < model->TotalLength())
+		{
+			TextIterator it(model, after);
+			if (!it.IsNull() && (*it).GetValue() == kTextChar_ZeroSpaceNoBreak)
+				endnoteStoriesLeft.insert(rows[i].story);
+		}
+	}
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		if (endnoteStoriesLeft.count(rows[i].story) == 0)
+			continue;
+		if (rows[i].target || rows[i].lockedTick)
+		{
+			++outEndnoteLeft;
+			KBSResultModel::SetHitOutcome(chapterIdx, rows[i].hitIdx, KBSResultModel::kOutcomeEndnoteLeft);
+		}
+		rows[i].target = false;		// never written: the final check holds it to its text
+		rows[i].lockedTick = false;
+	}
 
 	// ----- the one shape Change All cannot write as ticked: refused BEFORE anything is written -----
 	// Touching matches replaced with NOTHING share one deletion ("catcatcat" -> "": one record), so one
@@ -1178,6 +1309,35 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			return false;
 		}
 		ReadCodePoints(db, rows[i].story, threadStart, threadSpan, threadBefore[TrackKeyOf(rows[i])]);
+	}
+	// Where each footnote holding a row has its reference, when that reference is in a row's text: a
+	// row taken back brings such a footnote back under a new UID (RehomeFootnotes).
+	std::vector<FootnoteHome> footnoteHomes;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		if (!rows[i].inFootnote || (i > 0 && rows[i - 1].inFootnote && TrackSameThread(rows[i - 1], rows[i])))
+			continue;		// one per footnote
+		InterfacePtr<ITextModel> model(db, rows[i].story, UseDefaultIID());
+		InterfacePtr<IItemStrand> strand(model != nil
+			? static_cast<IItemStrand*>(model->QueryStrand(kOwnedItemStrandBoss, IID_IITEMSTRAND)) : nil);
+		if (strand == nil)
+			continue;
+		const TextIndex ref = strand->GetOwnedItemIndex(kFootnoteReferenceBoss, rows[i].dict);
+		if (ref == kInvalidTextIndex || ref < 0)
+			continue;
+		for (size_t k = 0; k < rows.size(); ++k)
+		{
+			if (!rows[k].inFootnote && rows[k].story == rows[i].story
+				&& rows[k].absBefore <= ref && ref < rows[k].absBefore + rows[k].length)
+			{
+				FootnoteHome home;
+				home.dict = rows[i].dict;
+				home.row = k;
+				home.delta = ref - rows[k].absBefore;
+				footnoteHomes.push_back(home);
+				break;
+			}
+		}
 	}
 	// The records of ours already there, by their time stamps: an earlier run's are neither lined up
 	// nor rejected (records are left in the document on purpose).
@@ -1266,6 +1426,12 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 					outWhyNot.Append(why);
 					return true;
 				}
+			}
+			// a footnote whose reference came back with an unticked row is back - as a new object
+			if (!RehomeFootnotes(db, rows, from, to, footnoteHomes, threadBefore, outWhyNot))
+			{
+				outFailed = true;
+				return true;
 			}
 		}
 
@@ -2094,6 +2260,15 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(t.locked);
 		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
+	}
+
+	// Ticked rows in the endnotes, left alone on purpose (2026-09-27): a match ends an endnote, and
+	// InDesign's replace leaves an endnote it writes at the end of with a character nobody can delete.
+	if (t.endnoteLeft > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.endnoteLeft);
+		outSummary.Append(" hit(s) in endnotes not replaced - a match ends an endnote, and InDesign's replace breaks an endnote there.");
 	}
 
 	// Checked rows the replace command itself would not run on. The one entry in this list that is
@@ -3100,9 +3275,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			bool changeAllCancelled = false;
 			bool changeAllFailed = false;
 			PMString whyNot;
+			int32 endnoteLeft = 0;
 			const bool byChangeAll = ReplaceInChapterByChangeAll(ci, docRef, scopeOptions,
-				&progressBar, progressBase, progressReported, replaced, missing, locked,
+				&progressBar, progressBase, progressReported, replaced, missing, locked, endnoteLeft,
 				changeAllCancelled, changeAllFailed, whyNot);
+			totals.endnoteLeft += endnoteLeft;
 			if (changeAllCancelled)
 			{
 				totals.cancelled = true;
@@ -3484,6 +3661,59 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	outStatus = (rows.size() > 1)
 		? "Rejected - the row and the matches touching it are back to their original text. Right-click one for Redo."
 		: "Rejected - the row is back to its original text. Right-click it for Redo.";
+	return true;
+}
+
+// ======================================================================================================
+// Accept All Changes in This Document (2026-09-27) - see the header. The same plain sequence and rollback
+// as Reject Change above.
+// ======================================================================================================
+bool KBSReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
+{
+	UIDRef docRef;
+	IDFile file;
+	return KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) && docRef.GetDataBase() != nil
+		&& KBSBookScope::IsDocStillOpen(docRef) && KBSTrackChange::DocumentHasOurChanges(docRef.GetDataBase());
+}
+
+bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
+		|| !KBSBookScope::IsDocStillOpen(docRef))
+	{
+		outStatus = "Accept All Changes: the document is not open.";
+		return false;
+	}
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	if (sequence == nil)
+	{
+		outStatus = "Accept All Changes: InDesign would not start a command sequence - nothing was changed.";
+		return false;
+	}
+	PMString name("Accept All Changes");
+	name.SetTranslatable(kFalse);
+	sequence->SetName(name);
+	PMString why;
+	why.SetTranslatable(kFalse);
+	const int32 accepted = KBSTrackChange::AcceptOursInDocument(docRef.GetDataBase(), why);
+	if (accepted < 0)
+		ErrorUtils::PMSetGlobalErrorCode(kFailure);
+	CmdUtils::EndCommandSequence(sequence);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (accepted < 0)
+	{
+		outStatus = "Accept All Changes: ";
+		outStatus.Append(why);
+		outStatus.Append(" - nothing was accepted and the document is as it was.");
+		return false;
+	}
+	outStatus = "Accepted ";
+	outStatus.AppendNumber(accepted);
+	outStatus.Append(" change(s) of this replace in the document - they can no longer be rejected here. Other people's changes are left as they are.");
 	return true;
 }
 

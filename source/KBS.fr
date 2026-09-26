@@ -649,6 +649,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Accept All Changes in This Document (2026-09-27): KBS's own tracked changes in the document of
+		// the row the menu was popped over.
+		kKBSAcceptAllChangesActionID,
+		kKBSResultRowMenuName
+		kKBSAcceptAllChangesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// ----- A hit row's right-click menu (2026-09-26) -----
 		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Reject Change takes that row's replace
 		// back through its tracked change, Redo replaces it again. Hit rows had no menu before.
@@ -900,6 +907,16 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSRedoActionID,
 		kKBSRedoMenuKey,				// "Redo"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Accept All Changes in This Document - a document row's right-click menu (2026-09-27).
+		kKBSActionComponentBoss,
+		kKBSAcceptAllChangesActionID,
+		kKBSAcceptAllChangesMenuKey,	// "Accept All Changes in This Document"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
