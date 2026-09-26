@@ -337,6 +337,8 @@ DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
 // every tracked change of KBS's own in that chapter's document (nobody else's) - the name is InDesign's
 // own ($ID/Accept All Changes in This Document).
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
+// The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).
+DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
 
 
 // WidgetIDs:
@@ -584,10 +586,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 
 // Menu item positions:
 //
-// The flyout reads in five blocks, parted by four rules (the user's arrangement, 2026-08-04):
-//    1.0 - 1.2    the three commands that RUN something over the current scope
+// The flyout reads in six blocks, parted by five rules (the user's arrangement, 2026-08-04; the two
+// scans moved below Change Checked on 2026-09-27, the user's "B"):
+//    1.0          Find in Document / Find in Book
+//   ---- 1.1
+//    1.2          Change Checked - the one command that writes to the DOCUMENTS
 //   ---- 1.3
-//    1.6          Change Checked - the one command that writes to the DOCUMENTS
+//    1.4 - 1.5    the two scans (Find Missing Glyphs, Find Overset)
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (listed under "Block 3" below - counted there, not here)
 //   ---- 3.0
@@ -597,17 +602,17 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // Positions that the new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the three "run something over the scope" commands, in the order they were added. The
-// scope they run on is set by Book Scope, two blocks below.
+// Block 1 - the search, then Change Checked alone between two rules. It is the only item on this menu
+// that rewrites the documents, so it is kept apart from the search above it and the scans below, where
+// it cannot be reached by a slip of the pointer. The scope all of these run on is set by Book Scope.
 #define kKBSSearchBookMenuItemPosition		1.0
-#define kKBSFindMissingGlyphsMenuItemPosition	1.1
-#define kKBSFindOversetMenuItemPosition		1.2
-#define kKBSSeparator2MenuItemPosition		1.3
+#define kKBSSeparator2MenuItemPosition		1.1
+#define kKBSReplaceCheckedMenuItemPosition	1.2
+#define kKBSSeparator5MenuItemPosition		1.3
 
-// Block 2 - Change Checked, alone between two rules. It is the only item on this menu that rewrites
-// the documents, so it is kept apart from both the read-only runs above it and the toggles below,
-// where it cannot be reached by a slip of the pointer.
-#define kKBSReplaceCheckedMenuItemPosition	1.6
+// Block 2 - the two scans, reports only (the user's order, 2026-09-27: below Change Checked).
+#define kKBSFindMissingGlyphsMenuItemPosition	1.4
+#define kKBSFindOversetMenuItemPosition		1.5
 #define kKBSSeparator3MenuItemPosition		2.0
 
 // Block 3 - the six check-mark toggles (the six positions from 2.2 to 2.9; it said "four" at the top of this

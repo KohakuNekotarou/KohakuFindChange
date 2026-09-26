@@ -495,11 +495,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// ----- The panel's flyout menu -----
 		// Written here in the order it is DRAWN. What actually decides that order is each item's
-		// position number, and the five blocks those numbers form are laid out in KBSID.h. The
+		// position number, and the six blocks those numbers form are laid out in KBSID.h. The
 		// separators' names are in the order they were added, not the order they appear in - the
 		// first one written was the rule above About, which is why it is Separator1 down at 10.0.
 
-		// --- Block 1: the three commands that run something over the current scope ---
+		// --- Block 1: Find/Change - the search, then the one command that rewrites the documents ---
+		// (the user's order, 2026-09-27: the two scans moved below Change Checked)
 
 		// Find in Document / Find in Book: run the search over the current scope using the settings
 		// in InDesign's own Find/Change dialog. Drawn under whichever of the two names the scope
@@ -509,36 +510,41 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Find Missing Glyphs: scan the same scope for notdef glyphs (the boxes InDesign draws when
-		// a font has no glyph for a character). Sits under the search command because the two are
-		// siblings - both run something over the current scope.
-		kKBSFindMissingGlyphsActionID,
-		kKBSTargetMenuPath
-		kKBSFindMissingGlyphsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Find Overset: list the text that did not fit. The third sibling of the two above - all
-		// three run something over the current scope.
-		kKBSFindOversetActionID,
-		kKBSTargetMenuPath
-		kKBSFindOversetMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Separator between the three runs above and Change Checked.
+		// Separator between the search and Change Checked.
 		kKBSSeparator2ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator2MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 2: the one command that rewrites the documents, alone between two rules ---
-
-		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
+		// Change Checked: replace every checked hit with the Find/Change dialog's change string. Alone
+		// between two rules - the only item that rewrites the documents.
 		kKBSReplaceCheckedActionID,
 		kKBSTargetMenuPath
 		kKBSReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between Change Checked and the toggles.
+		// Separator between Change Checked and the two scans.
+		kKBSSeparator5ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator5MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// --- Block 2: the two scans (reports - nothing is written) ---
+
+		// Find Missing Glyphs: scan the same scope for notdef glyphs (the boxes InDesign draws when
+		// a font has no glyph for a character).
+		kKBSFindMissingGlyphsActionID,
+		kKBSTargetMenuPath
+		kKBSFindMissingGlyphsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Find Overset: list the text that did not fit. The sibling of the scan above.
+		kKBSFindOversetActionID,
+		kKBSTargetMenuPath
+		kKBSFindOversetMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Separator between the two scans and the toggles.
 		kKBSSeparator3ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator3MenuItemPosition,
