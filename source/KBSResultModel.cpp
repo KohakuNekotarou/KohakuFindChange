@@ -670,8 +670,7 @@ namespace
 			AppendWord(flags, "missing");
 		else if (hit.outcome == KBSResultModel::kOutcomeRefused)
 			AppendWord(flags, "refused");
-		else if (hit.outcome == KBSResultModel::kOutcomeRejected)
-			AppendWord(flags, "rejected");
+		// (a rejected row says nothing - as on the panel, 2026-09-27: it reads its original text again)
 		else if (hit.outcome == KBSResultModel::kOutcomeDeleted)
 			AppendWord(flags, "deleted");
 		else if (hit.outcome == KBSResultModel::kOutcomeEndnoteLeft)
