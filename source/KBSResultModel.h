@@ -151,6 +151,9 @@ namespace KBSResultModel
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
 		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
 		bool		inFootnote;
+		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
+		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
+		uint64		recordTime;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -164,7 +167,7 @@ namespace KBSResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				pageOrdinal(0) {}
+				recordTime(0), pageOrdinal(0) {}
 	};
 
 	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
@@ -589,9 +592,22 @@ namespace KBSResultModel
 	    a scan (a report has nothing to replace). It asks that question the same way the panel does,
 	    so the model can never hold a checked hit that no row offered; it is a backstop rather than
 	    the first line of defence, since those rows carry no box to click in the first place. */
-	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
+	/** Ticks or unticks the row - AND every row touching it (2026-09-26, the user's design B): matches
+	    that touch in the same story go on and off together. Taking back the LATER of two touching
+	    replaces drops the EARLIER one's deletion record (it sits on the later one's first character -
+	    measured, by any way of rejecting), so "earlier ticked, later not" must never be made.
+	    Returns how many rows the group holds (1 = no neighbour). */
+	int32 SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
+
+	/** The rows touching `hitIdx` in its chapter - same story, ranges meeting or overlapping, followed
+	    both ways - in TEXT order, `hitIdx` included. Reads the ranges as they stand (the search's
+	    before a replace, the replaced text's after one). */
+	void GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
 	/** Is the row inside a footnote (Hit::inFootnote)? False for an out-of-range index. */
 	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
+	/** The time stamp of the row's tracked changes (Hit::recordTime); 0 for none or out of range. */
+	uint64 GetHitRecordTime(int32 chapterIdx, int32 hitIdx);
+	void SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time);
 	/** Why a row is pinned - always replaced, never taken back - if it is (2026-09-26). */
 	enum PinnedReason { kPinnedNone = 0, kPinnedFootnote };
 	PinnedReason GetHitPinned(int32 chapterIdx, int32 hitIdx);
@@ -853,7 +869,10 @@ namespace KBSResultModel
 	    caller. The rule here is unchanged either way.)
 
 	    (The report flattens what is left afterwards, which is what keeps its tabs from splitting a
-	    cell. The marks take the breaks out of that pass's way, so nothing there changes.) */
+	    cell. The marks take the breaks out of that pass's way, so nothing there changes.)
+
+	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
+	    table anchors, page number markers (2026-09-26, the user's call: they drew as a box). */
 	void MarkUpBreaksForDisplay(PMString& s);
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,

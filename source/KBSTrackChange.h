@@ -93,10 +93,24 @@ namespace KBSTrackChange
 	/** True when the story holds at least one record of ours. */
 	bool StoryHasOurChanges(const UIDRef& story);
 
-	/** Reject every record of ours standing AT `position` (an insertion and a deletion can share one),
-	    except records whose time stamp is in `keepTimes` (an earlier run's - never taken back here).
-	    Returns how many were rejected. Leaves the global error state clear. */
-	int32 RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes = nil);
+	/** Reject ONE record of ours standing AT `position` - the deletion when `wantDelete`, else the
+	    insertion - except one whose time stamp is in `keepTimes` (an earlier run's, or another row's).
+	    ***** ONE, AND OF THE KIND ASKED (2026-09-26, case touching-mixed). ***** Touching replaces put the
+	    first one's deletion and the next one's insertion at the SAME position ("catcat" -> "kitten":
+	    deleted "cat"@6 and inserted "k"@6); rejecting "everything of ours there" took the ticked row's
+	    deletion back with the unticked row's insertion. Returns 1 when one was rejected, 0 when none.
+	    Leaves the global error state clear. */
+	int32 RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes, bool wantDelete);
+
+	/** ***** TAKE ONE REPLACE BACK - WHOLE RECORDS, OURS ONLY (2026-09-26). ***** Its deletion (at
+	    delAnchor; delOffset must be 0 - a deletion shared with a touching row cannot be split) and its
+	    insertion's pieces in [insAt, insAt + insLen), each rejected whole by RejectAt, and only records
+	    signed kAuthor whose time stamp is not in oldTimes and, when onlyTime is not 0, is onlyTime. No
+	    range is handed to InDesign (measured: an insertion range with a deletion at its start brought it
+	    down). False = not ours, or not whole; outWhy says which. Callers read the text back. */
+	bool RejectReplacement(const UIDRef& story, TextIndex insAt, int32 insLen,
+		TextIndex delAnchor, int32 delOffset, int32 delLen, const std::set<uint64>* oldTimes, uint64 onlyTime,
+		PMString& outWhy);
 
 	/** One replacement of ours, paired: the insertion [at, at+insLen) and the deletion anchored at
 	    at+insLen. `inserted` / `deleted` are the texts (deleted read from the deleted-text record). */
@@ -107,7 +121,8 @@ namespace KBSTrackChange
 		bool		hasDelete;
 		PMString	inserted;
 		PMString	deleted;
-		Change() : at(0), insLen(0), hasDelete(false) {}
+		uint64		time;		// the records' time stamp - one run's (VOSRedlineChange::GetTimeStamp)
+		Change() : at(0), insLen(0), hasDelete(false), time(0) {}
 	};
 
 	/** Every change of ours in the story, insertions and deletions paired, in position order. */
@@ -117,6 +132,10 @@ namespace KBSTrackChange
 	    nearest `nearAt`. False = none. */
 	bool FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
 		TextIndex nearAt, Change& out);
+
+	/** The time stamp of the records of ours standing in [from, to] - the newest, 0 when none. What a
+	    replaced row keeps (Hit::recordTime) so its change is found among that run's alone. */
+	uint64 RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to);
 
 	/** A REPLACED row put where its tracked change stands now - range, line and hash - so an edit
 	    made since the replace does not put it off (the record moves with the text). False = the row

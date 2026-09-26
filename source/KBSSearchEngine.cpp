@@ -1845,6 +1845,47 @@ void KBSSearchEngine::FinalizeHits(std::vector<KBSResultModel::Hit>& hits)
 	FinalizeChapterHits(hits);
 }
 
+namespace
+{
+// The session's search direction for one tab, through the command the dialog's own radio button
+// stands for (the silent one: no panel is told to redraw). A failure is cleared at once - an error
+// left standing would roll back the sequence of whatever runs next.
+bool SetSessionSearchBackwards(bool16 backwards, IFindChangeOptions::SearchMode mode)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSearchBackwardsSilentCmdBoss));
+	InterfacePtr<IBoolData> value(cmd, UseDefaultIID());
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (cmd == nil || value == nil || modeData == nil)
+		return false;
+	value->Set(backwards);
+	modeData->Set(static_cast<int32>(mode));
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
+	}
+	return true;
+}
+}	// anonymous namespace
+
+KBSForwardSearchScope::KBSForwardSearchScope() : fRestore(false), fMode(0)
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	fMode = static_cast<int32>(mode);
+	if (!opts->GetSearchBackwards(mode))
+		return;		// forward already - nothing to turn, nothing to put back
+	fRestore = SetSessionSearchBackwards(kFalse, mode);
+}
+
+KBSForwardSearchScope::~KBSForwardSearchScope()
+{
+	if (fRestore)
+		SetSessionSearchBackwards(kTrue, static_cast<IFindChangeOptions::SearchMode>(fMode));
+}
+
 void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force)
 {
 	if (bar == nil)
@@ -2339,9 +2380,8 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 		opts->GetIncludeHiddenLayers(mode),
 		opts->GetIncludeLockedStoriesForFind(mode),
 		opts->GetIncludeFootnotes(mode),
-		// ...and the direction, which decides the ORDER the same matches are numbered in - the
-		// one thing the replace joins rows by (see the header, 2026-09-25).
-		opts->GetSearchBackwards(mode),
+		// (The direction stood here from 2026-09-25 to 2026-09-26. KBS searches and replaces forward
+		// only now - KBSForwardSearchScope - so the dialog's direction changes nothing KBS does.)
 	};
 	outSignature.Append(" o");
 	for (size_t i = 0; i < sizeof(switches) / sizeof(switches[0]); ++i)
@@ -2518,6 +2558,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
+	// Forward, whatever the dialog says (2026-09-26) - and put back as the function ends.
+	KBSForwardSearchScope forward;
 
 	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
 	// the progress bar pumps events, so a command could still find its way in here.

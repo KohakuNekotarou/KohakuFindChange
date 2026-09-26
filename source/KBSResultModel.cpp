@@ -771,6 +771,17 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 // here rather than left as a bare number in the loop below.
 static const UTF32TextChar kKBSReturnArrow = 0x21B5;
 
+// ***** THE CHARACTERS AN OBJECT STANDS ON ARE NOT SHOWN (2026-09-26, the user's call). ***** They have
+// no glyph in the panel's font and drew as a box: a footnote / endnote reference (0x04 / 0x05), the
+// marks around an endnote's text and other anchors (U+FEFF), a table's anchor and continuation
+// (0x16 / 0x17), the page number and section markers (0x18 / 0x19), an anchored object (U+FFFC).
+// Display only, like the break marks: app.kfcResults still reports them as they are.
+static bool IsHiddenMarker(UTF16TextChar c)
+{
+	return c == 0x04 || c == 0x05 || c == 0x16 || c == 0x17 || c == 0x18 || c == 0x19
+		|| c == 0xFEFF || c == 0xFFFC;
+}
+
 // See KBSResultModel.h for what this is for and why it is DISPLAY ONLY.
 //
 // The two marks are the ones InDesign itself draws with Show Hidden Characters on: a pilcrow for a
@@ -789,7 +800,7 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 
 	bool16 any = kFalse;
 	for (int32 i = 0; i < n && !any; ++i)
-		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF);
+		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF || IsHiddenMarker(buf[i]));
 	if (!any)
 		return;
 
@@ -798,13 +809,15 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 	int32 runStart = 0;
 	for (int32 i = 0; i < n; ++i)
 	{
-		if (buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
+		const bool marker = IsHiddenMarker(buf[i]);
+		if (!marker && buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
 			continue;
 		if (i > runStart)
 			out.AppendW(buf + runStart, i - runStart);
-		out.AppendW(buf[i] == kTextChar_CR
-			? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
-			: kKBSReturnArrow);
+		if (!marker)
+			out.AppendW(buf[i] == kTextChar_CR
+				? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
+				: kKBSReturnArrow);
 		runStart = i + 1;
 	}
 	if (n > runStart)
@@ -969,25 +982,65 @@ void KBSResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 	gChapters[chapterIdx].docRef = newDocRef;
 }
 
-void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
+void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
 {
+	outHits.clear();
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(hits.size()))
+		return;
+	const Hit& me = hits[hitIdx];
+	// the story's rows with a place, in text order
+	std::vector<std::pair<TextIndex, int32> > order;
+	for (size_t i = 0; i < hits.size(); ++i)
+		if (hits[i].storyUID == me.storyUID && hits[i].textStart != kInvalidTextIndex)
+			order.push_back(std::make_pair(hits[i].textStart, static_cast<int32>(i)));
+	std::sort(order.begin(), order.end());
+	size_t at = 0;
+	while (at < order.size() && order[at].second != hitIdx)
+		++at;
+	if (at == order.size())
+	{
+		outHits.push_back(hitIdx);
+		return;
+	}
+	size_t from = at, to = at;
+	while (from > 0 && hits[order[from - 1].second].textEnd >= hits[order[from].second].textStart)
+		--from;
+	while (to + 1 < order.size() && hits[order[to].second].textEnd >= hits[order[to + 1].second].textStart)
+		++to;
+	for (size_t k = from; k <= to; ++k)
+		outHits.push_back(order[k].second);
+}
+
+int32 KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
 	Chapter& c = gChapters[chapterIdx];
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+		return 0;
+	std::vector<int32> group;
+	GetTouchingGroup(chapterIdx, hitIdx, group);
 	// The same question the panel asks before it draws a box, asked here so the model can never hold
 	// a checked hit that no row offered. It covers the whole list as well as the row - a scan has
 	// nothing to replace, and neither has a replace's report - which the per-row flags cannot say
 	// anything about.
-	if (!RowHasCheckBox(h))
-		return;
-	// A footnote's row cannot be taken off (2026-09-26): Track Changes records nothing inside a
-	// footnote, so its replace could not be kept apart from the others' nor taken back.
-	if (!checked && h.inFootnote)
-		return;
-	h.checked = checked;
+	for (size_t k = 0; k < group.size(); ++k)
+	{
+		const Hit& g = c.hits[group[k]];
+		if (!RowHasCheckBox(g))
+			return static_cast<int32>(group.size());
+		// A footnote's row cannot be taken off (2026-09-26): Track Changes records nothing inside a
+		// footnote, so its replace could not be kept apart from the others' nor taken back - and a
+		// group holding one goes off with it or not at all.
+		if (!checked && g.inFootnote)
+			return static_cast<int32>(group.size());
+	}
+	for (size_t k = 0; k < group.size(); ++k)
+		c.hits[group[k]].checked = checked;
+	return static_cast<int32>(group.size());
 }
 
 KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int32 hitIdx)
@@ -999,6 +1052,27 @@ KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int3
 		return kPinnedNone;
 	const Hit& h = c.hits[hitIdx];
 	return h.inFootnote ? kPinnedFootnote : kPinnedNone;
+}
+
+uint64 KBSResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return 0;
+	return c.hits[hitIdx].recordTime;
+}
+
+void KBSResultModel::SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	BackUpRow(chapterIdx, hitIdx, c.hits[hitIdx]);
+	c.hits[hitIdx].recordTime = time;
 }
 
 bool KBSResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)

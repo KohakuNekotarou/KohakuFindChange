@@ -42,6 +42,25 @@ class RangeProgressBar;
     follows the loop in SearchBook and ReplaceChecked. */
 void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
+/** ***** KBS SEARCHES AND REPLACES FORWARD ONLY (2026-09-26, the user's call). ***** The results are a
+    list and the replace is Change All, so a direction means nothing to KBS - and a backward search
+    lists matches Change All does not make (H-5: GREP lookarounds read other text backwards). For the
+    life of the object the session's search direction is forward; the user's own setting is put back
+    by the destructor, whatever way the run ends (kSearchBackwardsSilentCmdBoss, the command the
+    2026-09-26 spike measured). Create it OUTSIDE any command sequence: an aborted sequence would take
+    the switch back and leave the restore to set it a second time. */
+class KBSForwardSearchScope
+{
+public:
+	KBSForwardSearchScope();
+	~KBSForwardSearchScope();
+private:
+	KBSForwardSearchScope(const KBSForwardSearchScope&);
+	KBSForwardSearchScope& operator=(const KBSForwardSearchScope&);
+	bool	fRestore;
+	int32	fMode;
+};
+
 namespace KBSSearchEngine
 {
 	/** Resolve the scope from the Book Scope toggle (the TARGET book's chapters when it is ON - see

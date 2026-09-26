@@ -87,7 +87,10 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	if (nodeID == nil || !nodeID->IsHitRow())
 		return;
 
-	KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
+	const int32 groupSize = KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
+	// Touching matches go on and off together (2026-09-26): their rows are repainted with this one.
+	if (groupSize > 1)
+		KBSResultTree::RefreshRows();
 
 	// A footnote's row refuses to be taken off (2026-09-26): put the box back and say why.
 	const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(nodeID->GetChapter(), nodeID->GetHit());

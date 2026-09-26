@@ -16,6 +16,7 @@
 #include "IBoolData.h"
 #include "ICommand.h"
 #include "IRedlineDataStrand.h"
+#include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
 #include "IStringData.h"
 #include "ITextModel.h"
@@ -126,6 +127,16 @@ KBSTrackChange::AuthorScope::AuthorScope() : fSwitched(false)
 	fOld.SetTranslatable(kFalse);
 	PMString name(kAuthor);
 	name.SetTranslatable(kFalse);
+	// ***** A NAME THAT IS ALREADY OURS IS A LEFTOVER (2026-09-26). ***** Only an interrupted run leaves
+	// InDesign's user name as kAuthor - InDesign going down in the middle of a replace, or a script that
+	// set it and stopped before setting it back (it happened, and the script DOM cannot set the name
+	// back to "unset"). Handed back as unset, so the user's own tracked edits are never signed with
+	// KBS's name - KBS would take them for its own. "Unset" is the value a never-set name reads as,
+	// "Unknown User Name" (IUserInfo.h:53, shown translated in a Japanese UI - measured through the
+	// script DOM); an empty name, which only such a repair leaves, is put back to it the same way
+	// (IUserInfoUtils.h:52 treats the two alike).
+	if (fOld == name || fOld.IsEmpty())
+		fOld = PMString("Unknown User Name");
 	fSwitched = (SetUserName(name) == kSuccess);
 }
 
@@ -199,13 +210,13 @@ bool KBSTrackChange::StoryHasOurChanges(const UIDRef& story)
 	return !records.empty();
 }
 
-int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes)
+int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes, bool wantDelete)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return 0;
 	int32 done = 0;
-	for (int32 guard = 0; guard < 100; ++guard)
+	for (int32 guard = 0; guard < 1; ++guard)	// ONE record - see the header
 	{
 		RedlineIterator* it = redline->NewRedlineIterator(position);
 		if (it == nil)
@@ -219,8 +230,9 @@ int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const st
 			if (record == nil)
 				continue;
 			const uint64 time = record->GetTimeStamp();
+			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 			delete record;
-			if (IsOurs(it) && (keepTimes == nil || keepTimes->count(time) == 0))
+			if (IsOurs(it) && isDelete == wantDelete && (keepTimes == nil || keepTimes->count(time) == 0))
 			{
 				found = true;
 				break;
@@ -234,6 +246,66 @@ int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const st
 	}
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return done;
+}
+
+bool KBSTrackChange::RejectReplacement(const UIDRef& story, TextIndex insAt, int32 insLen,
+	TextIndex delAnchor, int32 delOffset, int32 delLen, const std::set<uint64>* oldTimes, uint64 onlyTime,
+	PMString& outWhy)
+{
+	// ***** WHOLE RECORDS, OURS ONLY (2026-09-26, measured). ***** A range reject was tried and: an
+	// insertion's exact range took nothing back, and an insertion range whose start held the touching
+	// neighbour's deletion brought InDesign down (ShuksanTerminate; rangelog-2026-09-26.txt). So every
+	// record is rejected whole by RejectAt, picked by position, author and time - nobody else's change
+	// can be taken, and no range is handed to InDesign at all. A deletion SHARED with a touching row
+	// (replaces that wrote nothing) cannot be split this way: that shape is refused before the write.
+	outWhy.Clear();
+	outWhy.SetTranslatable(kFalse);
+	std::vector<Record> recs;
+	CollectRecords(story, recs);
+	std::set<uint64> keep;			// the times NOT to take back: an earlier run's, or not this row's
+	if (oldTimes != nil)
+		keep = *oldTimes;
+	if (onlyTime != 0)
+		for (size_t k = 0; k < recs.size(); ++k)
+			if (recs[k].time != onlyTime)
+				keep.insert(recs[k].time);
+	if (delLen > 0)
+	{
+		if (delOffset != 0)
+		{
+			outWhy = "the deletion is shared with a touching row";
+			return false;
+		}
+		if (RejectAt(story, delAnchor, &keep, true) == 0)
+		{
+			outWhy = "no deletion of KBS's own stands there";
+			return false;
+		}
+	}
+	if (insLen > 0)
+	{
+		// the insertion's pieces, from the last to the first - each whole
+		std::vector<TextIndex> starts;
+		int32 covered = 0;
+		for (size_t k = 0; k < recs.size(); ++k)
+		{
+			if (recs[k].isDelete || keep.count(recs[k].time) != 0)
+				continue;
+			if (recs[k].at >= insAt && recs[k].at + recs[k].len <= insAt + insLen)
+			{
+				starts.push_back(recs[k].at);
+				covered += recs[k].len;
+			}
+		}
+		if (covered != insLen)
+		{
+			outWhy = "the inserted text is not KBS's own record, whole";
+			return false;
+		}
+		for (size_t k = starts.size(); k-- > 0; )
+			RejectAt(story, starts[k], &keep, false);
+	}
+	return true;
 }
 
 void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& out)
@@ -253,16 +325,20 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 		if (record == nil)
 			continue;
 		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const uint64 time = record->GetTimeStamp();
 		delete record;
 		if (!IsOurs(it))
 			continue;
+		// pieces of one replace are one run's: records of another run never join them
+		const bool follows = !out.empty() && !out.back().hasDelete
+			&& out.back().at + out.back().insLen == at && out.back().time == time;
 		if (isDelete)
 		{
 			PMString deleted;
 			it->DescribeChangeContent(deleted, 0x7fffffff);
 			deleted.SetTranslatable(kFalse);
 			// the deletion anchored right after an insertion is that insertion's pair
-			if (!out.empty() && !out.back().hasDelete && out.back().at + out.back().insLen == at)
+			if (follows)
 			{
 				out.back().hasDelete = true;
 				out.back().deleted = deleted;
@@ -273,10 +349,11 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 				c.at = at;
 				c.hasDelete = true;
 				c.deleted = deleted;
+				c.time = time;
 				out.push_back(c);
 			}
 		}
-		else if (!out.empty() && !out.back().hasDelete && out.back().at + out.back().insLen == at)
+		else if (follows)
 		{
 			out.back().insLen += len;	// an insertion split into pieces
 		}
@@ -285,6 +362,7 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 			Change c;
 			c.at = at;
 			c.insLen = len;
+			c.time = time;
 			out.push_back(c);
 		}
 	}
@@ -359,6 +437,10 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 			&& KBSResultModel::GetHitChangeTexts(chapterIdx, i, o2, n2) && o2 == originalText && n2 == replacedText)
 			twins.push_back(a2);
 	}
+	// ***** ONLY THE ROW'S OWN RUN (2026-09-26, the user's design): the time stamp its records were made
+	// with, kept when it was replaced. Another run's records - an earlier replace of the same words -
+	// are not candidates at all.
+	const uint64 rowTime = KBSResultModel::GetHitRecordTime(chapterIdx, hitIdx);
 	std::vector<Change> changes;
 	CollectChanges(outStory, changes);
 	bool found = false;
@@ -366,6 +448,8 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	for (size_t k = 0; k < changes.size(); ++k)
 	{
 		if (changes[k].inserted != replacedText || changes[k].deleted != originalText)
+			continue;
+		if (rowTime != 0 && changes[k].time != rowTime)
 			continue;
 		const int32 mine = (changes[k].at > start) ? changes[k].at - start : start - changes[k].at;
 		bool someoneNearer = false;
@@ -400,4 +484,15 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
 		KBSSearchEngine::HashMatchText(storyRef, c.at, end));
 	return true;
+}
+
+uint64 KBSTrackChange::RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to)
+{
+	std::vector<Record> recs;
+	CollectRecords(story, recs);
+	uint64 newest = 0;
+	for (size_t k = 0; k < recs.size(); ++k)
+		if (recs[k].at >= from && recs[k].at <= to && recs[k].time > newest)
+			newest = recs[k].time;
+	return newest;
 }
