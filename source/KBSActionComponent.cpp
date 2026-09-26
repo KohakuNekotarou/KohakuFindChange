@@ -55,6 +55,7 @@
 #include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
 #include "KBSOversetScanEngine.h"	// Find Overset
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
+#include "KBSTrackChange.h"		// Reject Change / Redo: is this row's tracked change still there?
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
@@ -394,6 +395,29 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// the chooser, the encoding - is in KBSResultTree::SaveResultsAsText, which is where the
 			// panel's own file-facing work lives; nothing to report from here.
 			KBSResultTree::SaveResultsAsText();
+			break;
+		}
+
+		case kKBSRejectChangeActionID:
+		case kKBSRedoActionID:
+		{
+			// A hit row's right-click menu (2026-09-26). Nothing stashed = nobody right-clicked a hit
+			// row (a script firing the action by ID): do nothing.
+			int32 chapter = -1, hit = -1;
+			if (!KBSResultModel::GetContextMenuHit(chapter, hit))
+				break;
+			if (KBSRunGuard::IsAnyRunning())
+			{
+				PMString busy(KBSRunGuard::BusyMessage());
+				busy.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(busy);
+				break;
+			}
+			PMString status;
+			if (actionID.Get() == kKBSRejectChangeActionID)
+				KBSReplaceEngine::RejectHit(chapter, hit, status);
+			KBSResultTree::RefreshRows();
+			KBSResultTree::ShowStatus(status);
 			break;
 		}
 
@@ -956,6 +980,25 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// neither does a replace's aftermath, which is exactly the list a user wants to keep.
 			listToUpdate->SetNthActionState(i,
 				(KBSResultModel::GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSRejectChangeActionID || action == kKBSRedoActionID)
+		{
+			// A hit row's menu (2026-09-26): Reject Change while the row's tracked change is still
+			// there, Redo once it has been rejected. (Runs are greyed out above, before this loop.)
+			int32 chapter = -1, hit = -1;
+			bool enable = false;
+			if (KBSResultModel::GetContextMenuHit(chapter, hit))
+			{
+				if (action == kKBSRejectChangeActionID)
+				{
+					UIDRef storyRef;
+					KBSTrackChange::Change change;
+					enable = KBSTrackChange::FindRowChangeForHit(chapter, hit, storyRef, change);
+				}
+				else
+					enable = (KBSResultModel::GetHitOutcome(chapter, hit) == KBSResultModel::kOutcomeRejected);
+			}
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
 		{

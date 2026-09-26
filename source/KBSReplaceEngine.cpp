@@ -41,6 +41,8 @@
 #include "ITextModel.h"
 #include "ITextStoryThread.h"
 #include "textiterator.h"			// the object characters a Change All row may hold
+#include "TextID.h"					// kFootnoteReferenceBoss - a footnote's thread
+#include "WideString.h"			// Reject Change: the original text's length in code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
@@ -555,6 +557,7 @@ struct TrackRow
 	int32		length;
 	int32		newLen;		// filled from the records: the text the replacement wrote (0 = deleted)
 	bool		changed;	// Change All wrote here
+	PMString	before;		// a ticked row's text before anything was written (LineUpStory's last check)
 };
 
 bool TrackRowBefore(const TrackRow& a, const TrackRow& b)
@@ -721,6 +724,25 @@ bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t
 			return false;
 		}
 	}
+	// ***** A TICKED ROW THE RECORDS SAY WAS NOT WRITTEN MUST STILL READ AS IT DID (2026-09-26). ***** Text
+	// Track Changes does not record (a footnote's - measured) would otherwise be rewritten while the
+	// row is reported "missing" and the run committed: the records alone cannot see such a write.
+	std::map<TrackThreadKey, TextIndex> cum;
+	for (size_t i = from; i < to; ++i)
+	{
+		const TrackRow& r = rows[i];
+		TextIndex threadStart = kInvalidTextIndex;
+		if (r.target && !r.changed && TrackThreadStart(db, r, threadStart))
+		{
+			const TextIndex s = threadStart + r.offset + cum[TrackKeyOf(r)];
+			if (KBSTrackChange::ReadText(UIDRef(db, story), s, r.length) != r.before)
+			{
+				outWhy = "a row was written without a tracked change";
+				return false;
+			}
+		}
+		cum[TrackKeyOf(r)] += r.changed ? (r.newLen - r.length) : 0;
+	}
 	return true;
 }
 
@@ -796,6 +818,20 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		}
 		r.offset = start - threadStart;
 		r.length = end - start;
+		if (r.target)
+			r.before = KBSTrackChange::ReadText(UIDRef(db, r.story), start, r.length);
+		// ***** A ROW IN A FOOTNOTE GOES TO THE WALK (measured 2026-09-26 through IDML): Track Changes
+		// records nothing written inside a footnote - by Change All or by hand - so such a row could be
+		// neither lined up nor taken back. A footnote's thread IS its reference boss (KCMTextRead's test).
+		{
+			InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+			InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(start, nil, nil) : nil);
+			if (thread != nil && ::GetClass(thread) == kFootnoteReferenceBoss)
+			{
+				outWhyNot = "a row in a footnote";
+				return false;
+			}
+		}
 		if (r.target)
 		{
 			const UIDRef storyRef(db, r.story);
@@ -3045,6 +3081,72 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 bool KBSReplaceEngine::IsReplacing()
 {
 	return gReplacing;
+}
+
+// ======================================================================================================
+// Reject Change (2026-09-26) - see the header. The sequence is a PLAIN one, as KCM's own reject is
+// (KCMFacades.cpp, RejectImportChange): an abortable sequence, ended, was measured to take the undo
+// step below it away. The rollback of a plain sequence is the SDK's own: raise the error state, end it,
+// clear it (CmdUtils.h, SequenceContext).
+// ======================================================================================================
+bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
+		|| !KBSBookScope::IsDocStillOpen(docRef))
+	{
+		outStatus = "Reject Change: the document of this row is not open.";
+		return false;
+	}
+	PMString originalText, replacedText;
+	UIDRef storyRef;
+	KBSTrackChange::Change change;
+	if (!KBSResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText)
+		|| !KBSTrackChange::FindRowChangeForHit(chapterIdx, hitIdx, storyRef, change))
+	{
+		outStatus = "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded).";
+		return false;
+	}
+	const int32 originalLen = WideString(originalText).CharCount();
+
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	if (sequence == nil)
+	{
+		outStatus = "Reject Change: InDesign would not start a command sequence - nothing was changed.";
+		return false;
+	}
+	PMString name("Reject Change");
+	name.SetTranslatable(kFalse);
+	sequence->SetName(name);
+	// The deletion first - it stands after the insertion, so rejecting it moves nothing in front of it.
+	int32 done = 0;
+	if (change.hasDelete)
+		done += KBSTrackChange::RejectAt(storyRef, change.at + change.insLen);
+	if (change.insLen > 0)
+		done += KBSTrackChange::RejectAt(storyRef, change.at);
+	// ALL THE WAY BACK, OR NOT AT ALL: the original text has to stand where the change stood.
+	const bool same = (done > 0)
+		&& (KBSTrackChange::ReadText(storyRef, change.at, originalLen) == originalText);
+	if (!same)
+		ErrorUtils::PMSetGlobalErrorCode(kFailure);
+	CmdUtils::EndCommandSequence(sequence);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (!same)
+	{
+		outStatus = "Reject Change: the original text did not come all the way back, so the reject was cancelled - the document is as it was.";
+		return false;
+	}
+
+	KBSResultModel::SetHitRejected(chapterIdx, hitIdx, storyRef.GetUID(), change.at, change.at + originalLen);
+	PMString pre, match, post;
+	KBSSearchEngine::SplitLineAroundMatch(storyRef, change.at, change.at + originalLen, pre, match, post);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
+		KBSSearchEngine::HashMatchText(storyRef, change.at, change.at + originalLen));
+	outStatus = "Rejected - the row is back to its original text. Right-click it for Redo.";
+	return true;
 }
 
 // End, KBSReplaceEngine.cpp.

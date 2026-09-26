@@ -649,6 +649,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- A hit row's right-click menu (2026-09-26) -----
+		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Reject Change takes that row's replace
+		// back through its tracked change, Redo replaces it again. Hit rows had no menu before.
+		kKBSRejectChangeActionID,
+		kKBSResultHitMenuName
+		kKBSRejectChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSRedoActionID,
+		kKBSResultHitMenuName
+		kKBSRedoMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -867,6 +880,26 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSUncheckAllActionID,
 		kKBSUncheckAllMenuKey,			// "Uncheck All"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Reject Change / Redo - a hit row's right-click menu (2026-09-26). kCustomEnabling for the
+		// same reason as Check All: UpdateActionStates greys them by the row the menu is over.
+		kKBSActionComponentBoss,
+		kKBSRejectChangeActionID,
+		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSRedoActionID,
+		kKBSRedoMenuKey,				// "Redo"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

@@ -32,6 +32,7 @@
 #include "VOSRedline.h"
 #include "redlineiterator.h"
 #include "textiterator.h"
+#include "WideString.h"
 
 // Project includes:
 #include "KBSResultModel.h"
@@ -319,7 +320,52 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	if (!KBSResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText))
 		return false;
 	outStory = UIDRef(docRef.GetDataBase(), story);
-	return FindRowChange(outStory, replacedText, originalText, start, outChange);
+
+	// ***** A CHANGE BELONGS TO THE ROW NEAREST IT (2026-09-26, case accepted-then-reject). ***** Rows with
+	// the same texts leave changes that look alike; when one row's change is gone (accepted in the Track
+	// Changes panel), "the nearest change with the same texts" is ANOTHER row's, and rejecting it took
+	// the wrong row back. So every change is handed to the nearest replaced row of the same story and
+	// texts, and this row gets only a change handed to it.
+	std::vector<TextIndex> twins;	// the stored starts of every replaced row that looks like this one
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		bool c2 = false, r2 = false, l2 = false;
+		UID s2 = kInvalidUID;
+		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+		uint64 h2 = 0;
+		PMString o2, n2;
+		if (i != hitIdx && KBSResultModel::GetHitFlags(chapterIdx, i, c2, r2, l2) && r2
+			&& KBSResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2) && s2 == story
+			&& KBSResultModel::GetHitChangeTexts(chapterIdx, i, o2, n2) && o2 == originalText && n2 == replacedText)
+			twins.push_back(a2);
+	}
+	std::vector<Change> changes;
+	CollectChanges(outStory, changes);
+	bool found = false;
+	int32 best = 0;
+	for (size_t k = 0; k < changes.size(); ++k)
+	{
+		if (changes[k].inserted != replacedText || changes[k].deleted != originalText)
+			continue;
+		const int32 mine = (changes[k].at > start) ? changes[k].at - start : start - changes[k].at;
+		bool someoneNearer = false;
+		for (size_t t = 0; t < twins.size() && !someoneNearer; ++t)
+		{
+			const int32 theirs = (changes[k].at > twins[t]) ? changes[k].at - twins[t] : twins[t] - changes[k].at;
+			if (theirs < mine)
+				someoneNearer = true;
+		}
+		if (someoneNearer)
+			continue;
+		if (!found || mine < best)
+		{
+			found = true;
+			best = mine;
+			outChange = changes[k];
+		}
+	}
+	return found;
 }
 
 bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)

@@ -70,6 +70,8 @@
 #include "KBSResultNodeID.h"
 #include "KBSJump.h"
 #include "KBSResultModel.h"		// SetContextMenuChapter - which row the menu is about to act on
+#include "KBSResultTree.h"		// ShowStatus - why a hit row's menu has nothing to offer
+#include "KBSTrackChange.h"		// RefreshRowFromRecords - is this row's tracked change still there?
 
 namespace
 {
@@ -262,12 +264,34 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Hit rows carry no context menu (user's call, 2026-08-01): checking ONE hit is what the row's own
-	// check box is for, so a menu there would only offer to act on something else. The click is
-	// consumed all the same - no menu, and no stock handling either, so the row is not selected and
-	// nothing jumps.
+	// Hit rows carry their own menu since 2026-09-26 - Reject Change and Redo, about THIS row (the
+	// user's call; until then a hit row had no menu, its check box being all a row needed). The row is
+	// stashed first, like the chapter below: the action is handed no widget context of its own. The
+	// click is consumed either way - no stock handling, so the row is not selected and nothing jumps.
+	//
+	// ***** WHY THE ITEMS ARE GREY IS SAID HERE, BEFORE THE MENU. ***** When both are disabled the
+	// popup does not open at all (measured 2026-08-01 with Check All), so the status line is the only
+	// place left to say it.
 	if (nodeID->IsHitRow())
+	{
+		const int32 chapter = nodeID->GetChapter();
+		const int32 hit = nodeID->GetHit();
+		KBSResultModel::SetContextMenuHit(chapter, hit);
+		bool checked = false, replaced = false, locked = false;
+		KBSResultModel::GetHitFlags(chapter, hit, checked, replaced, locked);
+		if (replaced && !KBSTrackChange::RefreshRowFromRecords(chapter, hit))
+		{
+			PMString why("Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded).");
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(why);
+		}
+		InterfacePtr<IApplication> hitApp(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IActionManager> hitActionMgr(hitApp != nil ? hitApp->QueryActionManager() : nil);
+		InterfacePtr<IMenuManager> hitMenuMgr(hitActionMgr, UseDefaultIID());
+		if (hitMenuMgr != nil)
+			hitMenuMgr->HandlePopupMenu(kKBSResultHitMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
 		return kTrue;
+	}
 
 	const int32 target = nodeID->IsBookRow()
 		? static_cast<int32>(KBSResultModel::kContextMenuBookRow)

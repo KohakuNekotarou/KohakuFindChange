@@ -328,7 +328,11 @@ DECLARE_PMID(kActionIDSpace, kKBSMinimizableFindChangeActionID, kKBSPrefix + 23)
 // it next appears. OFF by default. *Unlike the toggles above, flipping it WRITES ITS OWN KEY to the
 // settings file at once (the user's rule) - see KBSBookPanelPlacement.h.
 DECLARE_PMID(kActionIDSpace, kKBSRememberBookPanelActionID, kKBSPrefix + 24)
-//DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 25)
+// "Reject Change" on a replaced hit row's right-click menu (2026-09-26): takes back that row's
+// replacement by rejecting its tracked change - the name is the Track Changes panel's own item.
+DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKBSPrefix + 25)
+// "Redo" on the same menu: replaces that one row again, with the query the run used.
+DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
 
 
 // WidgetIDs:
@@ -432,6 +436,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSReplaceCheckedMenuKey		kKBSStringPrefix "kKBSReplaceCheckedMenuKey"
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
 #define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
+// The hit row's own right-click menu (2026-09-26).
+#define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
+#define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"
 // "Save Results...": write what the panel is showing to a text file. The trailing "..." is the
 // platform convention for a command that opens a dialog before it does anything.
 #define kKBSSaveResultsMenuKey			kKBSStringPrefix "kKBSSaveResultsMenuKey"
@@ -458,6 +465,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
 // plain literal rather than a translated key.
 #define kKBSResultRowMenuName				"KBSRtMenuResultRow"
+// ...and the HIT rows' menu (2026-09-26): Reject Change and Redo, about that one row. A subtree of its
+// own because the two menus never share an item.
+#define kKBSResultHitMenuName				"KBSRtMenuResultHit"
 
 // The Change Checked confirmation prompt. The ENGLISH wording lives in KBS_enUS.fr under these
 // keys; the JAPANESE lives in KBSLoc.h and is switched in at run time by UI language (the jaJP
@@ -621,6 +631,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // sat under Change Checked on the flyout.
 #define kKBSCheckAllMenuItemPosition		1.0
 #define kKBSUncheckAllMenuItemPosition		2.0
+// The hit row's menu, its own 1 and 2.
+#define kKBSRejectChangeMenuItemPosition	1.0
+#define kKBSRedoMenuItemPosition			2.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets (Task 2). Offset from the
