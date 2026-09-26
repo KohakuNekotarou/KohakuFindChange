@@ -741,6 +741,9 @@ bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
 	SpaceIfEmpty(replaceStr);
 	::ReplaceStringParameters(&changeLine, replaceStr);
 	msg.Append(changeLine);
+	// Every replace is tracked (2026-09-26) - said under the two lines above, in the user's words.
+	msg.Append(kLineSeparatorString);
+	msg.Append(KBSLoc::English(kKBSConfirmTrackedKey));
 
 	// ***** NOTHING HERE ABOUT THE DOCUMENT HAVING MOVED SINCE THE SEARCH - the run makes sure of
 	// ***** that itself. ***** A disclaimer sat between the query and the closing lines until

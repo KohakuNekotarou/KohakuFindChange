@@ -480,6 +480,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSConfirmReplaceManyKey	kKBSStringPrefix "kKBSConfirmReplaceManyKey"
 #define kKBSConfirmFindKey			kKBSStringPrefix "kKBSConfirmFindKey"
 #define kKBSConfirmChangeToKey		kKBSStringPrefix "kKBSConfirmChangeToKey"
+// The line under Change: (2026-09-26): the replace is tracked, and can be taken back.
+#define kKBSConfirmTrackedKey		kKBSStringPrefix "kKBSConfirmTrackedKey"
 // Shown in place of the change string when it is empty - which is a legitimate request (delete
 // every match), not a mistake, so it is spelled out rather than left blank. NOT used when a Change
 // Format is set: there an empty box changes the FORMAT and leaves the text alone, and this wording
