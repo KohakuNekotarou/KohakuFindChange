@@ -57,6 +57,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -204,6 +207,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h">
