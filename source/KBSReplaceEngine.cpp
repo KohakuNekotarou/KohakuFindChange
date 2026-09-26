@@ -440,22 +440,43 @@ void CarryRowsPast(std::vector<RowNow>& rows, UID story, UID threadDict, uint32 
 // no such chance, so it has to recognise the match itself.
 //
 // So each match is recognised by WHERE it is, against rowNow - every row's position carried past
-// every replacement so far, which is where that row's text has to be now:
-//   * at the expected row's position: that row - the ordinary case, asked first;
-//   * at a LATER row's position: that row, and the rows in between are gone (a replacement took
-//     away what they matched). Answering with the later walk order leaves those in targets, and the
-//     end of the walk counts them missing, as it does any row that never came up;
-//   * at no row's position: a match the search never listed. -1.
+// every replacement so far, which is where that row's text has to be now ("at a row" = the row's
+// start AND its length - see below):
+//   * at the expected row: that row - the ordinary case, asked first;
+//   * at a LATER row: that row, and the rows in between are gone (a replacement took away what they
+//     matched). Answering with the later walk order leaves those in targets, and the end of the walk
+//     counts them missing, as it does any row that never came up;
+//   * at no row: a match the search never listed. -1.
 // A row whose identity could not be read (known == false) cannot be recognised; at its own turn it
 // is taken on the count, as every row was until this function existed.
 //
-// Only the start is compared, the same test the verify pass makes: the start is what the search
-// recorded and what the carrying keeps true; the end belongs to the query.
+// ***** THE START AND THE LENGTH ARE BOTH COMPARED. ***** Until 2026-09-26 it was the start alone
+// ("the start is what the search recorded; the end belongs to the query"), and a new match can
+// begin exactly where a row begins and still not be that row. Measured 2026-09-26 (H-8): GREP
+// \r|^a|ab on "x<CR>ab" lists <CR>@1 and a@2 (a paragraph start, so ^a wins); deleting the return
+// runs "ab" on from x, and the walk resuming at 1 meets ab@1 - the second row's start now, two
+// characters where the row listed one. Taken as that row, it deleted "ab": KBS left "x" and said
+// "2 replaced", where Change All leaves "xb".
+// The length of a row's own match cannot change on the way: the walk never sees past the point it
+// resumes from (lookbehind, lookahead and \b - kbs-bughunt-2026-08-09 R-1), so a listed match meets
+// the text it met at search time and matches it the same way - a literal Text or Glyph query cannot
+// differ at all. What does see further - ^ and $ - is exactly what makes a match the search never
+// listed, so a length that differs names one of those. It is stepped over like any other; the row
+// is then left in targets and reported missing - untouched and said so - rather than written with
+// text nobody ticked.
 //
 // A row whose thread is gone cannot be where the match is, and is passed over like one that does
 // not stand there.
+bool RowIsThisMatch(IDataBase* db, const RowNow& row, UID story, TextIndex start, TextIndex end)
+{
+	TextIndex rowStart = kInvalidTextIndex;
+	return row.known && row.story == story && RowStartNow(db, row, rowStart) && rowStart == start
+		&& row.length == end - start;
+}
+
 int32 WalkOrderOfMatch(IDataBase* db, const std::vector<RowNow>& rowNow,
-	const std::map<int32, int32>& rowByWalkOrder, int32 walkIndex, UID story, TextIndex start)
+	const std::map<int32, int32>& rowByWalkOrder, int32 walkIndex, UID story, TextIndex start,
+	TextIndex end)
 {
 	std::map<int32, int32>::const_iterator it = rowByWalkOrder.lower_bound(walkIndex);
 	if (it != rowByWalkOrder.end() && it->first == walkIndex)
@@ -463,15 +484,12 @@ int32 WalkOrderOfMatch(IDataBase* db, const std::vector<RowNow>& rowNow,
 		const RowNow& expected = rowNow[it->second];
 		if (!expected.known)
 			return walkIndex;
-		TextIndex expectedStart = kInvalidTextIndex;
-		if (expected.story == story && RowStartNow(db, expected, expectedStart) && expectedStart == start)
+		if (RowIsThisMatch(db, expected, story, start, end))
 			return walkIndex;
 	}
 	for (; it != rowByWalkOrder.end(); ++it)
 	{
-		const RowNow& later = rowNow[it->second];
-		TextIndex laterStart = kInvalidTextIndex;
-		if (later.known && later.story == story && RowStartNow(db, later, laterStart) && laterStart == start)
+		if (RowIsThisMatch(db, rowNow[it->second], story, start, end))
 			return it->first;
 	}
 	return -1;
@@ -532,7 +550,9 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 // The END of the match is not compared, and neither is its text - the start alone is the test
 // (the user's decision). A match that still begins where it began is the occurrence that was
 // found there; length and content belong to the query, which RefuseChangedQuery has already
-// established has not changed.
+// established has not changed. (That is the VERIFY pass. The writing pass compares the length as
+// well, for a different question - which row a match it meets IS, once replacements have made
+// matches the search never listed; see WalkOrderOfMatch.)
 int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	int32& outMissing, int32& outLocked, int32& outRefused, bool& outNotWalked, bool& outWalkFailed,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
@@ -825,7 +845,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		if (!verifyOnly)
 		{
 			const int32 matchWalkOrder = WalkOrderOfMatch(docRef.GetDataBase(), rowNow, rowByWalkOrder, walkIndex,
-				story.GetUID(), start);
+				story.GetUID(), start, end);
 			if (matchWalkOrder < 0)
 				continue;
 			walkIndex = matchWalkOrder;
