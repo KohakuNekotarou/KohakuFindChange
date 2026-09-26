@@ -150,6 +150,12 @@ struct Placement
 	int32	prevGroup;		// ... and above
 	int32	nextColumn;		// the nearest panel in a column after, in the same dock
 	int32	prevColumn;		// ... and before
+	// ***** AND THE DOCK ITSELF (2026-09-27). ***** A book panel alone in its column has no neighbour at
+	// all - and its column goes with the book when it closes - so neighbours alone cannot find the place
+	// again (the user: "alone in the dock, it comes back undocked"). Which dock (PaletteRefUtils::
+	// DockLocation, 0 = not known) and which column in it, counted from the dock's first.
+	int32	dockSide;
+	int32	columnIndex;
 
 	// Both: the tab pane's (floating palette's, or dock column's) icon state and icon-strip width.
 	bool	iconic;
@@ -158,6 +164,7 @@ struct Placement
 	Placement() : haveFloat(false), left(0), top(0), width(0), height(0),
 		floatMate(0), floatTabIndex(0), floatNextGroup(0), floatPrevGroup(0),
 		docked(false), mate(0), tabIndex(0), nextGroup(0), prevGroup(0), nextColumn(0), prevColumn(0),
+		dockSide(0), columnIndex(0),
 		iconic(false), iconicWidth(0) {}
 
 	bool IsUsable() const { return docked || haveFloat; }
@@ -236,6 +243,8 @@ const char* const kKeyNextGroup   = "bookPanelNextGroup";
 const char* const kKeyPrevGroup   = "bookPanelPrevGroup";
 const char* const kKeyNextColumn  = "bookPanelNextColumn";
 const char* const kKeyPrevColumn  = "bookPanelPrevColumn";
+const char* const kKeyDockSide    = "bookPanelDockSide";
+const char* const kKeyColumnIndex = "bookPanelColumnIndex";
 
 /** The installed command interceptor, or nil. Held because the processor keeps a RAW pointer:
     releasing it while installed would leave InDesign calling into freed memory (KIDMCPCmdWatch.cpp
@@ -471,6 +480,8 @@ bool MeasureDocked(IPanelMgr* panelMgr, const PaletteRef& container, Placement& 
 
 	const int32 ci = IndexOfChild(dock, column);
 	const int32 columns = PaletteRefUtils::GetChildCountOfPalette(dock);
+	out.dockSide = static_cast<int32>(PaletteRefUtils::GetDockLocation(dock));
+	out.columnIndex = (ci >= 0) ? ci : 0;
 	out.nextColumn = 0;
 	for (int32 i = ci + 1; i < columns && out.nextColumn == 0; ++i)
 	{
@@ -595,6 +606,8 @@ void AppendPlacementKeys(const Placement& p, std::vector<std::pair<std::string, 
 		keys.push_back(std::make_pair(std::string(kKeyPrevGroup),  std::to_string(p.prevGroup)));
 		keys.push_back(std::make_pair(std::string(kKeyNextColumn), std::to_string(p.nextColumn)));
 		keys.push_back(std::make_pair(std::string(kKeyPrevColumn), std::to_string(p.prevColumn)));
+		keys.push_back(std::make_pair(std::string(kKeyDockSide),    std::to_string(p.dockSide)));
+		keys.push_back(std::make_pair(std::string(kKeyColumnIndex), std::to_string(p.columnIndex)));
 	}
 	keys.push_back(std::make_pair(std::string(kKeyIconic), BoolValue(p.iconic)));
 	if (p.iconicWidth > 0)
@@ -866,6 +879,14 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 			dock = ParentOf(prevCol);
 			before = ChildAtOrEnd(dock, IndexOfChild(dock, prevCol) + 1);
 		}
+	}
+	// 5. No neighbouring column either - the book panel was alone in its dock: the dock it was in, by
+	//    its side, and a new column at the place its own column had (2026-09-27).
+	if (!Is(dock, &PaletteRefUtils::IsDock) && p.dockSide != 0)
+	{
+		dock = PaletteRefUtils::FindDockByLocation(static_cast<PaletteRefUtils::DockLocation>(p.dockSide));
+		if (Is(dock, &PaletteRefUtils::IsDock))
+			before = ChildAtOrEnd(dock, p.columnIndex);
 	}
 	if (!Is(dock, &PaletteRefUtils::IsDock))
 		return;		// no neighbour left to find the place by - it stays where InDesign put it
@@ -1280,6 +1301,8 @@ void KBSBookPanelPlacement::LoadFromSettings(const std::string& text)
 		KBSPanelStateReadInt(text, kKeyPrevGroup,  p.prevGroup);
 		KBSPanelStateReadInt(text, kKeyNextColumn, p.nextColumn);
 		KBSPanelStateReadInt(text, kKeyPrevColumn, p.prevColumn);
+		KBSPanelStateReadInt(text, kKeyDockSide,    p.dockSide);		// 0 in a file written before 2026-09-27
+		KBSPanelStateReadInt(text, kKeyColumnIndex, p.columnIndex);
 	}
 
 	p.iconic = KBSPanelStateReadBool(text, kKeyIconic, false);
