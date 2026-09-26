@@ -13,6 +13,8 @@
 
 // Interface includes:
 #include "ICommand.h"
+#include "IBoolData.h"			// SPIKE: kSearchBackwardsSilentCmdBoss's value
+#include "IIntData.h"			// SPIKE: ...and its mode (IID_IFINDCHANGEMODEDATA)
 #include "IFindChangeCmdData.h"
 #include "IFindChangeOptions.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
@@ -507,6 +509,62 @@ const bool kKBSSpikeBackwardWrite = true;
 // Which direction the writing pass actually went, for the status line (spike diagnostics only).
 PMString gKBSSpikeWalkNote;
 
+// ***** ROUTE B (user's call, 2026-09-26): TURN THE SESSION'S DIRECTION ROUND FOR THE WALK, THEN
+// ***** PUT IT BACK. ***** Route A (WalkerScopeOptions::SetSearchBackwards) was measured to change
+// nothing - the walker follows the Find/Change options it is handed (the session's). There is no way
+// to copy those options into a private object (no Copy/Clone on IFindChangeOptions, and copying ~30
+// settings by hand risks a different replacement), so the session's own direction is set with
+// kSearchBackwardsSilentCmdBoss (IBoolData = the direction, IID_IFINDCHANGEMODEDATA = the tab - the
+// same shape SnpFindAndReplace gives its option commands) and set back by the destructor, whatever
+// way the walk ends. A command that fails is cleared at once: an error left standing would roll the
+// whole run's sequence back.
+bool SetSessionSearchBackwards(bool16 backwards, IFindChangeOptions::SearchMode mode)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSearchBackwardsSilentCmdBoss));
+	if (cmd == nil)
+		return false;
+	InterfacePtr<IBoolData> value(cmd, UseDefaultIID());
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (value == nil || modeData == nil)
+		return false;
+	value->Set(backwards);
+	modeData->Set(static_cast<int32>(mode));
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
+	}
+	return true;
+}
+
+class SessionDirectionBackwards
+{
+public:
+	explicit SessionDirectionBackwards(bool wanted) : fRestore(false), fOld(kFalse),
+		fMode(IFindChangeOptions::kTextSearch)
+	{
+		if (!wanted)
+			return;
+		InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+		if (opts == nil)
+			return;
+		fMode = opts->GetSearchMode();
+		fOld = opts->GetSearchBackwards(fMode);
+		if (fOld)
+			return;		// already backwards - nothing to turn, nothing to put back
+		fRestore = SetSessionSearchBackwards(kTrue, fMode);
+	}
+	~SessionDirectionBackwards()
+	{
+		if (fRestore)
+			(void)SetSessionSearchBackwards(fOld, fMode);
+	}
+private:
+	bool fRestore;
+	bool16 fOld;
+	IFindChangeOptions::SearchMode fMode;
+};
+
 int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const std::set<int32>& pendingRows,
 	UID story, TextIndex start, TextIndex end)
 {
@@ -761,6 +819,9 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		outNotWalked = true;
 		return 0;
 	}
+	// SPIKE route B: the writing pass walks backwards; the session's direction goes back when this
+	// function returns, by any exit.
+	const SessionDirectionBackwards spikeDirection(!verifyOnly && kKBSSpikeBackwardWrite);
 	walker->Initialize(client, scope, opts, nil);
 
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
