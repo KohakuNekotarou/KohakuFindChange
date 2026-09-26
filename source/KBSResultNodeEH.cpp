@@ -282,9 +282,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(chapter, hit);
 		if (pinned != KBSResultModel::kPinnedNone)
 		{
-			PMString why(pinned == KBSResultModel::kPinnedFootnote
-				? "Reject Change / Redo: not for a match inside a footnote - Track Changes records nothing there."
-				: "Reject Change / Redo: not for a match at the end of an endnote - InDesign's Track Changes cannot take it back.");
+			PMString why("Reject Change / Redo: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}

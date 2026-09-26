@@ -1429,8 +1429,6 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	outHit.isLocked = facts->isLocked;
 	// Inside a footnote? Such a row is always replaced - Track Changes records nothing there (2026-09-26).
 	outHit.inFootnote = KBSTrackChange::IsInFootnote(storyRef, start);
-	// Up to the end of an endnote? Handled the same way - InDesign cannot take such a replace back.
-	outHit.atEndnoteEnd = KBSTrackChange::IsAtEndnoteEnd(storyRef, end);
 	if (outHit.isLocked)
 		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 

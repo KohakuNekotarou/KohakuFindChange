@@ -94,9 +94,7 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	if (!nowChecked && pinned != KBSResultModel::kPinnedNone)
 	{
 		KBSResultTree::RefreshRows();
-		PMString why(pinned == KBSResultModel::kPinnedFootnote
-			? "This match is inside a footnote. Track Changes records nothing in footnotes, so it is always replaced and cannot be left out or taken back."
-			: "This match runs to the end of an endnote. InDesign's Track Changes cannot take such a replace back, so it is always replaced and cannot be left out or taken back.");
+		PMString why("This match is inside a footnote. Track Changes records nothing in footnotes, so it is always replaced and cannot be left out or taken back.");
 		why.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(why);
 		return;

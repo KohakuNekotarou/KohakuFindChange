@@ -1063,12 +1063,6 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			outWhyNot = "a row inside a footnote is not ticked";
 			return false;
 		}
-		// The same for a row at an endnote's end: InDesign's reject cannot put it back (IsAtEndnoteEnd).
-		if (!checked && KBSTrackChange::IsAtEndnoteEnd(UIDRef(db, r.story), end))
-		{
-			outWhyNot = "a row at the end of an endnote is not ticked";
-			return false;
-		}
 		if (r.target)
 		{
 			const UIDRef storyRef(db, r.story);
@@ -3348,15 +3342,6 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	}
 	const int32 originalLen = WideString(originalText).CharCount();
 
-	// Asked BEFORE the sequence (an empty one would land on the Undo menu). The range reject takes every
-	// author's changes: anything in the range that is not this row's own insertion and deletion (the
-	// user's own typing right next to it) would go too.
-	if (KBSTrackChange::CountOthersIn(storyRef, change.at, change.at + change.insLen + 1,
-		change.at, change.at + change.insLen) > 0)
-	{
-		outStatus = "Reject Change: another change sits right next to this one (someone's own edit) - nothing was changed, so as not to take that back too.";
-		return false;
-	}
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3367,12 +3352,15 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	name.SetTranslatable(kFalse);
 	sequence->SetName(name);
 	int32 done = 0;
-	// ***** ONE RANGE REJECT, AS THE STORY EDITOR'S MENU DOES (2026-09-26, the user's call). ***** The
-	// row's insertion and the deletion anchored right after it, in one kRejectRangeRedlineCmdBoss over
-	// [at, at + insLen + 1): the guide says a deletion at the range's END index is not rejected, so
-	// the range is taken one past it (measured: body, table cell and endnote all came back whole).
-	if (KBSTrackChange::RejectRange(storyRef, change.at, change.at + change.insLen + 1))
-		done = 1;
+	// ***** ONE RECORD AT A TIME, OURS ONLY (2026-09-26, the user's call: safety first). ***** The
+	// deletion, then the insertion, each picked by position AND author - so no one else's change can be
+	// taken back with the row, by construction. (A range reject, kRejectRangeRedlineCmdBoss, was tried
+	// the same day and took the row back just as well, but it rejects every author's changes in its
+	// range and so rested on a check that nothing else stood there.) One undo step: the sequence.
+	if (change.hasDelete)
+		done += KBSTrackChange::RejectAt(storyRef, change.at + change.insLen);
+	if (change.insLen > 0)
+		done += KBSTrackChange::RejectAt(storyRef, change.at);
 	// ALL THE WAY BACK, OR NOT AT ALL: the original text has to stand where the change stood.
 	const bool same = (done > 0)
 		&& (KBSTrackChange::ReadText(storyRef, change.at, originalLen) == originalText);

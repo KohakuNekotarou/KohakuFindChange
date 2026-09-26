@@ -15,7 +15,6 @@
 // Interface includes:
 #include "IBoolData.h"
 #include "ICommand.h"
-#include "IRangeData.h"			// kRejectRangeRedlineCmdBoss's range
 #include "IRedlineDataStrand.h"
 #include "ISession.h"
 #include "IStringData.h"
@@ -99,20 +98,6 @@ bool KBSTrackChange::IsInFootnote(const UIDRef& story, TextIndex at)
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(at, nil, nil) : nil);
 	return thread != nil && ::GetClass(thread) == kFootnoteReferenceBoss;
-}
-
-bool KBSTrackChange::IsAtEndnoteEnd(const UIDRef& story, TextIndex end)
-{
-	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	if (model == nil || ::GetClass(model) != kEndnoteStoryBoss || end < 0 || end >= model->TotalLength())
-		return false;
-	TextIterator it(model, end);
-	return !it.IsNull() && (*it).GetValue() == 0xFEFF;
-}
-
-bool KBSTrackChange::IsPinned(const UIDRef& story, TextIndex start, TextIndex end)
-{
-	return IsInFootnote(story, start) || IsAtEndnoteEnd(story, end);
 }
 
 PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
@@ -250,49 +235,6 @@ int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const st
 	return done;
 }
 
-int32 KBSTrackChange::CountOthersIn(const UIDRef& story, TextIndex from, TextIndex to, TextIndex insAt, TextIndex delAt)
-{
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil || !redline->StoryHasChanges())
-		return 0;
-	RedlineIterator* it = redline->NewRedlineIterator(from);
-	if (it == nil)
-		return 0;
-	int32 others = 0;
-	for (bool16 more = kTrue; more; more = it->Increment(kFalse))
-	{
-		TextIndex at = 0;
-		int32 len = 0;
-		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
-		if (record == nil)
-			continue;
-		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
-		delete record;
-		if (at >= to)
-			break;
-		if (at < from)
-			continue;
-		const bool mine = IsOurs(it) && ((isDelete && at == delAt) || (!isDelete && at >= insAt && at < delAt));
-		if (!mine)
-			++others;
-	}
-	delete it;
-	return others;
-}
-
-bool KBSTrackChange::RejectRange(const UIDRef& story, TextIndex from, TextIndex to)
-{
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kRejectRangeRedlineCmdBoss));
-	InterfacePtr<IRangeData> range(cmd, IID_IRANGEDATA);
-	if (cmd == nil || range == nil)
-		return false;
-	range->Set(from, to);
-	cmd->SetItemList(UIDList(story));
-	const bool ok = (CmdUtils::ProcessCommand(cmd) == kSuccess);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	return ok;
-}
-
 void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& out)
 {
 	out.clear();
@@ -377,7 +319,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	bool checked = false, replaced = false, locked = false;
 	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
 		return false;
-	// A pinned row (a footnote's, an endnote's end) is never taken back - see IsPinned.
+	// A footnote's row is never taken back - see IsInFootnote.
 	if (KBSResultModel::GetHitPinned(chapterIdx, hitIdx) != KBSResultModel::kPinnedNone)
 		return false;
 	UIDRef docRef;

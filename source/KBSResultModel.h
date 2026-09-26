@@ -151,9 +151,6 @@ namespace KBSResultModel
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
 		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
 		bool		inFootnote;
-		// The match runs up to the END of an endnote (2026-09-26). InDesign rejects such a tracked
-		// insertion one character short, so it is handled like a footnote's row.
-		bool		atEndnoteEnd;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -167,7 +164,7 @@ namespace KBSResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				atEndnoteEnd(false), pageOrdinal(0) {}
+				pageOrdinal(0) {}
 	};
 
 	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
@@ -596,7 +593,7 @@ namespace KBSResultModel
 	/** Is the row inside a footnote (Hit::inFootnote)? False for an out-of-range index. */
 	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
 	/** Why a row is pinned - always replaced, never taken back - if it is (2026-09-26). */
-	enum PinnedReason { kPinnedNone = 0, kPinnedFootnote, kPinnedEndnoteEnd };
+	enum PinnedReason { kPinnedNone = 0, kPinnedFootnote };
 	PinnedReason GetHitPinned(int32 chapterIdx, int32 hitIdx);
 
 	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this

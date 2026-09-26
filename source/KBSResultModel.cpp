@@ -559,7 +559,7 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.postText = h.postText;
 	out.fontName = h.fontName;
 	out.checked = h.checked;
-	out.inFootnote = h.inFootnote || h.atEndnoteEnd;	// the box is greyed for both
+	out.inFootnote = h.inFootnote;
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
@@ -985,7 +985,7 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 		return;
 	// A footnote's row cannot be taken off (2026-09-26): Track Changes records nothing inside a
 	// footnote, so its replace could not be kept apart from the others' nor taken back.
-	if (!checked && (h.inFootnote || h.atEndnoteEnd))
+	if (!checked && h.inFootnote)
 		return;
 	h.checked = checked;
 }
@@ -998,7 +998,7 @@ KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int3
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
 		return kPinnedNone;
 	const Hit& h = c.hits[hitIdx];
-	return h.inFootnote ? kPinnedFootnote : (h.atEndnoteEnd ? kPinnedEndnoteEnd : kPinnedNone);
+	return h.inFootnote ? kPinnedFootnote : kPinnedNone;
 }
 
 bool KBSResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
@@ -1058,8 +1058,8 @@ void KBSResultModel::SetAllChecked(bool checked)
 			// the model would hold checked hits the panel shows no box for.
 			if (!RowHasCheckBox(hits[hi]))
 				continue;
-			if (!checked && (hits[hi].inFootnote || hits[hi].atEndnoteEnd))
-				continue;	// a pinned row stays ticked (SetHitChecked)
+			if (!checked && hits[hi].inFootnote)
+				continue;	// a footnote's row stays ticked (SetHitChecked)
 			hits[hi].checked = checked;
 		}
 	}
@@ -1077,8 +1077,8 @@ void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
 	{
 		if (!RowHasCheckBox(hits[hi]))
 			continue;
-		if (!checked && (hits[hi].inFootnote || hits[hi].atEndnoteEnd))
-			continue;	// a pinned row stays ticked (SetHitChecked)
+		if (!checked && hits[hi].inFootnote)
+			continue;	// a footnote's row stays ticked (SetHitChecked)
 		hits[hi].checked = checked;
 	}
 }
