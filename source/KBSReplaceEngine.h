@@ -176,6 +176,13 @@ namespace KBSReplaceEngine
 	    False = nothing changed; outStatus says why either way. */
 	bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
+	/** Redo on a row taken back with Reject Change (2026-09-26): the same query - refused through
+	    RefuseChangedQuery when the dialog no longer holds it - is run over that row's text alone
+	    (Change All on the row's range, under Track Changes, signed like the run), in ONE undo step.
+	    All or nothing: unless exactly one replacement lands and writes the same text the run wrote,
+	    the step is rolled back. False = nothing changed; outStatus says why either way. */
+	bool RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
 	    search guards against with KBSSearchEngine::IsSearching, and a worse one here: the run holds

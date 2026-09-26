@@ -76,7 +76,23 @@ namespace KBSTrackChange
 		TextIndex	at;
 		int32		len;		// an insertion's length; for a deletion, what the iterator says (1)
 		bool		isDelete;
+		uint64		time;		// VOSRedlineChange::GetTimeStamp - which run made it
 	};
+
+	/** Is `at` inside a footnote? Track Changes records nothing there (measured 2026-09-26 through
+	    IDML), so a footnote's rows are always replaced and can be neither left out nor taken back.
+	    A footnote's thread IS its reference boss (KCMTextRead's test). */
+	bool IsInFootnote(const UIDRef& story, TextIndex at);
+
+	/** Does a match ending at `end` run up to the END of an endnote (the endnote story's closing
+	    U+FEFF marker follows it)? InDesign rejects such a tracked insertion one character short
+	    (measured 2026-09-26: "kitten" rejected leaves "e", by script as well) - so such a row is
+	    handled like a footnote's: always replaced, never taken back. */
+	bool IsAtEndnoteEnd(const UIDRef& story, TextIndex end);
+
+	/** Can this row be neither left out nor taken back? A footnote's (IsInFootnote) or one at an
+	    endnote's end (IsAtEndnoteEnd). */
+	bool IsPinned(const UIDRef& story, TextIndex start, TextIndex end);
 
 	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
@@ -87,9 +103,21 @@ namespace KBSTrackChange
 	/** True when the story holds at least one record of ours. */
 	bool StoryHasOurChanges(const UIDRef& story);
 
-	/** Reject every record of ours standing AT `position` (an insertion and a deletion can share one).
+	/** Reject every record of ours standing AT `position` (an insertion and a deletion can share one),
+	    except records whose time stamp is in `keepTimes` (an earlier run's - never taken back here).
 	    Returns how many were rejected. Leaves the global error state clear. */
-	int32 RejectAt(const UIDRef& story, TextIndex position);
+	int32 RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes = nil);
+
+	/** How many records in [from, to) are NOT this row's own - its insertion [insAt, delAt) and its
+	    deletion at delAt, signed kAuthor. RejectRange rejects every author's changes in its range, so
+	    anything counted here would be taken back with the row (Reject Change refuses then). */
+	int32 CountOthersIn(const UIDRef& story, TextIndex from, TextIndex to, TextIndex insAt, TextIndex delAt);
+
+	/** kRejectRangeRedlineCmdBoss over [from, to): every change in the range, any author, in ONE
+	    command - the Story Editor's own Reject Change over a selection. ***** The guide (vol2, the command's
+	    entry): a deletion at the range's START or END index is not rejected - so a replace's range is
+	    taken one past its insertion, to hold the deletion inside. False = the command did not run. */
+	bool RejectRange(const UIDRef& story, TextIndex from, TextIndex to);
 
 	/** One replacement of ours, paired: the insertion [at, at+insLen) and the deletion anchored at
 	    at+insLen. `inserted` / `deleted` are the texts (deleted read from the deleted-text record). */

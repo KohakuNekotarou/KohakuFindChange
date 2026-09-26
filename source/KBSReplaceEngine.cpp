@@ -41,7 +41,6 @@
 #include "ITextModel.h"
 #include "ITextStoryThread.h"
 #include "textiterator.h"			// the object characters a Change All row may hold
-#include "TextID.h"					// kFootnoteReferenceBoss - a footnote's thread
 #include "WideString.h"			// Reject Change: the original text's length in code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
@@ -257,12 +256,16 @@ struct RunTotals
 	// run was aborted on purpose. errorText then says how it did not line up.
 	bool		stoppedByMismatch;
 
+	// ...or the fourth (2026-09-26, the user's call "Change All only"): the ticks form a shape Change
+	// All cannot write as asked, so nothing was written at all. errorText says which shape.
+	bool		refusedByShape;
+
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
 		  chaptersNotWalked(0), chaptersNoWindow(0), chaptersWalkFailed(0),
 		  missing(0), locked(0), refused(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstWalkFailed(false),
-		  cancelled(false), stoppedByError(false), stoppedByMismatch(false)
+		  cancelled(false), stoppedByError(false), stoppedByMismatch(false), refusedByShape(false)
 	{
 		firstSkipped.SetTranslatable(kFalse);
 		firstNotWalked.SetTranslatable(kFalse);
@@ -557,7 +560,9 @@ struct TrackRow
 	int32		length;
 	int32		newLen;		// filled from the records: the text the replacement wrote (0 = deleted)
 	bool		changed;	// Change All wrote here
-	PMString	before;		// a ticked row's text before anything was written (LineUpStory's last check)
+	PMString	before;		// the row's text before anything was written (LineUpStory; the unticked-row check)
+	bool		inFootnote;	// inside a footnote: always ticked, never recorded - placed by AlignFootnote
+	bool		gone;		// ticked, and its thread went with an object a ticked row deleted
 };
 
 bool TrackRowBefore(const TrackRow& a, const TrackRow& b)
@@ -606,15 +611,16 @@ void CollectChapterStories(int32 chapterIdx, std::set<UID>& out)
 	}
 }
 
-// Change All over one story, with the walker scope the search used narrowed to that story. False =
-// it did not run (no walker, no scope, the command failed); the error state is left clear either way.
-bool RunChangeAllInStory(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions, IFindChangeOptions* opts)
+// Change All over a walker scope. False = it did not run (no walker, no scope, the command failed);
+// the error state is left clear either way. outCount (may be nil) = how many it replaced.
+bool RunChangeAllInScope(ITextWalkerScope* scope, IFindChangeOptions* opts, int32* outCount = nil)
 {
+	if (outCount != nil)
+		*outCount = 0;
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	InterfacePtr<IK2ServiceProvider> provider(registry != nil
 		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
 	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
-	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
 	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
 	if (walker == nil || scope == nil || client == nil)
 		return false;
@@ -632,6 +638,8 @@ bool RunChangeAllInStory(const UIDRef& storyRef, const WalkerScopeOptions& scope
 		{
 			cmdData->SetTextWalker(walker);
 			ran = (CmdUtils::ProcessCommand(cmd) == kSuccess);
+			if (ran && outCount != nil)
+				*outCount = cmdData->GetReplacementCount();
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		}
 	}
@@ -640,19 +648,95 @@ bool RunChangeAllInStory(const UIDRef& storyRef, const WalkerScopeOptions& scope
 	return ran;
 }
 
-// One story's rows (rows[from, to), sorted) lined up against the records Change All left there.
-// Fills changed / newLen. False = they do not line up (outWhy says how).
+// Change All over one story, with the walker scope the search used narrowed to that story.
+bool RunChangeAllInStory(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions, IFindChangeOptions* opts)
+{
+	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
+	return RunChangeAllInScope(scope, opts);
+}
+
+// The code points of a story range, for AlignFootnote.
+void ReadCodePoints(IDataBase* db, UID story, TextIndex at, int32 len, std::vector<UTF32TextChar>& out)
+{
+	out.clear();
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	if (model == nil || len <= 0)
+		return;
+	TextIterator it(model, at);
+	for (int32 k = 0; k < len && !it.IsNull(); ++k, ++it)
+		out.push_back(*it);
+}
+
+bool SameRun(const std::vector<UTF32TextChar>& a, size_t aFrom, const std::vector<UTF32TextChar>& b, size_t bFrom, size_t len)
+{
+	if (aFrom + len > a.size() || bFrom + len > b.size())
+		return false;
+	for (size_t k = 0; k < len; ++k)
+		if (a[aFrom + k] != b[bFrom + k])
+			return false;
+	return true;
+}
+
+// ***** WHERE A FOOTNOTE'S ROWS STAND AFTER CHANGE ALL (2026-09-26). ***** Nothing is recorded in a
+// footnote, but everything BETWEEN its rows is unchanged: the text after must read gap0 R1 gap1 R2 ...
+// gapN, the gaps being the original text between the rows. The replacements' lengths are what makes
+// that true - found here by trying lengths row by row, shortest first. False = no lengths do (Change
+// All wrote something no row accounts for). When more than one set would do, the first found is taken
+// (the user's rule: the jump then lands in that footnote, near enough).
+bool AlignFootnoteFrom(const std::vector<UTF32TextChar>& before, const std::vector<UTF32TextChar>& after,
+	const std::vector<std::pair<int32, int32> >& rowsOL, size_t row, size_t posAfter, std::vector<int32>& ioNewLen,
+	int32& ioBudget)
+{
+	if (--ioBudget < 0)
+		return false;
+	const size_t gapFrom = (row == 0) ? 0 : static_cast<size_t>(rowsOL[row - 1].first + rowsOL[row - 1].second);
+	if (row == rowsOL.size())
+	{
+		const size_t gapLen = before.size() - gapFrom;
+		return posAfter + gapLen == after.size() && SameRun(before, gapFrom, after, posAfter, gapLen);
+	}
+	// the gap in front of this row, then every length its replacement could have
+	const size_t gapLen = static_cast<size_t>(rowsOL[row].first) - gapFrom;
+	if (!SameRun(before, gapFrom, after, posAfter, gapLen))
+		return false;
+	const size_t at = posAfter + gapLen;
+	for (size_t len = 0; at + len <= after.size(); ++len)
+	{
+		ioNewLen[row] = static_cast<int32>(len);
+		if (AlignFootnoteFrom(before, after, rowsOL, row + 1, at + len, ioNewLen, ioBudget))
+			return true;
+		if (ioBudget < 0)
+			return false;
+	}
+	return false;
+}
+
+// One story's rows (rows[from, to), sorted) lined up against the records THIS run's Change All left
+// there (records whose time stamp is in oldTimes are an earlier run's and are not looked at). Fills
+// changed / newLen, and gone for a ticked row whose thread went with an object a ticked row deleted.
+// A footnote's rows are placed from its text instead (threadBefore = each thread's text before the
+// write). False = they do not line up (outWhy says how) - the caller aborts the run.
 bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t to,
-	IFindChangeOptions::SearchMode mode, PMString& outWhy)
+	const std::map<TrackThreadKey, std::vector<UTF32TextChar> >& threadBefore, const std::set<uint64>& oldTimes,
+	PMString& outWhy)
 {
 	const UID story = rows[from].story;
+	std::vector<KBSTrackChange::Record> all;
+	KBSTrackChange::CollectRecords(UIDRef(db, story), all);
 	std::vector<KBSTrackChange::Record> recs;
-	KBSTrackChange::CollectRecords(UIDRef(db, story), recs);
+	for (size_t k = 0; k < all.size(); ++k)
+		if (oldTimes.count(all[k].time) == 0)
+			recs.push_back(all[k]);
 	std::set<TextIndex> claimed;			// record positions a row has accounted for
 	std::map<TrackThreadKey, TextIndex> moved;	// per thread: what the rows so far did to lengths
 	for (size_t i = from; i < to; )
 	{
-		// a group: this row and those touching it
+		if (rows[i].inFootnote)
+		{
+			++i;		// placed below, from the footnote's text
+			continue;
+		}
+		// a group: this row and those touching it (all ticked alike - checked before the write)
 		size_t j = i + 1;
 		while (j < to && TrackTouches(rows[j - 1], rows[j]))
 			++j;
@@ -660,8 +744,19 @@ bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t
 		TextIndex threadStart = kInvalidTextIndex;
 		if (!TrackThreadStart(db, first, threadStart))
 		{
-			outWhy = "a row's thread is gone";
-			return false;
+			// The thread went with an object a ticked row deleted (a table, a footnote). Fine for ticked
+			// rows - that is Change All's own result - and never for an unticked one.
+			for (size_t k = i; k < j; ++k)
+			{
+				if (!rows[k].target)
+				{
+					outWhy = "a row that was not ticked was inside something a ticked row deleted";
+					return false;
+				}
+				rows[k].gone = true;
+			}
+			i = j;
+			continue;
 		}
 		const TrackThreadKey threadKey = TrackKeyOf(first);
 		const TextIndex s = threadStart + first.offset + moved[threadKey];
@@ -697,25 +792,74 @@ bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t
 		}
 		if (del)
 			claimed.insert(s + ins);
-		if (changed && groupSize > 1 && ins > 0 && mode == IFindChangeOptions::kGrepSearch)
-		{
-			outWhy = "GREP rows touching wrote text - where one ends and the next begins is unknown";
-			return false;
-		}
-		if (changed && (ins % groupSize) != 0)
-		{
-			outWhy = "touching rows wrote replacements of different lengths";
-			return false;
-		}
+		// Touching rows that wrote text: where one row's new text ends and the next one's begins is not
+		// in the records when their lengths differ (GREP). The group's new text is then held by its FIRST
+		// row and the others hold an empty range at its end - the text is right either way (the final
+		// check reads it), only the jump of those rows lands on the group.
+		const bool evenSplit = (ins % groupSize) == 0 && (groupSize == 1 || groupLen % groupSize == 0);
 		for (size_t k = i; k < j; ++k)
 		{
 			rows[k].changed = changed;
-			rows[k].newLen = changed ? ins / groupSize : rows[k].length;
+			if (!changed)
+				rows[k].newLen = rows[k].length;
+			else if (evenSplit)
+				rows[k].newLen = ins / groupSize;
+			else
+				rows[k].newLen = (k == i) ? ins : 0;
 		}
 		moved[threadKey] += changed ? (ins - groupLen) : 0;
 		i = j;
 	}
-	// every record of ours must belong to a row - one that does not is a match nobody listed
+	// ----- a footnote's rows, thread by thread: placed from its text (nothing is recorded there) -----
+	for (size_t i = from; i < to; )
+	{
+		if (!rows[i].inFootnote)
+		{
+			++i;
+			continue;
+		}
+		size_t j = i + 1;
+		while (j < to && rows[j].inFootnote && TrackSameThread(rows[i], rows[j]))
+			++j;
+		const TrackThreadKey key = TrackKeyOf(rows[i]);
+		std::map<TrackThreadKey, std::vector<UTF32TextChar> >::const_iterator b = threadBefore.find(key);
+		InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		int32 threadSpan = 0;
+		if (b == threadBefore.end() || model == nil)
+		{
+			outWhy = "a footnote's text could not be read";
+			return false;
+		}
+		if (!model->FindStoryThread(rows[i].dict, rows[i].key, &threadStart, &threadSpan))
+		{
+			// the footnote went with its reference, deleted by a ticked row (footnote rows are all ticked)
+			for (size_t k = i; k < j; ++k)
+				rows[k].gone = true;
+			i = j;
+			continue;
+		}
+		std::vector<UTF32TextChar> after;
+		ReadCodePoints(db, story, threadStart, threadSpan, after);
+		std::vector<std::pair<int32, int32> > rowsOL;
+		for (size_t k = i; k < j; ++k)
+			rowsOL.push_back(std::make_pair(static_cast<int32>(rows[k].offset), rows[k].length));
+		std::vector<int32> newLen(rowsOL.size(), 0);
+		int32 budget = 200000;
+		if (!AlignFootnoteFrom(b->second, after, rowsOL, 0, 0, newLen, budget))
+		{
+			outWhy = "Change All wrote something in a footnote that no row accounts for";
+			return false;
+		}
+		for (size_t k = i; k < j; ++k)
+		{
+			rows[k].changed = true;
+			rows[k].newLen = newLen[k - i];
+		}
+		i = j;
+	}
+
+	// every record of THIS run must belong to a row - one that does not is a match nobody listed
 	for (size_t k = 0; k < recs.size(); ++k)
 	{
 		if (claimed.find(recs[k].at) == claimed.end())
@@ -724,34 +868,122 @@ bool LineUpStory(IDataBase* db, std::vector<TrackRow>& rows, size_t from, size_t
 			return false;
 		}
 	}
-	// ***** A TICKED ROW THE RECORDS SAY WAS NOT WRITTEN MUST STILL READ AS IT DID (2026-09-26). ***** Text
-	// Track Changes does not record (a footnote's - measured) would otherwise be rewritten while the
-	// row is reported "missing" and the run committed: the records alone cannot see such a write.
-	std::map<TrackThreadKey, TextIndex> cum;
-	for (size_t i = from; i < to; ++i)
+	return true;
+}
+
+// ***** NOTHING BUT THE TICKED ROWS MAY HAVE CHANGED (2026-09-26, the user: "an unticked row being
+// replaced is the thing to fear most"). ***** Every thread holding a row - in every story of the
+// chapter, written or not - is read WHOLE and compared with what it must be: its text from before the
+// write, with the ticked rows' ranges, and only those, holding what Change All wrote there. A thread
+// that is gone is allowed only when every row in it was ticked (it went with an object a ticked row
+// deleted - Change All's own result), and those rows are marked "deleted". False = one code point
+// different anywhere, or an unticked row gone: the caller aborts the run, so nothing at all changes.
+//
+// Whole threads, not row by row: a row-by-row reading was measured BLIND (the armed build, 2026-09-26):
+// an unticked ZERO-WIDTH row (GREP ^) reads "" before and after whatever was written in front of it,
+// and the run reported success over an unticked row that had been replaced.
+bool CheckOnlyTickedChanged(IDataBase* db, int32 chapterIdx, std::vector<TrackRow>& rows,
+	const std::map<TrackThreadKey, std::vector<UTF32TextChar> >& threadBefore, int32& ioReplaced, PMString& outWhy)
+{
+	for (size_t i = 0; i < rows.size(); )
 	{
-		const TrackRow& r = rows[i];
+		size_t j = i + 1;
+		while (j < rows.size() && TrackSameThread(rows[i], rows[j]))
+			++j;
+		const UID story = rows[i].story;
+		bool alive = db->IsValidUID(story);
+		InterfacePtr<ITextModel> model(alive ? db : nil, story, UseDefaultIID());
 		TextIndex threadStart = kInvalidTextIndex;
-		if (r.target && !r.changed && TrackThreadStart(db, r, threadStart))
+		int32 threadSpan = 0;
+		alive = model != nil && model->FindStoryThread(rows[i].dict, rows[i].key, &threadStart, &threadSpan);
+		if (!alive)
 		{
-			const TextIndex s = threadStart + r.offset + cum[TrackKeyOf(r)];
-			if (KBSTrackChange::ReadText(UIDRef(db, story), s, r.length) != r.before)
+			for (size_t k = i; k < j; ++k)
 			{
-				outWhy = "a row was written without a tracked change";
+				if (!rows[k].target)
+				{
+					outWhy = "a row that was not ticked was inside something a ticked row deleted";
+					return false;
+				}
+			}
+			for (size_t k = i; k < j; ++k)
+			{
+				bool checked = false, replaced = false, locked = false;
+				KBSResultModel::GetHitFlags(chapterIdx, rows[k].hitIdx, checked, replaced, locked);
+				if (!replaced)
+					++ioReplaced;		// it was asked for, and it is done - with its object
+				KBSResultModel::SetHitDeleted(chapterIdx, rows[k].hitIdx);
+			}
+			i = j;
+			continue;
+		}
+		std::map<TrackThreadKey, std::vector<UTF32TextChar> >::const_iterator b = threadBefore.find(TrackKeyOf(rows[i]));
+		if (b == threadBefore.end())
+		{
+			outWhy = "a row's thread was not read before the write";
+			return false;
+		}
+		std::vector<UTF32TextChar> after;
+		ReadCodePoints(db, story, threadStart, threadSpan, after);
+		const std::vector<UTF32TextChar>& before = b->second;
+		std::vector<UTF32TextChar> expected;
+		size_t cursor = 0;		// in `before`
+		int32 moved = 0;		// what the ticked rows so far did to lengths
+		for (size_t k = i; k < j; ++k)
+		{
+			const TrackRow& r = rows[k];
+			const size_t rowAt = static_cast<size_t>(r.offset);
+			if (rowAt < cursor || rowAt + static_cast<size_t>(r.length) > before.size())
+			{
+				outWhy = "a row's place could not be read";
 				return false;
 			}
+			expected.insert(expected.end(), before.begin() + cursor, before.begin() + rowAt);
+			if (r.target && r.changed)
+			{
+				const size_t at = rowAt + static_cast<size_t>(moved);
+				if (at + static_cast<size_t>(r.newLen) > after.size())
+				{
+					outWhy = "text outside the ticked rows changed - a row that was not ticked did not come back";
+					return false;
+				}
+				expected.insert(expected.end(), after.begin() + at, after.begin() + at + r.newLen);
+				moved += r.newLen - r.length;
+			}
+			else
+				expected.insert(expected.end(), before.begin() + rowAt, before.begin() + rowAt + r.length);
+			cursor = rowAt + static_cast<size_t>(r.length);
 		}
-		cum[TrackKeyOf(r)] += r.changed ? (r.newLen - r.length) : 0;
+		expected.insert(expected.end(), before.begin() + cursor, before.end());
+		if (expected != after)
+		{
+			// Said with WHERE, so a failure can be followed up: the first code point that differs.
+			size_t at = 0;
+			while (at < expected.size() && at < after.size() && expected[at] == after[at])
+				++at;
+			outWhy = "text outside the ticked rows changed - a row that was not ticked did not come back (at ";
+			outWhy.AppendNumber(static_cast<int32>(at));
+			outWhy.Append(" of ");
+			outWhy.AppendNumber(static_cast<int32>(after.size()));
+			outWhy.Append(": expected U+");
+			outWhy.AppendNumber(at < expected.size() ? static_cast<int32>(expected[at].GetValue()) : -1);
+			outWhy.Append(", found U+");
+			outWhy.AppendNumber(at < after.size() ? static_cast<int32>(after[at].GetValue()) : -1);
+			outWhy.Append(")");
+			return false;
+		}
+		i = j;
 	}
 	return true;
 }
 
 // Replace this chapter's checked hits with Change All, story by story (the block comment above).
 //
-// Returns false when the chapter is NOT for this route - outWhyNot says why, and NOTHING was written:
-// the caller runs the one-at-a-time walk instead. Returns true when the route ran; then either the
-// counters are filled, or outCancelled / outFailed is set and things WERE written - the caller must
-// abort the run's sequence to take them back.
+// ***** CHANGE ALL ONLY (2026-09-26, the user's call). ***** There is no one-at-a-time fallback any more.
+// Returns false when the ticks form the one shape Change All cannot write as asked - outWhyNot says
+// which, and NOTHING was written; the caller refuses the whole run. Returns true when the route ran;
+// then either the counters are filled, or outCancelled / outFailed is set and things WERE written - the
+// caller must abort the run's sequence to take them back.
 bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked,
@@ -769,13 +1001,13 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (db == nil || opts == nil)
 	{
-		outWhyNot = "no db/options";
+		outWhyNot = "the document or the Find/Change options could not be read";
 		return false;
 	}
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
 	{
-		outWhyNot = "not Text/GREP";
+		outWhyNot = "only the Text and GREP tabs can be replaced";
 		return false;
 	}
 
@@ -788,12 +1020,12 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		bool checked = false, replaced = false, locked = false;
 		if (!KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked))
 		{
-			outWhyNot = "a row without flags";
+			outWhyNot = "a row could not be read";
 			return false;
 		}
 		if (replaced)
 		{
-			outWhyNot = "a row already replaced";
+			outWhyNot = "a row is already replaced - search again";
 			return false;
 		}
 		TrackRow r;
@@ -801,36 +1033,41 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		r.target = checked;
 		r.kept = locked && !checked;
 		r.lockedTick = false;
+		r.inFootnote = false;
+		r.gone = false;
 		r.newLen = 0;
 		r.changed = false;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
 		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, r.story, start, end, hash))
 		{
-			outWhyNot = "a row without identity";
+			outWhyNot = "a row has no place in the document";
 			return false;
 		}
 		TextIndex threadStart = kInvalidTextIndex;
 		if (!ThreadAt(db, r.story, start, r.dict, r.key, threadStart))
 		{
-			outWhyNot = "a row without a thread";
+			outWhyNot = "a row's text could not be found - search again";
 			return false;
 		}
 		r.offset = start - threadStart;
 		r.length = end - start;
-		if (r.target)
-			r.before = KBSTrackChange::ReadText(UIDRef(db, r.story), start, r.length);
-		// ***** A ROW IN A FOOTNOTE GOES TO THE WALK (measured 2026-09-26 through IDML): Track Changes
-		// records nothing written inside a footnote - by Change All or by hand - so such a row could be
-		// neither lined up nor taken back. A footnote's thread IS its reference boss (KCMTextRead's test).
+		r.before = KBSTrackChange::ReadText(UIDRef(db, r.story), start, r.length);
+		// ***** A ROW IN A FOOTNOTE (measured 2026-09-26 through IDML): Track Changes records nothing
+		// written inside a footnote. Such a row is always ticked (the user's call - the model will not
+		// let it go off) and Change All writes it with the rest; its new place is worked out from the
+		// footnote's text before and after (AlignFootnoteFrom). An unticked one could not be put back.
+		r.inFootnote = KBSTrackChange::IsInFootnote(UIDRef(db, r.story), start);
+		if (r.inFootnote && !checked)
 		{
-			InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
-			InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(start, nil, nil) : nil);
-			if (thread != nil && ::GetClass(thread) == kFootnoteReferenceBoss)
-			{
-				outWhyNot = "a row in a footnote";
-				return false;
-			}
+			outWhyNot = "a row inside a footnote is not ticked";
+			return false;
+		}
+		// The same for a row at an endnote's end: InDesign's reject cannot put it back (IsAtEndnoteEnd).
+		if (!checked && KBSTrackChange::IsAtEndnoteEnd(UIDRef(db, r.story), end))
+		{
+			outWhyNot = "a row at the end of an endnote is not ticked";
+			return false;
 		}
 		if (r.target)
 		{
@@ -845,7 +1082,9 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 				editableFrames[frameKey] = editable = KBSSearchEngine::IsFrameEditable(storyRef, frameUID);
 			if (!editable)
 			{
-				r.target = false;		// searched, never changed: counted as locked below
+				// Became locked since the search: never written - an unticked row as far as the replace
+				// goes (the final check holds it to its text), counted as locked.
+				r.target = false;
 				r.lockedTick = true;
 			}
 		}
@@ -853,85 +1092,62 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	}
 	std::sort(rows.begin(), rows.end(), TrackRowBefore);
 
-	// ----- what cannot be told apart afterwards goes to the walk, BEFORE anything is written -----
-	const bool grepWritesText = (mode == IFindChangeOptions::kGrepSearch) && !opts->GetReplaceString(mode).empty();
+	// ----- the one shape Change All cannot write as ticked: refused BEFORE anything is written -----
 	for (size_t i = 1; i < rows.size(); ++i)
 	{
-		if (!TrackTouches(rows[i - 1], rows[i]))
-			continue;
-		// Touching rows share their records: one of them cannot be taken back alone.
-		if (rows[i - 1].target != rows[i].target)
+		// Touching matches share their records (one deletion for "catcatcat"): one of them cannot be
+		// taken back alone.
+		if (TrackTouches(rows[i - 1], rows[i]) && rows[i - 1].target != rows[i].target)
 		{
-			outWhyNot = "touching rows, one ticked and one not";
+			outWhyNot = "matches that touch each other are ticked differently (tick them alike)";
 			return false;
-		}
-		// Touching GREP rows that write text: where one row's new text ends is not in the records. (A
-		// deletion writes nothing, so its place is known - H-8's rows stay on this route.)
-		if (grepWritesText)
-		{
-			outWhyNot = "GREP rows touching with a change string";
-			return false;
-		}
-	}
-	// ***** A ROW THAT HOLDS AN OBJECT'S CHARACTER (measured 2026-09-26, case footnote-marker). ***** A
-	// replace that deletes a footnote reference, a table anchor or an anchored object's character takes
-	// the object with it - and the rows INSIDE that object (the footnote's text, the cells, the anchored
-	// story) lose the thread their place is counted in, so their records cannot be lined up. Such a
-	// chapter goes to the walk, which finds its rows one at a time (and is tracked all the same, so a
-	// row still comes back with Reject Change). The characters: footnote / endnote reference (0x04 /
-	// 0x05), table anchor and continuation (0x16 / 0x17), anchored object (0xFFFC).
-	for (size_t i = 0; i < rows.size(); ++i)
-	{
-		const TrackRow& r = rows[i];
-		InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
-		TextIndex threadStart = kInvalidTextIndex;
-		if (model == nil || !model->FindStoryThread(r.dict, r.key, &threadStart, nil))
-		{
-			outWhyNot = "a thread gone";
-			return false;
-		}
-		TextIterator it(model, threadStart + r.offset);
-		for (int32 k = 0; k < r.length && !it.IsNull(); ++k, ++it)
-		{
-			const uint32 c = (*it).GetValue();
-			if (c == 0x04 || c == 0x05 || c == 0x16 || c == 0x17 || c == 0xFFFC)
-			{
-				outWhyNot = "a row holds an object's character";
-				return false;
-			}
 		}
 	}
 
 	std::set<UID> targetStories;	// the stories Change All will run on
-	std::set<UID> lockedStories;	// stories holding a ticked row that cannot be edited
 	for (size_t i = 0; i < rows.size(); ++i)
-	{
 		if (rows[i].target)
 			targetStories.insert(rows[i].story);
-		if (rows[i].lockedTick)
-			lockedStories.insert(rows[i].story);
-	}
 	if (targetStories.empty())
 	{
-		outWhyNot = "nothing to write";
-		return false;		// the walk counts the locked ones as it always has
+		// Nothing to write in this chapter - only rows ticked in places locked since, if any. Counted
+		// and marked, and nothing is run.
+		for (size_t i = 0; i < rows.size(); ++i)
+		{
+			if (!rows[i].lockedTick)
+				continue;
+			++outLocked;
+			KBSResultModel::SetHitOutcome(chapterIdx, rows[i].hitIdx, KBSResultModel::kOutcomeLocked);
+		}
+		return true;
 	}
+
+	// Every thread holding a row, as it reads BEFORE anything is written: a footnote's rows are placed
+	// from it, and every thread is checked against it at the end (CheckOnlyTickedChanged).
+	std::map<TrackThreadKey, std::vector<UTF32TextChar> > threadBefore;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		if (threadBefore.count(TrackKeyOf(rows[i])) != 0)
+			continue;
+		InterfacePtr<ITextModel> model(db, rows[i].story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		int32 threadSpan = 0;
+		if (model == nil || !model->FindStoryThread(rows[i].dict, rows[i].key, &threadStart, &threadSpan))
+		{
+			outWhyNot = "a row's text could not be read";
+			return false;
+		}
+		ReadCodePoints(db, rows[i].story, threadStart, threadSpan, threadBefore[TrackKeyOf(rows[i])]);
+	}
+	// The records of ours already there, by their time stamps: an earlier run's are neither lined up
+	// nor rejected (records are left in the document on purpose).
+	std::map<UID, std::set<uint64> > oldTimes;
 	for (std::set<UID>::const_iterator st = targetStories.begin(); st != targetStories.end(); ++st)
 	{
-		// What Change All does with a locked frame in the middle of a story it is writing is not
-		// measured - the walk, which never writes there, takes such a story.
-		if (lockedStories.count(*st) != 0)
-		{
-			outWhyNot = "a story with a locked row and a ticked row";
-			return false;
-		}
-		// Records of ours from an earlier replace would be read as this run's - the walk, which does
-		// not read records to find its rows, takes such a story.
-		if (KBSTrackChange::StoryHasOurChanges(UIDRef(db, *st)))
-		{
-			outWhyNot = "a story already holding changes of ours";
-			return false;
-		}
+		std::vector<KBSTrackChange::Record> recs;
+		KBSTrackChange::CollectRecords(UIDRef(db, *st), recs);
+		for (size_t k = 0; k < recs.size(); ++k)
+			oldTimes[*st].insert(recs[k].time);
 	}
 
 	// ===== from here on things are WRITTEN. A cancel or a failure below leaves the caller to abort. =====
@@ -957,7 +1173,10 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			if (rows[i].target || rows[i].lockedTick)
 				++storyTicked;
 
-		if (targetStories.count(story) != 0)
+		// A story an earlier story's Change All deleted (an anchored object's): nothing to run; its rows
+		// are settled by the final check.
+		const bool storyAlive = db->IsValidUID(story);
+		if (storyAlive && targetStories.count(story) != 0)
 		{
 			// Between stories is the only place a cancel can be heard: a Change All is one command.
 			if (progressBar != nil && progressBar->WasCancelled(kFalse))
@@ -971,7 +1190,7 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 				outWhyNot = "Change All did not run";
 				return true;
 			}
-			if (!LineUpStory(db, rows, from, to, mode, outWhyNot))
+			if (!LineUpStory(db, rows, from, to, threadBefore, oldTimes[story], outWhyNot))
 			{
 				outFailed = true;
 				return true;
@@ -986,7 +1205,8 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			{
 				const TrackRow& r = rows[i];
 				TextIndex threadStart = kInvalidTextIndex;
-				TrackThreadStart(db, r, threadStart);
+				if (r.gone || !TrackThreadStart(db, r, threadStart))
+					continue;
 				const TextIndex s = threadStart + r.offset + cum[TrackKeyOf(r)];
 				if (r.changed && !r.target)
 				{
@@ -998,17 +1218,17 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			std::sort(rejectAt.begin(), rejectAt.end());
 			rejectAt.erase(std::unique(rejectAt.begin(), rejectAt.end()), rejectAt.end());
 			for (size_t k = rejectAt.size(); k-- > 0; )
-				KBSTrackChange::RejectAt(storyRef, rejectAt[k]);
+				KBSTrackChange::RejectAt(storyRef, rejectAt[k], &oldTimes[story]);
 		}
 
 		// ----- the rows, where their text stands now: only the ticked rows moved anything -----
 		std::map<TrackThreadKey, TextIndex> cum;
-		for (size_t i = from; i < to; ++i)
+		for (size_t i = from; i < to && storyAlive; ++i)
 		{
 			TrackRow& r = rows[i];
 			TextIndex threadStart = kInvalidTextIndex;
-			if (!TrackThreadStart(db, r, threadStart))
-				continue;
+			if (r.gone || !TrackThreadStart(db, r, threadStart))
+				continue;		// settled by the final check
 			const TextIndex s = threadStart + r.offset + cum[TrackKeyOf(r)];
 			if (r.target)
 			{
@@ -1027,7 +1247,7 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			{
 				if (r.lockedTick)
 				{
-					++outLocked;	// ticked, but on a locked layer or in a locked story
+					++outLocked;	// ticked, but in a place locked since the search
 					KBSResultModel::SetHitOutcome(chapterIdx, r.hitIdx, KBSResultModel::kOutcomeLocked);
 				}
 				if (r.lockedTick || r.kept)
@@ -1053,6 +1273,13 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		done += storyTicked;
 		KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
 		from = to;
+	}
+
+	// ----- and the last word: nothing but the ticked rows changed, in any story of the chapter -----
+	if (!CheckOnlyTickedChanged(db, chapterIdx, rows, threadBefore, outReplaced, outWhyNot))
+	{
+		outFailed = true;
+		return true;
 	}
 	return true;
 }
@@ -1706,6 +1933,13 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		// the difference is that the run now says so, instead of reporting a count of replacements
 		// that no longer exist. InDesign's own wording for the failure is quoted when there is one:
 		// it is the only description of what went wrong that anybody has.
+		if (t.refusedByShape)
+		{
+			outSummary.Append("Replace not run - ");
+			outSummary.Append(t.errorText);
+			outSummary.Append(" - so nothing was changed.");
+			return;
+		}
 		if (t.stoppedByMismatch)
 		{
 			// Said as a failure, not as a cancel (the user's call, 2026-09-26): nothing was retried.
@@ -2824,12 +3058,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			}
 			if (!byChangeAll)
 			{
-				// The walk, under Track Changes too: its replacements are recorded the same way.
-				std::set<UID> stories;
-				CollectChapterStories(ci, stories);
-				KBSTrackChange::TrackingScope tracking(docRef.GetDataBase(), stories);
-				replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
-					refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
+				// ***** CHANGE ALL ONLY (2026-09-26, the user's call). ***** There is no one-at-a-time
+				// fallback: a chapter Change All cannot write as ticked refuses the whole run, and the
+				// abort below takes back whatever earlier chapters wrote.
+				totals.refusedByShape = true;
+				totals.errorText = whyNot;
+				totals.errorText.SetTranslatable(kFalse);
+				totals.cancelled = true;
+				break;
 			}
 
 			// ...and the other half: what each replaced row now reads.
@@ -3112,6 +3348,15 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	}
 	const int32 originalLen = WideString(originalText).CharCount();
 
+	// Asked BEFORE the sequence (an empty one would land on the Undo menu). The range reject takes every
+	// author's changes: anything in the range that is not this row's own insertion and deletion (the
+	// user's own typing right next to it) would go too.
+	if (KBSTrackChange::CountOthersIn(storyRef, change.at, change.at + change.insLen + 1,
+		change.at, change.at + change.insLen) > 0)
+	{
+		outStatus = "Reject Change: another change sits right next to this one (someone's own edit) - nothing was changed, so as not to take that back too.";
+		return false;
+	}
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3121,12 +3366,13 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	PMString name("Reject Change");
 	name.SetTranslatable(kFalse);
 	sequence->SetName(name);
-	// The deletion first - it stands after the insertion, so rejecting it moves nothing in front of it.
 	int32 done = 0;
-	if (change.hasDelete)
-		done += KBSTrackChange::RejectAt(storyRef, change.at + change.insLen);
-	if (change.insLen > 0)
-		done += KBSTrackChange::RejectAt(storyRef, change.at);
+	// ***** ONE RANGE REJECT, AS THE STORY EDITOR'S MENU DOES (2026-09-26, the user's call). ***** The
+	// row's insertion and the deletion anchored right after it, in one kRejectRangeRedlineCmdBoss over
+	// [at, at + insLen + 1): the guide says a deletion at the range's END index is not rejected, so
+	// the range is taken one past it (measured: body, table cell and endnote all came back whole).
+	if (KBSTrackChange::RejectRange(storyRef, change.at, change.at + change.insLen + 1))
+		done = 1;
 	// ALL THE WAY BACK, OR NOT AT ALL: the original text has to stand where the change stood.
 	const bool same = (done > 0)
 		&& (KBSTrackChange::ReadText(storyRef, change.at, originalLen) == originalText);
@@ -3146,6 +3392,115 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
 		KBSSearchEngine::HashMatchText(storyRef, change.at, change.at + originalLen));
 	outStatus = "Rejected - the row is back to its original text. Right-click it for Redo.";
+	return true;
+}
+
+// ======================================================================================================
+// Redo (2026-09-26) - see the header. Not the one-at-a-time walk: that lines matches up with rows by the
+// order the SEARCH walked them in, and after a replace that order no longer holds. The row's own range
+// is what Redo is about, so the query runs over that range alone and the result is checked against
+// what the run wrote there - a match that has grown, shrunk or moved does not pass.
+// ======================================================================================================
+bool KBSReplaceEngine::RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KBSResultModel::GetHitOutcome(chapterIdx, hitIdx) != KBSResultModel::kOutcomeRejected)
+	{
+		outStatus = "Redo: only a row taken back with Reject Change can be replaced again.";
+		return false;
+	}
+	PMString originalText, replacedText;
+	if (!KBSResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText))
+	{
+		outStatus = "Redo: this row keeps no record of its replace.";
+		return false;
+	}
+	// The same door Change Checked goes through - OUTSIDE any sequence (it runs a command of its own).
+	PMString refusal;
+	if (RefuseChangedQuery(refusal))
+	{
+		outStatus = "Redo: the Find/Change query changed since the search - the row is left as it is (query changed). ";
+		outStatus.Append(refusal);
+		return false;
+	}
+	// ...and the CHANGE side, which that door does not look at (a Change Checked takes whatever the
+	// dialog holds and says so in its prompt): Redo is "the same replace again", so it is the change
+	// side the replace ran with, recorded then (SetChangeText), or nothing.
+	if (KBSSearchEngine::DescribeCurrentChange() != KBSResultModel::GetChangeText())
+	{
+		outStatus = "Redo: the Change To in Find/Change is not the one this replace used - the row is left as it is (query changed).";
+		return false;
+	}
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
+		|| !KBSBookScope::IsDocStillOpen(docRef))
+	{
+		outStatus = "Redo: the document of this row is not open.";
+		return false;
+	}
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+	{
+		outStatus = "Redo: this row has no place in the document.";
+		return false;
+	}
+	const UIDRef storyRef(docRef.GetDataBase(), story);
+	if (KBSTrackChange::ReadText(storyRef, start, end - start) != originalText)
+	{
+		outStatus = "Redo: the text there is not the row's original text any more - left as it is.";
+		return false;
+	}
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	WalkerScopeOptions scopeOptions;
+	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
+	if (model == nil || opts == nil)
+	{
+		outStatus = "Redo: the story or the Find/Change options could not be read.";
+		return false;
+	}
+
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	if (sequence == nil)
+	{
+		outStatus = "Redo: InDesign would not start a command sequence - nothing was changed.";
+		return false;
+	}
+	PMString name("Redo Replace");
+	name.SetTranslatable(kFalse);
+	sequence->SetName(name);
+	int32 count = 0;
+	bool same = false;
+	{
+		std::set<UID> stories;
+		stories.insert(story);
+		KBSTrackChange::TrackingScope tracking(docRef.GetDataBase(), stories);
+		KBSTrackChange::AuthorScope author;
+		InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryRangeWalkerScope(model, start, end - start, scopeOptions));
+		if (tracking.Ok() && author.Ok() && RunChangeAllInScope(scope, opts, &count) && count == 1)
+			same = (KBSTrackChange::ReadText(storyRef, start, WideString(replacedText).CharCount()) == replacedText);
+	}
+	if (!same)
+		ErrorUtils::PMSetGlobalErrorCode(kFailure);
+	CmdUtils::EndCommandSequence(sequence);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (!same)
+	{
+		outStatus = "Redo: the query no longer makes the same replacement there, so nothing was changed.";
+		return false;
+	}
+
+	const TextIndex newEnd = start + WideString(replacedText).CharCount();
+	KBSResultModel::SetHitRedone(chapterIdx, hitIdx, story, start, newEnd);
+	PMString pre, match, post;
+	KBSSearchEngine::SplitLineAroundMatch(storyRef, start, newEnd, pre, match, post);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
+		KBSSearchEngine::HashMatchText(storyRef, start, newEnd));
+	outStatus = "Redone - the row is replaced again.";
 	return true;
 }
 

@@ -224,6 +224,14 @@ void KBSResultModel::AppendChapter(Chapter&& chapter)
 	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
+
+	// ***** EVERY ROW STARTS TICKED (2026-09-26, the user's call - the reverse of 2026-08-02). ***** The
+	// user takes off what is NOT to be replaced. Only rows that carry a box: a scan's rows and locked
+	// rows have none, and the result kind is stated before any chapter comes in (the three engines).
+	std::vector<Hit>& hits = gChapters.back().hits;
+	for (size_t hi = 0; hi < hits.size(); ++hi)
+		if (RowHasCheckBox(hits[hi]))
+			hits[hi].checked = true;
 }
 
 void KBSResultModel::Clear()
@@ -340,6 +348,11 @@ void KBSResultModel::SetChangeText(const PMString& change)
 {
 	gChangeText = change;
 	gChangeText.SetTranslatable(kFalse);
+}
+
+PMString KBSResultModel::GetChangeText()
+{
+	return gChangeText;
 }
 
 void KBSResultModel::SetWalkSignature(const PMString& signature)
@@ -546,6 +559,7 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.postText = h.postText;
 	out.fontName = h.fontName;
 	out.checked = h.checked;
+	out.inFootnote = h.inFootnote || h.atEndnoteEnd;	// the box is greyed for both
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
@@ -598,6 +612,7 @@ namespace
 			case KBSResultModel::kOutcomeLocked:	return "locked";
 			case KBSResultModel::kOutcomeRefused:	return "refused";
 			case KBSResultModel::kOutcomeRejected:	return "rejected";
+			case KBSResultModel::kOutcomeDeleted:	return "deleted";
 			case KBSResultModel::kOutcomeNone:		break;
 		}
 		return "";
@@ -656,6 +671,8 @@ namespace
 			AppendWord(flags, "refused");
 		else if (hit.outcome == KBSResultModel::kOutcomeRejected)
 			AppendWord(flags, "rejected");
+		else if (hit.outcome == KBSResultModel::kOutcomeDeleted)
+			AppendWord(flags, "deleted");
 		if (hit.replaced)
 			AppendWord(flags, "replaced");
 		return flags;
@@ -966,7 +983,32 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	// anything about.
 	if (!RowHasCheckBox(h))
 		return;
+	// A footnote's row cannot be taken off (2026-09-26): Track Changes records nothing inside a
+	// footnote, so its replace could not be kept apart from the others' nor taken back.
+	if (!checked && (h.inFootnote || h.atEndnoteEnd))
+		return;
 	h.checked = checked;
+}
+
+KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return kPinnedNone;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return kPinnedNone;
+	const Hit& h = c.hits[hitIdx];
+	return h.inFootnote ? kPinnedFootnote : (h.atEndnoteEnd ? kPinnedEndnoteEnd : kPinnedNone);
+}
+
+bool KBSResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	return c.hits[hitIdx].inFootnote;
 }
 
 bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked)
@@ -1016,6 +1058,8 @@ void KBSResultModel::SetAllChecked(bool checked)
 			// the model would hold checked hits the panel shows no box for.
 			if (!RowHasCheckBox(hits[hi]))
 				continue;
+			if (!checked && (hits[hi].inFootnote || hits[hi].atEndnoteEnd))
+				continue;	// a pinned row stays ticked (SetHitChecked)
 			hits[hi].checked = checked;
 		}
 	}
@@ -1033,6 +1077,8 @@ void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
 	{
 		if (!RowHasCheckBox(hits[hi]))
 			continue;
+		if (!checked && (hits[hi].inFootnote || hits[hi].atEndnoteEnd))
+			continue;	// a pinned row stays ticked (SetHitChecked)
 		hits[hi].checked = checked;
 	}
 }
@@ -1189,6 +1235,23 @@ void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID
 	h.replaced = false;
 	h.checked = false;
 	h.outcome = kOutcomeRejected;
+	BuildHitLocator(h);
+}
+
+void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.textStart = kInvalidTextIndex;
+	h.textEnd = kInvalidTextIndex;
+	h.replaced = true;
+	h.checked = false;
+	h.outcome = kOutcomeDeleted;
 	BuildHitLocator(h);
 }
 
@@ -1382,6 +1445,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeRejected)
 		hit.locator.Append(" rejected");	// the user's own act, not a reason something failed: normal colour
+	else if (hit.outcome == kOutcomeDeleted)
+		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 }
 
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)

@@ -559,7 +559,12 @@ private:
 			// Rows are recycled as the tree scrolls, so a row that once showed a replaced or locked
 			// hit has to get its box back.
 			checkView->ShowView(kTrue);
-			checkView->Enable();
+			// A footnote's row: ticked and greyed, not to be touched (2026-09-26, the user's call) -
+			// Track Changes records nothing in a footnote, so it is always replaced.
+			if (row.inFootnote)
+				checkView->Disable();
+			else
+				checkView->Enable();
 		}
 
 		IControlView* cell = rowData->FindWidget(kKBSResultTextWidgetID);

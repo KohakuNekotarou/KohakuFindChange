@@ -416,6 +416,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString status;
 			if (actionID.Get() == kKBSRejectChangeActionID)
 				KBSReplaceEngine::RejectHit(chapter, hit, status);
+			else
+				KBSReplaceEngine::RedoHit(chapter, hit, status);
 			KBSResultTree::RefreshRows();
 			KBSResultTree::ShowStatus(status);
 			break;

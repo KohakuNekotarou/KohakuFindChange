@@ -279,9 +279,18 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		KBSResultModel::SetContextMenuHit(chapter, hit);
 		bool checked = false, replaced = false, locked = false;
 		KBSResultModel::GetHitFlags(chapter, hit, checked, replaced, locked);
-		if (replaced && !KBSTrackChange::RefreshRowFromRecords(chapter, hit))
+		const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(chapter, hit);
+		if (pinned != KBSResultModel::kPinnedNone)
 		{
-			PMString why("Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded).");
+			PMString why(pinned == KBSResultModel::kPinnedFootnote
+				? "Reject Change / Redo: not for a match inside a footnote - Track Changes records nothing there."
+				: "Reject Change / Redo: not for a match at the end of an endnote - InDesign's Track Changes cannot take it back.");
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(why);
+		}
+		else if (replaced && !KBSTrackChange::RefreshRowFromRecords(chapter, hit))
+		{
+			PMString why("Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?).");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}

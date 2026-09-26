@@ -104,6 +104,7 @@
 
 // Project includes:
 #include "KBSSearchEngine.h"
+#include "KBSTrackChange.h"		// IsInFootnote - a footnote's row is always replaced
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -1426,6 +1427,10 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// way to change it. Decided HERE, once, so the row can be built without a check box instead of
 	// offering one that would quietly do nothing.
 	outHit.isLocked = facts->isLocked;
+	// Inside a footnote? Such a row is always replaced - Track Changes records nothing there (2026-09-26).
+	outHit.inFootnote = KBSTrackChange::IsInFootnote(storyRef, start);
+	// Up to the end of an endnote? Handled the same way - InDesign cannot take such a replace back.
+	outHit.atEndnoteEnd = KBSTrackChange::IsAtEndnoteEnd(storyRef, end);
 	if (outHit.isLocked)
 		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
 

@@ -56,8 +56,10 @@ namespace KBSResultModel
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeRejected	// replaced, then taken back with Reject Change (2026-09-26): the row
+		kOutcomeRejected,	// replaced, then taken back with Reject Change (2026-09-26): the row
 							// shows the original text again and can be replaced once more (Redo)
+		kOutcomeDeleted		// ticked, and gone WITH the footnote / table / anchored object another
+							// ticked row deleted (2026-09-26) - Change All's own result; no place to jump to
 	};
 
 	/** One match on one line of one chapter. The three text segments are the line split around
@@ -146,6 +148,12 @@ namespace KBSResultModel
 		// until the row is replaced.
 		PMString	originalText;
 		PMString	replacedText;
+		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
+		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
+		bool		inFootnote;
+		// The match runs up to the END of an endnote (2026-09-26). InDesign rejects such a tracked
+		// insertion one character short, so it is handled like a footnote's row.
+		bool		atEndnoteEnd;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -158,7 +166,8 @@ namespace KBSResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
+				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
+				atEndnoteEnd(false), pageOrdinal(0) {}
 	};
 
 	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
@@ -371,6 +380,8 @@ namespace KBSResultModel
 	    Cleared by Clear(), so it can never outlive the results it describes. Read inside the model
 	    only, like SetQueryText's line - BuildReportText is the one place that wants it. */
 	void SetChangeText(const PMString& change);
+	/** The change side the last replace ran with (SetChangeText) - what Redo compares the dialog to. */
+	PMString GetChangeText();
 
 	/** EVERYTHING a walk is driven by, as one opaque comparable string: the query itself plus every
 	    Find/Change switch that decides which matches come back (see
@@ -479,8 +490,11 @@ namespace KBSResultModel
 										// so the panel does not have to re-derive it from the four
 										// fields above - see GetHitRow.
 
+		bool			inFootnote;		// the box is shown ticked and greyed - it cannot be taken off
+										// (Hit::inFootnote, 2026-09-26)
+
 		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
-					   hasCheckBox(false) {}
+					   hasCheckBox(false), inFootnote(false) {}
 	};
 
 	/** One row's worth of everything, in a single call.
@@ -579,6 +593,11 @@ namespace KBSResultModel
 	    so the model can never hold a checked hit that no row offered; it is a backstop rather than
 	    the first line of defence, since those rows carry no box to click in the first place. */
 	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
+	/** Is the row inside a footnote (Hit::inFootnote)? False for an out-of-range index. */
+	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
+	/** Why a row is pinned - always replaced, never taken back - if it is (2026-09-26). */
+	enum PinnedReason { kPinnedNone = 0, kPinnedFootnote, kPinnedEndnoteEnd };
+	PinnedReason GetHitPinned(int32 chapterIdx, int32 hitIdx);
 
 	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this
 	    row gets no check box", for different reasons. false = index out of range.
@@ -683,6 +702,8 @@ namespace KBSResultModel
 	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 	/** Redo replaced it again: replaced, at [start, end), the "rejected" gone. */
 	void SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
+	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
+	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
 
 	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
 	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is

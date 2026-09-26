@@ -89,6 +89,19 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 
 	KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
 
+	// A footnote's row refuses to be taken off (2026-09-26): put the box back and say why.
+	const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(nodeID->GetChapter(), nodeID->GetHit());
+	if (!nowChecked && pinned != KBSResultModel::kPinnedNone)
+	{
+		KBSResultTree::RefreshRows();
+		PMString why(pinned == KBSResultModel::kPinnedFootnote
+			? "This match is inside a footnote. Track Changes records nothing in footnotes, so it is always replaced and cannot be left out or taken back."
+			: "This match runs to the end of an endnote. InDesign's Track Changes cannot take such a replace back, so it is always replaced and cannot be left out or taken back.");
+		why.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(why);
+		return;
+	}
+
 	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
 	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.
 	KBSResultTree::RefreshCheckedCounts(nodeID->GetChapter());
