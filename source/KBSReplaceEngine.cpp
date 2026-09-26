@@ -25,6 +25,16 @@
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "ISession.h"				// GetExecutionContextSession
+// SPIKE 2026-09-26 (mark the ticked rows with a condition, then InDesign's own Change All):
+#include "IConditionalTextFacade.h"	// create / apply / read / delete the temporary mark condition
+#include "IDocument.h"				// GetDocWorkSpace - where the condition is created
+#include "IFindChangeFormatCmdData.h"	// the mark goes into Find Format for the run, and comes out again
+#include "IIntData.h"				// IID_IFINDCHANGEMODEDATA on kFindChangeFormatCmdBoss
+#include "ITextAttrUIDList.h"		// kConditionalTextAttributeBoss's value: the list of conditions
+#include "IWorkspace.h"
+#include "ConditionalTextID.h"		// kConditionalTextAttributeBoss
+#include "AttributeBossList.h"
+#include "UIDList.h"
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
@@ -45,6 +55,7 @@
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <vector>
@@ -502,6 +513,534 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 {
 	SetRowAt(db, rowNow[static_cast<size_t>(hitIdx)], story, start, end);
 	keptRows.push_back(hitIdx);
+}
+
+// ======================================================================================================
+// ***** SPIKE 2026-09-26: REPLACE THE TICKED ROWS WITH InDesign's OWN CHANGE ALL. *****
+//
+// Why: a replace that writes one match at a time and then finds the next one reads text it has
+// already rewritten - GREP's ^, $ and lookahead then see a different document (H-5, H-8, and the
+// mirror case of a backward walk). InDesign's Change All decides every match on the ORIGINAL text and
+// writes after. It has no way to be told "only these", so the ticked rows are MARKED: a temporary,
+// VISIBLE condition is added to their characters (a condition changes no character, so every regex
+// context is the original), the mark is added to Find Format, and Change All then finds only
+// characters that carry it (measured with DOM probes, work/kbs-regress/probe-mark-checked*.jsx).
+//
+// What conditional text imposes (measured):
+//   * Find Format's conditions match the SET exactly - [M] does not find text carrying [U, M]. So every
+//     ticked row must carry the same conditions S, and the search asks for S + M.
+//   * The replacement text inherits the mark, and the text between rows never had it - so the runs of
+//     the mark after the replace are where the rows went. Rows next to each other merge into one run:
+//     with a literal (Text tab) change string they are split evenly; under GREP that cannot be done,
+//     so such a run is not tried here.
+//   * A zero-width row (^ -> X) has no character to carry the mark - not tried here.
+// Anything this cannot do returns false BEFORE anything is written, and the caller runs the
+// one-at-a-time walk (ReplaceInChapter) instead. outWhyNot says which.
+// ======================================================================================================
+const bool kKBSSpikeMarkReplace = true;
+PMString gKBSSpikeMarkNote;		// diagnostics for the status line: "[mark]" or "[walk: <why>]"
+
+struct MarkRow
+{
+	int32		hitIdx;
+	bool		target;		// ticked and to be written; false = a locked row the report keeps, only carried
+	UID			story;
+	UID			dict;
+	uint32		key;
+	TextIndex	offset;		// into its thread, as the search found it
+	int32		length;
+	uint64		hash;
+	bool		endsThread;	// the row takes in its thread's last character (a return)
+};
+
+bool MarkRowBefore(const MarkRow& a, const MarkRow& b)
+{
+	if (a.story != b.story) return a.story.Get() < b.story.Get();
+	if (a.dict != b.dict) return a.dict.Get() < b.dict.Get();
+	if (a.key != b.key) return a.key < b.key;
+	return a.offset < b.offset;
+}
+
+bool SameThread(const MarkRow& a, const MarkRow& b)
+{
+	return a.story == b.story && a.dict == b.dict && a.key == b.key;
+}
+
+// Find Format's conditions for the run, and back as they were whatever way the run ends. The user's
+// own condition (if any) is remembered with the database it names UIDs in, and put back into it.
+bool ProcessFindConditions(IDataBase* targetDB, IFindChangeOptions::SearchMode mode,
+	const K2Vector<UID>* conditions)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindChangeFormatCmdBoss));
+	if (cmd == nil)
+		return false;
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	InterfacePtr<IFindChangeFormatCmdData> data(cmd, IID_IFINDCHANGEFORMATCMDDATA);
+	if (modeData == nil || data == nil)
+		return false;
+	modeData->Set(static_cast<int32>(mode));
+	data->SetTargetDB(targetDB);
+	if (conditions == nil)
+		data->RemoveFindAttribute(kConditionalTextAttributeBoss);
+	else
+	{
+		InterfacePtr<ITextAttrUIDList> attr(static_cast<ITextAttrUIDList*>(
+			::CreateObject(kConditionalTextAttributeBoss, IID_ITEXTATTRUIDLIST)));
+		if (attr == nil)
+			return false;
+		attr->SetUIDList(*conditions);
+		AttributeBossList list;
+		list.ApplyAttribute(attr, kConditionalTextAttributeBoss);
+		data->ApplyFindAttributeBossList(&list);
+	}
+	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+	{
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		return false;
+	}
+	return true;
+}
+
+class FindConditionsOverride
+{
+public:
+	FindConditionsOverride(IFindChangeOptions* opts, IDataBase* db, IFindChangeOptions::SearchMode mode)
+		: fMode(mode), fApplied(false), fHadOwn(false), fOwnDB(nil)
+	{
+		const AttributeBossList* own = (opts != nil) ? opts->GetFindAttributeBossList(db, mode) : nil;
+		if (own != nil)
+		{
+			InterfacePtr<const ITextAttrUIDList> ownConds(static_cast<const ITextAttrUIDList*>(
+				own->QueryByClassID(kConditionalTextAttributeBoss, IID_ITEXTATTRUIDLIST)));
+			if (ownConds != nil)
+			{
+				fHadOwn = true;
+				fOwn = ownConds->GetUIDList();
+				fOwnDB = opts->GetUIDAttrDB();
+			}
+		}
+	}
+	bool Apply(IDataBase* db, const K2Vector<UID>& conditions)
+	{
+		fApplied = ProcessFindConditions(db, fMode, &conditions);
+		return fApplied;
+	}
+	bool HadOwn() const { return fHadOwn; }
+	const K2Vector<UID>& Own() const { return fOwn; }
+	~FindConditionsOverride()
+	{
+		if (!fApplied)
+			return;
+		(void)ProcessFindConditions(fOwnDB, fMode, nil);
+		if (fHadOwn)
+			(void)ProcessFindConditions(fOwnDB, fMode, &fOwn);
+	}
+private:
+	IFindChangeOptions::SearchMode fMode;
+	bool fApplied;
+	bool fHadOwn;
+	K2Vector<UID> fOwn;
+	IDataBase* fOwnDB;
+};
+
+bool ReplaceInChapterByMark(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	int32& outReplaced, int32& outMissing, int32& outLocked, bool& outWalkFailed, PMString& outWhyNot)
+{
+	outReplaced = 0;
+	outMissing = 0;
+	outLocked = 0;
+	outWalkFailed = false;
+	outWhyNot.Clear();
+	outWhyNot.SetTranslatable(kFalse);
+
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	Utils<Facade::IConditionalTextFacade> conds;
+	if (db == nil || opts == nil || !conds)
+	{
+		outWhyNot = "no db/options/facade";
+		return false;
+	}
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+	{
+		outWhyNot = "not Text/GREP";
+		return false;
+	}
+	const AttributeBossList* changeAttrs = opts->GetChangeAttributeBossList(db, mode, kFalse);
+	if (changeAttrs != nil)
+	{
+		InterfacePtr<const IPMUnknown> changeConds(changeAttrs->QueryByClassID(kConditionalTextAttributeBoss, IID_IUNKNOWN));
+		if (changeConds != nil)
+		{
+			outWhyNot = "Change Format sets conditions";
+			return false;
+		}
+	}
+
+	// ----- the rows: which to write, which only to carry -----
+	std::vector<MarkRow> rows;
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	std::map<std::pair<UID, UID>, bool> editableFrames;
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		bool checked = false, replaced = false, locked = false;
+		if (!KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked))
+			continue;
+		const bool keptLocked = locked && !replaced && !checked;
+		if (!(checked && !replaced) && !keptLocked)
+			continue;
+		MarkRow r;
+		r.hitIdx = i;
+		r.target = checked && !replaced;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, r.story, start, end, r.hash))
+		{
+			outWhyNot = "a row without identity";
+			return false;
+		}
+		TextIndex threadStart = kInvalidTextIndex;
+		if (!ThreadAt(db, r.story, start, r.dict, r.key, threadStart))
+		{
+			outWhyNot = "a row without a thread";
+			return false;
+		}
+		r.offset = start - threadStart;
+		r.length = end - start;
+		{
+			InterfacePtr<ITextModel> spanModel(db, r.story, UseDefaultIID());
+			int32 span = 0;
+			TextIndex ts = kInvalidTextIndex;
+			r.endsThread = spanModel != nil && spanModel->FindStoryThread(r.dict, r.key, &ts, &span)
+				&& r.offset + r.length >= span;
+		}
+		if (r.target)
+		{
+			if (r.length <= 0)
+			{
+				outWhyNot = "a zero-width row";
+				return false;
+			}
+			// A locked layer or story: searched, never changed (the same test the walk makes).
+			const UIDRef storyRef(db, r.story);
+			const UID frameUID = KBSSearchEngine::EditableFrameForMatch(storyRef, start);
+			const std::pair<UID, UID> frameKey(r.story, frameUID);
+			std::map<std::pair<UID, UID>, bool>::const_iterator known = editableFrames.find(frameKey);
+			bool editable = false;
+			if (known != editableFrames.end())
+				editable = known->second;
+			else
+				editableFrames[frameKey] = editable = KBSSearchEngine::IsFrameEditable(storyRef, frameUID);
+			if (!editable)
+			{
+				r.target = false;		// carried like a locked row
+				++outLocked;
+				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeLocked);
+			}
+		}
+		rows.push_back(r);
+	}
+	std::sort(rows.begin(), rows.end(), MarkRowBefore);
+
+	// ----- every target must carry one and the same set of conditions -----
+	K2Vector<UID> rowConds;
+	bool haveRowConds = false;
+	int32 targets = 0;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const MarkRow& r = rows[i];
+		if (!r.target)
+			continue;
+		++targets;
+		InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		if (model == nil || !model->FindStoryThread(r.dict, r.key, &threadStart, nil))
+		{
+			outWhyNot = "a thread gone";
+			return false;
+		}
+		const TextIndex start = threadStart + r.offset;
+		int32 runLen = 0;
+		K2Vector<UID> c = conds->GetAppliedConditions(UIDRef(db, r.story), start, start + r.length, &runLen);
+		if (runLen < r.length)
+		{
+			outWhyNot = "conditions change inside a row";
+			return false;
+		}
+		std::sort(c.begin(), c.end());
+		if (!haveRowConds)
+		{
+			rowConds = c;
+			haveRowConds = true;
+		}
+		else if (c != rowConds)
+		{
+			outWhyNot = "rows carry different conditions";
+			return false;
+		}
+		// Next to the previous target in the same thread: one merged run afterwards. Split evenly on
+		// the Text tab (a literal change string is one length); not under GREP.
+		if (mode == IFindChangeOptions::kGrepSearch && i > 0)
+		{
+			for (size_t p = i; p-- > 0; )
+			{
+				if (!rows[p].target)
+					continue;
+				if (SameThread(rows[p], r) && rows[p].offset + rows[p].length == r.offset)
+				{
+					outWhyNot = "GREP rows next to each other";
+					return false;
+				}
+				break;
+			}
+		}
+	}
+	if (targets == 0)
+	{
+		gKBSSpikeMarkNote = "mark";
+		return true;	// only locked ones - counted above, nothing to write
+	}
+
+	// ===== from here on things are WRITTEN. No return false below this line. =====
+	InterfacePtr<IDocument> document(db, db->GetRootUID(), UseDefaultIID());
+	InterfacePtr<IWorkspace> ws(document != nil ? document->GetDocWorkSpace() : UIDRef(), UseDefaultIID());
+	UID mark = kInvalidUID;
+	WideString markName("KBS temporary mark");
+	for (int32 n = 2; ; ++n)
+	{
+		UID existing = kInvalidUID;
+		if (ws == nil || conds->FindCondition(ws, markName, existing) != kSuccess || existing == kInvalidUID)
+			break;
+		markName = WideString("KBS temporary mark ");
+		PMString num; num.AppendNumber(n);
+		markName.Append(WideString(num));
+	}
+	if (ws == nil || conds->CreateCondition(ws, &mark, markName) != kSuccess || mark == kInvalidUID)
+	{
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		outWhyNot = "could not create the mark";
+		return false;		// nothing was written yet: the condition was not created
+	}
+
+	K2Vector<UID> markOnly;
+	markOnly.push_back(mark);
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const MarkRow& r = rows[i];
+		if (!r.target)
+			continue;
+		InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		model->FindStoryThread(r.dict, r.key, &threadStart, nil);
+		conds->ApplyConditionsToText(UIDRef(db, r.story), threadStart + r.offset, r.length, markOnly, kFalse);
+	}
+
+	// ***** A MARK ON THE LAST CHARACTER OF A STORY SPREADS TO ITS CLOSING RETURN (measured
+	// ***** 2026-09-26: "ac ac", the second c marked -> the story's final return carried the mark too).
+	// A marked character nobody ticked is one Change All may write to, so it comes off again - unless a
+	// ticked row really takes that return in.
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const MarkRow& r = rows[i];
+		if (!r.target || (i + 1 < rows.size() && rows[i + 1].target && SameThread(rows[i + 1], r)))
+			continue;	// only the last target of each thread
+		bool threadEndTicked = false;
+		for (size_t k = 0; k < rows.size(); ++k)
+			if (rows[k].target && SameThread(rows[k], r) && rows[k].endsThread)
+				threadEndTicked = true;
+		if (threadEndTicked)
+			continue;
+		InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		int32 span = 0;
+		if (model == nil || !model->FindStoryThread(r.dict, r.key, &threadStart, &span) || span <= 0)
+			continue;
+		const TextIndex last = threadStart + span - 1;
+		int32 len = 0;
+		K2Vector<UID> at = conds->GetAppliedConditions(UIDRef(db, r.story), last, last + 1, &len);
+		if (std::find(at.begin(), at.end(), mark) != at.end())
+			conds->RemoveConditionsFromText(UIDRef(db, r.story), last, 1, markOnly);
+	}
+
+	int32 replacementCount = 0;
+	{
+		K2Vector<UID> findConds(rowConds);
+		findConds.push_back(mark);
+		std::sort(findConds.begin(), findConds.end());
+		FindConditionsOverride findOverride(opts, db, mode);
+		if (findOverride.Apply(db, findConds))
+		{
+			InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
+			InterfacePtr<IK2ServiceProvider> provider(registry != nil
+				? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
+			InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
+			InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
+			InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+			if (walker != nil && scope != nil && client != nil)
+			{
+				if (walker->IsWalking())
+					walker->Halt();
+				walker->Initialize(client, scope, opts, nil);
+				InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
+				if (selUtils != nil)
+				{
+					const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+					InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceAllTextCmdBoss));
+					InterfacePtr<IFindChangeCmdData> cmdData(cmd, UseDefaultIID());
+					if (cmdData != nil)
+					{
+						cmdData->SetTextWalker(walker);
+						if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+						{
+							ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+							outWalkFailed = true;
+						}
+						else
+						{
+							replacementCount = cmdData->GetReplacementCount();
+							const IFindChangeService::FindChangeResult res = cmdData->GetFindChangeResult();
+							if (res == IFindChangeService::kFailure)
+								outWalkFailed = true;
+							ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+						}
+					}
+				}
+				if (walker->IsWalking())
+					walker->Halt();
+			}
+			else
+				outWalkFailed = true;
+		}
+		else
+			outWalkFailed = true;
+	}	// Find Format is back as it was here
+
+	// ----- read back: where each row went. The mark's runs are the rows; the text between is untouched -----
+	PMString counts;
+	std::map<std::pair<UID, std::pair<UID, uint32> >, TextIndex> cum;	// per thread: how far rows so far moved it
+	int32 unreplacedLeft = targets - replacementCount;	// rows Change All did not write (if the count is honest)
+	for (size_t i = 0; i < rows.size(); )
+	{
+		// a group = this row and the targets straight after it in the same thread, touching
+		size_t j = i + 1;
+		if (rows[i].target)
+			while (j < rows.size() && rows[j].target && SameThread(rows[j], rows[j - 1])
+				&& rows[j - 1].offset + rows[j - 1].length == rows[j].offset)
+				++j;
+		const MarkRow& first = rows[i];
+		const std::pair<UID, std::pair<UID, uint32> > threadKey(first.story, std::make_pair(first.dict, first.key));
+		TextIndex& moved = cum[threadKey];
+		InterfacePtr<ITextModel> model(db, first.story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		int32 threadSpan = 0;
+		const bool threadThere = (model != nil) && model->FindStoryThread(first.dict, first.key, &threadStart, &threadSpan);
+		const UIDRef storyRef(db, first.story);
+		if (!first.target)
+		{
+			// a locked row the report keeps: carried by what the rows before it did
+			if (threadThere)
+			{
+				const TextIndex s = threadStart + first.offset + moved;
+				KBSResultModel::SetHitRange(chapterIdx, first.hitIdx, first.story, s, s + first.length);
+				PMString pre, match, post;
+				KBSSearchEngine::SplitLineAroundMatch(storyRef, s, s + first.length, pre, match, post);
+				KBSResultModel::SetHitSegments(chapterIdx, first.hitIdx, pre, match, post,
+					KBSSearchEngine::HashMatchText(storyRef, s, s + first.length));
+			}
+			i = j;
+			continue;
+		}
+		const int32 groupSize = static_cast<int32>(j - i);
+		int32 originalLen = 0;
+		for (size_t k = i; k < j; ++k)
+			originalLen += rows[k].length;
+		const TextIndex s = threadThere ? threadStart + first.offset + moved : kInvalidTextIndex;
+		int32 runLen = 0;
+		bool marked = false;
+		if (threadThere && s < threadStart + threadSpan)
+		{
+			K2Vector<UID> at = conds->GetAppliedConditions(storyRef, s, threadStart + threadSpan, &runLen);
+			marked = std::find(at.begin(), at.end(), mark) != at.end();
+		}
+		// The thread's closing return is never part of a row that did not take it in (see where the
+		// marks are applied: the mark can spread to it).
+		if (marked && !rows[j - 1].endsThread && s + runLen > threadStart + threadSpan - 1)
+		{
+			runLen = threadStart + threadSpan - 1 - s;
+			if (runLen <= 0)
+				marked = false;
+		}
+		if (!marked)
+			runLen = 0;		// no run: the rows were replaced with nothing
+		// Not written? The run is still the original text (same length, same hash).
+		bool notWritten = false;
+		if (marked && unreplacedLeft > 0 && groupSize == 1 && runLen == first.length
+			&& KBSSearchEngine::HashMatchText(storyRef, s, s + runLen) == first.hash)
+			notWritten = true;
+		if (!threadThere)
+		{
+			for (size_t k = i; k < j; ++k)
+			{
+				++outMissing;
+				KBSResultModel::SetHitOutcome(chapterIdx, rows[k].hitIdx, KBSResultModel::kOutcomeMissing);
+			}
+		}
+		else if (notWritten)
+		{
+			--unreplacedLeft;
+			++outMissing;
+			KBSResultModel::SetHitOutcome(chapterIdx, first.hitIdx, KBSResultModel::kOutcomeMissing);
+		}
+		else
+		{
+			// Written. A merged group (Text tab only) is split evenly.
+			const int32 each = (groupSize > 0) ? runLen / groupSize : 0;
+			TextIndex at = s;
+			for (size_t k = i; k < j; ++k)
+			{
+				const int32 len = (k + 1 == j) ? (s + runLen - at) : each;
+				KBSResultModel::MarkHitReplaced(chapterIdx, rows[k].hitIdx, first.story, at, at + len);
+				++outReplaced;
+				at += len;
+			}
+			moved += runLen - originalLen;
+		}
+		i = j;
+	}
+
+	// ----- the mark goes: deleting the condition takes it off every character -----
+	UIDList markList(db);
+	markList.Append(mark);
+	if (conds->DeleteConditions(markList, kInvalidUID) != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+
+	// ----- each replaced row reads its final line (the mark is gone, positions are unchanged) -----
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		if (!rows[i].target)
+			continue;
+		UID story = kInvalidUID;
+		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
+		uint64 h = 0;
+		bool checked = false, replaced = false, locked = false;
+		if (!KBSResultModel::GetHitFlags(chapterIdx, rows[i].hitIdx, checked, replaced, locked) || !replaced)
+			continue;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[i].hitIdx, story, s, e, h))
+			continue;
+		const UIDRef storyRef(db, story);
+		PMString pre, match, post;
+		KBSSearchEngine::SplitLineAroundMatch(storyRef, s, e, pre, match, post);
+		KBSResultModel::SetHitSegments(chapterIdx, rows[i].hitIdx, pre, match, post,
+			KBSSearchEngine::HashMatchText(storyRef, s, e));
+	}
+
+	gKBSSpikeMarkNote = "mark";
+	if (replacementCount != outReplaced)
+	{
+		gKBSSpikeMarkNote.Append(" count=");
+		gKBSSpikeMarkNote.AppendNumber(replacementCount);
+	}
+	return true;
 }
 
 // Replace this chapter's checked hits. Returns how many were replaced.
@@ -1140,7 +1679,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 //
 // Every checked hit that was not replaced is named here rather than being allowed to make the total
 // quietly come up short. That rule is what most of these branches exist for.
-void BuildSummary(const RunTotals& t, PMString& outSummary)
+void BuildSummaryBody(const RunTotals& t, PMString& outSummary)
 {
 	// ***** A cancel is absolute. ***** The whole run is one command sequence and a cancel aborts
 	// it, so the text goes back and the panel goes back with it - there is nothing left to account
@@ -1287,6 +1826,18 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// which only the chapter-at-a-time path could produce. This path wraps the whole run in a single
 	// sequence, so there is no such thing here as one chapter going back on its own - an error
 	// standing at the end takes every chapter with it, and the cancel sentence above covers that.
+}
+
+// SPIKE: the status line, with which way the last chapter was written at its end.
+void BuildSummary(const RunTotals& t, PMString& outSummary)
+{
+	BuildSummaryBody(t, outSummary);
+	if (!gKBSSpikeMarkNote.IsEmpty())
+	{
+		outSummary.Append(" [");
+		outSummary.Append(gKBSSpikeMarkNote);
+		outSummary.Append("]");
+	}
 }
 
 // ***** HAND BACK EVERY CHAPTER THIS RUN OPENED AND THEN LEFT NOTHING IN. *****
@@ -1655,6 +2206,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 {
+	gKBSSpikeMarkNote.Clear();	// SPIKE diagnostics
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
@@ -2209,8 +2761,23 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
-			refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
+		// SPIKE: InDesign's own Change All over the marked rows first; the one-at-a-time walk when the
+		// mark cannot be used (it says why on the status line).
+		int32 replaced = 0;
+		bool byMark = false;
+		if (kKBSSpikeMarkReplace)
+		{
+			PMString whyNot;
+			byMark = ReplaceInChapterByMark(ci, docRef, scopeOptions, replaced, missing, locked, walkFailed, whyNot);
+			if (!byMark)
+			{
+				gKBSSpikeMarkNote = "walk: ";
+				gKBSSpikeMarkNote.Append(whyNot);
+			}
+		}
+		if (!byMark)
+			replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
+				refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
 		// line up) must still hand the bar on at the right place.
