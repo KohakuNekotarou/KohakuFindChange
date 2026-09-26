@@ -71,6 +71,7 @@
 #include "KBSHitMarker.h"
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
+#include "KBSTrackChange.h"		// RefreshRowFromRecords - a replaced row found by its tracked change
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
 #include "KBSSearchEngine.h"		// MatchIsSameOccurrence (the jump is its only caller since
 									// 2026-08-05) / EditableFrameForMatch / IsPositionOverset
@@ -675,6 +676,13 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		return;
 	}
 
+	// ***** A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST (2026-09-26). ***** The record moves
+	// with the text, so an edit made since the replace does not put the jump off. Asked only now,
+	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
+	// rejected, a footnote's row) = the stored range and its hash, as before.
+	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
+
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
 	{
@@ -970,6 +978,13 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// reached it another way must not select into a database that is not there.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 		return false;
+
+	// ***** A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST (2026-09-26). ***** The record moves
+	// with the text, so an edit made since the replace does not put the jump off. Asked only now,
+	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
+	// rejected, a footnote's row) = the stored range and its hash, as before.
+	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)

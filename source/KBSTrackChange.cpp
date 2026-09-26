@@ -37,6 +37,7 @@
 #include "WideString.h"
 
 // Project includes:
+#include "KBSBookScope.h"			// IsDocStillOpen - a closed chapter is not read
 #include "KBSResultModel.h"
 #include "KBSSearchEngine.h"		// the line a row shows, and its hash
 #include "KBSTrackChange.h"
@@ -324,7 +325,10 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 		return false;
 	UIDRef docRef;
 	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil)
+	// ***** OPEN, OR NOT AT ALL. ***** A chapter closed since the search leaves a dangling database pointer
+	// behind (KBSBookScope::IsDocStillOpen says why) - asked before anything is read through it.
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
+		|| !KBSBookScope::IsDocStillOpen(docRef))
 		return false;
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
