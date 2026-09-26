@@ -70,8 +70,9 @@
 //    tries them in that order - the closer the neighbour, the more exact the place.
 //    ***** Measured 2026-09-25 (the user's tests, read back from a temporary log): into the mate's
 //    group at tab 0 and at tab 1, above the next group, below the previous one - each came back where
-//    it had been, and the floating palette it was taken out of went away with it. NOT measured: a
-//    new column (NewTabPaneInDock), because no test had a second column in the dock.
+//    it had been, and the floating palette it was taken out of went away with it. A new column
+//    (NewTabPaneInDock) was measured 2026-09-27 alone in the dock and beside the toolbox (which it
+//    does not take as "before" - RestoreDocked); beside another column it is still NOT measured.
 //    ! Seen once and not again (the user, same day): the Book panel's icon drawn as KBS's own. KBS
 //      writes no palette icon anywhere, so the suspicion is OWL's icon strip after a reparent - not
 //      confirmed.
@@ -862,7 +863,8 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 
 	// 4. It had a column to itself, so there is no column left to go back into: a new one, beside
 	//    the column that was after it (or before it), in the same icon state and width.
-	//    ***** NOT MEASURED YET (2026-09-25): no test had a second column. *****
+	//    ***** NOT MEASURED YET: beside a second COLUMN (2026-09-25: no test had one). Beside the
+	//    toolbox, and alone in the dock, it is (2026-09-27 - see below and step 5). *****
 	PaletteRef dock;
 	PaletteRef before;
 	const PaletteRef nextCol = FindAncestor(ContainerOfPanel(panelMgr, p.nextColumn), &PaletteRefUtils::IsTabPane);
@@ -895,6 +897,15 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 		p.iconic ? PaletteRefUtils::kIcon_TabPaneMode : PaletteRefUtils::kExpanded_TabPaneMode, before);
 	if (!Is(newColumn, &PaletteRefUtils::IsTabPane))
 		return;
+	// ***** NewTabPaneInDock DOES NOT TAKE THE TOOLBOX AS "BEFORE" (2026-09-27, measured). ***** A
+	// column that sat between the document and the docked toolbox (the toolbox is a dock child too -
+	// IsToolbar, not IsTabPane) was recorded as column 0 of 2; with the column gone, the child at 0 is
+	// the toolbox, and a new tab pane asked to go before it was put at the END - the outer side of the
+	// toolbox, left dock and right alike (the user). Then the next close recorded that place, so it
+	// stayed there. ReparentPalette does put the new column before the toolbox (measured: child 0,
+	// drawn inside the toolbox), so the column is moved there when it did not arrive there.
+	if (before.IsValid() && IndexOfChild(dock, newColumn) + 1 != IndexOfChild(dock, before))
+		PaletteRefUtils::ReparentPalette(newColumn, dock, before);
 	PaletteRefUtils::ReparentPalette(ownGroup, newColumn, PaletteRef());
 	ApplyIconState(newColumn, p);
 }
