@@ -104,6 +104,9 @@
 #include "CreateObject.h"		// ::CreateObject / ::CreateObject2
 #include "CServiceProvider.h"
 #include "IDThreadingPrimitives.h"	// IsMainThreadDomain - the interceptor's gate (see KBSBookPanelCmdWatch)
+#include "IDocumentList.h"		// GetDocCount - the Home screen only matters while no document is open
+#include "IExtendScriptUtils.h"	// RunScriptInEngine - app.homeScreenVisible has no C++ door
+#include "ErrorUtils.h"				// a declined script must not leave the error state standing
 #include "PaletteRef.h"
 #include "PaletteRefUtils.h"	// the palette tree: walk it, measure it, move things about in it
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
@@ -193,6 +196,22 @@ const uint32 kKBSBookPanelRestoreDelayMs = 100;
 const uint32 kKBSBookPanelReRestoreDelayMs = 1500;
 const int32 kKBSBookPanelMaxReRestores = 3;
 int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMaybeRestore resets it)
+
+/** ***** THE HOME SCREEN HIDES THE DOCKS (2026-09-27, measured). ***** A book opened with InDesign
+    itself (a .indb double-clicked while InDesign is not running) opens BEFORE InDesign puts up its
+    Home screen, and the Home screen then stays - with every dock hidden under it, the book panel put
+    back into one among them. Opened from a running InDesign, the same book takes the Home screen
+    away (app.homeScreenVisible true -> false, the workspace reloaded, the docks shown). No command
+    does it (kLoadUserWorkspaceCmdBoss is its result - app.applyWorkspace alone leaves the Home screen
+    up); the opening of a book does. So when the placement is docked and the Home screen stands over
+    an open book, KBS closes the books and opens them again, as the user would - once a session, and
+    only with no document open and no book modified. (User's call, 2026-09-27: "the docks visible,
+    as when the book is opened from InDesign, is best".) */
+ICallbackTimer* gHomeTimer = nil;
+const uint32 kKBSHomeCheckDelayMs = 1500;
+const int32 kKBSMaxHomeChecks = 6;	// per opening - the visibility messages come in bursts
+int32 gHomeChecks = 0;
+bool gLeftHomeScreen = false;	// once a session
 
 /** How much of the title band has to be on a screen for a remembered placement to be used: enough
     to take hold of it and drag it back. */
@@ -925,6 +944,73 @@ void ArmRestoreTimer(uint32 delayMs = kKBSBookPanelRestoreDelayMs)
 	gRestoreTimer->StartTimer(RestoreTimerCallback, delayMs, nil);
 }
 
+/** How many documents are open. */
+int32 OpenDocumentCount()
+{
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IDocumentList> docs(app != nil ? app->QueryDocumentList() : nil);
+	return (docs != nil) ? docs->GetDocCount() : 0;
+}
+
+/** The Home screen standing over the open books (see gHomeTimer): close them and open them again.
+    Everything is asked and done in ONE script - app.homeScreenVisible is scripting-only. The 4-argument
+    RunScriptInEngine, as KESCL runs its script (the 9-argument one's ScriptRecordData needs a library
+    KBS does not link): it hands no value back, so the script THROWS whenever it declines - the Home
+    screen not up, a document open, no book, a book modified - and kSuccess means "reopened". */
+void LeaveHomeScreen()
+{
+	if (gLeftHomeScreen || !gOn || !gRemembered.docked)
+		return;
+	Utils<IExtendScriptUtils> utils;
+	if (!utils.Exists())
+		return;
+	PMString engine;
+	engine.SetTranslatable(kFalse);
+	engine.SetUTF8String(std::string("KohakuFindChangeBookPanel"));
+	PMString text;
+	text.SetTranslatable(kFalse);
+	text.SetUTF8String(std::string(
+		"(function () {"
+		" if (!app.homeScreenVisible) throw new Error(\"no-home\");"
+		" if (app.documents.length > 0) throw new Error(\"documents\");"
+		" if (app.books.length == 0) throw new Error(\"no-book\");"
+		" var files = [];"
+		" for (var i = 0; i < app.books.length; i++) {"
+		"  if (app.books[i].modified) throw new Error(\"modified\");"
+		"  files.push(app.books[i].fullName);"
+		" }"
+		" for (var j = app.books.length - 1; j >= 0; j--) app.books[j].close(SaveOptions.NO);"
+		" for (var k = 0; k < files.length; k++) app.open(files[k]);"
+		"})();"));
+	const ErrorCode ran = utils->RunScriptInEngine(engine, text, kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (ran == kSuccess)
+		gLeftHomeScreen = true;		// the reopening itself puts the book panel back (0 -> 1)
+}
+
+/** Home timer callback - the same rules as RestoreTimerCallback. */
+uint32 HomeTimerCallback(void* /*refPtr*/)
+{
+	LeaveHomeScreen();
+	return IIdleTask::kEndOfTime;
+}
+
+/** A visibility message with a book panel up, no document open and the placement docked: look at
+    the Home screen once the messages stop. Its own timer, so the restore's short wait is untouched. */
+void MaybeCheckHomeScreen()
+{
+	if (gLeftHomeScreen || !gRemembered.IsUsable() || !gRemembered.docked || gBookPanelCount == 0
+		|| gHomeChecks >= kKBSMaxHomeChecks || OpenDocumentCount() > 0)
+		return;
+	if (gHomeTimer == nil)
+		gHomeTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+	if (gHomeTimer == nil)
+		return;
+	++gHomeChecks;
+	gHomeTimer->StopTimer();
+	gHomeTimer->StartTimer(HomeTimerCallback, kKBSHomeCheckDelayMs, nil);
+}
+
 /** The book panel thrown out of the dock by InDesign (see kKBSBookPanelReRestoreDelayMs): remembered
     docked, and now in a floating palette that is not on show. Then the restore is armed again, with
     the longer wait - every message restarts it, so it runs once they stop. */
@@ -958,6 +1044,7 @@ void RecountAndMaybeRestore()
 	if (previous == 0 && gBookPanelCount > 0 && gRemembered.IsUsable())
 	{
 		gReRestores = 0;
+		gHomeChecks = 0;
 		ArmRestoreTimer();
 	}
 }
@@ -997,6 +1084,12 @@ void AttachObserver(bool attach)
 /** Drop a pending restore and give the timer back. The ONE place it is released. */
 void DisarmRestoreTimer()
 {
+	if (gHomeTimer != nil)
+	{
+		gHomeTimer->StopTimer();
+		gHomeTimer->Release();
+		gHomeTimer = nil;
+	}
 	if (gRestoreTimer == nil)
 		return;
 	gRestoreTimer->StopTimer();
@@ -1274,6 +1367,7 @@ void KBSBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
 
 	RecountAndMaybeRestore();
 	MaybeRestoreAgain();
+	MaybeCheckHomeScreen();
 }
 
 //----------------------------------------------------------------------------------------
