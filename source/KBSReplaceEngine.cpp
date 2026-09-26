@@ -25,6 +25,19 @@
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "ISession.h"				// GetExecutionContextSession
+// SPIKE 2026-09-26 (Track Changes on, InDesign's own Change All, the unticked rows rejected):
+#include "IBoolData.h"
+#include "IRedlineDataStrand.h"
+#include "IStringData.h"
+#include "ITrackChangesSettings.h"	// ITrackChangeStorySettings - on kTextStoryBoss
+#include "IUserInfo.h"
+#include "IWorkspace.h"
+#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetUserNameCmdBoss, kSetRedlineTrackingCmdBoss
+#include "PersistUtils.h"
+#include "redlineiterator.h"
+#include "UIDList.h"
+#include "VOSRedline.h"
+#include "textiterator.h"
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
@@ -45,6 +58,7 @@
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <vector>
@@ -502,6 +516,626 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 {
 	SetRowAt(db, rowNow[static_cast<size_t>(hitIdx)], story, start, end);
 	keptRows.push_back(hitIdx);
+}
+
+// ======================================================================================================
+// ***** SPIKE 2026-09-26: REPLACE WITH InDesign's OWN CHANGE ALL, UNDER TRACK CHANGES. *****
+//
+// Why: a replace that writes one match and then finds the next reads text it has already rewritten -
+// GREP's ^, $ and lookahead then see another document (H-5, H-8, and the mirror case of a backward
+// walk). InDesign's Change All decides every match on the ORIGINAL text before writing. It cannot be
+// told "only the ticked ones", so (the user's design, 2026-09-26) it runs over EVERY match with Track
+// Changes on, and the changes of the rows NOT ticked are then REJECTED - which puts their text back as
+// it was, objects and all - and the rest are accepted and tracking goes back off.
+//
+// Measured with DOM probes first (work/kbs-regress/probe-track-changes.jsx): a replacement leaves an
+// insertion record over the new text and a deletion record on the character after it
+// (redlineiterator.h:42-50); matches that TOUCH merge their records (one deletion for "catcatcat"),
+// and insertions next to each other split where they please. So a row whose neighbour touches it and
+// whose fate differs cannot be taken back alone, and under GREP a run of touching rows cannot be
+// split: both go to the one-at-a-time walk, before anything is written.
+//
+// ***** THE SAFETY NET: if anything read back does not line up, every change of ours is rejected - the
+// chapter is exactly as it was - and the walk runs instead. Track Changes is what makes that possible.
+//
+// Not tried (the walk runs): the Glyph tab; a story already tracking changes or already holding some
+// (whose records would be ours to tell apart - left for the user's decision).
+// ======================================================================================================
+const bool kKBSSpikeTrackReplace = true;
+PMString gKBSSpikeTrackNote;	// diagnostics for the status line: "[track]" or "[walk: <why>]"
+const char* const kKBSTrackAuthor = "KohakuFindChange";
+
+ErrorCode TrackSetUserName(const PMString& name)
+{
+	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetUserNameCmdBoss));
+	InterfacePtr<IStringData> data(cmd, IID_ISTRINGDATA);
+	if (ws == nil || cmd == nil || data == nil)
+		return kFailure;
+	data->Set(name);
+	cmd->SetItemList(UIDList(::GetUIDRef(ws)));
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return err;
+}
+
+ErrorCode TrackSetStory(const UIDRef& story, bool16 on)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetRedlineTrackingCmdBoss));
+	InterfacePtr<IBoolData> data(cmd, IID_IBOOLDATA);
+	if (cmd == nil || data == nil)
+		return kFailure;
+	data->Set(on);
+	cmd->SetItemList(UIDList(story));
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return err;
+}
+
+// The user name the changes are signed with, for the run, and back (KCMImportAuthor's shape).
+class TrackAuthor
+{
+public:
+	TrackAuthor() : fSwitched(false)
+	{
+		InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
+		InterfacePtr<IUserInfo> info(ws, UseDefaultIID());
+		if (info == nil)
+			return;
+		fOld = info->GetUserName();
+		PMString name(kKBSTrackAuthor);
+		name.SetTranslatable(kFalse);
+		fSwitched = (TrackSetUserName(name) == kSuccess);
+	}
+	~TrackAuthor() { if (fSwitched) TrackSetUserName(fOld); }
+	bool Ok() const { return fSwitched; }
+private:
+	bool fSwitched;
+	PMString fOld;
+};
+
+IRedlineDataStrand* TrackQueryRedline(const UIDRef& story)
+{
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (model == nil)
+		return nil;
+	return static_cast<IRedlineDataStrand*>(model->QueryStrand(kRedlineStrandBoss, IRedlineDataStrand::kDefaultIID));
+}
+
+struct TrackRecord
+{
+	TextIndex	at;
+	int32		len;		// an insertion's length; 1 for a deletion (the character it sits on)
+	bool		isDelete;
+};
+
+bool TrackIsOurs(RedlineIterator* it)
+{
+	PMString who;
+	it->DescribeUser(who);
+	PMString ours(kKBSTrackAuthor);
+	ours.SetTranslatable(kFalse);
+	return who == ours;
+}
+
+// Every change of ours in the story, in position order.
+void TrackCollect(const UIDRef& story, std::vector<TrackRecord>& out)
+{
+	out.clear();
+	InterfacePtr<IRedlineDataStrand> redline(TrackQueryRedline(story));
+	if (redline == nil || !redline->StoryHasChanges())
+		return;
+	RedlineIterator* it = redline->NewRedlineIterator(0);
+	if (it == nil)
+		return;
+	for (bool16 more = kTrue; more; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+		if (!TrackIsOurs(it))
+			continue;
+		TrackRecord r;
+		r.at = at;
+		r.len = len;
+		r.isDelete = isDelete;
+		out.push_back(r);
+	}
+	delete it;
+}
+
+// Reject every change of ours standing AT `position` (an insertion and a deletion can share one).
+int32 TrackRejectAt(const UIDRef& story, TextIndex position)
+{
+	InterfacePtr<IRedlineDataStrand> redline(TrackQueryRedline(story));
+	if (redline == nil)
+		return 0;
+	int32 done = 0;
+	for (int32 guard = 0; guard < 100; ++guard)
+	{
+		RedlineIterator* it = redline->NewRedlineIterator(position);
+		if (it == nil)
+			break;
+		bool found = false;
+		for (bool16 more = kTrue; more && it->GetCurrentPosition() <= position; more = it->Increment(kFalse))
+		{
+			if (it->GetCurrentPosition() != position)
+				continue;
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+			if (record == nil)
+				continue;
+			delete record;
+			if (TrackIsOurs(it))
+			{
+				found = true;
+				break;
+			}
+		}
+		const bool ok = found && it->ProcessReject(nil, kFalse, kFalse);
+		delete it;
+		if (!ok)
+			break;
+		++done;
+	}
+	return done;
+}
+
+// Every change in the story, accepted or rejected at once (only used on a story that held none
+// before the run, so "every change" is "every change of ours").
+void TrackAll(const UIDRef& story, bool accept)
+{
+	InterfacePtr<IRedlineDataStrand> redline(TrackQueryRedline(story));
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (redline == nil || model == nil)
+		return;
+	for (int32 guard = 0; guard < 100000 && redline->StoryHasChanges(); ++guard)
+	{
+		RedlineIterator* it = redline->NewRedlineIterator(0);
+		if (it == nil)
+			break;
+		bool ok = false;
+		for (bool16 more = kTrue; more; more = it->Increment(kFalse))
+		{
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+			if (record == nil)
+				continue;
+			delete record;
+			ok = accept ? it->ProcessAccept(nil, kFalse, kFalse) : it->ProcessReject(nil, kFalse, kFalse);
+			break;
+		}
+		delete it;
+		if (!ok)
+			break;
+	}
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+}
+
+struct TrackRow
+{
+	int32		hitIdx;
+	bool		target;		// ticked (and not locked): its change is KEPT
+	bool		kept;		// a locked row the report keeps - carried, never written
+	UID			story;
+	UID			dict;
+	uint32		key;
+	TextIndex	offset;		// into its thread, as the search found it
+	int32		length;
+	int32		newLen;		// filled from the records: the text the replacement wrote (0 = deleted)
+	bool		changed;	// Change All wrote here
+};
+
+bool TrackRowBefore(const TrackRow& a, const TrackRow& b)
+{
+	if (a.story != b.story) return a.story.Get() < b.story.Get();
+	if (a.dict != b.dict) return a.dict.Get() < b.dict.Get();
+	if (a.key != b.key) return a.key < b.key;
+	return a.offset < b.offset;
+}
+
+bool TrackSameThread(const TrackRow& a, const TrackRow& b)
+{
+	return a.story == b.story && a.dict == b.dict && a.key == b.key;
+}
+
+bool TrackTouches(const TrackRow& a, const TrackRow& b)	// a before b
+{
+	return TrackSameThread(a, b) && a.offset + a.length >= b.offset;
+}
+
+bool TrackThreadStart(IDataBase* db, const TrackRow& r, TextIndex& outStart)
+{
+	InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+	return model != nil && model->FindStoryThread(r.dict, r.key, &outStart, nil);
+}
+
+bool ReplaceInChapterByTracking(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	int32& outReplaced, int32& outMissing, int32& outLocked, bool& outWalkFailed, PMString& outWhyNot)
+{
+	outReplaced = 0;
+	outMissing = 0;
+	outLocked = 0;
+	outWalkFailed = false;
+	outWhyNot.Clear();
+	outWhyNot.SetTranslatable(kFalse);
+
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (db == nil || opts == nil)
+	{
+		outWhyNot = "no db/options";
+		return false;
+	}
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+	{
+		outWhyNot = "not Text/GREP";
+		return false;
+	}
+
+	// ----- every row of the chapter: Change All will write to all of them (except locked text) -----
+	std::vector<TrackRow> rows;
+	std::set<UID> stories;
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	std::map<std::pair<UID, UID>, bool> editableFrames;
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		bool checked = false, replaced = false, locked = false;
+		if (!KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked))
+		{
+			outWhyNot = "a row without flags";
+			return false;
+		}
+		if (replaced)
+		{
+			outWhyNot = "a row already replaced";
+			return false;
+		}
+		TrackRow r;
+		r.hitIdx = i;
+		r.target = checked;
+		r.kept = locked && !checked;
+		r.newLen = 0;
+		r.changed = false;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, r.story, start, end, hash))
+		{
+			outWhyNot = "a row without identity";
+			return false;
+		}
+		TextIndex threadStart = kInvalidTextIndex;
+		if (!ThreadAt(db, r.story, start, r.dict, r.key, threadStart))
+		{
+			outWhyNot = "a row without a thread";
+			return false;
+		}
+		r.offset = start - threadStart;
+		r.length = end - start;
+		if (r.target)
+		{
+			const UIDRef storyRef(db, r.story);
+			const UID frameUID = KBSSearchEngine::EditableFrameForMatch(storyRef, start);
+			const std::pair<UID, UID> frameKey(r.story, frameUID);
+			std::map<std::pair<UID, UID>, bool>::const_iterator known = editableFrames.find(frameKey);
+			bool editable = false;
+			if (known != editableFrames.end())
+				editable = known->second;
+			else
+				editableFrames[frameKey] = editable = KBSSearchEngine::IsFrameEditable(storyRef, frameUID);
+			if (!editable)
+				r.target = false;		// searched, never changed: counted as locked below
+		}
+		rows.push_back(r);
+		stories.insert(r.story);
+	}
+	std::sort(rows.begin(), rows.end(), TrackRowBefore);
+
+	// ----- what cannot be told apart afterwards goes to the walk, BEFORE anything is written -----
+	for (size_t i = 1; i < rows.size(); ++i)
+	{
+		if (!TrackTouches(rows[i - 1], rows[i]))
+			continue;
+		// Touching rows share their records. When both are ticked nothing has to be taken back - only
+		// each row's new place is unknown, and that is read back below (a GREP group that wrote text
+		// cannot be split, and then the safety net rejects everything and the walk runs).
+		if (rows[i - 1].target != rows[i].target)
+		{
+			outWhyNot = "touching rows, one ticked and one not";
+			return false;
+		}
+	}
+	for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+	{
+		const UIDRef storyRef(db, *st);
+		InterfacePtr<ITrackChangeStorySettings> settings(storyRef, UseDefaultIID());
+		InterfacePtr<IRedlineDataStrand> redline(TrackQueryRedline(storyRef));
+		if (settings == nil || redline == nil)
+		{
+			outWhyNot = "no track-changes interfaces";
+			return false;
+		}
+		if (settings->GetIsTracking() || redline->StoryHasChanges())
+		{
+			outWhyNot = "a story already tracking or holding changes";
+			return false;
+		}
+	}
+	// ***** NO OBJECT CHARACTERS IN ANY ROW (measured 2026-09-26, probe-track-footnote.jsx). ***** Under
+	// Track Changes, deleting a footnote's reference character records THAT deletion and nothing of
+	// what the same Change All did inside the footnote: rejecting every change brought the footnotes
+	// back without their number characters and without the "cat" deleted in one of them. So Track
+	// Changes cannot take back a replace that touches an object, and the safety net would not hold -
+	// such a chapter goes to the walk. The characters: footnote / endnote reference (0x04 / 0x05),
+	// table anchor and continuation (0x16 / 0x17), variables and page numbers (0x18 / 0x19), anchored
+	// objects (0xFFFC), notes and XML tags (0xFEFF).
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const TrackRow& r = rows[i];
+		InterfacePtr<ITextModel> model(db, r.story, UseDefaultIID());
+		TextIndex threadStart = kInvalidTextIndex;
+		if (model == nil || !model->FindStoryThread(r.dict, r.key, &threadStart, nil))
+		{
+			outWhyNot = "a thread gone";
+			return false;
+		}
+		TextIterator it(model, threadStart + r.offset);
+		for (int32 k = 0; k < r.length && !it.IsNull(); ++k, ++it)
+		{
+			const uint32 c = (*it).GetValue();
+			if (c == 0x04 || c == 0x05 || c == 0x16 || c == 0x17 || c == 0x18 || c == 0x19
+				|| c == 0xFFFC || c == 0xFEFF)
+			{
+				outWhyNot = "a row holds an object character";
+				return false;
+			}
+		}
+	}
+
+	int32 targets = 0;
+	for (size_t i = 0; i < rows.size(); ++i)
+		if (rows[i].target)
+			++targets;
+	if (targets == 0)
+	{
+		outWhyNot = "nothing to write";
+		return false;		// the walk counts the locked ones as it always has
+	}
+
+	// ===== from here on things are WRITTEN. Every exit below goes through `putBack` or finishes. =====
+	for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+		TrackSetStory(UIDRef(db, *st), kTrue);
+
+	int32 replacementCount = 0;
+	bool ranChangeAll = false;
+	{
+		TrackAuthor author;
+		InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
+		InterfacePtr<IK2ServiceProvider> provider(registry != nil
+			? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
+		InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
+		InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
+		InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+		if (author.Ok() && walker != nil && scope != nil && client != nil)
+		{
+			if (walker->IsWalking())
+				walker->Halt();
+			walker->Initialize(client, scope, opts, nil);
+			InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
+			if (selUtils != nil)
+			{
+				const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+				InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceAllTextCmdBoss));
+				InterfacePtr<IFindChangeCmdData> cmdData(cmd, UseDefaultIID());
+				if (cmdData != nil)
+				{
+					cmdData->SetTextWalker(walker);
+					if (CmdUtils::ProcessCommand(cmd) == kSuccess)
+					{
+						ranChangeAll = true;
+						replacementCount = cmdData->GetReplacementCount();
+					}
+					ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+				}
+			}
+			if (walker->IsWalking())
+				walker->Halt();
+		}
+	}
+
+	// ----- read the records back, row by row, in thread order -----
+	bool linedUp = ranChangeAll;
+	int32 changedRows = 0;
+	std::map<UID, std::vector<TrackRecord> > records;
+	for (std::set<UID>::const_iterator st = stories.begin(); linedUp && st != stories.end(); ++st)
+		TrackCollect(UIDRef(db, *st), records[*st]);
+	std::set<std::pair<UID, TextIndex> > claimed;	// (story, record position) a row has accounted for
+	std::map<std::pair<UID, std::pair<UID, uint32> >, TextIndex> moved;	// per thread: what the rows so far did
+	for (size_t i = 0; linedUp && i < rows.size(); )
+	{
+		// a group: this row and those touching it (Text tab only - GREP groups went to the walk)
+		size_t j = i + 1;
+		while (j < rows.size() && TrackTouches(rows[j - 1], rows[j]))
+			++j;
+		TrackRow& first = rows[i];
+		const std::pair<UID, std::pair<UID, uint32> > threadKey(first.story, std::make_pair(first.dict, first.key));
+		TextIndex threadStart = kInvalidTextIndex;
+		if (!TrackThreadStart(db, first, threadStart))
+		{
+			linedUp = false;
+			break;
+		}
+		const TextIndex s = threadStart + first.offset + moved[threadKey];
+		const std::vector<TrackRecord>& recs = records[first.story];
+		// the insertion: our insertion records that follow on from s without a gap
+		int32 ins = 0;
+		for (bool grew = true; grew; )
+		{
+			grew = false;
+			for (size_t k = 0; k < recs.size(); ++k)
+			{
+				if (!recs[k].isDelete && recs[k].at == s + ins && recs[k].len > 0)
+				{
+					claimed.insert(std::make_pair(first.story, recs[k].at));
+					ins += recs[k].len;
+					grew = true;
+				}
+			}
+		}
+		bool del = false;
+		for (size_t k = 0; k < recs.size(); ++k)
+			if (recs[k].isDelete && recs[k].at == s + ins)
+				del = true;
+		int32 groupLen = 0;
+		for (size_t k = i; k < j; ++k)
+			groupLen += rows[k].length;
+		const bool changed = (ins > 0) || del;
+		if (changed && groupLen > 0 && !del)
+		{
+			linedUp = false;	// text was there and replaced, but no deletion where it stood
+			break;
+		}
+		if (del)
+			claimed.insert(std::make_pair(first.story, s + ins));
+		const int32 groupSize = static_cast<int32>(j - i);
+		if (changed && groupSize > 1 && ins > 0 && mode == IFindChangeOptions::kGrepSearch)
+		{
+			linedUp = false;	// GREP rows touching that wrote text: where one ends and the next begins is unknown
+			break;
+		}
+		if (changed && (ins % groupSize) != 0)
+		{
+			linedUp = false;	// a Text-tab group's replacements must be one length
+			break;
+		}
+		for (size_t k = i; k < j; ++k)
+		{
+			rows[k].changed = changed;
+			rows[k].newLen = changed ? ins / groupSize : rows[k].length;
+			if (changed)
+				++changedRows;
+		}
+		moved[threadKey] += changed ? (ins - groupLen) : 0;
+		i = j;
+	}
+	// every record of ours must belong to a row - one that does not is a match nobody listed
+	for (std::map<UID, std::vector<TrackRecord> >::const_iterator st = records.begin(); linedUp && st != records.end(); ++st)
+		for (size_t k = 0; k < st->second.size(); ++k)
+			if (claimed.find(std::make_pair(st->first, st->second[k].at)) == claimed.end())
+				linedUp = false;
+
+	if (!linedUp)
+	{
+		// ***** THE SAFETY NET: reject everything of ours - the chapter is as it was - and walk. *****
+		for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+			TrackAll(UIDRef(db, *st), false);
+		for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+			TrackSetStory(UIDRef(db, *st), kFalse);
+		outWhyNot = ranChangeAll ? "records did not line up (all rejected)" : "Change All did not run (all rejected)";
+		return false;
+	}
+
+	// ----- the rows NOT ticked go back: rejected from the last to the first, so no position moves -----
+	// Positions are those of the text as Change All left it (every row replaced).
+	{
+		std::vector<std::pair<UID, TextIndex> > rejectAt;	// positions, collected in order
+		std::map<std::pair<UID, std::pair<UID, uint32> >, TextIndex> cum;
+		for (size_t i = 0; i < rows.size(); ++i)
+		{
+			TrackRow& r = rows[i];
+			const std::pair<UID, std::pair<UID, uint32> > threadKey(r.story, std::make_pair(r.dict, r.key));
+			TextIndex threadStart = kInvalidTextIndex;
+			TrackThreadStart(db, r, threadStart);
+			const TextIndex s = threadStart + r.offset + cum[threadKey];
+			if (r.changed && !r.target)
+			{
+				rejectAt.push_back(std::make_pair(r.story, s));				// the insertion
+				rejectAt.push_back(std::make_pair(r.story, s + r.newLen));	// the deletion after it
+			}
+			cum[threadKey] += r.changed ? (r.newLen - r.length) : 0;
+		}
+		std::sort(rejectAt.begin(), rejectAt.end());
+		rejectAt.erase(std::unique(rejectAt.begin(), rejectAt.end()), rejectAt.end());
+		for (size_t k = rejectAt.size(); k-- > 0; )
+			TrackRejectAt(UIDRef(db, rejectAt[k].first), rejectAt[k].second);
+	}
+
+	// ----- what is left is the ticked rows: accepted, and tracking goes back off -----
+	for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+		TrackAll(UIDRef(db, *st), true);
+	for (std::set<UID>::const_iterator st = stories.begin(); st != stories.end(); ++st)
+		TrackSetStory(UIDRef(db, *st), kFalse);
+
+	// ----- the rows, where their text stands now: only the ticked rows moved anything -----
+	{
+		std::map<std::pair<UID, std::pair<UID, uint32> >, TextIndex> cum;
+		for (size_t i = 0; i < rows.size(); ++i)
+		{
+			TrackRow& r = rows[i];
+			const std::pair<UID, std::pair<UID, uint32> > threadKey(r.story, std::make_pair(r.dict, r.key));
+			TextIndex threadStart = kInvalidTextIndex;
+			if (!TrackThreadStart(db, r, threadStart))
+				continue;
+			const TextIndex s = threadStart + r.offset + cum[threadKey];
+			const UIDRef storyRef(db, r.story);
+			bool checked = false, replaced = false, locked = false;
+			KBSResultModel::GetHitFlags(chapterIdx, r.hitIdx, checked, replaced, locked);
+			if (r.target)
+			{
+				if (r.changed)
+				{
+					KBSResultModel::MarkHitReplaced(chapterIdx, r.hitIdx, r.story, s, s + r.newLen);
+					++outReplaced;
+				}
+				else
+				{
+					++outMissing;
+					KBSResultModel::SetHitOutcome(chapterIdx, r.hitIdx, KBSResultModel::kOutcomeMissing);
+				}
+			}
+			else
+			{
+				if (checked)
+				{
+					++outLocked;	// ticked, but on a locked layer or in a locked story
+					KBSResultModel::SetHitOutcome(chapterIdx, r.hitIdx, KBSResultModel::kOutcomeLocked);
+				}
+				if (checked || r.kept)
+					KBSResultModel::SetHitRange(chapterIdx, r.hitIdx, r.story, s, s + r.length);
+			}
+			if (r.target && r.changed)
+				cum[threadKey] += r.newLen - r.length;
+			// the rows the report keeps read their final line
+			if (r.target || r.kept || checked)
+			{
+				UID story = kInvalidUID;
+				TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+				uint64 h = 0;
+				if (KBSResultModel::GetHitMatchIdentity(chapterIdx, r.hitIdx, story, a, b, h))
+				{
+					PMString pre, match, post;
+					KBSSearchEngine::SplitLineAroundMatch(UIDRef(db, story), a, b, pre, match, post);
+					KBSResultModel::SetHitSegments(chapterIdx, r.hitIdx, pre, match, post,
+						KBSSearchEngine::HashMatchText(UIDRef(db, story), a, b));
+				}
+			}
+		}
+	}
+
+	gKBSSpikeTrackNote = "track";
+	if (replacementCount != changedRows)
+	{
+		gKBSSpikeTrackNote.Append(" count=");
+		gKBSSpikeTrackNote.AppendNumber(replacementCount);
+		gKBSSpikeTrackNote.Append("/");
+		gKBSSpikeTrackNote.AppendNumber(changedRows);
+	}
+	return true;
 }
 
 // Replace this chapter's checked hits. Returns how many were replaced.
@@ -1140,7 +1774,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 //
 // Every checked hit that was not replaced is named here rather than being allowed to make the total
 // quietly come up short. That rule is what most of these branches exist for.
-void BuildSummary(const RunTotals& t, PMString& outSummary)
+void BuildSummaryBody(const RunTotals& t, PMString& outSummary)
 {
 	// ***** A cancel is absolute. ***** The whole run is one command sequence and a cancel aborts
 	// it, so the text goes back and the panel goes back with it - there is nothing left to account
@@ -1287,6 +1921,18 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// which only the chapter-at-a-time path could produce. This path wraps the whole run in a single
 	// sequence, so there is no such thing here as one chapter going back on its own - an error
 	// standing at the end takes every chapter with it, and the cancel sentence above covers that.
+}
+
+// SPIKE: the status line, with how the last chapter was written at its end.
+void BuildSummary(const RunTotals& t, PMString& outSummary)
+{
+	BuildSummaryBody(t, outSummary);
+	if (!gKBSSpikeTrackNote.IsEmpty())
+	{
+		outSummary.Append(" [");
+		outSummary.Append(gKBSSpikeTrackNote);
+		outSummary.Append("]");
+	}
 }
 
 // ***** HAND BACK EVERY CHAPTER THIS RUN OPENED AND THEN LEFT NOTHING IN. *****
@@ -1655,6 +2301,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 {
+	gKBSSpikeTrackNote.Clear();	// SPIKE diagnostics
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
@@ -2209,8 +2856,23 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		int32 missing = 0;
 		int32 locked = 0;
 		int32 refused = 0;
-		const int32 replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
-			refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
+		// SPIKE: InDesign's own Change All under Track Changes first; the one-at-a-time walk when that
+		// cannot be used (the status line says why).
+		int32 replaced = 0;
+		bool byTracking = false;
+		if (kKBSSpikeTrackReplace)
+		{
+			PMString whyNot;
+			byTracking = ReplaceInChapterByTracking(ci, docRef, scopeOptions, replaced, missing, locked, walkFailed, whyNot);
+			if (!byTracking)
+			{
+				gKBSSpikeTrackNote = "walk: ";
+				gKBSSpikeTrackNote.Append(whyNot);
+			}
+		}
+		if (!byTracking)
+			replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
+				refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
 		progressBase += chapterChecked;
 		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
 		// line up) must still hand the bar on at the right place.
