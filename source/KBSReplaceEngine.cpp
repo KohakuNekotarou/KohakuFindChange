@@ -495,6 +495,38 @@ int32 WalkOrderOfMatch(IDataBase* db, const std::vector<RowNow>& rowNow,
 	return -1;
 }
 
+// ***** SPIKE 2026-09-26: THE WRITING PASS WALKS BACKWARDS (user's request, for accuracy). *****
+// The search and the verify pass walk the way the dialog says; the pass that WRITES walks from the
+// end of each story, so a replacement only ever changes text the walk has already passed. The walk
+// order then no longer runs the way the rows were numbered, so a match is recognised by its place
+// alone: the pending row in the same thread, at the same offset, with the same length. None - a match
+// nobody listed (a backward walk finds some a forward one does not) - is stepped over; a row that
+// never comes up is left in targets and counted missing, as before.
+const bool kKBSSpikeBackwardWrite = true;
+
+// Which direction the writing pass actually went, for the status line (spike diagnostics only).
+PMString gKBSSpikeWalkNote;
+
+int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const std::set<int32>& pendingRows,
+	UID story, TextIndex start, TextIndex end)
+{
+	UID dict = kInvalidUID;
+	uint32 key = 0;
+	TextIndex threadStart = kInvalidTextIndex;
+	if (!ThreadAt(db, story, start, dict, key, threadStart))
+		return -1;
+	const TextIndex offset = start - threadStart;
+	const int32 length = end - start;
+	for (std::set<int32>::const_iterator it = pendingRows.begin(); it != pendingRows.end(); ++it)
+	{
+		const RowNow& row = rowNow[static_cast<size_t>(*it)];
+		if (row.known && row.story == story && row.threadDict == dict && row.threadKey == key
+			&& row.offset == offset && row.length == length)
+			return *it;
+	}
+	return -1;
+}
+
 // The walk has dealt with a row the report keeps (replaced, locked, refused): put it where its text
 // stands now and name it for the read-back after the walk.
 void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& keptRows, int32 hitIdx,
@@ -593,6 +625,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	// at the last checked row before ever reaching it.
 	std::vector<int32> keptRows;
 
+	// SPIKE (backward write): the rows not yet met by the writing walk, and each row's walk order.
+	std::set<int32> pendingRows;
+	std::vector<int32> walkOrderOfRow;
+	if (!verifyOnly && hitCount > 0)
+		walkOrderOfRow.assign(static_cast<size_t>(hitCount), -1);
+
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
@@ -639,6 +677,9 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		uint64 rowHash = 0;
 		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, storyUID, rowStart, rowEnd, rowHash))
 			SetRowAt(docRef.GetDataBase(), rowNow[static_cast<size_t>(i)], storyUID, rowStart, rowEnd);
+		walkOrderOfRow[static_cast<size_t>(i)] = walkOrder;
+		if (rowNow[static_cast<size_t>(i)].known)
+			pendingRows.insert(i);
 
 		// A locked row the report will keep (it never had a box, so it is never checked).
 		if (haveFlags && locked && !replaced && !checked && rowNow[static_cast<size_t>(i)].known)
@@ -703,7 +744,12 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 	if (walker->IsWalking())
 		walker->Halt();
 
-	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
+	// SPIKE: the writing pass asks for a backward walk through the scope options (route A - the
+	// user's Find/Change settings are not touched). Whether the walker honours it is measured below.
+	WalkerScopeOptions walkOptions(scopeOptions);
+	if (!verifyOnly && kKBSSpikeBackwardWrite)
+		walkOptions.SetSearchBackwards(kTrue);
+	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, walkOptions));
 	if (scope == nil)
 	{
 		outNotWalked = true;
@@ -762,6 +808,8 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 
 	int32 walkIndex = 0;
 	int32 replacedCount = 0;
+	UID spikeDirStory = kInvalidUID;			// SPIKE diagnostics - see gKBSSpikeWalkNote
+	TextIndex spikeDirFirst = kInvalidTextIndex;
 
 	// The range the last replacement wrote, so a match INSIDE it can be recognised.
 	UID lastReplStory = kInvalidUID;
@@ -844,11 +892,34 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		// search met, and it has its own test (the start of each ticked row) a few lines below.
 		if (!verifyOnly)
 		{
-			const int32 matchWalkOrder = WalkOrderOfMatch(docRef.GetDataBase(), rowNow, rowByWalkOrder, walkIndex,
-				story.GetUID(), start, end);
-			if (matchWalkOrder < 0)
-				continue;
-			walkIndex = matchWalkOrder;
+			// SPIKE diagnostics: two finds in a row in the same story say which way the walk went.
+			if (spikeDirStory == kInvalidUID)
+			{
+				spikeDirStory = story.GetUID();
+				spikeDirFirst = start;
+			}
+			else if (gKBSSpikeWalkNote.IsEmpty() && story.GetUID() == spikeDirStory && start != spikeDirFirst)
+			{
+				gKBSSpikeWalkNote = (start < spikeDirFirst) ? "backward" : "forward";
+			}
+
+			if (kKBSSpikeBackwardWrite)
+			{
+				const int32 hitRow = RowOfMatchAnyOrder(docRef.GetDataBase(), rowNow, pendingRows,
+					story.GetUID(), start, end);
+				if (hitRow < 0)
+					continue;
+				pendingRows.erase(hitRow);
+				walkIndex = walkOrderOfRow[static_cast<size_t>(hitRow)];
+			}
+			else
+			{
+				const int32 matchWalkOrder = WalkOrderOfMatch(docRef.GetDataBase(), rowNow, rowByWalkOrder, walkIndex,
+					story.GetUID(), start, end);
+				if (matchWalkOrder < 0)
+					continue;
+				walkIndex = matchWalkOrder;
+			}
 		}
 
 		// An unselected hit is counted past. ReplaceChecked ends by turning the panel into a report
@@ -1140,7 +1211,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 //
 // Every checked hit that was not replaced is named here rather than being allowed to make the total
 // quietly come up short. That rule is what most of these branches exist for.
-void BuildSummary(const RunTotals& t, PMString& outSummary)
+void BuildSummaryBody(const RunTotals& t, PMString& outSummary)
 {
 	// ***** A cancel is absolute. ***** The whole run is one command sequence and a cancel aborts
 	// it, so the text goes back and the panel goes back with it - there is nothing left to account
@@ -1287,6 +1358,18 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// which only the chapter-at-a-time path could produce. This path wraps the whole run in a single
 	// sequence, so there is no such thing here as one chapter going back on its own - an error
 	// standing at the end takes every chapter with it, and the cancel sentence above covers that.
+}
+
+// SPIKE: the status line, with the writing walk's measured direction at its end.
+void BuildSummary(const RunTotals& t, PMString& outSummary)
+{
+	BuildSummaryBody(t, outSummary);
+	if (!gKBSSpikeWalkNote.IsEmpty())
+	{
+		outSummary.Append(" [walk:");
+		outSummary.Append(gKBSSpikeWalkNote);
+		outSummary.Append("]");
+	}
 }
 
 // ***** HAND BACK EVERY CHAPTER THIS RUN OPENED AND THEN LEFT NOTHING IN. *****
@@ -1655,6 +1738,7 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 {
+	gKBSSpikeWalkNote.Clear();	// SPIKE diagnostics
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
