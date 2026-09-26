@@ -143,8 +143,11 @@ namespace KBSTrackChange
 	bool FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
 		TextIndex nearAt, Change& out);
 
-	/** The time stamp of the records of ours standing in [from, to] - the newest, 0 when none. What a
-	    replaced row keeps (Hit::recordTime) so its change is found among that run's alone. */
+	/** The time stamp of the row's own record of ours: the insertion starting at `from` when the replace
+	    wrote text (to > from), else the one deletion standing at `from`; 0 when none, or when two
+	    deletions stand there. What a replaced row keeps (Hit::recordTime) so its change is found among
+	    that replace's alone. NOT the newest in [from, to]: a touching neighbour's deletion stands at
+	    `from` with its own time (2026-09-27). */
 	uint64 RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to);
 
 	/** A REPLACED row put where its tracked change stands now - range, line and hash - so an edit

@@ -573,11 +573,32 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 
 uint64 KBSTrackChange::RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to)
 {
+	// ***** THE ROW'S OWN RECORD, NOT THE NEWEST IN THE RANGE (2026-09-27). ***** Every replace of one Change
+	// All carries its own time (about 9 ms apart - rangelog-2026-09-26.txt), and a touching neighbour's
+	// DELETION stands at this row's first position ("DEL at=1 ...283696" beside "INS at=1 ...193368").
+	// "The newest in [from, to]" took the neighbour's time whenever the clock ticked between the two, and
+	// the row's change was then never found again (Reject Change grey, the jump by fingerprint only).
 	std::vector<Record> recs;
 	CollectRecords(story, recs);
-	uint64 newest = 0;
+	if (to > from)
+	{
+		// the replace wrote text: its insertion starts at the row
+		for (size_t k = 0; k < recs.size(); ++k)
+			if (!recs[k].isDelete && recs[k].at == from && recs[k].len > 0)
+				return recs[k].time;
+		return 0;
+	}
+	// it wrote nothing: its deletion stands at the row - unless another deletion stands there too, when
+	// which is whose cannot be told (0 = the change is found without the time)
+	uint64 time = 0;
+	int32 found = 0;
 	for (size_t k = 0; k < recs.size(); ++k)
-		if (recs[k].at >= from && recs[k].at <= to && recs[k].time > newest)
-			newest = recs[k].time;
-	return newest;
+	{
+		if (recs[k].isDelete && recs[k].at == from)
+		{
+			time = recs[k].time;
+			++found;
+		}
+	}
+	return (found == 1) ? time : 0;
 }

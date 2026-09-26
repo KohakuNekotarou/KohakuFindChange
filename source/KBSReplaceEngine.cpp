@@ -711,6 +711,22 @@ bool AlignFootnoteFrom(const std::vector<UTF32TextChar>& before, const std::vect
 	return false;
 }
 
+// ***** A REPLACE THAT WOULD WRITE AT AN ENDNOTE'S END (2026-09-27). ***** InDesign's replace - Change All,
+// changeText, one write over a range - that writes at the END of an endnote leaves the endnote's range
+// (IDML EndnoteRange) ending short, and the character before the overhang can never be deleted again
+// (measured, work/kbs-regress/probe-endnote-*-0927.jsx; no Track Changes needed). True = `matchEnd` is in
+// the endnote story (kEndnoteStoryBoss - SnpManipulateTextEndnotes::IsEndnoteStory) and the code point
+// there is the U+FEFF an endnote ends with. Asked by the replace (per row, before anything is written)
+// and by Redo (the row's text may have been moved to an endnote's end since).
+bool MatchEndsAnEndnote(const UIDRef& story, TextIndex matchEnd)
+{
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (model == nil || ::GetClass(model) != kEndnoteStoryBoss || matchEnd < 0 || matchEnd >= model->TotalLength())
+		return false;
+	TextIterator it(model, matchEnd);
+	return !it.IsNull() && (*it).GetValue() == kTextChar_ZeroSpaceNoBreak;
+}
+
 // One footnote's rows (rows[i, j), one thread): changed / newLen from its text before and after the
 // write. The footnote gone = its rows are marked gone (it went with its reference, deleted by a
 // ticked row - footnote rows are all ticked) and that is not a failure. False = the text cannot be
@@ -1233,20 +1249,9 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	// endnote story is. Any row counts, ticked or not - an unticked row is written too, then taken back.
 	std::set<UID> endnoteStoriesLeft;
 	for (size_t i = 0; i < rows.size(); ++i)
-	{
-		if (endnoteStoriesLeft.count(rows[i].story) != 0)
-			continue;
-		InterfacePtr<ITextModel> model(db, rows[i].story, UseDefaultIID());
-		if (model == nil || ::GetClass(model) != kEndnoteStoryBoss)
-			continue;
-		const TextIndex after = rows[i].absBefore + rows[i].length;
-		if (after < model->TotalLength())
-		{
-			TextIterator it(model, after);
-			if (!it.IsNull() && (*it).GetValue() == kTextChar_ZeroSpaceNoBreak)
-				endnoteStoriesLeft.insert(rows[i].story);
-		}
-	}
+		if (endnoteStoriesLeft.count(rows[i].story) == 0
+			&& MatchEndsAnEndnote(UIDRef(db, rows[i].story), rows[i].absBefore + rows[i].length))
+			endnoteStoriesLeft.insert(rows[i].story);
 	for (size_t i = 0; i < rows.size(); ++i)
 	{
 		if (endnoteStoriesLeft.count(rows[i].story) == 0)
@@ -3713,7 +3718,9 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	}
 	outStatus = "Accepted ";
 	outStatus.AppendNumber(accepted);
-	outStatus.Append(" change(s) of this replace in the document - they can no longer be rejected here. Other people's changes are left as they are.");
+	// "Kohaku Find/Change's", not "this replace's": every record signed kAuthor in the document is
+	// accepted, an earlier run's included.
+	outStatus.Append(" change(s) made by Kohaku Find/Change in the document - they can no longer be rejected here. Other people's changes are left as they are.");
 	return true;
 }
 
@@ -3812,6 +3819,12 @@ bool KBSReplaceEngine::RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStat
 			{
 				same = false;
 				why = "the text of a row is not its original text any more";
+				break;
+			}
+			if (MatchEndsAnEndnote(storyRef, end))
+			{
+				same = false;
+				why = "the row now ends an endnote, and InDesign's replace breaks an endnote there";
 				break;
 			}
 			InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
