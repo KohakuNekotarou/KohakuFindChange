@@ -96,6 +96,9 @@ namespace
 	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
 	// negative values it can hold.
 	int32 gContextMenuChapter = KBSResultModel::kNoContextMenuChapter;
+	// ...and which HIT row, for the hit row's own menu (Reject Change / Redo, 2026-09-26). -1 = none.
+	int32 gContextMenuHitChapter = -1;
+	int32 gContextMenuHit = -1;
 
 	// Does this row carry a check box? THE one definition of the question, so the commands that set
 	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
@@ -241,6 +244,8 @@ void KBSResultModel::Clear()
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	gContextMenuChapter = kNoContextMenuChapter;
+	gContextMenuHitChapter = -1;
+	gContextMenuHit = -1;
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
 }
@@ -592,6 +597,7 @@ namespace
 			case KBSResultModel::kOutcomeMissing:	return "missing";
 			case KBSResultModel::kOutcomeLocked:	return "locked";
 			case KBSResultModel::kOutcomeRefused:	return "refused";
+			case KBSResultModel::kOutcomeRejected:	return "rejected";
 			case KBSResultModel::kOutcomeNone:		break;
 		}
 		return "";
@@ -648,6 +654,8 @@ namespace
 			AppendWord(flags, "missing");
 		else if (hit.outcome == KBSResultModel::kOutcomeRefused)
 			AppendWord(flags, "refused");
+		else if (hit.outcome == KBSResultModel::kOutcomeRejected)
+			AppendWord(flags, "rejected");
 		if (hit.replaced)
 			AppendWord(flags, "replaced");
 		return flags;
@@ -1109,6 +1117,99 @@ int32 KBSResultModel::GetContextMenuChapter()
 	return gContextMenuChapter;
 }
 
+void KBSResultModel::SetContextMenuHit(int32 chapterIdx, int32 hitIdx)
+{
+	gContextMenuHitChapter = chapterIdx;
+	gContextMenuHit = hitIdx;
+}
+
+bool KBSResultModel::GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx)
+{
+	if (gContextMenuHitChapter < 0 || gContextMenuHitChapter >= static_cast<int32>(gChapters.size()))
+		return false;
+	if (gContextMenuHit < 0 || gContextMenuHit >= static_cast<int32>(gChapters[gContextMenuHitChapter].hits.size()))
+		return false;
+	outChapterIdx = gContextMenuHitChapter;
+	outHitIdx = gContextMenuHit;
+	return true;
+}
+
+KBSResultModel::ChangeOutcome KBSResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return kOutcomeNone;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return kOutcomeNone;
+	return c.hits[hitIdx].outcome;
+}
+
+void KBSResultModel::SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
+	const PMString& replacedText)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.originalText = originalText;	h.originalText.SetTranslatable(kFalse);
+	h.replacedText = replacedText;	h.replacedText.SetTranslatable(kFalse);
+}
+
+bool KBSResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
+	PMString& outReplacedText)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return false;
+	const Hit& h = c.hits[hitIdx];
+	if (!h.replaced && h.outcome != kOutcomeRejected)
+		return false;
+	outOriginalText = h.originalText;
+	outReplacedText = h.replacedText;
+	return true;
+}
+
+void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.storyUID = storyUID;
+	h.textStart = start;
+	h.textEnd = end;
+	h.replaced = false;
+	h.checked = false;
+	h.outcome = kOutcomeRejected;
+	BuildHitLocator(h);
+}
+
+void KBSResultModel::SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	h.storyUID = storyUID;
+	h.textStart = start;
+	h.textEnd = end;
+	h.replaced = true;
+	h.checked = false;
+	h.outcome = kOutcomeNone;
+	BuildHitLocator(h);
+}
+
 int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -1279,6 +1380,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
+	else if (hit.outcome == kOutcomeRejected)
+		hit.locator.Append(" rejected");	// the user's own act, not a reason something failed: normal colour
 }
 
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)

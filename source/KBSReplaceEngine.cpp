@@ -2747,6 +2747,26 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				totals.cancelled = true;
 				break;
 			}
+			// The whole text of every ticked row BEFORE anything is written - half of what a replaced
+			// row's tracked change is found by later (Hit::originalText). The positions are the
+			// search's own, which the verify pass has just vouched for.
+			const int32 hitCount = KBSResultModel::GetHitCount(ci);
+			std::vector<PMString> originals(static_cast<size_t>(hitCount > 0 ? hitCount : 0));
+			std::vector<bool> haveOriginal(originals.size(), false);	// a zero-width match reads ""
+			for (int32 hi = 0; hi < hitCount; ++hi)
+			{
+				bool checked = false, wasReplaced = false, isLocked = false;
+				UID story = kInvalidUID;
+				TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+				uint64 h = 0;
+				if (KBSResultModel::GetHitFlags(ci, hi, checked, wasReplaced, isLocked) && checked && !wasReplaced
+					&& KBSResultModel::GetHitMatchIdentity(ci, hi, story, a, b, h))
+				{
+					originals[static_cast<size_t>(hi)] = KBSTrackChange::ReadText(UIDRef(docRef.GetDataBase(), story), a, b - a);
+					haveOriginal[static_cast<size_t>(hi)] = true;
+				}
+			}
+
 			bool changeAllCancelled = false;
 			bool changeAllFailed = false;
 			PMString whyNot;
@@ -2774,6 +2794,20 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				KBSTrackChange::TrackingScope tracking(docRef.GetDataBase(), stories);
 				replaced = ReplaceInChapter(ci, docRef, scopeOptions, missing, locked,
 					refused, notWalked, walkFailed, &progressBar, progressBase, progressReported);
+			}
+
+			// ...and the other half: what each replaced row now reads.
+			for (int32 hi = 0; hi < hitCount; ++hi)
+			{
+				bool checked = false, isReplaced = false, isLocked = false;
+				UID story = kInvalidUID;
+				TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+				uint64 h = 0;
+				if (KBSResultModel::GetHitFlags(ci, hi, checked, isReplaced, isLocked) && isReplaced
+					&& haveOriginal[static_cast<size_t>(hi)]
+					&& KBSResultModel::GetHitMatchIdentity(ci, hi, story, a, b, h))
+					KBSResultModel::SetHitChangeTexts(ci, hi, originals[static_cast<size_t>(hi)],
+						KBSTrackChange::ReadText(UIDRef(docRef.GetDataBase(), story), a, b - a));
 			}
 		}
 		progressBase += chapterChecked;

@@ -55,7 +55,9 @@ namespace KBSResultModel
 		kOutcomeNone = 0,	// replaced, or never reached
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
-		kOutcomeRefused		// InDesign's own replace command would not run there
+		kOutcomeRefused,	// InDesign's own replace command would not run there
+		kOutcomeRejected	// replaced, then taken back with Reject Change (2026-09-26): the row
+							// shows the original text again and can be replaced once more (Redo)
 	};
 
 	/** One match on one line of one chapter. The three text segments are the line split around
@@ -136,6 +138,14 @@ namespace KBSResultModel
 								// Kept OUT of locator so the cell can paint it separately; built by
 								// BuildHitLocator alongside it. Only "missing" earns it - the other
 								// flags stay in locator and read in the normal colour.
+		// --- Track Changes (2026-09-26) ---
+		// The WHOLE text of the match before the replace and the whole text the replace wrote, as
+		// they were read around the replace (not capped for drawing like matchText). Together they
+		// are how a replaced row finds ITS tracked change among the others: the insertion holds
+		// replacedText and the deletion holds originalText (KBSTrackChange::FindRowChange). Empty
+		// until the row is replaced.
+		PMString	originalText;
+		PMString	replacedText;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -651,6 +661,28 @@ namespace KBSResultModel
 	};
 	void SetContextMenuChapter(int32 chapterIdx);
 	int32 GetContextMenuChapter();
+
+	/** The hit row the right-click menu was popped over (2026-09-26: Reject Change and Redo act on
+	    it). Cleared with the result set; false when no hit row is stashed or it is out of range. */
+	void SetContextMenuHit(int32 chapterIdx, int32 hitIdx);
+	bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx);
+
+	/** A row's outcome (kOutcomeNone for an out-of-range index). */
+	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
+
+	/** The texts a replaced row's tracked change is found by (see Hit::originalText). The replace
+	    reads them from the document - the model reads no text - and hands them over here. */
+	void SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
+		const PMString& replacedText);
+	/** False when the row holds no replace (never replaced, or out of range). */
+	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
+		PMString& outReplacedText);
+
+	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
+	    longer replaced, and says "rejected". */
+	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
+	/** Redo replaced it again: replaced, at [start, end), the "rejected" gone. */
+	void SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 
 	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
 	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is

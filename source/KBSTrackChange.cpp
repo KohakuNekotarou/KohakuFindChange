@@ -34,6 +34,8 @@
 #include "textiterator.h"
 
 // Project includes:
+#include "KBSResultModel.h"
+#include "KBSSearchEngine.h"		// the line a row shows, and its hash
 #include "KBSTrackChange.h"
 
 const char* const KBSTrackChange::kAuthor = "KohakuFindChange";
@@ -86,7 +88,9 @@ bool IsOurs(RedlineIterator* it)
 	return who == ours;
 }
 
-PMString ReadText(const UIDRef& story, TextIndex at, int32 len)
+}	// anonymous namespace
+
+PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
 {
 	WideString w;
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
@@ -100,7 +104,6 @@ PMString ReadText(const UIDRef& story, TextIndex at, int32 len)
 	s.SetTranslatable(kFalse);
 	return s;
 }
-}	// anonymous namespace
 
 KBSTrackChange::AuthorScope::AuthorScope() : fSwitched(false)
 {
@@ -296,4 +299,40 @@ bool KBSTrackChange::FindRowChange(const UIDRef& story, const PMString& newText,
 		}
 	}
 	return found;
+}
+
+bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange)
+{
+	bool checked = false, replaced = false, locked = false;
+	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
+		return false;
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil)
+		return false;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		return false;
+	PMString originalText, replacedText;
+	if (!KBSResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText))
+		return false;
+	outStory = UIDRef(docRef.GetDataBase(), story);
+	return FindRowChange(outStory, replacedText, originalText, start, outChange);
+}
+
+bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
+{
+	UIDRef storyRef;
+	Change c;
+	if (!FindRowChangeForHit(chapterIdx, hitIdx, storyRef, c))
+		return false;
+	const TextIndex end = c.at + c.insLen;
+	KBSResultModel::SetHitRange(chapterIdx, hitIdx, storyRef.GetUID(), c.at, end);
+	PMString pre, match, post;
+	KBSSearchEngine::SplitLineAroundMatch(storyRef, c.at, end, pre, match, post);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
+		KBSSearchEngine::HashMatchText(storyRef, c.at, end));
+	return true;
 }

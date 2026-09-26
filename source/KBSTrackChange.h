@@ -78,6 +78,9 @@ namespace KBSTrackChange
 		bool		isDelete;
 	};
 
+	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
+	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
+
 	/** Every record of ours in the story, in position order. */
 	void CollectRecords(const UIDRef& story, std::vector<Record>& out);
 
@@ -107,6 +110,16 @@ namespace KBSTrackChange
 	    nearest `nearAt`. False = none. */
 	bool FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
 		TextIndex nearAt, Change& out);
+
+	/** A REPLACED row put where its tracked change stands now - range, line and hash - so an edit
+	    made since the replace does not put it off (the record moves with the text). False = the row
+	    is not replaced, or no change of ours matches it (accepted or rejected in the Track Changes
+	    panel, merged with a neighbour's): the row keeps what it had. The one lookup behind the jump,
+	    Reject Change and Redo (spec section 5). */
+	bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx);
+
+	/** Like RefreshRowFromRecords, and hands the change back too. */
+	bool FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange);
 }
 
 #endif // __KBSTrackChange_h__
