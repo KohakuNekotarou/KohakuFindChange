@@ -69,14 +69,6 @@
 namespace
 {
 
-// What Edit > Undo would call a replace, if the sequence were named. It is NOT named at the
-// moment - see the SequencePtr in ReplaceChecked. Kept here so putting the name back is one line.
-//
-// Pass it with kUnknownEncoding wherever it is used, so it is taken literally rather than looked
-// up as a key in the string tables - an untranslated UI string is otherwise liable to come back as
-// somebody else's translation.
-//const char* const kKBSReplaceSequenceName = "Kohaku Replace";
-
 // Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
 // on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
 // which is the header's own contract (IFindChangeService.h:46-49) rather than a convention here:
@@ -2972,12 +2964,16 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// outside it. Nothing between the two runs a command: a progress bar is built and the rows are
 	// backed up, and neither touches the error state.
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
-	// DELIBERATELY UNNAMED (user's call, 2026-07-28). SetName is what Edit > Undo would say after
-	// the word "Undo"; leaving it unset lets InDesign word the step the way it words its own.
-	// To put the name back: seq->SetName(PMString(kKBSReplaceSequenceName, PMString::kUnknownEncoding));
-	//
-	// (The string above is TRACKING DATA, not that name - CmdUtils.h:134 - so it names this caller in
-	// a lost-sequence report and nowhere else.)
+	// ***** NAMED AGAIN (user's call, 2026-09-26): "Replace" / Japanese UI 置換. ***** It was left
+	// unnamed on 2026-07-28 so InDesign would word the step itself - but an unnamed step is worded
+	// by its LAST command, and since Track Changes that is the author name being put back
+	// (KBSTrackChange::AuthorScope): Edit > Undo read "Undo Set User Name" (measured, case
+	// undo-then-reject). The name cannot be fixed by moving that command out: outside the sequence it
+	// would be an undo step of its own, and the first Ctrl+Z would undo the name, not the replace.
+	// (The string passed above is TRACKING DATA, not that name - CmdUtils.h:134 - so it names this
+	// caller in a lost-sequence report and nowhere else.)
+	if (seq != nil)
+		seq->SetName(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep));
 
 	// ***** NO SEQUENCE, NO RUN. ***** BeginAbortableCmdSeq answers nil on error (CmdUtils.h:135),
 	// and everything this function promises rests on the sequence it hands back: one Ctrl+Z for the

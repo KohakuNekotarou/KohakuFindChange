@@ -525,6 +525,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 //  per-chapter "the text has been edited - carry on?" prompt, which the verify walk replaced.)
 #define kKBSStaleResultsDocKey		kKBSStringPrefix "kKBSStaleResultsDocKey"
 #define kKBSStaleResultsOneKey		kKBSStringPrefix "kKBSStaleResultsOneKey"
+// What Edit > Undo calls a Change Checked run (2026-09-26, the user's call: "Replace"; Japanese UI
+// through KBSJa::kReplaceStep). See the sequence in KBSReplaceEngine::ReplaceChecked for why it is named.
+#define kKBSReplaceStepKey			kKBSStringPrefix "kKBSReplaceStepKey"
 // (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
 //  the alert states the outcome in one sentence and the status line carries what to do next.)
 // The closing line: what the run LEAVES BEHIND.

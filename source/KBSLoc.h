@@ -99,6 +99,8 @@ namespace KBSJa
 	// See KBSID.h for how this came to be a statement rather than a question.
 	const char16_t kStaleResultsDoc[]        = u"検索結果に変化を確認しましたので、置換を中止しました。";
 	const char16_t kStaleResultsOne[]        = u"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
+	// What Edit > Undo calls a Change Checked run (2026-09-26, the user's call).
+	const char16_t kReplaceStep[]            = u"置換";
 	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert
