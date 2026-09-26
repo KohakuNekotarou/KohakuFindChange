@@ -182,6 +182,18 @@ ICallbackTimer* gRestoreTimer = nil;
     the new palette (asynchronous - PaletteRefUtils.h:40-41) has gone round first. */
 const uint32 kKBSBookPanelRestoreDelayMs = 100;
 
+/** ***** INDESIGN CAN THROW IT OUT OF THE DOCK AGAIN (2026-09-27, measured). ***** A book opened with
+    InDesign itself (a .indb double-clicked while InDesign is not running): the restore docks it, and
+    a few seconds later - while InDesign is still settling its workspace, the Home screen up - InDesign
+    takes the book panel out of the dock again and leaves it in a floating palette that is HIDDEN. The
+    book is open and its panel nowhere to be seen (3 launches in 4; the other one kept it). The
+    visibility message arrives as that happens, so the restore is simply done again once the messages
+    have stopped: a longer wait than the first (the messages came up to 0.9 s apart over 1.5 s), and a
+    few times at most per opening, so KBS never fights InDesign for good. */
+const uint32 kKBSBookPanelReRestoreDelayMs = 1500;
+const int32 kKBSBookPanelMaxReRestores = 3;
+int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMaybeRestore resets it)
+
 /** How much of the title band has to be on a screen for a remembered placement to be used: enough
     to take hold of it and drag it back. */
 const SysCoord kKBSBookPanelMinOnScreen = 40;
@@ -486,6 +498,13 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 
 	const PaletteRef dock = FindFloatingDock(container);
 	if (!dock.IsValid())
+		return false;
+
+	// A floating palette that is not on show is not a place to come back to: it is where InDesign leaves
+	// the book panel when it throws it out of the dock (2026-09-27, see kKBSBookPanelReRestoreDelayMs) -
+	// recorded, it read "floating at 0,0" and the next opening put the panel there. The last good
+	// placement is kept. (A floating dock holding only hidden panels answers false - measured 09-25.)
+	if (!PaletteRefUtils::IsPaletteVisible(dock))
 		return false;
 
 	const SysPoint pos = PaletteRefUtils::GetPalettePosition(dock);
@@ -861,6 +880,13 @@ void RestoreNow()
 	if (!PaletteRefUtils::IsPaletteFloating(container))
 		return;
 
+	// Put back from a hidden palette = InDesign threw it out of the dock again: counted, so it is only
+	// done a few times per opening (MaybeRestoreAgain).
+	const PaletteRef ownDock = FindFloatingDock(container);
+	if (ownDock.IsValid() && !PaletteRefUtils::IsPaletteVisible(ownDock))
+		++gReRestores;
+
+
 	if (gRemembered.docked)
 		RestoreDocked(panelMgr, container, gRemembered);
 	else if (!JoinNeighbours(panelMgr, container, gRemembered.floatMate, gRemembered.floatTabIndex,
@@ -883,7 +909,7 @@ uint32 RestoreTimerCallback(void* /*refPtr*/)
 }
 
 /** Arm the deferred restore (or restart its wait if one is pending). */
-void ArmRestoreTimer()
+void ArmRestoreTimer(uint32 delayMs = kKBSBookPanelRestoreDelayMs)
 {
 	if (gRestoreTimer == nil)
 		gRestoreTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
@@ -896,7 +922,29 @@ void ArmRestoreTimer()
 	}
 
 	gRestoreTimer->StopTimer();
-	gRestoreTimer->StartTimer(RestoreTimerCallback, kKBSBookPanelRestoreDelayMs, nil);
+	gRestoreTimer->StartTimer(RestoreTimerCallback, delayMs, nil);
+}
+
+/** The book panel thrown out of the dock by InDesign (see kKBSBookPanelReRestoreDelayMs): remembered
+    docked, and now in a floating palette that is not on show. Then the restore is armed again, with
+    the longer wait - every message restarts it, so it runs once they stop. */
+void MaybeRestoreAgain()
+{
+	if (!gRemembered.IsUsable() || !gRemembered.docked || gReRestores >= kKBSBookPanelMaxReRestores)
+		return;
+	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	IControlView* first = nil;
+	WalkBookPanels(panelMgr, &first);
+	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
+	if (bookPanel == nil)
+		return;
+	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(bookPanel);
+	if (!container.IsValid() || !PaletteRefUtils::IsPaletteFloating(container))
+		return;
+	const PaletteRef dock = FindFloatingDock(container);
+	if (!dock.IsValid() || PaletteRefUtils::IsPaletteVisible(dock))
+		return;		// floating and on show: the user's, or the first restore still to come
+	ArmRestoreTimer(kKBSBookPanelReRestoreDelayMs);
 }
 
 /** Count the book panels afresh, and arm a restore if there were none at the last look and there are
@@ -908,7 +956,10 @@ void RecountAndMaybeRestore()
 	gBookPanelCount = WalkBookPanels(panelMgr, nil);
 
 	if (previous == 0 && gBookPanelCount > 0 && gRemembered.IsUsable())
+	{
+		gReRestores = 0;
 		ArmRestoreTimer();
+	}
 }
 
 //----------------------------------------------------------------------------------------
@@ -1222,6 +1273,7 @@ void KBSBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
 		return;
 
 	RecountAndMaybeRestore();
+	MaybeRestoreAgain();
 }
 
 //----------------------------------------------------------------------------------------
