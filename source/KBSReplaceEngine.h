@@ -15,8 +15,8 @@
 //  decides every match on the ORIGINAL text - so GREP's ^, $ and lookarounds cannot see text this run
 //  has already written. The records Change All leaves are lined up with the rows by POSITION
 //  (LineUpStory in the .cpp), the rows NOT ticked are taken back record by record
-//  (KBSTrackChange::RejectReplacement), and the ticked rows' records are LEFT in the document, signed
-//  KBSTrackChange::kAuthor: they are what Reject Change, Redo and the jump find a row by. The last
+//  (KBSTrackChange::RejectReplacement), and the ticked rows' records are LEFT in the document, told
+//  apart by their time stamp: they are what Reject Change, Redo and the jump find a row by. The last
 //  step reads every thread holding a row and aborts the whole run on a single code point that is not
 //  what the ticked rows alone should have made (CheckOnlyTickedChanged).
 //  The long history in the .cpp explains each piece; the block comment over ReplaceInChapterByChangeAll
@@ -187,21 +187,20 @@ namespace KBSReplaceEngine
 
 	/** Redo on a row taken back with Reject Change (2026-09-26): the same query - refused through
 	    RefuseChangedQuery when the dialog no longer holds it - is run over that row's text alone
-	    (Change All on the row's range, under Track Changes, signed like the run), in ONE undo step.
+	    (Change All on the row's range, under Track Changes, as the run), in ONE undo step.
 	    All or nothing: unless exactly one replacement lands and writes the same text the run wrote,
 	    the step is rolled back. False = nothing changed; outStatus says why either way. */
 	bool RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** Accept All Changes in This Document on a document row (2026-09-27, the user's call A): every
-	    tracked change of KBS's own (KBSTrackChange::kAuthor) in that chapter's document is accepted, in
-	    ONE undo step; nobody else's change is touched. All or nothing - any change that will not go rolls
-	    the step back. Rows keep what they show; a replaced row's Reject Change then greys out (its
-	    records are gone), as after an accept in the Track Changes panel. False = nothing changed;
-	    outStatus says why either way. */
+	/** Accept All Changes in This Document on a document row (2026-09-27, the user's call): every
+	    tracked change in that chapter's document is accepted, whoever made it - as InDesign's own does -
+	    in ONE undo step. All or nothing - any change that will not go rolls the step back. Rows keep what
+	    they show; a replaced row's Reject Change then greys out (its records are gone), as after an
+	    accept in the Track Changes panel. False = nothing changed; outStatus says why either way. */
 	bool AcceptAllInChapter(int32 chapterIdx, PMString& outStatus);
 
 	/** Is there anything for Accept All Changes in This Document to do: the chapter's document open and
-	    holding at least one change of ours. */
+	    holding at least one tracked change. */
 	bool CanAcceptAllInChapter(int32 chapterIdx);
 
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu

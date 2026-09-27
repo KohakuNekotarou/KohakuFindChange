@@ -4,9 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Track Changes parts for the replace - see KBSTrackChange.h. The command shapes (the user name on
-//  the workspace, the story's tracking switch) are KCM's (KCMImportAuthor / KCMStoryTrackingOn),
-//  and the record walk is the one the 2026-09-26 spike measured (13fe01e).
+//  Track Changes parts for the replace - see KBSTrackChange.h. The command shape of the story's
+//  tracking switch is KCM's (KCMStoryTrackingOn), and the record walk is the one the 2026-09-26 spike
+//  measured (13fe01e).
 //
 //========================================================================================
 
@@ -19,16 +19,15 @@
 #include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
 #include "IStoryList.h"			// Accept All Changes in This Document - every text model of it
-#include "IStringData.h"
 #include "ITextModel.h"
 #include "ITrackChangesSettings.h"	// ITrackChangeStorySettings - on kTextStoryBoss
-#include "IUserInfo.h"
+#include "IUserInfo.h"				// the current user - whose own pending insertion a replace rewrites
 #include "IWorkspace.h"
 
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
-#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetUserNameCmdBoss, kSetRedlineTrackingCmdBoss
+#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss
 #include "PersistUtils.h"			// ::GetUIDRef
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
@@ -44,25 +43,8 @@
 #include "KBSSearchEngine.h"		// the line a row shows, and its hash
 #include "KBSTrackChange.h"
 
-const char* const KBSTrackChange::kAuthor = "KohakuFindChange";
-
 namespace
 {
-ErrorCode SetUserName(const PMString& name)
-{
-	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetUserNameCmdBoss));
-	InterfacePtr<IStringData> data(cmd, IID_ISTRINGDATA);
-	if (ws == nil || cmd == nil || data == nil)
-		return kFailure;
-	data->Set(name);
-	cmd->SetItemList(UIDList(::GetUIDRef(ws)));
-	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
-	if (err != kSuccess)
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	return err;
-}
-
 ErrorCode SetTracking(const UIDRef& story, bool16 on)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetRedlineTrackingCmdBoss));
@@ -83,15 +65,6 @@ IRedlineDataStrand* QueryRedline(const UIDRef& story)
 	if (model == nil)
 		return nil;
 	return static_cast<IRedlineDataStrand*>(model->QueryStrand(kRedlineStrandBoss, IRedlineDataStrand::kDefaultIID));
-}
-
-bool IsOurs(RedlineIterator* it)
-{
-	PMString who;
-	it->DescribeUser(who);
-	PMString ours(KBSTrackChange::kAuthor);
-	ours.SetTranslatable(kFalse);
-	return who == ours;
 }
 
 }	// anonymous namespace
@@ -116,35 +89,6 @@ PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
 	PMString s(w);
 	s.SetTranslatable(kFalse);
 	return s;
-}
-
-KBSTrackChange::AuthorScope::AuthorScope() : fSwitched(false)
-{
-	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
-	InterfacePtr<IUserInfo> info(ws, UseDefaultIID());
-	if (info == nil)
-		return;
-	fOld = info->GetUserName();
-	fOld.SetTranslatable(kFalse);
-	PMString name(kAuthor);
-	name.SetTranslatable(kFalse);
-	// ***** A NAME THAT IS ALREADY OURS IS A LEFTOVER (2026-09-26). ***** Only an interrupted run leaves
-	// InDesign's user name as kAuthor - InDesign going down in the middle of a replace, or a script that
-	// set it and stopped before setting it back (it happened, and the script DOM cannot set the name
-	// back to "unset"). Handed back as unset, so the user's own tracked edits are never signed with
-	// KBS's name - KBS would take them for its own. "Unset" is the value a never-set name reads as,
-	// "Unknown User Name" (IUserInfo.h:53, shown translated in a Japanese UI - measured through the
-	// script DOM); an empty name, which only such a repair leaves, is put back to it the same way
-	// (IUserInfoUtils.h:52 treats the two alike).
-	if (fOld == name || fOld.IsEmpty())
-		fOld = PMString("Unknown User Name");
-	fSwitched = (SetUserName(name) == kSuccess);
-}
-
-KBSTrackChange::AuthorScope::~AuthorScope()
-{
-	if (fSwitched)
-		SetUserName(fOld);
 }
 
 KBSTrackChange::TrackingScope::TrackingScope(IDataBase* db, const std::set<UID>& stories) : fDB(db), fOk(true)
@@ -192,8 +136,6 @@ void KBSTrackChange::CollectRecords(const UIDRef& story, std::vector<Record>& ou
 		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 		const uint64 time = record->GetTimeStamp();
 		delete record;		// the caller owns it (redlineiterator.h:137-138)
-		if (!IsOurs(it))
-			continue;
 		Record r;
 		r.at = at;
 		r.len = len;
@@ -204,29 +146,28 @@ void KBSTrackChange::CollectRecords(const UIDRef& story, std::vector<Record>& ou
 	delete it;
 }
 
-bool KBSTrackChange::StoryHasOurChanges(const UIDRef& story)
+bool KBSTrackChange::StoryHasChanges(const UIDRef& story)
 {
-	std::vector<Record> records;
-	CollectRecords(story, records);
-	return !records.empty();
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	return redline != nil && redline->StoryHasChanges();
 }
 
-bool KBSTrackChange::DocumentHasOurChanges(IDataBase* db)
+bool KBSTrackChange::DocumentHasChanges(IDataBase* db)
 {
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (storyList == nil)
 		return false;
-	// Every text model, not only the user-accessible ones: a record is ours wherever it stands.
+	// Every text model, not only the user-accessible ones: a record counts wherever it stands.
 	const int32 count = storyList->GetAllTextModelCount();
 	for (int32 i = 0; i < count; ++i)
-		if (StoryHasOurChanges(storyList->GetNthTextModelUID(i)))
+		if (StoryHasChanges(storyList->GetNthTextModelUID(i)))
 			return true;
 	return false;
 }
 
-// One story: accept our records one whole record at a time, the walk started over after each (an
+// One story: accept its records one whole record at a time, the walk started over after each (an
 // accept moves what comes after it, and the iterator it was made from is spent). -1 = one would not go.
-static int32 AcceptOursInStory(const UIDRef& story, PMString& outWhy)
+static int32 AcceptAllInStory(const UIDRef& story, PMString& outWhy)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
@@ -249,11 +190,8 @@ static int32 AcceptOursInStory(const UIDRef& story, PMString& outWhy)
 			if (record == nil)
 				continue;
 			delete record;
-			if (IsOurs(it))
-			{
-				found = true;
-				break;
-			}
+			found = true;
+			break;
 		}
 		const bool ok = found && it->ProcessAccept(nil, kFalse, kFalse);
 		delete it;
@@ -267,15 +205,52 @@ static int32 AcceptOursInStory(const UIDRef& story, PMString& outWhy)
 		}
 		++done;
 	}
-	if (KBSTrackChange::StoryHasOurChanges(story))
+	if (KBSTrackChange::StoryHasChanges(story))
 	{
-		outWhy = "a change of ours was still there after accepting";
+		outWhy = "a change was still there after accepting";
 		return -1;
 	}
 	return done;
 }
 
-int32 KBSTrackChange::AcceptOursInDocument(IDataBase* db, PMString& outWhy)
+bool KBSTrackChange::IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex from, TextIndex to,
+	const std::set<uint64>* onlyTimes)
+{
+	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
+	InterfacePtr<IUserInfo> info(ws, UseDefaultIID());
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (info == nil || redline == nil || !redline->StoryHasChanges())
+		return false;
+	PMString me(info->GetUserName());
+	me.SetTranslatable(kFalse);
+	RedlineIterator* it = redline->NewRedlineIterator(0);
+	if (it == nil)
+		return false;
+	bool inside = false;
+	for (bool16 more = kTrue; more && !inside; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isInsert = (record->GetChangeType() != VOSRedlineChange::kDelete);
+		const uint64 time = record->GetTimeStamp();
+		PMString who(record->GetUserName());
+		who.SetTranslatable(kFalse);
+		delete record;
+		if (!isInsert || len <= 0 || who != me || (onlyTimes != nil && onlyTimes->count(time) == 0))
+			continue;
+		// overlapping [from, to) or touching it at either end: typing extends an insertion of the same
+		// author, so new text written right next to one may join it (not measured - kept out alike)
+		if (from <= at + len && at <= to)
+			inside = true;
+	}
+	delete it;
+	return inside;
+}
+
+int32 KBSTrackChange::AcceptAllInDocument(IDataBase* db, PMString& outWhy)
 {
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (storyList == nil)
@@ -287,7 +262,7 @@ int32 KBSTrackChange::AcceptOursInDocument(IDataBase* db, PMString& outWhy)
 	const int32 count = storyList->GetAllTextModelCount();
 	for (int32 i = 0; i < count; ++i)
 	{
-		const int32 n = AcceptOursInStory(storyList->GetNthTextModelUID(i), outWhy);
+		const int32 n = AcceptAllInStory(storyList->GetNthTextModelUID(i), outWhy);
 		if (n < 0)
 			return -1;
 		total += n;
@@ -317,7 +292,7 @@ int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const st
 			const uint64 time = record->GetTimeStamp();
 			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 			delete record;
-			if (IsOurs(it) && isDelete == wantDelete && (keepTimes == nil || keepTimes->count(time) == 0))
+			if (isDelete == wantDelete && (keepTimes == nil || keepTimes->count(time) == 0))
 			{
 				found = true;
 				break;
@@ -337,14 +312,21 @@ bool KBSTrackChange::RejectReplacement(const UIDRef& story, TextIndex insAt, int
 	TextIndex delAnchor, int32 delOffset, int32 delLen, const std::set<uint64>* oldTimes, uint64 onlyTime,
 	PMString& outWhy)
 {
-	// ***** WHOLE RECORDS, OURS ONLY (2026-09-26, measured). ***** A range reject was tried and: an
+	// ***** WHOLE RECORDS, THE RUN'S ONLY (2026-09-26, measured). ***** A range reject was tried and: an
 	// insertion's exact range took nothing back, and an insertion range whose start held the touching
 	// neighbour's deletion brought InDesign down (ShuksanTerminate; rangelog-2026-09-26.txt). So every
-	// record is rejected whole by RejectAt, picked by position, author and time - nobody else's change
-	// can be taken, and no range is handed to InDesign at all. A deletion SHARED with a touching row
-	// (replaces that wrote nothing) cannot be split this way: that shape is refused before the write.
+	// record is rejected whole by RejectAt, picked by position and time - no change of another run, and
+	// none made before the run (the user's), can be taken, and no range is handed to InDesign at all.
+	// (Picked by author too until 2026-09-27, when records stopped carrying a name of KBS's own.) A
+	// deletion SHARED with a touching row (replaces that wrote nothing) cannot be split this way: that
+	// shape is refused before the write.
 	outWhy.Clear();
 	outWhy.SetTranslatable(kFalse);
+	if (oldTimes == nil && onlyTime == 0)
+	{
+		outWhy = "whose change it is was not told";		// any record there would qualify
+		return false;
+	}
 	std::vector<Record> recs;
 	CollectRecords(story, recs);
 	std::set<uint64> keep;			// the times NOT to take back: an earlier run's, or not this row's
@@ -363,7 +345,7 @@ bool KBSTrackChange::RejectReplacement(const UIDRef& story, TextIndex insAt, int
 		}
 		if (RejectAt(story, delAnchor, &keep, true) == 0)
 		{
-			outWhy = "no deletion of KBS's own stands there";
+			outWhy = "no deletion of that replace stands there";
 			return false;
 		}
 	}
@@ -384,7 +366,7 @@ bool KBSTrackChange::RejectReplacement(const UIDRef& story, TextIndex insAt, int
 		}
 		if (covered != insLen)
 		{
-			outWhy = "the inserted text is not KBS's own record, whole";
+			outWhy = "the inserted text is not that replace's record, whole";
 			return false;
 		}
 		for (size_t k = starts.size(); k-- > 0; )
@@ -412,8 +394,6 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 		const uint64 time = record->GetTimeStamp();
 		delete record;
-		if (!IsOurs(it))
-			continue;
 		// pieces of one replace are one run's: records of another run never join them.
 		// ! This pairing leans on the ORDER the iterator hands records over in at one position: where a
 		//   replace's deletion and the next (touching) replace's insertion share a position, the DELETION

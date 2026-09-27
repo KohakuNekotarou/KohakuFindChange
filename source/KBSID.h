@@ -334,7 +334,7 @@ DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKBSPrefix + 25)
 // "Redo" on the same menu: replaces that one row again, with the query the run used.
 DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
 // "Accept All Changes in This Document" on a document row's right-click menu (2026-09-27): accepts
-// every tracked change of KBS's own in that chapter's document (nobody else's) - the name is InDesign's
+// every tracked change in that chapter's document, whoever made it, as InDesign's does - the name is InDesign's
 // own ($ID/Accept All Changes in This Document).
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
 // The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).

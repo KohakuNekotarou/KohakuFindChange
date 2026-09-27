@@ -61,7 +61,7 @@
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
-#include "KBSTrackChange.h"	// every replace under Track Changes, signed and left (2026-09-26)
+#include "KBSTrackChange.h"	// every replace under Track Changes, its records left (2026-09-26)
 // (KBSJump.h was included here for IsHidePreviousChapterOn until 2026-08-03. A run that saves now
 // hands every chapter back as it goes, whatever that toggle says - it is about JUMPING, not about
 // what a run does with the chapters it opened for itself. Same call the search stopped making on
@@ -520,8 +520,8 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 // walk). InDesign's Change All decides every match on the ORIGINAL text before writing. It cannot be
 // told "only the ticked ones", so (the user's design) it runs over EVERY match of a story with Track
 // Changes on, and the changes of the rows NOT ticked are then REJECTED - which puts their text back as
-// it was, objects and all. The records of the ticked rows are LEFT in the document, signed
-// KBSTrackChange::kAuthor: they are what Reject Change and the jump find a row by.
+// it was, objects and all. The records of the ticked rows are LEFT in the document, told apart by
+// their time stamp: they are what Reject Change and the jump find a row by.
 //
 // ***** ONE STORY AT A TIME (the user's idea, 2026-09-26). ***** Each story with a ticked row gets a
 // Change All of its own, scoped to that story (IWalkerScopeFactoryUtils::QueryStoryWalkerScope), and
@@ -1216,13 +1216,9 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		// ***** A ROW IN A FOOTNOTE (measured 2026-09-26 through IDML): Track Changes records nothing
 		// written inside a footnote. Such a row is always ticked (the user's call - the model will not
 		// let it go off) and Change All writes it with the rest; its new place is worked out from the
-		// footnote's text before and after (AlignFootnoteFrom). An unticked one could not be put back.
+		// footnote's text before and after (AlignFootnoteFrom). An unticked one could not be put back -
+		// refused below, once it is known whether its story is written at all.
 		r.inFootnote = KBSTrackChange::IsInFootnote(UIDRef(db, r.story), start);
-		if (r.inFootnote && !checked)
-		{
-			outWhyNot = "a row inside a footnote is not ticked";
-			return false;
-		}
 		if (r.target)
 		{
 			const UIDRef storyRef(db, r.story);
@@ -1313,6 +1309,33 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 		return true;
 	}
 
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const TrackRow& r = rows[i];
+		if (targetStories.count(r.story) == 0)
+			continue;		// never written - nothing to refuse
+		// ***** A FOOTNOTE'S ROW LEFT OUT IS REFUSED ONLY WHERE ITS STORY IS WRITTEN (2026-09-27 defect
+		// ***** sweep, D-2). ***** It was refused wherever it stood, so one locked footnote match (unticked,
+		// no box) in a locked story refused the whole run although Change All never runs there (measured,
+		// case locked-footnote: "a row inside a footnote is not ticked").
+		if (r.inFootnote && !r.target)
+		{
+			outWhyNot = "a match inside a footnote is left out (unticked, or locked) in a story that is replaced, and nothing written in a footnote can be taken back";
+			return false;
+		}
+		// ***** INSIDE THE USER'S OWN PENDING INSERTION (2026-09-27, P-4). ***** Replacing text its own
+		// author inserted, not yet accepted, leaves no record (KBSTrackChange::IsInsideOwnPendingInsertion
+		// says why), so the run could neither line it up nor take it back and stopped after writing
+		// (measured, case rereplace-ours: "the tracked changes did not line up"). Every row of a written
+		// story counts, ticked or not: an unticked one is written too, then taken back.
+		if (!r.inFootnote
+			&& KBSTrackChange::IsInsideOwnPendingInsertion(UIDRef(db, r.story), r.absBefore, r.absBefore + r.length))
+		{
+			outWhyNot = "a match is inside or right next to text you inserted with Track Changes that is not accepted yet (an earlier replace, or your own typing) - accept or reject those changes first, then search again";
+			return false;
+		}
+	}
+
 	// Every thread holding a row, as it reads BEFORE anything is written: a footnote's rows are placed
 	// from it, and every thread is checked against it at the end (CheckOnlyTickedChanged).
 	std::map<TrackThreadKey, std::vector<UTF32TextChar> > threadBefore;
@@ -1359,8 +1382,10 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			}
 		}
 	}
-	// The records of ours already there, by their time stamps: an earlier run's are neither lined up
-	// nor rejected (records are left in the document on purpose).
+	// The records already there, by their time stamps - an earlier run's (left in the document on
+	// purpose) and the user's own alike: none of them is lined up or rejected. The run's records are the
+	// ones whose time is not in this set - the only thing that tells them apart since 2026-09-27, when
+	// the records stopped carrying a name of KBS's own.
 	std::map<UID, std::set<uint64> > oldTimes;
 	for (std::set<UID>::const_iterator st = targetStories.begin(); st != targetStories.end(); ++st)
 	{
@@ -3205,10 +3230,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
 	// ***** NAMED AGAIN (user's call, 2026-09-26): "Replace" / Japanese UI KBSJa::kReplaceStep. ***** It was left
 	// unnamed on 2026-07-28 so InDesign would word the step itself - but an unnamed step is worded
-	// by its LAST command, and since Track Changes that is the author name being put back
-	// (KBSTrackChange::AuthorScope): Edit > Undo read "Undo Set User Name" (measured, case
-	// undo-then-reject). The name cannot be fixed by moving that command out: outside the sequence it
-	// would be an undo step of its own, and the first Ctrl+Z would undo the name, not the replace.
+	// by its LAST command, which is not the replace: while the run switched the user name (until
+	// 2026-09-27) Edit > Undo read "Undo Set User Name" (measured, case undo-then-reject), and the
+	// story's tracking switch put back (TrackingScope) is last now.
 	// (The string passed above is TRACKING DATA, not that name - CmdUtils.h:134 - so it names this
 	// caller in a lost-sequence report and nowhere else.)
 	if (seq != nil)
@@ -3305,17 +3329,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		int32 refused = 0;
 		int32 replaced = 0;
 		{
-			// ***** EVERY REPLACE IS TRACKED (2026-09-26). ***** Signed KohakuFindChange for the chapter
-			// and handed back after it; the story's own Track Changes setting likewise (TrackingScope).
-			KBSTrackChange::AuthorScope author;
-			if (!author.Ok())
-			{
-				totals.stoppedByMismatch = true;
-				totals.errorText = "the user name for the tracked changes could not be set";
-				totals.errorText.SetTranslatable(kFalse);
-				totals.cancelled = true;
-				break;
-			}
+			// ***** EVERY REPLACE IS TRACKED (2026-09-26). ***** The story's own Track Changes setting is
+			// handed back as it was found (TrackingScope). The records are signed with the user's own
+			// name - InDesign's user name is not touched (2026-09-27; KBSTrackChange.h says why).
 			// The whole text of every ticked row BEFORE anything is written - half of what a replaced
 			// row's tracked change is found by later (Hit::originalText). The positions are the
 			// search's own, which the verify pass has just vouched for.
@@ -3631,8 +3647,8 @@ const char* KBSReplaceEngine::StoppedShortMessage()
 // step below it away. The rollback of a plain sequence is the SDK's own: raise the error state, end it,
 // clear it (CmdUtils.h, SequenceContext).
 // ======================================================================================================
-// One row's replace taken back inside the caller's sequence - its records whole, ours and this row's
-// run only (KBSTrackChange::RejectReplacement), then its original text read back where it stood.
+// One row's replace taken back inside the caller's sequence - its records whole, this row's run
+// only (KBSTrackChange::RejectReplacement), then its original text read back where it stood.
 // Nothing in the model is touched; outAt / outLen say where the original text now stands.
 static bool RejectOneRow(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, TextIndex& outAt, int32& outLen, PMString& outWhy)
 {
@@ -3753,7 +3769,7 @@ bool KBSReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
 	UIDRef docRef;
 	IDFile file;
 	return KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) && docRef.GetDataBase() != nil
-		&& KBSBookScope::IsDocStillOpen(docRef) && KBSTrackChange::DocumentHasOurChanges(docRef.GetDataBase());
+		&& KBSBookScope::IsDocStillOpen(docRef) && KBSTrackChange::DocumentHasChanges(docRef.GetDataBase());
 }
 
 bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
@@ -3779,7 +3795,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	sequence->SetName(name);
 	PMString why;
 	why.SetTranslatable(kFalse);
-	const int32 accepted = KBSTrackChange::AcceptOursInDocument(docRef.GetDataBase(), why);
+	const int32 accepted = KBSTrackChange::AcceptAllInDocument(docRef.GetDataBase(), why);
 	if (accepted < 0)
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);
 	CmdUtils::EndCommandSequence(sequence);
@@ -3793,9 +3809,9 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	}
 	outStatus = "Accepted ";
 	outStatus.AppendNumber(accepted);
-	// "Kohaku Find/Change's", not "this replace's": every record signed kAuthor in the document is
-	// accepted, an earlier run's included.
-	outStatus.Append(" change(s) made by Kohaku Find/Change in the document - they can no longer be rejected here. Other people's changes are left as they are.");
+	// Every change in the document, whoever made it - as InDesign's own Accept All Changes in This
+	// Document (2026-09-27, the user's call).
+	outStatus.Append(" change(s) in the document - every tracked change in it, as InDesign's own Accept All does. They can no longer be rejected.");
 	return true;
 }
 
@@ -3873,9 +3889,24 @@ bool KBSReplaceEngine::RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStat
 	std::vector<int32> newLens(rows.size(), 0);
 	bool same = true;
 	PMString why;
+	// The record times of each row's story BEFORE Redo writes anything: the check below looks at those
+	// alone, so the row Redo has just written for a touching neighbour does not refuse the next one.
+	std::map<UID, std::set<uint64> > timesBefore;
+	for (size_t k = 0; k < rows.size(); ++k)
 	{
-		KBSTrackChange::AuthorScope author;
-		same = author.Ok();
+		UID story = kInvalidUID;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[k], story, start, end, hash)
+			|| timesBefore.count(story) != 0)
+			continue;
+		std::set<uint64>& times = timesBefore[story];
+		std::vector<KBSTrackChange::Record> recs;
+		KBSTrackChange::CollectRecords(UIDRef(docRef.GetDataBase(), story), recs);
+		for (size_t r = 0; r < recs.size(); ++r)
+			times.insert(recs[r].time);
+	}
+	{
 		for (size_t k = rows.size(); same && k-- > 0; )
 		{
 			PMString originalText, replacedText;
@@ -3900,6 +3931,13 @@ bool KBSReplaceEngine::RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStat
 			{
 				same = false;
 				why = "the row now ends an endnote, and InDesign's replace breaks an endnote there";
+				break;
+			}
+			// (a replace inside the user's own pending insertion leaves no record - see ReplaceChecked)
+			if (KBSTrackChange::IsInsideOwnPendingInsertion(storyRef, start, end, &timesBefore[story]))
+			{
+				same = false;
+				why = "the row is now inside or next to a tracked insertion of yours that is not accepted yet";
 				break;
 			}
 			InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());

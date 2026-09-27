@@ -655,8 +655,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Accept All Changes in This Document (2026-09-27): KBS's own tracked changes in the document of
-		// the row the menu was popped over.
+		// Accept All Changes in This Document (2026-09-27): every tracked change in the document of the
+		// row the menu was popped over.
 		kKBSAcceptAllChangesActionID,
 		kKBSResultRowMenuName
 		kKBSAcceptAllChangesMenuItemPosition,
