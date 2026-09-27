@@ -47,9 +47,6 @@ REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
 REGISTER_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
 // Scripting: app.kfcStatus - the panel's status line, readable from a script or over COM.
 REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
-// The Glyph tab's replace confirmation: the dialog's controller and the view that draws one glyph.
-REGISTER_PMINTERFACE(KBSReplaceConfirmDialogController, kKBSReplaceConfirmDialogControllerImpl)
-REGISTER_PMINTERFACE(KBSGlyphView, kKBSGlyphViewImpl)
 // The panel illustration's tooltip (the URL a click on it opens).
 REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)
 // "Translucent Panel": the observer that re-applies the alpha when the panel's window is rebuilt,

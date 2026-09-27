@@ -30,7 +30,6 @@
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
-#include "KBSReplaceConfirmDialog.h"	// the last prompt's text and fonts, emptied at shutdown
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
@@ -108,16 +107,6 @@ public:
 		// belongs here rather than in a static destructor at DLL unload. It was the one piece of
 		// module state with no cleanup of its own until 2026-08-08.
 		KBSSearchEngine::ShutdownCleanup();
-		// ...and the replace confirmation's: the fonts its last prompt resolved (already empty
-		// between prompts) and the prompt text itself, which had no emptier at all until the
-		// 2026-08-09 sweep found it - the fifth static this list has gained one by one, and the
-		// THIRD of those five that is a PMString.
-		// *This said "the fifth static PMString" until 2026-08-11. The sentence it is quoting -
-		//  KBSReplaceConfirmDialog::ShutdownCleanup - says "the fifth static found still holding
-		//  storage", and two of the four it counts before this one are not strings at all
-		//  (gSearchedFindAttrs is an AttributeBossList, KBSEditStamp's gPending was a vector). A
-		//  qualifier added while quoting is a different claim from the one being quoted.
-		KBSReplaceConfirmDialog::ShutdownCleanup();
 	}
 };
 

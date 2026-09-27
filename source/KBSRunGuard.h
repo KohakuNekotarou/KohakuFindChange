@@ -27,8 +27,8 @@
 //  omitted having arrived one at a time):
 //
 //    * the panel's action enablement (KBSActionComponent, twice) greys everything out;
-//    * each engine's own front door (KBSSearchEngine / KBSReplaceEngine / KBSGlyphScanEngine /
-//      KBSOversetScanEngine), for a caller that never went through the menu - a script firing an
+//    * each engine's own front door (KBSSearchEngine / KBSReplaceEngine), for a caller that never
+//      went through the menu - a script firing an
 //      action by ID reaches the engine whatever the menu says;
 //    * the book-close watcher (KBSBookWatch, twice: at the cue and again in the deferred callback),
 //      whose question would otherwise release the chapters a run is walking. It used to ask only

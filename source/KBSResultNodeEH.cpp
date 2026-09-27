@@ -297,7 +297,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(chapter, hit);
 		if (pinned != KBSResultModel::kPinnedNone)
 		{
-			PMString why("Reject Change / Redo: not for a match inside a footnote - Track Changes records nothing there.");
+			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}

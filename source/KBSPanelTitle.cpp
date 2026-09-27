@@ -16,6 +16,8 @@
 #include "IPanelControlData.h"	// FindWidget - reaching the illustration inside the panel
 #include "IPanelMgr.h"			// GetPanelFromWidgetID / GetPaletteRefContainingPanel
 #include "ISession.h"
+#include "IWorkspace.h"			// the session workspace - where the Find/Change settings live
+#include "TextWalkerServiceProviderID.h"	// IID_IFINDCHANGEOPTIONS - the protocol their changes arrive on
 #include "ISubject.h"			// AttachObserver / DetachObserver on the illustration
 #include "ITriStateControlData.h"	// the protocol a button announces its click on
 
@@ -45,6 +47,7 @@ namespace GoToURLUtils
 #include "KBSPanelMetrics.h"	// how tall the message block has to be in this UI language
 #include "KBSPanelTitle.h"
 #include "KBSResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
+#include "KBSSearchEngine.h"	// TabName / CurrentSearchMode - the Find/Change tab on the name
 
 namespace
 {
@@ -128,10 +131,18 @@ void KBSPanelTitle::Update()
 	// (user's call 2026-07-28). Staying inside ASCII also keeps this file free of the CP932
 	// mangling a non-ASCII literal in a BOM-less .cpp would bring.
 	PMString title(kKBSPlainPanelName);
+	// ***** THE FIND/CHANGE TAB, THEN THE SCOPE (2026-09-27, the user's call) *****:
+	// "Kohaku Find/Change - Text - Book", "... - GREP - Document". The tab is the one the dialog is on NOW,
+	// which is what the next Find in ... will search with. Left out when the settings cannot be read.
+	const char* const tab = KBSSearchEngine::TabName(KBSSearchEngine::CurrentSearchMode());
+	if (tab[0] != '\0')
+	{
+		title.Append(" - ");
+		title.Append(tab);
+	}
 	title.Append(" - ");
-	// The whole word, not the "Doc" this used to say (user's call 2026-08-01). A tab is narrow and
-	// truncates, which is why it was shortened in the first place, but the name in front of it lost
-	// a word in the same rename and can carry the longer one now.
+	// The whole word, not "Doc" (user's call 2026-08-01, and again on 2026-09-27 after a few hours of
+	// "Doc" beside the tab name).
 	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : "Document");
 	// A palette label is a candidate translation key like any other UI string, so an untranslated
 	// name would be swapped for whatever the string table happens to hold under it.
@@ -154,6 +165,28 @@ namespace
 /** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
     Silently does nothing when the widget is not there, which is the ordinary state while the panel
     is being torn down. */
+// ***** THE FIND/CHANGE TAB ON THE PANEL'S NAME (2026-09-27). ***** The dialog's settings are a session
+// preference (IFindChangeOptions on the session workspace), and a preference command notifies the
+// workspace's subject on the preference's own IID - so switching the dialog's tab should arrive here
+// and rename the tab at once. (No worked example of observing these settings exists in the SDK; the
+// title is also rewritten on show, on a scope toggle and on every search, so it is right by the next
+// of those even if a tab switch never arrives.)
+void AttachToFindChangeOptions(IObserver* observer, bool attach)
+{
+	ISession* session = GetExecutionContextSession();
+	if (session == nil)
+		return;
+	InterfacePtr<IWorkspace> ws(session->QueryWorkspace());
+	InterfacePtr<ISubject> subject(ws, UseDefaultIID());
+	if (subject == nil)
+		return;
+	const bool attached = subject->IsAttached(observer, IID_IFINDCHANGEOPTIONS) != kFalse;
+	if (attach && !attached)
+		subject->AttachObserver(observer, IID_IFINDCHANGEOPTIONS);
+	else if (!attach && attached)
+		subject->DetachObserver(observer, IID_IFINDCHANGEOPTIONS);
+}
+
 void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const WidgetID& widgetID, bool attach)
 {
 	if (panelData == nil)
@@ -229,6 +262,9 @@ public:
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
 			AttachToWidget(panelData, this, KBSPanelIcon::NthWidgetID(i), true);
 
+		// The Find/Change tab on the name follows the dialog while the panel is up.
+		AttachToFindChangeOptions(this, true);
+
 		// *At startup (KBSStartupShutdown::Startup) the panel manager may not have come up yet, in
 		// which case the subscription failed - so it is tried again here. IsAttached guards it, so
 		// this cannot subscribe twice.
@@ -259,10 +295,20 @@ public:
 
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
 			AttachToWidget(panelData, this, KBSPanelIcon::NthWidgetID(i), false);
+
+		AttachToFindChangeOptions(this, false);
 	}
 
-	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& /*protocol*/, void* /*changedBy*/)
+	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* /*changedBy*/)
 	{
+		// A Find/Change setting changed - the tab, among others. Renaming costs one label write, so
+		// every change on this protocol is taken rather than trying to tell the tab from the rest.
+		if (protocol == IID_IFINDCHANGEOPTIONS)
+		{
+			KBSPanelTitle::Update();
+			return;
+		}
+
 		// kTrueStateMessage is the click - the product reads it as the button coming back UP
 		// (linksui/ProblemLinksDialogObserver.cpp:80 "Only respond when the button is going up"),
 		// and every product button observer tests this one message and nothing else

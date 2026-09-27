@@ -22,9 +22,8 @@
 //      colour cell (KBSColorTextView) with the matched part highlighted. No expander (a leaf);
 //      indented past its branch row.
 //
-//  The FONT rows (2026-08-02) appear only under a chapter whose hits name fonts - a missing-glyph
-//  scan. A Find/Change chapter has no groups and its hits hang off it directly, which is the tree
-//  KBS has always drawn.
+//  The STORY rows (2026-09-27) group each chapter's hits by story. (The level held the FONT rows of
+//  Find Missing Glyphs from 2026-08-02 until that scan was removed on 2026-09-27.)
 //
 //  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget, applied on top of
 //  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
@@ -664,7 +663,7 @@ void KBSResultTree::Rebuild()
 	// ***** THE STORY ROWS COME UP OPEN (2026-09-27, the story level). ***** The level is a grouping, not
 	// a place to hide rows: a story row closed would put every hit one click further away than it was
 	// before the level existed. Opened in a closed chapter too (a book's), so the chapter's arrow shows
-	// its hits at once. A missing-glyph scan's FONT rows are left as they always were.
+	// its hits at once.
 	for (int32 c = 0; c < chapters; ++c)
 	{
 		const int32 groups = KBSResultModel::GetDisplayFontCount(c);

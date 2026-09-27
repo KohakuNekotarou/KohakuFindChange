@@ -198,23 +198,32 @@ namespace KBSReplaceEngine
 
 	/** ***** A STORY ROW'S MENU (2026-09-27, the story level). ***** Replace = the story's TICKED rows (the
 	    user's call), no prompt, one undo step, the list stays a work list (as ReplaceHit). Reject Change =
-	    every replaced row of the story whose tracked change is still there, one undo step. Redo = every row
-	    of the story taken back that can be replaced again; the others are skipped and counted. Each says
-	    what it did - or why nothing - in outStatus. */
+	    every replaced row of the story whose tracked change is still there, one undo step. (Redo went on
+	    2026-09-27 - a row taken back is replaced again with Replace.) Each says what it did - or why
+	    nothing - in outStatus. */
 	bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	/** Replace on a DOCUMENT row (2026-09-27): that document's ticked rows, as ReplaceStory. */
+	bool ReplaceChapter(int32 chapterIdx, PMString& outStatus);
+	bool CanReplaceChapter(int32 chapterIdx);
+	/** Reject Change on a DOCUMENT row (2026-09-27): every replaced row of the document outside a footnote
+	    whose tracked change is still there, one undo step (as RejectStory, over the whole document). */
+	bool RejectChapter(int32 chapterIdx, PMString& outStatus);
+	bool CanRejectChapter(int32 chapterIdx);
+	/** Redo on a DOCUMENT row (2026-09-27): as RedoStory, over the whole document. */
+	bool RedoChapter(int32 chapterIdx, PMString& outStatus);
+	bool CanRedoChapter(int32 chapterIdx);
 	bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	/** Redo on a story row (2026-09-27, the user's call C): every row of the story taken back with Reject
+	    Change and still holding its original text, replaced again with what Find/Change holds now, ticked
+	    or not; the rest are skipped and counted. One undo step, the list stays as it is. */
 	bool RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	/** Is there anything for the story row's Replace / Reject Change / Redo to do (the menu's greying). */
+	bool CanRedoStory(int32 chapterIdx, int32 groupIdx);
+	/** Is there anything for the story row's Replace / Reject Change to do (the menu's greying). */
 	bool CanReplaceStory(int32 chapterIdx, int32 groupIdx);
 	bool CanRejectStory(int32 chapterIdx, int32 groupIdx);
-	bool CanRedoStory(int32 chapterIdx, int32 groupIdx);
 
-	/** Redo on a row taken back with Reject Change (2026-09-26): the same query - refused through
-	    RefuseChangedQuery when the dialog no longer holds it - is run over that row's text alone
-	    (Change All on the row's range, under Track Changes, as the run), in ONE undo step.
-	    All or nothing: unless exactly one replacement lands and writes the same text the run wrote,
-	    the step is rolled back. False = nothing changed; outStatus says why either way. */
-	bool RedoHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+	// (RedoHit - Redo on a row taken back - went on 2026-09-27, the user's call: a row taken back carries a
+	//  box again and is replaced again with Replace or Change Checked.)
 
 	/** Accept All Changes in This Document on a document row (2026-09-27, the user's call): every
 	    tracked change in that chapter's document is accepted, whoever made it - as InDesign's own does -

@@ -218,7 +218,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSActionComponent.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListWidgetMgr.cpp"/>
@@ -227,7 +226,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSMarkerExpiryIdleTask.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSJump.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReportSave.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp"/>
@@ -243,12 +241,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetScanEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
@@ -270,7 +265,6 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFactoryList.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeID.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.h"/>
@@ -288,11 +282,8 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSOversetScanEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h"/>
    </ItemGroup>

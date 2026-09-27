@@ -24,9 +24,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -49,9 +46,6 @@
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReportSave.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp">
@@ -99,12 +93,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphView.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -112,9 +100,6 @@
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetScanEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.cpp">
@@ -159,9 +144,6 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphScanEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.h">
@@ -215,19 +197,10 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceConfirmDialog.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSGlyphView.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSOversetScanEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h">

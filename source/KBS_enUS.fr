@@ -40,8 +40,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
 
                 // ----- Command strings
                 kKBSSearchBookMenuKey,			"Search",
-                kKBSFindMissingGlyphsMenuKey,	"Find Missing Glyphs",
-                kKBSFindOversetMenuKey,			"Find Overset",
                 kKBSBookScopeMenuKey,			"Book Scope",
                 kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
                 kKBSTranslucentPanelMenuKey,	"Translucent Panel",
@@ -53,12 +51,14 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSReplaceHitMenuKey,			"Replace",
                 kKBSRejectChangeMenuKey,		"Reject Change",
-                kKBSRedoMenuKey,				"Redo",
                 kKBSAcceptAllChangesMenuKey,	"Accept All Changes in This Document",
+                kKBSRedoMenuKey,				"Redo",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
-                kKBSSaveResultsMenuKey,			"Save Results...",
                 // The operating reference. English in both tables, like the rest of the flyout.
                 kKBSHowToMenuKey,				"How to Use...",
+                // The Keyboard Shortcuts editor's area (kKBSPanelMenuActionArea): files the
+                // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
+                kKBSPanelMenuActionArea,		kKBSPanelMenuActionAreaValue,
 
                 // ----- Window strings
 
@@ -72,22 +72,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // is always right here, because Book Scope starts OFF at every launch.
                 kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find in Document from this panel's menu.",
 
-                // ----- Change Checked confirmation prompt
-                // ^1 takes real data (a count, the user's find / change string), which is marked
-                // untranslatable before it goes in - see KBSActionComponent::ConfirmReplace.
-                // The Japanese wording lives in KBSLoc.h (runtime switch by UI language - the
-                // jaJP string table is gone, 2026-08-05).
-                kKBSConfirmReplaceOneKey,		"Change 1 checked hit?",
-                kKBSConfirmReplaceManyKey,		"Change ^1 checked hits?",
-                kKBSConfirmFindKey,				"Find: ^1",
-                kKBSConfirmChangeToKey,			"Change: ^1",
-                kKBSConfirmTrackedKey,			"Replaces with Track Changes on. After replacing, a change can be undone with Reject Change in Track Changes.",
-                kKBSConfirmEmptyReplaceKey,		"(empty - the matches will be deleted)",
-                // The Find/Change dialog's own names for its two format panes. Shown when a format
-                // is set: "cat  + Find Format", or alone when the box beside it is empty (a search
-                // by format with nothing typed - which the dialog allows and KBS now runs).
-                kKBSConfirmFindFormatKey,		"Find Format",
-                kKBSConfirmChangeFormatKey,		"Change Format",
+                // (The Change Checked confirmation's strings stood here until 2026-09-27, when the
+                // prompt was removed.)
                 // Sits between the query and the closing lines: what is about to be written, then
                 // what could go wrong with it, then what the run leaves behind.
                 //
@@ -104,24 +90,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
                 // What Edit > Undo calls a Change Checked run (2026-09-26).
                 kKBSReplaceStepKey,				"Replace",
-                // Unconditional again since 2026-08-05: both used to open with "Unless you tick the
-                // box below", because a "save after replace" box underneath could make them false.
-                // That box is gone with its feature, so a run has only one outcome left to state.
-                // ONE string since 2026-08-07 (user's wording): it states the case instead of
-                // counting chapters, so the singular/plural pair it replaced is gone and there is
-                // no ^1 left in it.
-                kKBSConfirmUnsavedKey,			"When a replace covers several documents in a book, every document it changes is left open and UNSAVED.",
-                // Follows the line above on both layouts, whatever the count. Just the warning
-                // since 2026-08-07 (user's wording): the line above already states the condition
-                // it used to repeat.
-                kKBSConfirmCareKey,				"Please take care.",
-
-                // ----- Glyph tab confirmation (the dialog that draws the glyphs themselves)
-                // The count and the closing line above are shared with it - only these four are new.
-                kKBSGlyphConfirmFindLabelKey,	"Find",
-                kKBSGlyphConfirmChangeLabelKey,	"Change to",
-                kKBSGlyphConfirmArrowKey,		"->",
-                kKBSGlyphConfirmDontShowKey,	"Don't show again",
 
                 // "Save after replace" had three strings here (the box, its note, and the extra
                 // warning that went up when it was ticked) from 2026-08-02 until the feature was

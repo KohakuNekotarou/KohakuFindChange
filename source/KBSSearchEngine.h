@@ -95,8 +95,8 @@ namespace KBSSearchEngine
 	           changing: same scope, same five options, same result model, same progress bar.
 	           !! NO CALLER PASSES ANYTHING ELSE TODAY. It was built for the missing-glyph scan, which
 	           drove it with kAnyNotDefGlyphID until 2026-08-02 - that route reads the composed wax
-	           now (KBSGlyphScanEngine) because the find/change one takes InDesign down on any
-	           document holding overset text. Kept rather than removed because it is the whole of
+	           instead (that scan was removed on 2026-09-27) because the find/change one takes
+	           InDesign down on any document holding overset text. Kept rather than removed because it is the whole of
 	           what a caller with its own glyph query needs, and removing it would take the matching
 	           argument on CommitSearchMode with it; do not read the presence of the parameter as
 	           evidence that something uses it.
@@ -179,75 +179,24 @@ namespace KBSSearchEngine
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
 	bool CommitReplaceSide();
 
-	/** The Find/Change dialog's English name for a CJK character type ("Kanji", "Full-Width
-	    Katakana", ...) - the Transliterate tab's query, which has no find string to quote. Never a
-	    translation key; a value outside the enum comes back EMPTY - the walk signature is the place
-	    that states the raw number. */
-	const char* CharacterTypeName(int32 characterType);
+	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value):
+	    "Text", "GREP", "Glyph", "Transliterate" ... - empty for a value outside the enum. The status
+	    line and the panel's tab (KBSPanelTitle) both name the tab through this one table. */
+	const char* TabName(int32 mode);
 
-	/** Is anything set in the dialog's Find Format / Change Format pane, for the tab in force?
+	/** The tab the Find/Change dialog is on NOW (the session's IFindChangeOptions), as an
+	    IFindChangeOptions::SearchMode value; -1 when the settings cannot be read. Held as a plain int
+	    so this header needs no text includes. */
+	int32 CurrentSearchMode();
 
-	    Used to caption a search by formatting alone ("Find Format" where the query would otherwise be
-	    blank) and to keep the replace prompt from telling the user that an empty Change To box will
-	    DELETE their matches when a Change Format is set and only the formatting will change.
+	/** Can Find in ... run on this tab? No on Object and Colour, which find page items rather than
+	    text. Asked by the menu (greys the command) and by the search itself (refuses), so the two
+	    cannot disagree. */
+	bool CanSearchTab(int32 mode);
 
-	    ***** TWO PLACES HOLD A FORMAT AND ONLY ONE OF THEM IS A LIST. ***** Counting
-	    AttributeBossList alone misses paragraph and character STYLES, which IFindChangeOptions keeps
-	    in fields of their own (GetFindParaStyle / GetFindCharStyle and the change-side pair).
-	    Measured 2026-08-04: a paragraph style in Find Format left CountBosses at 0 while a point size
-	    put one in, so the prompt printed "Find: ^1" and "(empty - the matches will be deleted)" for
-	    exactly the query this was supposed to describe. Both are asked here, so no caller has to
-	    remember the split.
-
-	    Takes no arguments on purpose: every caller wants the tab in force, and asking for it here
-	    keeps IFindChangeOptions.h out of this header. Says false when the settings cannot be read. */
-	bool HasFindFormatSet();
-	bool HasChangeFormatSet();
-
-	/** WHAT is set in one side of the format pane, in InDesign's own words -
-	    "size: 14 pt + leading: 24 pt + Paragraph style: Body".
-
-	    The " + " between entries is the Style Options "Settings" line's own separator, and it comes
-	    from the attributes themselves rather than from this call (measured 2026-08-04).
-
-	    The attributes describe THEMSELVES: IAttrReport::AppendDescription is the call that builds
-	    the Settings text in Style Options and the "+" override tooltip, so the wording and the
-	    language are the ones the user already sees. Paragraph and character styles are added
-	    separately (they are not attributes) and are named by their FULL path, group included.
-
-	    Comes back EMPTY when nothing is set, when the settings cannot be read, or - possible in
-	    principle - when every attribute declines to describe itself. Callers must treat empty as
-	    "say nothing extra", never as "no format set" (that question is HasFindFormatSet's).
-
-	    @param findSide true for Find Format, false for Change Format.
-	    @param limited  true to stop at kKBSFormatDetailLimit characters and say " + ..." for the
-	           rest, false to write every setting however long the line becomes.
-
-	           ***** WHICH ONE A CALLER WANTS FOLLOWS FROM WHAT IT IS WRITING. ***** The replace
-	           prompt is a QUESTION - the reader is recognising the settings they made, and a
-	           paragraph of them in an alert helps nobody - so it limits. The saved report is a
-	           RECORD, read later and matched against a document, so it does not (user's decision,
-	           2026-08-04: "the export, with no character limit"). */
-	PMString DescribeFormatSetting(bool findSide, bool limited);
-
-	/** What is in the Change To box, as the one line the saved report's "Change:" heading shows -
-	    the replace string plus its Change Format, or the Glyph tab's replacement glyph.
-
-	    The change side's counterpart to the query line KBSResultModel::SetQueryText holds, and it
-	    carries no tab name: the Query: line directly above it in the report has already said which
-	    tab this was.
-
-	    ***** RECORD IT WHEN THE REPLACE RUNS, NOT WHEN THE REPORT IS SAVED. ***** The user is free
-	    to retype Change To the moment the replace returns, and a report that read the dialog at save
-	    time would name a replacement these rows never took (the same rule, and the same reason, as
-	    SetQueryText). KBSReplaceEngine records it on the way in, after CommitReplaceSide - the
-	    Glyph tab's change glyph is not on the options until that has run.
-
-	    Comes back EMPTY when the settings cannot be read, and on the Glyph tab when Change To holds
-	    no glyph. An empty Change To on Text/GREP gives an empty string, which is honest: the report
-	    states what was set, and does not explain that an empty box deletes the matches - that
-	    sentence belongs to the prompt, where the user is being ASKED. */
-	PMString DescribeCurrentChange();
+	// (CharacterTypeName, HasFindFormatSet / HasChangeFormatSet, DescribeFormatSetting and
+	// DescribeCurrentChange - the captions the replace prompt and the saved report printed - were
+	// removed with them on 2026-09-27.)
 
 	/** EVERYTHING the current Find/Change settings would drive a walk BY, as one opaque string:
 	    the tab, the query itself, and every switch that decides WHICH matches come back -
@@ -397,8 +346,8 @@ namespace KBSSearchEngine
 	    along the citation.)
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
-	          THREAD (and is the only test that answers for a table cell overflowing on its own -
-	          see KBSOversetScanEngine). This one is about a single position.
+	          THREAD (and is the only test that answers for a table cell overflowing on its own).
+	          This one is about a single position.
 
 	    @return true when the position has no frame of its own. Anything that cannot be resolved -
 	            no text model, no parcel list - reads the same way, exactly as FrameUIDForPosition

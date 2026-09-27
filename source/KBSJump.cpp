@@ -736,10 +736,8 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// The story and position arms of the test are trivially satisfied here - we are asking ABOUT the
 	// stored position. What does the work is the text.
 	//
-	// ***** Asked only of a row whose match IS story text. ***** An overset finding carries the
-	// scan's own words there - "Frame (370)" - so the comparison could never agree, and every click
-	// on one was answering a jump that had just landed correctly with "Not found - the text is no
-	// longer where the search left it" and stamping the row 'missing' (2026-08-02).
+	// (Asked only of a row whose match was story text until 2026-09-27: Find Overset's rows carried
+	//  the scan's own words. Every row is a search's since that scan was removed.)
 	// The stored HASH, not the drawn text: the row's match string is capped for drawing, so
 	// asking it about a long GREP match only ever compared its first stretch (2026-08-04). The story,
 	// position and length arms are all trivially satisfied here - this side asks about the very
@@ -749,9 +747,8 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	uint64 expectHash = 0;
 	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
 		expectHash);
-	const bool sameOccurrence = !KBSResultModel::MatchTextIsLiveText()
-		|| KBSSearchEngine::MatchIsSameOccurrence(
-			storyRef, start, end, storyUID, start, end, expectHash);
+	const bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
+		storyRef, start, end, storyUID, start, end, expectHash);
 
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
@@ -865,24 +862,6 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			KBSResultTree::RefreshRows();
 			message.Append("Not found - the text is no longer where the search left it. Search again.");
 		}
-		KBSResultTree::ShowStatus(message);
-	}
-	else if (!KBSResultModel::MatchTextIsLiveText() && !overset)
-	{
-		// ***** An OVERSET row whose place is not overset any anymore. *****
-		//
-		// An overset finding is a statement about the document as it was AT SCAN TIME, and this is the
-		// one row that can go silently stale: the test above cannot speak for it - its match segment
-		// holds the scan's own words ("Frame (370)"), so the comparison is short-circuited - and the
-		// jump itself works perfectly, scrolling to whatever now stands at that position. The result
-		// was a click that moved the view and said nothing at all, over a row that no longer describes
-		// anything (the text was made to fit, or an edit moved this position into placed text).
-		//
-		// The ROW is left alone on purpose. 'missing' means "the text is not where the search left
-		// it", which is not what happened here, and there is nothing to fix on a row whose whole
-		// content is a measurement - the answer is to scan again, which is what this says.
-		PMString message("No longer overset here - this row is out of date. Run Find Overset again.");
-		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
 	}
 }
@@ -1068,8 +1047,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	uint64 expectHash = 0;
 	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
 		expectHash);
-	if (KBSResultModel::MatchTextIsLiveText()
-		&& !KBSSearchEngine::MatchIsSameOccurrence(storyRef, start, end, storyUID, start, end,
+	if (!KBSSearchEngine::MatchIsSameOccurrence(storyRef, start, end, storyUID, start, end,
 			expectHash))
 	{
 		return false;

@@ -92,19 +92,9 @@ namespace KBSResultModel
 								// Layers" is on, and then the text is composed and jumpable but
 								// draws nothing, so the row has to say why the page looks empty.
 
-		PMString	fontName;	// the font that had no glyph for this text. Empty for a Find/Change
-								// hit: only a glyph scan fills it, because there the font IS the
-								// answer - a box almost always means "this font does not have this
-								// character", and the fix is to apply one that does.
-								//
-								// It is the tree's FONT LEVEL that says it now, not the row: the
-								// name was drawn at the end of every row until 2026-08-02, when the
-								// hits were grouped under it instead (see FontGroup).
-
-		int32		fontGroup;	// which of its chapter's fontGroups this hit belongs to, and where it
-		int32		fontGroupPos;	// sits inside that group. Both -1 when the chapter has no groups
-								// at all - a Find/Change result names no font, and its tree stays
-								// the three levels it has always had. Filled by AppendChapter; the
+		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
+		int32		fontGroupPos;	// to, and where it sits inside that group. -1 before AppendChapter
+								// groups it (every hit has a group since 2026-09-27). Filled by AppendChapter; the
 								// tree reads them to answer "who is my parent" and "which child am
 								// I" without searching.
 
@@ -176,22 +166,17 @@ namespace KBSResultModel
 				recordTime(0), pageOrdinal(0) {}
 	};
 
-	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
-
-	    The tree has a font level because a box means "this font has no glyph for this character",
-	    so the font IS the unit a fix applies to - the official preflight rule offers "Apply a font
-	    that has the glyph" for exactly the same reason.
+	/** One STORY of a chapter's hits - one story row in the tree (2026-09-27). The struct keeps the name
+	    it had when this level held the fonts of Find Missing Glyphs (removed 2026-09-27).
 
 	    hitIndices index the chapter's own hits vector, ASCENDING, which is what lets the display cap
 	    be applied to a group with a lower_bound rather than a scan. */
 	struct FontGroup
 	{
-		PMString			fontName;	// as the user sees it in the font menu (family + style) - or, for a
-										// STORY group, the story row's text ("P3  first words...")
+		PMString			fontName;	// the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// ***** A STORY GROUP (2026-09-27, the user's call). ***** A Find/Change result groups its hits
-		// by story, the way KCM's Story mode lists stories: the same level a missing-glyph scan fills
-		// with fonts. A story row carries Replace / Reject Change / Redo / Check All / Uncheck All for its
+		// by story, the way KCM's Story mode lists stories. A story row carries Replace / Reject Change / Redo / Check All / Uncheck All for its
 		// rows (KBSReplaceEngine::ReplaceStory and the rest).
 		bool				isStory;
 		UID					story;
@@ -217,7 +202,7 @@ namespace KBSResultModel
 	    then appends each chapter as it finishes. Only chapters with >=1 hit should be appended (empty
 	    branches are never shown).
 
-	    This is also where the chapter's FONT GROUPS are built, from the hits' own fontName - so a
+	    This is also where the chapter's STORY GROUPS are built, from the hits' own stories - so a
 	    caller fills in nothing but the hits, and no result can reach the tree ungrouped.
 	    (A SetResults that swapped the whole vector in at once sat beside this until 2026-07-30, by
 	    which time nothing called it: two entry points for filling the same model, one of them also
@@ -259,7 +244,7 @@ namespace KBSResultModel
 	    like SetFromBook.
 
 	    It is its own flag rather than a second meaning hung on SetFromBook, for the reason stated
-	    over SetResultKind below: two statements behind one flag cannot be changed independently
+	    over IsShowingReplaceOutcome: two statements behind one flag cannot be changed independently
 	    afterwards. */
 	void NoteRun();
 	bool HasRun();
@@ -276,43 +261,14 @@ namespace KBSResultModel
 	void SetStoppedShort(bool stoppedShort);
 	bool IsStoppedShort();
 
-	/** What KIND of results the model is holding.
-
-	    A missing-glyph scan is a REPORT, not a work list: there is nothing about it to replace, so
-	    no row offers a check box and Change Checked has nothing to act on.
-
-	    Deliberately NOT folded into IsShowingReplaceOutcome, which states something else entirely -
-	    "these rows are the aftermath of a replace". Two different statements behind one flag cannot
-	    be changed independently afterwards.
-
-	    Cleared by Clear() back to kResultFindChange, so - like SetFromBook - it has to be set AFTER
-	    the model is cleared, not before. */
-	enum ResultKind
-	{
-		kResultFindChange = 0,	// hits from the user's own Find/Change query (the original feature)
-		kResultMissingGlyph,	// findings from a notdef scan
-		kResultOverset			// findings from an overset scan
-	};
-
-	void SetResultKind(ResultKind kind);
-	ResultKind GetResultKind();
-
-	/** Is the model holding a REPORT rather than a work list? A scan finds something to look at;
-	    it does not offer anything to change. So no row of one carries a check box, and the column
-	    those boxes would have stood in is narrowed to half (KBSResultListWidgetMgr).
-
-	    ONE question in ONE place. The model side (RowHasCheckBox) and the drawing side (ApplyHitRow)
-	    each used to name kResultMissingGlyph themselves, which meant a second scan kind had to be
-	    remembered in two files - and a row whose box the model refuses but the panel still draws is
-	    a row that promises an action nothing carries out. */
-	bool IsReportOnlyKind();
+	// (ResultKind - Find/Change hits, or a scan's report - and IsReportOnlyKind stood here until the two
+	//  scans were removed on 2026-09-27: every result set is a Find/Change one.)
 
 	/** Does NO row of this result set carry a check box?
 
-	    A property of the WHOLE list, and there are two ways it happens - a SCAN reports rather than
-	    offering work (IsReportOnlyKind), and a replace's REPORT is what is left after every row lost
-	    its box at once (IsShowingReplaceOutcome). They are different facts, which is why both are
-	    asked, but everything that draws the panel wants the OR of them.
+	    A property of the WHOLE list: a replace's REPORT is what is left after every row lost its box at
+	    once (IsShowingReplaceOutcome) - unless a row of it has been taken back with Reject Change. (A
+	    scan's report was the second way until the two scans were removed, 2026-09-27.)
 
 	    ***** ASKED BY THE BRANCH ROWS TOO, AND THAT IS WHY IT IS HERE. ***** The book row and the
 	    document rows read out "(N/M checked)", which is a sentence only a work list can mean. On a
@@ -323,19 +279,6 @@ namespace KBSResultModel
 	    asks it here as well: three rows of one tree cannot be allowed to disagree about whether the
 	    list they are in offers work. */
 	bool NoRowHasCheckBox();
-
-	/** Is a hit's matchText the text that is REALLY at its position in the story?
-
-	    True for everything the search and the glyph scan produce - both take the row's three
-	    segments straight out of the story - and false for an overset finding, where
-	    KBSOversetScanEngine writes what it found ("Frame (370)") into matchText instead, because the
-	    colour cell keeps the match at full strength and ellipsizes the context around it.
-
-	    Asked by anything that compares a stored row against the document. KBSJump does it on every
-	    click, to notice that an edit has moved the text out from under a row; over an overset row
-	    that comparison could only ever fail, and it was announcing "Not found" and marking the row
-	    'missing' on a jump that had just worked perfectly. */
-	bool MatchTextIsLiveText();
 
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
@@ -355,59 +298,8 @@ namespace KBSResultModel
 	void SetSearchMode(int32 mode);
 	int32 GetSearchMode();
 
-	/** The query these results were found with, as ONE READY-MADE LINE - the string plus the tab it
-	    was searched on: "cat  (Text)", or "Glyph 1234 (Kozuka Mincho Pr6N  Regular) U+845B  (Glyph)".
-
-	    Held as a finished line rather than as its parts because the parts live in two different
-	    places: the string is on IFindChangeOptions, and the tab's NAME is the Find/Change dialog's own
-	    label, spelled by the search engine. The model would have to learn both to join them, and the
-	    only thing that reads this - the report's heading - wants them joined.
-
-	    Recorded by the search beside SetSearchMode, and cleared by Clear(), so it can never outlive
-	    the results it describes. It must NOT be read back off the Find/Change dialog at save time:
-	    the user can retype the query between the search and the save, and the file would then name a
-	    query these rows never came from.
-
-	    Empty for a scan - neither scan has a query - and empty until the first search of a session.
-
-	    ***** RECORDED HERE, READ INSIDE THE MODEL. ***** BuildReportText writes it into the saved
-	    report's heading, and that is the whole of its use - so there is no getter. One stood here
-	    until 2026-08-08 with no callers at all. */
-	void SetQueryText(const PMString& query);
-
-	/** The sentence the run that produced these results reported - what DoAction shows on the
-	    status line the moment a run returns ("9 hit(s) in 3 of 3 chapter(s)...").
-
-	    Recorded because the STATUS LINE cannot be trusted to still say it by save time: ticking a
-	    row overwrites it with "P1(2)  checked", toggling the translucent panel writes its own
-	    sentence, and the saved report's "Summary:" heading then carried whichever of those came
-	    last (found 2026-08-09). Cleared by Clear() like every other line the report reads, so it
-	    can never outlive the results it describes.
-
-	    @param summary the run's finished summary sentence (already untranslatable). */
-	void NoteRunSummary(const PMString& summary);
-
-	/** The recorded run summary, for the saved report's heading - empty when no run has reported
-	    since the last Clear(). @see NoteRunSummary */
-	PMString GetRunSummary();
-
-	/** What the replace was told to WRITE, as one ready-made line - the change string plus its Change
-	    Format, or the Glyph tab's replacement glyph. See KBSSearchEngine::DescribeCurrentChange.
-
-	    The change side's counterpart to SetQueryText, and recorded by the same rule: the REPLACE
-	    records it on its way in, because the user is free to retype Change To the moment it returns
-	    and a report that read the dialog at save time would name a replacement these rows never took.
-
-	    ***** WRITTEN INTO THE REPORT ONLY WHILE IsShowingReplaceOutcome IS ON. ***** A search that
-	    has not been replaced yet leaves it empty, and that is the point (user's decision,
-	    2026-08-04): a "Change:" line in the report of a plain search would name something that has
-	    not happened, which reads as something that has.
-
-	    Cleared by Clear(), so it can never outlive the results it describes. Read inside the model
-	    only, like SetQueryText's line - BuildReportText is the one place that wants it. */
-	void SetChangeText(const PMString& change);
-	/** The change side the last replace ran with (SetChangeText) - what Redo compares the dialog to. */
-	PMString GetChangeText();
+	// (SetQueryText / NoteRunSummary / GetRunSummary / SetChangeText / GetChangeText - the lines the
+	//  saved report's heading read - went with Save Results... on 2026-09-27.)
 
 	/** EVERYTHING a walk is driven by, as one opaque comparable string: the query itself plus every
 	    Find/Change switch that decides which matches come back (see
@@ -517,10 +409,6 @@ namespace KBSResultModel
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
 		PMString		postText;
-		PMString		fontName;	// the font that had no glyph for this text; empty on a Find/Change
-									// row. NOT drawn on the row any more - the tree says it once on
-									// the FONT row above the group (2026-08-02). Still handed out
-									// because app.kfcResults reports it per hit (DescribeAllRows).
 		bool			checked;
 		bool			replaced;
 		bool			locked;
@@ -567,49 +455,14 @@ namespace KBSResultModel
 	        #  <book name>  <from book>  <showing outcome>  <chapters>  <total hits>
 	        <chapter idx>  <chapter name>  <hit idx>  <locator>  <accent>  <pre>  <match>  <post>
 	            <font name>  <checked>  <replaced>  <locked>  <outcome word>  <font group>
+	    (<font name> is always EMPTY since Find Missing Glyphs went on 2026-09-27 - kept so the columns
+	     after it stay where the scripts that read them expect.)
 
 	    Tab, return and backslash inside the text are escaped (\t, \n, \\), so one hit is always
 	    exactly one line with a fixed column count - a match CAN run across a paragraph break. */
 	void DescribeAllRows(PMString& out);
 
-	/** The whole result set as the text file "Save Results..." writes: a heading block, a blank line,
-	    a column-heading row, then ONE LINE PER HIT - tab separated, uncapped (every stored hit,
-	    including those past the panel's display limit).
-
-	        Kohaku Find/Change (after Change Checked)
-	        Query: cat  + Find Format (size: 14 pt + Paragraph style: Body)  (Text)
-	        Change: dog  + Change Format (size: 20 pt)
-	        Book: savetest.indb
-	        Summary: 9 replaced in 3 of 3 chapter(s)
-	        Rows: 9
-
-	        <Document>  <Page>  <No>  <Text>  <Font>  <Flags>
-	        ch1.indd    1             ...the cat sat on the...
-	        ch1.indd    2       2     ...three cats...                    locked
-
-	    !SIX columns, and <No> is the one that goes stale in a written-out example. It carries the
-	     "(2)" of the panel's locator - which hit this is ON ITS PAGE - and without it several matches
-	     in one paragraph write identical lines (see the comment at that column in BuildReportText).
-	     It was added on the same day the file was named after the document, and this example was
-	     still showing the five columns that came before it until 2026-08-11. The flag words are
-	     BuildFlagCell's, which are the locator's own ("locked", not "lock").
-
-	    The format detail in those two lines is written IN FULL, however long it runs (user's
-	    decision, 2026-08-04) - the replace prompt is the one that shortens it. "Change:" appears on
-	    the aftermath of a replace only; see SetChangeText.
-
-	    NOT DescribeAllRows in another dress, though they read the same rows. That one is the machine
-	    port behind app.kfcResults: it escapes tabs and newlines to "\t" / "\n" so a script can split
-	    the block back into fields. This one is pasted into a spreadsheet by a person, where a literal
-	    "\n" is noise - so here the same characters are FLATTENED TO A SPACE instead (a match can run
-	    across a paragraph break, and a real newline in a cell splits the row).
-
-	    @param summaryLine the RUN's summary sentence (GetRunSummary), written into the heading as
-	           "Summary:". Until 2026-08-09 the caller passed the panel's status line here, and a
-	           tick between the run and the save made the heading say "P1(2)  checked". Empty =
-	           leave the line out. Passed in rather than fetched only so this stays a pure
-	           formatter. */
-	void BuildReportText(const PMString& summaryLine, PMString& out);
+	// (BuildReportText - the text file Save Results... wrote - was removed on 2026-09-27.)
 
 	/** A hit node's display: the page locator and the three line segments to paint. false = index
 	    out of range. @see GetHitRow when the flags are wanted as well. */
@@ -754,8 +607,8 @@ namespace KBSResultModel
 	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
 	    longer replaced, and says "rejected". */
 	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
-	/** Redo replaced it again: replaced, at [start, end), the "rejected" gone. */
-	void SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
+	// (SetHitRedone went with Redo on 2026-09-27: a row taken back is replaced again like any other -
+	//  MarkHitReplaced clears its "taken back".)
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
 
@@ -804,6 +657,14 @@ namespace KBSResultModel
 	    every check box off the panel.
 	    @return the number of rows left in the model. */
 	int32 KeepCheckedRows();
+
+	/** ***** A ROW TAKEN BACK IS WORK AGAIN (2026-09-27, the user's call A and B). ***** A row Reject Change
+	    put back to its original text carries a box again - in a work list and in a replace's report
+	    alike - so it can be ticked and replaced again (Change Checked, or its menu's Replace). (Redo went
+	    on 2026-09-27, the user's call: Replace is the one way.) IsWorkRow = checked-and-waiting's rule: not replaced, and nothing said about it
+	    but "taken back". AnyRejectedRowOpen = does a report hold one (then the report offers work). */
+	bool IsWorkOutcome(ChangeOutcome outcome);
+	bool AnyRejectedRowOpen();
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
 	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced

@@ -102,12 +102,13 @@ DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
 // read from a script (and therefore over COM). Built for verification - the panel says what a
 // search or a replace did in one line, and until now the only way to read it was to look at it.
 DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
-// The Glyph tab's replace confirmation: the dialog itself, and the widget that draws one glyph in
+// RETIRED 2026-09-27 with the confirmation (not reused): the Glyph tab's replace confirmation - the
+// dialog itself, and the widget that draws one glyph in
 // the font that defines it. The dialog is the stock kDialogBoss plus our controller (the shape
 // basicdialog and KESCL's offset dialog both use); the glyph widget is a generic panel whose
 // IControlView is ours, built the same way the hit row's colour cell is.
-DECLARE_PMID(kClassIDSpace, kKBSReplaceConfirmDialogBoss, kKBSPrefix + 11)
-DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
+//DECLARE_PMID(kClassIDSpace, kKBSReplaceConfirmDialogBoss, kKBSPrefix + 11)
+//DECLARE_PMID(kClassIDSpace, kKBSGlyphViewWidgetBoss, kKBSPrefix + 12)
 // +13 was the missing-glyph scan's own text-walker client, from the measurement phase. Removed on
 // 2026-08-02 with the -2 route it existed to drive: the scan reads the composed wax and needs no
 // walker at all. NOT reused - a class id that once shipped stays spent.
@@ -213,9 +214,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 // from the template and every one of those numbers is taken by the lines just above, so it was an
 // invitation to hand out an id twice. Removed rather than corrected - the live declarations are
 // the record of what is spent.)
-// The Glyph tab's replace confirmation: its dialog controller and its glyph-drawing view.
-DECLARE_PMID(kImplementationIDSpace, kKBSReplaceConfirmDialogControllerImpl, kKBSPrefix + 15)
-DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
+// RETIRED 2026-09-27 (not reused): the Glyph tab's replace confirmation's controller and glyph view.
+//DECLARE_PMID(kImplementationIDSpace, kKBSReplaceConfirmDialogControllerImpl, kKBSPrefix + 15)
+//DECLARE_PMID(kImplementationIDSpace, kKBSGlyphViewImpl, kKBSPrefix + 16)
 // The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
 // they land on, so a book search's closed chapters do not hide their hits from the keyboard.
 DECLARE_PMID(kImplementationIDSpace, kKBSResultTreeEHImpl, kKBSPrefix + 17)
@@ -265,7 +266,9 @@ DECLARE_PMID(kActionIDSpace, kKBSHidePrevChapterActionID, kKBSPrefix + 5)
 // the KESCL "Search book" pattern (kKESCLPopupSearchBookActionID).
 DECLARE_PMID(kActionIDSpace, kKBSScopeBookActionID, kKBSPrefix + 6)
 // Separator between the search command and the toggles below it (MenuDef only, no ActionDef).
-DECLARE_PMID(kActionIDSpace, kKBSSeparator2ActionID, kKBSPrefix + 7)
+// (Its MenuDef was removed on 2026-09-27, the user's call - Change Checked sits right under the
+// search now. Not reused.)
+//DECLARE_PMID(kActionIDSpace, kKBSSeparator2ActionID, kKBSPrefix + 7)
 // Replace feature: a separator, the replace command, and the two bulk check toggles. The replace
 // command is declared here but only wired up in Phase 2 - reserving its number now keeps the
 // numbering from shifting later.
@@ -283,7 +286,8 @@ DECLARE_PMID(kActionIDSpace, kKBSUncheckAllActionID, kKBSPrefix + 11)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 13)
 // Find Missing Glyphs: scan the scope for notdef glyphs (2026-08-01). + 12 and + 13 are burnt
 // numbers (see above), so this is the first genuinely unused one.
-DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
+// (Removed with the scan on 2026-09-27 - the Book panel's preflight reports missing glyphs. Not reused.)
+//DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
 // +15 was a second menu item that ran the same scan through the official find/change engine with
 // kAnyNotDefGlyphID. Removed on 2026-08-02: that route takes InDesign down on any document holding
 // overset text, by every route there is, so it must not be reachable at all. Like the numbers above
@@ -291,10 +295,12 @@ DECLARE_PMID(kActionIDSpace, kKBSFindMissingGlyphsActionID, kKBSPrefix + 14)
 //DECLARE_PMID(kActionIDSpace, kKBSActionID, kKBSPrefix + 15)
 // Find Overset: list the text that did not fit (2026-08-02). + 15 is a burnt number (see above),
 // so this is the first genuinely unused one.
-DECLARE_PMID(kActionIDSpace, kKBSFindOversetActionID, kKBSPrefix + 16)
+// (Removed with the scan on 2026-09-27 - the Book panel's preflight reports overset text. Not reused.)
+//DECLARE_PMID(kActionIDSpace, kKBSFindOversetActionID, kKBSPrefix + 16)
 // "Save Results...": write the result set to a tab-separated text file (2026-08-03). + 12, + 13 and
 // + 15 are burnt numbers (see above), so this is the first genuinely unused one.
-DECLARE_PMID(kActionIDSpace, kKBSSaveResultsActionID, kKBSPrefix + 17)
+// (Removed on 2026-09-27, the user's call. Not reused.)
+//DECLARE_PMID(kActionIDSpace, kKBSSaveResultsActionID, kKBSPrefix + 17)
 // "How to Use..." on the flyout: the plug-in's operating reference, shown in a scrollable dialog
 // (KBSHowTo.cpp). Deliberately NOT greyed out by anything - it is the one item that has to stay
 // readable when nothing is loaded and while a run is going, which is when it is most wanted.
@@ -331,14 +337,15 @@ DECLARE_PMID(kActionIDSpace, kKBSRememberBookPanelActionID, kKBSPrefix + 24)
 // "Reject Change" on a replaced hit row's right-click menu (2026-09-26): takes back that row's
 // replacement by rejecting its tracked change - the name is the Track Changes panel's own item.
 DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKBSPrefix + 25)
-// "Redo" on the same menu: replaces that one row again, with the query the run used.
-DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
+// (kKBSPrefix + 26 was "Redo" on the same menu, 2026-09-26 to 2026-09-27 - a row taken back is replaced
+//  again with Replace now. Left unused rather than handed to something else.)
 // "Accept All Changes in This Document" on a document row's right-click menu (2026-09-27): accepts
 // every tracked change in that chapter's document, whoever made it, as InDesign's does - the name is InDesign's
 // own ($ID/Accept All Changes in This Document).
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
 // The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).
-DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
+// (The rule between Change Checked and the scans, gone with them on 2026-09-27. Not reused.)
+//DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
 // "Replace" on a hit row's right-click menu (2026-09-27, the user's call): replaces that one row, with
 // no prompt; the list stays a work list (KBSReplaceEngine::ReplaceHit).
 DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKBSPrefix + 29)
@@ -346,9 +353,20 @@ DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKBSPrefix + 29)
 // Redo, Check All, Uncheck All - each over that story's rows.
 DECLARE_PMID(kActionIDSpace, kKBSStoryReplaceActionID, kKBSPrefix + 30)
 DECLARE_PMID(kActionIDSpace, kKBSStoryRejectActionID, kKBSPrefix + 31)
+// A story row's Redo (2026-09-27, the user's call C): the story's rows taken back with Reject Change,
+// replaced again with what Find/Change holds now - the one way to do them all without ticking them.
 DECLARE_PMID(kActionIDSpace, kKBSStoryRedoActionID, kKBSPrefix + 32)
 DECLARE_PMID(kActionIDSpace, kKBSStoryCheckAllActionID, kKBSPrefix + 33)
 DECLARE_PMID(kActionIDSpace, kKBSStoryUncheckAllActionID, kKBSPrefix + 34)
+// "Replace" on a DOCUMENT row's right-click menu (2026-09-27, the user's call): that document's ticked
+// rows, no prompt, the list stays a work list (KBSReplaceEngine::ReplaceChapter). The book row greys it.
+DECLARE_PMID(kActionIDSpace, kKBSChapterReplaceActionID, kKBSPrefix + 35)
+// "Reject Change" on a DOCUMENT row's right-click menu (2026-09-27, the user's call): every replaced row of
+// that document whose tracked change is still there (KBSReplaceEngine::RejectChapter).
+DECLARE_PMID(kActionIDSpace, kKBSChapterRejectActionID, kKBSPrefix + 36)
+// "Redo" on a DOCUMENT row's right-click menu (2026-09-27, the user's call): that document's rows taken
+// back, replaced again with what Find/Change holds now (KBSReplaceEngine::RedoChapter).
+DECLARE_PMID(kActionIDSpace, kKBSChapterRedoActionID, kKBSPrefix + 37)
 
 
 // WidgetIDs:
@@ -363,24 +381,26 @@ DECLARE_PMID(kWidgetIDSpace, kKBSResultHitNodeWidgetID, kKBSPrefix + 5)
 DECLARE_PMID(kWidgetIDSpace, kKBSResultTextWidgetID, kKBSPrefix + 6)
 // Replace feature: the hit row's check box (hit rows only).
 DECLARE_PMID(kWidgetIDSpace, kKBSResultCheckWidgetID, kKBSPrefix + 7)
-// The Glyph tab's replace confirmation. The two glyph frames are told apart by their WidgetID -
+// RETIRED 2026-09-27 with the confirmation, like every kKBSReplaceConfirm* / kKBSGlyphConfirm* widget
+// id below (commented out, numbers not reused). The Glyph tab's replace confirmation. The two glyph
+// frames are told apart by their WidgetID -
 // that is how KBSGlyphView knows which side it is drawing - so these two are not interchangeable.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDialogWidgetID, kKBSPrefix + 8)
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCountWidgetID, kKBSPrefix + 9)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindGlyphWidgetID, kKBSPrefix + 10)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeGlyphWidgetID, kKBSPrefix + 11)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindFontWidgetID, kKBSPrefix + 12)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeFontWidgetID, kKBSPrefix + 13)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 14)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmUnsavedWidgetID, kKBSPrefix + 16)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDialogWidgetID, kKBSPrefix + 8)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCountWidgetID, kKBSPrefix + 9)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindGlyphWidgetID, kKBSPrefix + 10)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeGlyphWidgetID, kKBSPrefix + 11)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindFontWidgetID, kKBSPrefix + 12)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeFontWidgetID, kKBSPrefix + 13)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindUnicodeWidgetID, kKBSPrefix + 14)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeUnicodeWidgetID, kKBSPrefix + 15)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmUnsavedWidgetID, kKBSPrefix + 16)
 // UNUSED since 2026-08-01 - the "Don't show again" box it named is no longer in the dialog. Like
 // the string key beside it (kKBSGlyphConfirmDontShowKey), it is kept rather than freed: a widget id
 // that once shipped stays spent, so a saved workspace referring to it cannot bind to something else.
 // ! Until 2026-08-06 the dialog controller went on stamping a label into this id every time the
 // confirmation opened. It was harmless - SetTextControlData looks the widget up first and there is
 // nothing to find - but it made the id read as live. Removed; nothing writes it now.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDontShowWidgetID, kKBSPrefix + 17)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmDontShowWidgetID, kKBSPrefix + 17)
 // The panel's illustrations, stacked at ONE frame to the right of the status message - exactly one
 // is visible and enabled at a time (KBSPanelIcon picks, and it is the ONLY place that knows which
 // state each belongs to). Adding another is one id here, one resource below, one row in kIcons.
@@ -391,8 +411,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // and GREP put the whole prompt into a single wrapped block (the same sentences the plain alert
 // used to draw), and Glyph shows the two glyph frames instead. The frames are hidden as a BLOCK
 // rather than child by child, so EVE closes the gap they leave.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmMessageWidgetID, kKBSPrefix + 21)
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 22)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmMessageWidgetID, kKBSPrefix + 21)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 22)
 // RETIRED 2026-08-05, NOT TO BE REUSED: the "save after replace" box and the line under it, which
 // stood on the confirmation from 2026-08-02 until the feature was removed. A widget id that comes
 // back on a DIFFERENT control is read by a saved workspace as the old one; the numbers cost nothing.
@@ -401,7 +421,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmGlyphBlockWidgetID, kKBSPrefix + 
 // "Take care when you are replacing across several chapters", under the line above. The GLYPH layout
 // only: the Text / GREP one carries the same sentence inside its single wrapped block, assembled by
 // KBSActionComponent, which is why there is no second widget for it there.
-DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
+//DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
 // "If the text has been edited since the search..." - the GLYPH layout's copy of that warning, live
 // for one afternoon on 2026-08-08 and off both layouts by the end of it: the question can only be
 // answered where the chapters are OPEN, so it moved to the replace itself (see the string keys
@@ -411,9 +431,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSReplaceConfirmCareWidgetID, kKBSPrefix + 25)
 // The glyph dialog's three fixed labels ("Find", the arrow, "Change to"). They carry ids so the
 // runtime language switch (KBSLoc) can restamp them Japanese - the jaJP string table that used
 // to do it is gone (2026-08-05).
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindLabelWidgetID, kKBSPrefix + 27)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmArrowWidgetID, kKBSPrefix + 28)
-DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 29)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmFindLabelWidgetID, kKBSPrefix + 27)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmArrowWidgetID, kKBSPrefix + 28)
+//DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 29)
 //DECLARE_PMID(kWidgetIDSpace, kKBSWidgetID, kKBSPrefix + 30)
 
 
@@ -430,10 +450,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 
 // Menu item keys:
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
-// "Find Missing Glyphs": scan for notdef glyphs rather than for the Find/Change query.
-#define kKBSFindMissingGlyphsMenuKey	kKBSStringPrefix "kKBSFindMissingGlyphsMenuKey"
-// "Find Overset": list the text that did not fit rather than searching for anything.
-#define kKBSFindOversetMenuKey			kKBSStringPrefix "kKBSFindOversetMenuKey"
 // "Book Scope" toggle: ON = the whole book, OFF = the front document.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
@@ -455,13 +471,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // The hit row's own right-click menu (2026-09-26).
 #define kKBSReplaceHitMenuKey			kKBSStringPrefix "kKBSReplaceHitMenuKey"
 #define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
-#define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"
 #define kKBSAcceptAllChangesMenuKey		kKBSStringPrefix "kKBSAcceptAllChangesMenuKey"
-// "Save Results...": write what the panel is showing to a text file. The trailing "..." is the
-// platform convention for a command that opens a dialog before it does anything.
-#define kKBSSaveResultsMenuKey			kKBSStringPrefix "kKBSSaveResultsMenuKey"
+#define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"	// the story row's Redo (2026-09-27)
 // "How to Use...": the operating reference. English in both string tables, like the rest of the
-// flyout - only the replace prompts are translated (see kKBSConfirmReplaceOneKey). The BODY of the
+// flyout - only the replace's own alerts are translated (see kKBSStaleResultsDocKey). The BODY of the
 // reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single string at
 // about 3.1KB and this text is several times that.
 #define kKBSHowToMenuKey				kKBSStringPrefix "kKBSHowToMenuKey"
@@ -475,6 +488,13 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSPanelPluginsMenuPosition		101.0
 #define kKBSStaticTextKey kKBSStringPrefix	"kKBSStaticTextKey"
 #define kKBSInternalPopupMenuNameKey kKBSStringPrefix	"kKBSInternalPopupMenuNameKey"
+// The Keyboard Shortcuts editor's area for the shortcut-assignable actions (2026-09-27, the user's call:
+// "like KCM"). KCM's shape (kKCMPanelMenuActionArea): the ActionDef names this key, the string table
+// resolves it to the value, and the actions appear under Product Area "Palette Menus" as
+// "Kohaku Find/Change: <name>". "KBSCE " is the prefix a KBSC editor area key carries. A display label
+// only - a shortcut is held against the ActionID, so renaming this does not detach an assignment.
+#define kKBSPanelMenuActionArea			"KBSCE Palette Menus: Kohaku Find/Change: "
+#define kKBSPanelMenuActionAreaValue	"Palette Menus:Kohaku Find/Change"
 #define kKBSTargetMenuPath kKBSInternalPopupMenuNameKey
 
 // The result rows' right-click context menu (2026-08-01, user request): the popup's internal name.
@@ -489,38 +509,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // A story row's own right-click menu (2026-09-27).
 #define kKBSResultStoryMenuName				"KBSRtMenuResultStory"
 
-// The Change Checked confirmation prompt. The ENGLISH wording lives in KBS_enUS.fr under these
-// keys; the JAPANESE lives in KBSLoc.h and is switched in at run time by UI language (the jaJP
-// string table is gone - 2026-08-05). The keys carry the plug-in's prefix number, so they cannot
-// collide with a built-in phrase and come back as somebody else's translation.
-//
-// Singular and plural are separate keys rather than one "hit(s)": that reads like a placeholder
-// nobody filled in, and languages that inflect differently cannot be built from it at all.
-#define kKBSConfirmReplaceOneKey	kKBSStringPrefix "kKBSConfirmReplaceOneKey"
-#define kKBSConfirmReplaceManyKey	kKBSStringPrefix "kKBSConfirmReplaceManyKey"
-#define kKBSConfirmFindKey			kKBSStringPrefix "kKBSConfirmFindKey"
-#define kKBSConfirmChangeToKey		kKBSStringPrefix "kKBSConfirmChangeToKey"
-// The line under Change: (2026-09-26): the replace is tracked, and can be taken back.
-#define kKBSConfirmTrackedKey		kKBSStringPrefix "kKBSConfirmTrackedKey"
-// Shown in place of the change string when it is empty - which is a legitimate request (delete
-// every match), not a mistake, so it is spelled out rather than left blank. NOT used when a Change
-// Format is set: there an empty box changes the FORMAT and leaves the text alone, and this wording
-// would state the opposite of what happens.
-#define kKBSConfirmEmptyReplaceKey	kKBSStringPrefix "kKBSConfirmEmptyReplaceKey"
-// The dialog's own name for its format pane, appended to whichever side has one set: "cat  + Find
-// Format", or on its own when the box beside it is empty. WHAT is set follows in parentheses, in
-// InDesign's own words and the user's own language: the attributes describe THEMSELVES through
-// IAttrReport::AppendDescription - the call behind the Settings line in Style Options - and the two
-// styles are added by their full path (KBSSearchEngine::DescribeFormatSetting).
-//
-// ! Until 2026-08-04 this note read "WHAT is set is not named: TextAttrID.h declares 222 attribute
-// bosses and the SDK has no ClassID-to-name call". That was asking the wrong object. The prompt
-// shortens the list; the saved report writes it in full.
-//
-// The two places a format can be set - the attribute list and the style fields beside it - are in
-// HasFormatSet, which moved to KBSSearchEngine.cpp the same day.
-#define kKBSConfirmFindFormatKey	kKBSStringPrefix "kKBSConfirmFindFormatKey"
-#define kKBSConfirmChangeFormatKey	kKBSStringPrefix "kKBSConfirmChangeFormatKey"
+// (The Change Checked confirmation prompt's keys - kKBSConfirm* - stood here until 2026-09-27, when
+//  the prompt was removed. The English lives in KBS_enUS.fr; the Japanese in KBSLoc.h.)
 // ***** NOT PART OF THE CONFIRMATION PROMPT - the replace's own alert, shown INSTEAD of running.
 //
 // A replace walks the chapter again and gives the Nth match the Nth ticked row's replacement, so
@@ -550,49 +540,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSReplaceStepKey			kKBSStringPrefix "kKBSReplaceStepKey"
 // (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
 //  the alert states the outcome in one sentence and the status line carries what to do next.)
-// The closing line: what the run LEAVES BEHIND.
-//
-// ***** ONE key since 2026-08-07 (user's wording). ***** It was two - singular and plural, split by
-// how many chapters would be written to, because languages that inflect cannot build both from one
-// string. The new sentence states the case rather than counting it ("when a replace covers several
-// documents in a book..."), so there is no number in it and nothing left to inflect. With the count
-// went the reason for KBSReplaceConfirmDialog::Ask to be told it at all.
-//
-// It used to end by promising the undo ("a single undo puts it back"). Dropped on 2026-08-05 (user's
-// call): the sentence is about what the user is LEFT WITH, and a promise about undo in the same
-// breath softens it. The behaviour it described is unchanged and still worth knowing here - the
-// whole replace is ONE undo step however many chapters it touches, because KBSReplaceEngine wraps
-// the entire run in a single command sequence. (Until 2026-07-28 this said "one undo step per
-// chapter", which was both wrong and dangerous: with a sequence per chapter, undoing one document
-// silently stripped the step from the others without reverting their text.)
-#define kKBSConfirmUnsavedKey	kKBSStringPrefix "kKBSConfirmUnsavedKey"
-// The warning that closes the prompt, in the user's own words. Shown WHATEVER the count.
-//
-// ***** JUST "take care" since 2026-08-07 (user's wording). ***** It used to name the condition too
-// - "take care when you are replacing across several chapters" - which is why the key was called
-// SeveralChapters. The line ABOVE it now states that condition in full (kKBSConfirmUnsavedKey:
-// "when a replace covers several documents in a book..."), so saying it twice only made the closing
-// warning longer than the thing it warns about. Renamed with the wording rather than left standing
-// as a key that names a condition its string no longer carries.
-#define kKBSConfirmCareKey	kKBSStringPrefix "kKBSConfirmCareKey"
-
-// The Glyph tab's own confirmation, the one that draws the glyphs. The count and the closing line
-// are shared with the plain alert above - the same sentences, on a different screen - so the only
-// new strings are the labels around the two glyph frames.
-#define kKBSGlyphConfirmFindLabelKey	kKBSStringPrefix "kKBSGlyphConfirmFindLabelKey"
-#define kKBSGlyphConfirmChangeLabelKey	kKBSStringPrefix "kKBSGlyphConfirmChangeLabelKey"
-#define kKBSGlyphConfirmArrowKey		kKBSStringPrefix "kKBSGlyphConfirmArrowKey"
-// UNUSED since 2026-08-01, when the "Don't show again" box came off both confirmations (it made a
-// destructive rewrite suppressible with one tick, and the only way back is Preferences > General >
-// Reset All Warning Dialogs). Left in place, with its entry in the string table, so that putting
-// the box back is a resource change rather than a translation round. Nothing reads it today - true
-// since 2026-08-06, when the controller stopped stamping it into a widget that does not exist.
-#define kKBSGlyphConfirmDontShowKey		kKBSStringPrefix "kKBSGlyphConfirmDontShowKey"
+// (kKBSConfirmUnsavedKey, kKBSConfirmCareKey and the Glyph tab confirmation's labels -
+//  kKBSGlyphConfirm*Key - went with the prompt on 2026-09-27.)
 
 // RETIRED 2026-08-05 with the feature they belonged to: the "save after replace" box, its note, and
 // the extra warning that went up when the box was ticked. They stood here from 2026-08-02. Removed
-// from both string tables as well - unlike kKBSGlyphConfirmDontShowKey above, which is a box that
-// could come back, these describe a run this plug-in no longer performs.
+// from both string tables as well: these describe a run this plug-in no longer performs.
 //#define kKBSSaveAfterReplaceKey		kKBSStringPrefix "kKBSSaveAfterReplaceKey"
 //#define kKBSSaveAfterReplaceNoteKey	kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
 //#define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
@@ -615,17 +568,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // Positions that the new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then Change Checked alone between two rules. It is the only item on this menu
-// that rewrites the documents, so it is kept apart from the search above it and the scans below, where
-// it cannot be reached by a slip of the pointer. The scope all of these run on is set by Book Scope.
+// Block 1 - the search, then Change Checked right under it (the rule between them was removed on
+// 2026-09-27, the user's call), then a rule. The scope both run on is set by Book Scope.
 #define kKBSSearchBookMenuItemPosition		1.0
-#define kKBSSeparator2MenuItemPosition		1.1
 #define kKBSReplaceCheckedMenuItemPosition	1.2
-#define kKBSSeparator5MenuItemPosition		1.3
-
-// Block 2 - the two scans, reports only (the user's order, 2026-09-27: below Change Checked).
-#define kKBSFindMissingGlyphsMenuItemPosition	1.4
-#define kKBSFindOversetMenuItemPosition		1.5
+// (Block 2 - the two scans at 1.3 to 1.5 - was removed on 2026-09-27.)
 #define kKBSSeparator3MenuItemPosition		2.0
 
 // Block 3 - the six check-mark toggles (the six positions from 2.2 to 2.9; it said "four" at the top of this
@@ -642,10 +589,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSRememberBookPanelMenuItemPosition	2.9
 #define kKBSSeparator4MenuItemPosition		3.0
 
-// Block 4 - the two commands that write a file of our own and touch no document: the toggles above
-// (Save Panel Settings), and the result set (Save Results...).
+// Block 4 - the command that writes a file of our own and touches no document: the toggles above
+// (Save Panel Settings). Save Results... (5.0) was removed on 2026-09-27.
 #define kKBSSavePanelSettingsMenuItemPosition	4.0
-#define kKBSSaveResultsMenuItemPosition		5.0
 #define	kKBSSeparator1MenuItemPosition		10.0
 
 // Block 5 - the reference items, the placement KESCM uses (its own is Sep2 9.95 / How to Use 10 /
@@ -657,6 +603,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // Check All / Uncheck All are the two items of the RESULT ROWS' right-click menu (2026-08-01), not
 // of the flyout, so their positions are that menu's own 1 and 2 - they were 5.0 and 6.0 while they
 // sat under Change Checked on the flyout.
+#define kKBSChapterReplaceMenuItemPosition	0.5		// a document row's only (2026-09-27; the book row greys it)
+#define kKBSChapterRejectMenuItemPosition	0.6		// a document row's only (2026-09-27; the book row greys it)
+#define kKBSChapterRedoMenuItemPosition		0.7		// a document row's only (2026-09-27; the book row greys it)
 #define kKBSCheckAllMenuItemPosition		1.0
 #define kKBSUncheckAllMenuItemPosition		2.0
 #define kKBSAcceptAllChangesMenuItemPosition	3.0		// a document row's only (the book row greys it)
@@ -669,7 +618,6 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // The hit row's menu: Replace first (2026-09-27), then its own 1 and 2.
 #define kKBSReplaceHitMenuItemPosition		0.5
 #define kKBSRejectChangeMenuItemPosition	1.0
-#define kKBSRedoMenuItemPosition			2.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets (Task 2). Offset from the

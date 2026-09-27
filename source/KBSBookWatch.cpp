@@ -234,12 +234,11 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// words; this side stated it as fact, which is one question answered two ways in one plug-in.
 	//
 	// ***** WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. ***** The cue is dropped and this book's
-	// chapters are not handed back HERE - but the next search or scan calls ReleaseSearchedBook on
-	// its way in and hands them back then (KBSSearchEngine.cpp, KBSGlyphScanEngine.cpp,
-	// KBSOversetScanEngine.cpp, each beside its own KBSResultModel::Clear()). A REPLACE does not:
-	// it keeps the searched book on purpose, its results being still on the panel. So the worst case
-	// is a book's results left on the panel, and any chapter that refused to close left locked,
-	// until the next search or scan - not a permanent strand. Named rather than assumed, because a
+	// chapters are not handed back HERE - but the next search calls ReleaseSearchedBook on its way
+	// in and hands them back then (KBSSearchEngine.cpp, beside its KBSResultModel::Clear()). A REPLACE
+	// does not: it keeps the searched book on purpose, its results being still on the panel. So the
+	// worst case is a book's results left on the panel, and any chapter that refused to close left
+	// locked, until the next search - not a permanent strand. Named rather than assumed, because a
 	// fallback nobody has written down is one the next change can remove without noticing.
 	if (KBSRunGuard::IsAnyRunning())
 		return kKBSBookRetireDelayMs;

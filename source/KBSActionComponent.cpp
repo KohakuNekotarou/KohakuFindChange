@@ -25,25 +25,15 @@
 
 // Interface includes:
 
-// Interface includes:
-#include "IFindChangeOptions.h"	// the find / change strings the confirmation prompt names
-#include "CTextEnum.h"			// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
-
 // General includes:
 #include "CActionComponent.h"
 #include "CAlert.h"
-#include "CoreResTypes.h"		// kLineSeparatorString - the prompt is several lines
 #include "IActionStateList.h"	// UpdateActionStates: check mark for the Hide Previous Chapter toggle
 #include "PreferenceUtils.h"	// QuerySessionPreferences
-#include "StringUtils.h"		// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
-
-// Interface includes (cont.):
-#include "IMenuUtils.h"		// InsertAmpersandForDisplay - the find/change strings are the user's
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSLoc.h"			// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSSearchEngine.h"
 #include "KBSResultTree.h"		// rebuild the result tree after a search
 #include "KBSJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
@@ -51,9 +41,6 @@
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
-#include "KBSReplaceConfirmDialog.h"	// the Glyph tab's confirmation: the fonts behind the two glyphs
-#include "KBSGlyphScanEngine.h"	// Find Missing Glyphs
-#include "KBSOversetScanEngine.h"	// Find Overset
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
 #include "KBSTrackChange.h"		// Reject Change / Redo: is this row's tracked change still there?
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
@@ -98,12 +85,6 @@ public:
 		/** Encapsulates functionality for the about menu item. */
 		void DoAbout();
 
-		/** Ask before replacing. The prompt names the find and change strings - they come from the
-		    Find/Change dialog, not from this panel, so this is the only place the user sees what is
-		    about to be written - and how many hits will change. An empty change string is spelled
-		    out: deleting the matches is a legitimate request, but never a surprise.
-		    @return true to go ahead. */
-		bool ConfirmReplace(int32 checkedCount);
 		
 
 
@@ -169,22 +150,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKBSFindMissingGlyphsActionID:
-		{
-			// Scan the same scope for notdef glyphs - the boxes InDesign draws where a font has no
-			// glyph for a character. The engine puts its own summary on the status line, so there
-			// is nothing to report from here.
-			KBSGlyphScanEngine::Run();
-			break;
-		}
-
-		case kKBSFindOversetActionID:
-		{
-			// List the text that did not fit, over the same scope. The engine puts its own summary
-			// on the status line, so there is nothing to report from here.
-			KBSOversetScanEngine::Run();
-			break;
-		}
+		// (Find Missing Glyphs and Find Overset stood here until 2026-09-27, when they were removed on the
+		//  user's call: the Book panel's preflight reports both over the whole book.)
 
 		case kKBSScopeBookActionID:
 		{
@@ -330,7 +297,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// check so the report can account for them, so GetCheckedCount() is still positive and
 			// the user would otherwise be asked to authorise a rewrite that the engine declines on
 			// the far side of the prompt. Same wording as the engine's own door.
-			if (KBSResultModel::IsShowingReplaceOutcome())
+			if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyRejectedRowOpen())
 			{
 				PMString report("This is the last replace's report - search again to replace more.");
 				report.SetTranslatable(kFalse);
@@ -377,27 +344,44 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				}
 			}
 
-			// ONE prompt, and this is it. A second warning stood here from 2026-08-02 to
-			// 2026-08-05, for the "save after replace" box: saving was the one thing this plug-in
-			// did that nothing could take back, so it was asked again on its own. With that box
-			// gone, everything a run does is undoable - the chapters are left open and unsaved -
-			// and a second prompt in front of an undoable step is just a step to click through.
-			if (!this->ConfirmReplace(checkedCount))
-				break;
-
+			// ***** NO PROMPT SINCE 2026-09-27 (the user's call). ***** The confirmation (ConfirmReplace -
+			// KBSReplaceConfirmDialog) asked before every Change Checked; everything a run does is one undo
+			// step and every chapter is left open and unsaved, and the rows' own menus had already gone
+			// without one. What the prompt said about Track Changes is said on the status line instead.
 			PMString summary;
-			KBSReplaceEngine::ReplaceChecked(summary);
+			const int32 replaced = KBSReplaceEngine::ReplaceChecked(summary);
+			if (replaced > 0)
+				summary.Append(" Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back.");
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
 			KBSResultTree::ShowStatus(summary);
 			break;
 		}
 
-		case kKBSSaveResultsActionID:
+		case kKBSChapterRejectActionID:
+		case kKBSChapterRedoActionID:
+		case kKBSChapterReplaceActionID:
 		{
-			// Write the current result set to a text file. Everything - the busy test, the empty test,
-			// the chooser, the encoding - is in KBSResultTree::SaveResultsAsText, which is where the
-			// panel's own file-facing work lives; nothing to report from here.
-			KBSResultTree::SaveResultsAsText();
+			// A DOCUMENT row's menu (2026-09-27): that document's ticked rows, no prompt. The book row (and
+			// nothing stashed - a script firing the action by ID) does nothing.
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
+				break;
+			if (KBSRunGuard::IsAnyRunning())
+			{
+				PMString busy(KBSRunGuard::BusyMessage());
+				busy.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(busy);
+				break;
+			}
+			PMString status;
+			if (actionID.Get() == kKBSChapterRejectActionID)
+				KBSReplaceEngine::RejectChapter(chapter, status);
+			else if (actionID.Get() == kKBSChapterRedoActionID)
+				KBSReplaceEngine::RedoChapter(chapter, status);	// no prompt, like Replace
+			else
+				KBSReplaceEngine::ReplaceChapter(chapter, status);
+			KBSResultTree::RefreshRows();
+			KBSResultTree::ShowStatus(status);
 			break;
 		}
 
@@ -426,7 +410,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			else if (id == kKBSStoryRejectActionID)
 				KBSReplaceEngine::RejectStory(chapter, group, status);
 			else if (id == kKBSStoryRedoActionID)
-				KBSReplaceEngine::RedoStory(chapter, group, status);
+				KBSReplaceEngine::RedoStory(chapter, group, status);	// no prompt, like Replace
 			else
 			{
 				const bool check = (id == kKBSStoryCheckAllActionID);
@@ -440,7 +424,6 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSReplaceHitActionID:
 		case kKBSRejectChangeActionID:
-		case kKBSRedoActionID:
 		{
 			// A hit row's right-click menu (2026-09-26). Nothing stashed = nobody right-clicked a hit
 			// row (a script firing the action by ID): do nothing.
@@ -457,10 +440,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString status;
 			if (actionID.Get() == kKBSReplaceHitActionID)
 				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
-			else if (actionID.Get() == kKBSRejectChangeActionID)
-				KBSReplaceEngine::RejectHit(chapter, hit, status);
 			else
-				KBSReplaceEngine::RedoHit(chapter, hit, status);
+				KBSReplaceEngine::RejectHit(chapter, hit, status);
 			KBSResultTree::RefreshRows();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -576,273 +557,6 @@ void KBSActionComponent::DoAbout()
 	);
 }
 
-// Name a glyph the way the confirmation prompt has to name it. The Glyph tab's query is a glyph,
-// not a string, so quoting the find / change strings there would describe the wrong thing (and on
-// the change side there is no string at all). The ID is always shown, because the ID is what the
-// search and the replace actually run on - but an ID alone does not identify a character (a GID
-// belongs to one font file, a CID means a different character under a different ROS), so the font
-// is named beside it whenever it could be resolved. Pure data: never translated.
-static void AppendGlyphDescription(PMString& str, Text::GlyphID glyphID, const PMString& fontLabel)
-{
-	if (!str.IsEmpty())
-		str.Append("  ");
-	str.Append("[glyph ");
-	str.AppendNumber(glyphID);
-	str.Append("]");
-	if (!fontLabel.IsEmpty())
-	{
-		str.Append("  ");
-		str.Append(fontLabel);
-	}
-}
-
-// "Is anything set in the format pane?" now lives in KBSSearchEngine (HasFindFormatSet /
-// HasChangeFormatSet) - the search's own caption asks the same question, and the two answers must
-// not drift apart. It also looks in one more place than the version that used to sit here: a
-// paragraph or character STYLE is not in the attribute list this counted, which is what made the
-// prompt print "Find: ^1" and threaten to delete matches it was only going to restyle (2026-08-04).
-//
-// WHAT is set IS named, as of the same day: DescribeFormatSetting asks the attributes to describe
-// themselves (IAttrReport::AppendDescription) and adds the two styles by their full path. The note
-// that used to stand here - "the 222 attribute bosses have no readable names" - was asking the wrong
-// object. See DescribeFormatSetting in KBSSearchEngine.cpp.
-
-// ***** ReplaceStringParameters LEAVES ^1 STANDING WHEN THE STRING IS EMPTY. ***** The header says
-// the parameter "may be empty"; what the prompt actually printed for a format-only search was the
-// literal "Find: ^1" (measured 2026-08-04). Both sides of this prompt can legitimately be empty - a
-// search by formatting alone, and a Glyph-tab replace with an empty Change To box, where the blank
-// after the label IS the message - so an empty side is handed over as a single space.
-static void SpaceIfEmpty(PMString& str)
-{
-	if (str.IsEmpty())
-	{
-		str = PMString(" ");
-		str.SetTranslatable(kFalse);
-	}
-}
-
-// Append the dialog's name for the format pane to one side of the prompt, as the user asked it to
-// read: "cat  + Find Format" when both are set, "Find Format" on its own when the box is empty.
-// In English on every UI since 2026-09-26 - the prompt was the one place KBS translated until the
-// user asked for it in English (see the note at the head of the prompt in ConfirmReplace).
-static void AppendFormatNote(PMString& str, const char* formatKey, const PMString& detail)
-{
-	PMString note(KBSLoc::English(formatKey));	// English on every UI since 2026-09-26 - see ConfirmReplace
-	if (str.IsEmpty())
-		str = note;
-	else
-	{
-		str.Append("  + ");
-		str.Append(note);
-	}
-	// ...and WHAT is set, in InDesign's own words (KBSSearchEngine::DescribeFormatSetting). Empty
-	// means "nothing extra to say" - never "nothing is set", which is HasFindFormatSet's answer and
-	// was decided before this line is reached.
-	//
-	// ***** DOUBLED HERE TOO, BECAUSE THIS IS THE USER'S TEXT AS WELL. ***** It arrives AFTER the
-	// caller ran InsertAmpersandForDisplay over the find / change string, and it carries names taken
-	// straight out of the document - styles, swatches, fonts - so a style called "A&B" would be
-	// quoted back as "AB" by the alert's accelerator handling, in the ONE place the user checks what
-	// is about to be written. Same doubling and same reason as the two strings above, one step later.
-	if (!detail.IsEmpty())
-	{
-		PMString shown(detail);
-		shown.SetTranslatable(kFalse);
-		Utils<IMenuUtils>()->InsertAmpersandForDisplay(&shown);
-		str.Append(" (");
-		str.Append(shown);
-		str.Append(")");
-	}
-	str.SetTranslatable(kFalse);
-}
-
-/* ConfirmReplace
-*/
-bool KBSActionComponent::ConfirmReplace(int32 checkedCount)
-{
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	if (opts == nil)
-	{
-		// Without the Find/Change settings there is nothing to name in the prompt, and nothing to
-		// replace with either. Say so on the status line: a menu command that produces no prompt
-		// and no message reads as a broken plug-in.
-		PMString unavailable("Find/Change settings are unavailable - nothing was changed.");
-		unavailable.SetTranslatable(kFalse);
-		KBSResultTree::ShowStatus(unavailable);
-		return false;
-	}
-	// Read only - KBS never writes to the user's Find/Change settings.
-	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
-	const bool glyphMode = (mode == IFindChangeOptions::kGlyphSearch);
-	// Transliterate quotes character types where the other text tabs quote strings, so it shares
-	// the glyph tab's "empty box deletes" exemption below - its change side always holds a type.
-	// It does NOT share the format-note exemption: the glyph tab's attribute list always carries
-	// the query's own font, so a note there would say nothing, but on this tab a format is set
-	// only when the user set one - information the prompt has to repeat.
-	const bool translitMode = (mode == IFindChangeOptions::kTransliterateSearch);
-
-	// A glyph replace with nothing in the Change To box used to be refused here. It is not: an empty
-	// Change To DELETES every match, which is what the Find/Change dialog does with it (confirmed
-	// against the dialog, 2026-07-31), and refusing it made this panel less capable than the dialog
-	// it delegates to. It is still shown to the user before anything is written - the prompt below
-	// simply leaves the "Change to:" line empty, and an empty line after that label is what an empty
-	// box looks like.
-
-	// On the Glyph tab, work out which fonts the two glyphs belong to. A glyph id names nothing
-	// by itself, so the answer is worth having even here, in the plain prompt: it is what turns
-	// "[glyph 7425]" into something the user can check against the Find/Change dialog. Whatever
-	// this resolves is released before every exit below.
-	const bool glyphResolved = glyphMode && KBSReplaceConfirmDialog::Resolve(opts);
-
-	// On the Glyph tab, show the glyphs THEMSELVES rather than their numbers - but the choice of
-	// layout is made at the single call at the bottom of this function, not here, so the message
-	// below is assembled either way. It is what the glyph layout falls back to when the fonts
-	// could not be resolved (a ROS-group query carries none), and a confirmation that cannot be
-	// DRAWN is never a reason the replace cannot RUN.
-
-	// ***** TWO LINES, IN ENGLISH ON EVERY UI (user's call, 2026-09-26). *****
-	//     Find: <the find string>  + Find Format (<what is set>)     (GREP)
-	//     Change: <the change string>  + Change Format (<what is set>)
-	// The prompt says what is about to be written and nothing else. It used to open with "Change N
-	// checked hits?" and close with two lines about a book-wide replace leaving its documents open
-	// and unsaved, and it spoke Japanese on a Japanese UI (KBSLoc::Text); all of that went on the
-	// user's word. Kept, as the user agreed: the format on the same line when one is set (a format-only
-	// replace would otherwise read "Find:" with nothing after it), and the sentence that says an empty
-	// Change box deletes the matches (the one blank that is easier to press OK on than to notice).
-	//
-	// Each piece is looked up BEFORE it is appended: a key only translates while it is the WHOLE
-	// string, and what the prompt receives is a concatenation. Everything pushed into a ^1 is real
-	// data (the user's own find / change string) and is marked untranslatable first - a search for a
-	// word that happens to match a built-in phrase would otherwise come back as somebody else's
-	// translation.
-	PMString msg;
-	msg.SetTranslatable(kFalse);
-
-	// Not seeded from GetFindString on the Transliterate tab. IFindChangeOptions.h:690-691 calls
-	// that tab's find string "irrelevant" - irrelevant, not guaranteed empty - so anything left in
-	// it would be quoted ahead of the character type. DescribeCurrentQuery already states that tab
-	// as the type alone; this line says the same thing. (The Glyph tab keeps the seed on purpose:
-	// picking a glyph with a character of its own also leaves that character in the box.)
-	PMString findStr(translitMode ? PMString() : PMString(opts->GetFindString(mode)));
-	if (glyphMode)
-		AppendGlyphDescription(findStr, opts->GetFindGlyphID(),
-			glyphResolved ? KBSReplaceConfirmDialog::GetFindSide().fFontLabel : PMString());
-	else if (translitMode)
-		findStr.Append(KBSSearchEngine::CharacterTypeName(
-			static_cast<int32>(opts->GetFindCharacterType())));
-	findStr.SetTranslatable(kFalse);
-	// CAlert draws its message through a widget that reads a lone '&' as a keyboard accelerator -
-	// its own check box arrives spelled "&Don't show again". Without this a search for "A&B" is
-	// quoted back as "AB", in the ONE place the user checks what is about to be written (reported
-	// from the running panel, 2026-07-31). Same doubling the tree rows and the status line do.
-	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&findStr);
-	// Find Format, appended AFTER the ampersand doubling: that guards the USER's string, and what
-	// goes on here is ours (it carries no ampersand to double).
-	//
-	// Not on the Glyph tab. Its attribute list is where the QUERY's own font and style live - the
-	// glyph id names nothing without them - so the list is never empty there and the note would be
-	// on every glyph prompt, saying nothing. That tab states its query by DRAWING the glyphs.
-	if (!glyphMode && KBSSearchEngine::HasFindFormatSet())
-		AppendFormatNote(findStr, kKBSConfirmFindFormatKey,
-			KBSSearchEngine::DescribeFormatSetting(true /*findSide*/, true /*limited*/));
-	PMString findLine(KBSLoc::English(kKBSConfirmFindKey));
-	SpaceIfEmpty(findStr);
-	::ReplaceStringParameters(&findLine, findStr);
-	msg.Append(findLine);
-	// The dialog's own name for the mode, untranslated everywhere. Named for Glyph as well as GREP:
-	// on that tab what is quoted above is a glyph, and the line has to say so.
-	if (mode == IFindChangeOptions::kGrepSearch)
-		msg.Append("   (GREP)");
-	else if (glyphMode)
-		msg.Append("   (Glyph)");
-	else if (translitMode)
-		msg.Append("   (Transliterate)");
-	msg.Append(kLineSeparatorString);
-
-	// On the Glyph tab the change side has no string at all - it is the glyph chosen in Change To,
-	// which the refusal above has already established is there.
-	PMString replaceStr;
-	if (glyphMode)
-	{
-		// An empty Change To box leaves this line EMPTY - no "[glyph -1]", and no sentence
-		// explaining it either (user's decision, 2026-07-31). The blank after the label is what an
-		// empty box looks like, and it reads the same way in every language.
-		if (opts->GetReplaceGlyphID() != kInvalidGlyphID)
-			AppendGlyphDescription(replaceStr, opts->GetReplaceGlyphID(),
-				glyphResolved ? KBSReplaceConfirmDialog::GetChangeSide().fFontLabel : PMString());
-	}
-	else if (translitMode)
-		replaceStr.Append(KBSSearchEngine::CharacterTypeName(
-			static_cast<int32>(opts->GetReplaceCharacterType())));
-	else
-		replaceStr = opts->GetReplaceString(mode);
-	replaceStr.SetTranslatable(kFalse);
-	// ***** AN EMPTY CHANGE BOX MEANS TWO DIFFERENT THINGS. ***** With no Change Format set it
-	// DELETES every match; with one set it changes the FORMAT and leaves the text alone. Saying
-	// "the matches will be deleted" about the second is the prompt telling the user the opposite of
-	// what is about to happen, so the format is asked about first.
-	const bool changeHasFormat = !glyphMode && KBSSearchEngine::HasChangeFormatSet();
-
-	// Text and GREP only: on those tabs the change string is a STRING, and a blank line there could
-	// as easily be a mistake as a deletion, so it is spelled out. The Glyph tab says it with the
-	// blank itself - see above - and Transliterate always names a type.
-	if (replaceStr.IsEmpty() && !glyphMode && !translitMode && !changeHasFormat)
-	{
-		// An empty change string is a legitimate request - it deletes every match - so it is
-		// spelled out instead of leaving a blank line for the user to interpret.
-		PMString empty(KBSLoc::English(kKBSConfirmEmptyReplaceKey));
-		replaceStr = empty;
-		replaceStr.SetTranslatable(kFalse);
-	}
-	// Same reason as the find string above. Harmless on the "(empty - the matches will be deleted)"
-	// wording that replaces it when Change To is blank: that carries no ampersand to double.
-	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&replaceStr);
-	// "dog  + Change Format", or "Change Format" on its own when the box is empty.
-	if (changeHasFormat)
-		AppendFormatNote(replaceStr, kKBSConfirmChangeFormatKey,
-			KBSSearchEngine::DescribeFormatSetting(false /*findSide*/, true /*limited*/));
-	PMString changeLine(KBSLoc::English(kKBSConfirmChangeToKey));
-	SpaceIfEmpty(replaceStr);
-	::ReplaceStringParameters(&changeLine, replaceStr);
-	msg.Append(changeLine);
-	// Every replace is tracked (2026-09-26) - said under the two lines above, in the user's words.
-	msg.Append(kLineSeparatorString);
-	msg.Append(KBSLoc::English(kKBSConfirmTrackedKey));
-
-	// ***** NOTHING HERE ABOUT THE DOCUMENT HAVING MOVED SINCE THE SEARCH - the run makes sure of
-	// ***** that itself. ***** A disclaimer sat between the query and the closing lines until
-	// 2026-08-08 ("if the text has been edited, a replacement can land somewhere you did not
-	// intend"), and this prompt was never the place for it: from here only the chapters that
-	// happen to be OPEN can be asked anything, and the case that matters most - a chapter opened,
-	// edited, saved and closed again - is exactly the one that cannot.
-	//
-	// Since 2026-08-10 the replace walks every chapter before writing and checks that each ticked
-	// match still begins where the search left it, stopping the whole run if one has moved
-	// (KBSReplaceEngine). There is nothing left to warn about: the prompt asks about the
-	// replacement itself, and the run guarantees the rest (user's decision, 2026-08-10).
-
-	// (Two closing lines followed here until 2026-09-26: a book-wide replace leaves every chapter it
-	//  touched open and unsaved, and "Please take care." They went with the opening question on the
-	//  user's word - see the head of this prompt.)
-
-	// ONE prompt for every tab (2026-08-02). It used to be CAlert::ModalAlert here and the glyph
-	// dialog above; both are the same dialog now. The box that forced the move - "save after
-	// replace" - was itself removed on 2026-08-05, but the arrangement stays for the reason that
-	// outlived it: CANCEL is the DEFAULT button here. This starts a destructive rewrite and a stray
-	// Enter must not be what starts it, and the alerts that draw a box of their own take no
-	// default-button argument (CAlert.h:185,209).
-	//
-	// An empty message asks with the GLYPH layout, so this is where the two part company: the
-	// glyphs when they resolved, the assembled sentences when they did not.
-	PMString glyphLayout;
-	const bool approved = KBSReplaceConfirmDialog::Ask(checkedCount,
-		glyphResolved ? glyphLayout : msg);
-
-	// Drop the fonts taken above. This is the only exit past the resolve, so one call covers it.
-	KBSReplaceConfirmDialog::ReleaseSides();
-
-	return approved;
-}
 
 /* UpdateActionStates
 */
@@ -918,22 +632,11 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			listToUpdate->SetNthActionName(i, name);
 			// The name is written whether or not it can run, so a greyed-out item still says which
 			// scope it would have used.
-			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKBSFindMissingGlyphsActionID || action == kKBSFindOversetActionID)
-		{
-			// Both scans, in one branch: they ask the same one question the search command above
-			// asks, because they run over the same scope - something to scan, or grey. Nothing about
-			// the current RESULTS decides whether a scan may run; it starts from the document, not
-			// from them. (Two branches with byte-identical bodies until 2026-08-08. Official code
-			// stacks the labels of actions that share an answer rather than repeating the answer -
-			// ConditionalTextUIPanelMenuAction.cpp:123-124.)
-			//
-			// It has to be said explicitly either way: kCustomEnabling means this method owns the
-			// state, and an action this loop never names stays DISABLED. (Found on the real
-			// application - the item appeared in the flyout but invoke() answered "Action is not
-			// enabled".)
-			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
+			// ...and grey on the Object and Colour tabs too (2026-09-27, the user's call): they find page
+			// items, which this panel does not list. The same question the search asks (CanSearchTab).
+			const bool canRun = haveTarget
+				&& KBSSearchEngine::CanSearchTab(KBSSearchEngine::CurrentSearchMode());
+			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSScopeBookActionID)
 		{
@@ -1012,17 +715,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// reaches the user instead of being greyed out unexplained.
 			//
 			// ***** THE SECOND HALF IS ONE QUESTION, AND THE MODEL ALREADY OWNS IT. ***** "Can any
-			// row of this list be checked at all" is NoRowHasCheckBox(), which ORs the two cases that
-			// answer no: a list that is a REPORT rather than a work list (the two scans), and a
-			// Find/Change list showing the last replace's outcome. This line spelled that OR out by
-			// hand - "not showing an outcome AND the kind is kResultFindChange" - until 2026-08-08.
-			//
-			// Same shape as the block 6 finding, in the same model: a question with one home, and a
-			// caller answering half of it for itself. Worse here, because the hand-written half used
-			// the very spelling the model warns against: KBSResultModel::IsReportOnlyKind states that
-			// the report-only kinds are LISTED rather than written as "not kResultFindChange" so that
-			// a new kind which DOES offer work has to be a decision instead of quietly losing its
-			// boxes - and this was the "not kResultFindChange" the model was guarding against.
+			// row of this list be checked at all" is NoRowHasCheckBox(). This line spelled that out by
+			// hand until 2026-08-08. (It also asked about the two scans' report-only kinds, removed with
+			// the scans on 2026-09-27.)
 			// !Named by FUNCTION, not by line. This read "KBSResultModel.cpp:259-263", which was
 			//  correct on the day it was written (2026-08-08, where the definition sat at :257) and
 			//  pointed at HasRun() by 2026-08-11: the same definition had moved to :273 as that file
@@ -1037,18 +732,6 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::NoRowHasCheckBox())
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKBSSaveResultsActionID)
-		{
-			// Nothing to write without results. Asked of the STORED count rather than the displayed
-			// one: the file carries every hit, including those past the panel's display cap, so a
-			// result set that is mostly cap is still worth writing.
-			//
-			// Nothing else is asked. Unlike the three commands above it, this one does not run over the
-			// document - it writes down what already happened - so an empty desk does not stop it, and
-			// neither does a replace's aftermath, which is exactly the list a user wants to keep.
-			listToUpdate->SetNthActionState(i,
-				(KBSResultModel::GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSStoryReplaceActionID || action == kKBSStoryRejectActionID || action == kKBSStoryRedoActionID
 			|| action == kKBSStoryCheckAllActionID || action == kKBSStoryUncheckAllActionID)
@@ -1078,23 +761,40 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KBSReplaceEngine::CanReplaceHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKBSRejectChangeActionID || action == kKBSRedoActionID)
+		else if (action == kKBSRejectChangeActionID)
 		{
-			// A hit row's menu (2026-09-26): Reject Change while the row's tracked change is still
-			// there, Redo once it has been rejected. (Runs are greyed out above, before this loop.)
+			// A hit row's menu (2026-09-26): Reject Change while the row's tracked change is still there.
+			// (Runs are greyed out above, before this loop. Redo shared this branch until 2026-09-27.)
 			int32 chapter = -1, hit = -1;
 			bool enable = false;
 			if (KBSResultModel::GetContextMenuHit(chapter, hit))
 			{
-				if (action == kKBSRejectChangeActionID)
-				{
-					UIDRef storyRef;
-					KBSTrackChange::Change change;
-					enable = KBSTrackChange::FindRowChangeForHit(chapter, hit, storyRef, change);
-				}
-				else
-					enable = (KBSResultModel::GetHitOutcome(chapter, hit) == KBSResultModel::kOutcomeRejected);
+				UIDRef storyRef;
+				KBSTrackChange::Change change;
+				enable = KBSTrackChange::FindRowChangeForHit(chapter, hit, storyRef, change);
 			}
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSChapterRedoActionID)
+		{
+			// A document row's menu (2026-09-27): while that document has a row taken back.
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSReplaceEngine::CanRedoChapter(chapter);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSChapterRejectActionID)
+		{
+			// A document row's menu (2026-09-27): while that document has a replaced row to take back.
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSReplaceEngine::CanRejectChapter(chapter);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSChapterReplaceActionID)
+		{
+			// A document row's menu (2026-09-27): while that document has a ticked row to replace. The book
+			// row greys it (Change Checked, with its prompt, is the whole book's).
+			const int32 chapter = KBSResultModel::GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSReplaceEngine::CanReplaceChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSAcceptAllChangesActionID)

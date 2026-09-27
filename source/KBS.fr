@@ -44,8 +44,6 @@
 #include "IControlViewDefs.h"
 #include "SysControlIDs.h"
 #include "Widgets.fh"	// for PalettePanelWidget or DialogBoss
-#include "EveInfo.fh"	// EVE widget types + layout flags - the Glyph tab's confirmation dialog
-#include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the glyph frame's own size
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list (Task 2)
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
@@ -260,41 +258,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/*
-	 * The Glyph tab's replace confirmation: the stock kDialogBoss plus our controller - the shape
-	 * basicdialog and KESCL's offset dialog both use. No IID_IOBSERVER: the dialog has nothing to
-	 * do while it is open, only on OK.
-	 */
-	Class
-	{
-		kKBSReplaceConfirmDialogBoss,
-		kDialogBoss,
-		{
-			IID_IDIALOGCONTROLLER, kKBSReplaceConfirmDialogControllerImpl,
-		}
-	},
-
-	/*
-	 * One glyph frame of that dialog: a generic panel whose IControlView is our own drawing view,
-	 * exactly how the hit row's colour cell is built. Two instances, told apart by their WidgetID -
-	 * which is how the view knows whether it is drawing the found glyph or the replacement.
-	 */
-	Class
-	{
-		kKBSGlyphViewWidgetBoss,
-		kGenericPanelWidgetBoss,
-		{
-			IID_ICONTROLVIEW, kKBSGlyphViewImpl,
-			// EVE decides a widget's size through its IID_IEVEINFO implementation, and the one
-			// inherited from kGenericPanelWidgetBoss measures a PANEL - from its children. This
-			// frame has no children (it holds a drawing), so that implementation collapsed it to
-			// nothing and the font name sat directly under the label. kFixedSizeEVEInfoImpl is the
-			// implementation for a widget whose size is simply what the resource says.
-			// (No worked example of it exists in the SDK - it is declared in DialogLayoutID.h and
-			// used nowhere - so this is confirmed by running it, not by reading.)
-			IID_IEVEINFO, kFixedSizeEVEInfoImpl,
-		}
-	},
+	// (The Glyph tab's replace confirmation - kKBSReplaceConfirmDialogBoss - and its glyph frame -
+	//  kKBSGlyphViewWidgetBoss - stood here until 2026-09-27: Change Checked no longer asks first.)
 
 	/*
 	 * The jump marker (2026-09-26): a global text adornment. Two interfaces, only one of them ours:
@@ -510,41 +475,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between the search and Change Checked.
-		kKBSSeparator2ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator2MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (A rule stood here between the search and Change Checked until 2026-09-27 - removed on the
+		//  user's call.)
 
-		// Change Checked: replace every checked hit with the Find/Change dialog's change string. Alone
-		// between two rules - the only item that rewrites the documents.
+		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
 		kKBSReplaceCheckedActionID,
 		kKBSTargetMenuPath
 		kKBSReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between Change Checked and the two scans.
-		kKBSSeparator5ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator5MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (Block 2 - Find Missing Glyphs and Find Overset, with the rule above them - was removed on
+		//  2026-09-27: the Book panel's preflight reports both.)
 
-		// --- Block 2: the two scans (reports - nothing is written) ---
-
-		// Find Missing Glyphs: scan the same scope for notdef glyphs (the boxes InDesign draws when
-		// a font has no glyph for a character).
-		kKBSFindMissingGlyphsActionID,
-		kKBSTargetMenuPath
-		kKBSFindMissingGlyphsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Find Overset: list the text that did not fit. The sibling of the scan above.
-		kKBSFindOversetActionID,
-		kKBSTargetMenuPath
-		kKBSFindOversetMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Separator between the two scans and the toggles.
+		// Separator between Change Checked and the toggles.
 		kKBSSeparator3ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator3MenuItemPosition,
@@ -595,13 +538,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Separator between the toggles and the two commands that write a file.
+		// Separator between the toggles and the command that writes a file.
 		kKBSSeparator4ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator4MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 4: the two commands that write a file of our own ---
+		// --- Block 4: the command that writes a file of our own ---
 
 		// Save Panel Settings: write the toggles above to a JSON file of our own in the user's
 		// preferences folder, read back at startup. A plain command, not a toggle.
@@ -610,11 +553,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSSavePanelSettingsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Save Results...: write the current result set to a tab-separated text file.
-		kKBSSaveResultsActionID,
-		kKBSTargetMenuPath
-		kKBSSaveResultsMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
+		// (Save Results... stood here until 2026-09-27 - removed on the user's call.)
 
 		// Separator between those and the two reference items that close the menu.
 		kKBSSeparator1ActionID,
@@ -645,6 +584,24 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// this date, where they could only ever mean "every hit everywhere". Here they mean the row
 		// the menu was popped over - the BOOK row for all of it, a document row for that chapter
 		// alone - which is why they moved.
+		// Replace (2026-09-27): the ticked rows of the document the menu was popped over, no prompt.
+		kKBSChapterReplaceActionID,
+		kKBSResultRowMenuName
+		kKBSChapterReplaceMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Reject Change (2026-09-27): every replaced row of that document with a tracked change left.
+		kKBSChapterRejectActionID,
+		kKBSResultRowMenuName
+		kKBSChapterRejectMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Redo (2026-09-27): that document's rows taken back, replaced again.
+		kKBSChapterRedoActionID,
+		kKBSResultRowMenuName
+		kKBSChapterRedoMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		kKBSCheckAllActionID,
 		kKBSResultRowMenuName
 		kKBSCheckAllMenuItemPosition,
@@ -664,8 +621,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// ----- A hit row's right-click menu (2026-09-26) -----
 		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Replace (2026-09-27) replaces that row
-		// alone with no prompt, Reject Change takes that row's replace back through its tracked change,
-		// Redo replaces it again. Hit rows had no menu before.
+		// alone with no prompt, Reject Change takes that row's replace back through its tracked change.
+		// (Redo went on 2026-09-27 - a row taken back is replaced again with Replace.) Hit rows had no menu before.
 		kKBSReplaceHitActionID,
 		kKBSResultHitMenuName
 		kKBSReplaceHitMenuItemPosition,
@@ -676,10 +633,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSRejectChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSRedoActionID,
-		kKBSResultHitMenuName
-		kKBSRedoMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- A STORY row's right-click menu (2026-09-27, the story level) -----
 		// Popped by KBSResultNodeEH::RButtonDn over a story row: each command over that story's rows.
@@ -697,6 +650,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSResultStoryMenuName
 		kKBSStoryRedoMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
+
 
 		kKBSStoryCheckAllActionID,
 		kKBSResultStoryMenuName
@@ -750,42 +704,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
 		// "There is nothing to run on" IS answered, but in UpdateActionStates, where the question can
 		// be put to the CURRENT scope (KBSBookScope::HasScopeTarget).
+		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
+		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
+		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
-		kOtherActionArea,
+		kKBSPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// The glyph scan. Same flags as the search command above, and for the same reasons: it runs
-		// over the same scope, so it must stay live while a book is open with no document window
-		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
-		// one place that decides whether either command can run - including whether the current
-		// scope has anything to run on at all.
-		kKBSActionComponentBoss,
-		kKBSFindMissingGlyphsActionID,
-		kKBSFindMissingGlyphsMenuKey,	// "Find Missing Glyphs"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// The overset scan. Same flags as the two commands above, and for the same reasons: it runs
-		// over the same scope, so it must stay live while a book is open with no document window
-		// (hence no kDisableIfNoFrontDocument), and kCustomEnabling keeps UpdateActionStates as the
-		// one place that decides whether it can run - including whether the current scope has
-		// anything to run on at all.
-		kKBSActionComponentBoss,
-		kKBSFindOversetActionID,
-		kKBSFindOversetMenuKey,			// "Find Overset"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
+		kSDKDefVisibleInKBSCEditorFlag,
 
 
 		kKBSActionComponentBoss,
@@ -888,27 +817,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		//  2026-08-11. That call has never existed in KBSActionComponent.cpp - checked against the
 		//  whole history of the file, not just today's - and it must not: a per-hit door there is
 		//  exactly the one that would grey out a book-wide replace.
+		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
+		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
+		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
 		kKBSActionComponentBoss,
 		kKBSReplaceCheckedActionID,
 		kKBSReplaceCheckedMenuKey,		// "Change Checked"
-		kOtherActionArea,
+		kKBSPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Save Results.... kCustomEnabling so UpdateActionStates can grey it out while there are no
-		// results to write - the same flag every other command here needs. No kDisableIfNoFrontDocument:
-		// what it writes is the RESULT SET, which outlives the document window that produced it (a book
-		// run leaves no window open at all).
-		kKBSActionComponentBoss,
-		kKBSSaveResultsActionID,
-		kKBSSaveResultsMenuKey,			// "Save Results..."
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
+		kSDKDefVisibleInKBSCEditorFlag,
 
 		// Check All / Uncheck All - the result rows' right-click menu since 2026-08-01 (the MenuDef
 		// above). kCustomEnabling so UpdateActionStates can grey them out when the row the menu was
@@ -953,14 +872,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSRedoActionID,
-		kKBSRedoMenuKey,				// "Redo"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// A story row's right-click menu (2026-09-27) - the same five names as the rows' own commands.
 		kKBSActionComponentBoss,
@@ -981,9 +892,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
+
 		kKBSActionComponentBoss,
 		kKBSStoryRedoActionID,
-		kKBSRedoMenuKey,				// "Redo"
+		kKBSRedoMenuKey,				// "Redo" - the story row's (2026-09-27)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1002,6 +914,36 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSStoryUncheckAllActionID,
 		kKBSUncheckAllMenuKey,			// "Uncheck All"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Replace - a document row's right-click menu (2026-09-27): that document's ticked rows.
+		kKBSActionComponentBoss,
+		kKBSChapterReplaceActionID,
+		kKBSReplaceHitMenuKey,			// "Replace"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Reject Change - a document row's right-click menu (2026-09-27).
+		kKBSActionComponentBoss,
+		kKBSChapterRejectActionID,
+		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Redo - a document row's right-click menu (2026-09-27).
+		kKBSActionComponentBoss,
+		kKBSChapterRedoActionID,
+		kKBSRedoMenuKey,				// "Redo"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1133,16 +1075,6 @@ resource LocaleIndex (kKBSResultHitNodeWidgetRsrcID)
 	}
 };
 
-// The Glyph tab's replace confirmation dialog. Its view is not localised - every string it shows
-// comes from the string table, the same way the plain alert's wording does.
-resource LocaleIndex (kSDKDefDialogResourceID)
-{
-	kViewRsrcType,
-	{
-		kWildFS, k_Wild, 	kSDKDefDialogResourceID + index_enUS
-	}
-};
-
 /*  
  * Type definition.
  */
@@ -1210,29 +1142,6 @@ resource PNGR(kKBSIconChangedResID) "KohakuChange32.png"
  * no rollover state to give it.
  */
 resource PNGA(kKBSPaletteIconResID) "KohakuFindChangeTab.png"
-
-/*
- * The Glyph tab's replace confirmation. "DialogBoss" is the exotic name of what is really a widget;
- * WidgetEveInfo is what lets the dialog lay itself out with EVE (basicdialog's BscDlg.fr does the
- * same). The glyph frame inherits EVEGenericPanelWidget, which already carries WidgetEveInfo, so
- * the frame takes part in that layout while its IControlView is ours.
- */
-type KBSReplaceConfirmDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKBSReplaceConfirmDialogBoss)
-{
-	WidgetEveInfo;
-};
-
-// A LEAF, not a container: it holds a drawing, not child widgets. That distinction is what decides
-// its size under EVE - a panel widget is measured from its children, so an empty one collapses to
-// nothing (which is exactly what happened when this inherited EVEGenericPanelWidget: the frame
-// vanished and the font name sat directly under the label). The shape here is the one EveInfo.fh
-// uses for its own leaves - see EVEButtonBarWidget: CControlView plus WidgetEveInfo, and no
-// CPanelControlData - so the Frame written in the resource is the size EVE lays out.
-type KBSGlyphViewWidget(kViewRsrcType) : Widget(ClassID = kKBSGlyphViewWidgetBoss)
-{
-	CControlView;
-	WidgetEveInfo;
-};
 
 /*  
  * PanelList definition.
@@ -1596,347 +1505,6 @@ resource VersionedScriptElementInfo(1)
 	}
 };
 
-/*
- * The Glyph tab's replace confirmation.
- *
- * What this has that the plain alert cannot have is the two glyphs themselves, drawn in the font
- * that defines them. On that tab the query IS a glyph, and a glyph drawn as a character would come
- * out as the STANDARD form - an alternate form shares its Unicode with it - which would be a lie in
- * the one place the user authorises a rewrite.
- *
- * Laid out with EVE: a column of (sentence / the two frames side by side / sentence / check box /
- * buttons), and each frame is a column of (label / glyph / font name / Unicode). The two lines under
- * a frame are optional and the controller hides them when there is nothing to say - an alternate
- * form has no Unicode, and an empty Change To box has no font either.
- *
- * Cancel is the DEFAULT button (user's decision, 2026-07-31): Enter must not start a rewrite. The
- * plain CAlert lost that guard when it gained its "don't show again" box - WarningAlertWithDont-
- * ShowAgain takes no default-button argument - and a dialog of our own is what gets it back.
- * EVEDefaultButtonWidget means "the default button", not "the OK button"; linksui's ProblemLinks
- * dialog likewise gives it a label of its own.
- */
-resource KBSReplaceConfirmDialogWidget (kSDKDefDialogResourceID + index_enUS)
-{
-	__FILE__, __LINE__,
-	kKBSReplaceConfirmDialogWidgetID,	// WidgetID
-	kPMRsrcID_None,					// RsrcID
-	kBindNone,						// Binding
-	Frame(0, 0, 380, 300)			// Frame (l,t,r,b) - EVE resizes it to fit the children
-	kTrue, kTrue,					// Visible, Enabled
-	kKBSPanelTitleKey,				// Dialog name
-	{
-		// ----- "Change N checked hits?" -----
-		EVEStaticTextWidget
-		(
-			kKBSReplaceConfirmCountWidgetID,	// WidgetId
-			kSysStaticTextPMRsrcId,			// RsrcId
-			kBindNone,						// Frame binding
-			Frame(0, 0, 340, 20)			// Frame (l,t,r,b)
-			kTrue, kTrue, kAlignLeft,		// Visible, Enabled, Alignment
-			kDontEllipsize, kFalse,			// Ellipsize style, Convert ampersands
-			"",								// Text (the controller fills it)
-			0								// Associated control for shortcut focus
-
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
-
-		// ----- the two glyph frames, side by side (Glyph tab only) -----
-		// Named as a BLOCK so the Text / GREP layout can hide the whole thing in one call; hiding
-		// the children one by one leaves EVE holding the row's height.
-		EVEGenericPanelWidget
-		(
-			kKBSReplaceConfirmGlyphBlockWidgetID,	// WidgetId
-			0						// RsrcId
-			0,						// Widget EVE Info
-			kBindNone,				// Frame binding
-			Frame(0, 0, 340, 150)	// Frame
-			kTrue,					// Visible
-			kTrue,					// Enabled
-			kEVEAlignCenter | kEVELargeSpaceAfter | kEVEArrangeChildrenInRow,
-
-			{
-				// --- the glyph being searched for ---
-				EVEGenericPanelWidget
-				(
-					kInvalidWidgetID,
-					0
-					0,
-					kBindNone,
-					Frame(0, 0, 145, 150)
-					kTrue,
-					kTrue,
-					kEVEAlignCenter |kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn | kEVEChildAlignCenter,
-
-					{
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmFindLabelWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kDontEllipsize, kFalse,
-							kKBSGlyphConfirmFindLabelKey,	// "Find"
-							0
-
-							kEVEAlignCenter | kEVESmallSpaceAfter,
-						),
-
-						KBSGlyphViewWidget
-						(
-							kKBSGlyphConfirmFindGlyphWidgetID,
-							kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 72, 72)
-							kTrue, kTrue,
-
-							kEVEAlignCenter | kEVESmallSpaceAfter,
-						),
-
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmFindFontWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kEllipsizeEnd, kFalse,
-							"",								// the controller fills it
-							0
-
-							kEVEAlignCenter | kEVENoSpaceAfter,
-						),
-
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmFindUnicodeWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kDontEllipsize, kFalse,
-							"",								// the controller fills or hides it
-							0
-
-							kEVEAlignCenter | kEVENoSpaceAfter,
-						),
-					}
-				),
-
-				// --- the arrow between them ---
-				EVEStaticTextWidget
-				(
-					kKBSGlyphConfirmArrowWidgetID,
-					kSysStaticTextPMRsrcId,
-					kBindNone,
-					Frame(0, 0, 30, 18)
-					kTrue, kTrue, kAlignCenter,
-					kDontEllipsize, kFalse,
-					kKBSGlyphConfirmArrowKey,		// "->"
-					0
-
-					kEVEAlignCenter | kEVELargeSpaceAfter,
-				),
-
-				// --- the glyph that will be written ---
-				EVEGenericPanelWidget
-				(
-					kInvalidWidgetID,
-					0
-					0,
-					kBindNone,
-					Frame(0, 0, 145, 150)
-					kTrue,
-					kTrue,
-					kEVEAlignCenter |kEVENoSpaceAfter | kEVEArrangeChildrenInColumn | kEVEChildAlignCenter,
-
-					{
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmChangeLabelWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kDontEllipsize, kFalse,
-							kKBSGlyphConfirmChangeLabelKey,	// "Change to"
-							0
-
-							kEVEAlignCenter | kEVESmallSpaceAfter,
-						),
-
-						KBSGlyphViewWidget
-						(
-							kKBSGlyphConfirmChangeGlyphWidgetID,
-							kPMRsrcID_None,
-							kBindNone,
-							Frame(0, 0, 72, 72)
-							kTrue, kTrue,
-
-							kEVEAlignCenter | kEVESmallSpaceAfter,
-						),
-
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmChangeFontWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kEllipsizeEnd, kFalse,
-							"",
-							0
-
-							kEVEAlignCenter | kEVENoSpaceAfter,
-						),
-
-						EVEStaticTextWidget
-						(
-							kKBSGlyphConfirmChangeUnicodeWidgetID,
-							kSysStaticTextPMRsrcId,
-							kBindNone,
-							Frame(0, 0, 140, 18)
-							kTrue, kTrue, kAlignCenter,
-							kDontEllipsize, kFalse,
-							"",
-							0
-
-							kEVEAlignCenter | kEVENoSpaceAfter,
-						),
-					}
-				),
-			}
-		),
-
-		// ----- Text / GREP: the whole prompt in one wrapped block -----
-		// The same sentences the plain alert drew, assembled by KBSActionComponent and handed over
-		// whole. ONE widget rather than a line each: the find and change strings are the user's own
-		// and can be any length, and a wrapped block is what the alert gave them. Modelled on
-		// linksui's ProblemLinksDialog, which is where the button arrangement below came from too.
-		EVEStaticMultiLineTextWidget
-		(
-			kKBSReplaceConfirmMessageWidgetID, kSysStaticTextPMRsrcId,	// WidgetId, RsrcId
-			kBindNone,
-			Frame(0, 0, 340, 120)			// Frame (l,t,r,b) - EVE grows it to fit the text
-			kTrue, kTrue, kAlignLeft,		// Visible, Enabled, Alignment
-			kDontEllipsize, kTrue,			// Ellipsize style, Convert ampersands
-			// StaticMultiLineTextAttr
-			0,								// fScrollBarWidgetID
-			kDialogWindowFontId;			// fFontID
-			3,								// fNumPixelsBetweenLines
-			0, 0,							// fInset
-			"",								// Text (the controller fills it)
-
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
-
-		// ***** A WIDGET FOR "the text has been edited since the search" STOOD HERE ON 2026-08-08.
-		// ***** Both layouts carried that sentence - this one on a line of its own, the Text / GREP
-		// one inside the wrapped block above - and it left the prompt entirely the same day: from
-		// here only the chapters that happen to be OPEN can be asked about, and a chapter the user
-		// opened, edited, saved and closed cannot. The replace WALKS each chapter as it opens it now
-		// and compares the ticked positions themselves; one that has moved stops the whole run and is
-		// stated rather than asked about (KBSReplaceEngine's resolve pass and TellResultsWentStale).
-		// A per-chapter OK / Cancel alert stood in between, from 2026-08-08 to 2026-08-10.
-		//
-		// kKBSReplaceConfirmEditedWidgetID is commented out in KBSID.h, its number not reused - the
-		// way the "Don't show again" box's id was before it.
-
-		// ----- "When a replace covers several documents in a book, every document it changes is
-		//        left open and UNSAVED." -----
-		//
-		// MULTI-line since 2026-08-07, for exactly the reason the warning above it already was: the
-		// sentence it carries (the user's wording, replacing a pair that counted the chapters) runs
-		// well past 340px in both languages, and a single-line widget does NOT shorten it - with
-		// kDontEllipsize, EVE widens the WHOLE DIALOG to fit the line instead. Measured on the
-		// running prompt: the dialog went 370px -> 654px while every other row stayed at 340.
-		EVEStaticMultiLineTextWidget
-		(
-			kKBSReplaceConfirmUnsavedWidgetID, kSysStaticTextPMRsrcId,
-			kBindNone,
-			Frame(0, 0, 340, 40)			// EVE grows it to fit the text
-			kTrue, kTrue, kAlignLeft,
-			kDontEllipsize, kFalse,
-			// StaticMultiLineTextAttr
-			0,								// fScrollBarWidgetID
-			kDialogWindowFontId;			// fFontID
-			3,								// fNumPixelsBetweenLines
-			0, 0,							// fInset
-			"",								// the controller fills it
-
-			kEVEAlignLeft | kEVENoSpaceAfter,
-		),
-
-		// ----- "Please take care." -----
-		// A line of its own rather than more text on the one above: the two are different kinds of
-		// statement - that one says what the run LEAVES BEHIND, this one is the warning about it.
-		// Single-line on purpose and safely so: since 2026-08-07 this is the shortest line on the
-		// prompt (it named the condition too until then, which the line above now states in full).
-		EVEStaticTextWidget
-		(
-			kKBSReplaceConfirmCareWidgetID,
-			kSysStaticTextPMRsrcId,
-			kBindNone,
-			Frame(0, 0, 340, 20)
-			kTrue, kTrue, kAlignLeft,
-			kDontEllipsize, kFalse,
-			"",									// the controller fills it
-			0
-
-			kEVEAlignLeft | kEVELargeSpaceAfter,
-		),
-
-		// Two check boxes have stood here and both are gone:
-		//   - "Don't show again", 2026-07-28 to 2026-08-01. Ticking it suppressed the confirmation
-		//     for a DESTRUCTIVE rewrite permanently and almost invisibly - the only way back is
-		//     Preferences > General > Reset All Warning Dialogs.
-		//   - "Save each chapter after replace" and its note, 2026-08-02 to 2026-08-05, removed with
-		//     the feature itself (user's decision: a machine that cannot hold the whole book open is
-		//     served by ticking fewer rows). A run now always leaves every chapter it wrote to open
-		//     and unsaved, which is the state the closing line above describes.
-
-		// ----- OK / Cancel (Cancel is the default - see the note above) -----
-		EVEGenericPanelWidget
-		(
-			kInvalidWidgetID,
-			0
-			0,
-			kBindNone,
-			Frame(0, 0, 200, 24)
-			kTrue,
-			kTrue,
-			kEVEAlignRight | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
-
-			{
-				EVEButtonWidget
-				(
-					kOKButtonWidgetID,
-					kSysButtonPMRsrcId,
-					kBindNone,
-					Frame(0, 0, 0, 0)
-					kTrue, kTrue,
-					kSDKDefOKButtonApplicationKey,
-
-					kEVERegularSpaceAfter,
-				),
-
-				EVEDefaultButtonWidget
-				(
-					kCancelButton_WidgetID,
-					kSysButtonPMRsrcId,
-					kBindNone,
-					Frame(0, 0, 0, 0)
-					kTrue, kTrue,
-					kSDKDefCancelButtonApplicationKey,
-
-					kEVERegularSpaceAfter,
-				),
-			}
-		),
-	},
-
-	kEVEArrangeChildrenInColumn | kEVELargeMargin,
-};
 
 #endif // __ODFRC__
 

@@ -30,9 +30,6 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
-	// Find/Change hits, or a missing-glyph scan's findings? See KBSResultModel::SetResultKind.
-	KBSResultModel::ResultKind gResultKind = KBSResultModel::kResultFindChange;
-
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
@@ -40,23 +37,9 @@ namespace
 	// searched yet). See KBSResultModel::SetSearchMode for why the replace has to compare against it.
 	int32 gSearchMode = -1;
 
-	// The query the results were found with, as one ready-made line. See KBSResultModel::SetQueryText.
-	PMString gQueryText;
-
-	// What the replace that produced this aftermath was told to write. Empty until a replace runs -
-	// see KBSResultModel::SetChangeText.
-	PMString gChangeText;
-
 	// The whole of what those results were WALKED by - query plus every switch that decides the match
 	// set - as one opaque key. See KBSResultModel::SetWalkSignature.
 	PMString gWalkSignature;
-
-	// The sentence the RUN that produced these results reported ("9 hit(s) in 3 of 3 chapter(s)...").
-	// Kept apart from the panel's status line, which anything may overwrite - ticking a row writes
-	// "P1(2)  checked" there - because the saved report's heading wants the run's own summary, not
-	// whatever the panel happened to say last (found 2026-08-09: a search-tick-save sequence wrote
-	// "Summary: P1(2)  checked" at the head of the file). See KBSResultModel::NoteRunSummary.
-	PMString gRunSummary;
 
 	// Is the panel showing a replace's aftermath rather than a search's results? See
 	// KBSResultModel::IsShowingReplaceOutcome.
@@ -115,7 +98,7 @@ namespace
 		// Is this a list that offers work at all? Asked first because it is a property of the RESULT
 		// SET, not of the row: when the answer is no, no row carries a box whatever that row holds.
 		//
-		// ***** THE WHOLE QUESTION, NOT HALF OF IT. ***** This asked IsReportOnlyKind alone until
+		// ***** THE WHOLE QUESTION, NOT HALF OF IT. ***** This asked the scans' report-only kind alone until
 		// 2026-08-07, which left the OTHER half - a replace's aftermath - for every caller to
 		// remember on its own, and all five of them did (SetHitChecked, SetAllChecked,
 		// SetChapterChecked, GetCheckableCount, GetChapterCheckableCount). Nothing was wrong with
@@ -125,104 +108,32 @@ namespace
 		// question (see there).
 		if (KBSResultModel::NoRowHasCheckBox())
 			return false;
+		// A replace's report offers work only on the rows Reject Change put back (2026-09-27, B).
+		if (KBSResultModel::IsShowingReplaceOutcome() && hit.outcome != KBSResultModel::kOutcomeRejected)
+			return false;
 
-		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
+		return !hit.replaced && !hit.isLocked && KBSResultModel::IsWorkOutcome(hit.outcome);
 	}
 
-	// Group a chapter's hits by the font that had no glyph for them - the tree's font level.
+	// ***** GROUP A CHAPTER'S HITS BY STORY (2026-09-27, the user's call) - the tree's middle level. *****
+	// One group per story in first-appearance (page) order - so the stories read in the order their
+	// first matches stand - and every hit given its group. The row reads "P<page of the story's first
+	// match>  <the story's first words>". (The level held FONTS for Find Missing Glyphs from 2026-08-02;
+	// that scan was removed on 2026-09-27, and the level is the story's alone.)
 	//
-	// A chapter is grouped only when at least one of its hits NAMES a font: a Find/Change result
-	// names none, and its tree stays the three levels it has always had. The question is asked of the
-	// HITS rather than of gResultKind on purpose - SetResultKind happens to run before the chapters
-	// are appended today (KBSGlyphScanEngine.cpp:505-512), and a rule resting on that order is a rule
-	// that breaks silently the day the order changes.
-	//
-	// Once a chapter IS grouped, EVERY hit joins a group - including one whose font name came back
-	// empty, which gets a group of its own rather than being left without a parent. A hit with no
-	// parent is a hit that vanishes from the tree; a row reading "(unknown font)" is one the user can
-	// still see and click.
+	// !! Every caller hands over hits that are NEW (fontGroup / fontGroupPos -1 / -1, as Hit's own
+	// constructor sets them) or resets them itself - KeepCheckedRows does. The groups are rebuilt from
+	// scratch here either way.
 	void BuildFontGroups(KBSResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
-
-		bool anyFont = false;
-		for (size_t i = 0; i < chapter.hits.size(); ++i)
-		{
-			if (!chapter.hits[i].fontName.IsEmpty())
-			{
-				anyFont = true;
-				break;
-			}
-		}
-
-		// No font level for this chapter, and nothing to write: -1 / -1 is what Hit's own constructor
-		// sets, this is the only code in the plug-in that ever writes those two fields, and the hits
-		// arriving here have just been built. Walking the whole chapter to store the values it
-		// already holds is what this did until 2026-08-08.
-		//
-		// !! That rests on the hits being NEW. A caller that ever hands over hits carried across from
-		// an earlier result set has to reset the pair itself - the alternative is this loop back, and
-		// it costs one pass over every hit of every ungrouped chapter for the sake of one caller.
-		//
-		// ***** THERE IS ONE SUCH CALLER, AND IT RESETS THEM ITSELF: KeepCheckedRows. ***** This note
-		// read "to defend against a caller that does not exist" from 2026-08-08, when the loop-back
-		// was dropped, until 2026-08-10 - and that caller had been there since 2026-08-07, one day
-		// OLDER than the sentence denying it. Whoever writes the next one: reset the pair there, or
-		// put the loop back here.
-		if (!anyFont)
-		{
-			// ***** A FIND/CHANGE RESULT IS GROUPED BY STORY (2026-09-27, the user's call). ***** The same
-			// level, one group per story in first-appearance (page) order - so the stories read in the
-			// order their first matches stand - and every hit given its group, as below. The row reads
-			// "P<page of the story's first match>  <the story's first words>".
-			if (gResultKind != KBSResultModel::kResultFindChange)
-				return;
-			for (size_t i = 0; i < chapter.hits.size(); ++i)
-			{
-				KBSResultModel::Hit& hit = chapter.hits[i];
-				int32 found = -1;
-				for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
-				{
-					if (chapter.fontGroups[g].story == hit.storyUID)
-					{
-						found = static_cast<int32>(g);
-						break;
-					}
-				}
-				if (found < 0)
-				{
-					KBSResultModel::FontGroup group;
-					group.isStory = true;
-					group.story = hit.storyUID;
-					group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
-					if (!hit.pageString.IsEmpty())
-						group.fontName.Append(hit.pageString);
-					group.fontName.Append("  ");
-					group.fontName.Append(hit.storyLead);
-					group.fontName.SetTranslatable(kFalse);
-					chapter.fontGroups.push_back(group);
-					found = static_cast<int32>(chapter.fontGroups.size()) - 1;
-				}
-				KBSResultModel::FontGroup& group = chapter.fontGroups[found];
-				hit.fontGroup = found;
-				hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
-				group.hitIndices.push_back(static_cast<int32>(i));
-			}
-			return;
-		}
-
-		// The hits arrive in PAGE order, so walking them in order leaves the groups in
-		// first-appearance order - which is the order the panel shows them in (user's call
-		// 2026-08-02). The linear search over the groups runs over a handful of entries: a document
-		// broken in dozens of different fonts is not a case worth carrying a map for.
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KBSResultModel::Hit& hit = chapter.hits[i];
-
 			int32 found = -1;
 			for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
 			{
-				if (chapter.fontGroups[g].fontName.Compare(kTrue, hit.fontName) == 0)
+				if (chapter.fontGroups[g].story == hit.storyUID)
 				{
 					found = static_cast<int32>(g);
 					break;
@@ -231,12 +142,17 @@ namespace
 			if (found < 0)
 			{
 				KBSResultModel::FontGroup group;
-				group.fontName = hit.fontName;
+				group.isStory = true;
+				group.story = hit.storyUID;
+				group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
+				if (!hit.pageString.IsEmpty())
+					group.fontName.Append(hit.pageString);
+				group.fontName.Append("  ");
+				group.fontName.Append(hit.storyLead);
 				group.fontName.SetTranslatable(kFalse);
 				chapter.fontGroups.push_back(group);
 				found = static_cast<int32>(chapter.fontGroups.size()) - 1;
 			}
-
 			KBSResultModel::FontGroup& group = chapter.fontGroups[found];
 			hit.fontGroup = found;
 			hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
@@ -280,13 +196,9 @@ void KBSResultModel::Clear()
 	gChapters.clear();
 	gShowingOutcome = false;
 	gFromBook = false;
-	gResultKind = kResultFindChange;
 	gBookName.Clear();
 	gSearchMode = -1;
-	gQueryText.Clear();
-	gChangeText.Clear();
 	gWalkSignature.Clear();
-	gRunSummary.Clear();
 	// (KBSEditStamp::Forget was called from here, and the file is gone: the replace checks the
 	//  stored positions against a fresh walk rather than fingerprinting each chapter, so nothing
 	//  outside this model describes these rows any more.)
@@ -332,38 +244,30 @@ bool KBSResultModel::IsFromBook()
 	return gFromBook;
 }
 
-void KBSResultModel::SetResultKind(ResultKind kind)
-{
-	gResultKind = kind;
-}
-
-bool KBSResultModel::IsReportOnlyKind()
-{
-	// Every kind EXCEPT the Find/Change query, which is the one that offers work. Written as the
-	// list of scans rather than as "not kResultFindChange" so that adding a kind is a decision
-	// rather than a default: a new kind that DOES offer work would otherwise quietly lose its
-	// check boxes here.
-	return gResultKind == kResultMissingGlyph || gResultKind == kResultOverset;
-}
-
 bool KBSResultModel::NoRowHasCheckBox()
 {
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
-	return KBSResultModel::IsReportOnlyKind() || gShowingOutcome;
+	// ***** EXCEPT A REPORT HOLDING A ROW TAKEN BACK (2026-09-27, B): that row carries a box. *****
+	// (A scan's report-only kind was the other half until the two scans were removed, 2026-09-27.)
+	return gShowingOutcome && !KBSResultModel::AnyRejectedRowOpen();
 }
 
-bool KBSResultModel::MatchTextIsLiveText()
+bool KBSResultModel::IsWorkOutcome(ChangeOutcome outcome)
 {
-	// Named the ONE kind that departs from it, not "is a scan": the glyph scan is every bit as much
-	// a report, and its rows DO hold the story's own characters - so folding this into
-	// IsReportOnlyKind would silently switch off a check that works there.
-	return gResultKind != kResultOverset;
+	return outcome == kOutcomeNone || outcome == kOutcomeRejected;
 }
 
-KBSResultModel::ResultKind KBSResultModel::GetResultKind()
+bool KBSResultModel::AnyRejectedRowOpen()
 {
-	return gResultKind;
+	for (size_t ci = 0; ci < gChapters.size(); ++ci)
+		for (size_t hi = 0; hi < gChapters[ci].hits.size(); ++hi)
+		{
+			const Hit& h = gChapters[ci].hits[hi];
+			if (h.outcome == kOutcomeRejected && !h.replaced && !h.isLocked)
+				return true;
+		}
+	return false;
 }
 
 void KBSResultModel::SetSearchMode(int32 mode)
@@ -374,39 +278,6 @@ void KBSResultModel::SetSearchMode(int32 mode)
 int32 KBSResultModel::GetSearchMode()
 {
 	return gSearchMode;
-}
-
-// The two recorded lines are READ inside this file only - BuildReportText writes them into the
-// saved report's heading and nothing else asks for them. Getters for them lived here until
-// 2026-08-08 and had no callers at all.
-void KBSResultModel::NoteRunSummary(const PMString& summary)
-{
-	gRunSummary = summary;
-	gRunSummary.SetTranslatable(kFalse);
-}
-
-PMString KBSResultModel::GetRunSummary()
-{
-	PMString summary(gRunSummary);
-	summary.SetTranslatable(kFalse);
-	return summary;
-}
-
-void KBSResultModel::SetQueryText(const PMString& query)
-{
-	gQueryText = query;
-	gQueryText.SetTranslatable(kFalse);
-}
-
-void KBSResultModel::SetChangeText(const PMString& change)
-{
-	gChangeText = change;
-	gChangeText.SetTranslatable(kFalse);
-}
-
-PMString KBSResultModel::GetChangeText()
-{
-	return gChangeText;
 }
 
 void KBSResultModel::SetWalkSignature(const PMString& signature)
@@ -444,15 +315,12 @@ void KBSResultModel::ShutdownCleanup()
 	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
 	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
 	//
-	// ALL FIVE of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one
-	// string that is only ever filled by a replace was the one left holding storage at unload. When
-	// a static is added above, it is added here too - that is what this list is (gRunSummary joined
-	// with its line already written, 2026-08-09).
+	// ALL of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one string
+	// that is only ever filled by a replace was the one left holding storage at unload. When a static
+	// is added above, it is added here too - that is what this list is. (gQueryText, gChangeText and
+	// gRunSummary went with Save Results... on 2026-09-27.)
 	gBookName.Clear();
-	gQueryText.Clear();
-	gChangeText.Clear();
 	gWalkSignature.Clear();
-	gRunSummary.Clear();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
 	// one would leave copies behind, and these hold PMStrings like the chapters do.
@@ -575,7 +443,7 @@ int32 KBSResultModel::GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx)
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
 		const Hit& h = gChapters[chapterIdx].hits[rows[k]];
-		if (h.checked && !h.replaced)
+		if (h.checked && !h.replaced && IsWorkOutcome(h.outcome))
 			++count;
 	}
 	return count;
@@ -619,9 +487,7 @@ bool KBSResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 		return false;
 
 	const FontGroup& group = c.fontGroups[fontIdx];
-	outName = group.fontName;
-	if (outName.IsEmpty())
-		outName = "(unknown font)";		// the font could not be named - see BuildFontGroups
+	outName = group.fontName;			// the story row's text - see BuildFontGroups
 	outName.SetTranslatable(kFalse);
 	outHitCount = static_cast<int32>(group.hitIndices.size());
 	return true;
@@ -673,7 +539,6 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.preText = h.preText;
 	out.matchText = h.matchText;
 	out.postText = h.postText;
-	out.fontName = h.fontName;
 	out.checked = h.checked;
 	out.inFootnote = h.inFootnote;
 	out.replaced = h.replaced;
@@ -735,81 +600,8 @@ namespace
 		return "";
 	}
 
-	// One cell of the SAVED report: the text with its tabs and line breaks flattened to a single
-	// space. Deliberately NOT AppendEscapedUTF8's "\t" / "\n": that block is split back into fields by
-	// a script, this file is pasted into a spreadsheet by a person - where a literal backslash-n is
-	// noise, and a real newline would split the row. A run of them collapses to ONE space, so a CRLF
-	// does not become two.
-	void AppendFlattenedUTF8(std::string& out, const PMString& s)
-	{
-		const std::string utf8 = s.GetUTF8String();
-		bool folded = false;
-		for (std::string::size_type i = 0; i < utf8.size(); ++i)
-		{
-			const char c = utf8[i];
-			if (c == '\t' || c == '\r' || c == '\n')
-			{
-				if (!folded)
-					out += ' ';
-				folded = true;
-				continue;
-			}
-			out += c;
-			folded = false;
-		}
-	}
-
-	// Add one word to a space-separated cell.
-	void AppendWord(std::string& cell, const char* word)
-	{
-		if (!cell.empty())
-			cell += ' ';
-		cell += word;
-	}
-
-	// The row's flags as one cell, in the SAME WORDS AND THE SAME ORDER the panel's locator uses
-	// (KBSResultModel::BuildHitLocator) - so the file and the panel never call one thing by two names.
-	// "replaced" is the one word the locator has no place for: on the panel a replaced row shows it by
-	// having lost its check box, which a text file cannot show.
-	std::string BuildFlagCell(const KBSResultModel::Hit& hit)
-	{
-		std::string flags;
-		if (hit.isOverset)
-			AppendWord(flags, "overset");
-		if (hit.isHidden)
-			AppendWord(flags, "hidden");
-		if (hit.isLocked || hit.outcome == KBSResultModel::kOutcomeLocked)
-			AppendWord(flags, "locked");
-		// Missing and refused exclude each other (two values of one field); locked is already said
-		// above, in the word the locator uses for it.
-		if (hit.outcome == KBSResultModel::kOutcomeMissing)
-			AppendWord(flags, "missing");
-		else if (hit.outcome == KBSResultModel::kOutcomeRefused)
-			AppendWord(flags, "refused");
-		// (a rejected row says nothing - as on the panel, 2026-09-27: it reads its original text again)
-		else if (hit.outcome == KBSResultModel::kOutcomeDeleted)
-			AppendWord(flags, "deleted");
-		else if (hit.outcome == KBSResultModel::kOutcomeEndnoteLeft)
-			AppendWord(flags, "not-replaced");
-		if (hit.replaced)
-			AppendWord(flags, "replaced");
-		return flags;
-	}
-
-	// The report heading's first line: WHICH command produced these rows. Reads the module's own state
-	// directly - it is in the same translation unit - rather than going back through the getters.
-	const char* ReportKindHeading()
-	{
-		switch (gResultKind)
-		{
-			case KBSResultModel::kResultMissingGlyph:	return "Find Missing Glyphs";
-			case KBSResultModel::kResultOverset:		return "Find Overset";
-			case KBSResultModel::kResultFindChange:		break;
-		}
-		// A replace turns the result set into a report of what it did, which is a different thing to
-		// have in front of you than a search's hits - so the heading says which one this is.
-		return gShowingOutcome ? "Kohaku Find/Change (after Change Checked)" : "Kohaku Find/Change";
-	}
+	// (AppendFlattenedUTF8 / AppendWord / BuildFlagCell / ReportKindHeading - the saved report's
+	//  helpers - went with Save Results... on 2026-09-27.)
 }
 
 void KBSResultModel::DescribeAllRows(PMString& out)
@@ -863,7 +655,8 @@ void KBSResultModel::DescribeAllRows(PMString& out)
 			buf += "\t";
 			AppendEscapedUTF8(buf, row.postText);
 			buf += "\t";
-			AppendEscapedUTF8(buf, row.fontName);
+			// The font column (Find Missing Glyphs' font) is kept EMPTY since that scan was removed
+			// (2026-09-27), so the columns after it keep their places for the scripts that read them.
 			buf += "\t";
 			AppendNumberUTF8(buf, row.checked ? 1 : 0);
 			buf += "\t";
@@ -945,120 +738,6 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 	s.SetTranslatable(kFalse);
 }
 
-void KBSResultModel::BuildReportText(const PMString& summaryLine, PMString& out)
-{
-	std::string buf;
-
-	// ----- The heading: what this result set IS, before any row of it -----
-	buf += ReportKindHeading();
-
-	// The query, on the Find/Change results only - neither scan has one. Kept on the replace's
-	// aftermath as well: "what was searched for" is exactly what a report of a replace needs to name.
-	if (gResultKind == kResultFindChange && !gQueryText.IsEmpty())
-	{
-		buf += "\nQuery: ";
-		AppendFlattenedUTF8(buf, gQueryText);
-	}
-
-	// ...and what was WRITTEN, on the aftermath of a replace only. A report of a search names what was
-	// looked for and nothing else: the Change To box may hold anything at all at that point, and
-	// naming it would read as something that has already been done (user's decision, 2026-08-04).
-	//
-	// Asked of IsShowingReplaceOutcome rather than of the string alone, so that the line follows the
-	// same flag every other "this is a replace's report" decision in this plug-in follows - the file
-	// name (KBSReportSave::ActionNamePart) and the panel's own illustration among them.
-	if (gResultKind == kResultFindChange && IsShowingReplaceOutcome() && !gChangeText.IsEmpty())
-	{
-		buf += "\nChange: ";
-		AppendFlattenedUTF8(buf, gChangeText);
-	}
-
-	// What was run over. A book search names the book; a document search names its one chapter.
-	if (gFromBook && !gBookName.IsEmpty())
-	{
-		buf += "\nBook: ";
-		AppendFlattenedUTF8(buf, gBookName);
-	}
-	else if (!gChapters.empty())
-	{
-		buf += "\nDocument: ";
-		AppendFlattenedUTF8(buf, gChapters[0].name);
-	}
-
-	// The panel's own status line, verbatim. Every kind of run words its summary differently
-	// ("9 hit(s) in 3 of 3 chapter(s)", "55 missing glyphs in 6 places."), and taking the sentence
-	// rather than re-counting is what keeps the file from ever contradicting the panel.
-	if (!summaryLine.IsEmpty())
-	{
-		buf += "\nSummary: ";
-		AppendFlattenedUTF8(buf, summaryLine);
-	}
-
-	// How many lines follow. NOT the same number as the panel shows: the display cap stops at
-	// kKBSDisplayHitLimit rows, and this file carries every stored hit.
-	buf += "\nRows: ";
-	AppendNumberUTF8(buf, GetTotalHitCount());
-
-	// ----- The table -----
-	buf += "\n\n";
-	buf += "<Document>\t<Page>\t<No>\t<Text>\t<Font>\t<Flags>";
-
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		const Chapter& chapter = gChapters[ci];
-		for (size_t hi = 0; hi < chapter.hits.size(); ++hi)
-		{
-			const Hit& hit = chapter.hits[hi];
-
-			buf += "\n";
-			AppendFlattenedUTF8(buf, chapter.name);
-			buf += "\t";
-			// The page NUMBER alone, so a spreadsheet can sort on it - the "overset" / "locked" that
-			// ride the panel's locator are in the Flags cell instead. A hit with no page NUMBER
-			// leaves the cell empty rather than writing what the page list spells for it: an empty
-			// cell sorts and filters, "PB" or a master's name in a number column does not.
-			//
-			// THREE things answer a negative index, not one: the pasteboard (the lookup falls back
-			// to the spread), a MASTER PAGE (GetPageIndex counts pages within the pub and a master
-			// is not one of them), and a hit with nothing placed anywhere. This note named only the
-			// first until 2026-08-11, when Find Overset stopped dropping the other two and they
-			// started reaching this file (block 10 of the defect re-check).
-			if (hit.pageIndex >= 0)
-				AppendFlattenedUTF8(buf, hit.pageString);
-			buf += "\t";
-			// Which hit this is ON ITS PAGE - the "(2)" the panel's locator carries. Without it several
-			// matches in one paragraph write IDENTICAL lines (measured on the first real save, three
-			// matches deep in one paragraph), and the file cannot be lined up against the panel at all.
-			// Its own column rather than part of the page, so the page still sorts as a number. 0 means
-			// the row does not show one - the cell is left empty rather than writing a zero.
-			if (hit.pageOrdinal > 0)
-				AppendNumberUTF8(buf, hit.pageOrdinal);
-			buf += "\t";
-			// The line as the panel draws it: the three segments joined back together, and carrying
-			// the SAME break marks the panel puts on them (2026-08-04), so a match that spans
-			// paragraphs reads as one row in both places rather than as two different rows.
-			//   *The flattening still runs, after the marks: it folds the TABS a line can carry -
-			//    which would split this cell into extra columns - and by then the marks have taken
-			//    the breaks out of its way, so it has nothing else left to fold.
-			//   *A mark is one CHARACTER, so nothing here can put a line break into the file.
-			// (An overset finding has its report - "Frame (370)" - in the match segment, so this
-			// writes that.)
-			PMString seg(hit.preText);	MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
-			seg = hit.matchText;		MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
-			seg = hit.postText;			MarkUpBreaksForDisplay(seg);	AppendFlattenedUTF8(buf, seg);
-			buf += "\t";
-			AppendFlattenedUTF8(buf, hit.fontName);
-			buf += "\t";
-			buf += BuildFlagCell(hit);
-		}
-	}
-
-	// A text file ends with a line break: without it the last row is a partial line, and some tools
-	// drop it.
-	buf += "\n";
-
-	out.SetUTF8String(buf);
-}
 
 bool KBSResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 	PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost)
@@ -1273,7 +952,7 @@ int32 KBSResultModel::GetCheckedCount()
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (hits[hi].checked && !hits[hi].replaced)
+			if (hits[hi].checked && !hits[hi].replaced && IsWorkOutcome(hits[hi].outcome))
 				++count;
 		}
 	}
@@ -1291,7 +970,7 @@ int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
 	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
 	for (size_t hi = 0; hi < hits.size(); ++hi)
 	{
-		if (hits[hi].checked && !hits[hi].replaced)
+		if (hits[hi].checked && !hits[hi].replaced && IsWorkOutcome(hits[hi].outcome))
 			++count;
 	}
 	return count;
@@ -1437,24 +1116,6 @@ void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 	BuildHitLocator(h);
 }
 
-void KBSResultModel::SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
-	BackUpRow(chapterIdx, hitIdx, h);
-	h.storyUID = storyUID;
-	h.textStart = start;
-	h.textEnd = end;
-	h.replaced = true;
-	h.checked = false;
-	h.outcome = kOutcomeNone;
-	BuildHitLocator(h);
-}
-
 void KBSResultModel::SetHitWalkOrder(int32 chapterIdx, int32 hitIdx, int32 walkOrder)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -1530,6 +1191,12 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textEnd = newEnd;
 	h.replaced = true;
 	h.checked = false;
+	// a row taken back and replaced again (2026-09-27, A/B) is an ordinary replaced row once more
+	if (h.outcome == kOutcomeRejected)
+	{
+		h.outcome = kOutcomeNone;
+		BuildHitLocator(h);
+	}
 }
 
 // (GetHitReplacedRange stood here until 2026-09-25: the replace pass read a replaced row's range
@@ -1806,11 +1473,7 @@ int32 KBSResultModel::KeepCheckedRows()
 		// hit) would stamp a stale group onto the node: two nodes naming one hit while carrying
 		// different fonts, which is the one thing that header says must never happen.
 		//
-		// Not reachable today - a chapter only HAS groups when its hits name a font, which only the
-		// glyph scan does, and a scan is a report whose rows carry no check box for a replace to be
-		// asked about (RowHasCheckBox), so KBSReplaceEngine turns back at its door before it can
-		// get here. It is rebuilt anyway because the rule this pass has to keep is "the model is
-		// consistent when it returns", not "nothing calls it in the one arrangement we have today".
+		// Reached on every Find/Change chapter since the story groups came in (2026-09-27).
 		BuildFontGroups(gChapters[ci]);
 	}
 

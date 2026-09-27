@@ -14,18 +14,15 @@
 #include "KBSRunGuard.h"
 #include "KBSSearchEngine.h"
 #include "KBSReplaceEngine.h"
-#include "KBSGlyphScanEngine.h"
-#include "KBSOversetScanEngine.h"
 
 bool KBSRunGuard::IsAnyRunning()
 {
 	// Each engine keeps its own flag, raised by a guard object for the whole length of its run, so
-	// this is four reads of a bool and can be asked as often as a caller likes - including from
-	// inside an action-enablement pass, which runs every time a menu is opened.
+	// this is two reads of a bool and can be asked as often as a caller likes - including from
+	// inside an action-enablement pass, which runs every time a menu is opened. (Four until
+	// 2026-09-27, when the two scans were removed.)
 	return KBSSearchEngine::IsSearching()
-		|| KBSReplaceEngine::IsReplacing()
-		|| KBSGlyphScanEngine::IsScanning()
-		|| KBSOversetScanEngine::IsScanning();
+		|| KBSReplaceEngine::IsReplacing();
 }
 
 const char* KBSRunGuard::BusyMessage()

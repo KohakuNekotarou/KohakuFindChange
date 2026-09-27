@@ -122,21 +122,7 @@ namespace KBSResultTree
 	    @param nowChecked the state the box was just put into. */
 	void ShowHitCheckStatus(const PMString& locator, bool nowChecked);
 
-	/** "Save Results..." on the panel's flyout: write the current result set to a tab-separated text
-	    file the user picks. Implemented in KBSReportSave.cpp.
-
-	    Lives with the tree for the same reason ShowStatus does - it is the panel reporting what it is
-	    showing.
-
-	    ***** THE HEADING'S "Summary:" LINE COMES FROM THE RUN, NOT FROM THIS STATUS LINE. ***** It
-	    did read the line back until 2026-08-09, and a tick between the run and the save then put
-	    "P1(2)  checked" at the head of the file - so every run records its own sentence
-	    (KBSResultModel::NoteRunSummary) and the report asks for that. GetLastStatus stands in only
-	    when nothing recorded one (KBSReportSave.cpp:203-210).
-
-	    Says nothing when it works: the file is where the user put it. Only the failures reach the
-	    status line, and a cancelled chooser does nothing at all. */
-	void SaveResultsAsText();
+	// (SaveResultsAsText - "Save Results..." - was removed on 2026-09-27, the user's call.)
 }
 
 #endif // __KBSResultTree_h__

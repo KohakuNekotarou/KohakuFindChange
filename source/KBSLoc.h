@@ -4,8 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace confirmations and
-//  the Glyph-tab confirmation dialog's labels. (The About box was one of these until 2026-08-09;
+//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace's own alerts and
+//  its undo step name. (The Glyph-tab confirmation dialog's labels went with it on 2026-09-27.)
+//  (The About box was one of these until 2026-08-09;
 //  it now reads the same in every language, so it needs nothing from this file.)
 //
 //  There is no jaJP string TABLE any more (2026-08-05, user's call). Every locale reads the
@@ -105,15 +106,6 @@ namespace KBSJa
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert
 	//  to state the outcome and the status line to carry what to do next.)
-
-	// ----- Glyph confirmation dialog chrome -----
-	const char16_t kGlyphFindLabel[]   = u"検索";
-	const char16_t kGlyphChangeLabel[] = u"置換後";
-	const char16_t kGlyphArrow[]       = u"→";
-	// No caller since 2026-08-06 - the box this labels came off the dialog on 2026-08-01, and the
-	// controller stopped stamping it into a widget that no longer exists. Kept for the same reason
-	// KBSID.h keeps the key and the id: putting the box back should not need a translation round.
-	const char16_t kGlyphDontShow[]    = u"次回から表示しない";
 
 	// ----- About box -----
 	// GONE on 2026-08-09 (user's call): the About box now reads the same in every UI language -
