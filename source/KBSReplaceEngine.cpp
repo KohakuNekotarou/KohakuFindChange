@@ -255,11 +255,12 @@ struct RunTotals
 
 	// Ticked rows in an endnote story that was left alone (2026-09-27): a match there ends an endnote.
 	int32		endnoteLeft;
+	int32		acceptedFirst;	// pending tracked changes accepted before the first write (2026-09-27)
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
 		  chaptersNotWalked(0), chaptersNoWindow(0), chaptersWalkFailed(0),
-		  missing(0), locked(0), refused(0), endnoteLeft(0),
+		  missing(0), locked(0), refused(0), endnoteLeft(0), acceptedFirst(0),
 		  haveFirstSkipped(false), haveFirstNotWalked(false), haveFirstWalkFailed(false),
 		  cancelled(false), stoppedByError(false), stoppedByMismatch(false), refusedByShape(false)
 	{
@@ -1576,6 +1577,456 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	return true;
 }
 
+// ======================================================================================================
+// ***** ONE MATCH AT A TIME AGAIN, STORY BY STORY, UNDER TRACK CHANGES (2026-09-27, the user's call). *****
+//
+// Change All over whole stories (above, 2026-09-26 to 2026-09-27) wrote the rows NOT ticked as well and
+// then took them back, which is what a footnote (nothing recorded there) and a deletion shared by
+// touching matches could not survive. The user's call: back to writing only the ticked matches, one at a
+// time (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current - the old walk's two
+// commands), a story at a time, still with Track Changes on so a replaced row keeps its Reject Change.
+//
+// ***** WHICH WAY THE WALK GOES IS DECIDED BEFORE ANYTHING IS WRITTEN (the user's call B). ***** A walk
+// that writes as it goes reads text it has already rewritten, and each direction has one shape it
+// cannot get right (measured 2026-09-26, spike/2026-09-26-backward-replace):
+//   - forward, GREP ^ reads the character a replacement has just deleted in front of it (H-8:
+//     \r|^a|ab on "x<CR>ab" left "xab" and one row missing, where Change All makes "xb");
+//   - backward, a lookahead reads text a replacement has just rewritten behind it (x(?=y)|y on "xy"
+//     left "x" and one row missing, where Change All makes "").
+// Neither ever writes a match the search did not list - every match is recognised by its place and
+// length (RowOfMatchAnyOrder), so a match the walk meets that no row accounts for is stepped over and
+// the row is reported missing. So the choice only decides which shape comes out missing: a GREP query
+// holding ^ walks backward, everything else forward (WriteBackward). Retrying the missing rows the other
+// way round after the fact was considered (A) and dropped: by then the text has already moved, and the
+// retry meets the same unlisted match (x<CR>ab -> xab: the "a" is part of "ab" either way).
+// ======================================================================================================
+
+// Does a GREP query hold ^ as the start of a paragraph? Not \^ (a literal caret), not a ^ inside a
+// character class ([^a], [a^]), and not one quoted by \Q...\E. A POSIX class inside a class ([[:alpha:]])
+// does not end the class at its own ']'.
+bool GrepQueryHoldsLineStart(const WideString& query)
+{
+	bool inClass = false;
+	bool quoted = false;
+	bool classJustOpened = false;	// the ']' right after '[' or '[^' is a literal
+	WideString::const_iterator it = query.begin();
+	const WideString::const_iterator end = query.end();
+	while (it != end)
+	{
+		const uint32 c = *it;
+		++it;
+		if (quoted)
+		{
+			if (c == '\\' && it != end && *it == 'E')
+			{
+				quoted = false;
+				++it;
+			}
+			continue;
+		}
+		if (c == '\\')
+		{
+			if (it == end)
+				break;
+			const uint32 next = *it;
+			++it;
+			if (next == 'Q' && !inClass)
+				quoted = true;
+			classJustOpened = false;
+			continue;
+		}
+		if (inClass)
+		{
+			if (c == '[' && it != end && *it == ':')
+			{
+				// [:name:] - skip to its ":]"
+				++it;
+				while (it != end)
+				{
+					const uint32 p = *it;
+					++it;
+					if (p == ':' && it != end && *it == ']')
+					{
+						++it;
+						break;
+					}
+				}
+				classJustOpened = false;
+				continue;
+			}
+			if (c == '^' && classJustOpened)
+				continue;		// [^ - still "just opened" for the ']' that may follow
+			if (c == ']' && !classJustOpened)
+				inClass = false;
+			classJustOpened = false;
+			continue;
+		}
+		if (c == '[')
+		{
+			inClass = true;
+			classJustOpened = true;
+			continue;
+		}
+		if (c == '^')
+			return true;
+	}
+	return false;
+}
+
+// Should this run's writing walk go backward? Only on the GREP tab, and only when the query holds ^.
+bool WriteBackward()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil || opts->GetSearchMode() != IFindChangeOptions::kGrepSearch)
+		return false;
+	return GrepQueryHoldsLineStart(opts->GetFindString(IFindChangeOptions::kGrepSearch));
+}
+
+// Which pending row is the match the walk has just found - by its place alone (the thread, how far into
+// it, and the length), in whatever order the walk meets the rows. -1 = no row: a match the search never
+// listed, which the walk steps over. (Taken from spike/2026-09-26-backward-replace. The length is
+// compared for the reason RowIsThisMatch gives.)
+int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const std::set<int32>& pending,
+	UID story, TextIndex start, TextIndex end)
+{
+	UID dict = kInvalidUID;
+	uint32 key = 0;
+	TextIndex threadStart = kInvalidTextIndex;
+	if (!ThreadAt(db, story, start, dict, key, threadStart))
+		return -1;
+	const TextIndex offset = start - threadStart;
+	const int32 length = end - start;
+	for (std::set<int32>::const_iterator it = pending.begin(); it != pending.end(); ++it)
+	{
+		const RowNow& row = rowNow[static_cast<size_t>(*it)];
+		if (row.known && row.story == story && row.threadDict == dict && row.threadKey == key
+			&& row.offset == offset && row.length == length)
+			return *it;
+	}
+	return -1;
+}
+
+// One story's walk: every pending row the walk meets is written, one at a time, in the direction the
+// session is set to (the caller's KBSBackwardSearchScope). What the walk writes moves every row after it
+// in the same thread (CarryRowsPast); a written row is put where its new text stands. A row that would
+// write at an endnote's end is left, and said so (MatchEndsAnEndnote). What is still in `pending` at the
+// end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
+bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
+	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
+	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone)
+{
+	IDataBase* const db = storyRef.GetDataBase();
+	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IK2ServiceProvider> provider(registry != nil
+		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
+	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
+	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
+	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+	if (db == nil || walker == nil || scope == nil || client == nil)
+		return false;
+	if (walker->IsWalking())
+		walker->Halt();
+	walker->Initialize(client, scope, opts, nil);
+	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
+	if (selUtils == nil)
+	{
+		if (walker->IsWalking())
+			walker->Halt();
+		return false;
+	}
+	{
+		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+		// The range the last replacement wrote: a match inside it ("cat" -> "cat cat") is none of ours.
+		UID lastStory = kInvalidUID;
+		TextIndex lastStart = kInvalidTextIndex, lastEnd = kInvalidTextIndex;
+		while (!pending.empty())
+		{
+			UIDRef story;
+			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+			const IFindChangeService::FindChangeResult found = RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
+			if (found != IFindChangeService::kSuccess)
+			{
+				if (found == IFindChangeService::kFailure)
+					outWalkFailed = true;
+				break;
+			}
+			if (story.GetUID() == lastStory && start >= lastStart && start < lastEnd)
+				continue;
+			const int32 hitIdx = RowOfMatchAnyOrder(db, rowNow, pending, story.GetUID(), start, end);
+			if (hitIdx < 0)
+				continue;
+			pending.erase(hitIdx);
+
+			if (MatchEndsAnEndnote(story, end))
+			{
+				// InDesign's replace at an endnote's end breaks the endnote's range for good (see
+				// MatchEndsAnEndnote) - one at a time, only this row is left (2026-09-27).
+				++ioEndnoteLeft;
+				KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeEndnoteLeft);
+				KeepRowAt(db, rowNow, keptRows, hitIdx, story.GetUID(), start, end);
+			}
+			else
+			{
+				// The thread and the offset into it BEFORE the command - what every row's place is kept in.
+				UID matchDict = kInvalidUID;
+				uint32 matchKey = 0;
+				TextIndex matchThreadStart = kInvalidTextIndex;
+				const bool haveThread = ThreadAt(db, story.GetUID(), start, matchDict, matchKey, matchThreadStart);
+				UIDRef written;
+				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
+				if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
+				{
+					++ioReplaced;
+					lastStory = written.GetUID();
+					lastStart = writtenStart;
+					lastEnd = writtenEnd;
+					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+					// every row after it first, then this row at what was written - so it is not moved by itself
+					if (haveThread)
+						CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
+							end - matchThreadStart, writtenEnd - writtenStart);
+					KeepRowAt(db, rowNow, keptRows, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+				}
+				else
+				{
+					++ioRefused;
+					KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeRefused);
+					KeepRowAt(db, rowNow, keptRows, hitIdx, story.GetUID(), start, end);
+				}
+			}
+			++ioDone;
+			KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
+		}
+	}
+	if (walker->IsWalking())
+		walker->Halt();
+	return true;
+}
+
+// ***** THE CHAPTER'S REPLACE (2026-09-27). ***** Every ticked row is written by the walk of its story,
+// with Track Changes on for the stories written (TrackingScope) and the direction the caller set.
+// Refuses before anything is written - returns false, outWhyNot says why - only for a row already
+// replaced. The document's pending tracked changes are accepted before the first write (outAcceptedFirst
+// = how many). outCancelled / outFailed: the caller aborts the whole run.
+bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
+	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
+	int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed, PMString& outWhyNot)
+{
+	outAcceptedFirst = 0;
+	outReplaced = 0;
+	outMissing = 0;
+	outLocked = 0;
+	outRefused = 0;
+	outEndnoteLeft = 0;
+	outWalkFailed = false;
+	outCancelled = false;
+	outFailed = false;
+	outWhyNot.Clear();
+	outWhyNot.SetTranslatable(kFalse);
+
+	IDataBase* const db = docRef.GetDataBase();
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (db == nil || opts == nil)
+	{
+		outWhyNot = "the document or the Find/Change options could not be read";
+		return false;
+	}
+	// ***** GLYPH AND TRANSLITERATE AGAIN (2026-09-27, the user's call). ***** Change All (2026-09-26 to
+	// 2026-09-27) ran on the Text and GREP tabs only, and a Glyph or Transliterate run was refused after
+	// its prompt (defect sweep D-1). One match at a time is the walk those two tabs were built and
+	// measured on (2026-07-30, 2026-08-08): ReplaceChecked has already stated the change glyph or the
+	// character type the command writes (KBSSearchEngine::CommitReplaceSide), and the menu refuses the
+	// Object and Colour tabs before any of this.
+
+	// Every row's place now (RowNow) - the ticked ones are what the walks look for, and every row is
+	// carried past what they write, for the read-back at the end.
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	std::vector<RowNow> rowNow(static_cast<size_t>(hitCount > 0 ? hitCount : 0));
+	std::vector<int32> keptRows;						// the rows the report keeps, read back at the end
+	std::map<UID, std::set<int32> > pendingByStory;		// the ticked, editable rows, story by story
+	std::map<std::pair<UID, UID>, bool> editableFrames;
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		bool checked = false, replaced = false, locked = false;
+		if (!KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked))
+		{
+			outWhyNot = "a row could not be read";
+			return false;
+		}
+		if (replaced)
+		{
+			outWhyNot = "a row is already replaced - search again";
+			return false;
+		}
+		UID story = kInvalidUID;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, start, end, hash))
+		{
+			if (checked)
+			{
+				++outMissing;
+				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
+			}
+			continue;
+		}
+		SetRowAt(db, rowNow[static_cast<size_t>(i)], story, start, end);
+		if (!rowNow[static_cast<size_t>(i)].known)
+		{
+			if (checked)
+			{
+				++outMissing;
+				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
+			}
+			continue;
+		}
+		if (!checked)
+		{
+			if (locked)
+				keptRows.push_back(i);		// a locked row the report keeps (it never had a box)
+			continue;
+		}
+		const UIDRef storyRef(db, story);
+		const UID frameUID = KBSSearchEngine::EditableFrameForMatch(storyRef, start);
+		const std::pair<UID, UID> frameKey(story, frameUID);
+		std::map<std::pair<UID, UID>, bool>::const_iterator known = editableFrames.find(frameKey);
+		bool editable = false;
+		if (known != editableFrames.end())
+			editable = known->second;
+		else
+			editableFrames[frameKey] = editable = KBSSearchEngine::IsFrameEditable(storyRef, frameUID);
+		if (!editable)
+		{
+			// locked since the search: never written, counted as locked
+			++outLocked;
+			KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeLocked);
+			keptRows.push_back(i);
+			continue;
+		}
+		// (A ticked match inside or next to the user's own pending insertion refused the run here from
+		//  2026-09-27 morning (P-4): replacing it leaves no record, so it could never be taken back. The
+		//  document's pending changes are accepted before anything is written instead - below.)
+		pendingByStory[story].insert(i);
+	}
+	if (pendingByStory.empty())
+	{
+		for (size_t k = 0; k < keptRows.size(); ++k)
+		{
+			TextIndex s = kInvalidTextIndex;
+			if (RowStartNow(db, rowNow[static_cast<size_t>(keptRows[k])], s))
+				KBSResultModel::SetHitRange(chapterIdx, keptRows[k], rowNow[static_cast<size_t>(keptRows[k])].story,
+					s, s + rowNow[static_cast<size_t>(keptRows[k])].length);
+		}
+		return true;
+	}
+
+	// ===== from here on things are WRITTEN. A cancel or a failure below leaves the caller to abort. =====
+
+	// ***** THE DOCUMENT'S PENDING CHANGES ARE ACCEPTED FIRST - ANYBODY'S (2026-09-27, the user's call:
+	// ***** "replacing again means what came before is fine"). ***** A replace written inside or next to
+	// the user's own pending insertion leaves no record of its own (KBSTrackChange::
+	// IsInsideOwnPendingInsertion), so it could never be taken back; that refused the run until the
+	// user's call. Every record in the document goes, whoever made it, as the row's Accept All Changes
+	// in This Document does - inside the run's sequence, so the Undo and a cancel take it back with the
+	// replaces. Only a chapter that is written to: one with no ticked row returned above.
+	// ! AFTER the rows' places were taken as thread offsets (SetRowAt, above): an accepted deletion's
+	//   deleted-text thread goes, which moves the story indexes of the cells and footnotes behind it.
+	if (KBSTrackChange::DocumentHasChanges(db))
+	{
+		PMString why;
+		why.SetTranslatable(kFalse);
+		const int32 accepted = KBSTrackChange::AcceptAllInDocument(db, why);
+		if (accepted < 0)
+		{
+			outFailed = true;
+			outWhyNot = "the document's pending tracked changes could not be accepted - ";
+			outWhyNot.Append(why);
+			return true;
+		}
+		outAcceptedFirst += accepted;
+	}
+
+	std::set<UID> targetStories;
+	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
+		targetStories.insert(s->first);
+	KBSTrackChange::TrackingScope tracking(db, targetStories);
+	if (!tracking.Ok())
+	{
+		outFailed = true;
+		outWhyNot = "Track Changes could not be switched on";
+		return true;
+	}
+
+	int32 done = 0;		// ticked rows accounted for, for the bar
+	for (std::map<UID, std::set<int32> >::iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
+	{
+		// Between stories is where a cancel is heard (the user's call: story by story).
+		if (progressBar != nil && progressBar->WasCancelled(kFalse))
+		{
+			outCancelled = true;
+			return true;
+		}
+		std::set<int32>& pending = s->second;
+		// A story an earlier story's replace deleted (an anchored object's): its rows never come up.
+		if (db->IsValidUID(s->first))
+		{
+			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
+				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase, ioProgressReported, done))
+			{
+				outFailed = true;
+				outWhyNot = "the text walker could not be started";
+				return true;
+			}
+		}
+		for (std::set<int32>::const_iterator p = pending.begin(); p != pending.end(); ++p)
+		{
+			TextIndex at = kInvalidTextIndex;
+			if (!db->IsValidUID(s->first) || !RowStartNow(db, rowNow[static_cast<size_t>(*p)], at))
+			{
+				// Its thread went with the footnote, table or object another ticked row deleted (or its
+				// story with an anchored frame): asked for, and done - with its object. Counted and shown
+				// as the Change All path did (SetHitDeleted: "deleted").
+				++outReplaced;
+				KBSResultModel::SetHitDeleted(chapterIdx, *p);
+			}
+			else
+			{
+				++outMissing;
+				KBSResultModel::SetHitOutcome(chapterIdx, *p, KBSResultModel::kOutcomeMissing);
+			}
+			++done;
+		}
+		KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
+	}
+
+	// ----- every row the report keeps, where its text stands now: its range, its line, and - for a
+	// replaced row outside a footnote - the time of the records its replace made (what Reject Change and
+	// Redo find it by). Read once the chapter has stopped changing: a line read as its own match was
+	// written would still show the later matches of its paragraph as they were (2026-07-28).
+	for (size_t k = 0; k < keptRows.size(); ++k)
+	{
+		const int32 hitIdx = keptRows[k];
+		const RowNow& kept = rowNow[static_cast<size_t>(hitIdx)];
+		TextIndex keptStart = kInvalidTextIndex;
+		if (!RowStartNow(db, kept, keptStart))
+			continue;		// its thread went with an object another replace deleted
+		const TextIndex keptEnd = keptStart + kept.length;
+		const UIDRef rowStoryRef(db, kept.story);
+		KBSResultModel::SetHitRange(chapterIdx, hitIdx, kept.story, keptStart, keptEnd);
+		PMString pre, match, post;
+		KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, keptStart, keptEnd, pre, match, post);
+		KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
+			KBSSearchEngine::HashMatchText(rowStoryRef, keptStart, keptEnd));
+		bool checked = false, replaced = false, locked = false;
+		if (KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) && replaced
+			&& !KBSTrackChange::IsInFootnote(rowStoryRef, keptStart))
+			KBSResultModel::SetHitRecordTime(chapterIdx, hitIdx, KBSTrackChange::RecordTimeIn(rowStoryRef, keptStart, keptEnd));
+	}
+	return true;
+}
+
 // ***** ONLY THE VERIFY PASS CALLS THIS SINCE 2026-09-26 (verifyOnly = true). ***** The replace itself
 // is ReplaceInChapterByChangeAll. Everything below that is about WRITING - the walk's replace step,
 // RowNow and CarryRowsPast, the kept rows' read-back, the refused / not-walked / walk-failed counters -
@@ -2339,6 +2790,15 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(t.locked);
 		outSummary.Append(" hit(s) left alone - locked layer or story (those can be searched, not changed).");
+	}
+
+	// The documents' pending tracked changes, accepted before the first write (2026-09-27, the user's
+	// call) - said, because they no longer show in the Track Changes panel.
+	if (t.acceptedFirst > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.acceptedFirst);
+		outSummary.Append(" pending tracked change(s) accepted first.");
 	}
 
 	// Ticked rows in the endnotes, left alone on purpose (2026-09-27): a match ends an endnote, and
@@ -3227,6 +3687,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// INSIDE the sequence, and the pass above - which opens documents and walks every chapter - is
 	// outside it. Nothing between the two runs a command: a progress bar is built and the rows are
 	// backed up, and neither touches the error state.
+	//
+	// ***** EXCEPT ONE COMMAND, ON PURPOSE (2026-09-27): THE WRITING WALK'S DIRECTION. ***** A GREP query
+	// holding ^ is written backward (WriteBackward, and the note above ReplaceInChapterOneByOne). The
+	// session's direction is turned here - after the verify pass, which re-walks the search forward, and
+	// before the sequence, so neither the Undo step nor an abort carries the switch - and put back when
+	// this function returns, after the sequence has ended. A switch that fails clears its own error.
+	const KBSBackwardSearchScope writeDirection(WriteBackward());
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
 	// ***** NAMED AGAIN (user's call, 2026-09-26): "Replace" / Japanese UI KBSJa::kReplaceStep. ***** It was left
 	// unnamed on 2026-07-28 so InDesign would word the step itself - but an unnamed step is worded
@@ -3352,20 +3819,24 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				}
 			}
 
-			bool changeAllCancelled = false;
-			bool changeAllFailed = false;
+			bool runCancelled = false;
+			bool runFailed = false;
 			PMString whyNot;
 			int32 endnoteLeft = 0;
-			const bool byChangeAll = ReplaceInChapterByChangeAll(ci, docRef, scopeOptions,
-				&progressBar, progressBase, progressReported, replaced, missing, locked, endnoteLeft,
-				changeAllCancelled, changeAllFailed, whyNot);
+			int32 acceptedFirst = 0;
+			// ***** ONE MATCH AT A TIME, STORY BY STORY (2026-09-27, the user's call). ***** Change All
+			// over whole stories (ReplaceInChapterByChangeAll) stood here from 2026-09-26.
+			const bool wrote = ReplaceInChapterOneByOne(ci, docRef, scopeOptions,
+				&progressBar, progressBase, progressReported, replaced, missing, locked, refused, endnoteLeft,
+				acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
 			totals.endnoteLeft += endnoteLeft;
-			if (changeAllCancelled)
+			totals.acceptedFirst += acceptedFirst;
+			if (runCancelled)
 			{
 				totals.cancelled = true;
 				break;
 			}
-			if (changeAllFailed)
+			if (runFailed)
 			{
 				totals.stoppedByMismatch = true;
 				totals.errorText = whyNot;
@@ -3373,11 +3844,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 				totals.cancelled = true;	// everything a cancel does, this needs too
 				break;
 			}
-			if (!byChangeAll)
+			if (!wrote)
 			{
-				// ***** CHANGE ALL ONLY (2026-09-26, the user's call). ***** There is no one-at-a-time
-				// fallback: a chapter Change All cannot write as ticked refuses the whole run, and the
-				// abort below takes back whatever earlier chapters wrote.
+				// Refused before this chapter wrote anything (a row already replaced); the abort below
+				// takes back what earlier chapters wrote.
 				totals.refusedByShape = true;
 				totals.errorText = whyNot;
 				totals.errorText.SetTranslatable(kFalse);
@@ -3725,10 +4195,50 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	// state, so the panel drew text beside their own. The replace's own RowBackup is what puts them
 	// back (nothing else can be running: the action greys out during a run).
 	KBSResultModel::BeginRowBackup();
-	for (size_t k = 0; k < rows.size() && ok; ++k)
+	// ***** ONE MERGED CHANGE FOR THE WHOLE GROUP (2026-09-27). ***** Touching matches replaced one at a
+	// time leave one insertion and one deletion between them (KBSTrackChange::FindGroupChange), so the
+	// group goes back in one reject of those two records, and each row is put at its share of the text
+	// that comes back.
+	KBSTrackChange::Change merged;
+	UIDRef mergedStory;
+	uint64 mergedDeleteTime = 0;
+	if (rows.size() >= 2 && KBSTrackChange::FindGroupChange(chapterIdx, rows, mergedStory, merged, &mergedDeleteTime))
 	{
-		KBSTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);	// the front ones moved the rest
-		ok = RejectOneRow(chapterIdx, rows[k], stories[k], ats[k], lens[k], why);
+		PMString allOriginal;
+		allOriginal.SetTranslatable(kFalse);
+		int32 at = merged.at;
+		for (size_t k = 0; k < rows.size() && ok; ++k)
+		{
+			PMString originalText, replacedText;
+			ok = KBSResultModel::GetHitChangeTexts(chapterIdx, rows[k], originalText, replacedText);
+			stories[k] = mergedStory;
+			ats[k] = at;
+			lens[k] = WideString(originalText).CharCount();
+			at += lens[k];
+			allOriginal.Append(originalText);
+		}
+		const int32 allLen = at - merged.at;
+		// the deletion first, then the insertion - each under its own time (they do not share one: see
+		// FindGroupChange)
+		if (ok && merged.hasDelete)
+			ok = KBSTrackChange::RejectReplacement(mergedStory, merged.at, 0, merged.at + merged.insLen, 0,
+				allLen, nil, mergedDeleteTime, why);
+		if (ok && merged.insLen > 0)
+			ok = KBSTrackChange::RejectReplacement(mergedStory, merged.at, merged.insLen, kInvalidTextIndex, 0,
+				0, nil, merged.time, why);
+		if (ok && KBSTrackChange::ReadText(mergedStory, merged.at, allLen) != allOriginal)
+		{
+			why = "the original text did not come all the way back";
+			ok = false;
+		}
+	}
+	else
+	{
+		for (size_t k = 0; k < rows.size() && ok; ++k)
+		{
+			KBSTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);	// the front ones moved the rest
+			ok = RejectOneRow(chapterIdx, rows[k], stories[k], ats[k], lens[k], why);
+		}
 	}
 	if (!ok)
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);

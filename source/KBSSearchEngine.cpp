@@ -1886,6 +1886,26 @@ KBSForwardSearchScope::~KBSForwardSearchScope()
 		SetSessionSearchBackwards(kTrue, static_cast<IFindChangeOptions::SearchMode>(fMode));
 }
 
+KBSBackwardSearchScope::KBSBackwardSearchScope(bool wanted) : fRestore(false), fMode(0)
+{
+	if (!wanted)
+		return;
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	fMode = static_cast<int32>(mode);
+	if (opts->GetSearchBackwards(mode))
+		return;		// backward already - nothing to turn, nothing to put back
+	fRestore = SetSessionSearchBackwards(kTrue, mode);
+}
+
+KBSBackwardSearchScope::~KBSBackwardSearchScope()
+{
+	if (fRestore)
+		SetSessionSearchBackwards(kFalse, static_cast<IFindChangeOptions::SearchMode>(fMode));
+}
+
 void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force)
 {
 	if (bar == nil)

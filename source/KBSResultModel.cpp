@@ -228,13 +228,10 @@ void KBSResultModel::AppendChapter(Chapter&& chapter)
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
 
-	// ***** EVERY ROW STARTS TICKED (2026-09-26, the user's call - the reverse of 2026-08-02). ***** The
-	// user takes off what is NOT to be replaced. Only rows that carry a box: a scan's rows and locked
-	// rows have none, and the result kind is stated before any chapter comes in (the three engines).
-	std::vector<Hit>& hits = gChapters.back().hits;
-	for (size_t hi = 0; hi < hits.size(); ++hi)
-		if (RowHasCheckBox(hits[hi]))
-			hits[hi].checked = true;
+	// ***** EVERY ROW STARTS UNTICKED (2026-09-27, the user's call). ***** From 2026-09-26 to 2026-09-27
+	// every row came in ticked, because the replace was Change All over whole stories and the rows left
+	// out had to be taken back; the replace writes one match at a time again, so the user ticks what is
+	// to be replaced. (Hit::checked is false as a Hit is built - nothing to do here.)
 }
 
 void KBSResultModel::Clear()
@@ -1037,26 +1034,20 @@ int32 KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked
 	Chapter& c = gChapters[chapterIdx];
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
 		return 0;
-	std::vector<int32> group;
-	GetTouchingGroup(chapterIdx, hitIdx, group);
 	// The same question the panel asks before it draws a box, asked here so the model can never hold
 	// a checked hit that no row offered. It covers the whole list as well as the row - a scan has
 	// nothing to replace, and neither has a replace's report - which the per-row flags cannot say
 	// anything about.
-	for (size_t k = 0; k < group.size(); ++k)
-	{
-		const Hit& g = c.hits[group[k]];
-		if (!RowHasCheckBox(g))
-			return static_cast<int32>(group.size());
-		// A footnote's row cannot be taken off (2026-09-26): Track Changes records nothing inside a
-		// footnote, so its replace could not be kept apart from the others' nor taken back - and a
-		// group holding one goes off with it or not at all.
-		if (!checked && g.inFootnote)
-			return static_cast<int32>(group.size());
-	}
-	for (size_t k = 0; k < group.size(); ++k)
-		c.hits[group[k]].checked = checked;
-	return static_cast<int32>(group.size());
+	//
+	// ***** ONE ROW AT A TIME AGAIN (2026-09-27). ***** Touching matches went on and off together, and a
+	// footnote's row could not go off, while the replace was Change All (2026-09-26 to 2026-09-27): a row
+	// left out had to be taken back, and neither a deletion shared by touching matches nor anything in a
+	// footnote can be. The replace writes only the ticked matches now, so every box is the row's own.
+	// (Reject Change and Redo still take a touching group together - GetTouchingGroup.)
+	if (!RowHasCheckBox(c.hits[hitIdx]))
+		return 1;
+	c.hits[hitIdx].checked = checked;
+	return 1;
 }
 
 KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int32 hitIdx)
@@ -1148,8 +1139,6 @@ void KBSResultModel::SetAllChecked(bool checked)
 			// the model would hold checked hits the panel shows no box for.
 			if (!RowHasCheckBox(hits[hi]))
 				continue;
-			if (!checked && hits[hi].inFootnote)
-				continue;	// a footnote's row stays ticked (SetHitChecked)
 			hits[hi].checked = checked;
 		}
 	}
@@ -1167,8 +1156,6 @@ void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
 	{
 		if (!RowHasCheckBox(hits[hi]))
 			continue;
-		if (!checked && hits[hi].inFootnote)
-			continue;	// a footnote's row stays ticked (SetHitChecked)
 		hits[hi].checked = checked;
 	}
 }

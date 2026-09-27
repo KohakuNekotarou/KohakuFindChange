@@ -87,39 +87,11 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	if (nodeID == nil || !nodeID->IsHitRow())
 		return;
 
-	const int32 groupSize = KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
-	// Touching matches go on and off together (2026-09-26): their rows are repainted with this one.
-	if (groupSize > 1)
-		KBSResultTree::RefreshRows();
-
-	// A footnote's row refuses to be taken off (2026-09-26): put the box back and say why.
-	const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(nodeID->GetChapter(), nodeID->GetHit());
-	if (!nowChecked && pinned != KBSResultModel::kPinnedNone)
-	{
-		KBSResultTree::RefreshRows();
-		PMString why("This match is inside a footnote. Track Changes records nothing in footnotes, so it is always replaced and cannot be left out or taken back.");
-		why.SetTranslatable(kFalse);
-		KBSResultTree::ShowStatus(why);
-		return;
-	}
-
-	// ***** REFUSED BECAUSE OF A NEIGHBOUR - SAID, NOT SWALLOWED (2026-09-27 defect sweep, D-3). *****
-	// SetHitChecked moves the whole touching group or none of it, and it moves none when ANOTHER row of
-	// the group has no box (locked, or already marked) or, going off, sits in a footnote. The row asked
-	// about then keeps its old state and the repaint above puts its box back - which read as a click
-	// that did nothing. The model is asked whether the change took, rather than the reason re-derived.
-	{
-		bool isChecked = false, isReplaced = false, isLocked = false;
-		if (KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), isChecked, isReplaced, isLocked)
-			&& isChecked != nowChecked)
-		{
-			KBSResultTree::RefreshRows();
-			PMString why("This match touches another one that cannot be changed here (locked, marked, or inside a footnote). Touching matches are ticked together.");
-			why.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(why);
-			return;
-		}
-	}
+	// One row, one box (2026-09-27): touching matches no longer go on and off together, and a footnote's
+	// row can be taken off like any other - the replace writes only the ticked matches again. (From
+	// 2026-09-26 the model moved a whole touching group and refused to take a footnote's row off, and
+	// this said so on the status line.)
+	KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
 
 	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
 	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.

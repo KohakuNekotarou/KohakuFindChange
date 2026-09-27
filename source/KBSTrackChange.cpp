@@ -538,6 +538,115 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 			outChange = changes[k];
 		}
 	}
+	if (found)
+		return true;
+
+	// ***** A TOUCHING GROUP'S MERGED CHANGE (2026-09-27): this row's share of it. *****
+	std::vector<int32> group;
+	ReplacedTouchingGroup(chapterIdx, hitIdx, group);
+	Change merged;
+	UIDRef groupStory;
+	if (group.size() < 2 || !FindGroupChange(chapterIdx, group, groupStory, merged))
+		return false;
+	int32 before = 0;		// the new text of the group's rows in front of this one
+	for (size_t k = 0; k < group.size() && group[k] != hitIdx; ++k)
+	{
+		PMString o2, n2;
+		if (!KBSResultModel::GetHitChangeTexts(chapterIdx, group[k], o2, n2))
+			return false;
+		before += WideString(n2).CharCount();
+	}
+	outStory = groupStory;
+	outChange = merged;
+	outChange.at = merged.at + before;
+	outChange.insLen = WideString(replacedText).CharCount();
+	outChange.inserted = replacedText;
+	outChange.deleted = originalText;
+	return true;
+}
+
+void KBSTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
+{
+	outRows.clear();
+	std::vector<int32> group;
+	KBSResultModel::GetTouchingGroup(chapterIdx, hitIdx, group);	// in text order
+	for (size_t k = 0; k < group.size(); ++k)
+	{
+		bool checked = false, replaced = false, locked = false;
+		if (KBSResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) && replaced
+			&& !KBSResultModel::GetHitInFootnote(chapterIdx, group[k]))
+			outRows.push_back(group[k]);
+	}
+}
+
+bool KBSTrackChange::FindGroupChange(int32 chapterIdx, const std::vector<int32>& rows, UIDRef& outStory, Change& outChange,
+	uint64* outDeleteTime)
+{
+	if (outDeleteTime != nil)
+		*outDeleteTime = 0;
+	if (rows.size() < 2)
+		return false;
+	UIDRef docRef;
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
+		|| !KBSBookScope::IsDocStillOpen(docRef))
+		return false;
+	PMString allOriginal, allReplaced;
+	allOriginal.SetTranslatable(kFalse);
+	allReplaced.SetTranslatable(kFalse);
+	UID story = kInvalidUID;
+	TextIndex firstStart = kInvalidTextIndex;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		PMString o, n;
+		UID s = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 h = 0;
+		if (!KBSResultModel::GetHitChangeTexts(chapterIdx, rows[k], o, n)
+			|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[k], s, a, b, h))
+			return false;
+		if (k == 0)
+		{
+			story = s;
+			firstStart = a;
+		}
+		else if (s != story)
+			return false;
+		allOriginal.Append(o);
+		allReplaced.Append(n);
+	}
+	outStory = UIDRef(docRef.GetDataBase(), story);
+	std::vector<Change> changes;
+	CollectChanges(outStory, changes);
+	bool found = false;
+	int32 best = 0;
+	for (size_t k = 0; k < changes.size(); ++k)
+	{
+		Change candidate = changes[k];
+		uint64 deleteTime = candidate.hasDelete ? candidate.time : 0;
+		if (candidate.inserted != allReplaced)
+			continue;
+		// the merged deletion, standing alone right after the merged insertion under its own time
+		if (!allOriginal.IsEmpty() && !candidate.hasDelete && k + 1 < changes.size()
+			&& changes[k + 1].insLen == 0 && changes[k + 1].hasDelete
+			&& changes[k + 1].at == candidate.at + candidate.insLen && changes[k + 1].deleted == allOriginal)
+		{
+			candidate.hasDelete = true;
+			candidate.deleted = allOriginal;
+			deleteTime = changes[k + 1].time;
+		}
+		if (candidate.deleted != allOriginal)
+			continue;
+		const int32 distance = (candidate.at > firstStart) ? candidate.at - firstStart : firstStart - candidate.at;
+		if (!found || distance < best)
+		{
+			found = true;
+			best = distance;
+			outChange = candidate;
+			if (outDeleteTime != nil)
+				*outDeleteTime = deleteTime;
+		}
+	}
 	return found;
 }
 

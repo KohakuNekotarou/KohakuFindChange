@@ -559,12 +559,10 @@ private:
 			// Rows are recycled as the tree scrolls, so a row that once showed a replaced or locked
 			// hit has to get its box back.
 			checkView->ShowView(kTrue);
-			// A footnote's row: ticked and greyed, not to be touched (2026-09-26, the user's call) -
-			// Track Changes records nothing in a footnote, so it is always replaced.
-			if (row.inFootnote)
-				checkView->Disable();
-			else
-				checkView->Enable();
+			// (A footnote's row was ticked and greyed from 2026-09-26 to 2026-09-27, while the replace was
+			// Change All. It is ticked by hand like any other now - only its Reject Change and Redo stay
+			// off, since Track Changes records nothing in a footnote.)
+			checkView->Enable();
 		}
 
 		IControlView* cell = rowData->FindWidget(kKBSResultTextWidgetID);

@@ -110,6 +110,7 @@ namespace KBSTrackChange
 	bool IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex from, TextIndex to,
 		const std::set<uint64>* onlyTimes = nil);
 
+
 	/** Reject ONE record standing AT `position` - the deletion when `wantDelete`, else the insertion -
 	    except one whose time stamp is in `keepTimes`. The caller puts in `keepTimes` every time that is
 	    not the row's run: the times that stood before the run (the replace), or every time but the
@@ -170,8 +171,29 @@ namespace KBSTrackChange
 	    Reject Change and Redo (spec section 5). */
 	bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx);
 
-	/** Like RefreshRowFromRecords, and hands the change back too. */
+	/** Like RefreshRowFromRecords, and hands the change back too. A row of a touching group whose replaces
+	    InDesign merged (FindGroupChange) gets its own share of the merged change: where its new text
+	    stands in the merged insertion, and its own texts. */
 	bool FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange);
+
+	/** ***** TOUCHING REPLACES MADE ONE AT A TIME ARE MERGED INTO ONE CHANGE (2026-09-27, measured: case
+	    touching-group-reject). ***** Two touching matches replaced one after the other ("catcat" ->
+	    "kittenkitten") leave ONE insertion "kittenkitten" and ONE deletion "catcat" - InDesign joins a
+	    tracked insertion to the one it touches (Change All, one command, had left a pair per replace).
+	    `rows` = the group's replaced rows in text order (two or more). True = a change of the story
+	    inserted all their new texts and deleted all their original texts, joined in that order; the one
+	    nearest the first row is handed back.
+	    ! The merged insertion and deletion do NOT share a time stamp (measured: ...694464 and ...694480 -
+	    the first replace's clock tick and the second's), so CollectChanges does not pair them: the
+	    insertion comes back alone and the deletion right after it alone, and they are joined here. Each
+	    has to be rejected under its own time - outChange.time is the insertion's, outDeleteTime (when
+	    not nil) the deletion's (0 when there is none). */
+	bool FindGroupChange(int32 chapterIdx, const std::vector<int32>& rows, UIDRef& outStory, Change& outChange,
+		uint64* outDeleteTime = nil);
+
+	/** The touching group of a replaced row, as FindGroupChange takes it: the replaced rows outside a
+	    footnote, in text order. */
+	void ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
 }
 
 #endif // __KBSTrackChange_h__

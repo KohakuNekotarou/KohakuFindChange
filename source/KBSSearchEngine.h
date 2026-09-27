@@ -61,6 +61,24 @@ private:
 	int32	fMode;
 };
 
+/** ***** THE REPLACE'S WRITING WALK GOES BACKWARD WHEN THE GREP QUERY HOLDS ^ (2026-09-27, the user's
+    call B). ***** The search, and the verify pass that re-walks it, stay forward (KBSForwardSearchScope
+    above); only the walk that writes turns round, for the life of this object, and the direction it
+    found is put back by the destructor. Chosen BEFORE anything is written - which way it has to go
+    depends on the text as the search saw it (see WriteBackward in KBSReplaceEngine.cpp). Create it
+    inside a KBSForwardSearchScope and OUTSIDE any command sequence, for the same reason as that one. */
+class KBSBackwardSearchScope
+{
+public:
+	explicit KBSBackwardSearchScope(bool wanted);
+	~KBSBackwardSearchScope();
+private:
+	KBSBackwardSearchScope(const KBSBackwardSearchScope&);
+	KBSBackwardSearchScope& operator=(const KBSBackwardSearchScope&);
+	bool	fRestore;
+	int32	fMode;
+};
+
 namespace KBSSearchEngine
 {
 	/** Resolve the scope from the Book Scope toggle (the TARGET book's chapters when it is ON - see
