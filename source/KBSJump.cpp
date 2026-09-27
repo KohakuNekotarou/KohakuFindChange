@@ -76,6 +76,8 @@
 #include "KBSSearchEngine.h"		// MatchIsSameOccurrence (the jump is its only caller since
 									// 2026-08-05) / EditableFrameForMatch / IsPositionOverset
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
+#include "KBSReplaceEngine.h"		// RefuseChangedQuery - a row is looked for again only under its own query
+#include <vector>
 
 namespace
 {
@@ -664,6 +666,82 @@ void SayRowHasNoPlace()
 	KBSResultTree::ShowStatus(message);
 }
 
+// ***** A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (2026-09-27, the user's call B). *****
+// The rows keep their places themselves, and follow every change KBS makes - but not Edit > Undo / Redo,
+// which moves the text without telling them. Measured (case del-jump-undo-reject): delete the first of
+// two matches, take it back with Reject Change, press Ctrl+Z, click the second row - its stored place
+// is one character off, and the jump called it "missing" although its text had not been touched.
+//
+// So before a jump gives up on a row, the story is walked again under the same query, and the row moves
+// to the ONE match that is the same text with the same line around it (the three segments the row
+// drew) and that no other row stands on. None, or more than one, and it is missing as before - a guess
+// between two look-alikes would be worse than saying so. Rows not replaced only: a replaced row is found
+// by its tracked change (KBSTrackChange::RefreshRowFromRecords), before this is asked. True = the row was
+// moved; ioStart / ioEnd are its new place.
+bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
+	TextIndex& ioStart, TextIndex& ioEnd)
+{
+	bool checked = false, replaced = false, locked = false;
+	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || replaced)
+		return false;
+	PMString refusal;
+	if (KBSReplaceEngine::RefuseChangedQuery(refusal))
+		return false;		// another query would find other matches - nothing to compare with
+	KBSResultModel::RowDisplay row;
+	UID story = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KBSResultModel::GetHitRow(chapterIdx, hitIdx, row)
+		|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+		return false;
+	std::vector<KBSResultModel::Hit> hits;
+	{
+		// forward, as the search was (the walk orders it stamps are the search's)
+		KBSForwardSearchScope forward;
+		WalkerScopeOptions scopeOptions;
+		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
+		if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, hits))
+			return false;
+	}
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	int32 found = -1;
+	int32 count = 0;
+	for (size_t h = 0; h < hits.size() && count < 2; ++h)
+	{
+		const KBSResultModel::Hit& cand = hits[h];
+		if (cand.storyUID != storyUID || cand.matchHash != hash
+			|| (cand.textEnd - cand.textStart) != (ioEnd - ioStart)
+			|| cand.preText != row.preText || cand.postText != row.postText)
+			continue;
+		// a place another row already stands on is that row's
+		bool taken = false;
+		for (int32 i = 0; i < hitCount && !taken; ++i)
+		{
+			UID s2 = kInvalidUID;
+			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+			uint64 h2 = 0;
+			if (i != hitIdx && KBSResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
+				&& s2 == cand.storyUID && a2 == cand.textStart && b2 == cand.textEnd)
+				taken = true;
+		}
+		if (taken)
+			continue;
+		found = static_cast<int32>(h);
+		++count;
+	}
+	if (count != 1)
+		return false;
+	const KBSResultModel::Hit& to = hits[static_cast<size_t>(found)];
+	KBSResultModel::SetHitRange(chapterIdx, hitIdx, to.storyUID, to.textStart, to.textEnd);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, to.preText, to.matchText, to.postText, to.matchHash);
+	KBSResultModel::SetHitWalkOrder(chapterIdx, hitIdx, to.walkOrder);
+	if (KBSResultModel::GetHitOutcome(chapterIdx, hitIdx) == KBSResultModel::kOutcomeMissing)
+		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeNone);	// found after all
+	ioStart = to.textStart;
+	ioEnd = to.textEnd;
+	return true;
+}
+
 }
 
 void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
@@ -747,8 +825,14 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	uint64 expectHash = 0;
 	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
 		expectHash);
-	const bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
+	bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
 		storyRef, start, end, storyUID, start, end, expectHash);
+	// ...and when it is not, the row may only have been left behind by Undo / Redo (RelocateStaleRow).
+	if (!sameOccurrence && RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
+	{
+		sameOccurrence = true;
+		KBSResultTree::RefreshRows();
+	}
 
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
@@ -1050,7 +1134,11 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (!KBSSearchEngine::MatchIsSameOccurrence(storyRef, start, end, storyUID, start, end,
 			expectHash))
 	{
-		return false;
+		// The jump a moment ago looks for a row left behind by Undo / Redo; a caller that came here
+		// another way gets the same chance (RelocateStaleRow).
+		if (!RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
+			return false;
+		KBSResultTree::RefreshRows();
 	}
 
 	// From here the shape is the official one: gotolasttextedit's GTTxtEdtUtils::ActivateStory
