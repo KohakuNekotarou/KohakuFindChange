@@ -1092,6 +1092,12 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// the document came in with rather than forcing it clean.
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 
+	// Compose first, then read - the order JumpToHit keeps, for the reason it gives there: being
+	// overset is a reading of the RESULT of composition. The first click's jump composed this story,
+	// but nothing between the two clicks promises it is still undamaged, and this function does not
+	// lean on its caller's history. A no-op when nothing is damaged.
+	RecomposeIfDamaged(storyRef);
+
 	// ***** OVERSET: move there, but do not select. ***** (Same rule as locked and hidden above -
 	// user's call, 2026-08-09.) There is no on-page text to highlight, and the row's match segment
 	// holds the scan's own words ("Frame (370)") rather than story text, so there is not even a
