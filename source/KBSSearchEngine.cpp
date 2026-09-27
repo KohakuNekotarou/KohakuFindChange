@@ -1375,10 +1375,58 @@ void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResu
 // paragraph's text split into (before / matched / after). The offsets are CODE POINTS, not UTF-16
 // units - see the note at the head of this file, which retracted the UTF-16 wording this comment
 // used to carry.
+// The first words of a story, for its row in the tree (2026-09-27, the story level): up to 24 characters
+// that show, each run of white space read as one space, InDesign's own marker characters (a table's
+// anchor, a footnote's reference, an anchored object, an endnote's mark...) left out, and "..." when the
+// story goes on. Read from the first 200 characters, which is plenty for 24 that show.
+PMString StoryLeadText(const UIDRef& storyRef)
+{
+	PMString out;
+	out.SetTranslatable(kFalse);
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil)
+		return out;
+	const int32 total = model->TotalLength();
+	const WideString raw(KBSTrackChange::ReadText(storyRef, 0, total < 200 ? total : 200));
+	WideString lead;
+	int32 shown = 0;
+	bool pendingSpace = false;
+	bool more = false;
+	for (WideString::const_iterator it = raw.begin(); it != raw.end(); ++it)
+	{
+		const uint32 c = *it;
+		if (c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D || c == 0x3000 || c == 0x2028 || c == 0x2029)
+		{
+			pendingSpace = (shown > 0);
+			continue;
+		}
+		if (c < 0x20 || c == 0xFEFF || c == 0xFFFC || (c >= 0xE000 && c <= 0xF8FF))
+			continue;
+		if (shown >= 24)
+		{
+			more = true;
+			break;
+		}
+		if (pendingSpace)
+		{
+			lead.Append(UTF32TextChar(0x20));
+			pendingSpace = false;
+		}
+		lead.Append(UTF32TextChar(c));
+		++shown;
+	}
+	out = PMString(lead);
+	out.SetTranslatable(kFalse);
+	if (more)
+		out.Append("...");
+	return out;
+}
+
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	FrameFactsCache& frameFacts, KBSResultModel::Hit& outHit)
 {
 	outHit.storyUID = storyRef.GetUID();
+	outHit.storyLead = StoryLeadText(storyRef);
 	outHit.textStart = start;
 	outHit.textEnd = end;
 

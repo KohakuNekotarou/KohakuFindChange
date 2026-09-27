@@ -152,6 +152,10 @@ namespace KBSResultModel
 		// until the row is replaced.
 		PMString	originalText;
 		PMString	replacedText;
+		// The first characters of the match's STORY (2026-09-27, the story level): what a story row of
+		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
+		// as it has walked it, so the story cannot be read again when the tree draws.
+		PMString	storyLead;
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
 		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
 		bool		inFootnote;
@@ -182,8 +186,16 @@ namespace KBSResultModel
 	    be applied to a group with a lower_bound rather than a scan. */
 	struct FontGroup
 	{
-		PMString			fontName;	// as the user sees it in the font menu (family + style)
+		PMString			fontName;	// as the user sees it in the font menu (family + style) - or, for a
+										// STORY group, the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
+		// ***** A STORY GROUP (2026-09-27, the user's call). ***** A Find/Change result groups its hits
+		// by story, the way KCM's Story mode lists stories: the same level a missing-glyph scan fills
+		// with fonts. A story row carries Replace / Reject Change / Redo / Check All / Uncheck All for its
+		// rows (KBSReplaceEngine::ReplaceStory and the rest).
+		bool				isStory;
+		UID					story;
+		FontGroup() : isStory(false), story(kInvalidUID) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -483,6 +495,19 @@ namespace KBSResultModel
 	    chapter. */
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
+
+	/** Is this group a STORY group (FontGroup::isStory - a Find/Change result's level)? */
+	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
+	/** Every hit of the group, chapter-wide indexes in the chapter's order (empty when out of range). */
+	void GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits);
+	/** The group's rows that are checked and still waiting to be replaced (GetChapterCheckedCount's rule). */
+	int32 GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx);
+	/** Check All / Uncheck All on a story row: every row of the group that carries a box. */
+	void SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked);
+	/** The story row a right-click menu was popped over (2026-09-27); cleared by the other rows'
+	    right-clicks and by Clear(). False = none. */
+	void SetContextMenuGroup(int32 chapterIdx, int32 groupIdx);
+	bool GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx);
 
 	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
 	struct RowDisplay

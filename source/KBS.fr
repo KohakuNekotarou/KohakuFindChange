@@ -681,6 +681,33 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSRedoMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- A STORY row's right-click menu (2026-09-27, the story level) -----
+		// Popped by KBSResultNodeEH::RButtonDn over a story row: each command over that story's rows.
+		kKBSStoryReplaceActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryReplaceMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSStoryRejectActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryRejectMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSStoryRedoActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryRedoMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSStoryCheckAllActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryCheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSStoryUncheckAllActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryUncheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -929,6 +956,52 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSRedoActionID,
 		kKBSRedoMenuKey,				// "Redo"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// A story row's right-click menu (2026-09-27) - the same five names as the rows' own commands.
+		kKBSActionComponentBoss,
+		kKBSStoryReplaceActionID,
+		kKBSReplaceHitMenuKey,			// "Replace"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSStoryRejectActionID,
+		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSStoryRedoActionID,
+		kKBSRedoMenuKey,				// "Redo"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSStoryCheckAllActionID,
+		kKBSCheckAllMenuKey,			// "Check All"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSStoryUncheckAllActionID,
+		kKBSUncheckAllMenuKey,			// "Uncheck All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

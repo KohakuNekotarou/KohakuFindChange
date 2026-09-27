@@ -102,6 +102,8 @@ namespace
 	// ...and which HIT row, for the hit row's own menu (Reject Change / Redo, 2026-09-26). -1 = none.
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
+	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked (2026-09-27)
+	int32 gContextMenuGroup = -1;
 
 	// Does this row carry a check box? THE one definition of the question, so the commands that set
 	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
@@ -168,7 +170,46 @@ namespace
 		// OLDER than the sentence denying it. Whoever writes the next one: reset the pair there, or
 		// put the loop back here.
 		if (!anyFont)
+		{
+			// ***** A FIND/CHANGE RESULT IS GROUPED BY STORY (2026-09-27, the user's call). ***** The same
+			// level, one group per story in first-appearance (page) order - so the stories read in the
+			// order their first matches stand - and every hit given its group, as below. The row reads
+			// "P<page of the story's first match>  <the story's first words>".
+			if (gResultKind != KBSResultModel::kResultFindChange)
+				return;
+			for (size_t i = 0; i < chapter.hits.size(); ++i)
+			{
+				KBSResultModel::Hit& hit = chapter.hits[i];
+				int32 found = -1;
+				for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
+				{
+					if (chapter.fontGroups[g].story == hit.storyUID)
+					{
+						found = static_cast<int32>(g);
+						break;
+					}
+				}
+				if (found < 0)
+				{
+					KBSResultModel::FontGroup group;
+					group.isStory = true;
+					group.story = hit.storyUID;
+					group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
+					if (!hit.pageString.IsEmpty())
+						group.fontName.Append(hit.pageString);
+					group.fontName.Append("  ");
+					group.fontName.Append(hit.storyLead);
+					group.fontName.SetTranslatable(kFalse);
+					chapter.fontGroups.push_back(group);
+					found = static_cast<int32>(chapter.fontGroups.size()) - 1;
+				}
+				KBSResultModel::FontGroup& group = chapter.fontGroups[found];
+				hit.fontGroup = found;
+				hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
+				group.hitIndices.push_back(static_cast<int32>(i));
+			}
 			return;
+		}
 
 		// The hits arrive in PAGE order, so walking them in order leaves the groups in
 		// first-appearance order - which is the order the panel shows them in (user's call
@@ -254,6 +295,8 @@ void KBSResultModel::Clear()
 	gContextMenuChapter = kNoContextMenuChapter;
 	gContextMenuHitChapter = -1;
 	gContextMenuHit = -1;
+	gContextMenuGroupChapter = -1;
+	gContextMenuGroup = -1;
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
 	gStoppedShort = false;
@@ -503,6 +546,68 @@ int32 KBSResultModel::GetDisplayFontCount(int32 chapterIdx)
 			++shownGroups;
 	}
 	return shownGroups;
+}
+
+bool KBSResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const Chapter& c = gChapters[chapterIdx];
+	return groupIdx >= 0 && groupIdx < static_cast<int32>(c.fontGroups.size()) && c.fontGroups[groupIdx].isStory;
+}
+
+void KBSResultModel::GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits)
+{
+	outHits.clear();
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	const Chapter& c = gChapters[chapterIdx];
+	if (groupIdx < 0 || groupIdx >= static_cast<int32>(c.fontGroups.size()))
+		return;
+	outHits = c.fontGroups[groupIdx].hitIndices;
+}
+
+int32 KBSResultModel::GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx)
+{
+	std::vector<int32> rows;
+	GetGroupHits(chapterIdx, groupIdx, rows);
+	int32 count = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		const Hit& h = gChapters[chapterIdx].hits[rows[k]];
+		if (h.checked && !h.replaced)
+			++count;
+	}
+	return count;
+}
+
+void KBSResultModel::SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked)
+{
+	if (NoRowHasCheckBox())
+		return;
+	std::vector<int32> rows;
+	GetGroupHits(chapterIdx, groupIdx, rows);
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		Hit& h = gChapters[chapterIdx].hits[rows[k]];
+		if (RowHasCheckBox(h))
+			h.checked = checked;
+	}
+}
+
+void KBSResultModel::SetContextMenuGroup(int32 chapterIdx, int32 groupIdx)
+{
+	gContextMenuGroupChapter = chapterIdx;
+	gContextMenuGroup = groupIdx;
+}
+
+bool KBSResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx)
+{
+	if (!IsStoryGroup(gContextMenuGroupChapter, gContextMenuGroup))
+		return false;
+	outChapterIdx = gContextMenuGroupChapter;
+	outGroupIdx = gContextMenuGroup;
+	return true;
 }
 
 bool KBSResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)

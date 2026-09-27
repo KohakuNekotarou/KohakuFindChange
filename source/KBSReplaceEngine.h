@@ -196,6 +196,19 @@ namespace KBSReplaceEngine
 	    outcome, and no replace running. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
+	/** ***** A STORY ROW'S MENU (2026-09-27, the story level). ***** Replace = the story's TICKED rows (the
+	    user's call), no prompt, one undo step, the list stays a work list (as ReplaceHit). Reject Change =
+	    every replaced row of the story whose tracked change is still there, one undo step. Redo = every row
+	    of the story taken back that can be replaced again; the others are skipped and counted. Each says
+	    what it did - or why nothing - in outStatus. */
+	bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	bool RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	/** Is there anything for the story row's Replace / Reject Change / Redo to do (the menu's greying). */
+	bool CanReplaceStory(int32 chapterIdx, int32 groupIdx);
+	bool CanRejectStory(int32 chapterIdx, int32 groupIdx);
+	bool CanRedoStory(int32 chapterIdx, int32 groupIdx);
+
 	/** Redo on a row taken back with Reject Change (2026-09-26): the same query - refused through
 	    RefuseChangedQuery when the dialog no longer holds it - is run over that row's text alone
 	    (Change All on the row's range, under Track Changes, as the run), in ONE undo step.

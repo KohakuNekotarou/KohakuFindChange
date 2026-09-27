@@ -272,6 +272,21 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	// ***** WHY THE ITEMS ARE GREY IS SAID HERE, BEFORE THE MENU. ***** When both are disabled the
 	// popup does not open at all (measured 2026-08-01 with Check All), so the status line is the only
 	// place left to say it.
+	// ***** A STORY ROW (2026-09-27, the story level): its own menu, over that story's rows. *****
+	// Every other right-click clears the story it named, so a story menu item fired later (a script, a
+	// shortcut) cannot act on a story nobody right-clicked this time.
+	if (nodeID->IsFontRow() && KBSResultModel::IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
+	{
+		KBSResultModel::SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
+		InterfacePtr<IApplication> storyApp(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IActionManager> storyActionMgr(storyApp != nil ? storyApp->QueryActionManager() : nil);
+		InterfacePtr<IMenuManager> storyMenuMgr(storyActionMgr, UseDefaultIID());
+		if (storyMenuMgr != nil)
+			storyMenuMgr->HandlePopupMenu(kKBSResultStoryMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+		return kTrue;
+	}
+	KBSResultModel::SetContextMenuGroup(-1, -1);
+
 	if (nodeID->IsHitRow())
 	{
 		const int32 chapter = nodeID->GetChapter();

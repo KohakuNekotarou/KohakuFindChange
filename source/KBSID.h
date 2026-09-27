@@ -342,6 +342,13 @@ DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
 // "Replace" on a hit row's right-click menu (2026-09-27, the user's call): replaces that one row, with
 // no prompt; the list stays a work list (KBSReplaceEngine::ReplaceHit).
 DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKBSPrefix + 29)
+// A STORY row's right-click menu (2026-09-27, the story level): Replace (its ticked rows), Reject Change,
+// Redo, Check All, Uncheck All - each over that story's rows.
+DECLARE_PMID(kActionIDSpace, kKBSStoryReplaceActionID, kKBSPrefix + 30)
+DECLARE_PMID(kActionIDSpace, kKBSStoryRejectActionID, kKBSPrefix + 31)
+DECLARE_PMID(kActionIDSpace, kKBSStoryRedoActionID, kKBSPrefix + 32)
+DECLARE_PMID(kActionIDSpace, kKBSStoryCheckAllActionID, kKBSPrefix + 33)
+DECLARE_PMID(kActionIDSpace, kKBSStoryUncheckAllActionID, kKBSPrefix + 34)
 
 
 // WidgetIDs:
@@ -479,6 +486,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 // ...and the HIT rows' menu (2026-09-26): Reject Change and Redo, about that one row. A subtree of its
 // own because the two menus never share an item.
 #define kKBSResultHitMenuName				"KBSRtMenuResultHit"
+// A story row's own right-click menu (2026-09-27).
+#define kKBSResultStoryMenuName				"KBSRtMenuResultStory"
 
 // The Change Checked confirmation prompt. The ENGLISH wording lives in KBS_enUS.fr under these
 // keys; the JAPANESE lives in KBSLoc.h and is switched in at run time by UI language (the jaJP
@@ -651,6 +660,12 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSCheckAllMenuItemPosition		1.0
 #define kKBSUncheckAllMenuItemPosition		2.0
 #define kKBSAcceptAllChangesMenuItemPosition	3.0		// a document row's only (the book row greys it)
+// The story row's menu (2026-09-27): the three commands, then the two check commands.
+#define kKBSStoryReplaceMenuItemPosition	1.0
+#define kKBSStoryRejectMenuItemPosition		2.0
+#define kKBSStoryRedoMenuItemPosition		3.0
+#define kKBSStoryCheckAllMenuItemPosition	4.0
+#define kKBSStoryUncheckAllMenuItemPosition	5.0
 // The hit row's menu: Replace first (2026-09-27), then its own 1 and 2.
 #define kKBSReplaceHitMenuItemPosition		0.5
 #define kKBSRejectChangeMenuItemPosition	1.0

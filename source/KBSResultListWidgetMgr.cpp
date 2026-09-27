@@ -464,8 +464,19 @@ private:
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		label.AppendNumber(fullCount);
-		label.Append(")");
+		// A STORY row (2026-09-27) reads out its checked count the way a document row does.
+		if (KBSResultModel::IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()) && !KBSResultModel::NoRowHasCheckBox())
+		{
+			label.AppendNumber(KBSResultModel::GetGroupCheckedCount(nodeID->GetChapter(), nodeID->GetFont()));
+			label.Append("/");
+			label.AppendNumber(fullCount);
+			label.Append(" checked)");
+		}
+		else
+		{
+			label.AppendNumber(fullCount);
+			label.Append(")");
+		}
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift() + kFontLevelIndent, label);
 	}
 
@@ -636,19 +647,31 @@ void KBSResultTree::Rebuild()
 	// reports children, which does not depend on the node ever having been expanded). The
 	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
 	// manager overrides it.
+	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
 	if (KBSResultModel::IsFromBook())
 	{
 		// The book row is the root's only child, so leaving it closed would show a panel with one
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
 		treeMgr->ExpandNode(KBSResultNodeID::CreateBook(), kFalse);
-		return;
 	}
-
-	// A single document has just the one chapter, so open it - otherwise the result is one closed
-	// row and the hits take an extra click to reach.
-	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
+	else
+	{
+		// A single document has just the one chapter, so open it - otherwise the result is one closed
+		// row and the hits take an extra click to reach.
+		for (int32 c = 0; c < chapters; ++c)
+			treeMgr->ExpandNode(KBSResultNodeID::Create(c), kFalse);
+	}
+	// ***** THE STORY ROWS COME UP OPEN (2026-09-27, the story level). ***** The level is a grouping, not
+	// a place to hide rows: a story row closed would put every hit one click further away than it was
+	// before the level existed. Opened in a closed chapter too (a book's), so the chapter's arrow shows
+	// its hits at once. A missing-glyph scan's FONT rows are left as they always were.
 	for (int32 c = 0; c < chapters; ++c)
-		treeMgr->ExpandNode(KBSResultNodeID::Create(c), kFalse);
+	{
+		const int32 groups = KBSResultModel::GetDisplayFontCount(c);
+		for (int32 g = 0; g < groups; ++g)
+			if (KBSResultModel::IsStoryGroup(c, g))
+				treeMgr->ExpandNode(KBSResultNodeID::CreateFont(c, g), kFalse);
+	}
 }
 
 //----------------------------------------------------------------------------------------
@@ -718,7 +741,14 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 	if (KBSResultModel::IsFromBook())
 		treeMgr->NodeChanged(KBSResultNodeID::CreateBook(), kFalse);
 	if (chapterIdx >= 0)
+	{
 		treeMgr->NodeChanged(KBSResultNodeID::Create(chapterIdx), kFalse);
+		// ...and its STORY rows, which read out a checked count too (2026-09-27)
+		const int32 groups = KBSResultModel::GetDisplayFontCount(chapterIdx);
+		for (int32 g = 0; g < groups; ++g)
+			if (KBSResultModel::IsStoryGroup(chapterIdx, g))
+				treeMgr->NodeChanged(KBSResultNodeID::CreateFont(chapterIdx, g), kFalse);
+	}
 }
 
 //----------------------------------------------------------------------------------------

@@ -401,6 +401,43 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSStoryReplaceActionID:
+		case kKBSStoryRejectActionID:
+		case kKBSStoryRedoActionID:
+		case kKBSStoryCheckAllActionID:
+		case kKBSStoryUncheckAllActionID:
+		{
+			// A story row's menu (2026-09-27). Nothing stashed = nobody right-clicked a story row.
+			int32 chapter = -1, group = -1;
+			if (!KBSResultModel::GetContextMenuGroup(chapter, group))
+				break;
+			if (KBSRunGuard::IsAnyRunning())
+			{
+				PMString busy(KBSRunGuard::BusyMessage());
+				busy.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(busy);
+				break;
+			}
+			PMString status;
+			status.SetTranslatable(kFalse);
+			const uint32 id = actionID.Get();
+			if (id == kKBSStoryReplaceActionID)
+				KBSReplaceEngine::ReplaceStory(chapter, group, status);	// no prompt (the user's call)
+			else if (id == kKBSStoryRejectActionID)
+				KBSReplaceEngine::RejectStory(chapter, group, status);
+			else if (id == kKBSStoryRedoActionID)
+				KBSReplaceEngine::RedoStory(chapter, group, status);
+			else
+			{
+				const bool check = (id == kKBSStoryCheckAllActionID);
+				KBSResultModel::SetGroupChecked(chapter, group, check);
+				status = check ? "This story: all checked." : "This story: all unchecked.";
+			}
+			KBSResultTree::RefreshRows();
+			KBSResultTree::ShowStatus(status);
+			break;
+		}
+
 		case kKBSReplaceHitActionID:
 		case kKBSRejectChangeActionID:
 		case kKBSRedoActionID:
@@ -1012,6 +1049,25 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// neither does a replace's aftermath, which is exactly the list a user wants to keep.
 			listToUpdate->SetNthActionState(i,
 				(KBSResultModel::GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSStoryReplaceActionID || action == kKBSStoryRejectActionID || action == kKBSStoryRedoActionID
+			|| action == kKBSStoryCheckAllActionID || action == kKBSStoryUncheckAllActionID)
+		{
+			// A story row's menu (2026-09-27): each item while it has something to do in that story.
+			int32 chapter = -1, group = -1;
+			bool enable = KBSResultModel::GetContextMenuGroup(chapter, group);
+			if (enable)
+			{
+				if (action == kKBSStoryReplaceActionID)
+					enable = KBSReplaceEngine::CanReplaceStory(chapter, group);
+				else if (action == kKBSStoryRejectActionID)
+					enable = KBSReplaceEngine::CanRejectStory(chapter, group);
+				else if (action == kKBSStoryRedoActionID)
+					enable = KBSReplaceEngine::CanRedoStory(chapter, group);
+				else
+					enable = !KBSResultModel::NoRowHasCheckBox();
+			}
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSReplaceHitActionID)
 		{
