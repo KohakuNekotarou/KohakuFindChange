@@ -9,25 +9,24 @@
 //  reads - so GREP back-references and escapes are interpreted by InDesign's own engine and are
 //  never parsed here.
 //
-//  ***** HOW IT WRITES, SINCE 2026-09-26: InDesign's OWN CHANGE ALL, ONE STORY AT A TIME, UNDER
-//  ***** TRACK CHANGES (the user's design). ***** Every story that holds a ticked row gets a
-//  Change All (kReplaceAllTextCmdBoss over IWalkerScopeFactoryUtils::QueryStoryWalkerScope), which
-//  decides every match on the ORIGINAL text - so GREP's ^, $ and lookarounds cannot see text this run
-//  has already written. The records Change All leaves are lined up with the rows by POSITION
-//  (LineUpStory in the .cpp), the rows NOT ticked are taken back record by record
-//  (KBSTrackChange::RejectReplacement), and the ticked rows' records are LEFT in the document, told
-//  apart by their time stamp: they are what Reject Change, Redo and the jump find a row by. The last
-//  step reads every thread holding a row and aborts the whole run on a single code point that is not
-//  what the ticked rows alone should have made (CheckOnlyTickedChanged).
-//  The long history in the .cpp explains each piece; the block comment over ReplaceInChapterByChangeAll
-//  is where to start.
+//  ***** HOW IT WRITES, SINCE 2026-09-27: ONE TICKED MATCH AT A TIME, A STORY AT A TIME, UNDER TRACK
+//  ***** CHANGES (the user's call). ***** ReplaceInChapterOneByOne in the .cpp walks each story that holds
+//  a ticked row (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current) and writes
+//  only the ticked rows, each recognised by its thread, its offset into it and its length - so a match
+//  a replacement made that the search never listed is stepped over, and its row is reported missing
+//  rather than written (H-8). A GREP query holding ^ is walked backward (the direction is set before
+//  anything is written, outside the sequence). The pending tracked changes a ticked match sits in or
+//  next to are accepted first; the replaces' own records are LEFT in the document, told apart by their time stamp: they are
+//  what Reject Change, Redo and the jump find a row by.
+//  (From 2026-09-26 to 2026-09-27 each story got InDesign's Change All instead and the rows NOT ticked
+//  were taken back; that went in the 2026-09-27 cleanup - git history, c876bc7 and before.)
 //
-//  ***** THE OLD WALK IS STILL HERE, FOR ONE JOB. ***** Until 2026-09-26 each chapter was re-walked
-//  match by match (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on a ticked walk order - measured
-//  2026-07-25, docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-design.md section 10.1).
-//  That function, ReplaceInChapter, now runs ONLY as the verify pass (verifyOnly = true): it walks
-//  each chapter before anything is written and checks that every ticked row still begins where the
-//  search found it. Its writing half is kept but is not reached (2026-09-27 defect sweep, C-2).
+//  ***** THE OLD CHAPTER WALK IS STILL HERE, FOR ONE JOB. ***** Until 2026-09-26 each chapter was
+//  re-walked match by match (measured 2026-07-25, docs/superpowers/specs/_done/2026-07-25-kbs-replace-
+//  checked-design.md section 10.1). That function, ReplaceInChapter, now runs ONLY as the verify pass
+//  (verifyOnly = true): it walks each chapter before anything is written and checks that every ticked
+//  row still begins where the search found it. Its writing half is kept but is not reached (2026-09-27
+//  defect sweep, C-2).
 //
 //========================================================================================
 
@@ -94,12 +93,12 @@ namespace KBSReplaceEngine
 	    allowed to make the total quietly come up short. The ways that happens since 2026-09-26:
 	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
 	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
-	      - missing: Change All left no record of its own at that row.
-	      - endnote left: the row is in the endnote story, which is left whole when any match there
-	        ends an endnote (see MatchEndsAnEndnote in the .cpp).
+	      - missing: the walk never met the row's match as the search listed it - this run's own
+	        replaces moved the text around it (GREP's ^, $ or a lookahead now reads something else).
+	      - endnote left: the match ends an endnote, where InDesign's replace breaks the endnote (see
+	        MatchEndsAnEndnote in the .cpp); that row alone is left.
+	      - refused: the replace command itself declined.
 	      - deleted: the row went with a footnote, table or object another ticked row deleted.
-	    (A fourth, "refused" - the one-at-a-time replace command declining - belonged to the old walk and
-	    can no longer arise; its counter and its sentence in the summary are kept but not reached.)
 
 	    ***** NOTHING IS EVER SAVED. ***** Every chapter a replacement lands in is left MODIFIED AND
 	    UNSAVED, with a window open on it, and the summary says so: overwriting the user's files is
@@ -185,6 +184,18 @@ namespace KBSReplaceEngine
 	    False = nothing changed; outStatus says why either way. */
 	bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
+	/** Replace on a hit row's right-click menu (2026-09-27, the user's call): that one row, ticked or
+	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
+	    list stays a work list: the row reads "replaced", every other row is moved to where its text now
+	    stands and numbered again by a fresh walk. Refused - nothing changed, outStatus says why - when
+	    the query changed since the search, the row's text is not the one the search found, the chapter
+	    cannot be opened, or the row would not be replaced (locked since, missing, an endnote's end). */
+	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+
+	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
+	    outcome, and no replace running. */
+	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
+
 	/** Redo on a row taken back with Reject Change (2026-09-26): the same query - refused through
 	    RefuseChangedQuery when the dialog no longer holds it - is run over that row's text alone
 	    (Change All on the row's range, under Track Changes, as the run), in ONE undo step.
@@ -210,9 +221,6 @@ namespace KBSReplaceEngine
 	    one's walker out from under it. The panel greys every action out while this is true. */
 	bool IsReplacing();
 
-	/** The refusal for results that stop short of the scope (KBSResultModel::IsStoppedShort) - one
-	    sentence for both doors, the menu's (before its prompt) and ReplaceChecked's own. */
-	const char* StoppedShortMessage();
 }
 
 #endif // __KBSReplaceEngine_h__

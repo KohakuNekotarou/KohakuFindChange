@@ -51,6 +51,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSSavePanelSettingsMenuKey,	"Save Panel Settings",
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
+                kKBSReplaceHitMenuKey,			"Replace",
                 kKBSRejectChangeMenuKey,		"Reject Change",
                 kKBSRedoMenuKey,				"Redo",
                 kKBSAcceptAllChangesMenuKey,	"Accept All Changes in This Document",

@@ -110,6 +110,18 @@ namespace KBSTrackChange
 	bool IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex from, TextIndex to,
 		const std::set<uint64>* onlyTimes = nil);
 
+	/** ***** ACCEPT THE PENDING CHANGES A MATCH ABOUT TO BE REPLACED SITS IN OR NEXT TO - ANYBODY'S
+	    ***** (2026-09-27, the user's call: "only that part"). ***** Every insertion overlapping or touching
+	    [from, to) is accepted, and every deletion anchored in [from, to] (an insertion's own deletion
+	    stands at its end), one whole record at a time, whoever made it; nothing else in the story is
+	    touched. Needed for the user's own insertion at least: replacing text its author inserted and has
+	    not accepted leaves no record (IsInsideOwnPendingInsertion), so the replace could never be taken
+	    back. The main text does not move (an accepted insertion stays, an accepted deletion was never in
+	    it), but a deleted-text thread goes, so a caller holding story indexes past it should hold them as
+	    thread offsets. Runs inside the caller's command sequence. Returns how many were accepted, or -1
+	    when one would not be (outWhy says so). Leaves the error state clear. */
+	int32 AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy);
+
 
 	/** Reject ONE record standing AT `position` - the deletion when `wantDelete`, else the insertion -
 	    except one whose time stamp is in `keepTimes`. The caller puts in `keepTimes` every time that is

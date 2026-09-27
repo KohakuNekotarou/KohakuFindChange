@@ -250,6 +250,51 @@ bool KBSTrackChange::IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex 
 	return inside;
 }
 
+int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy)
+{
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return 0;
+	std::vector<Record> records;
+	CollectRecords(story, records);
+	int32 done = 0;
+	// The walk starts over after each accept (the iterator it came from is spent), bounded by the
+	// records there were, as AcceptAllInStory.
+	for (size_t guard = 0; guard <= records.size(); ++guard)
+	{
+		if (!redline->StoryHasChanges())
+			break;
+		RedlineIterator* it = redline->NewRedlineIterator(0);
+		if (it == nil)
+			break;
+		bool found = false;
+		for (bool16 more = kTrue; more && !found; more = found ? kFalse : it->Increment(kFalse))
+		{
+			TextIndex at = 0;
+			int32 len = 0;
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+			if (record == nil)
+				continue;
+			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+			delete record;
+			if (isDelete ? (from <= at && at <= to) : (len > 0 && from <= at + len && at <= to))
+				found = true;
+		}
+		const bool ok = found && it->ProcessAccept(nil, kFalse, kFalse);
+		delete it;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		if (!found)
+			break;
+		if (!ok)
+		{
+			outWhy = "InDesign would not accept a pending change next to a match being replaced";
+			return -1;
+		}
+		++done;
+	}
+	return done;
+}
+
 int32 KBSTrackChange::AcceptAllInDocument(IDataBase* db, PMString& outWhy)
 {
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());

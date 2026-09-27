@@ -486,6 +486,14 @@ namespace KBSSearchEngine
 	    built. */
 	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
 
+	/** Every match of the current query in one open document, as the search collects them (walk order
+	    stamped, not yet in page order), with the given scope switches. For the right-click Replace
+	    (2026-09-27): the rest of the list is numbered again by it (KBSReplaceEngine.cpp,
+	    RenumberWalkOrders). Read-only (the walk's own dirty guard). False = the document could not be
+	    walked. */
+	bool CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+		std::vector<KBSResultModel::Hit>& outHits);
+
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
 	    asked in this order, none of which may answer no:
 

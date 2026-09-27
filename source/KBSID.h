@@ -339,6 +339,9 @@ DECLARE_PMID(kActionIDSpace, kKBSRedoActionID, kKBSPrefix + 26)
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
 // The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).
 DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
+// "Replace" on a hit row's right-click menu (2026-09-27, the user's call): replaces that one row, with
+// no prompt; the list stays a work list (KBSReplaceEngine::ReplaceHit).
+DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKBSPrefix + 29)
 
 
 // WidgetIDs:
@@ -443,6 +446,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSCheckAllMenuKey				kKBSStringPrefix "kKBSCheckAllMenuKey"
 #define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
 // The hit row's own right-click menu (2026-09-26).
+#define kKBSReplaceHitMenuKey			kKBSStringPrefix "kKBSReplaceHitMenuKey"
 #define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
 #define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"
 #define kKBSAcceptAllChangesMenuKey		kKBSStringPrefix "kKBSAcceptAllChangesMenuKey"
@@ -647,7 +651,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSGlyphConfirmChangeLabelWidgetID, kKBSPrefix + 2
 #define kKBSCheckAllMenuItemPosition		1.0
 #define kKBSUncheckAllMenuItemPosition		2.0
 #define kKBSAcceptAllChangesMenuItemPosition	3.0		// a document row's only (the book row greys it)
-// The hit row's menu, its own 1 and 2.
+// The hit row's menu: Replace first (2026-09-27), then its own 1 and 2.
+#define kKBSReplaceHitMenuItemPosition		0.5
 #define kKBSRejectChangeMenuItemPosition	1.0
 #define kKBSRedoMenuItemPosition			2.0
 

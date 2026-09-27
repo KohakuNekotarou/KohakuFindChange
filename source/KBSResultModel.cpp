@@ -1350,6 +1350,16 @@ void KBSResultModel::SetHitRedone(int32 chapterIdx, int32 hitIdx, UID storyUID, 
 	BuildHitLocator(h);
 }
 
+void KBSResultModel::SetHitWalkOrder(int32 chapterIdx, int32 hitIdx, int32 walkOrder)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	c.hits[hitIdx].walkOrder = walkOrder;
+}
+
 int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))

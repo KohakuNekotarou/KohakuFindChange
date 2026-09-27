@@ -738,6 +738,10 @@ namespace KBSResultModel
 	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is
 	    N - the only key that survives replacing (see Hit::walkOrder). */
 	int32 GetHitWalkOrder(int32 chapterIdx, int32 hitIdx);
+	/** Give a row a walk order again (2026-09-27): after a one-row Replace, the rest of the list is
+	    numbered by a fresh walk of the chapter (KBSReplaceEngine::ReplaceHit), so a Change Checked
+	    after it verifies against the text as it stands. -1 = no match of that walk is this row. */
+	void SetHitWalkOrder(int32 chapterIdx, int32 hitIdx, int32 walkOrder);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */

@@ -349,15 +349,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSResultTree::ShowStatus(nothing);
 				break;
 			}
-			// Results that stopped short (the safety limit, or a search error) cannot be replaced -
-			// asked before the prompt, like the doors around it (2026-09-27 defect sweep, D-5).
-			if (KBSResultModel::IsStoppedShort())
-			{
-				PMString shortMsg(KBSReplaceEngine::StoppedShortMessage());
-				shortMsg.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(shortMsg);
-				break;
-			}
+			// (Results that stopped short - the safety limit, or a search error - were refused here from
+			//  the 2026-09-27 defect sweep (D-5) until the same day's cleanup: Change All would have written
+			//  the matches past where the search stopped. One match at a time writes the ticked rows only.)
 			// Do the Find/Change settings still describe these rows - the tab, and the query with
 			// every option that decides the match set? Asked HERE, ahead of the prompt, for the same
 			// reason the report test above is: the prompt asks the user to authorise a rewrite, and
@@ -407,6 +401,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSReplaceHitActionID:
 		case kKBSRejectChangeActionID:
 		case kKBSRedoActionID:
 		{
@@ -423,7 +418,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			}
 			PMString status;
-			if (actionID.Get() == kKBSRejectChangeActionID)
+			if (actionID.Get() == kKBSReplaceHitActionID)
+				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
+			else if (actionID.Get() == kKBSRejectChangeActionID)
 				KBSReplaceEngine::RejectHit(chapter, hit, status);
 			else
 				KBSReplaceEngine::RedoHit(chapter, hit, status);
@@ -1015,6 +1012,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// neither does a replace's aftermath, which is exactly the list a user wants to keep.
 			listToUpdate->SetNthActionState(i,
 				(KBSResultModel::GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSReplaceHitActionID)
+		{
+			// A hit row's menu (2026-09-27): Replace while the row is a Find/Change match not yet replaced,
+			// not locked and with nothing said about it (KBSReplaceEngine::CanReplaceHit).
+			int32 chapter = -1, hit = -1;
+			const bool enable = KBSResultModel::GetContextMenuHit(chapter, hit)
+				&& KBSReplaceEngine::CanReplaceHit(chapter, hit);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSRejectChangeActionID || action == kKBSRedoActionID)
 		{

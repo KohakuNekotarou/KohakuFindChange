@@ -663,8 +663,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- A hit row's right-click menu (2026-09-26) -----
-		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Reject Change takes that row's replace
-		// back through its tracked change, Redo replaces it again. Hit rows had no menu before.
+		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Replace (2026-09-27) replaces that row
+		// alone with no prompt, Reject Change takes that row's replace back through its tracked change,
+		// Redo replaces it again. Hit rows had no menu before.
+		kKBSReplaceHitActionID,
+		kKBSResultHitMenuName
+		kKBSReplaceHitMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		kKBSRejectChangeActionID,
 		kKBSResultHitMenuName
 		kKBSRejectChangeMenuItemPosition,
@@ -899,8 +905,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Reject Change / Redo - a hit row's right-click menu (2026-09-26). kCustomEnabling for the
-		// same reason as Check All: UpdateActionStates greys them by the row the menu is over.
+		// Replace / Reject Change / Redo - a hit row's right-click menu (2026-09-26, Replace 2026-09-27).
+		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys them by the row the
+		// menu is over.
+		kKBSActionComponentBoss,
+		kKBSReplaceHitActionID,
+		kKBSReplaceHitMenuKey,			// "Replace"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
 		kKBSActionComponentBoss,
 		kKBSRejectChangeActionID,
 		kKBSRejectChangeMenuKey,		// "Reject Change"
