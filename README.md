@@ -38,7 +38,7 @@ Get-FileHash -Algorithm SHA256 KohakuFindChange.pln
 https://github.com/sponsors/KohakuNekotarou
 
 ## Discussions 掲示板
-https://github.com/KohakuNekotarou/KohakuChangeMarker/discussions
+https://github.com/KohakuNekotarou/KohakuFindChange/discussions
 
 ## About Creation
 This plugin was designed and implemented by **KohakuNekotarou** in collaboration with Anthropic's AI, **Claude (Claude Code)**.
