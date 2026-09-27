@@ -5,8 +5,9 @@
 //  KohakuBookSearch (KBS)
 //
 //  Book-wide search scope implementation. See KBSBookScope.h for the overall contract.
-//  Ported from KESCLBookScope (KESCL left untouched); the toggle and the jump-time
-//  reopen/early-close machinery are omitted in this Step-1 subset.
+//  Ported from KESCLBookScope (KESCL left untouched). (This said the toggle and the jump-time
+//  reopen were "omitted in this Step-1 subset" until 2026-09-27, long after both had arrived -
+//  gBookScopeOn and ReopenChapterDoc.)
 //
 //========================================================================================
 
@@ -50,6 +51,7 @@
 #include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
 #include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "K2Vector.h"			// the held-chapter list (it came in through IBookUtils.h until 2026-08-08)
+#include "FileUtils.h"		// IsEqual - is this open document that chapter's file
 #include "SDKFileHelper.h"
 #include "UIDList.h"
 #include "Utils.h"
@@ -720,7 +722,15 @@ void KBSBookScope::ShutdownCleanup()
 //
 // Asked only of a document with NO file: one the user has saved under another name has a file of
 // its own and is that file's document, not the chapter's, whatever it was opened from.
-static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
+//
+// ***** THE FILES ARE COMPARED, NOT THEIR PATH STRINGS (2026-09-27, the open/close re-check R-1). *****
+// FileUtils::IsEqual, which is what the product's own lookup-then-check does
+// (buttonui/.../GoToAnchorPanelObserver.cpp, FindDocInDocList) and what KCM asks (KCMOpenDocOnFile).
+// Measured with the path strings: a chapter the user had open as Q:\hb\hb1.indd (a subst of the
+// book's folder) read as "not this chapter", the open that followed hit the chapter's lock, and the
+// search reported "1 chapter(s) could not be opened (hb1.indd: in use elsewhere)" - that chapter's
+// hits were silently left out (work/kbs-selftest/r1-path-spelling.ps1).
+static bool KBSDocumentLivesInFile(IDocument* doc, const IDFile& wanted)
 {
 	if (doc == nil)
 		return false;
@@ -729,17 +739,16 @@ static bool KBSDocumentLivesInFile(IDocument* doc, const PMString& wantedPath)
 		return false;
 	const IDFile* docFile = db->GetSysFile();
 	if (docFile != nil)
-	{
-		SDKFileHelper helper(*docFile);
-		return helper.GetPath() == wantedPath;
-	}
+		return FileUtils::IsEqual(*docFile, wanted) != kFalse;
 	if (!doc->IsConverted())
 		return false;
 	InterfacePtr<IOpenedFileInfo> openedFrom(doc, UseDefaultIID());
 	if (openedFrom == nil)
 		return false;
-	SDKFileHelper openedHelper(openedFrom->GetOpenedFilePath());
-	return !openedHelper.GetPath().empty() && openedHelper.GetPath() == wantedPath;
+	const IDFile openedFile = openedFrom->GetOpenedFilePath();
+	if (!KBSBookScope::ChapterHasFile(openedFile))
+		return false;		// nothing recorded to compare with
+	return FileUtils::IsEqual(openedFile, wanted) != kFalse;
 }
 
 bool KBSBookScope::ChapterHasFile(const IDFile& file)
@@ -758,8 +767,6 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	if (!ChapterHasFile(file))
 		return false;	// a front-document entry carries no file - nothing to reopen
 
-	SDKFileHelper fileHelper(file);
-	const PMString wantedPath = fileHelper.GetPath();
 
 	// Is it open already - because the user reopened it, or because an earlier chapter of this very
 	// run is still standing? Rebind to THAT document and do NOT hold it: closing something somebody
@@ -781,14 +788,14 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// resolves its chapters with the earlier ones still open (1, then 2, then 3 documents standing)
 	// while a SEARCH closes each before opening the next and asks with none.
 	//
-	// So the check stays whatever the lookup is: it costs one string compare, and it is the only
+	// So the check stays whatever the lookup is: it costs one file compare, and it is the only
 	// thing standing between a wrong answer and a replace in the wrong document.
 	{
 		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
 		if (docList != nil)
 		{
 			IDocument* openDoc = docList->FindDoc(file);
-			if (KBSDocumentLivesInFile(openDoc, wantedPath))
+			if (KBSDocumentLivesInFile(openDoc, file))
 			{
 				outDocRef = ::GetUIDRef(openDoc);
 				return true;
@@ -806,7 +813,7 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 				IDocument* candidate = docList->GetNthDoc(i);
 				if (candidate == nil || candidate == openDoc || !candidate->IsConverted())
 					continue;
-				if (KBSDocumentLivesInFile(candidate, wantedPath))
+				if (KBSDocumentLivesInFile(candidate, file))
 				{
 					outDocRef = ::GetUIDRef(candidate);
 					return true;
@@ -872,11 +879,15 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 
 	// Still open? Asked the way IsDocStillOpen asks everything - the pair against the session's
 	// list, no dereference - because the callers hand over chapters their run recorded EARLIER in
-	// the same tick, and the run's progress bars pump events: a scheduled close (a script's, or
-	// one of this module's own from a previous cue) can land in between. Every question below
-	// this line reads the document; this is the door that keeps a dangling (IDataBase*, UID) away
-	// from all of them (2026-08-09, the pre-submission re-check). False is also the true answer:
-	// a chapter nobody has open cannot be given a window.
+	// the same tick, and every question below this line reads the document; this is the door that
+	// keeps a dangling (IDataBase*, UID) away from all of them (2026-08-09, the pre-submission
+	// re-check). False is also the true answer: a chapter nobody has open cannot be given a window.
+	//
+	// ! A DOOR, NOT A KNOWN CASE. This said a scheduled close "can land in between" because the run's
+	//   progress bars pump events. What was MEASURED (2026-08-04) points the other way: a close this
+	//   module scheduled did not run until the run was over (the .idlk files stayed until then). So
+	//   no path is known that closes a chapter under a run; the test stays because it costs nothing
+	//   and the thing it guards against would be a crash. (Corrected 2026-09-27.)
 	if (!IsDocStillOpen(docRef))
 		return false;
 
@@ -941,8 +952,8 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	if (window == nil)
 		return false;
 
-	// It has a window now, so it is no longer part of the windowless reopen cache - dropping it
-	// keeps a later ReleaseHeldDocs from closing a window the user is looking at.
+	// It has a window now, so it is the user's - dropping it from the held list keeps a later
+	// ReleaseHeldDocs from closing a window the user is looking at.
 	KBSBookScope::ForgetHeldDoc(docRef);
 	return true;
 }
@@ -1001,8 +1012,9 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (HasUnsavedWork(ref))
 			continue;
 
-		// Only documents that HAVE a window go: a windowless held chapter survives as the reopen
-		// cache (speed over tidiness).
+		// Only documents that HAVE a window go: a windowless held chapter is not this sweep's to close
+		// (the releases take it). Runs close chapters as they go, so one is left only when a jump or a
+		// replace could not give it a window. (Called "the reopen cache" until 2026-09-27.)
 		if (!DocHasAnyWindow(ref))
 			continue;	// windowless - keep it held
 
@@ -1490,9 +1502,7 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 		// is the book's to give, not ours to assume, and because falling through costs nothing: an
 		// entry with no file cannot be opened either, so the chapter is reported as unopenable,
 		// which is what a chapter nobody can resolve should look like.
-		SDKFileHelper chapterFileHelper(ioChapter.file);
-		const PMString wantedPath = chapterFileHelper.GetPath();
-		if (alreadyOpenDoc != nil && KBSDocumentLivesInFile(alreadyOpenDoc, wantedPath))
+		if (alreadyOpenDoc != nil && KBSDocumentLivesInFile(alreadyOpenDoc, ioChapter.file))
 		{
 			// The user's (or an earlier run's) own copy. NOT held: closing a document somebody
 			// else opened would surprise them - the same rule ReopenChapterDoc follows, and the

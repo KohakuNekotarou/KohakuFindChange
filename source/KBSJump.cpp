@@ -966,6 +966,14 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 		return;
 
+	// The guard the file's header promises for everything after the database is in hand - opening a
+	// window, zooming, making it active - and that JumpToHit and SelectHitText both keep. This entry
+	// alone went without it until 2026-09-27 (the open/close re-check, S-1): a chapter a search had
+	// closed and this row reopened could come out wanting to be saved for having been LOOKED at, and
+	// then "Hide Previous Chapter" would not close it. It restores the flag the document came in
+	// with, so it changes nothing when nothing was dirtied.
+	IDataBase::SaveRestoreModifiedState dirtyGuard(docRef.GetDataBase());
+
 	// Showing a chapter is NOT jumping to a match: the view is left exactly where the user had it
 	// and no marker is raised. The row says "this document", so the answer is that document, not a
 	// place inside it. (KESCL's document rows behave the same way.)

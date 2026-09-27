@@ -364,11 +364,15 @@ namespace KBSBookScope
 	    very function - so the two cannot come to differ. */
 	bool ChapterHasFile(const IDFile& file);
 
-	/** Reopen a chapter by its file (Task 3 jump): if the user reopened it themselves, rebind to
-	    THEIR open copy (and do not hold it); otherwise open it windowless + UI-suppressed and hold
-	    it. The (re)opened document is returned in outDocRef. false = cannot reopen (missing file,
-	    locked) - or there was no file to open by at all, which ChapterHasFile is what tells apart.
-	    Used when a jump target's held chapter was closed by the user since the search. */
+	/** Reopen a chapter by its file: if it is open already (the user's copy, or a conversion of an
+	    older InDesign's chapter - see KBSDocumentLivesInFile), rebind to that copy and do not hold
+	    it; otherwise open it windowless + UI-suppressed and hold it. The (re)opened document is
+	    returned in outDocRef. false = cannot reopen (missing file, locked) - or there was no file to
+	    open by at all, which ChapterHasFile is what tells apart.
+	    Used by every run that walks a book's chapters (through OpenChapterDoc), by the replace's
+	    resolve pass, and by the jump - a chapter is closed as soon as each walk is done with it, so
+	    this is how any of them reaches one again. (It said "Task 3 jump ... held chapter closed by the
+	    user" until 2026-09-27: true of its first caller only.) */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
 
 	/** Give a chapter that is open WITHOUT a window (the search opens them that way) a real layout
@@ -387,7 +391,10 @@ namespace KBSBookScope
 
 	/** The "Hide Previous Chapter" sweep (Task 3): close every OTHER document that HAS a window and
 	    needs no save, on schedule - whoever opened it. The exception document (the one a jump just
-	    landed in) and the windowless held chapters (the reopen cache) survive.
+	    landed in) and any windowless held chapter survive. (Runs close each chapter as they finish
+	    with it since 2026-08-02, so a windowless held chapter is left only by a failure - a jump or
+	    a replace whose window did not appear. This called them "the reopen cache" until 2026-09-27;
+	    there has been no cache since.)
 
 	    "Needs no save" is IDocFileHandler::CanSave, "modified OR UNSAVED" - so what stays is not
 	    only the DIRTY document this line used to name, but also the one that has never been saved at
