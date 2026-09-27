@@ -31,6 +31,7 @@
 #include "IGraphicsPort.h"
 #include "IInterfaceColors.h"	// RealAGMColor, InterfaceColor indices
 #include "IInterfaceFonts.h"	// the palette window font
+#include "ITextControlData.h"	// the row's line as plain text, for a reader that walks the widgets
 #include "IWidgetParent.h"		// QueryParentFor - this cell -> the row widget that carries the hilite
 
 // General includes:
@@ -117,6 +118,34 @@ public:
 		fPre = pre;   fPre.SetTranslatable(kFalse);
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
+
+		// The same line as plain text on this boss's ITextControlData (KBSRowLabel below), which is
+		// where a reader that walks the widgets looks for a label. Laid out as the cell draws it -
+		// locator, flag, then the line with its breaks marked - and the match in [ ] where the cell
+		// uses colour. Written here, the one place every row's parts arrive, so the two cannot drift.
+		InterfacePtr<ITextControlData> label(this, UseDefaultIID());
+		if (label != nil)
+		{
+			PMString line(fLocator);
+			if (!fFlag.IsEmpty())
+			{
+				line.Append(" ");
+				line.Append(fFlag);
+			}
+			PMString preShown(fPre), matchShown(fMatch), postShown(fPost);
+			KBSResultModel::MarkUpBreaksForDisplay(preShown);
+			KBSResultModel::MarkUpBreaksForDisplay(matchShown);
+			KBSResultModel::MarkUpBreaksForDisplay(postShown);
+			line.Append("  ");
+			line.Append(preShown);
+			line.Append("[");
+			line.Append(matchShown);
+			line.Append("]");
+			line.Append(postShown);
+			line.SetTranslatable(kFalse);
+			label->SetString(line, kFalse /*invalidate: the view draws from the segments*/,
+				kFalse /*notify: nothing observes it*/);
+		}
 	}
 
 	virtual void GetSegments(PMString& outLocator, PMString& outFlag, PMString& outPre,
@@ -138,6 +167,41 @@ private:
 };
 
 CREATE_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
+
+//----------------------------------------------------------------------------------------
+// KBSRowLabel - the row's line as plain text
+//----------------------------------------------------------------------------------------
+
+/** ITextControlData for the colour cell: holds the plain-text line KBSRowData::SetSegments writes.
+    Nothing here draws it - KBSColorTextView paints from the segments. It is for a reader that walks
+    the widgets and takes a widget's label from this interface (KIDMCP's inspect_ui), which a
+    self-drawing cell would otherwise answer with nothing.
+
+    Not persistent and not read from the resource, which is why it is ours rather than the stock
+    kCTextControlDataImpl. */
+class KBSRowLabel : public CPMUnknown<ITextControlData>
+{
+public:
+	KBSRowLabel(IPMUnknown* boss) : CPMUnknown<ITextControlData>(boss) {}
+	virtual ~KBSRowLabel() {}
+
+	virtual void SetString(const PMString& newString, bool16 /*invalidate*/,
+		bool16 /*notifyOfChange*/, bool16 /*isGoodString*/)
+	{
+		fText = newString;
+		fText.SetTranslatable(kFalse);
+	}
+
+	virtual const PMString& GetString() const
+	{
+		return fText;
+	}
+
+private:
+	PMString fText;
+};
+
+CREATE_PMINTERFACE(KBSRowLabel, kKBSRowLabelImpl)
 
 //----------------------------------------------------------------------------------------
 // KBSColorTextView - the self-drawing cell

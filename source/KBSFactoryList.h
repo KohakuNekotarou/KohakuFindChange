@@ -26,6 +26,7 @@ REGISTER_PMINTERFACE(KBSResultListAdapter, kKBSResultListAdapterImpl)
 REGISTER_PMINTERFACE(KBSResultListWidgetMgr, kKBSResultListWidgetMgrImpl)
 REGISTER_PMINTERFACE(KBSColorTextView, kKBSColorTextViewImpl)
 REGISTER_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
+REGISTER_PMINTERFACE(KBSRowLabel, kKBSRowLabelImpl)
 // Task 3: jump + marker + startup/shutdown. (KBSDrawEventSrvc / KBSDrawEventHandler stood here until
 // 2026-09-26; the marker is the global text adornment below - KBSHitMarker.cpp.)
 REGISTER_PMINTERFACE(KBSHitMarkerAdornment, kKBSHitMarkerAdornmentImpl)
