@@ -330,7 +330,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// check so the report can account for them, so GetCheckedCount() is still positive and
 			// the user would otherwise be asked to authorise a rewrite that the engine declines on
 			// the far side of the prompt. Same wording as the engine's own door.
-			if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyAppearedRowOpen())
+			if (KBSResultModel::IsShowingReplaceOutcome())
 			{
 				PMString report("This is the last replace's report - search again to replace more.");
 				report.SetTranslatable(kFalse);

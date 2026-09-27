@@ -153,15 +153,8 @@ namespace KBSResultModel
 		PMString	originalText;
 		PMString	replacedText;
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
-		// a row cannot be taken back (no Reject Change / Redo). Since 2026-09-27 it is ticked by hand
-		// like any other row.
+		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
 		bool		inFootnote;
-		// ***** A MATCH THAT APPEARED AFTER A REPLACE (2026-09-27, the user's call A). ***** A replace
-		// that left a row missing searches that chapter again, and every match now standing where a
-		// missing row is joins the report right under it, unticked, reading "new": the text around it
-		// moved under the replace, so what matches there is not what the search listed, and the user
-		// sees it before anything is written. The only rows of a report that carry a box.
-		bool		appeared;
 		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
 		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
 		uint64		recordTime;
@@ -169,13 +162,14 @@ namespace KBSResultModel
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
 
-		// checked starts FALSE, and stays so for a search's rows since 2026-09-27 (the user's call; they
-		// came in ticked from 2026-09-26 - AppendChapter).
+		// checked starts FALSE here, and a SEARCH's rows are ticked afterwards (AppendChapter): the
+		// default went unticked on 2026-08-02 and back to ticked on 2026-09-26, both on the user's call.
+		// (This note described the 2026-08-02 default as current until the 2026-09-27 defect sweep.)
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				appeared(false), recordTime(0), pageOrdinal(0) {}
+				recordTime(0), pageOrdinal(0) {}
 	};
 
 	/** One font that had no glyph for some of a chapter's text - one FONT row in the tree.
@@ -781,17 +775,6 @@ namespace KBSResultModel
 	    every check box off the panel.
 	    @return the number of rows left in the model. */
 	int32 KeepCheckedRows();
-
-	/** ***** THE MATCHES THAT APPEARED WHERE A REPLACE LEFT ROWS MISSING (2026-09-27, the user's call A). *****
-	    Each hit goes in right after the row index paired with it (indexes as the chapter stands now), marked
-	    Hit::appeared and unticked, and the chapter's locators are numbered again. Every other row of the
-	    chapter gives up its walk order (-1): the new rows carry the walk order of the search that found them,
-	    which is the walk the next replace's verify pass makes, and a report row's old number would collide
-	    with them. Returns how many went in. */
-	int32 InsertAppearedHits(int32 chapterIdx, std::vector<std::pair<int32, Hit> >& afterRowAndHit);
-
-	/** Does any row carry a box because it appeared after a replace (Hit::appeared, not replaced)? */
-	bool AnyAppearedRowOpen();
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
 	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced

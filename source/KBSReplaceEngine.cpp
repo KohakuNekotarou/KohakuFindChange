@@ -1855,19 +1855,17 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			outWhyNot = "a row could not be read";
 			return false;
 		}
-		// ***** WHAT THIS RUN WRITES: A TICKED ROW WITH NOTHING SAID ABOUT IT YET. ***** A replace's report
-		// can be run again since 2026-09-27 - on the matches that appeared where rows went missing
-		// (Hit::appeared) - and its other rows (replaced, missing, deleted, locked...) keep their ticks.
-		// They are not written, only carried past what this run writes. (A replaced row refused the run
-		// with "search again" until then.)
-		const KBSResultModel::ChangeOutcome outcome = KBSResultModel::GetHitOutcome(chapterIdx, i);
-		const bool target = checked && !replaced && outcome == KBSResultModel::kOutcomeNone;
+		if (replaced)
+		{
+			outWhyNot = "a row is already replaced - search again";
+			return false;
+		}
 		UID story = kInvalidUID;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
 		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, start, end, hash))
 		{
-			if (target)
+			if (checked)
 			{
 				++outMissing;
 				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
@@ -1877,18 +1875,17 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		SetRowAt(db, rowNow[static_cast<size_t>(i)], story, start, end);
 		if (!rowNow[static_cast<size_t>(i)].known)
 		{
-			if (target)
+			if (checked)
 			{
 				++outMissing;
 				KBSResultModel::SetHitOutcome(chapterIdx, i, KBSResultModel::kOutcomeMissing);
 			}
 			continue;
 		}
-		if (!target)
+		if (!checked)
 		{
-			// a row the report keeps: a locked one (it never had a box), or a report's own row
-			if (locked || replaced || outcome != KBSResultModel::kOutcomeNone)
-				keptRows.push_back(i);
+			if (locked)
+				keptRows.push_back(i);		// a locked row the report keeps (it never had a box)
 			continue;
 		}
 		const UIDRef storyRef(db, story);
@@ -1998,9 +1995,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			{
 				++outMissing;
 				KBSResultModel::SetHitOutcome(chapterIdx, *p, KBSResultModel::kOutcomeMissing);
-				// read back where its text stands now - the place the follow-up search looks at
-				// (FollowUpMissingRows) and a click jumps to
-				keptRows.push_back(*p);
 			}
 			++done;
 		}
@@ -2133,10 +2127,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
 		bool checked = false, replaced = false, locked = false;
 		const bool haveFlags = KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked);
-		// A report's own rows keep their ticks (2026-09-27: a report is run again on its appeared rows),
-		// so a row with an outcome is not work - the same rule as ReplaceInChapterOneByOne's target.
-		const bool isWork = haveFlags && checked && !replaced
-			&& KBSResultModel::GetHitOutcome(chapterIdx, i) == KBSResultModel::kOutcomeNone;
 		if (walkOrder < 0)
 		{
 			// A checked row with NO walk order cannot be lined up with any match of the re-walk, so
@@ -2151,7 +2141,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			// door the walk below keeps for a walk order with no row behind it (hitIdx < 0). Without
 			// it such a row was on the bar - the run is sized with GetChapterCheckedCount, which
 			// asks nothing about walk orders - and in no counter at all.
-			if (isWork)
+			if (haveFlags && checked && !replaced)
 			{
 				// In verify, a ticked row that no walk can ever reach is reported as a change and
 				// nothing is marked: the pass writes nothing at all, outcomes included, and the
@@ -2168,7 +2158,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			continue;
 		}
 		rowByWalkOrder[walkOrder] = i;
-		if (isWork)
+		if (haveFlags && checked && !replaced)
 			targets.insert(walkOrder);
 
 		if (verifyOnly)
@@ -2661,75 +2651,6 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			KBSResultModel::SetHitOutcome(chapterIdx, row->second, KBSResultModel::kOutcomeMissing);
 	}
 	return replacedCount;
-}
-
-// ***** THE MATCHES THAT APPEARED WHERE ROWS WENT MISSING (2026-09-27, the user's call A). *****
-// A row goes missing when this run's own replaces moved the text around it: GREP's ^ or a lookahead
-// now reads something else there, so the match the search listed is not there to be written (see the
-// note above ReplaceInChapterOneByOne). Searching again shows what matches there NOW - x<CR>ab under
-// \r|^a|ab: the "a" row goes missing once the return is deleted, and "ab" matches in its place. It is
-// never written on the run's own authority: that is how a replace once deleted a "b" nobody had listed
-// (H-8). Every match now standing on a missing row's text goes into the report right under that row,
-// unticked and reading "new", and a Change Checked on the report writes the ones the user ticks. Runs
-// after KeepCheckedRows, on the chapters still open (a missing row means its story was written to, so
-// its chapter is kept). Returns how many rows went in.
-int32 FollowUpMissingRows(const WalkerScopeOptions& scopeOptions)
-{
-	int32 added = 0;
-	const int32 chapterCount = KBSResultModel::GetChapterCount();
-	for (int32 ci = 0; ci < chapterCount; ++ci)
-	{
-		struct Gone
-		{
-			int32		row;
-			UID			story;
-			TextIndex	from;
-			TextIndex	to;
-		};
-		std::vector<Gone> gone;
-		const int32 hitCount = KBSResultModel::GetHitCount(ci);
-		for (int32 i = 0; i < hitCount; ++i)
-		{
-			if (KBSResultModel::GetHitOutcome(ci, i) != KBSResultModel::kOutcomeMissing)
-				continue;
-			Gone g;
-			uint64 hash = 0;
-			g.row = i;
-			if (KBSResultModel::GetHitMatchIdentity(ci, i, g.story, g.from, g.to, hash) && g.story != kInvalidUID)
-				gone.push_back(g);
-		}
-		if (gone.empty())
-			continue;
-		UIDRef docRef;
-		IDFile file;
-		if (!KBSResultModel::GetChapterLocation(ci, docRef, file) || docRef.GetDataBase() == nil
-			|| !KBSBookScope::IsDocStillOpen(docRef))
-			continue;
-		std::vector<KBSResultModel::Hit> hits;
-		if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, hits))
-			continue;
-		std::vector<std::pair<int32, KBSResultModel::Hit> > add;
-		for (size_t h = 0; h < hits.size(); ++h)
-		{
-			const KBSResultModel::Hit& hit = hits[h];
-			for (size_t g = 0; g < gone.size(); ++g)
-			{
-				const Gone& m = gone[g];
-				if (hit.storyUID != m.story)
-					continue;
-				// on the missing row's text - overlapping it, or (a zero-width one on either side) touching it
-				const bool overlaps = (hit.textStart < m.to && m.from < hit.textEnd)
-					|| (hit.textStart == hit.textEnd && m.from <= hit.textStart && hit.textStart <= m.to)
-					|| (m.from == m.to && hit.textStart <= m.from && m.from <= hit.textEnd);
-				if (!overlaps)
-					continue;
-				add.push_back(std::make_pair(m.row, hit));
-				break;
-			}
-		}
-		added += KBSResultModel::InsertAppearedHits(ci, add);
-	}
-	return added;
 }
 
 // A SECOND shape lived here from 2026-08-03 to 2026-08-05: ReplaceChapterByChapter ran a SAVING
@@ -3337,7 +3258,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The menu greys the command out for the same reason (KBSActionComponent::UpdateActionStates).
 	// This is the same door on the far side of it, for a caller that never went through the menu -
 	// a script invoking the action reaches this function whatever state the menu is in.
-	if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyAppearedRowOpen())
+	if (KBSResultModel::IsShowingReplaceOutcome())
 	{
 		outSummary.Append("This is the last replace's report - search again to replace more.");
 		return 0;
@@ -4166,16 +4087,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// unchecked are dropped - they were never part of the request. A replace that was asked for
 	// nothing at all leaves the results exactly as they were.
 	KBSResultModel::KeepCheckedRows();
-	// ...and the matches that appeared where rows went missing, under them (2026-09-27, FollowUpMissingRows)
-	const int32 appeared = (totals.missing > 0) ? FollowUpMissingRows(scopeOptions) : 0;
 
 	BuildSummary(totals, outSummary);
-	if (appeared > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(appeared);
-		outSummary.Append(" new match(es) where rows went missing - listed under them: tick and Change Checked again.");
-	}
 	// The chapters the hand-back could not close, at the end the way the scans say it - it appends
 	// nothing in the ordinary case.
 	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);

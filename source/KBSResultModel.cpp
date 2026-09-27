@@ -123,9 +123,6 @@ namespace
 		// question (see there).
 		if (KBSResultModel::NoRowHasCheckBox())
 			return false;
-		// A replace's report offers work only on the matches that appeared after it (2026-09-27).
-		if (KBSResultModel::IsShowingReplaceOutcome() && !hit.appeared)
-			return false;
 
 		return !hit.replaced && !hit.isLocked && hit.outcome == KBSResultModel::kOutcomeNone;
 	}
@@ -310,69 +307,7 @@ bool KBSResultModel::NoRowHasCheckBox()
 {
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
-	// ***** EXCEPT A REPORT WITH APPEARED ROWS (2026-09-27): those carry boxes (Hit::appeared). *****
-	return KBSResultModel::IsReportOnlyKind() || (gShowingOutcome && !KBSResultModel::AnyAppearedRowOpen());
-}
-
-bool KBSResultModel::AnyAppearedRowOpen()
-{
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-		for (size_t hi = 0; hi < gChapters[ci].hits.size(); ++hi)
-		{
-			const Hit& h = gChapters[ci].hits[hi];
-			if (h.appeared && !h.replaced && !h.isLocked && h.outcome == kOutcomeNone)
-				return true;
-		}
-	return false;
-}
-
-int32 KBSResultModel::InsertAppearedHits(int32 chapterIdx, std::vector<std::pair<int32, Hit> >& afterRowAndHit)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()) || afterRowAndHit.empty())
-		return 0;
-	Chapter& c = gChapters[chapterIdx];
-	std::vector<Hit> rows;
-	rows.reserve(c.hits.size() + afterRowAndHit.size());
-	int32 added = 0;
-	for (size_t hi = 0; hi < c.hits.size(); ++hi)
-	{
-		Hit h = std::move(c.hits[hi]);
-		if (!h.appeared || h.replaced)
-			h.walkOrder = -1;		// a report row: its old walk order would collide with the new rows'
-		rows.push_back(std::move(h));
-		for (size_t k = 0; k < afterRowAndHit.size(); ++k)
-		{
-			if (afterRowAndHit[k].first != static_cast<int32>(hi))
-				continue;
-			Hit n = std::move(afterRowAndHit[k].second);
-			n.appeared = true;
-			n.checked = false;
-			n.replaced = false;
-			n.outcome = kOutcomeNone;
-			rows.push_back(std::move(n));
-			++added;
-		}
-	}
-	c.hits.swap(rows);
-	// the page ordinals and locators again, as KeepCheckedRows does
-	size_t runStart = 0;
-	while (runStart < c.hits.size())
-	{
-		size_t runEnd = runStart;
-		while (runEnd < c.hits.size() && c.hits[runEnd].pageIndex == c.hits[runStart].pageIndex)
-			++runEnd;
-		const int32 runCount = static_cast<int32>(runEnd - runStart);
-		for (size_t k = runStart; k < runEnd; ++k)
-		{
-			c.hits[k].fontGroup = -1;
-			c.hits[k].fontGroupPos = -1;
-			c.hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
-			BuildHitLocator(c.hits[k]);
-		}
-		runStart = runEnd;
-	}
-	BuildFontGroups(c);
-	return added;
+	return KBSResultModel::IsReportOnlyKind() || gShowingOutcome;
 }
 
 bool KBSResultModel::MatchTextIsLiveText()
@@ -751,8 +686,6 @@ namespace
 			AppendWord(flags, "deleted");
 		else if (hit.outcome == KBSResultModel::kOutcomeEndnoteLeft)
 			AppendWord(flags, "not-replaced");
-		if (hit.appeared && !hit.replaced)
-			AppendWord(flags, "new");
 		if (hit.replaced)
 			AppendWord(flags, "replaced");
 		return flags;
@@ -1235,7 +1168,7 @@ int32 KBSResultModel::GetCheckedCount()
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (hits[hi].checked && !hits[hi].replaced && hits[hi].outcome == kOutcomeNone)
+			if (hits[hi].checked && !hits[hi].replaced)
 				++count;
 		}
 	}
@@ -1248,13 +1181,12 @@ int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
 		return 0;
 
 	// Same rule as GetCheckedCount, applied to one chapter: a REPLACED row does not count, because
-	// it is no longer waiting to be done - and nor does a row with an outcome (missing, locked...):
-	// a report's rows keep their ticks, and only its appeared rows are work (2026-09-27).
+	// it is no longer waiting to be done.
 	int32 count = 0;
 	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
 	for (size_t hi = 0; hi < hits.size(); ++hi)
 	{
-		if (hits[hi].checked && !hits[hi].replaced && hits[hi].outcome == kOutcomeNone)
+		if (hits[hi].checked && !hits[hi].replaced)
 			++count;
 	}
 	return count;
@@ -1575,8 +1507,6 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" hidden");
 	if (hit.isLocked || hit.outcome == kOutcomeLocked)
 		hit.locator.Append(" locked");
-	if (hit.appeared && !hit.replaced)
-		hit.locator.Append(" new");		// appeared after a replace, where a row went missing (Hit::appeared)
 
 	// NOT chained onto the test above. A locked row can be jumped to and found changed, and then it
 	// has both things to say - "P4(1) locked missing" - where an else left it saying only that it

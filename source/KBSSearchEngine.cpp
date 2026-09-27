@@ -1845,18 +1845,6 @@ void KBSSearchEngine::FinalizeHits(std::vector<KBSResultModel::Hit>& hits)
 	FinalizeChapterHits(hits);
 }
 
-bool KBSSearchEngine::CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
-	std::vector<KBSResultModel::Hit>& outHits)
-{
-	outHits.clear();
-	bool capped = false;
-	ChapterWalkResult result = kChapterWalked;
-	int32 reported = 0;
-	CollectHitsInDoc(docRef, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions, outHits, capped, result,
-		nil, 0, 0, 1, reported);
-	return result == kChapterWalked;
-}
-
 namespace
 {
 // The session's search direction for one tab, through the command the dialog's own radio button
