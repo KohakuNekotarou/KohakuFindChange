@@ -63,14 +63,12 @@ namespace KBSResultTree
 	    the results it describes are gone. The panel's show is the one moment that can outrank the
 	    persisted value, the same moment the tab's name and the illustration are written at.
 
-	    Does NOT touch what GetLastStatus answers: restoring a line is not the panel reporting
-	    something. Safe to call when the panel is closed (does nothing then). */
+	    Does NOT change the kept line: restoring a line is not the panel reporting something. Safe
+	    to call when the panel is closed (does nothing then). */
 	void RestoreStatusOnPanelShow();
 
-	/** The last message ShowStatus was given, whether or not the panel was open to display it.
-	    Kept for the app.kfcStatus script property (KBSScriptProvider.cpp), which is how a script -
-	    or PowerShell over COM - reads what the panel just reported. Empty until the first message. */
-	void GetLastStatus(PMString& outMessage);
+	// (GetLastStatus - the kept line, for the app.kfcStatus script property - went with that
+	//  property on 2026-09-27.)
 
 	/** Release this module's static storage during the controlled shutdown
 	    (KBSStartupShutdown::Shutdown), so no static destructor at DLL unload finds work left to do.

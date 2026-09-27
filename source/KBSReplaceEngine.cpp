@@ -2056,7 +2056,7 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 // With userInteractionLevel at NEVER_INTERACT the alert is never drawn (CAlert::SetShowAlerts,
 // CAlert.h:218-226: "If showAlert is kFalse, no alerts will be displayed") and the run stops all the
 // same: the caller returns through StopBeforeAnythingIsWritten either way, and a scripted run reads
-// what happened off app.kfcStatus.
+// what happened off the panel's status line (app.kfcStatus until 2026-09-27; KIDMCP's inspect_ui now).
 // (That citation read CAlert.h:178-183 until 2026-08-10, which is the argument list of a call this
 // file does not make - WarningAlertWithDontShowAgain. The fact was measured and is right; only the
 // line was pointing at the wrong function.)

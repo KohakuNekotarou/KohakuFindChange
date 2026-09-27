@@ -754,17 +754,11 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 // KBSResultTree::ShowStatus - write the panel's single-line status read-out
 //----------------------------------------------------------------------------------------
 
-// The last thing ShowStatus was given. Kept in the module rather than read back off the widget:
-// the widget is gone whenever the panel is closed, and app.kfcStatus has to answer regardless (a
-// script can run a search with no panel on screen). Also, a StaticText cannot be read back
-// reliably from outside anyway - see the panel-title work.
+// The last thing ShowStatus was given. Kept in the module rather than read back off the widget: the
+// widget is gone whenever the panel is closed, and the line is written back when the panel is shown
+// again (RestoreStatusOnPanelShow). (GetLastStatus, which handed it to app.kfcStatus, went with that
+// property on 2026-09-27.)
 static PMString gLastStatus;
-
-void KBSResultTree::GetLastStatus(PMString& outMessage)
-{
-	outMessage = gLastStatus;
-	outMessage.SetTranslatable(kFalse);
-}
 
 void KBSResultTree::ShutdownCleanup()
 {
@@ -817,9 +811,9 @@ void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
 	// above already does for the tree's rows, and what the shipping panels do before handing a
 	// user-entered name to a static text.
 	//
-	// ONLY what is drawn is doubled. gLastStatus keeps the message exactly as it was written:
-	// app.kfcStatus exists to hand back what the panel said, not how a widget had to spell it, and
-	// a test comparing against a file name must not have to know about this.
+	// ONLY what is drawn is doubled. gLastStatus keeps the message exactly as it was written, so the
+	// restore below doubles it once, not once per showing.
+	// ! A reader of the WIDGET (KIDMCP's inspect_ui) gets the doubled form: "A&&B.indd".
 	PMString display(message);
 	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
 

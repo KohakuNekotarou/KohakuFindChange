@@ -240,7 +240,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp"/>
@@ -281,7 +280,6 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h"/>

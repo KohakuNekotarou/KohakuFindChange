@@ -440,27 +440,8 @@ namespace KBSResultModel
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
-	/** The WHOLE result set as one tab-separated block, so a script can read what the panel is
-	    showing. Serves app.kfcResults (KBSScriptProvider.cpp), its only caller.
-
-	    Its reason to exist is the same as app.kfcStatus': verification. The status line gives one
-	    summary sentence, which proves the counts and nothing else - whether the right ROW carries
-	    "missing", whether a locked row lost its check box, whether a page reads "P4(1)ov" - none of
-	    that is in it, and reading it off the screen cannot be automated. This is those same rows in
-	    text.
-
-	    Line 1 is a header, then one line per hit - uncapped, so it includes the hits past the
-	    panel's display limit:
-
-	        #  <book name>  <from book>  <showing outcome>  <chapters>  <total hits>
-	        <chapter idx>  <chapter name>  <hit idx>  <locator>  <accent>  <pre>  <match>  <post>
-	            <font name>  <checked>  <replaced>  <locked>  <outcome word>  <font group>
-	    (<font name> is always EMPTY since Find Missing Glyphs went on 2026-09-27 - kept so the columns
-	     after it stay where the scripts that read them expect.)
-
-	    Tab, return and backslash inside the text are escaped (\t, \n, \\), so one hit is always
-	    exactly one line with a fixed column count - a match CAN run across a paragraph break. */
-	void DescribeAllRows(PMString& out);
+	// (DescribeAllRows - the whole result set as one block, for app.kfcResults - went with that
+	//  property on 2026-09-27. The regression suite reads the panel through KIDMCP.)
 
 	// (BuildReportText - the text file Save Results... wrote - was removed on 2026-09-27.)
 

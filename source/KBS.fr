@@ -56,13 +56,10 @@
 // claimed until 2026-08-06 - those are ShuksanID.h:376 and :824.
 #include "AppFrameworkID.h"
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
-#include "ScriptInfoTypes.fh"	// Property / Provider - the scripting definitions below
-#include "ScriptingID.h"		// kCoreScriptManagerBoss / kBaseScriptProviderBoss
 #include "TipsID.h"			// IID_ITIP - the tooltip on the panel's illustration
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSScriptingDefs.h"	// p_KBSStatus / p_KBSResults - the IDs behind the two properties
 
 // GenericID.h, TextID.h, TextWalkerServiceProviderID.h and a SECOND copy of ShuksanID.h stood here
 // until 2026-08-06. Nothing in this file ever named a symbol from any of them: the search's own ids
@@ -418,20 +415,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/*
-	 * Scripting provider: serves app.kfcStatus and app.kfcResults. Derives from
-	 * kBaseScriptProviderBoss, which brings the machinery that dispatches script requests; all this
-	 * boss adds is our own handler. The properties themselves are declared in the
-	 * VersionedScriptElementInfo resource at the end of this file.
-	 */
-	Class
-	{
-		kKBSScriptProviderBoss,
-		kBaseScriptProviderBoss,
-		{
-			IID_ISCRIPTPROVIDER, kKBSScriptProviderImpl,
-		}
-	},
+	// (The scripting provider - kKBSScriptProviderBoss, serving app.kfcStatus / app.kfcResults -
+	//  stood here until 2026-09-27. The regression suite reads the panel through KIDMCP instead.)
 
 }}};
 
@@ -1420,91 +1405,8 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 };
 
 
-/*
- * Scripting: app.kfcStatus and app.kfcResults - the panel's own account of a run, readable from a
- * script.
- *
- * TWO read-only string properties on the application object: the status line's sentence, and the
- * rows behind it (declared one after the other below). *This preamble said "one" until 2026-08-11 -
- * the second property was added three hours after this paragraph was written (c4190a9 against
- * 990cfbe, both 2026-07-31) and landed in the Elements list below without the count above it being
- * counted again. The same sentence stood in KBSScriptProvider.cpp, corrected the same day.
- *
- * What they are for is verification: the panel reports what a search or a replace did in a single
- * line, and without this the only way to read that line is to look at the screen. With it, a script
- * - or PowerShell over COM - can run the command and then read the answer:
- *
- *     app.menuActions.itemByName("Search").invoke();
- *     app.kfcStatus;      // "1234 hit(s) in 5 of 12 chapter(s) - book "x.indb"."
- *
- * !! WHICH NAME finds this action MOVES (measured 2026-08-02). itemByName matches the name the
- *   action currently CARRIES, and UpdateActionStates renames it - so "Search", the resource name, is
- *   only good until the flyout is first drawn (or until any script reads .enabled, which runs the
- *   same hook); after that the action answers to "Find in Document" or "Find in Book", whichever the
- *   scope last called for, and "Search" answers isValid = false. A script that has to reach it
- *   reliably tries all three and takes the one that is valid.
- *
- * The value lives in the module, not on the widget (KBSResultTree::GetLastStatus), so it answers
- * with the panel closed as well.
- *
- * The four-character ScriptID is allocated in docs/ai-notes/kes-scriptid-registry.md - what an
- * engine matches on is that code, not the C++ name, so two plug-ins that pick the same four
- * characters cannot be told apart.
- */
-resource VersionedScriptElementInfo(1)
-{
-	// Contexts. Declared from the oldest version this could have worked in, which is how the SDK's
-	// own samples do it - a later application still honours it.
-	{
-		kCS2ScriptVersion, kCoreScriptManagerBoss, kWildFS, k_Wild,
-	}
-
-	// Elements
-	{
-		Property
-		{
-			kKBSStatusPropertyScriptElement,	// this property's script element ID
-			p_KBSStatus,						// ScriptID (KBSScriptingDefs.h)
-			"kfc status",						// name -> app.kfcStatus
-			"The last message the Kohaku Find/Change panel put on its status line.",	// description
-			StringType,							// type
-			{}									// alternate types
-			kNoAttributeClass,					// attribute class ID
-		}
-
-		// The rows behind that sentence. Same reason to exist, one level down: the status line
-		// proves the COUNTS, this proves which ROW carries "missing", which one lost its check box
-		// to a lock, and what page each one says it is on. None of that is on the status line, and
-		// reading it off the screen cannot be automated.
-		Property
-		{
-			kKBSResultsPropertyScriptElement,	// this property's script element ID
-			p_KBSResults,						// ScriptID (KBSScriptingDefs.h)
-			"kfc results",						// name -> app.kfcResults
-			"Every row the Kohaku Find/Change panel is holding, tab-separated, one hit per line.",
-			StringType,							// type
-			{}									// alternate types
-			kNoAttributeClass,					// attribute class ID
-		}
-
-		// Puts both properties ON the application object.
-		//
-		// Object{}, not Parent{}. They are different questions: Object names an EXISTING scripting
-		// object to add members to, while Parent hangs a NEW object underneath one (which is what a
-		// plug-in with its own preferences object needs, and what this first tried - the property
-		// then never appeared on app at all). BPI.fr:603-612 is the form being followed here.
-		Provider
-		{
-			kKBSScriptProviderBoss,
-			{
-				Object{ kApplicationObjectScriptElement },
-				Property{ kKBSStatusPropertyScriptElement, kReadOnly },
-				Property{ kKBSResultsPropertyScriptElement, kReadOnly },
-			}
-		}
-	}
-};
-
+// (Scripting - app.kfcStatus and app.kfcResults, a VersionedScriptElementInfo resource - stood here
+//  until 2026-09-27. Never in a published build (1.0.0 predates them), so nothing is kept as Obsolete.)
 
 #endif // __ODFRC__
 

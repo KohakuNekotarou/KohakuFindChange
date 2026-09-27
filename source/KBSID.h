@@ -98,10 +98,10 @@ DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKBSPrefix + 8)
 // result row that names a closed document still jumps and still replaces (by reopening it), so the
 // results are retired with their document. Document scope only - see KBSCloseDocResponder.cpp.
 DECLARE_PMID(kClassIDSpace, kKBSCloseDocResponderBoss, kKBSPrefix + 9)
-// Scripting: puts app.kfcStatus on the application object, so the panel's own status line can be
-// read from a script (and therefore over COM). Built for verification - the panel says what a
-// search or a replace did in one line, and until now the only way to read it was to look at it.
-DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
+// RETIRED 2026-09-27 (not reused): the scripting provider behind app.kfcStatus / app.kfcResults.
+// Verification now reads the panel itself through KIDMCP; neither property was ever in a published
+// build.
+//DECLARE_PMID(kClassIDSpace, kKBSScriptProviderBoss, kKBSPrefix + 10)
 // RETIRED 2026-09-27 with the confirmation (not reused): the Glyph tab's replace confirmation - the
 // dialog itself, and the widget that draws one glyph in
 // the font that defines it. The dialog is the stock kDialogBoss plus our controller (the shape
@@ -208,8 +208,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookWatchImpl, kKBSPrefix + 12)
 // The panel tab's name: an observer on the panel boss whose only job is to write the current
 // scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKBSPrefix + 13)
-// Scripting: the provider behind app.kfcStatus (see KBSScriptProvider.cpp).
-DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
+// RETIRED 2026-09-27 (not reused): the scripting provider's implementation (see kKBSPrefix + 10 in the
+// class IDs).
+//DECLARE_PMID(kImplementationIDSpace, kKBSScriptProviderImpl, kKBSPrefix + 14)
 // (A commented block claiming + 5 ... + 14 were free sat here until 2026-08-02. It was left over
 // from the template and every one of those numbers is taken by the lines just above, so it was an
 // invitation to hand out an id twice. Removed rather than corrected - the live declarations are
@@ -650,11 +651,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 #define kKBSIconFoundResID		1003	// the illustration shown once something HAS been run
 #define kKBSIconChangedResID	1004	// ...and the one shown once a replace has written something
 
-// Script element IDs. These name the scripting DEFINITIONS (the entries in KBS.fr's
-// VersionedScriptElementInfo); the four-character ScriptIDs a script engine actually matches on live
-// in KBSScriptingDefs.h.
-DECLARE_PMID(kScriptInfoIDSpace, kKBSStatusPropertyScriptElement, kKBSPrefix + 0)
-DECLARE_PMID(kScriptInfoIDSpace, kKBSResultsPropertyScriptElement, kKBSPrefix + 1)
+// RETIRED 2026-09-27 (not reused): the script element IDs of app.kfcStatus / app.kfcResults, and
+// with them the four-character ScriptIDs 'pKBs' / 'pKBr' (docs/ai-notes/kes-scriptid-registry.md).
+//DECLARE_PMID(kScriptInfoIDSpace, kKBSStatusPropertyScriptElement, kKBSPrefix + 0)
+//DECLARE_PMID(kScriptInfoIDSpace, kKBSResultsPropertyScriptElement, kKBSPrefix + 1)
 
 // Initial data format version numbers
 #define kKBSFirstMajorFormatNumber  RezLong(1)

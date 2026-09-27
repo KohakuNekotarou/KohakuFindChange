@@ -90,9 +90,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSScriptProvider.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -192,9 +189,6 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSScriptingDefs.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h">

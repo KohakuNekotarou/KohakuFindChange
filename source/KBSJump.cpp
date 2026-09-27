@@ -784,7 +784,13 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
 	// rejected, a footnote's row) = the stored range and its hash, as before.
 	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+	{
 		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
+		// The row's text was taken again as well (an edit since the replace moves what stands around it):
+		// repaint, or the panel goes on showing the old line. Found 2026-09-27 by reading the panel itself
+		// (case jump-after-edit) - the model was right, the screen was not.
+		KBSResultTree::RefreshRows();
+	}
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -1080,7 +1086,13 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
 	// rejected, a footnote's row) = the stored range and its hash, as before.
 	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+	{
 		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
+		// The row's text was taken again as well (an edit since the replace moves what stands around it):
+		// repaint, or the panel goes on showing the old line. Found 2026-09-27 by reading the panel itself
+		// (case jump-after-edit) - the model was right, the screen was not.
+		KBSResultTree::RefreshRows();
+	}
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)

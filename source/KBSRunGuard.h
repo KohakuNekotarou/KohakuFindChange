@@ -35,9 +35,8 @@
 //      about the SEARCH, which left the replace and both scans unprotected;
 //    * the document-close responder (KBSCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
-//    * the report writer (KBSReportSave), which would otherwise save a half-filled result set;
-//    * the script provider (KBSScriptProvider), so app.kfcStatus / app.kfcResults answer "busy"
-//      rather than a partial reading.
+//    (the report writer - KBSReportSave - and the script provider - app.kfcStatus / app.kfcResults -
+//     asked too, until they were removed on 2026-09-27.)
 //
 //  A fifth run added later is one line in this file rather than a fault nobody notices in four.
 //

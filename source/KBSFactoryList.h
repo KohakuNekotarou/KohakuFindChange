@@ -45,8 +45,6 @@ REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
 // The panel's own view: the minimum size the panel can be dragged to.
 REGISTER_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
-// Scripting: app.kfcStatus - the panel's status line, readable from a script or over COM.
-REGISTER_PMINTERFACE(KBSScriptProvider, kKBSScriptProviderImpl)
 // The panel illustration's tooltip (the URL a click on it opens).
 REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)
 // "Translucent Panel": the observer that re-applies the alpha when the panel's window is rebuilt,
