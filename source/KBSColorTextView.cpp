@@ -119,10 +119,16 @@ public:
 		fMatch = match; fMatch.SetTranslatable(kFalse);
 		fPost = post; fPost.SetTranslatable(kFalse);
 
-		// The same line as plain text on this boss's ITextControlData (KBSRowLabel below), which is
-		// where a reader that walks the widgets looks for a label. Laid out as the cell draws it -
+		// The same line as plain text on this boss's ITextControlData, which is where a reader that
+		// walks the widgets looks for a label (KIDMCP's inspect_ui). Laid out as the cell draws it -
 		// locator, flag, then the line with its breaks marked - and the match in [ ] where the cell
 		// uses colour. Written here, the one place every row's parts arrive, so the two cannot drift.
+		//
+		// ***** THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER. *****
+		// It is persistent and reads the resource's "Panel name" field; nothing draws it, since this
+		// cell paints itself. An implementation of our own replacing it (non-persistent, 2026-09-27)
+		// crashed InDesign the first time a row was built: DVPanelControlData::ReadWrite called the
+		// ReadWrite it did not have (RIP 0, under KBSResultListWidgetMgr::CreateWidgetForNode).
 		InterfacePtr<ITextControlData> label(this, UseDefaultIID());
 		if (label != nil)
 		{
@@ -167,41 +173,6 @@ private:
 };
 
 CREATE_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
-
-//----------------------------------------------------------------------------------------
-// KBSRowLabel - the row's line as plain text
-//----------------------------------------------------------------------------------------
-
-/** ITextControlData for the colour cell: holds the plain-text line KBSRowData::SetSegments writes.
-    Nothing here draws it - KBSColorTextView paints from the segments. It is for a reader that walks
-    the widgets and takes a widget's label from this interface (KIDMCP's inspect_ui), which a
-    self-drawing cell would otherwise answer with nothing.
-
-    Not persistent and not read from the resource, which is why it is ours rather than the stock
-    kCTextControlDataImpl. */
-class KBSRowLabel : public CPMUnknown<ITextControlData>
-{
-public:
-	KBSRowLabel(IPMUnknown* boss) : CPMUnknown<ITextControlData>(boss) {}
-	virtual ~KBSRowLabel() {}
-
-	virtual void SetString(const PMString& newString, bool16 /*invalidate*/,
-		bool16 /*notifyOfChange*/, bool16 /*isGoodString*/)
-	{
-		fText = newString;
-		fText.SetTranslatable(kFalse);
-	}
-
-	virtual const PMString& GetString() const
-	{
-		return fText;
-	}
-
-private:
-	PMString fText;
-};
-
-CREATE_PMINTERFACE(KBSRowLabel, kKBSRowLabelImpl)
 
 //----------------------------------------------------------------------------------------
 // KBSColorTextView - the self-drawing cell

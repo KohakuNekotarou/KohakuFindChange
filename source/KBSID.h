@@ -253,7 +253,6 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefi
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 31)
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelCmdWatchImpl, kKBSPrefix + 32)
 DECLARE_PMID(kImplementationIDSpace, kKBSHitMarkerAdornmentImpl, kKBSPrefix + 33)	// IGlobalTextAdornment: the jump marker (KBSHitMarker.cpp)
-DECLARE_PMID(kImplementationIDSpace, kKBSRowLabelImpl, kKBSPrefix + 34)	// ITextControlData on the hit row's colour cell: its line as plain text (KBSColorTextView.cpp)
 
 
 // ActionIDs:

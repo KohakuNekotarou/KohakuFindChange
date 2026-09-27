@@ -218,11 +218,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	/*
 	 * The hit line's multi-colour text cell (Task 2): a generic panel widget whose IControlView
 	 * is our self-drawing view (KBSColorTextView), plus the per-row draw data it paints.
-	 *
-	 * ITextControlData carries the same line as plain text, for a reader that walks the widgets
-	 * (KIDMCP's inspect_ui reads a widget's label from exactly this interface) - a self-drawing cell
-	 * otherwise shows it nothing. Our own implementation, not kCTextControlDataImpl: that one may be
-	 * read from the widget's resource, and this widget's resource has no text field for it to read.
 	 */
 	Class
 	{
@@ -231,7 +226,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ICONTROLVIEW, kKBSColorTextViewImpl,
 			IID_IKBSROWDATA, kKBSRowDataImpl,
-			IID_ITEXTCONTROLDATA, kKBSRowLabelImpl,
 		}
 	},
 
