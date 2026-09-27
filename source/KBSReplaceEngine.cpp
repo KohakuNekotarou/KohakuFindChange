@@ -3676,6 +3676,14 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	if (!OpenChapterDoc(chapterIdx, "Reject Change", docRef, outStatus))
 		return false;
 	// The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together).
+	//
+	// ***** ONLY THE NEIGHBOURS WHOSE CHANGE IS STILL THERE (2026-09-27, case touching-group-redo-reject). *****
+	// A neighbour's change can be gone while the row still reads "replaced": the replace of THIS row accepts
+	// the pending changes it touches first (AcceptPendingAround), and a neighbour replaced a moment earlier
+	// is exactly such a change. Taking that neighbour along found nothing to reject for it, and the whole
+	// reject was cancelled - so this row could never be taken back at all. A neighbour with no change of its
+	// own left is not part of what can be taken back; the row itself always is (RejectOneRow says why when
+	// its own change is gone).
 	std::vector<int32> group;
 	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
 	KBSResultModel::GetTouchingGroup(chapterIdx, hitIdx, group);
@@ -3683,8 +3691,12 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	for (size_t k = 0; k < group.size(); ++k)
 	{
 		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) && replaced
-			&& !KBSResultModel::GetHitInFootnote(chapterIdx, group[k]))
+		if (!KBSResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) || !replaced
+			|| KBSResultModel::GetHitInFootnote(chapterIdx, group[k]))
+			continue;
+		UIDRef storyRef;
+		KBSTrackChange::Change change;
+		if (group[k] == hitIdx || KBSTrackChange::FindRowChangeForHit(chapterIdx, group[k], storyRef, change))
 			rows.push_back(group[k]);
 	}
 	if (rows.empty())
