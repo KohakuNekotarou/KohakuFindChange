@@ -157,7 +157,9 @@ namespace KBSTrackChange
 		PMString	inserted;
 		PMString	deleted;
 		uint64		time;		// the records' time stamp - one run's (VOSRedlineChange::GetTimeStamp)
-		Change() : at(0), insLen(0), hasDelete(false), time(0) {}
+		uint64		deleteTime;	// the deletion's, when it was stamped a clock tick after the insertion
+								// (0 = the same as time) - see FindRowChangeForHit
+		Change() : at(0), insLen(0), hasDelete(false), time(0), deleteTime(0) {}
 	};
 
 	/** Every change in the story, insertions and deletions paired (same time, the deletion right after

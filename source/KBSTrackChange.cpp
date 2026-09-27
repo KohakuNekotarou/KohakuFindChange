@@ -562,15 +562,33 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	int32 best = 0;
 	for (size_t k = 0; k < changes.size(); ++k)
 	{
-		if (changes[k].inserted != replacedText || changes[k].deleted != originalText)
+		// ***** ONE REPLACE, TWO CLOCK TICKS (2026-09-28). ***** A replace's insertion and its deletion are
+		// stamped separately, and now and then the clock ticks between the two: 1 replace in 600 of
+		// InDesign's own changeText, 8 ms apart (work/kbs-regress/probe-tick-0928.jsx). CollectChanges
+		// pairs by time, so that replace comes out as a lone insertion followed by a lone deletion - and
+		// this row's change was not found: Reject Change grey, the status "no tracked change of this
+		// replace is left" (case worklist-reject-then-jump, once on 2026-09-27; the user saw the same
+		// line that day). FindGroupChange already took "the deletion standing alone right after the
+		// insertion under its own time" for a touching group; a single row now does the same. The
+		// deletion must hold exactly this row's original text, so another run's record cannot join.
+		Change candidate = changes[k];
+		if (!candidate.hasDelete && !originalText.IsEmpty() && k + 1 < changes.size()
+			&& changes[k + 1].insLen == 0 && changes[k + 1].hasDelete
+			&& changes[k + 1].at == candidate.at + candidate.insLen && changes[k + 1].deleted == originalText)
+		{
+			candidate.hasDelete = true;
+			candidate.deleted = originalText;
+			candidate.deleteTime = changes[k + 1].time;
+		}
+		if (candidate.inserted != replacedText || candidate.deleted != originalText)
 			continue;
-		if (rowTime != 0 && changes[k].time != rowTime)
+		if (rowTime != 0 && candidate.time != rowTime)
 			continue;
-		const int32 mine = (changes[k].at > start) ? changes[k].at - start : start - changes[k].at;
+		const int32 mine = (candidate.at > start) ? candidate.at - start : start - candidate.at;
 		bool someoneNearer = false;
 		for (size_t t = 0; t < twins.size() && !someoneNearer; ++t)
 		{
-			const int32 theirs = (changes[k].at > twins[t]) ? changes[k].at - twins[t] : twins[t] - changes[k].at;
+			const int32 theirs = (candidate.at > twins[t]) ? candidate.at - twins[t] : twins[t] - candidate.at;
 			if (theirs < mine)
 				someoneNearer = true;
 		}
@@ -580,7 +598,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 		{
 			found = true;
 			best = mine;
-			outChange = changes[k];
+			outChange = candidate;
 		}
 	}
 	if (found)

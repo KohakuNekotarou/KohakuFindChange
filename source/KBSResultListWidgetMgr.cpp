@@ -340,6 +340,21 @@ private:
 	// The BOOK row: which book these results came from. Only ever built for a book search, where it
 	// is the root's single child - so it is the panel's standing answer to which book is the target,
 	// which a status line cannot be (one line, truncated, overwritten by the next message).
+	// "  - first N shown" when the tree is drawing fewer hit rows than it holds (kKBSDisplayHitLimit),
+	// on the OUTERMOST row only - the book row, or a document's row when there is no book. The counts
+	// in the rows stay uncapped (they are about the work: Check All and a replace reach every stored
+	// hit); this says, once, that the rows under them are not all drawn. Until 2026-09-28 the only word
+	// of it was a sentence on the status line, which the next click replaced (the notice had left the
+	// rows on 2026-08-05 - docs/ai-notes/kbs-checked-readout-audit-2026-08-05.md).
+	static void AppendDisplayCapNote(PMString& label)
+	{
+		if (KBSResultModel::GetTotalHitCount() <= KBSResultModel::kKBSDisplayHitLimit)
+			return;
+		label.Append("  - first ");
+		label.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
+		label.Append(" shown");
+	}
+
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
 		const InterfacePtr<IPanelControlData>& rowData) const
 	{
@@ -385,6 +400,7 @@ private:
 			label.AppendNumber(KBSResultModel::GetTotalHitCount());
 			label.Append(" checked)");
 		}
+		AppendDisplayCapNote(label);
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
@@ -406,7 +422,8 @@ private:
 		// chapter the display cap falls inside, which was the panel talking about ITSELF rather than
 		// about the work: the hits past the cap are still stored, still ticked by Check All and
 		// still rewritten by a replace. Saying how many are drawn was dropped with the matching
-		// "(N shown)" on the status line.
+		// "(N shown)" on the status line - and came back on 2026-09-28 as one note on the OUTERMOST
+		// row, outside the brackets (AppendDisplayCapNote).
 		//
 		// And, exactly as on the book row, only where there are boxes to count: a scan and a
 		// replace's report fall back to the plain total. See ApplyBookRow for the whole of it.
@@ -430,6 +447,9 @@ private:
 			label.AppendNumber(fullCount);
 			label.Append(" checked)");
 		}
+		// A document's results have no book row above this one, so the note goes here instead.
+		if (!KBSResultModel::IsFromBook())
+			AppendDisplayCapNote(label);
 
 		// A chapter a cancelled replace never reached used to say "cancelled" here (2026-08-03). Only
 		// the chapter-at-a-time path could leave one: it saved as it went, so a cancel stopped the run
