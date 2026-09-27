@@ -414,7 +414,12 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 		delete record;
 		if (!IsOurs(it))
 			continue;
-		// pieces of one replace are one run's: records of another run never join them
+		// pieces of one replace are one run's: records of another run never join them.
+		// ! This pairing leans on the ORDER the iterator hands records over in at one position: where a
+		//   replace's deletion and the next (touching) replace's insertion share a position, the DELETION
+		//   comes first (every record of rangelog-2026-09-26.txt: "at=1 DEL" then "at=1 INS"), so it
+		//   closes the earlier insertion before the later one can be taken for a continuation of it.
+		//   Nothing in redlineiterator.h promises that order; it is what was measured.
 		const bool follows = !out.empty() && !out.back().hasDelete
 			&& out.back().at + out.back().insLen == at && out.back().time == time;
 		if (isDelete)
@@ -573,11 +578,15 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 
 uint64 KBSTrackChange::RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to)
 {
-	// ***** THE ROW'S OWN RECORD, NOT THE NEWEST IN THE RANGE (2026-09-27). ***** Every replace of one Change
-	// All carries its own time (about 9 ms apart - rangelog-2026-09-26.txt), and a touching neighbour's
-	// DELETION stands at this row's first position ("DEL at=1 ...283696" beside "INS at=1 ...193368").
-	// "The newest in [from, to]" took the neighbour's time whenever the clock ticked between the two, and
-	// the row's change was then never found again (Reject Change grey, the jump by fingerprint only).
+	// ***** THE ROW'S OWN RECORD, NOT THE NEWEST IN THE RANGE (2026-09-27). ***** The replaces of one Change
+	// All do not all carry one time, and a touching neighbour's DELETION stands at this row's first
+	// position ("DEL at=1 ...283696" beside "INS at=1 ...193368" - rangelog-2026-09-26.txt). "The newest
+	// in [from, to]" took the neighbour's time whenever the clock ticked between the two, and the row's
+	// change was then never found again (Reject Change grey, the jump by fingerprint only).
+	// ! Nor does each replace carry a time of its OWN: the same log has three replaces sharing
+	//   ...076391 and four sharing ...193368 - the time is the run's and the clock tick's, never a
+	//   row's. Rows are told apart by POSITION; the time only keeps other runs' records out.
+	//   (This said "every replace carries its own time" until the 2026-09-27 defect sweep, C-1.)
 	std::vector<Record> recs;
 	CollectRecords(story, recs);
 	if (to > from)

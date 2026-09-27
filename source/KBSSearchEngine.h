@@ -250,13 +250,12 @@ namespace KBSSearchEngine
 	    see RememberFindFormat / FindFormatHasChanged, which is the pair that answers "same conditions,
 	    different value".
 
-	    ***** THE DIRECTION IS IN IT TOO, since 2026-09-25. ***** It was left out on the belief that
-	    KBS always walks forward whatever the dialog says, because the scope options it builds say
-	    so; measured on that date, the walk follows the dialog's own "search backwards" instead
-	    (the walker is handed the live options). A walk the other way round numbers the same matches
-	    in the opposite order, so a direction flipped between the search and the replace changes
-	    what the stored walk orders mean exactly as a retyped query does - and is now refused as one,
-	    rather than reaching the verify pass and being reported as the DOCUMENT having changed.
+	    ***** THE DIRECTION IS NOT IN IT (again, since 2026-09-26). ***** It was added on 2026-09-25,
+	    when the walk was measured to follow the dialog's "search backwards" (the walker is handed the
+	    live options), and taken out the next day when KBS began searching and replacing FORWARD ONLY
+	    (KBSForwardSearchScope, round every search, replace and Redo): the dialog's direction no longer
+	    changes anything KBS does. (This paragraph still said "the direction is in it" until the
+	    2026-09-27 defect sweep.)
 
 	    Everything on the CHANGE side stays out: it decides what gets written rather than what gets
 	    found.

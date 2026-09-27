@@ -9,22 +9,25 @@
 //  reads - so GREP back-references and escapes are interpreted by InDesign's own engine and are
 //  never parsed here.
 //
-//  How the checked hits are found again: a hit's TextIndex shifts the moment an earlier hit in
-//  the same story is replaced, so stored positions cannot be the key. Instead each chapter is
-//  RE-WALKED with exactly the search's scope and options, and the Nth match of that walk is
-//  lined up with the hit whose walkOrder is N (KBSResultModel::Hit::walkOrder).
+//  ***** HOW IT WRITES, SINCE 2026-09-26: InDesign's OWN CHANGE ALL, ONE STORY AT A TIME, UNDER
+//  ***** TRACK CHANGES (the user's design). ***** Every story that holds a ticked row gets a
+//  Change All (kReplaceAllTextCmdBoss over IWalkerScopeFactoryUtils::QueryStoryWalkerScope), which
+//  decides every match on the ORIGINAL text - so GREP's ^, $ and lookarounds cannot see text this run
+//  has already written. The records Change All leaves are lined up with the rows by POSITION
+//  (LineUpStory in the .cpp), the rows NOT ticked are taken back record by record
+//  (KBSTrackChange::RejectReplacement), and the ticked rows' records are LEFT in the document, signed
+//  KBSTrackChange::kAuthor: they are what Reject Change, Redo and the jump find a row by. The last
+//  step reads every thread holding a row and aborts the whole run on a single code point that is not
+//  what the ticked rows alone should have made (CheckOnlyTickedChanged).
+//  The long history in the .cpp explains each piece; the block comment over ReplaceInChapterByChangeAll
+//  is where to start.
 //
-//  The command behaviour below was measured on the real application (2026-07-25 probe, recorded
-//  in docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-design.md section 10.1):
-//    * kTWReplaceTextCmdBoss does NOT search on its own. Fired without a preceding
-//      kFindTextCmdBoss it returns kFailure with an invalid range. So every step here is
-//      find-then-maybe-replace, exactly like the application's own Find / Change button pair.
-//    * After a replace, IFindChangeCmdData::GetRange describes the REPLACED text and follows a
-//      change of length (1 char -> 3 chars came back as a 3-char range), so a replaced row's new
-//      text is read straight out of it.
-//    * A replace does not advance the walker: the following find still moves on by exactly one
-//      match, absorbing the shift the replacement caused.
-//    * GetReplacementCount is NOT updated. Success is GetFindChangeResult() == kSuccess.
+//  ***** THE OLD WALK IS STILL HERE, FOR ONE JOB. ***** Until 2026-09-26 each chapter was re-walked
+//  match by match (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on a ticked walk order - measured
+//  2026-07-25, docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-design.md section 10.1).
+//  That function, ReplaceInChapter, now runs ONLY as the verify pass (verifyOnly = true): it walks
+//  each chapter before anything is written and checks that every ticked row still begins where the
+//  search found it. Its writing half is kept but is not reached (2026-09-27 defect sweep, C-2).
 //
 //========================================================================================
 
@@ -56,12 +59,13 @@ namespace KBSReplaceEngine
 
 	    ***** THE RUN CHECKS THAT THE MATCHES ARE STILL WHERE THE SEARCH FOUND THEM, AND REFUSES TO
 	    ***** START IF THEY ARE NOT. (User's design, 2026-08-10.)
-	    The chapter is walked again with the same query and the Nth match is replaced for the Nth
-	    checked row - so if the document has moved since the search in a way that adds, removes or
-	    shifts a match, a replacement would land somewhere the user never ticked. The count alone
-	    cannot see that: it still comes out right, and every checked row still finds a match.
+	    The rows were found at positions the search recorded, and the run lines what it writes up with
+	    them - so if the document has moved since the search in a way that adds, removes or shifts a
+	    match, the rows no longer describe it. (This paragraph described the one-at-a-time walk, where
+	    the Nth match was replaced for the Nth checked row, until the 2026-09-27 defect sweep; the
+	    reason for the check is unchanged.)
 
-	    So each chapter is walked TWICE. The first walk writes nothing: at every ticked walk order it
+	    So each chapter is walked before it is written. That walk writes nothing: at every ticked walk order it
 	    asks whether the match still BEGINS in the same story at the same index, which is what the
 	    row recorded when the search found it. One mismatch - or one ticked row the walk never
 	    reaches - and the whole run stops, with an alert saying so and the results cleared
@@ -87,12 +91,15 @@ namespace KBSReplaceEngine
 	    longer here").
 
 	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
-	    allowed to make the total quietly come up short. Three ways that happens:
+	    allowed to make the total quietly come up short. The ways that happens since 2026-09-26:
 	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
 	        search those, but InDesign offers no way to change them ("Search Only"), so KBS follows.
-	      - missing: the re-walk ran to the end of the chapter without that hit's turn coming up.
-	      - refused: the replace command was asked and would not run. The only one of the three that
-	        is a failure rather than a decision.
+	      - missing: Change All left no record of its own at that row.
+	      - endnote left: the row is in the endnote story, which is left whole when any match there
+	        ends an endnote (see MatchEndsAnEndnote in the .cpp).
+	      - deleted: the row went with a footnote, table or object another ticked row deleted.
+	    (A fourth, "refused" - the one-at-a-time replace command declining - belonged to the old walk and
+	    can no longer arise; its counter and its sentence in the summary are kept but not reached.)
 
 	    ***** NOTHING IS EVER SAVED. ***** Every chapter a replacement lands in is left MODIFIED AND
 	    UNSAVED, with a window open on it, and the summary says so: overwriting the user's files is
@@ -137,10 +144,12 @@ namespace KBSReplaceEngine
 	         case / whole word / kana / width, the five scope switches, and FIND FORMAT (a paragraph
 	         style, a font, a colour). See KBSSearchEngine::BuildWalkSignature.
 
-	    Why it has to be asked at all: Change Checked RE-WALKS each chapter and lines the Nth match of
-	    that walk up with the hit whose walkOrder is N, and the walker is handed the LIVE
-	    IFindChangeOptions - so a query edited between the search and the replace makes the Nth match a
-	    different occurrence entirely.
+	    Why it has to be asked at all: Change Checked runs InDesign's Change All with the LIVE
+	    IFindChangeOptions over every story that holds a row, and lines what it writes up with the rows
+	    - so a query edited between the search and the replace writes a different set of matches from
+	    the one the rows list. (Said in terms of the one-at-a-time walk, "the Nth match of the re-walk
+	    for the hit whose walkOrder is N", until the 2026-09-27 defect sweep; the verify pass still
+	    walks that way, and the reason is the same for both.)
 
 	    ***** ONE OF TWO DOORS, and they divide the ways a run can be wrong between them. *****
 
@@ -201,6 +210,10 @@ namespace KBSReplaceEngine
 	    an open command sequence, and a second walk started underneath it would Halt() the first
 	    one's walker out from under it. The panel greys every action out while this is true. */
 	bool IsReplacing();
+
+	/** The refusal for results that stop short of the scope (KBSResultModel::IsStoppedShort) - one
+	    sentence for both doors, the menu's (before its prompt) and ReplaceChecked's own. */
+	const char* StoppedShortMessage();
 }
 
 #endif // __KBSReplaceEngine_h__

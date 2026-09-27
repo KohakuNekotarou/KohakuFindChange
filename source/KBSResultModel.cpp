@@ -66,6 +66,9 @@ namespace
 	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
 	bool gHasRun = false;
 
+	// Did the search stop short of its scope? See KBSResultModel::SetStoppedShort.
+	bool gStoppedShort = false;
+
 	// One row copied aside before a replace changed it. See KBSResultModel::BeginRowBackup.
 	struct BackedUpRow
 	{
@@ -256,6 +259,17 @@ void KBSResultModel::Clear()
 	gContextMenuHit = -1;
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
+	gStoppedShort = false;
+}
+
+void KBSResultModel::SetStoppedShort(bool stoppedShort)
+{
+	gStoppedShort = stoppedShort;
+}
+
+bool KBSResultModel::IsStoppedShort()
+{
+	return gStoppedShort;
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)

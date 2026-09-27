@@ -589,6 +589,13 @@ bool TrackThreadStart(IDataBase* db, const TrackRow& r, TextIndex& outStart)
 	return model != nil && model->FindStoryThread(r.dict, r.key, &outStart, nil);
 }
 
+// Ascending by the absolute position a take-back was computed at (the loop that uses it walks the
+// list from the back) - see the take-back in ReplaceInChapterByChangeAll.
+bool TakeBackBefore(const std::pair<size_t, TextIndex>& a, const std::pair<size_t, TextIndex>& b)
+{
+	return a.second < b.second;
+}
+
 typedef std::pair<UID, std::pair<UID, uint32> > TrackThreadKey;
 
 TrackThreadKey TrackKeyOf(const TrackRow& r)
@@ -1275,7 +1282,15 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	{
 		if (writesNothing && TrackTouches(rows[i - 1], rows[i]) && rows[i - 1].target != rows[i].target)
 		{
-			outWhyNot = "matches that touch each other are ticked differently (tick them alike)";
+			// ***** SAID DIFFERENTLY WHEN THE UNTICKED ONE HAS NO BOX (2026-09-27 defect sweep, D-4). *****
+			// A row can be off without the user unticking it - locked (at the search, or since), or marked
+			// missing by a jump - and "tick them alike" then asks for something no box on screen can do.
+			const TrackRow& off = rows[i - 1].target ? rows[i] : rows[i - 1];
+			const bool noBox = off.kept || off.lockedTick
+				|| KBSResultModel::GetHitOutcome(chapterIdx, off.hitIdx) != KBSResultModel::kOutcomeNone;
+			outWhyNot = noBox
+				? "a ticked match touches one that cannot be changed (locked, or marked missing), and touching matches can only be replaced together"
+				: "matches that touch each other are ticked differently (tick them alike)";
 			return false;
 		}
 	}
@@ -1406,6 +1421,15 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 			// only records of this run (2026-09-26: range rejects crashed InDesign where another
 			// deletion stood at the range's start). Positions are those of the text as Change All left
 			// it (every row replaced).
+			//
+			// ***** "LAST" MEANS LAST IN THE STORY'S TEXT, NOT LAST IN rows (2026-09-27 defect sweep, P-1).
+			// ***** rows is sorted by story, then thread (dict UID, key), then offset - and a story's
+			// thread blocks are laid out by where their ANCHORS stand, not by UID
+			// (ITextStoryThreadDictHier.h:32-39, :107-109): a table made later and put in front of an
+			// older one has the larger UID and the earlier cells. Taken back in rows' order, an earlier
+			// cell's take-back moved a later cell's precomputed position, and the run stopped with "an
+			// unticked row could not be taken back". So the list is put in descending order of the
+			// absolute position it was computed at, which is the order the sentence above means.
 			std::vector<std::pair<size_t, TextIndex> > toTakeBack;	// (row, where its new text starts)
 			std::map<TrackThreadKey, TextIndex> cum;
 			for (size_t i = from; i < to; ++i)
@@ -1419,9 +1443,28 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 					toTakeBack.push_back(std::make_pair(i, s));
 				cum[TrackKeyOf(r)] += r.changed ? (r.newLen - r.length) : 0;
 			}
+			std::stable_sort(toTakeBack.begin(), toTakeBack.end(), TakeBackBefore);
+			// ***** A DELETION SHARED BY TOUCHING ROWS GOES BACK ONCE, WHOLE (2026-09-27 defect sweep, D-6).
+			// ***** Touching replaces that write nothing share one deletion record ("catcat" -> "": one
+			// record, the second row at delOffset 3). Touching rows are always ticked alike (the shape
+			// check above), so when one of them is being taken back they all are - and the record is
+			// rejected whole by the row that holds its start (delOffset 0), which brings every part of it
+			// back. The other parts were handed to RejectReplacement on their own until then, which
+			// refuses a part ("the deletion is shared with a touching row") - so a story with such a pair
+			// unticked and any other row ticked stopped the whole run. The final check below still holds
+			// every thread's text to account.
+			std::set<TextIndex> wholeDeletions;		// delAnchors whose first part is being taken back
+			for (size_t k = 0; k < toTakeBack.size(); ++k)
+			{
+				const TrackRow& r = rows[toTakeBack[k].first];
+				if (r.delAnchor != kInvalidTextIndex && r.delOffset == 0)
+					wholeDeletions.insert(r.delAnchor);
+			}
 			for (size_t k = toTakeBack.size(); k-- > 0; )
 			{
 				const TrackRow& r = rows[toTakeBack[k].first];
+				if (r.delOffset != 0 && r.newLen == 0 && wholeDeletions.count(r.delAnchor) != 0)
+					continue;		// its part of the deletion goes back with the first part's row
 				PMString why;
 				if (!KBSTrackChange::RejectReplacement(storyRef, toTakeBack[k].second, r.newLen,
 					r.delAnchor, r.delOffset, (r.delAnchor != kInvalidTextIndex) ? r.length : 0, &oldTimes[story], 0, why))
@@ -1508,6 +1551,12 @@ bool ReplaceInChapterByChangeAll(int32 chapterIdx, const UIDRef& docRef, const W
 	return true;
 }
 
+// ***** ONLY THE VERIFY PASS CALLS THIS SINCE 2026-09-26 (verifyOnly = true). ***** The replace itself
+// is ReplaceInChapterByChangeAll. Everything below that is about WRITING - the walk's replace step,
+// RowNow and CarryRowsPast, the kept rows' read-back, the refused / not-walked / walk-failed counters -
+// is kept but not reached (2026-09-27 defect sweep, C-2). The description that follows is the one it
+// was written with.
+//
 // Replace this chapter's checked hits. Returns how many were replaced.
 // outMissing   = checked hits whose turn never came: the walk ran to the end of the chapter
 //                without them coming up, so the matches the search found are no longer there.
@@ -2734,6 +2783,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append("Nothing checked.");
 		return 0;
 	}
+	// Results that stop short of the scope cannot be replaced: Change All would write the matches past
+	// where the search stopped (KBSResultModel::SetStoppedShort). The menu asks this before its prompt.
+	if (KBSResultModel::IsStoppedShort())
+	{
+		outSummary.Append(KBSReplaceEngine::StoppedShortMessage());
+		return 0;
+	}
 
 	// Do the Find/Change settings still describe the search these rows came from - the tab, and the
 	// query with every option that decides the match set? This also STATES the tab
@@ -3084,16 +3140,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// ***** THE REPLACE'S OWN BAR. ***** A second object, not the one the pass above used - see the
 	// note there for why the run cannot carry a single bar across both.
 	//
-	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters and once
-	// more when the loop ends, never inside a chapter - the walk holds the walker's critical section
-	// and must not pump UI work (see the section in ReplaceInChapter). So a Cancel pressed during a
-	// ONE-CHAPTER run does not break off the work: the chapter is replaced to the end, and then the
-	// whole sequence is aborted and every character put back. The button is honoured - nothing is
-	// left changed - but it is honoured at the end rather than at the moment it is pressed.
+	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters, between
+	// the STORIES of a chapter (ReplaceInChapterByChangeAll - a Change All is one command and cannot be
+	// stopped inside), and once more when the loop ends. A Cancel pressed during one story's Change All
+	// is heard when that story is done; the whole sequence is then aborted and every character put
+	// back. (This said "between chapters only, never inside a chapter" until the 2026-09-27 defect
+	// sweep - true of the one-at-a-time walk it described, which held the walker's critical section.)
 	// DisableChildProgressBars keeps anything the replacements raise from putting up bars of their
 	// own (the chapter opens the other bar covers are the same case, and it says so there).
 	//
-	// SIZED IN HITS, not chapters, and moved by ReplaceInChapter as it goes (progressBase below).
+	// SIZED IN HITS, not chapters, and moved by ReplaceInChapterByChangeAll as it goes, a story at a
+	// time (progressBase below).
 	// The walker will not report progress for us: ITextWalkerProgressMonitor is only a place to PARK
 	// a bar - the client's own OnNextPosition is what calls SetPosition on it, and the stock
 	// kFindChangeClientBoss does not (measured 2026-07-31: registered fine, 5270 replacements, zero
@@ -3117,8 +3174,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// silent, unrecoverable loss of the user's content. Wrapping the whole run in one sequence is
 	// what makes a single Ctrl+Z put all of it back, whichever chapter happens to be in front.
 	//
-	// The per-chapter sequences inside ReplaceInChapter nest within this one and are absorbed by it
-	// (of nested sequences, only the outermost appears on the Undo menu).
+	// Nothing inside opens a sequence of its own: every Change All, take-back and Track Changes switch
+	// of every chapter goes straight into this one (see the note in ReplaceInChapter on why a nested
+	// per-chapter sequence was measured to be harmful). (This said "the per-chapter sequences inside
+	// ReplaceInChapter nest within this one" - there have been none since 2026-07-31.)
 	//
 	// ABORTABLE, and that is the whole point of choosing this kind over a plain SequencePtr.
 	//
@@ -3144,7 +3203,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// outside it. Nothing between the two runs a command: a progress bar is built and the rows are
 	// backed up, and neither touches the error state.
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KBS Replace");
-	// ***** NAMED AGAIN (user's call, 2026-09-26): "Replace" / Japanese UI 置換. ***** It was left
+	// ***** NAMED AGAIN (user's call, 2026-09-26): "Replace" / Japanese UI KBSJa::kReplaceStep. ***** It was left
 	// unnamed on 2026-07-28 so InDesign would word the step itself - but an unnamed step is worded
 	// by its LAST command, and since Track Changes that is the author name being put back
 	// (KBSTrackChange::AuthorScope): Edit > Undo read "Undo Set User Name" (measured, case
@@ -3561,6 +3620,11 @@ bool KBSReplaceEngine::IsReplacing()
 	return gReplacing;
 }
 
+const char* KBSReplaceEngine::StoppedShortMessage()
+{
+	return "These results stopped short (the safety limit, or a search error), and Change Checked replaces whole stories - narrow the search and search again.";
+}
+
 // ======================================================================================================
 // Reject Change (2026-09-26) - see the header. The sequence is a PLAIN one, as KCM's own reject is
 // (KCMFacades.cpp, RejectImportChange): an abortable sequence, ended, was measured to take the undo
@@ -3638,6 +3702,13 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	std::vector<int32> lens(rows.size(), 0);
 	PMString why;
 	bool ok = true;
+	// ***** THE ROWS ARE BACKED UP WITH THE TEXT (2026-09-27 defect sweep, P-2). ***** The refresh
+	// below moves each row to where its change stands AFTER the rows in front of it have been taken
+	// back. When a later row then fails, the sequence rolls the text back to before any of it - and
+	// the rows refreshed on the way used to keep positions, lines and hashes from the rolled-back
+	// state, so the panel drew text beside their own. The replace's own RowBackup is what puts them
+	// back (nothing else can be running: the action greys out during a run).
+	KBSResultModel::BeginRowBackup();
 	for (size_t k = 0; k < rows.size() && ok; ++k)
 	{
 		KBSTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);	// the front ones moved the rest
@@ -3647,6 +3718,10 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);
 	CmdUtils::EndCommandSequence(sequence);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (ok)
+		KBSResultModel::ForgetRowBackup();
+	else
+		KBSResultModel::RollBackRows();
 	if (!ok)
 	{
 		outStatus = "Reject Change: ";

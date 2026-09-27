@@ -42,7 +42,7 @@ public:
 	KBSStartupShutdown(IPMUnknown* boss) : CPMUnknown<IStartupShutdownService>(boss) {}
 	virtual ~KBSStartupShutdown() {}
 
-	/** The panel and the draw-event service are resource-driven, so the only things to start are the
+	/** The panel and the jump marker's text adornment are resource-driven, so the only things to start are the
 	    book-close watcher that retires book-scope results (see KBSBookWatch.cpp) and the subscription
 	    that keeps the "Translucent Panel" toggle applied across the panel being re-opened or moved
 	    (see KBSPanelAlpha.cpp). */

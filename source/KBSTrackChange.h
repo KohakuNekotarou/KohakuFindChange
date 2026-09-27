@@ -104,7 +104,9 @@ namespace KBSTrackChange
 	int32 AcceptOursInDocument(IDataBase* db, PMString& outWhy);
 
 	/** Reject ONE record of ours standing AT `position` - the deletion when `wantDelete`, else the
-	    insertion - except one whose time stamp is in `keepTimes` (an earlier run's, or another row's).
+	    insertion - except one whose time stamp is in `keepTimes` (an earlier run's). ! A time does not
+	    name a ROW: several replaces of one run share one (rangelog-2026-09-26.txt), so it is the
+	    position that says which row's record this is.
 	    ***** ONE, AND OF THE KIND ASKED (2026-09-26, case touching-mixed). ***** Touching replaces put the
 	    first one's deletion and the next one's insertion at the SAME position ("catcat" -> "kitten":
 	    deleted "cat"@6 and inserted "k"@6); rejecting "everything of ours there" took the ticked row's

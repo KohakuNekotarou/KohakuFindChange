@@ -349,6 +349,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSResultTree::ShowStatus(nothing);
 				break;
 			}
+			// Results that stopped short (the safety limit, or a search error) cannot be replaced -
+			// asked before the prompt, like the doors around it (2026-09-27 defect sweep, D-5).
+			if (KBSResultModel::IsStoppedShort())
+			{
+				PMString shortMsg(KBSReplaceEngine::StoppedShortMessage());
+				shortMsg.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(shortMsg);
+				break;
+			}
 			// Do the Find/Change settings still describe these rows - the tab, and the query with
 			// every option that decides the match set? Asked HERE, ahead of the prompt, for the same
 			// reason the report test above is: the prompt asks the user to authorise a rewrite, and

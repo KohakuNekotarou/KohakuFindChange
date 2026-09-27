@@ -1430,7 +1430,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// Inside a footnote? Such a row is always replaced - Track Changes records nothing there (2026-09-26).
 	outHit.inFootnote = KBSTrackChange::IsInFootnote(storyRef, start);
 	if (outHit.isLocked)
-		outHit.checked = false;		// a locked hit can never be checked. (Every hit STARTS unchecked since 2026-08-02, so this restates it - but the statement is about the lock, not about the default.)
+		outHit.checked = false;		// a locked hit can never be checked. (AppendChapter ticks the rows that have a box - since 2026-09-26 - and a locked row has none, so this restates it; the statement is about the lock, not about the default.)
 
 	// The line's three drawn segments, and the whole match as one number for the same-occurrence
 	// test the JUMP runs. (The replace ran that test too until 2026-08-05 - see KBSReplaceEngine.h.)
@@ -2423,15 +2423,13 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	// Hidden Layers ON still got nothing from a hidden layer (user's report 2026-07-28), and the
 	// three "include" boxes they had switched OFF were ignored just as silently.
 	//
-	// fSearchBackwards is not set here, and that does NOT make the walk go forward. This said "KBS
-	// always walks forward" until 2026-09-25, when the dialog's "search backwards" was measured to
-	// turn the walk round all the same - the walker is handed the live options as well as this scope,
-	// and follows the options (cat1 cat2 cat3 came back as cat3, cat2, cat1). What keeps a search
-	// and its replace joined is that BOTH walk the way the dialog says, and that a direction changed
-	// in between is refused by the walk signature, which counts it. The rows are put in reading order
-	// on the page either way (FinalizeChapterHits), and the replace carries the rows it has passed
-	// past every later replacement (KBSReplaceEngine's RowNow), so neither needs the walk to run
-	// in TextIndex order.
+	// fSearchBackwards is not set here, and that does NOT make the walk go forward: the walker is
+	// handed the live options as well as this scope, and follows the options' direction (measured
+	// 2026-09-25: cat1 cat2 cat3 came back as cat3, cat2, cat1). What makes every KBS walk forward is
+	// KBSForwardSearchScope, which the search, the replace and Redo each put round themselves
+	// (2026-09-26). (This said the direction was carried in the walk signature and the replace carried
+	// its rows past later replacements - both true for one day, and gone with the one-at-a-time walk;
+	// corrected in the 2026-09-27 defect sweep.)
 	//
 	// Two of the five are FIND-only in InDesign - "there is no option to change in locked stories /
 	// on locked layers" (IFindChangeOptions.h:259, 279), which is why the dialog labels them Search
@@ -3062,6 +3060,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// or a replace reopens whatever it needs (KBSJump::EnsureChapterReachable and the replace
 	// engine's own reopen). What that costs is a document load on the first click into a chapter;
 	// what it buys is that searching a book no longer leaves twenty hidden documents behind.
+
+	// The results stop short of the scope when collecting hit the ceiling or a chapter's walk broke
+	// off - and a replace over them would write matches no row lists (KBSResultModel::SetStoppedShort).
+	KBSResultModel::SetStoppedShort(collectionTruncated || !brokeOff.empty());
 
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
 	if (total == 0)

@@ -103,6 +103,24 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 		return;
 	}
 
+	// ***** REFUSED BECAUSE OF A NEIGHBOUR - SAID, NOT SWALLOWED (2026-09-27 defect sweep, D-3). *****
+	// SetHitChecked moves the whole touching group or none of it, and it moves none when ANOTHER row of
+	// the group has no box (locked, or already marked) or, going off, sits in a footnote. The row asked
+	// about then keeps its old state and the repaint above puts its box back - which read as a click
+	// that did nothing. The model is asked whether the change took, rather than the reason re-derived.
+	{
+		bool isChecked = false, isReplaced = false, isLocked = false;
+		if (KBSResultModel::GetHitFlags(nodeID->GetChapter(), nodeID->GetHit(), isChecked, isReplaced, isLocked)
+			&& isChecked != nowChecked)
+		{
+			KBSResultTree::RefreshRows();
+			PMString why("This match touches another one that cannot be changed here (locked, marked, or inside a footnote). Touching matches are ticked together.");
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(why);
+			return;
+		}
+	}
+
 	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
 	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.
 	KBSResultTree::RefreshCheckedCounts(nodeID->GetChapter());

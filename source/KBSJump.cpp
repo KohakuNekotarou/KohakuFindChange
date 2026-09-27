@@ -650,6 +650,20 @@ public:
 	~ActivationGuard() { gActivating = false; }
 };
 
+// Does a row name a place in its story? False for a "deleted" row (KBSResultModel::SetHitDeleted),
+// whose range is kInvalidTextIndex on purpose - there is no text left for it to point at.
+bool RowHasPlace(TextIndex start, TextIndex end)
+{
+	return start != kInvalidTextIndex && end != kInvalidTextIndex && start >= 0 && end >= start;
+}
+
+void SayRowHasNoPlace()
+{
+	PMString message("This match went with the footnote, table or object another ticked match deleted - there is nothing left to go to.");
+	message.SetTranslatable(kFalse);
+	KBSResultTree::ShowStatus(message);
+}
+
 }
 
 void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
@@ -665,6 +679,17 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
 		KBSHitMarker::ClearMarker();
+		return;
+	}
+
+	// ***** A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY (2026-09-27 defect sweep, P-3). ***** A
+	// "deleted" row - its text went with the footnote, table or anchored object another ticked row
+	// deleted (KBSResultModel::SetHitDeleted) - keeps kInvalidTextIndex as its range. Nothing below
+	// asks about that: the overset test, the spread and the wax rectangle would all be handed -1.
+	if (!RowHasPlace(start, end))
+	{
+		KBSHitMarker::ClearMarker();
+		SayRowHasNoPlace();
 		return;
 	}
 
@@ -878,7 +903,7 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 	//
 	// ***** AND THE STANDING MARKER IS NOT TAKEN DOWN, unlike every exit of JumpToHit. ***** The
 	// asymmetry is real and it is harmless, which is worth saying so that nobody "fixes" it: a
-	// marker belongs to one database (HandleDrawEvent draws for that one only), so bringing a
+	// marker belongs to one database (KBSHitMarker's adornment draws in that one only), so bringing a
 	// DIFFERENT chapter forward stops it being painted without anything being cleared, and bringing
 	// forward the chapter it is already in leaves it pointing at the same place, since this does not
 	// scroll. ShowBook is the same case again - it moves a panel tab, not a view. Either way it
@@ -934,6 +959,14 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 		return false;
+
+	// A "deleted" row has no range at all (P-3, see JumpToHit) - said before the zero-width test below,
+	// which would otherwise answer it with the wrong reason.
+	if (!RowHasPlace(start, end))
+	{
+		SayRowHasNoPlace();
+		return false;
+	}
 
 	// ***** OUT OF THE USER'S REACH: move there and mark it, but do not select. *****
 	// (user's call, 2026-08-09.) A LOCKED match is on a locked layer or in a locked story - InDesign

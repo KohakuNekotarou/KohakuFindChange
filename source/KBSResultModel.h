@@ -128,9 +128,10 @@ namespace KBSResultModel
 		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
 		// them up with these numbers.
 		int32		walkOrder;
-		bool		checked;	// selected for replacement. A fresh search leaves every row UNticked
-								// (see the constructor); ticking is the user's own act, through the
-								// row, or Check All from the right-click menu.
+		bool		checked;	// selected for replacement. A fresh search TICKS every row that has a
+								// box (AppendChapter, 2026-09-26 - the user's call, the reverse of
+								// 2026-08-02); the user takes off what is not to be replaced. The
+								// constructor's false is only what a scan's rows keep.
 		bool		replaced;	// already replaced in this result set - not selectable any more
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
@@ -161,11 +162,9 @@ namespace KBSResultModel
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
 
-		// checked starts FALSE (changed 2026-08-02, user's request, for every mode - Text, GREP and
-		// Glyph alike). A fresh search used to tick every row it was allowed to replace, which made
-		// Change Checked a whole-document rewrite one keystroke away. Ticking is now something the
-		// user does on purpose - and cheap to do, since the right-click menu gained Check All per
-		// document and per book on 2026-08-01, which is what made the old default unnecessary.
+		// checked starts FALSE here, and a SEARCH's rows are ticked afterwards (AppendChapter): the
+		// default went unticked on 2026-08-02 and back to ticked on 2026-09-26, both on the user's call.
+		// (This note described the 2026-08-02 default as current until the 2026-09-27 defect sweep.)
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
@@ -252,6 +251,18 @@ namespace KBSResultModel
 	    afterwards. */
 	void NoteRun();
 	bool HasRun();
+
+	/** Did the search that produced these results stop SHORT of the scope - at the whole-run ceiling
+	    (kKBSCollectHitLimit), or with a chapter whose walk broke off partway?
+
+	    ***** WHY THE REPLACE HAS TO KNOW (2026-09-27 defect sweep, D-5). ***** Change Checked is
+	    InDesign's Change All over each story that holds a row, and it writes EVERY match in that story -
+	    including the ones the search stopped before listing. The run then finds a change no row
+	    accounts for and stops ("Change All wrote a match that is not in the results"), which reads as
+	    a fault rather than as "these results are incomplete". Asked before the confirmation instead,
+	    so the refusal says what it is about. Set by the search; cleared by Clear(). */
+	void SetStoppedShort(bool stoppedShort);
+	bool IsStoppedShort();
 
 	/** What KIND of results the model is holding.
 
@@ -684,11 +695,13 @@ namespace KBSResultModel
 
 	    !Clear() is not the only pass that makes a stored index mean something else: KeepCheckedRows
 	     drops the chapters a replace left empty, which renumbers the ones after them, and it does NOT
-	     reset this. It does not have to, because it sets the aftermath flag in the same breath - and
-	     that takes the check box off every row, so both commands that read this go grey and the row
-	     menu does not open at all (an empty popup is not shown). The range check is what stands
-	     behind that for a caller arriving by ActionID instead. Anything that ever drops chapters
-	     WITHOUT the aftermath flag has to reset this the way Clear() does. */
+	     reset this. What keeps that safe is that the index is written again the moment a row is
+	     right-clicked (KBSResultNodeEH, just before the menu pops), so no menu acts on an index from
+	     before the renumbering; the range check stands behind it for a caller arriving by ActionID.
+	     (Until the 2026-09-27 defect sweep this said the row menu does not open at all after a
+	     replace. Since 2026-09-26 it does - Reject Change, Redo, Accept All Changes in This Document.)
+	     Anything that ever drops chapters WITHOUT a right-click in between has to reset this the way
+	     Clear() does. */
 	enum
 	{
 		kContextMenuBookRow		= -1,	// the BOOK row: the commands reach every chapter
