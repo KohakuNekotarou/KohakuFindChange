@@ -15,6 +15,10 @@
 // Interface includes:
 #include "IBoolData.h"
 #include "ICommand.h"
+#include "IInt64Data.h"			// kKBSSignRecordsCmdBoss's time stamp
+#include "IIntData.h"				// kReplaceDeleteChangeDataCmdBoss's position
+#include "IRangeData.h"			// kKBSSignRecordsCmdBoss's range
+#include "IRedlineChangeData.h"		// kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
 #include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
@@ -27,7 +31,8 @@
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
-#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss
+#include "GlobalTime.h"				// the run's time
+#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss, kReplaceDeleteChangeDataCmdBoss
 #include "PersistUtils.h"			// ::GetUIDRef
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
@@ -39,6 +44,7 @@
 
 // Project includes:
 #include "KBSBookScope.h"			// IsDocStillOpen - a closed chapter is not read
+#include "KBSID.h"					// kKBSSignRecordsCmdBoss
 #include "KBSResultModel.h"
 #include "KBSSearchEngine.h"		// the line a row shows, and its hash
 #include "KBSTrackChange.h"
@@ -728,38 +734,190 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 	return true;
 }
 
-uint64 KBSTrackChange::RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to)
+// (RecordTimeIn - a replaced row's time read back off its records, the clock's - stood here until
+//  2026-09-28. A row keeps the time it was handed out now: StampForRow, below.)
+
+// ======================================================================================================
+// THE SIGNATURE (2026-09-28) - see the head of KBSTrackChange.h.
+// ======================================================================================================
+const char* const KBSTrackChange::kSignAuthor = "KohakuFindChange";
+const char* const KBSTrackChange::kSignFailedWhy = "the tracked changes could not be signed";
+
+namespace
 {
-	// ***** THE ROW'S OWN RECORD, NOT THE NEWEST IN THE RANGE (2026-09-27). ***** The replaces of one Change
-	// All do not all carry one time, and a touching neighbour's DELETION stands at this row's first
-	// position ("DEL at=1 ...283696" beside "INS at=1 ...193368" - rangelog-2026-09-26.txt). "The newest
-	// in [from, to]" took the neighbour's time whenever the clock ticked between the two, and the row's
-	// change was then never found again (Reject Change grey, the jump by fingerprint only).
-	// ! Nor does each replace carry a time of its OWN: the same log has three replaces sharing
-	//   ...076391 and four sharing ...193368 - the time is the run's and the clock tick's, never a
-	//   row's. Rows are told apart by POSITION; the time only keeps other runs' records out.
-	//   (This said "every replace carries its own time" until the 2026-09-27 defect sweep, C-1.)
-	std::vector<Record> recs;
-	CollectRecords(story, recs);
-	if (to > from)
+const uint64 kTicksPerMs = 10000;	// the stamps' 100 ns units in a millisecond
+uint64 gRunT0 = 0;					// the current run's time
+uint64 gRunStartReal = 0;			// the clock at the run's start: a record older than a second before it is not the run's
+uint64 gLastStamp = 0;				// the last time handed out, over the session
+
+bool IsSignAuthor(const PMString& who)
+{
+	PMString a(KBSTrackChange::kSignAuthor);
+	a.SetTranslatable(kFalse);
+	return who == a;
+}
+
+struct Unsigned
+{
+	TextIndex			at;
+	int32				len;
+	bool				isDelete;
+	VOSRedlineChange*	record;		// as the iterator handed it over - the collector's caller deletes it
+};
+
+// The run's records in [from, to] not yet signed: insertion pieces in [from, to), deletions in [from, to].
+// withStamp (when not nil) counts the records already carrying `stamp` there.
+void CollectUnsigned(IRedlineDataStrand* redline, TextIndex from, TextIndex to, uint64 stamp,
+	std::vector<Unsigned>& out, int32* withStamp)
+{
+	out.clear();
+	if (withStamp != nil)
+		*withStamp = 0;
+	RedlineIterator* it = redline->NewRedlineIterator(from);
+	if (it == nil)
+		return;
+	const uint64 notBefore = (gRunStartReal > GlobalTime::kOneSecond) ? gRunStartReal - GlobalTime::kOneSecond : 0;
+	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
 	{
-		// the replace wrote text: its insertion starts at the row
-		for (size_t k = 0; k < recs.size(); ++k)
-			if (!recs[k].isDelete && recs[k].at == from && recs[k].len > 0)
-				return recs[k].time;
-		return 0;
-	}
-	// it wrote nothing: its deletion stands at the row - unless another deletion stands there too, when
-	// which is whose cannot be told (0 = the change is found without the time)
-	uint64 time = 0;
-	int32 found = 0;
-	for (size_t k = 0; k < recs.size(); ++k)
-	{
-		if (recs[k].isDelete && recs[k].at == from)
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const bool isInsert = (record->GetChangeType() == VOSRedlineChange::kInsert);
+		const bool signedAlready = IsSignAuthor(record->GetUserName());
+		if (withStamp != nil && signedAlready && record->GetTimeStamp() == stamp)
+			++*withStamp;
+		const bool inRange = isDelete ? (from <= at && at <= to) : (isInsert && len > 0 && from <= at && at < to);
+		if (inRange && !signedAlready && record->GetTimeStamp() >= notBefore)
 		{
-			time = recs[k].time;
-			++found;
+			Unsigned u;
+			u.at = at;
+			u.len = len;
+			u.isDelete = isDelete;
+			u.record = const_cast<VOSRedlineChange*>(record);
+			out.push_back(u);
+		}
+		else
+			delete record;		// the caller owns it (redlineiterator.h:137-138)
+	}
+	delete it;
+}
+}	// anonymous namespace
+
+void KBSTrackChange::BeginSignedRun()
+{
+	GlobalTime now;
+	now.CurrentTime();
+	gRunStartReal = now.GetTime();
+	const uint64 floorNow = (gRunStartReal / kTicksPerMs) * kTicksPerMs;
+	// never at or before the last time handed out: two runs in one millisecond take the next one
+	gRunT0 = (gLastStamp == 0 || floorNow > gLastStamp) ? floorNow : (gLastStamp / kTicksPerMs + 1) * kTicksPerMs;
+}
+
+int32 KBSTrackChange::RowNumber(int32 chapterIdx, int32 hitIdx)
+{
+	int32 n = 0;
+	for (int32 c = 0; c < chapterIdx; ++c)
+		n += KBSResultModel::GetHitCount(c);
+	return n + hitIdx;
+}
+
+uint64 KBSTrackChange::StampForRow(int32 chapterIdx, int32 hitIdx)
+{
+	if (gRunT0 == 0)
+		BeginSignedRun();
+	const uint64 stamp = gRunT0 + static_cast<uint64>(RowNumber(chapterIdx, hitIdx));
+	if (stamp > gLastStamp)
+		gLastStamp = stamp;
+	return stamp;
+}
+
+bool KBSTrackChange::SignReplace(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kKBSSignRecordsCmdBoss));
+	InterfacePtr<IRangeData> range(cmd, UseDefaultIID());
+	InterfacePtr<IInt64Data> stampData(cmd, UseDefaultIID());
+	if (cmd == nil || range == nil || stampData == nil)
+		return false;
+	range->Set(from, to);
+	stampData->Set(static_cast<IInt64Data::ValueType>(stamp));
+	cmd->SetItemList(UIDList(story));
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);		// the caller stops the run and says why
+	return err == kSuccess;
+}
+
+bool KBSTrackChange::SignRecordsNow(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp)
+{
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return true;		// nothing recorded in this story
+	std::vector<Unsigned> found;
+	CollectUnsigned(redline, from, to, stamp, found, nil);
+	PMString author(kSignAuthor);
+	author.SetTranslatable(kFalse);
+	bool ok = true;
+	// the insertion's pieces: the signed record over each piece, then the old one off it
+	for (size_t k = 0; k < found.size(); ++k)
+	{
+		if (found[k].isDelete)
+			continue;
+		redline->ApplyRedlineChange(VOSRedlineChange::kInsert, found[k].at, stamp,
+			found[k].record->GetIsMovedText(), found[k].len, author);
+		redline->RemoveRedlineChange(found[k].at, *found[k].record);
+	}
+	// the deletion: InDesign's own command for a deletion's data (measured on the 2026-09-28 spike)
+	for (size_t k = 0; k < found.size() && ok; ++k)
+	{
+		if (!found[k].isDelete)
+			continue;
+		found[k].record->SetUserName(author);
+		found[k].record->SetTimeStamp(stamp);
+		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceDeleteChangeDataCmdBoss));
+		InterfacePtr<IRedlineChangeData> changeData(cmd, IID_IREDLINECHANGEDATA);
+		InterfacePtr<IIntData> position(cmd, IID_IINTDATA);
+		ok = (cmd != nil && changeData != nil && position != nil);
+		if (ok)
+		{
+			changeData->Set(*found[k].record);
+			position->Set(found[k].at);
+			cmd->SetItemList(UIDList(story));
+			ok = (CmdUtils::ProcessCommand(cmd) == kSuccess);
 		}
 	}
-	return (found == 1) ? time : 0;
+	for (size_t k = 0; k < found.size(); ++k)
+		delete found[k].record;
+	if (!ok)
+		return false;
+	// read back: nothing of the run left unsigned in [from, to], and the row's time there
+	std::vector<Unsigned> left;
+	int32 withStamp = 0;
+	CollectUnsigned(redline, from, to, stamp, left, &withStamp);
+	for (size_t k = 0; k < left.size(); ++k)
+		delete left[k].record;
+	return left.empty() && (found.empty() || withStamp > 0);
+}
+
+bool KBSTrackChange::HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time)
+{
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return false;
+	RedlineIterator* it = redline->NewRedlineIterator(from);
+	if (it == nil)
+		return false;
+	bool found = false;
+	for (bool16 more = kTrue; more && !found && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+	{
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+		if (record == nil)
+			continue;
+		found = (record->GetTimeStamp() == time);
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+	}
+	delete it;
+	return found;
 }

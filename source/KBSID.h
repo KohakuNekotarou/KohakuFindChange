@@ -128,7 +128,9 @@ DECLARE_PMID(kClassIDSpace, kKBSBookPanelCmdWatchBoss, kKBSPrefix + 16)
 // The jump marker (2026-09-26): a global text adornment service - IID_IK2SERVICEPROVIDER =
 // kGlobalTextAdornmentServiceImpl + our IGlobalTextAdornment (KBSHitMarker.cpp). Replaces +5.
 DECLARE_PMID(kClassIDSpace, kKBSHitMarkerBoss, kKBSPrefix + 17)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 18)
+// Signs the tracked changes one replace made - "KohakuFindChange" at the row's time (2026-09-28,
+// KBSSignRecordsCmd.cpp / KBSTrackChange.h).
+DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 19)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 20)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 21)
@@ -254,6 +256,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelServiceProviderImpl, kKBSPrefi
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelPaletteMgrServiceImpl, kKBSPrefix + 31)
 DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelCmdWatchImpl, kKBSPrefix + 32)
 DECLARE_PMID(kImplementationIDSpace, kKBSHitMarkerAdornmentImpl, kKBSPrefix + 33)	// IGlobalTextAdornment: the jump marker (KBSHitMarker.cpp)
+// The replace's signature (2026-09-28, KBSSignRecordsCmd.cpp). (+ 34 onwards, not + 23: see the note above.)
+DECLARE_PMID(kImplementationIDSpace, kKBSSignRecordsCmdImpl, kKBSPrefix + 34)	// ICommand of kKBSSignRecordsCmdBoss
+DECLARE_PMID(kImplementationIDSpace, kKBSInt64DataImpl, kKBSPrefix + 35)		// IInt64Data (no stock one in the SDK)
 
 
 // ActionIDs:

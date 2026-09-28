@@ -228,6 +228,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSignRecordsCmd.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeEH.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultTreeEH.cpp"/>

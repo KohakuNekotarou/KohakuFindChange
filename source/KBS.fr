@@ -275,6 +275,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/** Signs the tracked changes one replace made (2026-09-28): the insertion's pieces and the deletion
+		in the range become "KohakuFindChange" at the row's time. KBSSignRecordsCmd.cpp.
+		ItemList: the story. */
+	Class
+	{
+		kKBSSignRecordsCmdBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMAND,		kKBSSignRecordsCmdImpl,
+			IID_IRANGEDATA,		kRangeDataImpl,			// the range the replace wrote [start, end]
+			IID_IINT64DATA,		kKBSInt64DataImpl,		// the row's time stamp (100 ns units since 1601)
+		}
+	},
+
 	/*
 	 * Marker-expiry idle task boss (Task 3): a one-shot idle task, armed each time the marker is
 	 * shown, that takes it back off the screen a second later. IID_IIDLETASK comes from ShuksanID.h.

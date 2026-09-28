@@ -59,3 +59,6 @@ REGISTER_PMINTERFACE(KBSBookPanelObserver, kKBSBookPanelObserverImpl)
 REGISTER_PMINTERFACE(KBSBookPanelServiceProvider, kKBSBookPanelServiceProviderImpl)
 REGISTER_PMINTERFACE(KBSBookPanelPaletteMgrService, kKBSBookPanelPaletteMgrServiceImpl)
 REGISTER_PMINTERFACE(KBSBookPanelCmdWatch, kKBSBookPanelCmdWatchImpl)
+// The replace's signature (2026-09-28): the command and its 64-bit data (KBSSignRecordsCmd.cpp).
+REGISTER_PMINTERFACE(KBSSignRecordsCmd, kKBSSignRecordsCmdImpl)
+REGISTER_PMINTERFACE(KBSInt64Data, kKBSInt64DataImpl)

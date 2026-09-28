@@ -54,6 +54,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSignRecordsCmd.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

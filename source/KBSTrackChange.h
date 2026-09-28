@@ -9,15 +9,19 @@
 //  replaced row be taken back later (Reject Change) and what the jump finds a replaced row by. The
 //  story's own "Track Changes" setting is handed back as it was found (TrackingScope).
 //
-//  ***** SIGNED WITH THE USER'S OWN NAME, AND TOLD APART BY TIME (2026-09-27, the user's call). *****
-//  Until then every replace switched InDesign's user name to "KohakuFindChange" for the run and back
-//  after it, and told its records apart by that author. A name the script DOM cannot put back to
-//  "unset" was a name that could be left behind (the user: "a name left behind is what I fear"), so
-//  the name is not touched any more. A record is found by WHERE it stands and by its TIME STAMP
-//  (VOSRedlineChange::GetTimeStamp - the date and time the change was created, 100 ns units since
-//  1601): the records a run made are the ones whose time was not in the story before the run, and a
-//  replaced row keeps the time its records carry (Hit::recordTime). No list of KBS's times is kept
-//  anywhere - "Accept All Changes in This Document" accepts every change, as InDesign's own does.
+//  ***** SIGNED "KohakuFindChange" AT A TIME KBS HANDS OUT (2026-09-28, the user's call; spec
+//  docs/superpowers/specs/2026-09-28-kbs-signed-designated-time-design.md). ***** InDesign's user name is
+//  not touched (a name the script DOM cannot put back to "unset" is a name that could be left behind -
+//  why the 2026-09-26 switch of it went on 2026-09-27): each replace is written under it and its records
+//  are rewritten right after, before the next row is written (KBSSignRecordsCmd). The time is the run's
+//  start, cut to the millisecond, plus the row's number in the result in 100 ns units (the four digits
+//  below the millisecond - no panel and no script shows them). A replaced row keeps its time
+//  (Hit::recordTime) and is tied to its records by that time exactly. (From 2026-09-27 to 2026-09-28 the
+//  records carried the user's own name and the clock's time, and a row was found by its texts and the
+//  nearest position.) "Accept All Changes in This Document" accepts every change, as InDesign's own does.
+//  ! Touching replaces written front to back leave one insertion per row but ONE deletion, carrying the
+//    LAST row's time: InDesign joins a deletion to the one it touches whoever made either (measured with
+//    two real user names). A touching group is taken back as one (KBSReplaceEngine RejectRowsNow).
 //
 //  ***** WHERE THE RECORDS ARE (measured 2026-09-26). ***** A replacement leaves an insertion record
 //  over the new text and a deletion record anchored right after it (redlineiterator.h:42-50);
@@ -43,6 +47,30 @@ namespace KBSTrackChange
 {
 	// (kAuthor and AuthorScope - the "KohakuFindChange" signature and the switch of InDesign's user
 	//  name that wrote it - stood here until 2026-09-27. See the head of this file.)
+
+	/** The author of every record KBS writes (2026-09-28). */
+	extern const char* const kSignAuthor;		// "KohakuFindChange"
+	/** Why a run was stopped when a replace's records could not be signed (the Change Checked summary
+	    tells it apart by this text). */
+	extern const char* const kSignFailedWhy;	// "the tracked changes could not be signed"
+
+	/** A replace run begins (Change Checked, or a row's / story's / document's Replace): its time T0 is
+	    the clock cut to the millisecond - or the millisecond after the last time handed out, if the clock
+	    is not already past it. */
+	void BeginSignedRun();
+	/** The row's number in the result: the rows of every chapter before it, then its index. */
+	int32 RowNumber(int32 chapterIdx, int32 hitIdx);
+	/** The row's time in the run: T0 + RowNumber (100 ns units). Remembered as the last handed out. */
+	uint64 StampForRow(int32 chapterIdx, int32 hitIdx);
+	/** Sign the records one replace just made - the insertion's pieces in [from, to) and the deletion
+	    anchored in [from, to], those not yet "KohakuFindChange" - through kKBSSignRecordsCmdBoss.
+	    False = they could not be signed (the caller stops the run). Nothing to sign (a footnote) is not
+	    a failure. */
+	bool SignReplace(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
+	/** The command's work (KBSSignRecordsCmd::Do) - not to be called from anywhere else. */
+	bool SignRecordsNow(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
+	/** Is there a record carrying exactly this time standing in [from, to] (where a replace just wrote)? */
+	bool HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time);
 
 	/** Every story in `stories` recording changes for the life of the object; the ones this switched
 	    on are switched back off. A story already recording is left alone both ways. */
@@ -171,12 +199,8 @@ namespace KBSTrackChange
 	bool FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
 		TextIndex nearAt, Change& out);
 
-	/** The time stamp of the row's own record of ours: the insertion starting at `from` when the replace
-	    wrote text (to > from), else the one deletion standing at `from`; 0 when none, or when two
-	    deletions stand there. What a replaced row keeps (Hit::recordTime) so its change is found among
-	    that replace's alone. NOT the newest in [from, to]: a touching neighbour's deletion stands at
-	    `from` with its own time (2026-09-27). */
-	uint64 RecordTimeIn(const UIDRef& story, TextIndex from, TextIndex to);
+	// (RecordTimeIn - the time read back off a replaced row's records - stood here until 2026-09-28: a row
+	//  keeps the time it was handed out now, StampForRow.)
 
 	/** A REPLACED row put where its tracked change stands now - range, line and hash - so an edit
 	    made since the replace does not put it off (the record moves with the text). False = the row

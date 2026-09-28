@@ -680,7 +680,8 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
 	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
-	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone)
+	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
+	bool& outSignFailed)
 {
 	IDataBase* const db = storyRef.GetDataBase();
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
@@ -744,6 +745,20 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
 				{
 					++ioReplaced;
+					// ***** SIGNED BEFORE THE NEXT ONE IS WRITTEN (2026-09-28). ***** "KohakuFindChange" at the
+					// row's time (KBSTrackChange.h) - a replace written next to this one has to meet records
+					// already signed, or InDesign joins its insertion to this one's.
+					const uint64 stamp = KBSTrackChange::StampForRow(chapterIdx, hitIdx);
+					if (!KBSTrackChange::SignReplace(written, writtenStart, writtenEnd, stamp))
+					{
+						outSignFailed = true;
+						break;
+					}
+					// The row's time only when a record carries it; 0 = none (a footnote records nothing) - set
+					// either way, so a row replaced once, taken back and replaced again where nothing is
+					// recorded does not keep the first replace's time.
+					KBSResultModel::SetHitRecordTime(chapterIdx, hitIdx,
+						KBSTrackChange::HasRecordsOfTimeIn(written, writtenStart, writtenEnd, stamp) ? stamp : 0);
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
@@ -1008,11 +1023,20 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		// A story an earlier story's replace deleted (an anchored object's): its rows never come up.
 		if (db->IsValidUID(s->first))
 		{
+			bool signFailed = false;
 			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
-				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase, ioProgressReported, done))
+				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase, ioProgressReported, done,
+				signFailed))
 			{
 				outFailed = true;
 				outWhyNot = "the text walker could not be started";
+				return true;
+			}
+			// a replace whose records could not be signed stops the whole run (the caller rolls it back)
+			if (signFailed)
+			{
+				outFailed = true;
+				outWhyNot = KBSTrackChange::kSignFailedWhy;
 				return true;
 			}
 		}
@@ -1037,10 +1061,11 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
 	}
 
-	// ----- every row the report keeps, where its text stands now: its range, its line, and - for a
-	// replaced row outside a footnote - the time of the records its replace made (what Reject Change and
-	// Redo find it by). Read once the chapter has stopped changing: a line read as its own match was
-	// written would still show the later matches of its paragraph as they were (2026-07-28).
+	// ----- every row the report keeps, where its text stands now: its range and its line. Read once the
+	// chapter has stopped changing: a line read as its own match was written would still show the later
+	// matches of its paragraph as they were (2026-07-28). (A replaced row's time - what Reject Change and
+	// the jump find its records by - is set when it is written, WalkStoryReplacing; it was read back off
+	// the records here until 2026-09-28.)
 	for (size_t k = 0; k < keptRows.size(); ++k)
 	{
 		const int32 hitIdx = keptRows[k];
@@ -1055,10 +1080,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, keptStart, keptEnd, pre, match, post);
 		KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
 			KBSSearchEngine::HashMatchText(rowStoryRef, keptStart, keptEnd));
-		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) && replaced
-			&& !KBSTrackChange::IsInFootnote(rowStoryRef, keptStart))
-			KBSResultModel::SetHitRecordTime(chapterIdx, hitIdx, KBSTrackChange::RecordTimeIn(rowStoryRef, keptStart, keptEnd));
 	}
 	return true;
 }
@@ -1731,6 +1752,12 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 			outSummary.Append(" - so nothing was changed.");
 			return;
 		}
+		if (t.stoppedByMismatch && t.errorText == PMString(KBSTrackChange::kSignFailedWhy))
+		{
+			// A replace's records could not be signed (2026-09-28): the run was rolled back.
+			outSummary.Append("Replace stopped - the tracked changes could not be signed, so nothing was changed.");
+			return;
+		}
 		if (t.stoppedByMismatch)
 		{
 			// Said as a failure, not as a cancel (the user's call, 2026-09-26): nothing was retried.
@@ -2349,15 +2376,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		return 0;
 	}
 
-	// ***** WHAT THIS RUN WAS TOLD TO WRITE, RECORDED BEFORE IT WRITES ANY OF IT. ***** The heading of
-	// the file "Save Results..." produces names it, and the user can retype Change To the moment this
-	// returns - so reading the dialog at save time would put a replacement in the report that these
-	// rows never took. Same rule, same reason, as the query line the search records (SetQueryText).
-	//
-	// Here rather than earlier because CommitReplaceSide has just stated the Glyph tab's change glyph
-	// on the options: before that call, the change side of a glyph replace is not there to be read.
-	// Still outside every command sequence, and past all the doors above, so nothing that gets this
-	// far is recorded without running.
+	// (What this run was told to write - the Change To line at the head of the file "Save Results..."
+	// wrote - was recorded here until that command was removed on 2026-09-27.)
 
 	// The five scope switches, read ONCE for the whole run and handed to every chapter's walk -
 	// the same single reading the search takes above its own chapter loop, and for the same two
@@ -2771,6 +2791,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 		return 0;
 	}
+	KBSTrackChange::BeginSignedRun();	// the run's time (2026-09-28) - every row of every chapter is stamped from it
 
 	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
 	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
@@ -3137,8 +3158,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	KBSResultModel::KeepCheckedRows();
 
 	BuildSummary(totals, outSummary);
-	// The chapters the hand-back could not close, at the end the way the scans say it - it appends
-	// nothing in the ordinary case.
+	// The chapters the hand-back could not close, at the end of the line - it appends nothing in the
+	// ordinary case.
 	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
 
 	// The saved report's heading, recorded on THIS exit alone: the panel is the replace's report
@@ -3355,6 +3376,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		}
 		sequence->SetName(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep));
 		KBSResultModel::BeginRowBackup();
+		KBSTrackChange::BeginSignedRun();	// the run's time (2026-09-28) - every row it writes is stamped from it
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
 			replaced, missing, locked, refused, endnoteLeft, accepted, walkFailed, cancelled, failed, whyNot, &rowsToReplace);
@@ -3396,7 +3418,6 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			&& KBSResultModel::GetHitMatchIdentity(chapterIdx, o->first, s2, a, b, h))
 			KBSResultModel::SetHitChangeTexts(chapterIdx, o->first, o->second, KBSTrackChange::ReadText(UIDRef(db, s2), a, b - a));
 	}
-	// the change side the rows were replaced with, for the report (Save Results)
 	RenumberWalkOrders(chapterIdx, docRef, scopeOptions);
 	if (rowsToReplace.size() == 1)
 		outStatus = KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx)
