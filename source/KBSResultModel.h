@@ -788,8 +788,8 @@ namespace KBSResultModel
 	    follow, or the copies stay alive until the next replace. */
 	void BeginRowBackup();
 
-	/** Put every remembered row back the way it was and stop remembering. Newest change first, so a
-	    row that was changed twice ends up holding the oldest copy - the one the search left. */
+	/** Put every remembered row back the way it was and stop remembering. A row is remembered once, as
+	    the run found it, however many times the run changes it (since 2026-09-28). */
 	void RollBackRows();
 
 	/** Stop remembering and release the copies: the replace committed, so the rows keep what they

@@ -20,20 +20,16 @@
 #include "IRangeData.h"			// kKBSSignRecordsCmdBoss's range
 #include "IRedlineChangeData.h"		// kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
-#include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
-#include "ISession.h"
 #include "IStoryList.h"			// Accept All Changes in This Document - every text model of it
 #include "ITextModel.h"
 #include "ITrackChangesSettings.h"	// ITrackChangeStorySettings - on kTextStoryBoss
-#include "IUserInfo.h"				// the current user - whose own pending insertion a replace rewrites
-#include "IWorkspace.h"
 
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
 #include "GlobalTime.h"				// the run's time
 #include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss, kReplaceDeleteChangeDataCmdBoss
-#include "PersistUtils.h"			// ::GetUIDRef
+#include "PersistUtils.h"			// ::GetClass - IsInFootnote
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
 #include "UIDList.h"
@@ -217,43 +213,6 @@ static int32 AcceptAllInStory(const UIDRef& story, PMString& outWhy)
 		return -1;
 	}
 	return done;
-}
-
-bool KBSTrackChange::IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex from, TextIndex to,
-	const std::set<uint64>* onlyTimes)
-{
-	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
-	InterfacePtr<IUserInfo> info(ws, UseDefaultIID());
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (info == nil || redline == nil || !redline->StoryHasChanges())
-		return false;
-	PMString me(info->GetUserName());
-	me.SetTranslatable(kFalse);
-	RedlineIterator* it = redline->NewRedlineIterator(0);
-	if (it == nil)
-		return false;
-	bool inside = false;
-	for (bool16 more = kTrue; more && !inside; more = it->Increment(kFalse))
-	{
-		TextIndex at = 0;
-		int32 len = 0;
-		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
-		if (record == nil)
-			continue;
-		const bool isInsert = (record->GetChangeType() != VOSRedlineChange::kDelete);
-		const uint64 time = record->GetTimeStamp();
-		PMString who(record->GetUserName());
-		who.SetTranslatable(kFalse);
-		delete record;
-		if (!isInsert || len <= 0 || who != me || (onlyTimes != nil && onlyTimes->count(time) == 0))
-			continue;
-		// overlapping [from, to) or touching it at either end: typing extends an insertion of the same
-		// author, so new text written right next to one may join it (not measured - kept out alike)
-		if (from <= at + len && at <= to)
-			inside = true;
-	}
-	delete it;
-	return inside;
 }
 
 int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy)
@@ -535,7 +494,6 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 // THE SIGNATURE (2026-09-28) - see the head of KBSTrackChange.h.
 // ======================================================================================================
 const char* const KBSTrackChange::kSignAuthor = "KohakuFindChange";
-const char* const KBSTrackChange::kSignFailedWhy = "the tracked changes could not be signed";
 
 namespace
 {
@@ -598,6 +556,15 @@ void CollectUnsigned(IRedlineDataStrand* redline, TextIndex from, TextIndex to, 
 	}
 	delete it;
 }
+
+// The row's number in the result: the rows of every chapter before it, then its index.
+int32 RowNumber(int32 chapterIdx, int32 hitIdx)
+{
+	int32 n = 0;
+	for (int32 c = 0; c < chapterIdx; ++c)
+		n += KBSResultModel::GetHitCount(c);
+	return n + hitIdx;
+}
 }	// anonymous namespace
 
 void KBSTrackChange::BeginSignedRun()
@@ -608,14 +575,6 @@ void KBSTrackChange::BeginSignedRun()
 	const uint64 floorNow = (gRunStartReal / kTicksPerMs) * kTicksPerMs;
 	// never at or before the last time handed out: two runs in one millisecond take the next one
 	gRunT0 = (gLastStamp == 0 || floorNow > gLastStamp) ? floorNow : (gLastStamp / kTicksPerMs + 1) * kTicksPerMs;
-}
-
-int32 KBSTrackChange::RowNumber(int32 chapterIdx, int32 hitIdx)
-{
-	int32 n = 0;
-	for (int32 c = 0; c < chapterIdx; ++c)
-		n += KBSResultModel::GetHitCount(c);
-	return n + hitIdx;
 }
 
 uint64 KBSTrackChange::StampForRow(int32 chapterIdx, int32 hitIdx)

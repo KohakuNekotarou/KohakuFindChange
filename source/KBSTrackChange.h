@@ -50,17 +50,15 @@ namespace KBSTrackChange
 
 	/** The author of every record KBS writes (2026-09-28). */
 	extern const char* const kSignAuthor;		// "KohakuFindChange"
-	/** Why a run was stopped when a replace's records could not be signed (the Change Checked summary
-	    tells it apart by this text). */
-	extern const char* const kSignFailedWhy;	// "the tracked changes could not be signed"
+	// (kSignFailedWhy - the summary told a signing failure apart by its text - stood here until 2026-09-28:
+	//  every reason a run stops on is said the same way now, KBSReplaceEngine's stoppedByFailure.)
 
 	/** A replace run begins (Change Checked, or a row's / story's / document's Replace): its time T0 is
 	    the clock cut to the millisecond - or the millisecond after the last time handed out, if the clock
 	    is not already past it. */
 	void BeginSignedRun();
-	/** The row's number in the result: the rows of every chapter before it, then its index. */
-	int32 RowNumber(int32 chapterIdx, int32 hitIdx);
-	/** The row's time in the run: T0 + RowNumber (100 ns units). Remembered as the last handed out. */
+	/** The row's time in the run: T0 + the row's number in the result - the rows of every chapter before
+	    it, then its index - in 100 ns units. Remembered as the last handed out. */
 	uint64 StampForRow(int32 chapterIdx, int32 hitIdx);
 	/** Sign the records one replace just made - the insertion's pieces in [from, to) and the deletion
 	    anchored in [from, to], those not yet "KohakuFindChange" - through kKBSSignRecordsCmdBoss.
@@ -126,25 +124,17 @@ namespace KBSTrackChange
 	    state clear. */
 	int32 AcceptAllInDocument(IDataBase* db, PMString& outWhy);
 
-	/** ***** DOES [from, to) OVERLAP OR TOUCH A PENDING INSERTION OF THE CURRENT USER? (2026-09-27, P-4.) *****
-	    An author replacing text it inserted itself, not yet accepted, gets NO new record - InDesign
-	    rewrites the insertion it has (VOSRedline.h CanApplyDeleteChange; measured with case
-	    rereplace-ours). A replace there cannot be lined up or taken back, so the run asks this BEFORE it
-	    writes and refuses. Since KBS signs with the user's own name, that covers an earlier KBS replace
-	    not yet accepted AND the user's own tracked typing. Touching counts too (not measured: typing
-	    extends an insertion of the same author, so new text written next to one may join it).
-	    `onlyTimes` (when not nil) = look only at records whose time is in it - Redo passes the times that
-	    stood before it wrote, so the row it has just written for a touching neighbour does not count
-	    (case touching-group-redo; touching insertions of different times stay apart, as Redo measured). */
-	bool IsInsideOwnPendingInsertion(const UIDRef& story, TextIndex from, TextIndex to,
-		const std::set<uint64>* onlyTimes = nil);
+	// (IsInsideOwnPendingInsertion - does a match touch the current user's pending insertion, which the
+	//  run then refused - stood here until 2026-09-28. Nothing had called it since the pending changes
+	//  around a ticked match came to be accepted first, AcceptPendingAround, on 2026-09-27.)
 
 	/** ***** ACCEPT THE PENDING CHANGES A MATCH ABOUT TO BE REPLACED SITS IN OR NEXT TO - ANYBODY'S
 	    ***** (2026-09-27, the user's call: "only that part"). ***** Every insertion overlapping or touching
 	    [from, to) is accepted, and every deletion anchored in [from, to] (an insertion's own deletion
 	    stands at its end), one whole record at a time, whoever made it; nothing else in the story is
 	    touched. Needed for the user's own insertion at least: replacing text its author inserted and has
-	    not accepted leaves no record (IsInsideOwnPendingInsertion), so the replace could never be taken
+	    not accepted leaves no record - InDesign rewrites the insertion it has (VOSRedline.h
+	    CanApplyDeleteChange; measured with case rereplace-ours) - so the replace could never be taken
 	    back. The main text does not move (an accepted insertion stays, an accepted deletion was never in
 	    it), but a deleted-text thread goes, so a caller holding story indexes past it should hold them as
 	    thread offsets. Runs inside the caller's command sequence. Returns how many were accepted, or -1

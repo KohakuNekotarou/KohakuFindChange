@@ -278,10 +278,16 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSReplaceCheckedActionID:
 		{
 			// Another run of ours is already up, reached through the events its progress bar pumps.
-			// The engine turns this away as well - but not before the confirmation prompt would
-			// have gone up over a run that is already under way, which is the whole reason the test
-			// is here too. Asked about EVERY run rather than only another replace: a scan cancelled
-			// underneath this one hands back the chapters it is about to write to (see KBSRunGuard).
+			// Asked about EVERY run rather than only another replace: a search cancelled underneath
+			// this one hands back the chapters it is about to write to (see KBSRunGuard).
+			//
+			// ***** THIS DOOR AND THE TWO BELOW ARE THE ENGINE'S TOO, ASKED HERE SO A REFUSAL LEAVES THE
+			// ***** TREE AS IT IS (2026-09-28). ***** They stood here to answer BEFORE the confirmation prompt
+			// until the prompt went on 2026-09-27; what they still buy is that a refusal does not reach the
+			// Rebuild after ReplaceChecked, which re-expands the tree and loses what the user had opened
+			// or closed. (A third - has the Find/Change query changed - stood here too until 2026-09-28. It
+			// rebuilt the tree on a refusal as the engine's path does, with the same words, so it was the
+			// engine's door asked twice: ReplaceChecked asks it.)
 			if (KBSRunGuard::IsAnyRunning())
 			{
 				PMString busy(KBSRunGuard::BusyMessage());
@@ -293,10 +299,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
 			// this command out in that state (see UpdateActionStates), but a caller that never went
 			// through the menu - a script invoking the action - lands here whatever the menu says.
-			// It has to be stopped BEFORE the prompt: the rows the last run never reached keep their
-			// check so the report can account for them, so GetCheckedCount() is still positive and
-			// the user would otherwise be asked to authorise a rewrite that the engine declines on
-			// the far side of the prompt. Same wording as the engine's own door.
+			// Asked before the checked count: the rows the last run never reached keep their check so
+			// the report can account for them, so GetCheckedCount() is still positive. Same wording
+			// as the engine's own door.
 			if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyRejectedRowOpen())
 			{
 				PMString report("This is the last replace's report - search again to replace more.");
@@ -305,11 +310,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			}
 
-			// A replace can touch several documents, so it asks first. It also sits in a flyout
-			// that gets opened by accident, which is the other reason the confirmation is not
-			// optional.
-			const int32 checkedCount = KBSResultModel::GetCheckedCount();
-			if (checkedCount <= 0)
+			if (KBSResultModel::GetCheckedCount() <= 0)
 			{
 				PMString nothing("Nothing checked.");
 				nothing.SetTranslatable(kFalse);
@@ -319,30 +320,6 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// (Results that stopped short - the safety limit, or a search error - were refused here from
 			//  the 2026-09-27 defect sweep (D-5) until the same day's cleanup: Change All would have written
 			//  the matches past where the search stopped. One match at a time writes the ticked rows only.)
-			// Do the Find/Change settings still describe these rows - the tab, and the query with
-			// every option that decides the match set? Asked HERE, ahead of the prompt, for the same
-			// reason the report test above is: the prompt asks the user to authorise a rewrite, and
-			// asking for that and then declining on the far side of it is the one thing a
-			// confirmation must not do. (It was doing exactly that when this door first landed, an
-			// hour before this line: the prompt went up, OK was pressed, and the engine then said the
-			// query had changed.)
-			//
-			// The engine keeps the same door for a caller that never came through this menu, and
-			// asking twice is safe - see KBSReplaceEngine::RefuseChangedQuery, which states the tab
-			// by writing back the value it just read.
-			//
-			// ***** It can CLEAR the results (only when the query itself moved), so the tree is
-			// redrawn here. ***** Nothing else on this path does: the ordinary route redraws after
-			// ReplaceChecked returns, and this exit never reaches it.
-			{
-				PMString queryMoved;
-				if (KBSReplaceEngine::RefuseChangedQuery(queryMoved))
-				{
-					KBSResultTree::Rebuild();
-					KBSResultTree::ShowStatus(queryMoved);
-					break;
-				}
-			}
 
 			// ***** NO PROMPT SINCE 2026-09-27 (the user's call). ***** The confirmation (ConfirmReplace -
 			// KBSReplaceConfirmDialog) asked before every Change Checked; everything a run does is one undo

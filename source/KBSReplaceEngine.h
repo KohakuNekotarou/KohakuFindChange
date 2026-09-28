@@ -21,12 +21,11 @@
 //  (From 2026-09-26 to 2026-09-27 each story got InDesign's Change All instead and the rows NOT ticked
 //  were taken back; that went in the 2026-09-27 cleanup - git history, c876bc7 and before.)
 //
-//  ***** THE OLD CHAPTER WALK IS STILL HERE, FOR ONE JOB. ***** Until 2026-09-26 each chapter was
-//  re-walked match by match (measured 2026-07-25, docs/superpowers/specs/_done/2026-07-25-kbs-replace-
-//  checked-design.md section 10.1). That function, ReplaceInChapter, now runs ONLY as the verify pass
-//  (verifyOnly = true): it walks each chapter before anything is written and checks that every ticked
-//  row still begins where the search found it. Its writing half is kept but is not reached (2026-09-27
-//  defect sweep, C-2).
+//  ***** THE OLD CHAPTER WALK'S CHECK IS STILL HERE. ***** Until 2026-09-26 each chapter was re-walked
+//  match by match (measured 2026-07-25, docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-
+//  design.md section 10.1). What is left of it is the check that walk ran before anything was written
+//  (ChapterMovedUnderRows in the .cpp): each chapter is walked as the search walked it, and every
+//  ticked row must still begin where the search found it. (Its writing half went on 2026-09-28.)
 //
 //========================================================================================
 
@@ -112,11 +111,11 @@ namespace KBSReplaceEngine
 	    windowless document cannot even be closed by hand - it is in no menu. Three cases:
 
 	      - a run that is CANCELLED has put every character back, so no chapter holds anything of it
-	        and they all go (ReleaseHeldDocs). The search and the two scans have always done this on
-	        their own cancel; the replace did not, between 2026-08-02 and 2026-08-05, because the only
-	        path that closed anything was the one that SAVED and it went with "save after replace";
+	        and they all go (ReleaseHeldDocs). The search has always done this on its own cancel; the
+	        replace did not, between 2026-08-02 and 2026-08-05, because the only path that closed
+	        anything was the one that SAVED and it went with "save after replace";
 	      - a run that goes THROUGH hands back the chapters no replacement landed in - every checked
-	        hit there came back locked, missing or refused, or the walk never ran. Added 2026-08-05:
+	        hit there came back locked, missing, refused or left at an endnote's end. Added 2026-08-05:
 	        such a chapter used to stay open, windowless and locked for the rest of the session, and
 	        WITH ITS MODIFIED FLAG SET, because a walk can mark a database changed without changing a
 	        character (which is why the SEARCH guards its own walk with SaveRestoreModifiedState and
@@ -143,12 +142,11 @@ namespace KBSReplaceEngine
 	         case / whole word / kana / width, the five scope switches, and FIND FORMAT (a paragraph
 	         style, a font, a colour). See KBSSearchEngine::BuildWalkSignature.
 
-	    Why it has to be asked at all: Change Checked runs InDesign's Change All with the LIVE
-	    IFindChangeOptions over every story that holds a row, and lines what it writes up with the rows
-	    - so a query edited between the search and the replace writes a different set of matches from
-	    the one the rows list. (Said in terms of the one-at-a-time walk, "the Nth match of the re-walk
-	    for the hit whose walkOrder is N", until the 2026-09-27 defect sweep; the verify pass still
-	    walks that way, and the reason is the same for both.)
+	    Why it has to be asked at all: the replace walks every story that holds a ticked row with the
+	    LIVE IFindChangeOptions and writes the matches it meets at the rows' places - so a query edited
+	    between the search and the replace walks a different set of matches from the one the rows
+	    list. (The verify walk joins its matches to the rows by walk order - "the Nth match for the hit
+	    whose walkOrder is N" - and the reason is the same for it.)
 
 	    ***** ONE OF TWO DOORS, and they divide the ways a run can be wrong between them. *****
 
@@ -198,9 +196,9 @@ namespace KBSReplaceEngine
 
 	/** ***** A STORY ROW'S MENU (2026-09-27, the story level). ***** Replace = the story's TICKED rows (the
 	    user's call), no prompt, one undo step, the list stays a work list (as ReplaceHit). Reject Change =
-	    every replaced row of the story whose tracked change is still there, one undo step. (Redo went on
-	    2026-09-27 - a row taken back is replaced again with Replace.) Each says what it did - or why
-	    nothing - in outStatus. */
+	    every replaced row of the story whose tracked change is still there, one undo step. Redo = the
+	    rows taken back, below (RedoStory - a ROW's own Redo went on 2026-09-27: a row taken back is
+	    replaced again with Replace). Each says what it did - or why nothing - in outStatus. */
 	bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 	/** Replace on a DOCUMENT row (2026-09-27): that document's ticked rows, as ReplaceStory. */
 	bool ReplaceChapter(int32 chapterIdx, PMString& outStatus);

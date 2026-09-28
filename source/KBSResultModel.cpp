@@ -17,6 +17,7 @@
 #include "Utils.h"
 
 #include <algorithm>	// std::lower_bound - where the display cap falls inside one font group
+#include <set>			// the rows already copied aside - see BackUpRow
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
 // Project includes:
@@ -62,13 +63,16 @@ namespace
 	// Only true while a replace is running; empty at every other moment.
 	bool gBackingUpRows = false;
 	std::vector<BackedUpRow> gRowBackup;
+	std::set<std::pair<int32, int32> > gRowsBackedUp;	// (chapter, hit) already in gRowBackup
 
-	// Copy a row aside before it is written to, if a replace is running. Every change is kept,
-	// including a second one to the same row - RollBackRows walks the copies backwards, so the
-	// oldest is applied last and wins.
+	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
+	// taken first is the row as the run found it, and it is the one a rollback has to put back. (Every
+	// change was kept until 2026-09-28, a replaced row four or five times over - MarkHitReplaced,
+	// SetHitRecordTime, SetHitChangeTexts, SetHitRange, SetHitSegments - and RollBackRows walked the
+	// copies backwards so the oldest won; every later copy was overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KBSResultModel::Hit& row)
 	{
-		if (!gBackingUpRows)
+		if (!gBackingUpRows || !gRowsBackedUp.insert(std::make_pair(chapterIdx, hitIdx)).second)
 			return;
 		BackedUpRow saved;
 		saved.chapter = chapterIdx;
@@ -1094,10 +1098,8 @@ void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMStri
 		return;
 	Hit& h = c.hits[hitIdx];
 
-	// Backed up again even though MarkHitReplaced already copied this row aside: a cancel has to
-	// put back what the search left, and RollBackRows applies the copies oldest-last, so an extra
-	// copy costs one Hit and cannot change the outcome. Nothing here relies on the earlier call
-	// having happened.
+	// Asked here too, whether or not MarkHitReplaced has already copied this row aside: BackUpRow
+	// takes the first copy only, so nothing here relies on the earlier call having happened.
 	BackUpRow(chapterIdx, hitIdx, h);
 
 	h.preText = newPre;			h.preText.SetTranslatable(kFalse);
@@ -1218,6 +1220,7 @@ bool KBSResultModel::IsShowingReplaceOutcome()
 void KBSResultModel::BeginRowBackup()
 {
 	gRowBackup.clear();
+	gRowsBackedUp.clear();
 	gBackingUpRows = true;
 }
 
@@ -1225,8 +1228,8 @@ void KBSResultModel::RollBackRows()
 {
 	gBackingUpRows = false;
 
-	// Backwards: a row written to more than once has several copies, and the one taken FIRST is
-	// the one the search left, so it has to be applied last.
+	// One copy per row (BackUpRow), so the order decides nothing now. (Backwards since the copies were
+	// several per row, when the one taken FIRST had to be applied last.)
 	for (size_t i = gRowBackup.size(); i > 0; --i)
 	{
 		const BackedUpRow& saved = gRowBackup[i - 1];
@@ -1240,12 +1243,14 @@ void KBSResultModel::RollBackRows()
 
 	// Swapping against a temporary releases the storage as well as the contents.
 	std::vector<BackedUpRow>().swap(gRowBackup);
+	gRowsBackedUp.clear();
 }
 
 void KBSResultModel::ForgetRowBackup()
 {
 	gBackingUpRows = false;
 	std::vector<BackedUpRow>().swap(gRowBackup);
+	gRowsBackedUp.clear();
 }
 
 // (DropChapter - erase one chapter and leave the others - was defined here until 2026-08-07. See
