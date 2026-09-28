@@ -2506,9 +2506,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// engine's own reopen). What that costs is a document load on the first click into a chapter;
 	// what it buys is that searching a book no longer leaves twenty hidden documents behind.
 
-	// The results stop short of the scope when collecting hit the ceiling or a chapter's walk broke
-	// off - and a replace over them would write matches no row lists (KBSResultModel::SetStoppedShort).
-	KBSResultModel::SetStoppedShort(collectionTruncated || !brokeOff.empty());
+	// (The results were marked "stopped short" here - the ceiling, or a walk that broke off - for the
+	// Change All replace to refuse them. That refusal went with Change All on 2026-09-27 and the mark had
+	// no reader left; it went on 2026-09-28. The summary below still says both, from these locals.)
 
 	// The chapters the run could not fully account for, said the same way whichever way the summary
 	// ends - "No matches" is a lie too if a chapter was skipped, or a walk broke off before its end.

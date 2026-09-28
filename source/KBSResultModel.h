@@ -246,17 +246,12 @@ namespace KBSResultModel
 	void NoteRun();
 	bool HasRun();
 
-	/** Did the search that produced these results stop SHORT of the scope - at the whole-run ceiling
-	    (kKBSCollectHitLimit), or with a chapter whose walk broke off partway?
-
-	    ***** WHY THE REPLACE HAS TO KNOW (2026-09-27 defect sweep, D-5). ***** Change Checked is
-	    InDesign's Change All over each story that holds a row, and it writes EVERY match in that story -
-	    including the ones the search stopped before listing. The run then finds a change no row
-	    accounts for and stops ("Change All wrote a match that is not in the results"), which reads as
-	    a fault rather than as "these results are incomplete". Asked before the confirmation instead,
-	    so the refusal says what it is about. Set by the search; cleared by Clear(). */
-	void SetStoppedShort(bool stoppedShort);
-	bool IsStoppedShort();
+	// (SetStoppedShort / IsStoppedShort - did the search stop short of its scope, at the whole-run ceiling
+	//  or with a chapter whose walk broke off - stood here from 2026-09-27 to 2026-09-28. The replace
+	//  asked it while it was InDesign's Change All over whole stories, which would have written the
+	//  matches past where the search stopped (defect sweep D-5, cfdf50a). The replace became one match at
+	//  a time the same day (486e2ef) and writes the ticked rows only - the user's call: results that
+	//  stopped at the limit can be replaced - so the question lost its one reader and went.)
 
 	// (ResultKind - Find/Change hits, or a scan's report - and IsReportOnlyKind stood here until the two
 	//  scans were removed on 2026-09-27: every result set is a Find/Change one.)

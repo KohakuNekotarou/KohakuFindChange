@@ -2338,11 +2338,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		outSummary.Append("Nothing checked.");
 		return 0;
 	}
-	// (Results that stop short of the scope - KBSResultModel::SetStoppedShort - were refused here while
-	//  the replace was Change All, which would have written the matches past where the search stopped.
-	//  One match at a time writes the ticked rows and nothing else, so the refusal went in the
-	//  2026-09-27 cleanup. A chapter whose search broke off is still caught by the verify pass: a
-	//  ticked row its walk cannot reach stops the run.)
+	// (Results that stop short of the scope were refused here while the replace was Change All, which
+	//  would have written the matches past where the search stopped. One match at a time writes the
+	//  ticked rows and nothing else, so the refusal went in the 2026-09-27 cleanup, and the flag it read
+	//  - KBSResultModel::SetStoppedShort - on 2026-09-28. A chapter whose search broke off is still
+	//  caught by the verify pass: a ticked row its walk cannot reach stops the run.)
 
 	// Do the Find/Change settings still describe the search these rows came from - the tab, and the
 	// query with every option that decides the match set? This also STATES the tab
