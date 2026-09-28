@@ -1033,3 +1033,10 @@ KBSTrackChange::AuthorScope::~AuthorScope()
 	if (fSwitched)
 		SpikeSetUserName(fOld);
 }
+
+void KBSTrackChange::SpikeSetRowAuthor(int32 replacesSoFar)
+{
+	PMString name((replacesSoFar % 2 == 0) ? "Kohaku" : "Nekotarou");
+	name.SetTranslatable(kFalse);
+	SpikeSetUserName(name);
+}

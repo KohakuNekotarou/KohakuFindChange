@@ -236,6 +236,12 @@ namespace KBSTrackChange
 	    InDesign's user name set to "KohakuFindChange" for the life of the object and put back - the
 	    AuthorScope that stood here until 2026-09-27 (4522ccf^), unchanged. The records are then made
 	    under that name by InDesign itself, so SignReplace finds nothing to rewrite. */
+	/** SPIKE step 3 (2026-09-28, the user: "for CatCat, the first Cat as Kohaku and the second as
+	    Nekotarou - do the deletions still merge?"): InDesign's user name for the replace about to be
+	    written - "Kohaku" for the chapter's 1st, 3rd, ... replace, "Nekotarou" for the 2nd, 4th, ...
+	    AuthorScope puts the user's own name back after the run. */
+	void SpikeSetRowAuthor(int32 replacesSoFar);
+
 	class AuthorScope
 	{
 	public:

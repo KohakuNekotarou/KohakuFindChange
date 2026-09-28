@@ -742,11 +742,13 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				const bool haveThread = ThreadAt(db, story.GetUID(), start, matchDict, matchKey, matchThreadStart);
 				UIDRef written;
 				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
+				// SPIKE step 3 (2026-09-28, not for main): each replace under its own author, as InDesign writes it
+				KBSTrackChange::SpikeSetRowAuthor(ioReplaced);
 				if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
 				{
 					++ioReplaced;
-					// SPIKE 2026-09-28 (not for main): sign this replace's records before the next one is written
-					KBSTrackChange::SignReplace(written, writtenStart, writtenEnd, KBSTrackChange::TakeSignedStamp());
+					// SPIKE 2026-09-28 (not for main): the rewrite is OFF in step 3 - the names stay InDesign's
+					// KBSTrackChange::SignReplace(written, writtenStart, writtenEnd, KBSTrackChange::TakeSignedStamp());
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
