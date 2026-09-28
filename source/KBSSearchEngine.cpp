@@ -29,7 +29,6 @@
 // Interface includes:
 #include "IComposeScanner.h"		// FindSurroundingParagraph / CopyText (the hit line's text)
 #include "IDocument.h"
-#include "ILayoutUIUtils.h"
 #include "IFindChangeOptions.h"
 #include "IFindChangeCmdData.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
@@ -69,7 +68,8 @@
 #include "AttributeBossList.h"		// the Find Format list the search remembers (RememberFindFormat)
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
-#include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
+#include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner, StoryLeadText)
+#include "UnicodeClass.h"			// IsWhiteSpace / IsIgnoredCharacter - which characters a story row's first words keep
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
 #include "ProgressBar.h"			// RangeProgressBar - the search's progress + cancel (both scopes)
@@ -90,7 +90,7 @@
 
 // Project includes:
 #include "KBSSearchEngine.h"
-#include "KBSTrackChange.h"		// IsInFootnote (a footnote's row cannot be taken back) / ReadText
+#include "KBSTrackChange.h"		// IsInFootnote (a footnote's row cannot be taken back)
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -956,31 +956,60 @@ void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResu
 
 // The first words of a story, for its row in the tree (2026-09-27, the story level): up to 24 characters
 // that show, each run of white space read as one space, InDesign's own marker characters (a table's
-// anchor, a footnote's reference, an anchored object, an endnote's mark...) left out, and "..." when the
-// story goes on. Read from the first 200 characters, which is plenty for 24 that show.
+// anchor, a footnote's reference, an anchored object, a zero-width mark...) left out, and the cut mark
+// when the story goes on. Read from the first 200 characters, which is plenty for 24 that show.
+//
+// ***** IN THE OFFICIAL TERMS (2026-09-28, the search API audit A-2). ***** Read through
+// IComposeScanner::CopyText, like every other read in this file (and codesnippets/
+// SnpCreateCrossReference.cpp, which names stories from their text the same way). A marker is what
+// InDesign itself counts as neither white space nor a character, UnicodeClass::IsIgnoredCharacter
+// with the spell checker's set (kIgnoreSpellingIgnorable: zero-width marks, discretionary hyphens,
+// page numbers and other computed text, table characters, inline graphics, special glyphs, variation
+// selectors), plus the rest of the control range and the object placeholder. A gap is one of the
+// three breaks InDesign keeps in the control range, or UnicodeClass::IsWhiteSpace (which KCM's story
+// list, KCMStoryList.cpp, asks too) - with the two corrections the loop below names. The cut is
+// kTextChar_Ellipse, as a hit row's is. Until then this was a table of fourteen code points that
+// dropped the whole private-use area - so a story opening with gaiji lost them from its row (seen
+// in the regression case: the row read "a-b-c" with the gaiji gone) - and the cut read "...".
 PMString StoryLeadText(const UIDRef& storyRef)
 {
 	PMString out;
 	out.SetTranslatable(kFalse);
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	if (model == nil)
+	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
+	if (model == nil || scanner == nil)
 		return out;
 	const int32 total = model->TotalLength();
-	const WideString raw(KBSTrackChange::ReadText(storyRef, 0, total < 200 ? total : 200));
+	WideString raw;
+	scanner->CopyText(0, total < 200 ? total : 200, &raw);
 	WideString lead;
 	int32 shown = 0;
 	bool pendingSpace = false;
 	bool more = false;
-	for (WideString::const_iterator it = raw.begin(); it != raw.end(); ++it)
+	for (int32 i = 0; i < raw.CharCount(); ++i)
 	{
-		const uint32 c = *it;
-		if (c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D || c == 0x3000 || c == 0x2028 || c == 0x2029)
+		const UTF32TextChar c = raw.GetChar(i);
+		const uint32 v = c.GetValue();
+		// ***** IN THIS ORDER, AND WITH TWO NAMED CHARACTERS - BOTH MEASURED (2026-09-28, the
+		// story-lead-chars regression case). ***** The breaks first: IsIgnoredCharacter counts CR / LF
+		// as markers too, and a break reads as a gap. Then the markers, BEFORE white space, because
+		// IsWhiteSpace answered TRUE for the zero-width space (U+200B), which then showed as a space
+		// between two letters. Then white space - with the ideographic space named, because
+		// IsWhiteSpace answered FALSE for it and a Japanese paragraph's indent came through as a
+		// character at the head of the row.
+		if (v == kTextChar_CR || v == kTextChar_LF || v == kTextChar_Tab)
 		{
 			pendingSpace = (shown > 0);
 			continue;
 		}
-		if (c < 0x20 || c == 0xFEFF || c == 0xFFFC || (c >= 0xE000 && c <= 0xF8FF))
+		if (v < kTextChar_Space || v == kTextChar_ObjectReplacementCharacter
+			|| UnicodeClass::IsIgnoredCharacter(c, UnicodeClass::kIgnoreSpellingIgnorable))
 			continue;
+		if (UnicodeClass::IsWhiteSpace(c) || v == kTextChar_IdeographicSpace)
+		{
+			pendingSpace = (shown > 0);
+			continue;
+		}
 		if (shown >= 24)
 		{
 			more = true;
@@ -988,16 +1017,16 @@ PMString StoryLeadText(const UIDRef& storyRef)
 		}
 		if (pendingSpace)
 		{
-			lead.Append(UTF32TextChar(0x20));
+			lead.Append(UTF32TextChar(kTextChar_Space));
 			pendingSpace = false;
 		}
-		lead.Append(UTF32TextChar(c));
+		lead.Append(c);
 		++shown;
 	}
 	out = PMString(lead);
-	out.SetTranslatable(kFalse);
 	if (more)
-		out.Append("...");
+		out.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+	out.SetTranslatable(kFalse);
 	return out;
 }
 
@@ -2091,7 +2120,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append("Book Scope is on, but no book is open.");
 		return 0;
 	}
-	if (!fromBook && Utils<ILayoutUIUtils>()->GetFrontDocument() == nil)
+	if (!fromBook && KBSBookScope::ActiveDocument() == nil)
 	{
 		outSummary.Append("No open document to search.");
 		return 0;
@@ -2153,8 +2182,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	else
 	{
 		// Re-read rather than carried down from the check above: a command has been processed since
-		// (CommitSearchMode), and a pointer to the front document is not ours to assume survived it.
-		IDocument* doc = Utils<ILayoutUIUtils>()->GetFrontDocument();
+		// (CommitSearchMode), and a pointer to the active document is not ours to assume survived it.
+		IDocument* doc = KBSBookScope::ActiveDocument();
 		if (doc == nil)
 		{
 			outSummary.Append("No open document to search.");
