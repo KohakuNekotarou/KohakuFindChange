@@ -426,8 +426,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSAcceptAllChangesActionID:
 		{
-			// A document row's right-click menu (2026-09-27): KBS's own tracked changes in that chapter's
-			// document. The book row (and nothing stashed - a script firing the action by ID) does nothing.
+			// A document row's right-click menu (2026-09-27): every tracked change in that chapter's document,
+			// anybody's. The book row (and nothing stashed - a script firing the action by ID) does nothing.
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
 				break;
@@ -769,15 +769,15 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		else if (action == kKBSChapterReplaceActionID)
 		{
 			// A document row's menu (2026-09-27): while that document has a ticked row to replace. The book
-			// row greys it (Change Checked, with its prompt, is the whole book's).
+			// row greys it (Change Checked is the whole book's).
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			const bool enable = chapter >= 0 && KBSReplaceEngine::CanReplaceChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSAcceptAllChangesActionID)
 		{
-			// A document row's menu (2026-09-27): only while that document is open and holds a change
-			// of ours. The book row greys it (the command is about one document).
+			// A document row's menu (2026-09-27): only while that document is open and holds a tracked
+			// change - anybody's, as InDesign's own. The book row greys it (the command is about one document).
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			const bool enable = chapter >= 0 && chapter < KBSResultModel::GetChapterCount()
 				&& KBSReplaceEngine::CanAcceptAllInChapter(chapter);

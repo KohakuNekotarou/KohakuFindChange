@@ -82,11 +82,15 @@ PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
 {
 	WideString w;
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	if (model != nil && len > 0)
+	// The official one-call read (textiterator.h AppendToStringAndIncrement), as KCM (KCMTextWords.h
+	// WordsAt) and KESCL (KESCLFindInDoc.cpp MatchStillValid) read a range - after the same check they
+	// make that it lies inside the story. A range running past the end reads up to the end, as the
+	// character-by-character loop here did until 2026-09-28.
+	if (model != nil && len > 0 && at >= 0 && at < model->TotalLength())
 	{
+		const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
 		TextIterator it(model, at);
-		for (int32 k = 0; k < len && !it.IsNull(); ++k, ++it)
-			w.Append((*it).GetValue());
+		it.AppendToStringAndIncrement(&w, n);
 	}
 	PMString s(w);
 	s.SetTranslatable(kFalse);

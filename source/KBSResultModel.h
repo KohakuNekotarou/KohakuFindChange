@@ -634,10 +634,17 @@ namespace KBSResultModel
 	/** ***** A ROW TAKEN BACK IS WORK AGAIN (2026-09-27, the user's call A and B). ***** A row Reject Change
 	    put back to its original text carries a box again - in a work list and in a replace's report
 	    alike - so it can be ticked and replaced again (Change Checked, or its menu's Replace). (Redo went
-	    on 2026-09-27, the user's call: Replace is the one way.) IsWorkRow = checked-and-waiting's rule: not replaced, and nothing said about it
+	    on 2026-09-27, the user's call: Replace is the one way.) IsWorkOutcome = nothing said about the row
 	    but "taken back". AnyRejectedRowOpen = does a report hold one (then the report offers work). */
 	bool IsWorkOutcome(ChangeOutcome outcome);
 	bool AnyRejectedRowOpen();
+
+	/** ***** IS THIS ROW CHANGE CHECKED'S WORK? (2026-09-28: one rule, asked everywhere) ***** Ticked, not
+	    replaced, and nothing said about it but "taken back" (IsWorkOutcome). What the checked counts count -
+	    the run is sized with them - and what the replace writes and its verify walk checks: the rule was
+	    spelled out in five places until 2026-09-28, and the bar's size rests on their agreeing. Out of
+	    range = false. */
+	bool IsHitCheckedWork(int32 chapterIdx, int32 hitIdx);
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
 	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced

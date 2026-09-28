@@ -118,6 +118,12 @@ namespace
 		return !hit.replaced && !hit.isLocked && KBSResultModel::IsWorkOutcome(hit.outcome);
 	}
 
+	// Change Checked's work - see KBSResultModel::IsHitCheckedWork.
+	bool IsCheckedWork(const KBSResultModel::Hit& hit)
+	{
+		return hit.checked && !hit.replaced && KBSResultModel::IsWorkOutcome(hit.outcome);
+	}
+
 	// ***** GROUP A CHAPTER'S HITS BY STORY (2026-09-27, the user's call) - the tree's middle level. *****
 	// One group per story in first-appearance (page) order - so the stories read in the order their
 	// first matches stand - and every hit given its group. The row reads "P<page of the story's first
@@ -248,6 +254,14 @@ bool KBSResultModel::NoRowHasCheckBox()
 bool KBSResultModel::IsWorkOutcome(ChangeOutcome outcome)
 {
 	return outcome == kOutcomeNone || outcome == kOutcomeRejected;
+}
+
+bool KBSResultModel::IsHitCheckedWork(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	return hitIdx >= 0 && hitIdx < static_cast<int32>(hits.size()) && IsCheckedWork(hits[hitIdx]);
 }
 
 bool KBSResultModel::AnyRejectedRowOpen()
@@ -434,8 +448,7 @@ int32 KBSResultModel::GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx)
 	int32 count = 0;
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
-		const Hit& h = gChapters[chapterIdx].hits[rows[k]];
-		if (h.checked && !h.replaced && IsWorkOutcome(h.outcome))
+		if (IsCheckedWork(gChapters[chapterIdx].hits[rows[k]]))
 			++count;
 	}
 	return count;
@@ -821,7 +834,7 @@ int32 KBSResultModel::GetCheckedCount()
 		const std::vector<Hit>& hits = gChapters[ci].hits;
 		for (size_t hi = 0; hi < hits.size(); ++hi)
 		{
-			if (hits[hi].checked && !hits[hi].replaced && IsWorkOutcome(hits[hi].outcome))
+			if (IsCheckedWork(hits[hi]))
 				++count;
 		}
 	}
@@ -839,7 +852,7 @@ int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
 	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
 	for (size_t hi = 0; hi < hits.size(); ++hi)
 	{
-		if (hits[hi].checked && !hits[hi].replaced && IsWorkOutcome(hits[hi].outcome))
+		if (IsCheckedWork(hits[hi]))
 			++count;
 	}
 	return count;
