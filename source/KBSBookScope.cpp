@@ -757,6 +757,42 @@ bool KBSBookScope::ChapterHasFile(const IDFile& file)
 	return !fileHelper.GetPath().empty();
 }
 
+// The open document living in a chapter's file, or gNull - OPENS NOTHING. ReopenChapterDoc's first half,
+// and FindOpenChapterDoc's whole (2026-09-29: the defect re-check F-3 - the two asked it in one place
+// from then). See ReopenChapterDoc for why the answer is checked against the file and why conversions
+// are walked for.
+static UIDRef KBSOpenDocOfChapterFile(const IDFile& file)
+{
+	InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+	if (docList == nil)
+		return UIDRef::gNull;
+	IDocument* openDoc = docList->FindDoc(file);
+	if (KBSDocumentLivesInFile(openDoc, file))
+		return ::GetUIDRef(openDoc);
+	const int32 openCount = docList->GetDocCount();
+	for (int32 i = 0; i < openCount; ++i)
+	{
+		IDocument* candidate = docList->GetNthDoc(i);
+		if (candidate == nil || candidate == openDoc || !candidate->IsConverted())
+			continue;
+		if (KBSDocumentLivesInFile(candidate, file))
+			return ::GetUIDRef(candidate);
+	}
+	return UIDRef::gNull;
+}
+
+bool KBSBookScope::FindOpenChapterDoc(const IDFile& file, UIDRef& ioDocRef)
+{
+	// See the header: by file for a chapter with one; the docRef the results hold only for one without.
+	if (!ChapterHasFile(file))
+		return IsDocStillOpen(ioDocRef);
+	const UIDRef open = KBSOpenDocOfChapterFile(file);
+	if (open == UIDRef::gNull)
+		return false;
+	ioDocRef = open;
+	return true;
+}
+
 bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 {
 	outDocRef = UIDRef::gNull;
@@ -790,35 +826,20 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	//
 	// So the check stays whatever the lookup is: it costs one file compare, and it is the only
 	// thing standing between a wrong answer and a replace in the wrong document.
+	//
+	// ***** AND A CONVERSION OF IT, WHICH THE LOOKUP BY FILE CANNOT FIND. ***** An older InDesign's
+	// chapter opens as a document with no file (see KBSDocumentLivesInFile), so FindDoc answers nil
+	// about it even while one stands open - and opening the file again below made a second conversion
+	// every time (2026-09-25). A walk of the open documents is the only way to ask; it is short, and
+	// KBSDocumentLivesInFile does the matching, so "is this the chapter" is still decided in one place.
+	//
+	// Both are KBSOpenDocOfChapterFile's (above) since 2026-09-29, which FindOpenChapterDoc asks too.
 	{
-		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
-		if (docList != nil)
+		const UIDRef open = KBSOpenDocOfChapterFile(file);
+		if (open != UIDRef::gNull)
 		{
-			IDocument* openDoc = docList->FindDoc(file);
-			if (KBSDocumentLivesInFile(openDoc, file))
-			{
-				outDocRef = ::GetUIDRef(openDoc);
-				return true;
-			}
-
-			// ***** AND A CONVERSION OF IT, WHICH THE LOOKUP BY FILE CANNOT FIND. ***** An older
-			// InDesign's chapter opens as a document with no file (see KBSDocumentLivesInFile), so
-			// FindDoc answers nil about it even while one stands open - and opening the file again
-			// below made a second conversion every time (2026-09-25). A walk of the open documents
-			// is the only way to ask; it is short, and KBSDocumentLivesInFile does the matching, so
-			// "is this the chapter" is still decided in one place.
-			const int32 openCount = docList->GetDocCount();
-			for (int32 i = 0; i < openCount; ++i)
-			{
-				IDocument* candidate = docList->GetNthDoc(i);
-				if (candidate == nil || candidate == openDoc || !candidate->IsConverted())
-					continue;
-				if (KBSDocumentLivesInFile(candidate, file))
-				{
-					outDocRef = ::GetUIDRef(candidate);
-					return true;
-				}
-			}
+			outDocRef = open;
+			return true;
 		}
 		// Not open - or an answer that is not this file, which is treated the same way, since the
 		// open below resolves by file and cannot be confused. ***** NEVER return false from here.

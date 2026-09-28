@@ -3015,10 +3015,18 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 // The document of a chapter, if it is open - Reject Change, Redo and Accept All work on the open document
 // only. One question for all of them (2026-09-29): they spelled it out one by one until then, each with a
 // test for no database in front of IsDocStillOpen, which answers false for that itself.
+// ***** BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS (2026-09-29, the defect re-check
+// ***** F-3). ***** It asked IsDocStillOpen of the docRef the results held: a chapter closed and opened again
+// sits at a new address ("not open" - its replaced rows could not be taken back until a click on one
+// rebound it), and a closed chapter's address taken by a document opened later answered for THAT one.
 static bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 {
 	IDFile file;
-	return KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file) && KBSBookScope::IsDocStillOpen(outDocRef);
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file)
+		|| !KBSBookScope::FindOpenChapterDoc(file, outDocRef))
+		return false;
+	KBSResultModel::RebindChapterDoc(chapterIdx, outDocRef);
+	return true;
 }
 
 bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)

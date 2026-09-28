@@ -72,6 +72,7 @@
 #include "KBSResultModel.h"		// SetContextMenuChapter - which row the menu is about to act on
 #include "KBSResultTree.h"		// ShowStatus - why a hit row's menu has nothing to offer
 #include "KBSTrackChange.h"		// RefreshRowFromRecords - is this row's tracked change still there?
+#include "KBSBookScope.h"		// FindOpenChapterDoc - or is its document simply not open?
 
 namespace
 {
@@ -302,7 +303,15 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		}
 		else if (replaced && !KBSTrackChange::RefreshRowFromRecords(chapter, hit))
 		{
-			PMString why("Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?).");
+			// A closed document is said as such (2026-09-29, the defect re-check F-3): the records may all
+			// be there, and the row reads "no tracked change" only because nothing is open to read them in.
+			UIDRef rowDoc;
+			IDFile rowFile;
+			const bool open = KBSResultModel::GetChapterLocation(chapter, rowDoc, rowFile)
+				&& KBSBookScope::FindOpenChapterDoc(rowFile, rowDoc);
+			PMString why(open
+				? "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?)."
+				: "Reject Change: the document of this row is not open - open it to take the replace back.");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}

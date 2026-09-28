@@ -399,10 +399,12 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	UIDRef docRef;
 	IDFile file;
 	// ***** OPEN, OR NOT AT ALL. ***** A chapter closed since the search leaves a dangling database pointer
-	// behind (KBSBookScope::IsDocStillOpen says why, and answers false for no database at all) - asked
-	// before anything is read through it.
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KBSBookScope::IsDocStillOpen(docRef))
+	// behind - asked before anything is read through it. By the chapter's FILE since 2026-09-29 (the defect
+	// re-check F-3, KBSBookScope::FindOpenChapterDoc): the held docRef read a chapter closed and opened
+	// again as "not open", and could be answered for by a document that took a closed chapter's address.
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KBSBookScope::FindOpenChapterDoc(file, docRef))
 		return false;
+	KBSResultModel::RebindChapterDoc(chapterIdx, docRef);
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	uint64 hash = 0;

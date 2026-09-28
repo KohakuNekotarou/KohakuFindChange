@@ -423,6 +423,17 @@ namespace KBSBookScope
 	            it is the same). */
 	bool ReachChapterDoc(const IDFile& file, UIDRef& ioDocRef);
 
+	/** ReachChapterDoc WITHOUT THE OPEN (2026-09-29, the defect re-check F-3): the chapter's
+	    document if it is open now - by its file, the same lookup ReopenChapterDoc makes before it
+	    opens anything; a chapter with no file (a document-scope row) by IsDocStillOpen(ioDocRef).
+	    For Reject Change, Redo and Accept All Changes by KohakuFindChange, which act on an open
+	    document only, and for a replaced row's record lookup (KBSTrackChange::FindRowChangeForHit).
+	    They asked IsDocStillOpen of the docRef the results held until then: a chapter the user had
+	    closed and opened again read "not open" (a new address) - and one whose address a
+	    document opened later had taken read as THAT document (the 2026-08-04 fault above).
+	    @return true = ioDocRef is the open document now. The caller rebinds the model to it. */
+	bool FindOpenChapterDoc(const IDFile& file, UIDRef& ioDocRef);
+
 	/** Give a chapter that is open WITHOUT a window (the search opens them that way) a real layout
 	    window, so the user can see what a replace did to it. Does NOT save, and does not bring an
 	    already-visible document to the front - a document that already has a window anywhere,
