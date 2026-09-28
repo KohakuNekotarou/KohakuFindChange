@@ -142,7 +142,8 @@ namespace KBSSearchEngine
 
 	    @param overrideFindGlyph  normally kInvalidGlyphID: state the glyph the dialog holds, which is
 	           what every existing caller wants. Anything else is stated INSTEAD of it, for callers
-	           that supply their own glyph query - the missing-glyph scan passes kAnyNotDefGlyphID.
+	           that supply their own glyph query - the missing-glyph scan passed kAnyNotDefGlyphID until
+           2026-08-02; no caller does now (see SearchBook).
 	           Only meaningful while the Glyph tab is the mode in force.
 
 	    @return true when every value above was actually stated. FALSE MUST STOP THE CALLER: what

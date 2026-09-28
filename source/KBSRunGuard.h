@@ -4,8 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
-//  can be running and every guard has to know about all four.
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because two different things
+//  can be running - a search and a replace (four until 2026-09-27, when the missing-glyph and
+//  overset scans were removed) - and every guard has to know about both.
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -32,13 +33,13 @@
 //      action by ID reaches the engine whatever the menu says;
 //    * the book-close watcher (KBSBookWatch, twice: at the cue and again in the deferred callback),
 //      whose question would otherwise release the chapters a run is walking. It used to ask only
-//      about the SEARCH, which left the replace and both scans unprotected;
+//      about the SEARCH, which left the replace (and the two scans, while they existed) unprotected;
 //    * the document-close responder (KBSCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
 //    (the report writer - KBSReportSave - and the script provider - app.kfcStatus / app.kfcResults -
 //     asked too, until they were removed on 2026-09-27.)
 //
-//  A fifth run added later is one line in this file rather than a fault nobody notices in four.
+//  A run added later is one line in KBSRunGuard.cpp rather than a fault nobody notices in the callers.
 //
 //========================================================================================
 
@@ -47,14 +48,14 @@
 
 namespace KBSRunGuard
 {
-	/** Is a search, a replace, a missing-glyph scan or an overset scan running right now? */
+	/** Is a search or a replace running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not
 	    translatable - the panel's status line is English throughout, echoing the Find/Change
-	    wording. Deliberately does not name WHICH run: the runs that use it are the ones whose own
-	    re-entry message would be a guess (a scan turned away by a replace, and so on), and the
-	    engines that DO know say so themselves before asking this. */
+	    wording. Deliberately does not name WHICH run: the callers that use it are the ones whose own
+	    re-entry message would be a guess, and the engines that DO know say so themselves before
+	    asking this. */
 	const char* BusyMessage();
 }
 

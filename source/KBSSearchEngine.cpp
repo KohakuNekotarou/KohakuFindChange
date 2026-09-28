@@ -1677,9 +1677,9 @@ bool KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 	// while it is certainly still there and hand it back afterwards.
 	//
 	// A caller that brought its own glyph wins over the dialog's. That is how the missing-glyph scan
-	// runs: it hands over kAnyNotDefGlyphID, which the engine reads as "any notdef, whatever font
-	// this run of text is in". Every other caller passes kInvalidGlyphID and gets the old behaviour
-	// exactly - the dialog's own glyph, stated back to the engine unchanged.
+	// ran until 2026-08-02: it handed over kAnyNotDefGlyphID, which the engine reads as "any notdef,
+	// whatever font this run of text is in". No caller does now (KBSSearchEngine.h, SearchBook): every
+	// one passes kInvalidGlyphID and gets the dialog's own glyph, stated back to the engine unchanged.
 	const Text::GlyphID findGlyphID =
 		(overrideFindGlyph != kInvalidGlyphID)
 			? overrideFindGlyph
@@ -2183,8 +2183,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// (It was refused here until the Japanese version came into use; on a Roman-featureset install
 	// the tab cannot be reached at all, so the transliterate paths simply lie dormant there.)
 
-	// A caller with its own glyph query - the missing-glyph scan - has nothing on the dialog that
-	// could be missing, so HasFindQuery is the wrong question for it. What it does need is the GLYPH
+	// A caller with its own glyph query - the missing-glyph scan was one until 2026-08-02; none is
+	// now - has nothing on the dialog that could be missing, so HasFindQuery is the wrong question for it. What it does need is the GLYPH
 	// TAB: the engine walks in the mode last committed, and a notdef sentinel is a glyph query.
 	// Switching the tab on the user's behalf would change a setting they can see and did not touch,
 	// so this says what to do and stops instead.
@@ -2331,13 +2331,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// but this is the one that would still be right on the day they stopped agreeing.
 	KBSResultModel::SetSearchMode(CurrentSearchModeValue());
 
-	// ...and WHAT WAS ASKED FOR, for the heading of the file "Save Results..." writes. Recorded here,
-	// beside the tab, because both answers have the same lifetime: they describe THESE rows, and the
-	// user is free to retype the query the moment this search returns.
+	// (What was asked for - the caption at the head of the file "Save Results..." wrote - was recorded
+	// here until that command was removed on 2026-09-27.)
 
 	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
-	// which matches come back. The line above is a caption; this one is a key, and Change Checked
-	// compares it before it re-walks. The tab alone is not enough: retyping the find string, or
+	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab alone is not enough: retyping the find string, or
 	// turning Include Footnotes off, changes the match set without changing the tab, and the walk
 	// order the hits below are numbered by would then point at other occurrences entirely.
 	// See KBSSearchEngine::BuildWalkSignature.
