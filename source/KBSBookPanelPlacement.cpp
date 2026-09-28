@@ -627,7 +627,8 @@ void SayWriteFailed(const char* reason)
 }
 
 /** Keep this placement for the session and write its keys - nothing else - to the settings file.
-    Silent when it works (see SayWriteFailed). */
+    Silent when it works (see SayWriteFailed) - except the once a broken file had to be repaired to
+    write it (2026-09-28), which is said when sayFailure is set. */
 void RememberAndWrite(const Placement& p, bool sayFailure)
 {
 	if (!p.IsUsable())
@@ -636,9 +637,19 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
 
 	std::vector<std::pair<std::string, std::string> > keys;
 	AppendPlacementKeys(p, keys);
-	const char* failure = KBSPanelStateWriteKeys(keys);
+	bool repaired = false;
+	const char* failure = KBSPanelStateWriteKeys(keys, &repaired);
 	if (failure != nil && sayFailure)
 		SayWriteFailed(failure);
+	else if (failure == nil && repaired && sayFailure)
+	{
+		// A broken settings file was repaired to keep the placement (2026-09-28) - said once, when it
+		// happens: a setting the file had lost comes up at its default from the next start (this
+		// session still holds it).
+		PMString msg("Book panel placement saved - the settings file was damaged and has been rewritten with what could be read.");
+		msg.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(msg);
+	}
 }
 
 //----------------------------------------------------------------------------------------
@@ -1238,13 +1249,16 @@ void KBSBookPanelPlacement::ToggleAndSave(PMString& outStatus)
 	// The toggle's key, and nothing else (the user's rule, 2026-09-25).
 	std::vector<std::pair<std::string, std::string> > keys;
 	keys.push_back(std::make_pair(std::string(kKeyToggle), BoolValue(gOn)));
-	const char* failure = KBSPanelStateWriteKeys(keys);
+	bool repaired = false;
+	const char* failure = KBSPanelStateWriteKeys(keys, &repaired);
 
 	// What was set, then WHERE it was written - the full path on a line of its own, the way "Save
 	// Panel Settings" shows it (the user's call, 2026-09-25), so the file can be found, backed up or
 	// deleted. The first line stays because, unlike Save Panel Settings, this command also CHANGES
 	// something, and the status line is where it says which way it went.
 	outStatus = gOn ? "Remember book panel placement: on" : "Remember book panel placement: off";
+	if (failure == nil && repaired)
+		outStatus.Append(" (the settings file was damaged and has been rewritten with what could be read)");
 	if (failure == nil)
 	{
 		PMString path;

@@ -45,8 +45,14 @@
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 
+// MoveFileEx - the side file put in place (KBSWriteWholeFile). KBS is Windows alone (2026-09-28). After
+// the SDK headers, so its macros cannot collide with SDK names (as KBSPanelAlpha.cpp).
+#include <windows.h>
+
 // The file name, in the roaming preferences folder itself.
 static const char* const kKBSPanelStateFileName = "KBSPanelState.json";
+// The side file every write goes to first (KBSWriteWholeFile), next to it.
+static const char* const kKBSPanelStateSideFileName = "KBSPanelState.json.tmp";
 
 //----------------------------------------------------------------------------------------
 // Where the file goes
@@ -153,8 +159,9 @@ static bool KBSJsonReadInt(const std::string& text, const char* key, int32& out)
 //   settings as they happen to stand on the flyout right now: those are saved when the user asks,
 //   and a half-way change they have not saved must not be saved behind their back.
 //   So the file is READ, the named keys are replaced (or added), and it is written back. The reader
-//   is a strict one for the only shape this plug-in writes - one flat object of "key": value pairs -
-//   and it refuses anything else rather than guess.
+//   is a strict one for the only shape this plug-in writes - one flat object of "key": value pairs.
+//   A file it refuses is not guessed at: only the pairs that stand complete in it are kept
+//   (KBSJsonSalvagePairs, 2026-09-28 - until then such a file was left alone and not written at all).
 //----------------------------------------------------------------------------------------
 
 typedef std::vector<std::pair<std::string, std::string> > KBSJsonPairs;	// key, raw value
@@ -266,6 +273,96 @@ static bool KBSJsonParseFlat(const std::string& text, KBSJsonPairs& out)
 	return p == text.size();
 }
 
+// true, false, or a whole number of at most nine digits (KBSJsonReadInt's limit) - the only bare
+// values this plug-in ever writes.
+static bool KBSJsonIsBareScalar(const std::string& v)
+{
+	if (v == "true" || v == "false")
+		return true;
+	size_t i = (!v.empty() && v[0] == '-') ? 1 : 0;
+	const size_t digits = v.size() - i;
+	if (digits == 0 || digits > 9)
+		return false;
+	for (; i < v.size(); ++i)
+		if (v[i] < '0' || v[i] > '9')
+			return false;
+	return true;
+}
+
+// ***** A FILE THAT DOES NOT READ AS THE FLAT OBJECT IS REPAIRED, NOT LEFT (2026-09-28, the user's
+// call: "if it is set to remember, fix what is broken and remember"). ***** Until then such a file was
+// never written again, so a file cut short by a crash stopped the book panel's placement from being
+// kept at all - with no word unless the toggle was flipped. Now every "key": value pair that stands
+// COMPLETE is kept, and the rest is dropped:
+//   - the key's quotes are closed and a ':' follows it;
+//   - the value is true, false, a whole number, or a closed string;
+//   - a ',', a '}' or a line end follows the value (spaces between allowed). This plug-in ends every
+//     value that way, so a value running into the end of the text is a write cut short - "12" may
+//     have been "123" - and is not kept.
+// A key seen twice keeps its last value. out may come back empty (an empty or all-garbage file).
+static void KBSJsonSalvagePairs(const std::string& text, KBSJsonPairs& out)
+{
+	out.clear();
+	size_t p = 0;
+	while (p < text.size())
+	{
+		const size_t q = text.find('"', p);
+		if (q == std::string::npos)
+			break;
+		size_t r = q;
+		std::string key;
+		if (!KBSJsonScanQuoted(text, r, key))
+			break;			// a quote never closed runs to the end of the text
+		size_t s = r;
+		KBSJsonSkipSpace(text, s);
+		if (s >= text.size() || text[s] != ':')
+		{
+			p = r;			// a string that is not a key (a value, or garbage) - look on from after it
+			continue;
+		}
+		++s;
+		KBSJsonSkipSpace(text, s);
+
+		std::string value;
+		size_t e = s;
+		if (e < text.size() && text[e] == '"')
+		{
+			std::string inner;
+			if (!KBSJsonScanQuoted(text, e, inner))
+				break;
+			value = "\"" + inner + "\"";
+		}
+		else
+		{
+			while (e < text.size() && text[e] != ',' && text[e] != '}' && text[e] != '\n' && text[e] != '\r'
+				&& text[e] != ' ' && text[e] != '\t')
+				++e;
+			value = text.substr(s, e - s);
+		}
+		p = e;
+
+		// what ends the value: a ',', a '}' or a line end, after spaces or tabs
+		size_t t = e;
+		while (t < text.size() && (text[t] == ' ' || text[t] == '\t'))
+			++t;
+		const bool ended = t < text.size() && (text[t] == ',' || text[t] == '}' || text[t] == '\n' || text[t] == '\r');
+		if (!ended || value.empty() || (value[0] != '"' && !KBSJsonIsBareScalar(value)))
+			continue;
+
+		bool replaced = false;
+		for (size_t i = 0; i < out.size() && !replaced; ++i)
+		{
+			if (out[i].first == key)
+			{
+				out[i].second = value;
+				replaced = true;
+			}
+		}
+		if (!replaced)
+			out.push_back(std::make_pair(key, value));
+	}
+}
+
 // The whole file, or false when it could not be read in full (see the read in
 // KBSLoadPanelStateIfPresent for why a partial read is never used).
 static bool KBSReadWholeFile(const IDFile& file, std::string& out)
@@ -283,22 +380,40 @@ static bool KBSReadWholeFile(const IDFile& file, std::string& out)
 	return !readFailed;
 }
 
-// Write text as the whole file. The byte count AND fclose are checked, as in KBSSavePanelState: a
-// full disk must not be reported as saved. nil when written, otherwise the reason.
+// Write text as the whole file. The byte count AND fclose are checked: a full disk must not be
+// reported as saved. nil when written, otherwise the reason.
+// ***** THROUGH A SIDE FILE, NEVER IN PLACE (2026-09-28, the user's call). ***** Opening the file itself
+// with "wb" empties it first, so InDesign going down between that and the last byte left an empty or
+// half-written file - and the book panel's placement then stopped being written at all (the strict
+// reader below refused the file) without a word. The text goes to KBSPanelState.json.tmp first, and only
+// a side file written in full is moved over the real one: the real file is always the old one whole or
+// the new one whole. A side file left behind by a crash is simply written over by the next write.
+// The move is Win32's MoveFileEx - KBS is Windows alone (the user's call, 2026-09-28) - told to replace
+// the file that is there and to return only once the move is on the disk. (FileUtils::SwapFiles, the
+// SDK's "moves file1 to file2" (FileUtils.h:132), has no caller in the SDK and does not say whether it
+// replaces a file that is already there.)
 static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text)
 {
-	FILE* fp = FileUtils::OpenFile(file, "wb");
+	IDFile side;
+	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKBSPanelStateSideFileName)))
+		return "folder";
+	FILE* fp = FileUtils::OpenFile(side, "wb");
 	if (fp == nil)
 		return "open";
 	const size_t wrote = fwrite(text.data(), 1, text.size(), fp);
 	const int closed = fclose(fp);
 	if (wrote != text.size() || closed != 0)
 		return "write";
+	IDFile target(file);	// GrabTString is not const
+	if (!::MoveFileEx(side.GrabTString(), target.GrabTString(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		return "replace";
 	return nil;
 }
 
-const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues)
+const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues, bool* outRepaired)
 {
+	if (outRepaired != nil)
+		*outRepaired = false;
 	IDFile file;
 	if (!KBSPanelStateFile(file))
 		return "folder";
@@ -310,13 +425,20 @@ const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues)
 		if (!KBSReadWholeFile(file, text))
 			return "read";
 		if (!KBSJsonParseFlat(text, pairs))
-			return "unreadable file";	// left as it is - see KBSPanelState.h
+		{
+			// A broken file is repaired with what can be read of it (KBSJsonSalvagePairs) - it was left
+			// alone, and the write refused, until 2026-09-28.
+			KBSJsonSalvagePairs(text, pairs);
+			if (outRepaired != nil)
+				*outRepaired = true;
+		}
 	}
-	else
-	{
-		// No file yet: the same "version" line "Save Panel Settings" opens with, and these keys.
-		pairs.push_back(std::make_pair(std::string("version"), std::string("1")));
-	}
+	// No file yet - or a repaired one that lost it: the same "version" line "Save Panel Settings" opens with.
+	bool haveVersion = false;
+	for (size_t i = 0; i < pairs.size() && !haveVersion; ++i)
+		haveVersion = (pairs[i].first == "version");
+	if (!haveVersion)
+		pairs.insert(pairs.begin(), std::make_pair(std::string("version"), std::string("1")));
 
 	for (size_t u = 0; u < keyValues.size(); ++u)
 	{
@@ -405,20 +527,16 @@ void KBSSavePanelState()
 	json += "\n";
 	json += "}\n";
 
-	FILE* fp = FileUtils::OpenFile(file, "wb");
-	if (fp == nil)
-	{
-		KBSPanelStateSayFailed("Save failed (open).");
-		return;
-	}
-
 	// *Both the byte count and fclose are checked (KESCM's 2026-07-25 audit): a partial write on a
-	// full disk must not be reported as a save, with a path that suggests the settings are safe.
-	const size_t wrote = fwrite(json.data(), 1, json.size(), fp);
-	const int closed = fclose(fp);
-	if (wrote != json.size() || closed != 0)
+	// full disk must not be reported as a save, with a path that suggests the settings are safe. And
+	// through the side file since 2026-09-28 - see KBSWriteWholeFile.
+	const char* failure = KBSWriteWholeFile(file, json);
+	if (failure != nil)
 	{
-		KBSPanelStateSayFailed("Save failed (write).");
+		std::string say("Save failed (");
+		say += failure;
+		say += ").";
+		KBSPanelStateSayFailed(say.c_str());
 		return;
 	}
 

@@ -76,12 +76,18 @@ void	KBSLoadPanelStateIfPresent();
 // it - its value, and the key itself when this version does not know it. A key not yet in the file is
 // added at the end. With no file yet, one is made holding "version" and these keys alone.
 // *Values are written RAW (already JSON: "true", "-12"), so a string value would need its quotes.
-// *A file that cannot be read as the flat object "Save Panel Settings" writes is NOT overwritten:
-//  rewriting it would throw away whatever the user had saved in it. The caller is told instead.
+// *A file that cannot be read as the flat object "Save Panel Settings" writes is REPAIRED (2026-09-28,
+//  the user's call): every "key": value pair that stands complete in it is kept, the rest dropped, and
+//  the file is written again with these keys. (Until then it was left as it was and the write refused -
+//  which, for a file cut short by a crash, stopped the book panel's placement being kept at all.)
+//  outRepaired (when not nil) says it happened.
+// *Every write goes through a side file (KBSPanelState.json.tmp) that is moved over the real one only
+//  when written in full, so a crash part way leaves the old file whole (2026-09-28).
 // @return nil when the file was written; otherwise a short reason for the status line - "folder",
-//         "read", "unreadable file", "open", "write".
+//         "read", "open", "write", "replace".
 // Implemented in KBSPanelState.cpp.
-const char*	KBSPanelStateWriteKeys(const std::vector<std::pair<std::string, std::string> >& keyValues);
+const char*	KBSPanelStateWriteKeys(const std::vector<std::pair<std::string, std::string> >& keyValues,
+	bool* outRepaired = nil);
 
 // The settings file's full path, as "Save Panel Settings" shows it on the status line. false when the
 // folder cannot be had. The toggle that writes its own key shows the same path (the user's call,
