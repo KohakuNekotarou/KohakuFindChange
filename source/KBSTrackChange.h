@@ -10,7 +10,7 @@
 //  story's own "Track Changes" setting is handed back as it was found (TrackingScope).
 //
 //  ***** SIGNED "KohakuFindChange" AT A TIME KBS HANDS OUT (2026-09-28, the user's call; spec
-//  docs/superpowers/specs/2026-09-28-kbs-signed-designated-time-design.md). ***** InDesign's user name is
+//  docs/superpowers/specs/_done/2026-09-28-kbs-signed-designated-time-design.md). ***** InDesign's user name is
 //  not touched (a name the script DOM cannot put back to "unset" is a name that could be left behind -
 //  why the 2026-09-26 switch of it went on 2026-09-27): each replace is written under it and its records
 //  are rewritten right after, before the next row is written (KBSSignRecordsCmd). The time is the run's
