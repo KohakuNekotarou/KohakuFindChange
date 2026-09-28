@@ -110,10 +110,13 @@ namespace
 		return !hit.replaced && !hit.isLocked && KBSResultModel::IsWorkOutcome(hit.outcome);
 	}
 
-	// Change Checked's work - see KBSResultModel::IsHitCheckedWork.
+	// Change Checked's work - see KBSResultModel::IsHitCheckedWork. Ticked and carrying a box: the box's own
+	// question (RowHasCheckBox) since 2026-09-29 (the defect re-check F-4) - it was "not replaced, and a work
+	// outcome" until then, which said yes over a report to the ticked rows of a chapter the run could not
+	// open, rows that have no box there.
 	bool IsCheckedWork(const KBSResultModel::Hit& hit)
 	{
-		return hit.checked && !hit.replaced && KBSResultModel::IsWorkOutcome(hit.outcome);
+		return hit.checked && RowHasCheckBox(hit);
 	}
 
 	// ***** GROUP A CHAPTER'S HITS BY STORY (2026-09-27, the user's call) - the tree's middle level. *****

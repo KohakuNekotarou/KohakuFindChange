@@ -2876,9 +2876,10 @@ static bool RowsToReplace(int32 chapterIdx, int32 groupIdx, std::set<int32>& out
 	ScopeRows(chapterIdx, groupIdx, rows);
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
-		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, rows[k], checked, replaced, locked) && checked
-			&& KBSReplaceEngine::CanReplaceHit(chapterIdx, rows[k]))
+		// Change Checked's own rule for "ticked" (IsHitCheckedWork - ticked AND a box on screen, 2026-09-29,
+		// the defect re-check F-4): "checked" alone took a report's unseen ticks of a chapter that could not
+		// be opened.
+		if (KBSResultModel::IsHitCheckedWork(chapterIdx, rows[k]) && KBSReplaceEngine::CanReplaceHit(chapterIdx, rows[k]))
 		{
 			out.insert(rows[k]);
 			if (firstOnly)

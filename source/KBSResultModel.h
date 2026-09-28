@@ -637,7 +637,11 @@ namespace KBSResultModel
 	    replaced, and nothing said about it but "taken back" (IsWorkOutcome). What the checked counts count -
 	    the run is sized with them - and what the replace writes and its verify walk checks: the rule was
 	    spelled out in five places until 2026-09-28, and the bar's size rests on their agreeing. Out of
-	    range = false. */
+	    range = false.
+	    ***** AND ITS BOX ON SCREEN (2026-09-29, the defect re-check F-4): ticked AND RowHasCheckBox. *****
+	    A replace's report keeps the rows of a chapter that could not be opened still ticked, with no box
+	    to see or clear; once a row of that report was taken back with Reject Change the report offered
+	    work again, and Change Checked (or a story's Replace) wrote those unseen rows as well. */
 	bool IsHitCheckedWork(int32 chapterIdx, int32 hitIdx);
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
