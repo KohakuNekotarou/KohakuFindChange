@@ -102,10 +102,11 @@ namespace KBSJa
 	const char16_t kStaleResultsOne[]        = u"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
 	// What Edit > Undo calls a Change Checked run (2026-09-26, the user's call).
 	const char16_t kReplaceStep[]            = u"置換";
-	// ...and a Reject Change and an Accept All Changes in This Document (2026-09-29: English on every UI
-	// until then). InDesign's own Track Changes words.
+	// ...and a Reject Change and an Accept All Changes by KohakuFindChange (2026-09-29: English on every
+	// UI until then). InDesign's own Track Changes words, the author named as the Track Changes panel
+	// shows it (the user's call: the name says only KohakuFindChange's changes are accepted).
 	const char16_t kRejectStep[]             = u"変更を却下";
-	const char16_t kAcceptAllStep[]          = u"すべての変更を承認";
+	const char16_t kAcceptAllStep[]          = u"KohakuFindChange によるすべての変更を承認";
 	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert

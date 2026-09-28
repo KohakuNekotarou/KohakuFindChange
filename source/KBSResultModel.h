@@ -538,7 +538,7 @@ namespace KBSResultModel
 	     right-clicked (KBSResultNodeEH, just before the menu pops), so no menu acts on an index from
 	     before the renumbering; the range check stands behind it for a caller arriving by ActionID.
 	     (Until the 2026-09-27 defect sweep this said the row menu does not open at all after a
-	     replace. Since 2026-09-26 it does - Reject Change, Redo, Accept All Changes in This Document.)
+	     replace. Since 2026-09-26 it does - Reject Change, Redo, Accept All Changes by KohakuFindChange.)
 	     Anything that ever drops chapters WITHOUT a right-click in between has to reset this the way
 	     Clear() does. */
 	enum

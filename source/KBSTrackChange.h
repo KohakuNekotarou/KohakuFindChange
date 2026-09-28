@@ -18,7 +18,8 @@
 //  below the millisecond - no panel and no script shows them). A replaced row keeps its time
 //  (Hit::recordTime) and is tied to its records by that time exactly. (From 2026-09-27 to 2026-09-28 the
 //  records carried the user's own name and the clock's time, and a row was found by its texts and the
-//  nearest position.) "Accept All Changes in This Document" accepts every change, as InDesign's own does.
+//  nearest position.) "Accept All Changes by KohakuFindChange in This Document" accepts the signed records only
+//  (2026-09-29, the user's call - from 2026-09-27 it accepted every change, as InDesign's own Accept All).
 //  ! Touching replaces written front to back leave one insertion per row but ONE deletion, carrying the
 //    LAST row's time: InDesign joins a deletion to the one it touches whoever made either (measured with
 //    two real user names). A touching group is taken back as one (KBSReplaceEngine RejectRowsNow).
@@ -105,24 +106,26 @@ namespace KBSTrackChange
 	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
 
-	/** Every record in the story, in position order - whoever made it. (Its callers count them: the
-	    bound on their accept loops.) */
-	void CollectRecords(const UIDRef& story, std::vector<Record>& out);
+	// (CollectRecords - every record in the story, the bound on the accept loops - stood here until
+	//  2026-09-29: see AcceptSignedInDocument and AcceptPendingAround.)
 
 	/** True when the story holds at least one record. */
 	bool StoryHasChanges(const UIDRef& story);
 
-	/** True when any story of the document holds a record (Accept All Changes in This Document). */
-	bool DocumentHasChanges(IDataBase* db);
+	/** True when any story of the document holds a record signed "KohakuFindChange" - the ones Accept
+	    All Changes by KohakuFindChange accepts. (Until 2026-09-29: any record, DocumentHasChanges.) */
+	bool DocumentHasSignedRecords(IDataBase* db);
 
-	/** ***** ACCEPT ALL CHANGES IN THIS DOCUMENT - EVERY CHANGE, AS InDesign's OWN (2026-09-27, the user's
-	    call). ***** Every record in every story of the document is accepted, one whole record at a time
-	    (RedlineIterator::ProcessAccept - the mirror of RejectAt's ProcessReject), whoever made it. (It
-	    accepted "KohakuFindChange"-signed records only from 2026-09-27 morning until the signature went
-	    the same day.) Runs inside the caller's command sequence. Returns how many were accepted, or -1
-	    when one would not be (outWhy says so - the caller rolls the sequence back). Leaves the error
-	    state clear. */
-	int32 AcceptAllInDocument(IDataBase* db, PMString& outWhy);
+	/** ***** ACCEPT ALL CHANGES BY KohakuFindChange - ONLY THE RECORDS SIGNED SO (2026-09-29, the user's
+	    ***** call: "only the ones named KohakuFindChange"). ***** InDesign's own Accept All command
+	    (kAcceptAllRedlineCmdBoss) over each story holding such a record, told the author: everybody
+	    else's changes stay. A change in hidden conditional text is not accepted (the command's default,
+	    measured) - outLeft counts the signed records still there after it, for the caller to say (hidden
+	    conditional text is the one cause measured). (From 2026-09-27 to 2026-09-29 it accepted
+	    every change, whoever made it, one whole record at a time - AcceptAllInDocument.) Runs inside the
+	    caller's command sequence. Returns how many were accepted, or -1 when InDesign would not (outWhy
+	    says so - the caller rolls the sequence back). Leaves the error state clear. */
+	int32 AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy);
 
 	// (IsInsideOwnPendingInsertion - does a match touch the current user's pending insertion, which the
 	//  run then refused - stood here until 2026-09-28. Nothing had called it since the pending changes
@@ -137,8 +140,9 @@ namespace KBSTrackChange
 	    CanApplyDeleteChange; measured with case rereplace-ours) - so the replace could never be taken
 	    back. The main text does not move (an accepted insertion stays, an accepted deletion was never in
 	    it), but a deleted-text thread goes, so a caller holding story indexes past it should hold them as
-	    thread offsets. Runs inside the caller's command sequence. Returns how many were accepted, or -1
-	    when one would not be (outWhy says so). Leaves the error state clear. */
+	    thread offsets. Only the records from one before `from` to `to` are walked (2026-09-29). Runs
+	    inside the caller's command sequence. Returns how many were accepted, or -1 when one would not be
+	    (outWhy says so). Leaves the error state clear. */
 	int32 AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy);
 
 

@@ -345,9 +345,10 @@ DECLARE_PMID(kActionIDSpace, kKBSRememberBookPanelActionID, kKBSPrefix + 24)
 DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKBSPrefix + 25)
 // (kKBSPrefix + 26 was "Redo" on the same menu, 2026-09-26 to 2026-09-27 - a row taken back is replaced
 //  again with Replace now. Left unused rather than handed to something else.)
-// "Accept All Changes in This Document" on a document row's right-click menu (2026-09-27): accepts
-// every tracked change in that chapter's document, whoever made it, as InDesign's does - the name is InDesign's
-// own ($ID/Accept All Changes in This Document).
+// "Accept All Changes by KohakuFindChange in This Document" on a document row's right-click menu
+// (2026-09-27): accepts the changes signed "KohakuFindChange" in that chapter's document and leaves everybody
+// else's (2026-09-29, the user's call, the author named in the item so it says so; until then it accepted
+// every change, as InDesign's own "Accept All Changes in This Document" does).
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKBSPrefix + 27)
 // The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).
 // (The rule between Change Checked and the scans, gone with them on 2026-09-27. Not reused.)
@@ -544,7 +545,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // What Edit > Undo calls a Change Checked run (2026-09-26, the user's call: "Replace"; Japanese UI
 // through KBSJa::kReplaceStep). See the sequence in KBSReplaceEngine::ReplaceChecked for why it is named.
 #define kKBSReplaceStepKey			kKBSStringPrefix "kKBSReplaceStepKey"
-// ...and what it calls a Reject Change and an Accept All Changes in This Document (2026-09-29: English on
+// ...and what it calls a Reject Change and an Accept All Changes by KohakuFindChange (2026-09-29: English on
 // every UI until then, beside a Replace that was translated).
 #define kKBSRejectStepKey			kKBSStringPrefix "kKBSRejectStepKey"
 #define kKBSAcceptAllStepKey		kKBSStringPrefix "kKBSAcceptAllStepKey"

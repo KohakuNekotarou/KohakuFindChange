@@ -20,19 +20,23 @@
 #include "IRangeData.h"			// kKBSSignRecordsCmdBoss's range
 #include "IRedlineChangeData.h"		// kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
-#include "IStoryList.h"			// Accept All Changes in This Document - every text model of it
+#include "IStoryList.h"			// Accept All Changes by KohakuFindChange - every text model
+#include "IStringData.h"			// kAcceptAllRedlineCmdBoss's author
 #include "ITextModel.h"
+#include "ITrackChangeUtils.h"		// GetDeletedText - a deletion's text
 #include "ITrackChangesSettings.h"	// ITrackChangeStorySettings - on kTextStoryBoss
 
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
 #include "GlobalTime.h"				// the run's time
-#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss, kReplaceDeleteChangeDataCmdBoss
+#include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss, kReplaceDeleteChangeDataCmdBoss,
+									// kAcceptAllRedlineCmdBoss
 #include "PersistUtils.h"			// ::GetClass - IsInFootnote
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
 #include "UIDList.h"
+#include "Utils.h"
 #include "VOSRedline.h"
 #include "redlineiterator.h"
 #include "textiterator.h"
@@ -67,6 +71,40 @@ IRedlineDataStrand* QueryRedline(const UIDRef& story)
 	if (model == nil)
 		return nil;
 	return static_cast<IRedlineDataStrand*>(model->QueryStrand(kRedlineStrandBoss, IRedlineDataStrand::kDefaultIID));
+}
+
+bool IsSignAuthor(const PMString& who)
+{
+	PMString a(KBSTrackChange::kSignAuthor);
+	a.SetTranslatable(kFalse);
+	return who == a;
+}
+
+// The story's records signed "KohakuFindChange" - wherever they stand, hidden conditional text included (a
+// hidden condition's text, and its records with it, stand in a thread past the main text: measured,
+// KTRedlineProbe - a record at 9 read at 16 once its condition was hidden). The walk is not gated by
+// StoryHasChanges: what it answers for a story whose records all stand in hidden text is not measured.
+// firstOnly = stop at 1.
+int32 CountSignedRecords(const UIDRef& story, bool firstOnly)
+{
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return 0;
+	RedlineIterator* it = redline->NewRedlineIterator(0);
+	if (it == nil)
+		return 0;
+	int32 n = 0;
+	for (bool16 more = kTrue; more && !(firstOnly && n > 0); more = it->Increment(kFalse))
+	{
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+		if (record == nil)
+			continue;
+		if (IsSignAuthor(record->GetUserName()))
+			++n;
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+	}
+	delete it;
+	return n;
 }
 
 }	// anonymous namespace
@@ -123,34 +161,9 @@ KBSTrackChange::TrackingScope::~TrackingScope()
 		SetTracking(UIDRef(fDB, fSwitchedOn[i]), kFalse);
 }
 
-void KBSTrackChange::CollectRecords(const UIDRef& story, std::vector<Record>& out)
-{
-	out.clear();
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil || !redline->StoryHasChanges())
-		return;
-	RedlineIterator* it = redline->NewRedlineIterator(0);
-	if (it == nil)
-		return;
-	for (bool16 more = kTrue; more; more = it->Increment(kFalse))
-	{
-		TextIndex at = 0;
-		int32 len = 0;
-		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
-		if (record == nil)
-			continue;
-		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
-		const uint64 time = record->GetTimeStamp();
-		delete record;		// the caller owns it (redlineiterator.h:137-138)
-		Record r;
-		r.at = at;
-		r.len = len;
-		r.isDelete = isDelete;
-		r.time = time;
-		out.push_back(r);
-	}
-	delete it;
-}
+// (CollectRecords - every record of a story, for the bound on the two accept loops below - stood here until
+//  2026-09-29. Accept All is InDesign's own command now, and the pending changes around a match are walked
+//  in the match's own window, which bounds itself.)
 
 bool KBSTrackChange::StoryHasChanges(const UIDRef& story)
 {
@@ -158,7 +171,7 @@ bool KBSTrackChange::StoryHasChanges(const UIDRef& story)
 	return redline != nil && redline->StoryHasChanges();
 }
 
-bool KBSTrackChange::DocumentHasChanges(IDataBase* db)
+bool KBSTrackChange::DocumentHasSignedRecords(IDataBase* db)
 {
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (storyList == nil)
@@ -166,57 +179,9 @@ bool KBSTrackChange::DocumentHasChanges(IDataBase* db)
 	// Every text model, not only the user-accessible ones: a record counts wherever it stands.
 	const int32 count = storyList->GetAllTextModelCount();
 	for (int32 i = 0; i < count; ++i)
-		if (StoryHasChanges(storyList->GetNthTextModelUID(i)))
+		if (CountSignedRecords(storyList->GetNthTextModelUID(i), true) > 0)
 			return true;
 	return false;
-}
-
-// One story: accept its records one whole record at a time, the walk started over after each (an
-// accept moves what comes after it, and the iterator it was made from is spent). -1 = one would not go.
-static int32 AcceptAllInStory(const UIDRef& story, PMString& outWhy)
-{
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil)
-		return 0;
-	std::vector<KBSTrackChange::Record> records;
-	KBSTrackChange::CollectRecords(story, records);
-	int32 done = 0;
-	// Bounded by the records there were: an accept that leaves its record in place must not spin.
-	for (size_t guard = 0; guard <= records.size(); ++guard)
-	{
-		if (!redline->StoryHasChanges())
-			break;
-		RedlineIterator* it = redline->NewRedlineIterator(0);
-		if (it == nil)
-			break;
-		bool found = false;
-		for (bool16 more = kTrue; more; more = it->Increment(kFalse))
-		{
-			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
-			if (record == nil)
-				continue;
-			delete record;
-			found = true;
-			break;
-		}
-		const bool ok = found && it->ProcessAccept(nil, kFalse, kFalse);
-		delete it;
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		if (!found)
-			break;
-		if (!ok)
-		{
-			outWhy = "InDesign would not accept one of the changes";
-			return -1;
-		}
-		++done;
-	}
-	if (KBSTrackChange::StoryHasChanges(story))
-	{
-		outWhy = "a change was still there after accepting";
-		return -1;
-	}
-	return done;
 }
 
 int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy)
@@ -224,20 +189,43 @@ int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return 0;
-	std::vector<Record> records;
-	CollectRecords(story, records);
+	// ***** THE MATCH'S OWN WINDOW, NOT THE WHOLE STORY (2026-09-29, the official-terms audit A-3). ***** An
+	// iterator made at a position stands first on the object CONTAINING it - an insertion that runs into the
+	// match is met - but one made just past an insertion's end starts after that insertion, which is exactly
+	// the one touching the match from the left (measured, KTRedlineProbe iterfrom: made at 6 or 7 it stood
+	// on the insertion at 5; made at 8, right after it, it did not). So the walk starts one before the match
+	// and stops past its end - the way RejectRecord, CollectUnsigned and HasRecordsOfTimeIn below walk. It
+	// walked every record of the story from 0, for every ticked match, until then (and once more for the
+	// loop's bound). The records the window holds bound the loop: an accept that leaves its record in place
+	// must not spin.
+	const TextIndex windowStart = (from > 0) ? from - 1 : 0;
+	int32 inWindow = 0;
+	{
+		RedlineIterator* it = redline->NewRedlineIterator(windowStart);
+		if (it == nil)
+			return 0;
+		for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+		{
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+			if (record == nil)
+				continue;
+			delete record;		// the caller owns it (redlineiterator.h:137-138)
+			++inWindow;
+		}
+		delete it;
+	}
 	int32 done = 0;
-	// The walk starts over after each accept (the iterator it came from is spent), bounded by the
-	// records there were, as AcceptAllInStory.
-	for (size_t guard = 0; guard <= records.size(); ++guard)
+	// The walk starts over after each accept (the iterator it came from is spent).
+	for (int32 guard = 0; guard <= inWindow; ++guard)
 	{
 		if (!redline->StoryHasChanges())
 			break;
-		RedlineIterator* it = redline->NewRedlineIterator(0);
+		RedlineIterator* it = redline->NewRedlineIterator(windowStart);
 		if (it == nil)
 			break;
 		bool found = false;
-		for (bool16 more = kTrue; more && !found; more = found ? kFalse : it->Increment(kFalse))
+		for (bool16 more = kTrue; more && !found && it->GetCurrentPosition() <= to;
+			more = found ? kFalse : it->Increment(kFalse))
 		{
 			TextIndex at = 0;
 			int32 len = 0;
@@ -264,22 +252,54 @@ int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 	return done;
 }
 
-int32 KBSTrackChange::AcceptAllInDocument(IDataBase* db, PMString& outWhy)
+int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy)
 {
+	outLeft = 0;
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (storyList == nil)
 	{
 		outWhy = "the document's stories could not be read";
 		return -1;
 	}
+	PMString author(kSignAuthor);
+	author.SetTranslatable(kFalse);
 	int32 total = 0;
 	const int32 count = storyList->GetAllTextModelCount();
 	for (int32 i = 0; i < count; ++i)
 	{
-		const int32 n = AcceptAllInStory(storyList->GetNthTextModelUID(i), outWhy);
-		if (n < 0)
+		const UIDRef story = storyList->GetNthTextModelUID(i);
+		const int32 before = CountSignedRecords(story, false);
+		if (before == 0)
+			continue;
+		// ***** InDesign's OWN ACCEPT ALL, TOLD WHOSE (2026-09-29, the official-terms audit A-4 and the user's
+		// ***** call: "only the ones named KohakuFindChange"). ***** kAcceptAllRedlineCmdBoss over the story, as
+		// the product does it (InCopyDocUtils.cpp:2399-2405), with its IStringData set to the author: the
+		// command then accepts that author's changes and leaves everybody else's (measured, KTRedlineProbe
+		// acceptall - SDK use: none. InDesign's own by-author accept is ITrackChangeSuite::AcceptAllByUser,
+		// whose way down to the command the SDK does not show).
+		// Its IID_IACCEPTREDLINEINHIDDENTEXTDATA is left at its default, false: a change in hidden conditional
+		// text is not accepted (measured) - counted in outLeft and said. InDesign's own Accept All seems to
+		// leave them too (kAcceptAllDocSomeHiddenChangesMsgID, InCopySharedID.h:477 - not measured: its menu
+		// action cannot be run from a script). The loop that stood here from 2026-09-27 accepted every
+		// change, whoever made it.
+		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kAcceptAllRedlineCmdBoss));
+		InterfacePtr<IStringData> whose(cmd, IID_ISTRINGDATA);
+		if (cmd == nil || whose == nil)
+		{
+			outWhy = "InDesign's accept command could not be made";
 			return -1;
-		total += n;
+		}
+		whose->Set(author);
+		cmd->SetItemList(UIDList(story));
+		if (CmdUtils::ProcessCommand(cmd) != kSuccess)
+		{
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);		// the caller rolls the step back and says why
+			outWhy = "InDesign would not accept the changes";
+			return -1;
+		}
+		const int32 after = CountSignedRecords(story, false);
+		total += before - after;
+		outLeft += after;
 	}
 	return total;
 }
@@ -297,6 +317,8 @@ void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<u
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil || times.empty() || !redline->StoryHasChanges())
 		return;
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	Utils<ITrackChangeUtils> utils;
 	RedlineIterator* it = redline->NewRedlineIterator(0);
 	if (it == nil)
 		return;
@@ -319,7 +341,15 @@ void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<u
 		r.time = time;
 		if (isDelete)
 		{
-			it->DescribeChangeContent(r.text, 0x7fffffff);
+			// ***** THE DELETED TEXT FROM THE UTILITY THE GUIDE NAMES (2026-09-29, the official-terms audit
+			// ***** A-6). ***** ITrackChangeUtils::GetDeletedText reads the deleted-text thread anchored at the
+			// deletion - the same text DescribeChangeContent gave for a tab, a return and a footnote
+			// reference (measured, KTRedlineProbe deltext: 2 of 2 alike), which stays as the fallback - also
+			// when the utility reads nothing there.
+			if (model != nil && utils)
+				utils->GetDeletedText(model, at, r.text);
+			if (r.text.IsEmpty())
+				it->DescribeChangeContent(r.text, 0x7fffffff);
 			r.text.SetTranslatable(kFalse);
 		}
 		out.push_back(r);
@@ -503,12 +533,8 @@ uint64 gRunT0 = 0;					// the current run's time
 uint64 gRunStartReal = 0;			// the clock at the run's start: a record older than a second before it is not the run's
 uint64 gLastStamp = 0;				// the last time handed out, over the session
 
-bool IsSignAuthor(const PMString& who)
-{
-	PMString a(KBSTrackChange::kSignAuthor);
-	a.SetTranslatable(kFalse);
-	return who == a;
-}
+// (IsSignAuthor stands at the head of this file since 2026-09-29: Accept All Changes by KohakuFindChange counts
+//  the signed records too.)
 
 struct Unsigned
 {

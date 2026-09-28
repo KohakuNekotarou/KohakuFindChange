@@ -234,15 +234,18 @@ namespace KBSReplaceEngine
 	// (RedoHit - Redo on a row taken back - went on 2026-09-27, the user's call: a row taken back carries a
 	//  box again and is replaced again with Replace or Change Checked.)
 
-	/** Accept All Changes in This Document on a document row (2026-09-27, the user's call): every
-	    tracked change in that chapter's document is accepted, whoever made it - as InDesign's own does -
-	    in ONE undo step. All or nothing - any change that will not go rolls the step back. Rows keep what
-	    they show; a replaced row's Reject Change then greys out (its records are gone), as after an
-	    accept in the Track Changes panel. False = nothing changed; outStatus says why either way. */
+	/** Accept All Changes by KohakuFindChange in This Document on a document row (2026-09-27, the user's
+	    call): the tracked changes signed "KohakuFindChange" in that chapter's document are accepted and
+	    everybody else's are left (2026-09-29, the user's call - until then every change, as InDesign's
+	    own Accept All), in ONE undo step (KBSTrackChange::AcceptSignedInDocument). All or nothing - a
+	    story that will not go rolls the step back. Ours in hidden conditional text are left, and the
+	    status says how many. Rows keep what they show; a replaced row's Reject Change then greys out
+	    (its records are gone), as after an accept in the Track Changes panel. False = nothing changed;
+	    outStatus says why either way. */
 	bool AcceptAllInChapter(int32 chapterIdx, PMString& outStatus);
 
-	/** Is there anything for Accept All Changes in This Document to do: the chapter's document open and
-	    holding at least one tracked change. */
+	/** Is there anything for Accept All Changes by KohakuFindChange to do: the chapter's document open
+	    and holding at least one record signed "KohakuFindChange". */
 	bool CanAcceptAllInChapter(int32 chapterIdx);
 
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu

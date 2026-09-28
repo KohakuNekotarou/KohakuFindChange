@@ -422,8 +422,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSAcceptAllChangesActionID:
 		{
-			// A document row's right-click menu (2026-09-27): every tracked change in that chapter's document,
-			// anybody's. The book row (and nothing stashed - a script firing the action by ID) does nothing.
+			// A document row's right-click menu (2026-09-27): the tracked changes signed "KohakuFindChange" in
+			// that chapter's document (anybody's until 2026-09-29). The book row (and nothing stashed - a
+			// script firing the action by ID) does nothing.
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
 				break;
@@ -766,7 +767,8 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		else if (action == kKBSAcceptAllChangesActionID)
 		{
 			// A document row's menu (2026-09-27): only while that document is open and holds a tracked
-			// change - anybody's, as InDesign's own. The book row greys it (the command is about one document).
+			// change signed "KohakuFindChange" (anybody's until 2026-09-29). The book row greys it (the
+			// command is about one document).
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			const bool enable = chapter >= 0 && chapter < KBSResultModel::GetChapterCount()
 				&& KBSReplaceEngine::CanAcceptAllInChapter(chapter);

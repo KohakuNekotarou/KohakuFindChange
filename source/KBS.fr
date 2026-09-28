@@ -611,8 +611,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Accept All Changes in This Document (2026-09-27): every tracked change in the document of the
-		// row the menu was popped over.
+		// Accept All Changes by KohakuFindChange in This Document (2026-09-27): the changes signed
+		// "KohakuFindChange" in the document of the row the menu was popped over (every change until 2026-09-29).
 		kKBSAcceptAllChangesActionID,
 		kKBSResultRowMenuName
 		kKBSAcceptAllChangesMenuItemPosition,
@@ -949,10 +949,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Accept All Changes in This Document - a document row's right-click menu (2026-09-27).
+		// Accept All Changes by KohakuFindChange in This Document - a document row's right-click menu (2026-09-27).
 		kKBSActionComponentBoss,
 		kKBSAcceptAllChangesActionID,
-		kKBSAcceptAllChangesMenuKey,	// "Accept All Changes in This Document"
+		kKBSAcceptAllChangesMenuKey,	// "Accept All Changes by KohakuFindChange in This Document"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

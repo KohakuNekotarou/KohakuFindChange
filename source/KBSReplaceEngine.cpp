@@ -25,6 +25,7 @@
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "ISession.h"				// GetExecutionContextSession
+#include "IEndnoteFacade.h"			// MatchEndsAnEndnote - is it the endnote story, and an endnote range's marker
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
@@ -39,7 +40,7 @@
 // as "this far into this thread" - see RowNow.)
 #include "ITextModel.h"
 #include "ITextStoryThread.h"
-#include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote)
+#include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote's fallback)
 #include "WideString.h"			// Reject Change: the original text's length in code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
@@ -470,13 +471,24 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 // changeText, one write over a range - that writes at the END of an endnote leaves the endnote's range
 // (IDML EndnoteRange) ending short, and the character before the overhang can never be deleted again
 // (measured, work/kbs-regress/probe-endnote-*-0927.jsx; no Track Changes needed). True = `matchEnd` is in
-// the endnote story (kEndnoteStoryBoss - SnpManipulateTextEndnotes::IsEndnoteStory) and the code point
-// there is the U+FEFF an endnote ends with. Asked by the replace (per row, as the walk meets it)
-// and by Redo (the row's text may have been moved to an endnote's end since).
+// the endnote story and stands on an endnote range's marker. Asked by the replace (per row, as the walk
+// meets it).
+// ***** ASKED OF InDesign's ENDNOTE FACADE (2026-09-29, the official-terms audit A-2). *****
+// Facade::IEndnoteFacade::IsEndnoteStory (as the product asks it, InCopyDocUtils.cpp:2389-2390) and
+// IsEndnoteTextRangeMarker: true on the U+FEFF an endnote range starts and ends with, false on the U+FEFF
+// of an index marker in the endnote's text (measured, KTRedlineProbe endnote) - which the check that
+// stood here until then (the class kEndnoteStoryBoss and any U+FEFF, SnpManipulateTextEndnotes::
+// IsEndnoteStory) took for an endnote's end, refusing a match that ended before an index marker. That
+// check stays as the fallback, when the facade is not there.
 bool MatchEndsAnEndnote(const UIDRef& story, TextIndex matchEnd)
 {
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	if (model == nil || ::GetClass(model) != kEndnoteStoryBoss || matchEnd < 0 || matchEnd >= model->TotalLength())
+	if (model == nil || matchEnd < 0 || matchEnd >= model->TotalLength())
+		return false;
+	Utils<Facade::IEndnoteFacade> endnotes;
+	if (endnotes)
+		return endnotes->IsEndnoteStory(story) && endnotes->IsEndnoteTextRangeMarker(matchEnd, model);
+	if (::GetClass(model) != kEndnoteStoryBoss)
 		return false;
 	TextIterator it(model, matchEnd);
 	return !it.IsNull() && (*it).GetValue() == kTextChar_ZeroSpaceNoBreak;
@@ -3092,13 +3104,13 @@ bool KBSReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& o
 }
 
 // ======================================================================================================
-// Accept All Changes in This Document (2026-09-27) - see the header. The same plain sequence and rollback
-// as Reject Change above.
+// Accept All Changes by KohakuFindChange in This Document (2026-09-27; the signed records only since
+// 2026-09-29) - see the header. The same plain sequence and rollback as Reject Change above.
 // ======================================================================================================
 bool KBSReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
 {
 	UIDRef docRef;
-	return ChapterDocIfOpen(chapterIdx, docRef) && KBSTrackChange::DocumentHasChanges(docRef.GetDataBase());
+	return ChapterDocIfOpen(chapterIdx, docRef) && KBSTrackChange::DocumentHasSignedRecords(docRef.GetDataBase());
 }
 
 bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
@@ -3108,7 +3120,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	UIDRef docRef;
 	if (!ChapterDocIfOpen(chapterIdx, docRef))
 	{
-		outStatus.Append("Accept All Changes: the document is not open.");
+		outStatus.Append("Accept All Changes by KohakuFindChange: the document is not open.");
 		return false;
 	}
 	// ***** THE ROWS FOLLOW THE TEXT (2026-09-28). ***** Accepting a deletion takes its deleted-text thread
@@ -3124,30 +3136,40 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
-		outStatus = "Accept All Changes: InDesign would not start a command sequence - nothing was changed.";
+		outStatus = "Accept All Changes by KohakuFindChange: InDesign would not start a command sequence - nothing was changed.";
 		return false;
 	}
 	sequence->SetName(KBSLoc::Text(kKBSAcceptAllStepKey, KBSJa::kAcceptAllStep));	// English on every UI until 2026-09-29
 	PMString why;
 	why.SetTranslatable(kFalse);
-	const int32 accepted = KBSTrackChange::AcceptAllInDocument(db, why);
+	int32 left = 0;
+	const int32 accepted = KBSTrackChange::AcceptSignedInDocument(db, left, why);
 	if (accepted < 0)
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);
 	CmdUtils::EndCommandSequence(sequence);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	if (accepted < 0)
 	{
-		outStatus = "Accept All Changes: ";
+		outStatus = "Accept All Changes by KohakuFindChange: ";
 		outStatus.Append(why);
 		outStatus.Append(" - nothing was accepted and the document is as it was.");
 		return false;
 	}
 	WriteBackRows(chapterIdx, db, rows, std::vector<bool>(), kRangeOnly);
+	// ***** OURS ONLY, AND THE HIDDEN ONES SAID (2026-09-29, the user's call). ***** The records signed
+	// "KohakuFindChange" - everybody else's changes stay (until then: every change in the document, as
+	// InDesign's own Accept All). The numbers come first: a status line cut short cuts its end.
 	outStatus = "Accepted ";
 	outStatus.AppendNumber(accepted);
-	// Every change in the document, whoever made it - as InDesign's own Accept All Changes in This
-	// Document (2026-09-27, the user's call).
-	outStatus.Append(" change(s) in the document - every tracked change in it, as InDesign's own Accept All does. They can no longer be rejected.");
+	if (left > 0)
+	{
+		// The one cause measured: text under a hidden condition, which the accept leaves.
+		outStatus.Append(" change(s) by KohakuFindChange; ");
+		outStatus.AppendNumber(left);
+		outStatus.Append(" left unaccepted - text under a hidden condition is left: show the condition and accept again.");
+	}
+	else
+		outStatus.Append(" change(s) by KohakuFindChange in the document - other changes are left. They can no longer be rejected.");
 	return true;
 }
 
