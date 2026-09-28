@@ -990,6 +990,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	std::set<UID> targetStories;
 	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
 		targetStories.insert(s->first);
+	// SPIKE step 2 (2026-09-28, not for main): the records made under "KohakuFindChange" by InDesign itself
+	KBSTrackChange::AuthorScope author;
 	KBSTrackChange::TrackingScope tracking(db, targetStories);
 	if (!tracking.Ok())
 	{

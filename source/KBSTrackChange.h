@@ -231,6 +231,23 @@ namespace KBSTrackChange
 
 	/** Append the run's counters to %TEMP%\kbs-spike-signed.log (and reset them). */
 	void WriteSignedRunLog(int32 chapterIdx, int32 replaced, double walkMs);
+
+	/** SPIKE step 2 (2026-09-28, the user: "try it in KBS" - the name at TRACK time, not rewritten after):
+	    InDesign's user name set to "KohakuFindChange" for the life of the object and put back - the
+	    AuthorScope that stood here until 2026-09-27 (4522ccf^), unchanged. The records are then made
+	    under that name by InDesign itself, so SignReplace finds nothing to rewrite. */
+	class AuthorScope
+	{
+	public:
+		AuthorScope();
+		~AuthorScope();
+		bool Ok() const { return fSwitched; }
+	private:
+		AuthorScope(const AuthorScope&);
+		AuthorScope& operator=(const AuthorScope&);
+		PMString	fOld;
+		bool		fSwitched;
+	};
 }
 
 #endif // __KBSTrackChange_h__

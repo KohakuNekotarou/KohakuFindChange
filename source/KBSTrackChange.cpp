@@ -18,6 +18,7 @@
 #include "IIntData.h"				// SPIKE 2026-09-28: kReplaceDeleteChangeDataCmdBoss's position
 #include "IRedlineChangeData.h"		// SPIKE 2026-09-28: kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
+#include "IStringData.h"			// SPIKE step 2: kSetUserNameCmdBoss's name
 #include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
 #include "IStoryList.h"			// Accept All Changes in This Document - every text model of it
@@ -990,4 +991,45 @@ void KBSTrackChange::WriteSignedRunLog(int32 chapterIdx, int32 replaced, double 
 		std::free(temp);
 	}
 	sStats = SignStats();
+}
+
+// SPIKE step 2 (2026-09-28): the AuthorScope of 4522ccf^, unchanged but for this comment.
+namespace
+{
+ErrorCode SpikeSetUserName(const PMString& name)
+{
+	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetUserNameCmdBoss));
+	InterfacePtr<IStringData> data(cmd, IID_ISTRINGDATA);
+	if (ws == nil || cmd == nil || data == nil)
+		return kFailure;
+	data->Set(name);
+	cmd->SetItemList(UIDList(::GetUIDRef(ws)));
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return err;
+}
+}	// anonymous namespace
+
+KBSTrackChange::AuthorScope::AuthorScope() : fSwitched(false)
+{
+	InterfacePtr<IWorkspace> ws(GetExecutionContextSession()->QueryWorkspace());
+	InterfacePtr<IUserInfo> info(ws, UseDefaultIID());
+	if (info == nil)
+		return;
+	fOld = info->GetUserName();
+	fOld.SetTranslatable(kFalse);
+	PMString name(kSignAuthor);
+	name.SetTranslatable(kFalse);
+	// A name that is already ours is a leftover of an interrupted run: handed back as unset.
+	if (fOld == name || fOld.IsEmpty())
+		fOld = PMString("Unknown User Name");
+	fSwitched = (SpikeSetUserName(name) == kSuccess);
+}
+
+KBSTrackChange::AuthorScope::~AuthorScope()
+{
+	if (fSwitched)
+		SpikeSetUserName(fOld);
 }
