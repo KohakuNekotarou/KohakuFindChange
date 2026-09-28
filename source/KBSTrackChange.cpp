@@ -459,6 +459,12 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 		c.inserted = ReadText(outStory, c.at, c.insLen);
 		if (c.inserted != replacedText)
 			return false;
+		// ***** AND ITS DELETION STANDS RIGHT AFTER THEM (2026-09-28, case reject-next-to-user-edit). ***** A
+		// replace's deletion is anchored at the end of its insertion. Somebody else's text typed right after
+		// the row - a record of its own now that the row's records are signed - stands between the two, and
+		// taking the row back would put the original text after that typing, not where it was.
+		if (c.hasDelete && delAt != c.at + c.insLen)
+			return false;
 		outChange = c;
 		return true;
 	}
