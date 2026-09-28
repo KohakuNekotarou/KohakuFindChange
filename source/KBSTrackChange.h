@@ -105,8 +105,8 @@ namespace KBSTrackChange
 	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
 
-	/** Every record in the story, in position order - whoever made it. Which ones are a run's is told
-	    by time (the caller's set of the times that stood before it wrote). */
+	/** Every record in the story, in position order - whoever made it. (Its callers count them: the
+	    bound on their accept loops.) */
 	void CollectRecords(const UIDRef& story, std::vector<Record>& out);
 
 	/** True when the story holds at least one record. */
@@ -156,16 +156,14 @@ namespace KBSTrackChange
 	bool RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
 
 	/** One row's change: its insertion [at, at+insLen) and whether a deletion of its time stands.
-	    `inserted` / `deleted` are the texts (deleted read from the deleted-text record). */
+	    (The two texts and the time rode along until 2026-09-29, and no caller read them: the texts are
+	    checked inside FindRowChangeForHit, and the time is the row's own, Hit::recordTime.) */
 	struct Change
 	{
 		TextIndex	at;
 		int32		insLen;
 		bool		hasDelete;
-		PMString	inserted;
-		PMString	deleted;
-		uint64		time;		// the row's time (Hit::recordTime) - what its records carry
-		Change() : at(0), insLen(0), hasDelete(false), time(0) {}
+		Change() : at(0), insLen(0), hasDelete(false) {}
 	};
 
 	// (RejectAt / RejectReplacement - a row's records taken back by position and "not an earlier run's

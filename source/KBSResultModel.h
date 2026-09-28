@@ -34,18 +34,12 @@ namespace KBSResultModel
 	    the tree display is capped, to keep a huge result set from flooding the panel. */
 	const int32 kKBSDisplayHitLimit = 5000;
 
-	/** The whole-RUN safety ceiling: a run stops collecting after this many hit rows across every
+	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
 	    chapter, so no query or document can pile up an unbounded result set. Unlike the display cap
-	    above this bounds the RESULT SET itself, so reaching it caps a later export too; the run says
-	    so in its summary rather than coming back quietly short.
-
-	    Shared by all three commands since 2026-08-03. It lived in KBSSearchEngine.cpp until then and
-	    the two scans had no ceiling at all, on the reasoning that a document's faults should all be
-	    named - which leaves the scans able to collect without bound on a document whose faults run
-	    into the tens of thousands (a book of overset table cells reaches it). Counted in ROWS, the
-	    same unit the display cap uses. NOT in glyphs: the glyph scan merges consecutive boxes into
-	    one row ("55 missing glyphs in 6 places"), so counting glyphs would cut a run short while it
-	    still had almost no rows to show. */
+	    above this bounds the RESULT SET itself; the search says so in its summary rather than coming
+	    back quietly short. Counted in ROWS, the same unit the display cap uses.
+	    (It lived in KBSSearchEngine.cpp until 2026-08-03, when the two scans were given it too; they
+	    were removed on 2026-09-27.) */
 	const int32 kKBSCollectHitLimit = 10000;
 
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
@@ -112,12 +106,11 @@ namespace KBSResultModel
 		uint64		matchHash;
 
 		// --- replace support ---
-		// The order the text walker handed this match back in, WITHIN ITS CHAPTER (0-based). It is
-		// stamped before the page-order sort, and it is the ONLY key that survives a replace pass:
-		// textStart shifts the moment an earlier match is replaced, and the array order is page
-		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
-		// them up with these numbers.
-		int32		walkOrder;
+		// (A walkOrder stood here until 2026-09-29 - the order the walker handed this match back in,
+		// which Change Checked's verify walk lined its matches up by, and which every row menu's Replace
+		// or Reject numbered again with a walk of the whole chapter. A row is found by its PLACE now:
+		// the verify walk asks for a match at the row's start (ChapterMovedUnderRows), the writing walk
+		// for one at its thread, offset and length (RowOfMatchAnyOrder).)
 		bool		checked;	// selected for replacement. Every row starts UNTICKED (2026-09-27, the
 								// user's call - AppendChapter); the user ticks what is to be replaced.
 		bool		replaced;	// already replaced in this result set - not selectable any more
@@ -133,11 +126,11 @@ namespace KBSResultModel
 								// BuildHitLocator alongside it. Only "missing" earns it - the other
 								// flags stay in locator and read in the normal colour.
 		// --- Track Changes (2026-09-26) ---
-		// The WHOLE text of the match before the replace and the whole text the replace wrote, as
-		// they were read around the replace (not capped for drawing like matchText). Together they
-		// are how a replaced row finds ITS tracked change among the others: the insertion holds
-		// replacedText and the deletion holds originalText (KBSTrackChange::FindRowChange). Empty
-		// until the row is replaced.
+		// The WHOLE text of the match before the replace and the whole text the replace wrote, taken
+		// as it was written (not capped for drawing like matchText). A replaced row's change is found by
+		// its time (recordTime); these are what that change must still read as - its insertion as
+		// replacedText (KBSTrackChange::FindRowChangeForHit), its run's deletions as the originalTexts
+		// (KBSReplaceEngine RejectRowsNow). Empty until the row is replaced.
 		PMString	originalText;
 		PMString	replacedText;
 		// The first characters of the match's STORY (2026-09-27, the story level): what a story row of
@@ -145,7 +138,7 @@ namespace KBSResultModel
 		// as it has walked it, so the story cannot be read again when the tree draws.
 		PMString	storyLead;
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
-		// a row cannot be taken back (GetHitPinned).
+		// a row cannot be taken back (GetHitInFootnote).
 		bool		inFootnote;
 		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
 		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
@@ -159,7 +152,7 @@ namespace KBSResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				walkOrder(-1), checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
+				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
 				recordTime(0), pageOrdinal(0) {}
 	};
 
@@ -207,12 +200,12 @@ namespace KBSResultModel
 
 	    ***** THE CHAPTER IS TAKEN, NOT COPIED. ***** Pass it with std::move: the model takes the
 	    hits over and the caller's Chapter is left empty. Every caller builds one, hands it over and
-	    drops it, and a chapter of a large search holds thousands of Hits with six PMStrings each -
-	    which this copied until 2026-08-08.
+	    drops it, and a chapter of a large search holds thousands of Hits, each carrying its texts as
+	    PMStrings - which this copied until 2026-08-08.
 
-	    !! The hits have to be NEWLY BUILT ones. Their fontGroup / fontGroupPos are read as unset at
-	    their constructor's -1, and an ungrouped chapter no longer writes that value back over
-	    them. */
+	    Every hit's fontGroup / fontGroupPos is written here, whatever it held before. (An "!! newly
+	    built hits only" stood here until 2026-09-29: an ungrouped chapter left the pair as it came,
+	    and every chapter is grouped since 2026-09-27.) */
 	void AppendChapter(Chapter&& chapter);
 
 	/** Forget the results (an empty search, or a teardown that still wants the tree emptied). */
@@ -278,8 +271,8 @@ namespace KBSResultModel
 
 	    Why it has to be remembered: the replace pass RE-WALKS each chapter, and a walk runs in the
 	    mode that is current AT THAT MOMENT. Switching tabs between a search and Change Checked
-	    therefore re-walks with a different query, returns a different set of matches, and leaves
-	    every stored walk order pointing at the wrong occurrence.
+	    therefore re-walks with a different query and meets a different set of matches from the one
+	    the rows list.
 
 	    ***** AND SINCE 2026-08-05 THAT WOULD BE WRITTEN. ***** This note used to end "Nothing wrong
 	    is written - the same-occurrence test refuses each one - but the whole run comes back
@@ -297,21 +290,20 @@ namespace KBSResultModel
 	    Find/Change switch that decides which matches come back (see
 	    KBSSearchEngine::BuildWalkSignature for the list).
 
-	    Not the same thing as SetQueryText's line, and deliberately a second field rather than a
-	    richer version of it: that one is a CAPTION - it is written into the saved report's heading
-	    and has to stay readable - while this one is a KEY, compared for equality and never shown.
+	    A KEY, compared for equality and never shown. (A readable caption of the query stood beside it
+	    for the saved report until Save Results... went, 2026-09-27.)
 
-	    Why the replace needs it. Change Checked RE-WALKS each chapter and lines the Nth match of that
-	    walk up with the hit whose walkOrder is N. That only holds while the walk returns the same
-	    matches in the same order, which needs the query AND its options to be what they were when the
-	    search ran - and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61), so
-	    whatever the dialog holds at replace time is what it walks by.
+	    Why the replace needs it. Change Checked RE-WALKS each chapter and writes the matches it meets
+	    at the rows' places. That only holds while the walk meets the matches the rows list, which
+	    needs the query AND its options to be what they were when the search ran - and the walker is
+	    handed the LIVE IFindChangeOptions (ITextWalker.h:58-61), so whatever the dialog holds at
+	    replace time is what it walks by.
 
 	    Comparing the TAB alone (SetSearchMode) is not enough: retyping the find string, or turning
 	    Include Footnotes off, changes the match set without changing the tab.
 
-	    Empty until the first search of a session, and empty for a scan - neither has a query.
-	    Cleared by Clear(), so it can never outlive the results it describes. */
+	    Empty until the first search of a session. Cleared by Clear(), so it can never outlive the
+	    results it describes. */
 	void SetWalkSignature(const PMString& signature);
 	PMString GetWalkSignature();
 
@@ -410,7 +402,7 @@ namespace KBSResultModel
 										// fields above - see GetHitRow.
 		// (An inFootnote stood here from 2026-09-26 - a footnote's box drawn ticked and greyed, while
 		// the replace was Change All. Nothing read it after the one-at-a-time replace of 2026-09-27;
-		// removed 2026-09-28. A footnote's row is told apart by GetHitPinned now.)
+		// removed 2026-09-28. A footnote's row is told apart by GetHitInFootnote now.)
 
 		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
 					   hasCheckBox(false) {}
@@ -454,15 +446,12 @@ namespace KBSResultModel
 	/** Select / deselect one hit for replacement. Ignored for anything the panel draws no check box
 	    on - a hit already replaced (the text it matched is gone), a locked one (InDesign offers no
 	    way to change locked content), one that already says why it was left alone, and every row of
-	    a scan (a report has nothing to replace). It asks that question the same way the panel does,
+	    a replace's report but the ones taken back. It asks that question the same way the panel does,
 	    so the model can never hold a checked hit that no row offered; it is a backstop rather than
-	    the first line of defence, since those rows carry no box to click in the first place. */
-	/** Ticks or unticks the row - AND every row touching it (2026-09-26, the user's design B): matches
-	    that touch in the same story go on and off together. Taking back the LATER of two touching
-	    replaces drops the EARLIER one's deletion record (it sits on the later one's first character -
-	    measured, by any way of rejecting), so "earlier ticked, later not" must never be made.
-	    Returns how many rows the group holds (1 = no neighbour). */
-	int32 SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
+	    the first line of defence, since those rows carry no box to click in the first place.
+	    (Every row touching it went on and off with it from 2026-09-26 to 2026-09-27, and this returned
+	    how many rows that was - nothing read the number after the boxes became the row's own again.) */
+	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
 
 	/** The rows touching `hitIdx` in its chapter - same story, ranges meeting or overlapping, followed
 	    both ways - in TEXT order, `hitIdx` included. Reads the ranges as they stand (the search's
@@ -473,9 +462,8 @@ namespace KBSResultModel
 	/** The time stamp of the row's tracked changes (Hit::recordTime); 0 for none or out of range. */
 	uint64 GetHitRecordTime(int32 chapterIdx, int32 hitIdx);
 	void SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time);
-	/** Why a row is pinned - always replaced, never taken back - if it is (2026-09-26). */
-	enum PinnedReason { kPinnedNone = 0, kPinnedFootnote };
-	PinnedReason GetHitPinned(int32 chapterIdx, int32 hitIdx);
+	// (GetHitPinned - why a row can never be taken back, an enum with one reason, a footnote - stood here
+	//  from 2026-09-26 to 2026-09-29, beside GetHitInFootnote asking the same thing.)
 
 	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this
 	    row gets no check box", for different reasons. false = index out of range.
@@ -585,14 +573,7 @@ namespace KBSResultModel
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
 
-	/** A hit's chapter-local walker order, or -1 for an out-of-range index. The replace pass
-	    re-walks a chapter and lines the Nth match of that walk up with the hit whose walkOrder is
-	    N - the only key that survives replacing (see Hit::walkOrder). */
-	int32 GetHitWalkOrder(int32 chapterIdx, int32 hitIdx);
-	/** Give a row a walk order again (2026-09-27): after a one-row Replace, the rest of the list is
-	    numbered by a fresh walk of the chapter (KBSReplaceEngine::ReplaceHit), so a Change Checked
-	    after it verifies against the text as it stands. -1 = no match of that walk is this row. */
-	void SetHitWalkOrder(int32 chapterIdx, int32 hitIdx, int32 walkOrder);
+	// (GetHitWalkOrder / SetHitWalkOrder stood here until 2026-09-29 - see where Hit::walkOrder stood.)
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */
@@ -746,12 +727,11 @@ namespace KBSResultModel
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break
 	    (LF) - in place. A string holding neither is left exactly as it came.
 
-	    THE one definition, called by BOTH places a match is shown: the panel's cell
-	    (KBSColorTextView::Draw) and the saved report (BuildReportText). Since 2026-08-04 a match is
-	    carried WHOLE however many paragraphs it spans, and neither of those draws a raw break with
-	    any width - the paragraphs either side of it run together and read as one piece of text -
-	    so both have to mark them, and marking them differently in the two places would make one row
-	    read as two different rows.
+	    THE one definition, called where a match is shown: the panel's cell (KBSColorTextView - where
+	    it draws, and where it measures). Since 2026-08-04 a match is carried WHOLE however many
+	    paragraphs it spans, and a raw break draws with no width - the paragraphs either side of it
+	    run together and read as one piece of text - so it has to be marked. (The saved report,
+	    BuildReportText, called it too until Save Results... went on 2026-09-27.)
 
 	    ***** DISPLAY ONLY. ***** Never applied to what the model holds. What the model holds is what
 	    a JUMP compares against the document (KBSSearchEngine::MatchIsSameOccurrence, through the
@@ -785,11 +765,10 @@ namespace KBSResultModel
 	    Only the rows actually written to are copied - one copy each, taken just before the change -
 	    so the cost follows the work done rather than the size of the result set.
 
-	    A replace that is cancelled rolls the TEXT back through its command sequence (a regular
-	    ICommandSequence rolls the database back to where it started when the global error code is
-	    not kSuccess, which is what ProgressBar's WasCancelled(kTrue) sets). That leaves the panel
-	    describing replacements that no longer exist, so the two have to be put back together: this
-	    is the panel's half.
+	    A replace that is cancelled or fails rolls the TEXT back through its command sequence
+	    (Change Checked aborts its abortable sequence; a row menu's Replace ends its plain one with the
+	    error state raised). That leaves the panel describing replacements that no longer exist, so
+	    the two have to be put back together: this is the panel's half.
 
 	    Exactly one of RollBackRows (the run was cancelled) or ForgetRowBackup (it committed) must
 	    follow, or the copies stay alive until the next replace. */

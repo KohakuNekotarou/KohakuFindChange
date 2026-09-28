@@ -871,6 +871,18 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	return true;
 }
 
+bool KBSBookScope::ReachChapterDoc(const IDFile& file, UIDRef& ioDocRef)
+{
+	// See the header: by file first; the docRef held only for a chapter with no file, while it is open.
+	UIDRef reopened;
+	if (ReopenChapterDoc(file, reopened))
+	{
+		ioDocRef = reopened;
+		return true;
+	}
+	return !ChapterHasFile(file) && IsDocStillOpen(ioDocRef);
+}
+
 bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 {
 	IDataBase* db = docRef.GetDataBase();

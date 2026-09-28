@@ -42,8 +42,10 @@ class RangeProgressBar;
 void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
 /** ***** KBS SEARCHES AND REPLACES FORWARD ONLY (2026-09-26, the user's call). ***** The results are a
-    list and the replace is Change All, so a direction means nothing to KBS - and a backward search
-    lists matches Change All does not make (H-5: GREP lookarounds read other text backwards). For the
+    list, so a direction means nothing to KBS - and a backward search listed matches the replace
+    (Change All, that day) did not make (H-5: GREP lookarounds read other text backwards). The one
+    exception is the replace's writing walk for a GREP query holding ^ (KBSBackwardSearchScope,
+    below). For the
     life of the object the session's search direction is forward; the user's own setting is put back
     by the destructor, whatever way the run ends (kSearchBackwardsSilentCmdBoss, the command the
     2026-09-26 spike measured). Create it OUTSIDE any command sequence: an aborted sequence would take
@@ -188,12 +190,11 @@ namespace KBSSearchEngine
 	    Recorded on the results at search time (KBSResultModel::SetWalkSignature) and compared before
 	    Change Checked re-walks.
 
-	    Why it has to exist: the replace lines the Nth match of its re-walk up with the hit whose
-	    walkOrder is N, and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61) -
-	    so a query edited between the search and the replace makes the walk return a DIFFERENT set of
-	    matches, in which the Nth one is a different occurrence entirely. Comparing the tab alone does
-	    not see that: retyping the find string, or turning Include Footnotes off, changes the match set
-	    without changing the tab.
+	    Why it has to exist: the replace re-walks and writes the matches it meets at the rows' places,
+	    and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so a query edited
+	    between the search and the replace makes the walk return a DIFFERENT set of matches, one of
+	    which can stand where a row does. Comparing the tab alone does not see that: retyping the find
+	    string, or turning Include Footnotes off, changes the match set without changing the tab.
 
 	    ***** FIND FORMAT IS ONLY COUNTED HERE, NOT DESCRIBED. ***** The signature carries how MANY
 	    attributes the format pane holds, and the two styles it keeps outside that list - but not the
@@ -266,8 +267,8 @@ namespace KBSSearchEngine
 
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
-	    with exactly the options the search that produced the hits used, or the walk order those
-	    hits were numbered by no longer lines up - hence one definition, shared by both.
+	    with exactly the options the search that produced the hits used, or it meets other matches
+	    than the rows list - hence one definition, shared by both.
 
 	    @note Two of the five ("include locked layers" / "include locked stories") are FIND-only in
 	          InDesign - the header states there is no option to change in locked content. They stay
@@ -393,22 +394,21 @@ namespace KBSSearchEngine
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
 	/** How much of each match CollectDocHits fills in. A walk costs the same whatever is asked for;
-	    what differs is how much is then read about every match it lands on. */
+	    what differs is how much is then read about every match it lands on. (A kHitPlace - the story
+	    and range alone, for numbering the rows again - went with that numbering on 2026-09-29.) */
 	enum HitDetail
 	{
-		kHitPlace,			// story, range and walk order - all that numbering the rows again reads
-		kHitPlaceAndText,	// ...and the three drawn segments and the hash - what finding a row again compares
+		kHitPlaceAndText,	// story, range, the three drawn segments and the hash - what finding a
+							// row again compares
 		kHitEverything		// ...and the page, the hidden / locked / footnote flags and the story's first
 							// words - a search's row
 	};
 
-	/** Every match of the current query in one open document, as the search walks them (walk order
-	    stamped, not yet in page order), with the given scope switches, each filled in as far as
-	    'detail' says. For the rows of a work list after it has changed under them: the rest of the
-	    list is numbered again (KBSReplaceEngine.cpp, RenumberWalkOrders - kHitPlace) and a row a
-	    jump found out of place is looked for again (KBSJump.cpp, RelocateStaleRow -
-	    kHitPlaceAndText). The walk is the search's own, so the walk orders are the numbers the search
-	    would give. Read-only (the walk's own dirty guard). False = the document could not be walked. */
+	/** Every match of the current query in one open document, as the search walks them (not yet in
+	    page order), with the given scope switches, each filled in as far as 'detail' says. For a row
+	    a jump found out of place, looked for again (KBSJump.cpp, RelocateStaleRow - kHitPlaceAndText).
+	    The walk is the search's own. Read-only (the walk's own dirty guard). False = the document
+	    could not be walked. */
 	bool CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
 		std::vector<KBSResultModel::Hit>& outHits);
 
@@ -431,7 +431,8 @@ namespace KBSSearchEngine
 	    ***** WHO ASKS. ***** The jump - KBSJump::JumpToHit, and KBSJump::SelectHitText, the double
 	    click that selects the match (the same pair that share IsPositionOverset above) - and, since
 	    the row menus of 2026-09-27, the replace's row doors in KBSReplaceEngine.cpp:
-	    RowStillStands, ReplaceRowsNow and RowsToRedo. Each asks about the very range its row
+	    RowStillStands, ReplaceRowsNow and RowsToRedo; since 2026-09-29, Change Checked's verify walk
+	    (ChapterMovedUnderRows) of every ticked row. Each asks about the very range its row
 	    recorded, so the first three questions are satisfied by construction and the hash is what
 	    does the work - the answer being how the panel can say "the replacement is no longer here"
 	    instead of scrolling to whatever took its place, how the double click refuses to hand the

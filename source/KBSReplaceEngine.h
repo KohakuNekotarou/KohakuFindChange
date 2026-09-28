@@ -63,12 +63,14 @@ namespace KBSReplaceEngine
 	    the Nth match was replaced for the Nth checked row, until the 2026-09-27 defect sweep; the
 	    reason for the check is unchanged.)
 
-	    So each chapter is walked before it is written. That walk writes nothing: at every ticked walk order it
-	    asks whether the match still BEGINS in the same story at the same index, which is what the
-	    row recorded when the search found it. One mismatch - or one ticked row the walk never
+	    So each chapter is walked before it is written. That walk writes nothing: for every ticked row
+	    it asks whether the row's text is still the text that was ticked, and whether a match of the
+	    walk still BEGINS where the row does. One that is not - or one ticked row the walk never
 	    reaches - and the whole run stops, with an alert saying so and the results cleared
 	    (TellResultsWentStale, and the verify pass in the resolve loop). Only if every chapter passes
-	    does the second walk open a command sequence and write.
+	    does the second walk open a command sequence and write. (It lined the Nth match of the walk up
+	    with the row numbered N, and did not read the text, until 2026-09-29 - see
+	    ChapterMovedUnderRows in the .cpp.)
 
 	    ***** IN THE RESOLVE PASS, AND NOWHERE ELSE. ***** That is the one moment where the question
 	    is both answerable and free: the chapter has just been reopened, and NOT ONE CHARACTER has
@@ -81,7 +83,7 @@ namespace KBSReplaceEngine
 	    enumerating every way a document can move - text, stories added or deleted, layers hidden or
 	    locked, conditions, master pages - and that list is never finished. Comparing the positions
 	    asks about the thing itself: whatever the cause, if a ticked match is not where it was, the
-	    walk order no longer means what the rows say it means.
+	    row no longer describes it.
 
 	    The same test used to stand INSIDE the replacing walk, per hit, until 2026-08-05. See the
 	    note above the walk in KBSReplaceEngine.cpp for why it could not work there and what remains
@@ -135,18 +137,19 @@ namespace KBSReplaceEngine
 
 	/** Do the current Find/Change settings still describe the search the panel's results came from?
 
-	    Three questions, most specific first:
+	    Two questions, most specific first:
 	      1. the TAB - clicking another one returns another set of matches;
-	      2. whether that tab is one this panel walks at all (Object and Colour are not);
-	      3. the QUERY and every switch that decides which occurrences come back - the find string,
+	      2. the QUERY and every switch that decides which occurrences come back - the find string,
 	         case / whole word / kana / width, the five scope switches, and FIND FORMAT (a paragraph
 	         style, a font, a colour). See KBSSearchEngine::BuildWalkSignature.
+	    (A third - is that tab one this panel walks at all - stood between them until 2026-09-29. The
+	    tab on the results is one the search could state, so it never answered no.)
 
 	    Why it has to be asked at all: the replace walks every story that holds a ticked row with the
 	    LIVE IFindChangeOptions and writes the matches it meets at the rows' places - so a query edited
 	    between the search and the replace walks a different set of matches from the one the rows
-	    list. (The verify walk joins its matches to the rows by walk order - "the Nth match for the hit
-	    whose walkOrder is N" - and the reason is the same for it.)
+	    list. The verify walk looks for the rows' matches the same way, and the reason is the same for
+	    it.
 
 	    ***** ONE OF TWO DOORS, and they divide the ways a run can be wrong between them. *****
 
@@ -164,16 +167,24 @@ namespace KBSReplaceEngine
 
 	    ***** TWO SIDE EFFECTS, both deliberate. ***** It STATES the tab (KBSSearchEngine::
 	    CommitSearchMode - the walk needs that whatever the answer is, and the comparison has to be
-	    taken on the same side of that command as the search took it), and on answer 3 it CLEARS THE
+	    taken on the same side of that command as the search took it), and on answer 2 it CLEARS THE
 	    RESULTS: they describe a query the dialog no longer holds, so keeping them up would only
-	    invite another attempt. Answers 1 and 2 leave them alone - a tab is one click to put back.
-	    A caller that gets true back should redraw the tree.
+	    invite another attempt. Answer 1 leaves them alone - a tab is one click to put back - and so
+	    does a tab that could not be stated. A caller that gets true back should redraw the tree.
 
 	    Call it OUTSIDE any command sequence: it processes a command of its own.
 
 	    @param outSummary OUT the reason, ready for the status line. Cleared first.
 	    @return true when the run must NOT go ahead. */
 	bool RefuseChangedQuery(PMString& outSummary);
+
+	/** RefuseChangedQuery's question WITHOUT ITS CONSEQUENCES (2026-09-29): true when the Find/Change
+	    settings still describe the search the results came from. The tab is stated all the same - a
+	    walk after this runs in it - and NOTHING IS CLEARED whatever the answer. For a caller that only
+	    has to know: the jump's look for a row Undo moved (KBSJump RelocateStaleRow), which asked
+	    RefuseChangedQuery until then and on a changed query cleared the whole result set in the middle
+	    of a jump. Same rule as RefuseChangedQuery: outside any command sequence. */
+	bool QueryUnchangedSinceSearch();
 
 	/** Reject Change on a replaced hit row (2026-09-26): its tracked change - found by
 	    KBSTrackChange::FindRowChangeForHit - is rejected, deletion and insertion, in ONE undo step, and
@@ -185,7 +196,7 @@ namespace KBSReplaceEngine
 	/** Replace on a hit row's right-click menu (2026-09-27, the user's call): that one row, ticked or
 	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
 	    list stays a work list: the row reads "replaced", every other row is moved to where its text now
-	    stands and numbered again by a fresh walk. Refused - nothing changed, outStatus says why - when
+	    stands. Refused - nothing changed, outStatus says why - when
 	    the query changed since the search, the row's text is not the one the search found, the chapter
 	    cannot be opened, or the row would not be replaced (locked since, missing, an endnote's end). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);

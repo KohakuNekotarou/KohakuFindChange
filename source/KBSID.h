@@ -519,10 +519,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 //  the prompt was removed. The English lives in KBS_enUS.fr; the Japanese in KBSLoc.h.)
 // ***** NOT PART OF THE CONFIRMATION PROMPT - the replace's own alert, shown INSTEAD of running.
 //
-// A replace walks the chapter again and gives the Nth match the Nth ticked row's replacement, so
-// the numbering only means what the rows say while the matches are where the search left them.
-// Since 2026-08-10 the run makes sure of that before it writes anything (the verify walk in
-// KBSReplaceEngine's resolve pass) and stops if they are not.
+// A replace writes the match standing at each ticked row's place, so the rows only mean what they
+// say while the matches are where the search left them, holding the text it found. Since 2026-08-10
+// the run makes sure of that before it writes anything (the verify walk in KBSReplaceEngine's
+// resolve pass - by place and text since 2026-09-29) and stops if they are not.
 //
 // The wording history, because it explains why the strings look the way they do: a standing
 // conditional disclaimer ("IF the text has been edited") sat on every confirmation prompt until

@@ -41,7 +41,7 @@
 #include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
-#include "KBSRunGuard.h"		// "is anything of ours running?" - one question, four runs
+#include "KBSRunGuard.h"		// "is anything of ours running?" - one question, both runs
 #include "KBSTrackChange.h"		// Reject Change / Redo: is this row's tracked change still there?
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
@@ -96,6 +96,22 @@ public:
  application.
 */
 CREATE_PMINTERFACE(KBSActionComponent, kKBSActionComponentImpl)
+
+namespace
+{
+// A run of ours is up - its progress bar pumps events, so an action can arrive in the middle of it:
+// say so on the status line, and the caller turns the action away. (The same lines stood in each of
+// the row menus' cases and Change Checked's until 2026-09-29.)
+bool RefusedWhileRunning()
+{
+	if (!KBSRunGuard::IsAnyRunning())
+		return false;
+	PMString busy(KBSRunGuard::BusyMessage());
+	busy.SetTranslatable(kFalse);
+	KBSResultTree::ShowStatus(busy);
+	return true;
+}
+}
 
 /* KBSActionComponent Constructor
 */
@@ -288,13 +304,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// or closed. (A third - has the Find/Change query changed - stood here too until 2026-09-28. It
 			// rebuilt the tree on a refusal as the engine's path does, with the same words, so it was the
 			// engine's door asked twice: ReplaceChecked asks it.)
-			if (KBSRunGuard::IsAnyRunning())
-			{
-				PMString busy(KBSRunGuard::BusyMessage());
-				busy.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(busy);
+			if (RefusedWhileRunning())
 				break;
-			}
 
 			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
 			// this command out in that state (see UpdateActionStates), but a caller that never went
@@ -302,7 +313,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Asked before the checked count: the rows the last run never reached keep their check so
 			// the report can account for them, so GetCheckedCount() is still positive. Same wording
 			// as the engine's own door.
-			if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyRejectedRowOpen())
+			if (KBSResultModel::NoRowHasCheckBox())		// a report - with no row taken back in it
 			{
 				PMString report("This is the last replace's report - search again to replace more.");
 				report.SetTranslatable(kFalse);
@@ -343,13 +354,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
 				break;
-			if (KBSRunGuard::IsAnyRunning())
-			{
-				PMString busy(KBSRunGuard::BusyMessage());
-				busy.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(busy);
+			if (RefusedWhileRunning())
 				break;
-			}
 			PMString status;
 			if (actionID.Get() == kKBSChapterRejectActionID)
 				KBSReplaceEngine::RejectChapter(chapter, status);
@@ -372,13 +378,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1, group = -1;
 			if (!KBSResultModel::GetContextMenuGroup(chapter, group))
 				break;
-			if (KBSRunGuard::IsAnyRunning())
-			{
-				PMString busy(KBSRunGuard::BusyMessage());
-				busy.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(busy);
+			if (RefusedWhileRunning())
 				break;
-			}
 			PMString status;
 			status.SetTranslatable(kFalse);
 			const uint32 id = actionID.Get();
@@ -407,13 +408,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1, hit = -1;
 			if (!KBSResultModel::GetContextMenuHit(chapter, hit))
 				break;
-			if (KBSRunGuard::IsAnyRunning())
-			{
-				PMString busy(KBSRunGuard::BusyMessage());
-				busy.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(busy);
+			if (RefusedWhileRunning())
 				break;
-			}
 			PMString status;
 			if (actionID.Get() == kKBSReplaceHitActionID)
 				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
@@ -431,13 +427,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			const int32 chapter = KBSResultModel::GetContextMenuChapter();
 			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
 				break;
-			if (KBSRunGuard::IsAnyRunning())
-			{
-				PMString busy(KBSRunGuard::BusyMessage());
-				busy.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(busy);
+			if (RefusedWhileRunning())
 				break;
-			}
 			PMString status;
 			KBSReplaceEngine::AcceptAllInChapter(chapter, status);
 			KBSResultTree::RefreshRows();
@@ -542,11 +533,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// A run of ours is standing behind its modal progress bar. The bar pumps events, so this list
 	// can be asked for its states from inside the run: lock everything until it returns.
 	//
-	// ALL FOUR runs, through KBSRunGuard - it used to name only the search and the replace, which
-	// left both scans able to start a second run on top of themselves and on top of each other. The
-	// replace needs it at least as much as the search (it works with a command sequence standing
-	// open, and a second walk underneath would Halt() its walker mid-walk), and a scan needs it
-	// because a run cancelled underneath it closes the very chapters it is walking.
+	// Every run, through KBSRunGuard - the search and the replace (and the two scans until they went,
+	// 2026-09-27). The replace needs it at least as much as the search: it works with a command
+	// sequence standing open, and a second walk underneath would Halt() its walker mid-walk.
 	if (KBSRunGuard::IsAnyRunning())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
@@ -687,9 +676,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// themselves out on the same page through GetCheckableCount, which asks this question
 			// for them.
 			//
-			// The Find/Change strings are deliberately NOT tested here - the confirmation prompt
-			// shows them, so an empty change string (a valid "delete the matches" request) still
-			// reaches the user instead of being greyed out unexplained.
+			// The Find/Change strings are deliberately NOT tested here - an empty change string is a
+			// valid "delete the matches" request, and greying the command out for it would say nothing
+			// about why.
 			//
 			// ***** THE SECOND HALF IS ONE QUESTION, AND THE MODEL ALREADY OWNS IT. ***** "Can any
 			// row of this list be checked at all" is NoRowHasCheckBox(). This line spelled that out by

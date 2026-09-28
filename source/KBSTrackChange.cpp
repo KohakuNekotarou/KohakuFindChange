@@ -364,14 +364,14 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
 		return false;
 	// A footnote's row is never taken back - see IsInFootnote.
-	if (KBSResultModel::GetHitPinned(chapterIdx, hitIdx) != KBSResultModel::kPinnedNone)
+	if (KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx))
 		return false;
 	UIDRef docRef;
 	IDFile file;
 	// ***** OPEN, OR NOT AT ALL. ***** A chapter closed since the search leaves a dangling database pointer
-	// behind (KBSBookScope::IsDocStillOpen says why) - asked before anything is read through it.
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
-		|| !KBSBookScope::IsDocStillOpen(docRef))
+	// behind (KBSBookScope::IsDocStillOpen says why, and answers false for no database at all) - asked
+	// before anything is read through it.
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KBSBookScope::IsDocStillOpen(docRef))
 		return false;
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
@@ -391,7 +391,6 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	std::vector<Record> recs;
 	CollectRecordsOfTimes(outStory, own, recs);
 	Change c;
-	c.time = rowTime;
 	bool haveIns = false;
 	TextIndex delAt = kInvalidTextIndex;
 	for (size_t k = 0; k < recs.size(); ++k)
@@ -401,7 +400,6 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 			if (!c.hasDelete)
 			{
 				c.hasDelete = true;
-				c.deleted = recs[k].text;
 				delAt = recs[k].at;
 			}
 			continue;
@@ -419,8 +417,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 		// typed in between (an insertion of theirs splitting the row's) means the row's change is not its
 		// own any more (case signed-user-typed-then-reject) - and a piece accepted in the Track Changes
 		// panel leaves the rest short.
-		c.inserted = ReadText(outStory, c.at, c.insLen);
-		if (c.inserted != replacedText)
+		if (ReadText(outStory, c.at, c.insLen) != replacedText)
 			return false;
 		// ***** AND ITS DELETION STANDS RIGHT AFTER THEM (2026-09-28, case reject-next-to-user-edit). ***** A
 		// replace's deletion is anchored at the end of its insertion. Somebody else's text typed right after

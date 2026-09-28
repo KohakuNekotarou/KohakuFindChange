@@ -384,7 +384,7 @@ namespace KBSBookScope
 	    second must give up instead, because that docRef belongs to a document which was closed when
 	    the search finished - and asking IsDocStillOpen about a closed one is the very fault removed
 	    on 2026-08-04 (a UIDRef is only (IDataBase*, UID), so a reused address with a matching UID
-	    answers YES about a DIFFERENT document). See the resolve pass in KBSReplaceEngine.
+	    answers YES about a DIFFERENT document). ReachChapterDoc, below, tells the two apart.
 
 	    Asked through the same SDKFileHelper::GetPath() ReopenChapterDoc itself asks - through this
 	    very function - so the two cannot come to differ. */
@@ -400,6 +400,28 @@ namespace KBSBookScope
 	    this is how any of them reaches one again. (It said "Task 3 jump ... held chapter closed by the
 	    user" until 2026-09-27: true of its first caller only.) */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
+
+	/** A result chapter's document, LIVE - the one question the jump (KBSJump
+	    EnsureChapterReachable), the replace's resolve pass and a row menu's Replace asked in three
+	    spellings until 2026-09-29.
+
+	    ***** BY FILE FIRST, never gated on IsDocStillOpen. ***** ioDocRef is what the results
+	    hold, and its document may have been closed since the search: a UIDRef is only
+	    (IDataBase*, UID), so once the address is reused by a document opened afterwards and the
+	    UID lands the same (chapters built the same way share internal UIDs), IsDocStillOpen
+	    answers YES about a DIFFERENT document - measured 2026-08-04: 2 to 4 book replaces in 10
+	    walked a neighbour and reported every row missing, never in the first chapter.
+	    ReopenChapterDoc asks by FILE, which cannot be confused.
+
+	    ***** ONLY A CHAPTER WITH NO FILE FALLS BACK ON ioDocRef ***** - a document-scope row,
+	    the front document, which nothing closed behind anybody - and only while it is still
+	    open. A file that would not open (moved, deleted, in use) gives up: that ioDocRef is the
+	    one the search left.
+
+	    @return true = ioDocRef is live now (the reopened document, or the one it held). The
+	            caller rebinds the model to it (KBSResultModel::RebindChapterDoc - a no-op when
+	            it is the same). */
+	bool ReachChapterDoc(const IDFile& file, UIDRef& ioDocRef);
 
 	/** Give a chapter that is open WITHOUT a window (the search opens them that way) a real layout
 	    window, so the user can see what a replace did to it. Does NOT save, and does not bring an

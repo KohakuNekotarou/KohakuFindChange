@@ -294,8 +294,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		KBSResultModel::SetContextMenuHit(chapter, hit);
 		bool checked = false, replaced = false, locked = false;
 		KBSResultModel::GetHitFlags(chapter, hit, checked, replaced, locked);
-		const KBSResultModel::PinnedReason pinned = KBSResultModel::GetHitPinned(chapter, hit);
-		if (pinned != KBSResultModel::kPinnedNone)
+		if (KBSResultModel::GetHitInFootnote(chapter, hit))
 		{
 			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);

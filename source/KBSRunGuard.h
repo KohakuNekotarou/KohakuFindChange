@@ -27,7 +27,8 @@
 //  (this comment said "the three kinds of caller" while there were six call sites, the three it
 //  omitted having arrived one at a time):
 //
-//    * the panel's action enablement (KBSActionComponent, twice) greys everything out;
+//    * the panel's actions (KBSActionComponent): UpdateActionStates greys everything out, and
+//      RefusedWhileRunning turns away a command that arrives anyway;
 //    * each engine's own front door (KBSSearchEngine / KBSReplaceEngine), for a caller that never
 //      went through the menu - a script firing an
 //      action by ID reaches the engine whatever the menu says;

@@ -76,7 +76,7 @@
 #include "KBSSearchEngine.h"		// MatchIsSameOccurrence / EditableFrameForMatch / IsPositionOverset /
 									// CollectDocHits
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
-#include "KBSReplaceEngine.h"		// RefuseChangedQuery - a row is looked for again only under its own query
+#include "KBSReplaceEngine.h"		// QueryUnchangedSinceSearch - a row is looked for again only under its own query
 #include <vector>
 
 namespace
@@ -575,28 +575,13 @@ namespace
 	// why through the status line, so it should just return.
 	bool EnsureChapterReachable(int32 chapterIdx, UIDRef& ioDocRef, const IDFile& file)
 	{
-		// ***** BY FILE FIRST, never gated on IsDocStillOpen. ***** That question is asked of a
-		// docRef whose document may have been closed since the search, and a UIDRef is only
-		// (IDataBase*, UID) - once the address is reused by a document opened afterwards, and the
-		// UID lands the same, it answers YES about a DIFFERENT DOCUMENT. ReopenChapterDoc asks by
-		// FILE instead: it hands back the open document living in this chapter's .indd, or opens
-		// it. See the longer note at the same change in KBSReplaceEngine's resolve pass.
-		UIDRef reopened;
-		if (KBSBookScope::ReopenChapterDoc(file, reopened))
+		// By file first; the docRef the results hold only for a chapter with no file - see
+		// KBSBookScope::ReachChapterDoc, which the replace asks too.
+		if (KBSBookScope::ReachChapterDoc(file, ioDocRef))
 		{
-			ioDocRef = reopened;
-			KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
+			KBSResultModel::RebindChapterDoc(chapterIdx, ioDocRef);
 			return true;
 		}
-
-		// ***** TWO different failures, and only ONE of them may fall back. ***** No file to open BY
-		// is normal - a DOCUMENT-scope row is the front document and carries none - and the old
-		// question is safe for it: that docRef IS the live front document, with nothing closed
-		// behind it. A file that would NOT open is the other case, and there the docRef is the one
-		// the search left behind, whose document was closed when the search finished - the exact
-		// thing the note above says must not be asked about. Say "cannot be reached" instead.
-		if (!KBSBookScope::ChapterHasFile(file) && KBSBookScope::IsDocStillOpen(ioDocRef))
-			return true;
 
 		// Nothing can be reached, so nothing moves - and that has to be SAID. A row that does
 		// nothing at all when clicked reads as a broken panel: the file has been moved, deleted,
@@ -684,9 +669,13 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 	bool checked = false, replaced = false, locked = false;
 	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || replaced)
 		return false;
-	PMString refusal;
-	if (KBSReplaceEngine::RefuseChangedQuery(refusal))
-		return false;		// another query would find other matches - nothing to compare with
+	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
+	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,
+	// and clears nothing. (It asked RefuseChangedQuery itself until 2026-09-29, which on a changed query
+	// cleared the whole result set and handed the chapters back in the middle of a jump, the tree left
+	// drawing rows the model no longer held.)
+	if (!KBSReplaceEngine::QueryUnchangedSinceSearch())
+		return false;
 	KBSResultModel::RowDisplay row;
 	UID story = kInvalidUID;
 	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
@@ -696,7 +685,7 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 		return false;
 	std::vector<KBSResultModel::Hit> hits;
 	{
-		// forward, as the search was (the walk orders it stamps are the search's)
+		// forward, as the search was
 		KBSForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
@@ -735,7 +724,6 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 	const KBSResultModel::Hit& to = hits[static_cast<size_t>(found)];
 	KBSResultModel::SetHitRange(chapterIdx, hitIdx, to.storyUID, to.textStart, to.textEnd);
 	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, to.preText, to.matchText, to.postText, to.matchHash);
-	KBSResultModel::SetHitWalkOrder(chapterIdx, hitIdx, to.walkOrder);
 	if (KBSResultModel::GetHitOutcome(chapterIdx, hitIdx) == KBSResultModel::kOutcomeMissing)
 		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeNone);	// found after all
 	ioStart = to.textStart;

@@ -100,9 +100,8 @@ namespace
 {
 
 // The whole-run safety ceiling lived here until 2026-08-03. It moved to KBSResultModel.h
-// (kKBSCollectHitLimit, beside the display cap) when the two scans were given the same ceiling -
-// three commands reading one number, in the header they all already include. Read the contract
-// there; this file uses it in SearchBook.
+// (kKBSCollectHitLimit, beside the display cap) when the two scans - removed 2026-09-27 - were given
+// the same ceiling. Read the contract there; this file uses it in SearchBook.
 
 // The smallest advance worth reporting to the progress bar. Moving the bar is what makes Cancel
 // work at all, but it is not free: doing it once per hit would repaint and run the message loop
@@ -1030,19 +1029,17 @@ PMString StoryLeadText(const UIDRef& storyRef)
 	return out;
 }
 
-// Fill a hit from one match (story, [start, end)), as far as 'detail' asks: its jump anchors; then
-// the containing paragraph's text split into (before / matched / after) with the hash of the whole
-// match; then the page, the flags and the story's first words. The offsets are CODE POINTS, not
-// UTF-16 units - see the note at the head of this file, which retracted the UTF-16 wording this
-// comment used to carry.
+// Fill a hit from one match (story, [start, end)), as far as 'detail' asks: its jump anchors and the
+// containing paragraph's text split into (before / matched / after) with the hash of the whole match;
+// then the page, the flags and the story's first words. The offsets are CODE POINTS, not UTF-16
+// units - see the note at the head of this file, which retracted the UTF-16 wording this comment used
+// to carry.
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	KBSSearchEngine::HitDetail detail, WalkCache& cache, KBSResultModel::Hit& outHit)
 {
 	outHit.storyUID = storyRef.GetUID();
 	outHit.textStart = start;
 	outHit.textEnd = end;
-	if (detail == KBSSearchEngine::kHitPlace)
-		return;
 
 	// The line's three drawn segments, and the whole match as one number for the same-occurrence
 	// test the JUMP and the replace's row doors run. Both describe THIS match as the search found it,
@@ -1116,8 +1113,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 //
 // scopeOptions: the five switches every chapter of this run is walked with, read once by the caller
 // (see SearchBook). They are the same for every chapter by definition - the replace pass re-walks
-// with exactly these, or the walk order the hits were numbered by no longer lines up - so reading
-// them here would have been the Find/Change settings asked once per chapter for one answer.
+// with exactly these, or it meets other matches than the hits list - so reading them here would have
+// been the Find/Change settings asked once per chapter for one answer.
 //
 // progressBar / progressBase: the run's bar and the point on it where this chapter starts.
 // chapterSpan / storiesInDoc: how much of the bar this chapter owns, and how many stories to divide
@@ -1126,8 +1123,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // by how far into its text the current match sits. nil is allowed for the bar.
 //
 // detail: how much of each hit is filled in (KBSSearchEngine::HitDetail) - everything for the search,
-// less for a caller that re-walks a changed document only to find the rows' places again. The walk is
-// the same either way, and so are the walk orders it stamps.
+// less for a caller that re-walks a changed document only to find a row's place again. The walk is
+// the same either way.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	KBSSearchEngine::HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
@@ -1197,8 +1194,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		walker->Halt();
 
 	// The single shared scope definition - the replace pass re-walks each chapter with exactly
-	// these options, or the walk order the hits were numbered by would no longer line up. Handed in
-	// by the caller, which reads them once for the whole run.
+	// these options, or it would meet other matches than the hits list. Handed in by the caller,
+	// which reads them once for the whole run.
 	//
 	// !! ADOBE CALLS THIS NOWHERE. Every other step of this walk is the shape SnpFindAndReplace
 	// uses, but the snippet builds its scope from the SELECTION
@@ -1296,7 +1293,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// about the user's DOCUMENT that the four walker answers below were flattened into until the
 		// day before. Adobe's loop takes the other view: SnpFindAndReplace.cpp:752-765 leaves its
 		// result at the kFailure it was initialised to and breaks out. So does the replace engine's
-		// RunWalkerCmd (KBSReplaceEngine.cpp:94-99), which had the answer right on both of them while
+		// RunWalkerCmd (KBSReplaceEngine.cpp), which had the answer right on both of them while
 		// this side did not - it is the same loop, written twice.
 		//
 		// kChapterWalkFailed rather than a "never started" reason, because either is possible here:
@@ -1411,15 +1408,13 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 			break;
 		}
 
-		// ***** BUILT WHERE IT IS GOING TO LIVE. ***** A Hit carries six PMStrings, so filling a
-		// local one and copying it in here cost six heap allocations per match that nothing asked
-		// for (2026-08-08). emplace_back hands back the new element itself (C++17), and BuildHit
+		// ***** BUILT WHERE IT IS GOING TO LIVE. ***** A Hit carries its texts as PMStrings, so filling
+		// a local one and copying it in here cost a heap allocation per string per match that nothing
+		// asked for (2026-08-08). emplace_back hands back the new element itself (C++17), and BuildHit
 		// never touches this vector, so the reference cannot be invalidated under it.
+		// (The walk order was stamped on it here until 2026-09-29 - see where Hit::walkOrder stood.)
 		KBSResultModel::Hit& hit = outHits.emplace_back();
 		BuildHit(docRef, story, start, end, detail, walkCache, hit);
-		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
-		// into page order. The replace pass re-walks the chapter and matches on this number.
-		hit.walkOrder = static_cast<int32>(outHits.size()) - 1;
 	}
 
 	if (walker->IsWalking())
@@ -1724,7 +1719,7 @@ void KBSSearchEngine::RememberFindFormat()
 		return;
 
 	// The database first, and on its own: it is the argument the call below takes, so it is tested
-	// before it is handed over rather than afterwards (see DescribeGlyphQuery).
+	// before it is handed over rather than afterwards (as HasFindQuery and BuildWalkSignature do).
 	IDataBase* const db = opts->GetUIDAttrDB();
 	if (db == nil)
 		return;			// nothing to remember - FindFormatHasChanged then says "cannot tell"
@@ -1816,7 +1811,7 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 	else
 	{
 		// Text and GREP keep SEPARATE find strings, so this is asked for the mode in force - the same
-		// way HasFindQuery and DescribeCurrentQuery ask it.
+		// way HasFindQuery asks it.
 		outSignature.Append(" q");
 		outSignature.Append(opts->GetFindString(mode));
 	}
@@ -1829,8 +1824,8 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 
 	// ----- the switches that decide WHICH occurrences of it come back -----
 	// The four matching options first, then the five scope switches GetKBSWalkerScopeOptions reads.
-	// Every one of them changes the match SET, and therefore the walk order the stored hits are
-	// numbered by. (Kana and width sensitivity are CJK-only in the dialog, but they are asked for
+	// Every one of them changes the match SET the replace's walks meet. (Kana and width sensitivity
+	// are CJK-only in the dialog, but they are asked for
 	// unconditionally: an option that is not on screen can still be set, and a signature that only
 	// covers what the current UI shows is a signature with a hole in it.)
 	const bool16 switches[] =
@@ -1864,7 +1859,7 @@ void KBSSearchEngine::BuildWalkSignature(PMString& outSignature)
 	outSignature.AppendNumber(attrs != nil ? attrs->CountBosses() : 0);
 
 	// ...and the two conditions that list does NOT carry. A paragraph or character style set in the
-	// format pane sits in a field of its own (see HasFormatSet), so without these a query that
+	// format pane sits in a field of its own (GetFindParaStyle / GetFindCharStyle), so without these a query that
 	// differs only by "Find Format = Style A" versus "Style B" would carry an IDENTICAL signature
 	// and the door that refuses a changed query would let it straight through. The UIDs go in raw:
 	// this string is compared, never read.
@@ -1898,8 +1893,8 @@ void KBSSearchEngine::GetKBSWalkerScopeOptions(WalkerScopeOptions& outOptions)
 	// Two of the five are FIND-only in InDesign - "there is no option to change in locked stories /
 	// on locked layers" (IFindChangeOptions.h:259, 279), which is why the dialog labels them Search
 	// Only. They are still taken here, and still handed to the REPLACE walk, because both walks
-	// have to visit the same matches in the same order or the walk order the hits were numbered by
-	// stops lining up. The distinction is made where it belongs instead: the replace asks
+	// have to meet the same matches or the rows stop describing what the replace meets. The
+	// distinction is made where it belongs instead: the replace asks
 	// EditableFrameForMatch / IsFrameEditable before it writes and leaves a locked match alone.
 	//
 	// (Note for anyone reading this as new behaviour: WalkerScopeOptions defaults every switch to
@@ -2226,10 +2221,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// here until that command was removed on 2026-09-27.)
 
 	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
-	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab alone is not enough: retyping the find string, or
-	// turning Include Footnotes off, changes the match set without changing the tab, and the walk
-	// order the hits below are numbered by would then point at other occurrences entirely.
-	// See KBSSearchEngine::BuildWalkSignature.
+	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab
+	// alone is not enough: retyping the find string, or turning Include Footnotes off, changes the
+	// match set without changing the tab, and the re-walk would then meet other occurrences where the
+	// hits below stand. See KBSSearchEngine::BuildWalkSignature.
 	{
 		PMString walkSignature;
 		KBSSearchEngine::BuildWalkSignature(walkSignature);

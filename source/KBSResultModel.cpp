@@ -98,20 +98,12 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
-		// Is this a list that offers work at all? Asked first because it is a property of the RESULT
-		// SET, not of the row: when the answer is no, no row carries a box whatever that row holds.
-		//
-		// ***** THE WHOLE QUESTION, NOT HALF OF IT. ***** This asked the scans' report-only kind alone until
-		// 2026-08-07, which left the OTHER half - a replace's aftermath - for every caller to
-		// remember on its own, and all five of them did (SetHitChecked, SetAllChecked,
-		// SetChapterChecked, GetCheckableCount, GetChapterCheckableCount). Nothing was wrong with
-		// the answers; what was wrong is that the sixth caller would have had to know. The two
-		// halves are ORed in one place - NoRowHasCheckBox - and this is that place's customer, not
-		// its rival. The callers still take their early exit, but they take it on the same
-		// question (see there).
-		if (KBSResultModel::NoRowHasCheckBox())
-			return false;
-		// A replace's report offers work only on the rows Reject Change put back (2026-09-27, B).
+		// A replace's report offers work only on the rows Reject Change put back (2026-09-27, B). This is
+		// the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
+		// taken back and still open is exactly what makes that question answer no, and every other row
+		// is refused here. (NoRowHasCheckBox was asked first as well until 2026-09-29 - an answer that
+		// could not change this one, and a walk of every row per row: squared in the rows over a report.
+		// The callers that loop still ask it once, as their early exit.)
 		if (KBSResultModel::IsShowingReplaceOutcome() && hit.outcome != KBSResultModel::kOutcomeRejected)
 			return false;
 
@@ -130,9 +122,8 @@ namespace
 	// match>  <the story's first words>". (The level held FONTS for Find Missing Glyphs from 2026-08-02;
 	// that scan was removed on 2026-09-27, and the level is the story's alone.)
 	//
-	// !! Every caller hands over hits that are NEW (fontGroup / fontGroupPos -1 / -1, as Hit's own
-	// constructor sets them) or resets them itself - KeepCheckedRows does. The groups are rebuilt from
-	// scratch here either way.
+	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
+	// the hit held before - a search's new hits and the hits KeepCheckedRows carries over alike.
 	void BuildFontGroups(KBSResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
@@ -185,7 +176,7 @@ namespace
 void KBSResultModel::AppendChapter(Chapter&& chapter)
 {
 	// ***** THE HITS ARE TAKEN, NOT COPIED. ***** A chapter of a large search holds thousands of
-	// Hits and each Hit holds six PMStrings, so copying the vector in here doubled the cost of
+	// Hits and each Hit holds its texts as PMStrings, so copying the vector in here doubled the cost of
 	// filling the model for nothing: every caller builds a Chapter, hands it over and drops it.
 	// Copied until 2026-08-08 - and the search had used swap() to keep the same hits from being
 	// copied into that Chapter one line earlier, which this then undid.
@@ -693,38 +684,24 @@ void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vecto
 		outHits.push_back(order[k].second);
 }
 
-int32 KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
+void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
+		return;
 	Chapter& c = gChapters[chapterIdx];
 	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return 0;
+		return;
 	// The same question the panel asks before it draws a box, asked here so the model can never hold
-	// a checked hit that no row offered. It covers the whole list as well as the row - a scan has
-	// nothing to replace, and neither has a replace's report - which the per-row flags cannot say
-	// anything about.
+	// a checked hit that no row offered - a replace's report above all, where only the rows taken back
+	// carry a box.
 	//
 	// ***** ONE ROW AT A TIME AGAIN (2026-09-27). ***** Touching matches went on and off together, and a
 	// footnote's row could not go off, while the replace was Change All (2026-09-26 to 2026-09-27): a row
 	// left out had to be taken back, and neither a deletion shared by touching matches nor anything in a
 	// footnote can be. The replace writes only the ticked matches now, so every box is the row's own.
-	// (Reject Change and Redo still take a touching group together - GetTouchingGroup.)
-	if (!RowHasCheckBox(c.hits[hitIdx]))
-		return 1;
-	c.hits[hitIdx].checked = checked;
-	return 1;
-}
-
-KBSResultModel::PinnedReason KBSResultModel::GetHitPinned(int32 chapterIdx, int32 hitIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return kPinnedNone;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return kPinnedNone;
-	const Hit& h = c.hits[hitIdx];
-	return h.inFootnote ? kPinnedFootnote : kPinnedNone;
+	// (Reject Change still takes a touching group together - GetTouchingGroup.)
+	if (RowHasCheckBox(c.hits[hitIdx]))
+		c.hits[hitIdx].checked = checked;
 }
 
 uint64 KBSResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
@@ -996,26 +973,6 @@ void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 	h.checked = false;
 	h.outcome = kOutcomeDeleted;
 	BuildHitLocator(h);
-}
-
-void KBSResultModel::SetHitWalkOrder(int32 chapterIdx, int32 hitIdx, int32 walkOrder)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	c.hits[hitIdx].walkOrder = walkOrder;
-}
-
-int32 KBSResultModel::GetHitWalkOrder(int32 chapterIdx, int32 hitIdx)
-{
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return -1;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return -1;
-	return c.hits[hitIdx].walkOrder;
 }
 
 bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile)
@@ -1308,30 +1265,11 @@ int32 KBSResultModel::KeepCheckedRows()
 				&& hits[hi].outcome == kOutcomeNone)
 				continue;
 			// The source vector is thrown away at the swap below, so the hit is moved out rather
-			// than copied - a Hit carries six PMStrings.
-			Hit hit = std::move(hits[hi]);
-
-			// ***** THE FONT PAIR GOES BACK TO "UNSET" BEFORE THE REGROUP BELOW. ***** BuildFontGroups
-			// reads -1 as unset and, for a chapter whose hits name NO font, returns without writing
-			// the pair back - which is only safe when the hits are newly built, and its own note says
-			// so ("a caller that ever hands over hits carried across from an earlier result set has to
-			// reset the pair itself"). THESE HITS ARE EXACTLY THAT CALLER: they are the search's own
-			// hits, carried across, and they hold the group numbers that search gave them.
-			//
-			// Without this, a chapter that HAD groups and keeps only hits that name no font would
-			// come out of the regroup with an empty fontGroups vector and rows still pointing into
-			// it - and KBSResultNodeID::Create(chapter, hit) takes a node's font FROM the hit
-			// (KBSResultNodeID.h:74-90), so the same row would be handed out under two identities.
-			// That is the one thing that header says must never happen.
-			//
-			// Not reachable today, for the reason written over the regroup below; this keeps the
-			// regroup able to deliver what it was put there to promise, which is that the model is
-			// consistent when this returns. (The note over BuildFontGroups says the defending caller
-			// "does not exist" - it was written on 2026-08-08, and this is it.)
-			hit.fontGroup = -1;
-			hit.fontGroupPos = -1;
-
-			keep.push_back(std::move(hit));
+			// than copied - a Hit carries its texts as PMStrings.
+			// (Its fontGroup / fontGroupPos were put back to -1 here until 2026-09-29, for a regroup
+			// that left an ungrouped chapter's pair as it came. BuildFontGroups below writes every
+			// hit's pair since every chapter is grouped by story, 2026-09-27.)
+			keep.push_back(std::move(hits[hi]));
 		}
 		hits.swap(keep);
 

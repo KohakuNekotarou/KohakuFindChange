@@ -53,7 +53,7 @@
 
 // Project includes:
 #include "KBSReplaceEngine.h"
-#include "KBSID.h"				// the string keys the edited-chapter warning is worded from
+#include "KBSID.h"				// the string keys the stale-results alert and the Undo step are worded from
 #include "KBSLoc.h"				// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -299,10 +299,11 @@ void NoteChapter(int32 chapterIdx, int32& ioCount, PMString& ioFirst, bool& ioHa
 //
 // ***** SINCE 2026-08-10 THE SAME QUESTION IS ASKED BEFORE THE RUN STARTS, AND IT REFUSES. *****
 // The resolve pass walks every chapter it is about to write to - ChapterMovedUnderRows - and checks that
-// each ticked hit still BEGINS in the same story at the same index. It is the test removed here,
-// moved to the one moment where it is both answerable and free: nothing has been written, so the
-// positions are the ones the search recorded, with no replacements of ours to cancel out (that is
-// what the posDelta map was for) - and a mismatch stops the run with not one character to take back.
+// each ticked hit still BEGINS in the same story at the same index, holding the same text. It is the
+// test removed here, moved to the one moment where it is both answerable and free: nothing has been
+// written, so the positions are the ones the rows carry, with no replacements of ours to cancel out
+// (that is what the posDelta map was for) - and a mismatch stops the run with not one character to
+// take back.
 //
 // A per-chapter fingerprint (KBSEditStamp: every story's ITextModel::GetChangeCount, recorded as
 // the search walked) did this job from 2026-08-08 to 2026-08-10, warning rather than refusing. It
@@ -313,9 +314,10 @@ void NoteChapter(int32 chapterIdx, int32& ioCount, PMString& ioFirst, bool& ioHa
 // So the walk below no longer needs a same-occurrence test of its own: by the time it runs, every
 // ticked position has been confirmed and nothing has moved since (the verify pass writes nothing).
 //
-// KBSSearchEngine::MatchIsSameOccurrence and the hash behind it are NOT gone - the JUMP still asks
-// them, which is how clicking a row can answer "the replacement is no longer here" instead of
-// scrolling to whatever now sits at that position.
+// KBSSearchEngine::MatchIsSameOccurrence and the hash behind it are NOT gone - the JUMP asks them,
+// which is how clicking a row can answer "the replacement is no longer here" instead of scrolling to
+// whatever now sits at that position; so do the row doors (RowStillStands, ReplaceRowsNow, RowsToRedo,
+// since 2026-09-27) and the verify walk (ChapterMovedUnderRows, since 2026-09-29).
 
 // Where one of the chapter's rows stands in the text NOW - where the search found it, carried past
 // every replacement this pass has made since - or, for a row this pass replaced, where its new text
@@ -902,17 +904,10 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		//  pending changes around the ticked matches are accepted before anything is written instead - below.)
 		pendingByStory[story].insert(i);
 	}
+	// Nothing to write: every row kept was placed a moment ago from where it stands, and nothing has moved
+	// since. (Their ranges were written back again here until 2026-09-29 - the same values.)
 	if (pendingByStory.empty())
-	{
-		for (size_t k = 0; k < keptRows.size(); ++k)
-		{
-			TextIndex s = kInvalidTextIndex;
-			if (RowStartNow(db, rowNow[static_cast<size_t>(keptRows[k])], s))
-				KBSResultModel::SetHitRange(chapterIdx, keptRows[k], rowNow[static_cast<size_t>(keptRows[k])].story,
-					s, s + rowNow[static_cast<size_t>(keptRows[k])].length);
-		}
 		return true;
-	}
 
 	// ===== from here on things are WRITTEN. A cancel or a failure below leaves the caller to abort. =====
 
@@ -1034,17 +1029,31 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 
 // ***** DOES THE CHAPTER STILL HOLD WHAT ITS TICKED ROWS DESCRIBE? (2026-08-10, the user's design) *****
 // The resolve pass asks it of every chapter before a character is written. Every ticked row carries the
-// position the search found it at, and this walks the chapter the way the search walked it - the same
-// scope, the same options, from the top - so the two can simply be compared: at each ticked walk order,
-// does the match still BEGIN in the same story at the same index? One that does not, or a ticked row the
-// walk never reaches, means the document is not the one the results describe, and the caller stops the
-// whole run before a character is written. It writes nothing, marks no row and moves no bar.
+// place its match stands at - where the search found it, carried past every change KBS has made since -
+// and this walks the chapter the way the search walked it (the same scope, the same options, from the
+// top), asking two things of every ticked row:
+//   - is its text still the text that was ticked (MatchIsSameOccurrence - the jump's own test: the same
+//     length and the same characters, the whole match as one hash), and
+//   - does a match of the walk still BEGIN where it does (the same story, the same index)?
+// A row that fails either, or one the walk never reaches, means the document is not the one the results
+// describe, and the caller stops the whole run before a character is written. It writes nothing, marks no
+// row and moves no bar.
 //
-// The END of the match is not compared, and neither is its text - the start alone is the test (the
-// user's decision). A match that still begins where it began is the occurrence that was found there;
-// length and content belong to the query, which RefuseChangedQuery has already established has not
-// changed. (The writing walk compares the length as well, for a different question - which row a match
-// it meets IS, once replacements have made matches the search never listed; see RowOfMatchAnyOrder.)
+// ***** BY PLACE AND TEXT, NOT BY COUNT (2026-09-29, the user's call: safe, even if slower). ***** Until
+// then it lined the Nth match of the walk up with the row numbered N (Hit::walkOrder) and read no text.
+// Both differences are on the safe side of what the writing walk does - it writes only a match standing
+// at a ticked row's thread, offset and length (RowOfMatchAnyOrder):
+//   - a ticked row whose text had been changed to other text the query also matches (GREP \d+ over
+//     "123" edited to "456"), with as many matches before it as there were, passed the count and was
+//     WRITTEN - text nobody ticked. The text is asked now, and the run stops;
+//   - a match added or removed somewhere before a ticked row, the row itself untouched, failed the count
+//     and stopped the run. It goes through now: what is written is what was ticked, where it was.
+// The numbers also had to be kept up: every row menu's Replace and Reject walked the whole chapter again
+// to number the rows afresh (RenumberWalkOrders, 2026-09-27 to 2026-09-29) - a Reject's walk with no tab
+// stated, so a Reject made with the dialog on another tab numbered the rows by that tab's matches.
+//
+// The END of a match is not compared against the walk: the writing walk asks the length as well, and a
+// ticked row whose match now runs longer or shorter is left there and reported missing, never written.
 //
 // A walk that cannot START (no database, no options, no walker, no scope) answers false - nothing was
 // compared, and the writing walk meets the same failure and stops the whole run ("the text walker could
@@ -1057,39 +1066,39 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // writing half went on 2026-09-28: git history, 8bf650d and before.)
 bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions)
 {
-	// walkOrder -> row index, plus the ticked walk orders. The rows are stored in PAGE order and the walk
-	// runs in DOCUMENT order, so walkOrder is what joins them.
-	std::map<int32, int32> rowByWalkOrder;
-	std::set<int32> targets;
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
-	{
-		const int32 walkOrder = KBSResultModel::GetHitWalkOrder(chapterIdx, i);
-		// A report's own rows keep their ticks, and a report can run a Change Checked on its taken-back
-		// rows (2026-09-27, B): work is what ReplaceInChapterOneByOne writes, by the same rule.
-		const bool isWork = KBSResultModel::IsHitCheckedWork(chapterIdx, i);
-		if (walkOrder < 0)
-		{
-			// A ticked row with NO walk order can be lined up with no match of the walk: a renumbering
-			// (RenumberWalkOrders, since 2026-09-27) gives -1 to a row whose match is no longer at its
-			// place. A change like any other - and "cannot tell" is not good enough to rewrite the
-			// user's text on.
-			if (isWork)
-				return true;
-			continue;
-		}
-		rowByWalkOrder[walkOrder] = i;
-		if (isWork)
-			targets.insert(walkOrder);
-	}
-	if (targets.empty())
-		return false;
-
 	// The DATABASE first, the way the search asks it (KBSSearchEngine's CollectHitsInDoc). It is NOT a
 	// liveness test - a UIDRef carries the IDataBase* itself, and "is this document still open?" has one
 	// honest answer in KBS (KBSBookScope::IsDocStillOpen); what this catches is a UIDRef that never had one.
-	if (docRef.GetDataBase() == nil)
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
 		return false;
+
+	// Where the ticked rows start: (story, start) -> how many of them start there (a zero-width GREP match
+	// and a wider one can share a start). A ticked row whose story is gone, whose text is not the text that
+	// was ticked, or whose identity cannot be read is a change like any other - "cannot tell" is not good
+	// enough to rewrite the user's text on.
+	std::map<std::pair<UID, TextIndex>, int32> waiting;
+	int32 waitingCount = 0;
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		// A report's own rows keep their ticks, and a report can run a Change Checked on its taken-back
+		// rows (2026-09-27, B): work is what ReplaceInChapterOneByOne writes, by the same rule.
+		if (!KBSResultModel::IsHitCheckedWork(chapterIdx, i))
+			continue;
+		UID story = kInvalidUID;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, start, end, hash)
+			|| !db->IsValidUID(story)
+			|| !KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), start, end, story, start, end, hash))
+			return true;
+		++waiting[std::make_pair(story, start)];
+		++waitingCount;
+	}
+	if (waitingCount == 0)
+		return false;
+
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	InterfacePtr<IK2ServiceProvider> provider(registry != nil
@@ -1098,8 +1107,7 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	if (opts == nil || walker == nil)
 		return false;
 
-	// Always a fresh walk from the top of the chapter - the starting point the search had, which is what
-	// makes the walk order comparable.
+	// Always a fresh walk from the top of the chapter - the starting point the search had.
 	if (walker->IsWalking())
 		walker->Halt();
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
@@ -1129,40 +1137,28 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
 	// How the walk moves forward is the walker's business alone: each find advances it to the next match,
-	// as the official loop runs it (SnpFindAndReplace), and the walk ends when the find says there is
-	// nothing more - or breaks off (kFailure), which leaves the rows it never reached in targets.
-	bool moved = false;
-	int32 walkIndex = 0;
-	while (!targets.empty())
+	// as the official loop runs it (SnpFindAndReplace), and the walk ends when every ticked row has been met,
+	// when the find says there is nothing more - or when it breaks off (kFailure), which leaves the rows it
+	// never reached waiting. The story as well as the index: an index means nothing without its story.
+	while (waitingCount > 0)
 	{
 		UIDRef story;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		if (RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end) != IFindChangeService::kSuccess)
 			break;
-		if (targets.erase(walkIndex) != 0)
+		const std::map<std::pair<UID, TextIndex>, int32>::iterator here =
+			waiting.find(std::make_pair(story.GetUID(), start));
+		if (here != waiting.end() && here->second > 0)
 		{
-			// Does this ticked match still BEGIN where the search found it? The story as well as the index:
-			// an index means nothing without the story it counts into. A row whose identity cannot be read
-			// counts as moved - it is the user's text about to be rewritten on the strength of it.
-			const std::map<int32, int32>::const_iterator row = rowByWalkOrder.find(walkIndex);
-			UID expectStory = kInvalidUID;
-			TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
-			uint64 expectHash = 0;
-			if (row == rowByWalkOrder.end()
-				|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, row->second, expectStory, expectStart, expectEnd, expectHash)
-				|| story.GetUID() != expectStory || start != expectStart)
-			{
-				moved = true;
-				break;
-			}
+			--here->second;
+			--waitingCount;
 		}
-		++walkIndex;
 	}
 	if (walker->IsWalking())
 		walker->Halt();
 	// A ticked row the walk never reached is as much a change as one that moved: the match the results
 	// promise is not there to be replaced.
-	return moved || !targets.empty();
+	return waitingCount > 0;
 }
 
 // A SECOND shape lived here from 2026-08-03 to 2026-08-05: ReplaceChapterByChapter ran a SAVING
@@ -1501,10 +1497,10 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 
 // ***** THE MATCHES THESE ROWS DESCRIBE ARE NOT WHERE THEY WERE. *****
 //
-// The run walks each chapter again and gives the Nth match to the Nth ticked row, so anything that
-// adds, removes or moves a match between the search and now would hand a replacement to an
-// occurrence the user never ticked. The verify walk in the resolve pass has just found exactly
-// that, and the run is over before it started - this only tells them.
+// The run writes the match standing at each ticked row's place, so a ticked match that has moved,
+// gone, or changed its text since would hand a replacement to an occurrence the user never ticked.
+// The verify walk in the resolve pass has just found exactly that, and the run is over before it
+// started - this only tells them.
 //
 // ***** IT IS A STATEMENT, NOT A QUESTION (user's decision, 2026-08-10). ***** There is no "carry
 // on anyway": a work list that has come apart cannot be replaced safely whatever anyone answers.
@@ -1574,41 +1570,32 @@ void TellResultsWentStale(int32 chapterIdx)
 	CAlert::WarningAlert(msg);
 }
 
-} // anonymous namespace
-
-bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
+// What CompareQueryWithSearch found - RefuseChangedQuery and QueryUnchangedSinceSearch share it.
+enum QueryCompared
 {
-	outSummary.Clear();
-	outSummary.SetTranslatable(kFalse);
+	kQueryUnchanged,	// the settings still describe the search (and its tab has been stated)
+	kQueryOtherTab,		// the dialog is on another tab
+	kQueryTabNotStated,	// the tab could not be stated (CommitSearchMode)
+	kQueryChanged		// the query, a switch or the Find Format has changed
+};
 
+// Do the current Find/Change settings still describe the search the results came from? The QUESTION
+// alone (2026-09-29): what a refusal does with the answer - clearing the results above all - is
+// RefuseChangedQuery's. The tab IS stated on the way (see below), which every walk after it needs.
+QueryCompared CompareQueryWithSearch()
+{
 	// ----- (1) the TAB the results were searched with -----
-	// Every chapter is RE-WALKED below, and a walk in another mode returns another set of matches -
-	// so the stored walk orders would line up with occurrences the user never saw. Asked first
-	// because it is the most specific thing that can be said, and because it does NOT cost the
-	// results: a tab is one click to put back.
+	// Every chapter is RE-WALKED, and a walk in another mode returns another set of matches - so the
+	// rows would be lined up with occurrences the user never saw. Asked first because it is the most
+	// specific thing that can be said, and because it does NOT cost the results: a tab is one click to
+	// put back. Read through the call the results were stamped with (KBSSearchEngine::CurrentSearchMode).
+	// (A second question stood here until 2026-09-29 - is the searched tab one this panel walks at all.
+	// The tab on the results is one SearchBook could state, and only the four text tabs can be, so it
+	// never answered no.)
 	const int32 searchedMode = KBSResultModel::GetSearchMode();
-	{
-		InterfacePtr<IFindChangeOptions> modeOpts(QuerySessionPreferences<IFindChangeOptions>());
-		const int32 currentMode = (modeOpts != nil) ? static_cast<int32>(modeOpts->GetSearchMode()) : -1;
-		if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
-		{
-			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran. Search again.");
-			return true;
-		}
-	}
-
-	// ----- (2) whether that tab is one this panel can walk at all -----
-	// Object and Colour search by attribute through a walker of their own and never produced these
-	// rows in the first place, so there is nothing here to rewrite.
-	if (searchedMode >= 0
-		&& searchedMode != IFindChangeOptions::kTextSearch
-		&& searchedMode != IFindChangeOptions::kGrepSearch
-		&& searchedMode != IFindChangeOptions::kGlyphSearch
-		&& searchedMode != IFindChangeOptions::kTransliterateSearch)
-	{
-		outSummary.Append("These results did not come from a text tab - use InDesign's own Find/Change to change them.");
-		return true;
-	}
+	const int32 currentMode = KBSSearchEngine::CurrentSearchMode();
+	if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
+		return kQueryOtherTab;
 
 	// State the tab, exactly as the search does. A walk runs in the mode last COMMITTED, not the one
 	// IFindChangeOptions reports, so without this a replace ran as plain Text whatever tab was on
@@ -1634,24 +1621,22 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	// wrong mode writes the wrong tab's change side over what this tab found - which is the very
 	// fault CommitSearchMode was written for (user's report, 2026-07-30). The failure was swallowed
 	// here until 2026-08-08. The results are NOT cleared: they still describe the search that found
-	// them, so this refuses the way every other door in this plug-in does and leaves the panel be.
+	// them, so RefuseChangedQuery refuses the way every other door in this plug-in does and leaves the
+	// panel be.
 	if (!KBSSearchEngine::CommitSearchMode())
-	{
-		outSummary.Append("The Find/Change tab could not be set - nothing was changed. Try reopening Edit > Find/Change.");
-		return true;
-	}
+		return kQueryTabNotStated;
 
-	// ----- (3) the QUERY itself, which the tab does not cover -----
+	// ----- (2) the QUERY itself, which the tab does not cover -----
 	//
 	// The tab test catches "the user clicked another tab". It does not catch the far more ordinary
 	// thing: the find string retyped, Case Sensitive ticked, a paragraph style put in Find Format,
 	// Include Footnotes turned off - each of which leaves the tab alone and changes WHICH matches a
 	// walk returns.
 	//
-	// That matters because the Nth match of the re-walk is lined up with the hit whose walkOrder is
-	// N. A different match set makes the Nth match a different occurrence, and the walker is handed
-	// the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so what it walks by is whatever the dialog
-	// holds RIGHT NOW, not what it held when these rows were found.
+	// That matters because the replace writes the matches its walk meets at the rows' places, and the
+	// walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so what it walks by is
+	// whatever the dialog holds RIGHT NOW, not what it held when these rows were found. A different
+	// query can make a match of its own stand where a row does.
 	//
 	// ***** THERE IS NOTHING BEHIND THIS TEST ANY MORE. ***** The per-hit same-occurrence test used
 	// to be the backstop for it ("Nothing wrong is written - the same-occurrence test refuses each
@@ -1663,9 +1648,9 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	//
 	// So this is no longer the door that says WHY a run came back all-missing; it is the door that
 	// keeps the run from happening at all. What it does not catch about the QUERY is caught by
-	// nothing else (the verify walk asks about the DOCUMENT, and compares starts only), so anything
-	// it does not know about a query is a wrong replacement made in silence. Widen the test rather
-	// than lean on anything downstream.
+	// nothing else (the verify walk asks about the DOCUMENT - is each ticked row's text still where it
+	// was), so anything it does not know about a query is a wrong replacement made in silence. Widen
+	// the test rather than lean on anything downstream.
 	//
 	// ***** IT IS TWO QUESTIONS, NOT ONE. ***** The signature covers the tab, the query and every
 	// switch, and it COUNTS the Find Format conditions without saying what they are set to. The
@@ -1679,38 +1664,54 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 	// results from before this field existed answer empty too - so only two known-different
 	// signatures refuse. The format test follows the same rule and answers false when it cannot
 	// tell.
-	//
-	// ***** AND THE RESULTS GO. ***** (User's call, 2026-08-03.) Every other refusal in this plug-in
-	// leaves the panel exactly as it found it - that is the rule the search's own refusals were moved
-	// above their Clear() to obey on the same day - and this one is deliberately the exception. The
-	// difference is what the rows would go on saying: a run turned away for any other reason leaves a
-	// list that is still TRUE, while these rows describe a query the dialog no longer holds, so
-	// leaving them up invites the user to try again against a list that cannot be acted on. Clearing
-	// says plainly that the search has to be re-run, which is the only way forward anyway.
-	{
-		const PMString walkedSignature = KBSResultModel::GetWalkSignature();
-		PMString currentSignature;
-		KBSSearchEngine::BuildWalkSignature(currentSignature);
-		const bool signatureDiffers = !walkedSignature.IsEmpty() && !currentSignature.IsEmpty()
-			&& walkedSignature != currentSignature;
+	const PMString walkedSignature = KBSResultModel::GetWalkSignature();
+	PMString currentSignature;
+	KBSSearchEngine::BuildWalkSignature(currentSignature);
+	const bool signatureDiffers = !walkedSignature.IsEmpty() && !currentSignature.IsEmpty()
+		&& walkedSignature != currentSignature;
+	return (signatureDiffers || KBSSearchEngine::FindFormatHasChanged()) ? kQueryChanged : kQueryUnchanged;
+}
 
-		if (signatureDiffers || KBSSearchEngine::FindFormatHasChanged())
-		{
-			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
-			// nothing here touches the panel.
+} // anonymous namespace
+
+bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+	switch (CompareQueryWithSearch())
+	{
+		case kQueryOtherTab:
+			outSummary.Append("The Find/Change dialog is on a different tab than when this search ran. Search again.");
+			return true;
+		case kQueryTabNotStated:
+			outSummary.Append("The Find/Change tab could not be set - nothing was changed. Try reopening Edit > Find/Change.");
+			return true;
+		case kQueryChanged:
+			// ***** AND THE RESULTS GO. ***** (User's call, 2026-08-03.) Every other refusal in this plug-in
+			// leaves the panel exactly as it found it - that is the rule the search's own refusals were moved
+			// above their Clear() to obey on the same day - and this one is deliberately the exception. The
+			// difference is what the rows would go on saying: a run turned away for any other reason leaves a
+			// list that is still TRUE, while these rows describe a query the dialog no longer holds, so
+			// leaving them up invites the user to try again against a list that cannot be acted on. Clearing
+			// says plainly that the search has to be re-run, which is the only way forward anyway.
 			//
-			// The remembered format goes with them, and here it matters more than anywhere: what was
-			// just compared against it is gone, so leaving it standing would have the NEXT question
-			// about a changed query answered from a search whose rows no longer exist.
+			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
+			// nothing here touches the panel. The remembered format goes with them, and here it matters
+			// more than anywhere: what was just compared against it is gone, so leaving it standing would
+			// have the NEXT question about a changed query answered from a search whose rows no longer exist.
 			KBSResultModel::Clear();
 			KBSBookScope::ReleaseSearchedBook();
 			KBSSearchEngine::ForgetSearchedFindFormat();
 			outSummary.Append("The Find/Change query has changed since this search - the results have been cleared. Search again.");
 			return true;
-		}
+		default:
+			return false;
 	}
+}
 
-	return false;
+bool KBSReplaceEngine::QueryUnchangedSinceSearch()
+{
+	return CompareQueryWithSearch() == kQueryUnchanged;
 }
 
 int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
@@ -1753,7 +1754,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The menu greys the command out for the same reason (KBSActionComponent::UpdateActionStates).
 	// This is the same door on the far side of it, for a caller that never went through the menu -
 	// a script invoking the action reaches this function whatever state the menu is in.
-	if (KBSResultModel::IsShowingReplaceOutcome() && !KBSResultModel::AnyRejectedRowOpen())
+	if (KBSResultModel::NoRowHasCheckBox())		// a report - with no row taken back in it
 	{
 		outSummary.Append("This is the last replace's report - search again to replace more.");
 		return 0;
@@ -1805,7 +1806,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// the same single reading the search takes above its own chapter loop, and for the same two
 	// reasons: the answer cannot differ between chapters (nothing can touch the dialog while the
 	// run's modal bar is up), and this walk HAS to run with exactly the switches the search ran
-	// with or the walk orders stop lining up. Read once per chapter here until 2026-08-07.
+	// with or it meets other matches than the rows list. Read once per chapter here until 2026-08-07.
 	WalkerScopeOptions scopeOptions;
 	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
@@ -1963,47 +1964,18 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			continue;		// unopened - the loop below only counts it past
 		}
 
-		// Resolve the chapter to a LIVE document, BY FILE.
-		//
-		// ***** NOT gated on IsDocStillOpen, and that is the whole point. ***** It used to be:
-		// "still open? then keep the docRef the search left". But that question is asked of a
-		// docRef whose document was closed when the search finished, and a UIDRef is only
-		// (IDataBase*, UID) - so once the address is reused by a document opened afterwards, and
-		// the UID lands the same (chapters built the same way have the same internal UIDs), it
-		// answers YES about a DIFFERENT DOCUMENT. The chapter was then never reopened, the walk ran
-		// over its neighbour, and every row came back 'missing' - measured 2026-08-04, 2 to 4 book
-		// replaces in 10, always in a chapter after the first, never in the first one (nothing is
-		// open yet when the first is resolved, so there is nothing to be confused with).
-		//
-		// ReopenChapterDoc answers the same question by FILE: it hands back the open document that
-		// lives in this chapter's .indd, or opens it. A file cannot be confused with another file.
+		// Resolve the chapter to a LIVE document, BY FILE - never by asking whether the docRef the
+		// search left is still open, which can answer YES about a DIFFERENT document (2026-08-04: every
+		// row of a chapter walked over its neighbour and came back 'missing'). See
+		// KBSBookScope::ReachChapterDoc, which the jump and a row menu's Replace ask too.
+		if (!KBSBookScope::ReachChapterDoc(file, docRef))
 		{
-			UIDRef reopened;
-			if (KBSBookScope::ReopenChapterDoc(file, reopened))
-			{
-				docRef = reopened;
-				KBSResultModel::RebindChapterDoc(ci, reopened);
-			}
-			// ***** TWO different failures, and only ONE of them may fall back. *****
-			//
-			//   - There was no file to open BY. Normal: a DOCUMENT-scope row is the front document
-			//     and carries none. The old question is safe here - that docRef IS the live front
-			//     document, and nothing was closed behind it.
-			//
-			//   - The file would not open (moved, deleted, in use by another application). Here the
-			//     docRef is the one the SEARCH left, and its document was closed when the search
-			//     finished - so asking IsDocStillOpen about it is the exact fault removed above. It
-			//     can answer YES about a DIFFERENT document, and the walk then runs over the wrong
-			//     chapter and reports every row missing. Skip instead: it is the one answer that
-			//     cannot be wrong, and the summary names the chapter either way.
-			else if (KBSBookScope::ChapterHasFile(file) || !KBSBookScope::IsDocStillOpen(docRef))
-			{
-				NoteChapter(ci, totals.chaptersSkipped, totals.firstSkipped, totals.haveFirstSkipped);
-				// Moved, deleted, or in use: counted and named just above; it stays in the list
-				// unopened so the bar still takes its step for it.
-				continue;
-			}
+			// Moved, deleted, or in use: counted and named in the summary; it stays in the list
+			// unopened so the bar still takes its step for it.
+			NoteChapter(ci, totals.chaptersSkipped, totals.firstSkipped, totals.haveFirstSkipped);
+			continue;
 		}
+		KBSResultModel::RebindChapterDoc(ci, docRef);
 
 		chapter.docRef = docRef;
 		chapter.opened = true;
@@ -2014,13 +1986,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		}
 
 		// ***** AND THE CHAPTER IS WALKED AGAIN, WRITING NOTHING, TO SEE WHETHER THE RESULTS STILL
-		// DESCRIBE IT. ***** Every ticked row carries the position the search found it at; this
-		// walk visits the same matches in the same order, so if one of them no longer BEGINS where
-		// it began, the document has moved under the results and the Nth-match join would hand a
-		// replacement to an occurrence the user never ticked. Whatever the cause - text edited, a
-		// story added or deleted, a layer hidden or locked, a condition switched - the effect is
-		// the same and it is the effect that is measured (2026-08-10, the user's design; it
-		// replaced KBSEditStamp, which tried to enumerate the causes instead).
+		// DESCRIBE IT. ***** Every ticked row carries the place its match stands at; if one of them
+		// no longer holds the ticked text, or no match of this walk begins there, the document has
+		// moved under the results and the replace would hand a replacement to an occurrence the user
+		// never ticked. Whatever the cause - text edited, a story added or deleted, a layer hidden or
+		// locked, a condition switched - the effect is the same and it is the effect that is measured
+		// (2026-08-10, the user's design; it replaced KBSEditStamp, which tried to enumerate the
+		// causes instead).
 		//
 		// ***** HERE, and here is the only place it can be. ***** The chapter has just become a
 		// live document, and NOT ONE CHARACTER has been written by this run - the command sequence
@@ -2483,49 +2455,16 @@ bool KBSReplaceEngine::IsReplacing()
 // ***** REPLACE ONE ROW, FROM ITS RIGHT-CLICK MENU (2026-09-27, the user's call). ***** No prompt; the
 // Track Changes note goes on the status line afterwards. The list stays a WORK LIST - unlike Change
 // Checked, which turns it into a report - so the row reads "replaced" and every other row is carried
-// to where its text now stands and numbered again by a fresh walk (RenumberWalkOrders), ready for the
-// next Replace or a Change Checked. One undo step ("Replace"). The same doors as Change Checked, asked
-// for this row: the query unchanged (RefuseChangedQuery), the row's text still the one the search found
-// (MatchIsSameOccurrence - the jump's own test), and only the pending changes the row sits in or next
-// to accepted first.
+// to where its text now stands, ready for the next Replace or a Change Checked. One undo step
+// ("Replace"). The same doors as Change Checked, asked for this row: the query unchanged
+// (RefuseChangedQuery), the row's text still the one the search found (MatchIsSameOccurrence - the
+// jump's own test), and only the pending changes the row sits in or next to accepted first.
 // ======================================================================================================
 
-// The chapter walked again, and every row not yet replaced given the walk order of the match that
-// stands at its place (story, start and length); -1 when none does. Replaced rows get -1: they are
-// not work, and their old numbers would collide.
-static void RenumberWalkOrders(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions)
-{
-	// FORWARD, whoever calls (2026-09-28): the numbers are what a Change Checked's verify pass counts by,
-	// and that pass walks forwards. A Reject Change came here in whatever direction the Find/Change dialog
-	// was set to - "search backwards" numbered the rows the other way round - and a row Replace with a
-	// query holding ^ came here still inside its backward write (see ReplaceRowsNow).
-	KBSForwardSearchScope forward;
-	std::vector<KBSResultModel::Hit> hits;
-	// Places only: the story, range and walk order below are all this reads of each match.
-	if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, KBSSearchEngine::kHitPlace, hits))
-		return;
-	std::map<std::pair<UID, std::pair<TextIndex, TextIndex> >, int32> byPlace;
-	for (size_t h = 0; h < hits.size(); ++h)
-		byPlace[std::make_pair(hits[h].storyUID, std::make_pair(hits[h].textStart, hits[h].textEnd))] = hits[h].walkOrder;
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
-	{
-		bool checked = false, replaced = false, locked = false;
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 hash = 0;
-		int32 order = -1;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && !replaced
-			&& KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash))
-		{
-			std::map<std::pair<UID, std::pair<TextIndex, TextIndex> >, int32>::const_iterator it =
-				byPlace.find(std::make_pair(story, std::make_pair(a, b)));
-			if (it != byPlace.end())
-				order = it->second;
-		}
-		KBSResultModel::SetHitWalkOrder(chapterIdx, i, order);
-	}
-}
+// (RenumberWalkOrders stood here from 2026-09-27 to 2026-09-29: after every row menu's Replace and
+//  Reject it walked the whole chapter again - every story, whichever one was written - to number the
+//  rows afresh for Change Checked's verify walk, which lined its matches up by those numbers. The verify
+//  walk finds a row by its place and text now - see ChapterMovedUnderRows.)
 
 // ***** THE OTHER ROWS FOLLOW A REJECT OR A REDO (2026-09-27 re-check). ***** Taking one row's replace
 // back, or writing it again, changes that row's length, and every row after it in the same thread moved
@@ -2616,8 +2555,8 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		outStatus = "Replace: the Change To in Find/Change could not be stated - nothing was changed.";
 		return false;
 	}
-	// The chapter's document, by its file first (a UIDRef can outlive its document - see the jump's
-	// EnsureChapterReachable, whose shape this is).
+	// The chapter's document, by its file first (a UIDRef can outlive its document - see
+	// KBSBookScope::ReachChapterDoc).
 	UIDRef docRef;
 	IDFile file;
 	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file))
@@ -2625,17 +2564,12 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		outStatus = "Replace: the document of this row could not be found.";
 		return false;
 	}
-	UIDRef reopened;
-	if (KBSBookScope::ReopenChapterDoc(file, reopened))
-	{
-		docRef = reopened;
-		KBSResultModel::RebindChapterDoc(chapterIdx, reopened);
-	}
-	else if (KBSBookScope::ChapterHasFile(file) || docRef.GetDataBase() == nil || !KBSBookScope::IsDocStillOpen(docRef))
+	if (!KBSBookScope::ReachChapterDoc(file, docRef))
 	{
 		outStatus = "Replace: the document of this row could not be opened.";
 		return false;
 	}
+	KBSResultModel::RebindChapterDoc(chapterIdx, docRef);
 	// ***** A CHAPTER THIS OPENED WITHOUT A WINDOW GETS ONE (2026-09-27 re-check). ***** ReopenChapterDoc
 	// opens a closed chapter windowless and holds it; a replace left in it would be seen by nobody and
 	// could not be saved. Change Checked gives every chapter it wrote to a window (ShowChapterWindow);
@@ -2671,10 +2605,9 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	bool ok = false;
 	{
 		// ***** BACKWARDS FOR THE WRITE ONLY (2026-09-28). ***** A query holding ^ is written backwards
-		// (WriteBackward). This scope stood to the end of the function until 2026-09-28, so the
-		// renumbering walk below (RenumberWalkOrders) ran backwards too, and gave the rows numbers the
-		// other way round from the forward walk a Change Checked's verify pass counts by - which then
-		// refused the Change Checked as "changed since the search" (case caret-row-then-change).
+		// (WriteBackward), inside this block and nowhere else. (It stood to the end of the function until
+		// 2026-09-28, and the walk that numbered the rows afterwards - gone since 2026-09-29 - ran
+		// backwards with it: case caret-row-then-change.)
 		const KBSBackwardSearchScope writeDirection(WriteBackward());
 
 		ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
@@ -2718,7 +2651,6 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	windowAfter.want = true;		// written to: it has to be seen and saved (a no-op when it has a window)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
-	RenumberWalkOrders(chapterIdx, docRef, scopeOptions);
 	if (rowsToReplace.size() == 1)
 		outStatus = KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx)
 			? "Replaced (inside a footnote - Track Changes records nothing there, so it cannot be taken back with Reject Change)."
@@ -2760,18 +2692,34 @@ bool KBSReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 // step below it away. The rollback of a plain sequence is the SDK's own: raise the error state, end it,
 // clear it (CmdUtils.h, SequenceContext).
 // ======================================================================================================
-// ***** A STORY ROW'S ROWS (2026-09-27, the story level). ***** Which of a story's rows each of its menu
-// items acts on: Replace = the TICKED rows that can be replaced (the user's call: "only the ticked
-// ones"); Reject Change = the replaced rows outside a footnote whose tracked change is still there;
-// (Redo, the rows taken back, went on 2026-09-27: they carry a box and are replaced again with Replace.)
-// True = at least one. `firstOnly` = stop at the first (the menu's greying asks
-// only "is there one", on every right-click: matching every replaced row of a large story against its
-// tracked changes took seconds - 2026-09-27 re-check).
-static bool StoryRowsToReplace(int32 chapterIdx, int32 groupIdx, std::set<int32>& out, bool firstOnly = false)
+// ***** A STORY ROW'S OR A DOCUMENT ROW'S ROWS (2026-09-27). ***** The rows of a story (groupIdx >= 0) or of
+// the whole document (groupIdx < 0) - one scope for every menu item of the two rows. (Replace and Reject
+// Change spelled the story and the document out as two functions each, identical but for this, until
+// 2026-09-29; Redo had been written over one scope from the start.)
+static void ScopeRows(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out)
+{
+	out.clear();
+	if (groupIdx >= 0)
+	{
+		KBSResultModel::GetGroupHits(chapterIdx, groupIdx, out);
+		return;
+	}
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < hitCount; ++i)
+		out.push_back(i);
+}
+
+// Which of the scope's rows each menu item acts on: Replace = the TICKED rows that can be replaced (the
+// user's call: "only the ticked ones"); Reject Change = the replaced rows whose tracked change is still
+// there (FindRowChangeForHit - which refuses a footnote's row, where nothing is recorded). True = at
+// least one. `firstOnly` = stop at the first (the menu's greying asks only "is there one", on every
+// right-click: matching every replaced row of a large story against its tracked changes took seconds -
+// 2026-09-27 re-check).
+static bool RowsToReplace(int32 chapterIdx, int32 groupIdx, std::set<int32>& out, bool firstOnly = false)
 {
 	out.clear();
 	std::vector<int32> rows;
-	KBSResultModel::GetGroupHits(chapterIdx, groupIdx, rows);
+	ScopeRows(chapterIdx, groupIdx, rows);
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
 		bool checked = false, replaced = false, locked = false;
@@ -2786,18 +2734,17 @@ static bool StoryRowsToReplace(int32 chapterIdx, int32 groupIdx, std::set<int32>
 	return !out.empty();
 }
 
-static bool StoryRowsToReject(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out, bool firstOnly = false)
+static bool RowsToReject(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out, bool firstOnly = false)
 {
 	out.clear();
 	std::vector<int32> rows;
-	KBSResultModel::GetGroupHits(chapterIdx, groupIdx, rows);
+	ScopeRows(chapterIdx, groupIdx, rows);
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
 		bool checked = false, replaced = false, locked = false;
 		UIDRef storyRef;
 		KBSTrackChange::Change change;
 		if (KBSResultModel::GetHitFlags(chapterIdx, rows[k], checked, replaced, locked) && replaced
-			&& !KBSResultModel::GetHitInFootnote(chapterIdx, rows[k])
 			&& KBSTrackChange::FindRowChangeForHit(chapterIdx, rows[k], storyRef, change))
 		{
 			out.push_back(rows[k]);
@@ -2811,13 +2758,13 @@ static bool StoryRowsToReject(int32 chapterIdx, int32 groupIdx, std::vector<int3
 bool KBSReplaceEngine::CanReplaceStory(int32 chapterIdx, int32 groupIdx)
 {
 	std::set<int32> rows;
-	return StoryRowsToReplace(chapterIdx, groupIdx, rows, true);
+	return RowsToReplace(chapterIdx, groupIdx, rows, true);
 }
 
 bool KBSReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 {
 	std::vector<int32> rows;
-	return StoryRowsToReject(chapterIdx, groupIdx, rows, true);
+	return RowsToReject(chapterIdx, groupIdx, rows, true);
 }
 
 // ***** TAKE A SET OF REPLACED ROWS BACK, IN ONE UNDO STEP (2026-09-27: the row's touching group, or a
@@ -2847,17 +2794,18 @@ bool KBSReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRef& docRef, PMString& outStatus)
 {
 	IDataBase* const db = docRef.GetDataBase();
-	// each row where its change stands now, then text order
+	// each row where its change stands now, then text order - (story, start, row), each carrying its end
+	// (the rows' places were read twice over, once to sort and once to split, until 2026-09-29)
 	for (size_t k = 0; k < rows.size(); ++k)
 		KBSTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);
-	std::vector<std::pair<std::pair<UID, TextIndex>, int32> > order;
+	std::vector<std::pair<std::pair<std::pair<UID, TextIndex>, int32>, TextIndex> > order;
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
 		UID story = kInvalidUID;
 		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
 		uint64 h = 0;
 		KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[k], story, a, b, h);
-		order.push_back(std::make_pair(std::make_pair(story, a), rows[k]));
+		order.push_back(std::make_pair(std::make_pair(std::make_pair(story, a), rows[k]), b));
 	}
 	std::sort(order.begin(), order.end());
 	std::vector<std::vector<int32> > runs;	// touching rows together
@@ -2865,15 +2813,13 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	TextIndex lastEnd = kInvalidTextIndex;
 	for (size_t k = 0; k < order.size(); ++k)
 	{
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 h = 0;
-		KBSResultModel::GetHitMatchIdentity(chapterIdx, order[k].second, story, a, b, h);
+		const UID story = order[k].first.first.first;
+		const TextIndex a = order[k].first.first.second;
 		if (runs.empty() || story != lastStory || a > lastEnd)
 			runs.push_back(std::vector<int32>());
-		runs.back().push_back(order[k].second);
+		runs.back().push_back(order[k].first.second);
 		lastStory = story;
-		lastEnd = b;
+		lastEnd = order[k].second;
 	}
 
 	// What each run takes back: the records carrying its rows' times. Found now, before anything moves; a
@@ -3033,30 +2979,19 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		KBSResultModel::SetHitRejected(chapterIdx, taken[k], row.story, at, at + row.length);
 		KBSSearchEngine::RereadRowText(chapterIdx, taken[k], UIDRef(db, row.story), at, at + row.length);
 	}
-	// ***** THE REST NUMBERED AGAIN (2026-09-27 re-check; in a report too since the same day, B). ***** The
-	// text is back, so its match is in the walk again, and a Change Checked after this - a report can
-	// run one on its taken-back rows now - would find every later row one walk order off and refuse.
-	{
-		WalkerScopeOptions scopeOptions;
-		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
-		RenumberWalkOrders(chapterIdx, docRef, scopeOptions);
-	}
+	// (The rest were numbered again here by a walk of the whole chapter, 2026-09-27 to 2026-09-29 - in the
+	//  dialog's tab of the moment, which nothing had stated. A Change Checked after this finds each row by
+	//  its place and text, which the lines above have just written.)
 	return true;
 }
 
-// The document of a chapter, open - or false and a status line saying so (Reject Change / Redo work on
-// the open document only).
-static bool OpenChapterDoc(int32 chapterIdx, const char* who, UIDRef& outDocRef, PMString& outStatus)
+// The document of a chapter, if it is open - Reject Change, Redo and Accept All work on the open document
+// only. One question for all of them (2026-09-29): they spelled it out one by one until then, each with a
+// test for no database in front of IsDocStillOpen, which answers false for that itself.
+static bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 {
 	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file) || outDocRef.GetDataBase() == nil
-		|| !KBSBookScope::IsDocStillOpen(outDocRef))
-	{
-		outStatus = who;
-		outStatus.Append(": the document of this row is not open.");
-		return false;
-	}
-	return true;
+	return KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file) && KBSBookScope::IsDocStillOpen(outDocRef);
 }
 
 bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
@@ -3064,8 +2999,11 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!OpenChapterDoc(chapterIdx, "Reject Change", docRef, outStatus))
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	{
+		outStatus.Append("Reject Change: the document of this row is not open.");
 		return false;
+	}
 	// The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together).
 	//
 	// ***** ONLY THE NEIGHBOURS WHOSE CHANGE IS STILL THERE (2026-09-27, case touching-group-redo-reject). *****
@@ -3077,14 +3015,10 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	// its own change is gone, and refuses when its deletion also holds such a neighbour's text).
 	std::vector<int32> group;
 	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
-	KBSResultModel::GetTouchingGroup(chapterIdx, hitIdx, group);
+	KBSTrackChange::ReplacedTouchingGroup(chapterIdx, hitIdx, group);	// the replaced rows outside a footnote
 	std::vector<int32> rows;
 	for (size_t k = 0; k < group.size(); ++k)
 	{
-		bool checked = false, replaced = false, locked = false;
-		if (!KBSResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) || !replaced
-			|| KBSResultModel::GetHitInFootnote(chapterIdx, group[k]))
-			continue;
 		UIDRef storyRef;
 		KBSTrackChange::Change change;
 		if (group[k] == hitIdx || KBSTrackChange::FindRowChangeForHit(chapterIdx, group[k], storyRef, change))
@@ -3100,74 +3034,50 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	return true;
 }
 
-// A document row's Reject Change (2026-09-27): the replaced rows of the whole document that can be taken back.
-static bool ChapterRowsToReject(int32 chapterIdx, std::vector<int32>& out, bool firstOnly)
+// Reject Change on a story row (groupIdx >= 0) or a document row (groupIdx < 0): every row of the scope
+// RowsToReject names, in one undo step. `unit` = "story" / "document", for the status line.
+static bool RejectRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus)
 {
-	out.clear();
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	UIDRef docRef;
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
 	{
-		bool checked = false, replaced = false, locked = false;
-		UIDRef storyRef;
-		KBSTrackChange::Change change;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && replaced
-			&& !KBSResultModel::GetHitInFootnote(chapterIdx, i)
-			&& KBSTrackChange::FindRowChangeForHit(chapterIdx, i, storyRef, change))
-		{
-			out.push_back(i);
-			if (firstOnly)
-				break;
-		}
+		outStatus.Append("Reject Change: the document of this row is not open.");
+		return false;
 	}
-	return !out.empty();
+	std::vector<int32> rows;
+	if (!RowsToReject(chapterIdx, groupIdx, rows))
+	{
+		outStatus.Append("Reject Change: no replaced row with a tracked change in this ");
+		outStatus.Append(unit);
+		outStatus.Append(".");
+		return false;
+	}
+	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
+		return false;
+	outStatus = "Rejected ";
+	outStatus.AppendNumber(static_cast<int32>(rows.size()));
+	outStatus.Append(" row(s) of this ");
+	outStatus.Append(unit);
+	outStatus.Append(" - back to their original text. Tick them and Replace to replace them again.");
+	return true;
 }
 
 bool KBSReplaceEngine::CanRejectChapter(int32 chapterIdx)
 {
 	std::vector<int32> rows;
-	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && ChapterRowsToReject(chapterIdx, rows, true);
+	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && RowsToReject(chapterIdx, -1, rows, true);
 }
 
 bool KBSReplaceEngine::RejectChapter(int32 chapterIdx, PMString& outStatus)
 {
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!OpenChapterDoc(chapterIdx, "Reject Change", docRef, outStatus))
-		return false;
-	std::vector<int32> rows;
-	if (!ChapterRowsToReject(chapterIdx, rows, false))
-	{
-		outStatus = "Reject Change: no replaced row with a tracked change in this document.";
-		return false;
-	}
-	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	outStatus = "Rejected ";
-	outStatus.AppendNumber(static_cast<int32>(rows.size()));
-	outStatus.Append(" row(s) of this document - back to their original text. Tick them and Replace to replace them again.");
-	return true;
+	return RejectRowsIn(chapterIdx, -1, "document", outStatus);
 }
 
 bool KBSReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!OpenChapterDoc(chapterIdx, "Reject Change", docRef, outStatus))
-		return false;
-	std::vector<int32> rows;
-	if (!StoryRowsToReject(chapterIdx, groupIdx, rows))
-	{
-		outStatus = "Reject Change: no replaced row with a tracked change in this story.";
-		return false;
-	}
-	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	outStatus = "Rejected ";
-	outStatus.AppendNumber(static_cast<int32>(rows.size()));
-	outStatus.Append(" row(s) of this story - back to their original text. Tick them and Replace to replace them again.");
-	return true;
+	return RejectRowsIn(chapterIdx, groupIdx, "story", outStatus);
 }
 
 // ======================================================================================================
@@ -3177,9 +3087,7 @@ bool KBSReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& o
 bool KBSReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
 {
 	UIDRef docRef;
-	IDFile file;
-	return KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) && docRef.GetDataBase() != nil
-		&& KBSBookScope::IsDocStillOpen(docRef) && KBSTrackChange::DocumentHasChanges(docRef.GetDataBase());
+	return ChapterDocIfOpen(chapterIdx, docRef) && KBSTrackChange::DocumentHasChanges(docRef.GetDataBase());
 }
 
 bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
@@ -3187,11 +3095,9 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
-		|| !KBSBookScope::IsDocStillOpen(docRef))
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
 	{
-		outStatus = "Accept All Changes: the document is not open.";
+		outStatus.Append("Accept All Changes: the document is not open.");
 		return false;
 	}
 	// ***** THE ROWS FOLLOW THE TEXT (2026-09-28). ***** Accepting a deletion takes its deleted-text thread
@@ -3236,42 +3142,32 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	return true;
 }
 
-// Replace on a DOCUMENT row (2026-09-27, the user's call): that document's TICKED rows, as a story row's.
-static bool ChapterRowsToReplace(int32 chapterIdx, std::set<int32>& out, bool firstOnly)
+// Replace on a story row (groupIdx >= 0) or a DOCUMENT row (groupIdx < 0) (2026-09-27, the user's call):
+// the scope's TICKED rows, no prompt, one undo step. `unit` = "story" / "document", for the status line.
+static bool ReplaceRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus)
 {
-	out.clear();
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	std::set<int32> rows;
+	if (!RowsToReplace(chapterIdx, groupIdx, rows))
 	{
-		bool checked = false, replaced = false, locked = false;
-		if (KBSResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && checked
-			&& KBSReplaceEngine::CanReplaceHit(chapterIdx, i))
-		{
-			out.insert(i);
-			if (firstOnly)
-				break;
-		}
+		outStatus.Append("Replace: no checked row in this ");
+		outStatus.Append(unit);
+		outStatus.Append(" to replace - tick the rows first.");
+		return false;
 	}
-	return !out.empty();
+	return ReplaceRowsNow(chapterIdx, rows, outStatus, unit);
 }
 
 bool KBSReplaceEngine::CanReplaceChapter(int32 chapterIdx)
 {
 	std::set<int32> rows;
-	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && ChapterRowsToReplace(chapterIdx, rows, true);
+	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && RowsToReplace(chapterIdx, -1, rows, true);
 }
 
 bool KBSReplaceEngine::ReplaceChapter(int32 chapterIdx, PMString& outStatus)
 {
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	std::set<int32> rows;
-	if (chapterIdx < 0 || chapterIdx >= KBSResultModel::GetChapterCount() || !ChapterRowsToReplace(chapterIdx, rows, false))
-	{
-		outStatus = "Replace: no checked row in this document to replace - tick the rows first.";
-		return false;
-	}
-	return ReplaceRowsNow(chapterIdx, rows, outStatus, "document");
+	return ReplaceRowsIn(chapterIdx, -1, "document", outStatus);
 }
 
 // ***** Redo on a story row (2026-09-27, the user's call C). ***** The story's rows taken back with Reject
@@ -3305,24 +3201,10 @@ static void RowsToRedo(int32 chapterIdx, const std::vector<int32>& rows, IDataBa
 	}
 }
 
-// The rows of a story (groupIdx >= 0) or of the whole document (groupIdx < 0).
-static void RedoScopeRows(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out)
-{
-	out.clear();
-	if (groupIdx >= 0)
-	{
-		KBSResultModel::GetGroupHits(chapterIdx, groupIdx, out);
-		return;
-	}
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
-		out.push_back(i);
-}
-
 static bool CanRedoRows(int32 chapterIdx, int32 groupIdx)
 {
 	std::vector<int32> scope;
-	RedoScopeRows(chapterIdx, groupIdx, scope);
+	ScopeRows(chapterIdx, groupIdx, scope);
 	std::set<int32> rows;
 	int32 skipped = 0;
 	RowsToRedo(chapterIdx, scope, nil, rows, skipped, true);	// nil = no text test for the greying
@@ -3359,18 +3241,14 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	IDFile file;
-	IDataBase* db = nil;
-	if (KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) && docRef.GetDataBase() != nil
-		&& KBSBookScope::IsDocStillOpen(docRef))
-		db = docRef.GetDataBase();
-	if (db == nil)
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
 	{
-		outStatus = "Redo: the document of these rows is not open.";
+		outStatus.Append("Redo: the document of these rows is not open.");
 		return false;
 	}
+	IDataBase* const db = docRef.GetDataBase();
 	std::vector<int32> scope;
-	RedoScopeRows(chapterIdx, groupIdx, scope);
+	ScopeRows(chapterIdx, groupIdx, scope);
 	std::set<int32> rows;
 	int32 skipped = 0;
 	RowsToRedo(chapterIdx, scope, db, rows, skipped, false);
@@ -3400,15 +3278,7 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 // Replace on a story row (2026-09-27): that story's TICKED rows (the user's call), one undo step.
 bool KBSReplaceEngine::ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	std::set<int32> rows;
-	if (!StoryRowsToReplace(chapterIdx, groupIdx, rows))
-	{
-		outStatus = "Replace: no checked row in this story to replace - tick the rows first.";
-		return false;
-	}
-	return ReplaceRowsNow(chapterIdx, rows, outStatus);
+	return ReplaceRowsIn(chapterIdx, groupIdx, "story", outStatus);
 }
 
 // End, KBSReplaceEngine.cpp.
