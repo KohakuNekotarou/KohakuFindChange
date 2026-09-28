@@ -208,6 +208,29 @@ namespace KBSTrackChange
 	/** The touching group of a replaced row, as FindGroupChange takes it: the replaced rows outside a
 	    footnote, in text order. */
 	void ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
+
+	// ***** SPIKE (2026-09-28, spike/2026-09-28-kbs-signed-time - NOT FOR MAIN). *****
+	// The user's idea: every record a replace makes is signed "KohakuFindChange" (InDesign's user name is
+	// not touched) and stamped with a time KBS hands out itself - one per row, 1 microsecond apart - so
+	// that a row and its records are tied by an exact time. What this measures: can the INSERTION be
+	// rewritten too (the deletion was, on 2026-09-28 in KCM: kReplaceDeleteChangeDataCmdBoss), do Undo
+	// and Redo carry it, do touching replaces stay apart, and what it costs. A line per chapter goes to
+	// %TEMP%\kbs-spike-signed.log.
+
+	/** Start a chapter's write: the clock is read ONCE here (T0); every stamp of the run is T0 + 1 us * n,
+	    and never at or before the last one handed out. */
+	void BeginSignedRun();
+
+	/** The next row's stamp (100 ns units since 1601, as VOSRedlineChange::GetTimeStamp). */
+	uint64 TakeSignedStamp();
+
+	/** Sign the records the replace just made in [from, to]: the insertion's pieces in [from, to) and
+	    the deletion anchored in [from, to] that are not "KohakuFindChange"'s yet, rewritten to that
+	    author and `stamp`. Returns how many records were rewritten; failures are counted for the log. */
+	int32 SignReplace(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
+
+	/** Append the run's counters to %TEMP%\kbs-spike-signed.log (and reset them). */
+	void WriteSignedRunLog(int32 chapterIdx, int32 replaced, double walkMs);
 }
 
 #endif // __KBSTrackChange_h__

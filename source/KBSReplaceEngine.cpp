@@ -49,6 +49,7 @@
 #include "Utils.h"
 
 #include <algorithm>
+#include <chrono>		// SPIKE 2026-09-28 (not for main): the walk's time for the signing log
 #include <map>
 #include <set>
 #include <vector>
@@ -744,6 +745,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
 				{
 					++ioReplaced;
+					// SPIKE 2026-09-28 (not for main): sign this replace's records before the next one is written
+					KBSTrackChange::SignReplace(written, writtenStart, writtenEnd, KBSTrackChange::TakeSignedStamp());
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
@@ -995,6 +998,10 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		return true;
 	}
 
+	// SPIKE 2026-09-28 (not for main): the run's T0, and the clock for the log line
+	KBSTrackChange::BeginSignedRun();
+	const std::chrono::steady_clock::time_point spikeWalkStart = std::chrono::steady_clock::now();
+
 	int32 done = 0;		// ticked rows accounted for, for the bar
 	for (std::map<UID, std::set<int32> >::iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
 	{
@@ -1036,6 +1043,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		}
 		KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
 	}
+	// SPIKE 2026-09-28 (not for main)
+	KBSTrackChange::WriteSignedRunLog(chapterIdx, outReplaced,
+		std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - spikeWalkStart).count());
 
 	// ----- every row the report keeps, where its text stands now: its range, its line, and - for a
 	// replaced row outside a footnote - the time of the records its replace made (what Reject Change and

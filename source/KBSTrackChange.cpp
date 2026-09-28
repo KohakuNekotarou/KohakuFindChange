@@ -15,6 +15,8 @@
 // Interface includes:
 #include "IBoolData.h"
 #include "ICommand.h"
+#include "IIntData.h"				// SPIKE 2026-09-28: kReplaceDeleteChangeDataCmdBoss's position
+#include "IRedlineChangeData.h"		// SPIKE 2026-09-28: kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
 #include "ITrackChangeUtils.h"		// PrimaryIndexToDeletedText - where a deletion's text lives
 #include "ISession.h"
@@ -27,6 +29,7 @@
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
+#include "GlobalTime.h"				// SPIKE 2026-09-28: the run's T0
 #include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss
 #include "PersistUtils.h"			// ::GetUIDRef
 #include "ITextStoryThread.h"
@@ -42,6 +45,11 @@
 #include "KBSResultModel.h"
 #include "KBSSearchEngine.h"		// the line a row shows, and its hash
 #include "KBSTrackChange.h"
+
+#include <chrono>		// SPIKE 2026-09-28: what the signing costs
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 
 namespace
 {
@@ -762,4 +770,224 @@ uint64 KBSTrackChange::RecordTimeIn(const UIDRef& story, TextIndex from, TextInd
 		}
 	}
 	return (found == 1) ? time : 0;
+}
+
+// ======================================================================================================
+// SPIKE (2026-09-28, spike/2026-09-28-kbs-signed-time - NOT FOR MAIN). See KBSTrackChange.h.
+// ! The insertion is rewritten on the strand directly (ApplyRedlineChange / RemoveRedlineChange), between
+//   the run's commands inside its sequence - not inside a command of its own. Whether Undo and Redo carry
+//   that is one of the things measured; a feature would wrap it in a command.
+// ======================================================================================================
+namespace
+{
+const char* const kSignAuthor = "KohakuFindChange";
+const uint64 kStampStep = 10;		// 1 microsecond, in the stamps' 100 ns units
+
+uint64 sLastStamp = 0;			// the last stamp handed out, over every run of the session
+uint64 sNextStamp = 0;
+uint64 sRunStartReal = 0;		// the clock at the run's start: records older than this are not the run's
+
+struct SignStats
+{
+	int32	rows;			// SignReplace calls
+	int32	insSigned;		// insertion pieces rewritten
+	int32	delSigned;		// deletions rewritten
+	int32	nothing;		// calls that found no record to sign (a footnote, or none made)
+	int32	cmdFailed;		// kReplaceDeleteChangeDataCmdBoss said no
+	int32	leftUnsigned;	// records of the run still not signed after it
+	int32	stampMissing;	// calls after which no record carries the row's stamp
+	double	ms;				// time spent in SignReplace
+	std::string firstTrouble;
+	SignStats() : rows(0), insSigned(0), delSigned(0), nothing(0), cmdFailed(0), leftUnsigned(0),
+		stampMissing(0), ms(0.0) {}
+};
+SignStats sStats;
+
+struct FoundRecord
+{
+	TextIndex			at;
+	int32				len;
+	bool				isDelete;
+	VOSRedlineChange*	record;		// as the iterator handed it over - deleted by us
+};
+
+bool IsSignAuthor(const PMString& who)
+{
+	PMString a(kSignAuthor);
+	a.SetTranslatable(kFalse);
+	return who == a;
+}
+
+// The run's records not signed yet, standing in [from, to]: insertion pieces in [from, to), deletions in
+// [from, to]. Taken from an iterator started at `from` and closed before anything is written.
+void CollectUnsigned(IRedlineDataStrand* redline, TextIndex from, TextIndex to, std::vector<FoundRecord>& out,
+	int32* outStampCount, uint64 stamp)
+{
+	out.clear();
+	if (outStampCount != nil)
+		*outStampCount = 0;
+	RedlineIterator* it = redline->NewRedlineIterator(from);
+	if (it == nil)
+		return;
+	const uint64 notBefore = (sRunStartReal > GlobalTime::kOneSecond) ? sRunStartReal - GlobalTime::kOneSecond : 0;
+	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const bool isInsert = (record->GetChangeType() == VOSRedlineChange::kInsert);
+		const bool signedAlready = IsSignAuthor(record->GetUserName());
+		if (signedAlready && outStampCount != nil && record->GetTimeStamp() == stamp)
+			++*outStampCount;
+		const bool inRange = isDelete ? (from <= at && at <= to) : (isInsert && len > 0 && from <= at && at < to);
+		if (inRange && !signedAlready && record->GetTimeStamp() >= notBefore)
+		{
+			FoundRecord f;
+			f.at = at;
+			f.len = len;
+			f.isDelete = isDelete;
+			f.record = const_cast<VOSRedlineChange*>(record);
+			out.push_back(f);
+		}
+		else
+			delete record;		// the caller owns it (redlineiterator.h:137-138)
+	}
+	delete it;
+}
+
+void Trouble(const std::string& what)
+{
+	if (sStats.firstTrouble.empty())
+		sStats.firstTrouble = what;
+}
+}	// anonymous namespace
+
+void KBSTrackChange::BeginSignedRun()
+{
+	GlobalTime now;
+	now.CurrentTime();
+	sRunStartReal = now.GetTime();
+	sNextStamp = (sRunStartReal > sLastStamp) ? sRunStartReal : sLastStamp + kStampStep;
+	sStats = SignStats();		// a run that broke off before its log line does not leak into the next
+}
+
+uint64 KBSTrackChange::TakeSignedStamp()
+{
+	if (sNextStamp == 0)
+		BeginSignedRun();
+	const uint64 stamp = sNextStamp;
+	sLastStamp = stamp;
+	sNextStamp += kStampStep;
+	return stamp;
+}
+
+int32 KBSTrackChange::SignReplace(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp)
+{
+	const std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+	++sStats.rows;
+	int32 done = 0;
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline != nil)
+	{
+		std::vector<FoundRecord> found;
+		CollectUnsigned(redline, from, to, found, nil, stamp);
+		if (found.empty())
+			++sStats.nothing;
+		PMString author(kSignAuthor);
+		author.SetTranslatable(kFalse);
+		// the insertion's pieces: the new record over the piece, then the old one off it
+		for (size_t k = 0; k < found.size(); ++k)
+		{
+			if (found[k].isDelete)
+				continue;
+			redline->ApplyRedlineChange(VOSRedlineChange::kInsert, found[k].at, stamp,
+				found[k].record->GetIsMovedText(), found[k].len, author);
+			redline->RemoveRedlineChange(found[k].at, *found[k].record);
+			++sStats.insSigned;
+			++done;
+		}
+		// the deletion: the command the KCM spike measured
+		for (size_t k = 0; k < found.size(); ++k)
+		{
+			if (!found[k].isDelete)
+				continue;
+			found[k].record->SetUserName(author);
+			found[k].record->SetTimeStamp(stamp);
+			InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceDeleteChangeDataCmdBoss));
+			InterfacePtr<IRedlineChangeData> changeData(cmd, IID_IREDLINECHANGEDATA);
+			InterfacePtr<IIntData> position(cmd, IID_IINTDATA);
+			ErrorCode err = kFailure;
+			if (cmd != nil && changeData != nil && position != nil)
+			{
+				changeData->Set(*found[k].record);
+				position->Set(found[k].at);
+				cmd->SetItemList(UIDList(story));
+				err = CmdUtils::ProcessCommand(cmd);
+			}
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			if (err == kSuccess)
+			{
+				++sStats.delSigned;
+				++done;
+			}
+			else
+			{
+				++sStats.cmdFailed;
+				Trouble("deletion at " + std::to_string(found[k].at) + ": the command answered " + std::to_string(err));
+			}
+		}
+		for (size_t k = 0; k < found.size(); ++k)
+			delete found[k].record;
+
+		// read it back: nothing of the run left unsigned in [from, to], and the row's stamp there
+		std::vector<FoundRecord> left;
+		int32 withStamp = 0;
+		CollectUnsigned(redline, from, to, left, &withStamp, stamp);
+		if (!left.empty())
+		{
+			sStats.leftUnsigned += static_cast<int32>(left.size());
+			Trouble(std::string(left[0].isDelete ? "deletion" : "insertion") + " at " + std::to_string(left[0].at)
+				+ " (len " + std::to_string(left[0].len) + ") still unsigned after [" + std::to_string(from) + ", "
+				+ std::to_string(to) + "]");
+		}
+		for (size_t k = 0; k < left.size(); ++k)
+			delete left[k].record;
+		if (!found.empty() && withStamp == 0)
+		{
+			++sStats.stampMissing;
+			Trouble("no record carries the stamp after [" + std::to_string(from) + ", " + std::to_string(to) + "]");
+		}
+	}
+	else
+		++sStats.nothing;
+	sStats.ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+	return done;
+}
+
+void KBSTrackChange::WriteSignedRunLog(int32 chapterIdx, int32 replaced, double walkMs)
+{
+	char* temp = nil;
+	size_t tempLen = 0;
+	if (_dupenv_s(&temp, &tempLen, "TEMP") == 0 && temp != nil)
+	{
+		const std::string path = std::string(temp) + "\\kbs-spike-signed.log";
+		FILE* f = nil;
+		if (fopen_s(&f, path.c_str(), "a") == 0 && f != nil)
+		{
+			GlobalTime now;
+			now.CurrentTime();
+			std::fprintf(f, "%llu chapter=%d replaced=%d rows=%d ins=%d del=%d nothing=%d cmdFailed=%d leftUnsigned=%d "
+				"stampMissing=%d signMs=%.1f walkMs=%.1f lastStamp=%llu trouble=%s\n",
+				static_cast<unsigned long long>(now.GetTime()), chapterIdx, replaced, sStats.rows, sStats.insSigned,
+				sStats.delSigned, sStats.nothing, sStats.cmdFailed, sStats.leftUnsigned, sStats.stampMissing, sStats.ms,
+				walkMs, static_cast<unsigned long long>(sLastStamp),
+				sStats.firstTrouble.empty() ? "-" : sStats.firstTrouble.c_str());
+			std::fclose(f);
+		}
+		std::free(temp);
+	}
+	sStats = SignStats();
 }
