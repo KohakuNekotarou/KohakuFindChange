@@ -61,7 +61,7 @@ namespace KBSBookScope
 		ChapterDoc() : contentUID(kInvalidUID), hasFile(false) {}
 	};
 
-	/** Is the search scope the whole book (ON) or just the front document (OFF)? Session state
+	/** Is the search scope the whole book (ON) or just the active document (OFF)? Session state
 	    only - every launch starts OFF, like KESCL's "Search book" toggle. */
 	bool IsBookScopeOn();
 
@@ -91,19 +91,36 @@ namespace KBSBookScope
 	bool HasTargetBook();
 
 	/** Is there anything for the CURRENT scope to run on - a targetable book while Book Scope is
-	    ON (HasTargetBook), a front document while it is OFF? Asked by the menu's enablement
+	    ON (HasTargetBook), an active document while it is OFF? Asked by the menu's enablement
 	    (KBSActionComponent's UpdateActionStates) so the three commands that start a run go grey
 	    when there is nothing to run them against, rather than starting and reporting "No open
 	    document to search."
 
 	    It asks exactly what the engines ask when they resolve their own scope - HasTargetBook() and
-	    ILayoutUIUtils::GetFrontDocument() - so the grey state and the run cannot disagree. Cheap
-	    enough for a menu hook: nothing here opens, lists or holds anything (the panel-book half
-	    reads a palette's file field and one IBookManager lookup).
+	    ActiveDocument() - so the grey state and the run cannot disagree. Cheap enough for a menu
+	    hook: nothing here opens, lists or holds anything (the panel-book half reads a palette's file
+	    field and one IBookManager lookup).
 
 	    NOT a substitute for the engines' own checks. This answers for the menu; a script reaching
 	    an action directly still meets the engine's guard. */
 	bool HasScopeTarget();
+
+	/** The document a document-scope run searches: the ACTIVE document - the one the user is working
+	    in, and the one Edit > Find/Change searches - through IActiveContext::GetContextDocument.
+	    Non-owning; nil when there is none. The one place both the menu's grey state (HasScopeTarget)
+	    and the search (KBSSearchEngine::SearchBook) ask.
+
+	    ***** NOT ILayoutUIUtils::GetFrontDocument, which it replaced on 2026-09-28. ***** That one
+	    answers "the document of the frontmost LAYOUT presentation" (ILayoutUIUtils.h:95-98) - a UI
+	    question, nil off the main thread - while the active context is architecture and safe in a
+	    model plug-in (memory document-activation-is-presentation; KCM's KCMActiveDoc is the same
+	    call). Measured the same day: with another document's Story Editor brought to the front,
+	    InDesign brings that document's layout window up with it, so the two answered alike there -
+	    the change is to the official question, not a fix of a case seen going wrong.
+
+	    A chapter a run opened WINDOWLESS is never the answer: a document with no window cannot be
+	    made active. */
+	class IDocument* ActiveDocument();
 
 	/** A chapter that could NOT be turned into a searchable document, and why. Reported rather
 	    than dropped: a chapter missing from the list is indistinguishable from a chapter that

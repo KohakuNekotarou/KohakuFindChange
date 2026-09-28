@@ -30,13 +30,13 @@
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
 #include "IDocumentPresentation.h"	// the predicate typedef / presentation handle
 #include "IDocumentUtils.h"
-#include "ILayoutUIUtils.h"		// GetFrontDocument - the document-scope half of HasScopeTarget
+#include "IActiveContext.h"		// GetContextDocument - ActiveDocument, the document-scope half of HasScopeTarget
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 // (IMenuUtils.h was here for InsertAmpersandForDisplay until 2026-08-03. The status line doubles
 // its own ampersands for the whole message, so doubling a chapter name here as well ran it twice -
-// see AppendUnopenableNote.)
+// see AppendChapterNote.)
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "IPanelControlData.h"	// what QueryActiveBookPanel hands over - the book panel's class is read off it
 #include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
@@ -1085,11 +1085,18 @@ bool KBSBookScope::HasScopeTarget()
 	if (IsBookScopeOn())
 		return HasTargetBook();
 
-	// GetFrontDocument, not "is any document open": a book search opens its chapters WINDOWLESS and
-	// this is the document-scope branch, where the front layout window is exactly what gets searched.
+	// The active document, not "is any document open": a book search opens its chapters WINDOWLESS and
+	// this is the document-scope branch, where the active document is exactly what gets searched.
 	// A chapter one of our own runs is holding open therefore does not count as a target, which is
 	// what we want.
-	return Utils<ILayoutUIUtils>()->GetFrontDocument() != nil;
+	return ActiveDocument() != nil;
+}
+
+IDocument* KBSBookScope::ActiveDocument()
+{
+	ISession* const session = GetExecutionContextSession();
+	IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
+	return (context != nil) ? context->GetContextDocument() : nil;
 }
 
 void KBSBookScope::AppendChapterNote(PMString& outSummary, const char* what,
