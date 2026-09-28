@@ -25,8 +25,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
-#include "CTextEnum.h"			// Text::GlyphID / kInvalidGlyphID - the missing-glyph scan's override
-#include "KBSResultModel.h"		// Hit - the borrowed hit builders below fill one
+#include "KBSResultModel.h"		// Hit - CollectDocHits fills them
 
 #include <vector>
 
@@ -85,23 +84,13 @@ namespace KBSSearchEngine
 	    the head of this file for which book that is - the
 	    front document when it is OFF - never a silent fallback between them), walk the user's
 	    current Find/Change query across it, fill KBSResultModel with the hits (grouped by
-	    chapter, only chapters with >=1 hit), and build a one-line status summary. Releases any
-	    windowless chapters opened for the search (Task 2: the hits' display text is already
-	    extracted, so nothing needs them held; Task 3 will hold them for the row jumps instead).
+	    chapter, only chapters with >=1 hit), and build a one-line status summary. Each chapter
+	    the search opened windowless is handed back as soon as it has been walked: the hits' display
+	    text is already extracted, and a jump or a replace reopens a chapter by its file.
 
 	    @param outSummary  a ready-to-show status line for the panel.
-	    @param overrideFindGlyph  normally kInvalidGlyphID, which means "walk the user's own query".
-	           Anything else replaces the FIND GLYPH for this one walk, nothing else about it
-	           changing: same scope, same five options, same result model, same progress bar.
-	           !! NO CALLER PASSES ANYTHING ELSE TODAY. It was built for the missing-glyph scan, which
-	           drove it with kAnyNotDefGlyphID until 2026-08-02 - that route reads the composed wax
-	           instead (that scan was removed on 2026-09-27) because the find/change one takes
-	           InDesign down on any document holding overset text. Kept rather than removed because it is the whole of
-	           what a caller with its own glyph query needs, and removing it would take the matching
-	           argument on CommitSearchMode with it; do not read the presence of the parameter as
-	           evidence that something uses it.
 	    @return the total number of matches across the scope. */
-	int32 SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
+	int32 SearchBook(PMString& outSummary);
 
 	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
 	    command could otherwise be dispatched INTO a running search. The panel's actions ask this
@@ -140,12 +129,6 @@ namespace KBSSearchEngine
 	    character type is stated too (kFindCharacterTypeCmdBoss), the exact glyph rule again; the
 	    CHANGE character type belongs to CommitReplaceSide.
 
-	    @param overrideFindGlyph  normally kInvalidGlyphID: state the glyph the dialog holds, which is
-	           what every existing caller wants. Anything else is stated INSTEAD of it, for callers
-	           that supply their own glyph query - the missing-glyph scan passed kAnyNotDefGlyphID until
-           2026-08-02; no caller does now (see SearchBook).
-	           Only meaningful while the Glyph tab is the mode in force.
-
 	    @return true when every value above was actually stated. FALSE MUST STOP THE CALLER: what
 	            was not stated is not merely missing, it is whatever was committed last - by an
 	            earlier run, or by the dialog on a tab the user has since left - so a walk that went
@@ -156,7 +139,7 @@ namespace KBSSearchEngine
 
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
 	          command inside the replace sequence would become part of that undo step. */
-	bool CommitSearchMode(Text::GlyphID overrideFindGlyph = kInvalidGlyphID);
+	bool CommitSearchMode();
 
 	/** State what a replace will WRITE, for the tabs whose change side is not a string: the Glyph
 	    tab's Change To glyph, and the Transliterate tab's change character type. Both are
@@ -377,9 +360,14 @@ namespace KBSSearchEngine
 	            2026-08-09, when every ^ hit read as missing on an untouched document). */
 	uint64 HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** The line around [start, end), in the three segments a hit row paints: the text before the
-	    match, the matched text itself, and the text after it - never reaching outside the
-	    paragraphs the match starts and ends in (a different paragraph once the match spans a break).
+	/** Give a row what [start, end) reads NOW - the three segments it paints and the hash of the
+	    whole match - in one KBSResultModel::SetHitSegments. For the callers that have just moved a
+	    row: the replace pass rebuilding a replaced row from the range the command reports, and the
+	    rows carried past a Reject or a Redo. Call it after the row's range has been set.
+
+	    The segments are the line around the match: the text before it, the match, and the text
+	    after it - never reaching outside the paragraphs the match starts and ends in (a different
+	    paragraph once the match spans a break).
 
 	    ***** ONE LINE BUDGET, MATCH FIRST - kKBSMaxLineChars = 50, the user's numbers
 	    (2026-08-10). ***** The three segments carry at most fifty characters BETWEEN THEM: the
@@ -394,54 +382,34 @@ namespace KBSSearchEngine
 	    drawn in the match colour - with no post at all then, because what follows that cut is more
 	    MATCH, and a normal-coloured segment there would show it as text lying outside it.
 
-	    Display and report only; the same-occurrence test reads none of the three segments (it
-	    compares the whole match through HashMatchText).
+	    Display only; the same-occurrence test reads none of the three segments (it compares the
+	    whole match through HashMatchText). Any of the three may come back empty; all three are
+	    empty when the position cannot be read.
 
-	    Any of the three may come back empty; all three are empty when the position cannot be read.
+	    The same one reading of the story the search's own hits get: one scanner for both halves,
+	    the matched characters copied once and hashed from that copy whenever they are the whole
+	    match. (Its callers split the line and then hashed the same range again, opening the story
+	    twice, until 2026-09-28.) */
+	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	    Used by the search when a hit is collected, and again by the replace pass to rebuild a
-	    row's text from the range the replace command reports back. */
-	void SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
-		PMString& outPre, PMString& outMatch, PMString& outPost);
+	/** How much of each match CollectDocHits fills in. A walk costs the same whatever is asked for;
+	    what differs is how much is then read about every match it lands on. */
+	enum HitDetail
+	{
+		kHitPlace,			// story, range and walk order - all that numbering the rows again reads
+		kHitPlaceAndText,	// ...and the three drawn segments and the hash - what finding a row again compares
+		kHitEverything		// ...and the page, the hidden / locked / footnote flags and the story's first
+							// words - a search's row
+	};
 
-	//------------------------------------------------------------------------------------
-	// For a caller that finds its ranges some other way than by walking the user's query.
-	//
-	// The missing-glyph scan reads the COMPOSED result (wax) rather than running a Find/Change
-	// query, but its rows have to look and behave exactly like search rows: the same page locator,
-	// the same hidden / locked flags, the same overset handling, the same three drawn segments,
-	// the same page ordering. All of that is already here, so the scan BORROWS it instead of
-	// growing a second copy that could drift away from this one.
-	//
-	// !! Nothing in the search or replace path was changed to make these possible - they are pure
-	//   entry points onto helpers the search itself already calls.
-	//------------------------------------------------------------------------------------
-
-	/** Opaque per-document scratch for BuildHitForRange. It remembers the per-FRAME answers (which
-	    page, layer switched off, locked), each of which climbs a structure of its own and would
-	    otherwise be recomputed for every hit in the same frame. One per document; hand it back with
-	    DeleteHitCache. */
-	struct HitCache;
-	HitCache* NewHitCache();
-	void DeleteHitCache(HitCache* cache);
-
-	/** Fill one Hit from a range the caller already found: the jump anchors, the page (naming the
-	    "+" indicator's page when the range is overset), the hidden / locked flags, and the line
-	    split into its three drawn segments. Only a LOCKED range touches 'checked' (forces false). */
-	void BuildHitForRange(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
-		HitCache* cache, KBSResultModel::Hit& outHit);
-
-	/** Put one chapter's hits in page order and bake each row's locator on (the within-page ordinal
-	    appears only when a page holds more than one). Call once per chapter, after every hit is
-	    built. */
-	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
-
-	/** Every match of the current query in one open document, as the search collects them (walk order
-	    stamped, not yet in page order), with the given scope switches. For the right-click Replace
-	    (2026-09-27): the rest of the list is numbered again by it (KBSReplaceEngine.cpp,
-	    RenumberWalkOrders). Read-only (the walk's own dirty guard). False = the document could not be
-	    walked. */
-	bool CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	/** Every match of the current query in one open document, as the search walks them (walk order
+	    stamped, not yet in page order), with the given scope switches, each filled in as far as
+	    'detail' says. For the rows of a work list after it has changed under them: the rest of the
+	    list is numbered again (KBSReplaceEngine.cpp, RenumberWalkOrders - kHitPlace) and a row a
+	    jump found out of place is looked for again (KBSJump.cpp, RelocateStaleRow -
+	    kHitPlaceAndText). The walk is the search's own, so the walk orders are the numbers the search
+	    would give. Read-only (the walk's own dirty guard). False = the document could not be walked. */
+	bool CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
 		std::vector<KBSResultModel::Hit>& outHits);
 
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
@@ -460,24 +428,23 @@ namespace KBSSearchEngine
 	    which must answer yes" until the fifth audit of this block, 2026-08-10 - the fix went into
 	    HashMatchText's @return and into the .cpp, and stopped one door short of here.
 
-	    ***** ASKED FROM KBSJump AND NOWHERE ELSE, AND SO IT HAS BEEN SINCE 2026-08-05. ***** TWO
-	    callers, the same pair that share IsPositionOverset above: KBSJump::JumpToHit and
-	    KBSJump::SelectHitText, the double click that selects the match. Each asks about the very
-	    range its row recorded, so the first three questions are satisfied by construction and the
-	    hash is what does the work - the answer being how the panel can say "the replacement is no
-	    longer here" instead of scrolling to whatever took its place, and how the double click
-	    refuses to hand the user a selection over text they never searched for.
+	    ***** WHO ASKS. ***** The jump - KBSJump::JumpToHit, and KBSJump::SelectHitText, the double
+	    click that selects the match (the same pair that share IsPositionOverset above) - and, since
+	    the row menus of 2026-09-27, the replace's row doors in KBSReplaceEngine.cpp:
+	    RowStillStands, ReplaceRowsNow and RowsToRedo. Each asks about the very range its row
+	    recorded, so the first three questions are satisfied by construction and the hash is what
+	    does the work - the answer being how the panel can say "the replacement is no longer here"
+	    instead of scrolling to whatever took its place, how the double click refuses to hand the
+	    user a selection over text they never searched for, and how a row whose text was edited
+	    is not written. (This said "asked from KBSJump and nowhere else" until 2026-09-28, a day
+	    after the replace began asking it again.)
 
-	    (This said "THE JUMP IS THE ONLY CALLER" until 2026-08-11. The second caller arrived on
-	    2026-08-09 and the sentence 110 lines above - which counts the same two for the same
-	    reason - was corrected for it on 2026-08-10 while this one was not. One place being right
-	    is not a reason to believe its neighbour.)
-
-	    The REPLACE asked it too until that date, of every row before writing it, and that is what
+	    The REPLACE asked it until 2026-08-05 too, of every row before writing it, and that is what
 	    the position arm was for. It carried a posDelta alongside - how far the replace pass had
 	    already moved the text in this story, its own replacements cancelled out, so that whatever
 	    difference was left was the USER's editing. Both went together (KBSReplaceEngine::
-	    ReplaceChecked): with no caller that moves text, nothing is left to cancel out.
+	    ReplaceChecked), and the posDelta has not come back with the row doors: a row now carries
+	    its own range past every change KBS makes, so what it asks about is already where it stands.
 
 	    ***** The last two questions arrived on 2026-08-04. ***** Until then the text was compared
 	    through the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters

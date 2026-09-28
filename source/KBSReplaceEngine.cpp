@@ -1074,12 +1074,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		if (!RowStartNow(db, kept, keptStart))
 			continue;		// its thread went with an object another replace deleted
 		const TextIndex keptEnd = keptStart + kept.length;
-		const UIDRef rowStoryRef(db, kept.story);
 		KBSResultModel::SetHitRange(chapterIdx, hitIdx, kept.story, keptStart, keptEnd);
-		PMString pre, match, post;
-		KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, keptStart, keptEnd, pre, match, post);
-		KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
-			KBSSearchEngine::HashMatchText(rowStoryRef, keptStart, keptEnd));
+		KBSSearchEngine::RereadRowText(chapterIdx, hitIdx, UIDRef(db, kept.story), keptStart, keptEnd);
 	}
 	return true;
 }
@@ -1688,11 +1684,7 @@ int32 ReplaceInChapter(int32 chapterIdx, const UIDRef& docRef, const WalkerScope
 			// the segments left the hash describing the text that was here BEFORE the replacement,
 			// so every replaced row answered a click with "the replacement is no longer here"
 			// (2026-08-04 to 2026-08-05 - see SetHitSegments).
-			const UIDRef rowStoryRef(db, kept.story);
-			PMString pre, match, post;
-			KBSSearchEngine::SplitLineAroundMatch(rowStoryRef, keptStart, keptEnd, pre, match, post);
-			KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
-				KBSSearchEngine::HashMatchText(rowStoryRef, keptStart, keptEnd));
+			KBSSearchEngine::RereadRowText(chapterIdx, hitIdx, UIDRef(db, kept.story), keptStart, keptEnd);
 		}
 	}
 
@@ -3196,7 +3188,8 @@ static void RenumberWalkOrders(int32 chapterIdx, const UIDRef& docRef, const Wal
 	// query holding ^ came here still inside its backward write (see ReplaceRowsNow).
 	KBSForwardSearchScope forward;
 	std::vector<KBSResultModel::Hit> hits;
-	if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, hits))
+	// Places only: the story, range and walk order below are all this reads of each match.
+	if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, KBSSearchEngine::kHitPlace, hits))
 		return;
 	std::map<std::pair<UID, std::pair<TextIndex, TextIndex> >, int32> byPlace;
 	for (size_t h = 0; h < hits.size(); ++h)
@@ -3266,12 +3259,8 @@ static void WriteBackRows(int32 chapterIdx, IDataBase* db, const std::vector<Row
 		TextIndex at = kInvalidTextIndex;
 		if (!RowStartNow(db, row, at))
 			continue;
-		const UIDRef storyRef(db, row.story);
 		KBSResultModel::SetHitRange(chapterIdx, static_cast<int32>(i), row.story, at, at + row.length);
-		PMString pre, match, post;
-		KBSSearchEngine::SplitLineAroundMatch(storyRef, at, at + row.length, pre, match, post);
-		KBSResultModel::SetHitSegments(chapterIdx, static_cast<int32>(i), pre, match, post,
-			KBSSearchEngine::HashMatchText(storyRef, at, at + row.length));
+		KBSSearchEngine::RereadRowText(chapterIdx, static_cast<int32>(i), UIDRef(db, row.story), at, at + row.length);
 	}
 }
 
@@ -3727,12 +3716,8 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		TextIndex at = kInvalidTextIndex;
 		if (!RowStartNow(db, row, at))
 			continue;
-		const UIDRef storyRef(db, row.story);
 		KBSResultModel::SetHitRejected(chapterIdx, taken[k], row.story, at, at + row.length);
-		PMString pre, match, post;
-		KBSSearchEngine::SplitLineAroundMatch(storyRef, at, at + row.length, pre, match, post);
-		KBSResultModel::SetHitSegments(chapterIdx, taken[k], pre, match, post,
-			KBSSearchEngine::HashMatchText(storyRef, at, at + row.length));
+		KBSSearchEngine::RereadRowText(chapterIdx, taken[k], UIDRef(db, row.story), at, at + row.length);
 	}
 	// ***** THE REST NUMBERED AGAIN (2026-09-27 re-check; in a report too since the same day, B). ***** The
 	// text is back, so its match is in the walk again, and a Change Checked after this - a report can

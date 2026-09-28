@@ -539,7 +539,6 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.matchText = h.matchText;
 	out.postText = h.postText;
 	out.checked = h.checked;
-	out.inFootnote = h.inFootnote;
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
@@ -1188,6 +1187,24 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 }
 
+void KBSResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
+{
+	size_t runStart = 0;
+	while (runStart < hits.size())
+	{
+		size_t runEnd = runStart;
+		while (runEnd < hits.size() && hits[runEnd].pageIndex == hits[runStart].pageIndex)
+			++runEnd;
+		const int32 runCount = static_cast<int32>(runEnd - runStart);
+		for (size_t k = runStart; k < runEnd; ++k)
+		{
+			hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
+			BuildHitLocator(hits[k]);
+		}
+		runStart = runEnd;
+	}
+}
+
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -1320,27 +1337,10 @@ int32 KBSResultModel::KeepCheckedRows()
 		// between; the user asked for the count to follow the REPLACEMENTS rather than the matches
 		// they came from, which is this.
 		//
-		// Same rule and same shape as the search's own numbering (KBSSearchEngine::FinalizeChapterHits):
-		// contiguous runs of equal pageIndex are one page, and a page holding ONE row shows no ordinal
-		// at all, since there is nothing to tell apart. Thinning preserves the page order the search
-		// sorted into, so one pass over each run does it.
-		size_t runStart = 0;
-		while (runStart < hits.size())
-		{
-			size_t runEnd = runStart;
-			while (runEnd < hits.size() && hits[runEnd].pageIndex == hits[runStart].pageIndex)
-				++runEnd;
-			const int32 runCount = static_cast<int32>(runEnd - runStart);
-
-			for (size_t k = runStart; k < runEnd; ++k)
-			{
-				hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
-				// Rebuilt here rather than as each row was kept: the flags may have changed too, and
-				// this is the one pass that has the final ordinal to bake in.
-				BuildHitLocator(hits[k]);
-			}
-			runStart = runEnd;
-		}
+		// The search's own numbering, over what is left: thinning preserves the page order the search
+		// sorted into. The locators are rebuilt here rather than as each row was kept - the flags may
+		// have changed too, and this is the one pass that has the final ordinal to bake in.
+		NumberHitsWithinPages(hits);
 
 		// ***** AND THE FONT GROUPS, because the thinning renumbered the hits they point AT. *****
 		// A group holds POSITIONS in the chapter's hits vector (FontGroup::hitIndices), and every

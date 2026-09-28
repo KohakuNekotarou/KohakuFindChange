@@ -1079,9 +1079,9 @@ bool KBSBookScope::HasTargetBook()
 
 bool KBSBookScope::HasScopeTarget()
 {
-	// The same two questions the engines ask when they resolve their scope (KBSSearchEngine.cpp,
-	// and the two scans beside it), asked here so the menu can go grey BEFORE a run that would only
-	// report that there was nothing to run on.
+	// The same two questions the search asks when it resolves its scope (KBSSearchEngine.cpp, SearchBook),
+	// asked here so the menu can go grey BEFORE a run that would only report that there was nothing to
+	// run on.
 	if (IsBookScopeOn())
 		return HasTargetBook();
 
@@ -1092,16 +1092,18 @@ bool KBSBookScope::HasScopeTarget()
 	return Utils<ILayoutUIUtils>()->GetFrontDocument() != nil;
 }
 
-void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
-	const std::vector<KBSBookScope::SkippedChapter>& skipped)
+void KBSBookScope::AppendChapterNote(PMString& outSummary, const char* what,
+	const std::vector<PMString>& names, const char* tail)
 {
-	if (skipped.empty())
+	if (names.empty())
 		return;
 
 	outSummary.Append("  ");
-	outSummary.AppendNumber(static_cast<int32>(skipped.size()));
-	outSummary.Append(" chapter(s) could not be opened (");
-	for (size_t i = 0; i < skipped.size(); ++i)
+	outSummary.AppendNumber(static_cast<int32>(names.size()));
+	outSummary.Append(" chapter(s) ");
+	outSummary.Append(what);
+	outSummary.Append(" (");
+	for (size_t i = 0; i < names.size(); ++i)
 	{
 		if (i > 0)
 			outSummary.Append(", ");
@@ -1114,53 +1116,41 @@ void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
 		// one place that draws one doubles the ampersands of the WHOLE line on its way to the widget
 		// (KBSResultListWidgetMgr's WriteStatusWidget, since 2026-07-31). Doubling the name here as
 		// well ran that twice: "A&B.indd" went to "A&&B.indd" and then to "A&&&&B.indd", which a
-		// StaticText draws as "A&&B.indd" - and the extra one also reached app.kfcStatus and the
-		// saved report's Summary line, which are supposed to hold the message verbatim
-		// (found 2026-08-03 in the defect audit).
-		//
-		// The sibling sentence in the search engine (AppendUnsearchableNote) never doubled, and was
-		// right not to. Anything that starts drawing this string WITHOUT going through the status
-		// line has to do its own doubling, exactly as the tree's rows do (SetColumnText).
-		PMString name(skipped[i].name);
-		name.SetTranslatable(kFalse);
-		outSummary.Append(name);
-		if (!skipped[i].reason.IsEmpty())
-		{
-			outSummary.Append(": ");
-			PMString reason(skipped[i].reason);
-			reason.SetTranslatable(kFalse);
-			outSummary.Append(reason);
-		}
-	}
-	outSummary.Append(").");
-}
-
-void KBSBookScope::AppendUnclosedNote(PMString& outSummary, const std::vector<PMString>& names)
-{
-	if (names.empty())
-		return;
-
-	// The other end of the run from AppendUnopenableNote, and deliberately built to the same shape:
-	// same count-then-name form, same three-and-then-"..." limit, same RAW names (the status line
-	// doubles the ampersands of the whole message on its way to the widget - see the long note in
-	// AppendUnopenableNote).
-	outSummary.Append("  ");
-	outSummary.AppendNumber(static_cast<int32>(names.size()));
-	outSummary.Append(" chapter(s) left open with no window (");
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		if (i > 0)
-			outSummary.Append(", ");
-		if (i >= 3)								// a status line stays short, even at three lines
-		{
-			outSummary.Append("...");
-			break;
-		}
+		// StaticText draws as "A&&B.indd" (found 2026-08-03 in the defect audit). Anything that starts
+		// drawing this string WITHOUT going through the status line has to do its own doubling,
+		// exactly as the tree's rows do (SetColumnText).
 		PMString name(names[i]);
 		name.SetTranslatable(kFalse);
 		outSummary.Append(name);
 	}
-	outSummary.Append(").");
+	outSummary.Append(")");
+	outSummary.Append(tail);
+}
+
+void KBSBookScope::AppendUnopenableNote(PMString& outSummary,
+	const std::vector<KBSBookScope::SkippedChapter>& skipped)
+{
+	// Each chapter as "name: what the book says about it" - or its name alone when the book said
+	// nothing, rather than a name with a dangling colon.
+	std::vector<PMString> entries;
+	entries.reserve(skipped.size());
+	for (size_t i = 0; i < skipped.size(); ++i)
+	{
+		PMString entry(skipped[i].name);
+		if (!skipped[i].reason.IsEmpty())
+		{
+			entry.Append(": ");
+			entry.Append(skipped[i].reason);
+		}
+		entries.push_back(entry);
+	}
+	AppendChapterNote(outSummary, "could not be opened", entries, ".");
+}
+
+void KBSBookScope::AppendUnclosedNote(PMString& outSummary, const std::vector<PMString>& names)
+{
+	// The other end of the run from AppendUnopenableNote.
+	AppendChapterNote(outSummary, "left open with no window", names, ".");
 }
 
 bool KBSBookScope::GetSearchedBookPath(PMString& outPath)
@@ -1346,24 +1336,12 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	if (bookDB == nil)
 		return false;
 
-	// Hand back whatever the last run left held before recording this one's book. Chapters are
-	// normally handed back as each run finishes with them, so this only ever finds chapters a JUMP
-	// reopened, or ones that refused to close.
-	//
-	// ***** THE "IS IT A DIFFERENT BOOK?" TEST IS ALWAYS TRUE, AND THAT IS NOT A BUG. ***** All
-	// three callers (the search and the two scans) call ReleaseSearchedBook immediately before this
-	// - it is how "every Clear() lets the book go" is kept a rule with no exceptions - and that
-	// clears the path. So the comparison is always against an empty string, and what it guards has
-	// already been done a moment earlier: this call finds an empty list and returns at its first
-	// line. It is kept because it costs nothing and because the guarantee is the caller's, not
-	// this function's - but it does NOT do what it said, which was to keep a second run against the
-	// SAME book from closing chapters it could have reused (found 2026-08-11; the callers took that
-	// possibility away when the release moved up to the commit point).
+	// Record this run's book. What the last run left held has already been handed back: the caller
+	// calls ReleaseSearchedBook at its commit point, just before this (the header's contract). (A
+	// "different book? hand the held chapters back" test stood here until 2026-09-28; with the path
+	// always cleared by then it was always true, and the list it emptied was always empty.)
 	SDKFileHelper bookFileHelper(book->GetBookFileSpec());
-	const PMString bookPath = bookFileHelper.GetPath();
-	if (!(gSearchedBookPath == bookPath))
-		ReleaseHeldDocs();
-	gSearchedBookPath = bookPath;
+	gSearchedBookPath = bookFileHelper.GetPath();
 
 	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
 	if (contentMgr == nil)

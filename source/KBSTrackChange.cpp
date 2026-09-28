@@ -524,10 +524,7 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 		return false;
 	const TextIndex end = c.at + c.insLen;
 	KBSResultModel::SetHitRange(chapterIdx, hitIdx, storyRef.GetUID(), c.at, end);
-	PMString pre, match, post;
-	KBSSearchEngine::SplitLineAroundMatch(storyRef, c.at, end, pre, match, post);
-	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, pre, match, post,
-		KBSSearchEngine::HashMatchText(storyRef, c.at, end));
+	KBSSearchEngine::RereadRowText(chapterIdx, hitIdx, storyRef, c.at, end);
 	return true;
 }
 

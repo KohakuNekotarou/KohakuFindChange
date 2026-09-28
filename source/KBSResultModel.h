@@ -118,10 +118,8 @@ namespace KBSResultModel
 		// order, not walk order. The replace pass re-walks the chapter and counts matches to line
 		// them up with these numbers.
 		int32		walkOrder;
-		bool		checked;	// selected for replacement. A fresh search TICKS every row that has a
-								// box (AppendChapter, 2026-09-26 - the user's call, the reverse of
-								// 2026-08-02); the user takes off what is not to be replaced. The
-								// constructor's false is only what a scan's rows keep.
+		bool		checked;	// selected for replacement. Every row starts UNTICKED (2026-09-27, the
+								// user's call - AppendChapter); the user ticks what is to be replaced.
 		bool		replaced;	// already replaced in this result set - not selectable any more
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
@@ -147,7 +145,7 @@ namespace KBSResultModel
 		// as it has walked it, so the story cannot be read again when the tree draws.
 		PMString	storyLead;
 		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
-		// a row is always replaced (its check cannot be taken off) and cannot be taken back.
+		// a row cannot be taken back (GetHitPinned).
 		bool		inFootnote;
 		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
 		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
@@ -156,9 +154,8 @@ namespace KBSResultModel
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
 
-		// checked starts FALSE here, and a SEARCH's rows are ticked afterwards (AppendChapter): the
-		// default went unticked on 2026-08-02 and back to ticked on 2026-09-26, both on the user's call.
-		// (This note described the 2026-08-02 default as current until the 2026-09-27 defect sweep.)
+		// checked starts FALSE here and stays so for a search's rows (unticked since 2026-09-27; ticked
+		// from 2026-09-26, unticked from 2026-08-02 - each the user's call).
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
@@ -416,12 +413,12 @@ namespace KBSResultModel
 		bool			hasCheckBox;	// does THIS row carry a check box? RowHasCheckBox's own answer,
 										// so the panel does not have to re-derive it from the four
 										// fields above - see GetHitRow.
-
-		bool			inFootnote;		// the box is shown ticked and greyed - it cannot be taken off
-										// (Hit::inFootnote, 2026-09-26)
+		// (An inFootnote stood here from 2026-09-26 - a footnote's box drawn ticked and greyed, while
+		// the replace was Change All. Nothing read it after the one-at-a-time replace of 2026-09-27;
+		// removed 2026-09-28. A footnote's row is told apart by GetHitPinned now.)
 
 		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
-					   hasCheckBox(false), inFootnote(false) {}
+					   hasCheckBox(false) {}
 	};
 
 	/** One row's worth of everything, in a single call.
@@ -735,6 +732,13 @@ namespace KBSResultModel
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
 	    found changed. Only missing and refused are exclusive, being two values of one field. */
 	void BuildHitLocator(Hit& hit);
+
+	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
+	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
+	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
+	    apart. THE one definition - the search's page ordering (KBSSearchEngine.cpp,
+	    FinalizeChapterHits) and a replace's report (KeepCheckedRows) both call it. */
+	void NumberHitsWithinPages(std::vector<Hit>& hits);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break

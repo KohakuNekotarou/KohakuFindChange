@@ -73,8 +73,8 @@
 #include "KBSResultModel.h"
 #include "KBSTrackChange.h"		// RefreshRowFromRecords - a replaced row found by its tracked change
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
-#include "KBSSearchEngine.h"		// MatchIsSameOccurrence (the jump is its only caller since
-									// 2026-08-05) / EditableFrameForMatch / IsPositionOverset
+#include "KBSSearchEngine.h"		// MatchIsSameOccurrence / EditableFrameForMatch / IsPositionOverset /
+									// CollectDocHits
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KBSReplaceEngine.h"		// RefuseChangedQuery - a row is looked for again only under its own query
 #include <vector>
@@ -700,7 +700,8 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 		KBSForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
-		if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, hits))
+		// the places and the line: a candidate is compared by its text and the line around it
+		if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, KBSSearchEngine::kHitPlaceAndText, hits))
 			return false;
 	}
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);

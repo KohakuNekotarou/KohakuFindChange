@@ -119,8 +119,9 @@ namespace KBSBookScope
 	    book's chapters" until 2026-08-11, naming the fallback as though it were the rule - while
 	    HasTargetBook, fourteen declarations above, had the order right. Each entry comes back with
 	    its file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
-	    in. Also resolves WHICH book the run is against (see GetSearchedBookPath) and releases
-	    chapters still held for a different one.
+	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
+	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
+	    the last run left held, and this does not.
 
 	    @return true when a book was resolved and it has at least one chapter. Note that this says
 	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
@@ -143,10 +144,21 @@ namespace KBSBookScope
 	    Appends nothing when every chapter opened. At most three are named and the rest become
 	    "..." - a status line stays short even at three lines.
 
-	    It lives beside SkippedChapter rather than in whichever engine happens to need it: the two
-	    scans and the search all end their summary the same way, and one sentence written twice is
-	    one sentence that gets corrected once. */
+	    It lives beside SkippedChapter rather than in whichever engine happens to need it: one
+	    sentence written twice is one sentence that gets corrected once. */
 	void AppendUnopenableNote(PMString& outSummary, const std::vector<SkippedChapter>& skipped);
+
+	/** The shape every chapter note in KBS has, and the one place it is spelled:
+	    "  N chapter(s) <what> (<name>, <name>, <name>, ...)<tail>". At most three names, then "..." -
+	    a status line stays short even at three lines. Appends nothing when 'names' is empty, so the
+	    ordinary summary is unchanged.
+
+	    Names are appended RAW, ampersands and all: the one place that draws a status line doubles
+	    them for the whole message (the note at its definition says what doubling twice looked
+	    like). The notes built on it: AppendUnopenableNote, AppendUnclosedNote, and the search's two
+	    (KBSSearchEngine.cpp, AppendUnsearchableNote / AppendSearchErrorNote). */
+	void AppendChapterNote(PMString& outSummary, const char* what, const std::vector<PMString>& names,
+		const char* tail);
 
 	/** Is this document still in the session's open-document list? Compares list entries
 	    against the UIDRef without dereferencing its (possibly dead) database. */
@@ -302,11 +314,8 @@ namespace KBSBookScope
 	    IDataBase::SaveRestoreModifiedState, so it means something else touched it) or when the close
 	    was refused.
 
-	    Appends nothing when every chapter was handed back, which is the ordinary case. At most three
-	    are named and the rest become "...", the same shape AppendUnopenableNote uses.
-
-	    Names are appended RAW, ampersands and all - the one place that draws a status line doubles
-	    them for the whole message (see AppendUnopenableNote for the full note). */
+	    Appends nothing when every chapter was handed back, which is the ordinary case. Built on
+	    AppendChapterNote, like AppendUnopenableNote. */
 	void AppendUnclosedNote(PMString& outSummary, const std::vector<PMString>& names);
 
 	/** Stop holding this chapter WITHOUT closing it: it has a WINDOW now, so it is the user's and no

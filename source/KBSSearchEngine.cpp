@@ -61,24 +61,12 @@
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 #include "ILockPosition.h"			// IsPageItemLocked - Object > Lock on the frame itself
-// For naming the Glyph tab's query in the saved report ("Glyph 1234 (Kozuka Mincho Pr6N  Regular)"):
-#include "IFontFamily.h"			// family UID -> the family's display name, and its faces
-#include "IGlyphUtils.h"			// GetUnicodeForGlyphID
-#include "IPMFont.h"				// the face, for that lookup
-#include "ITextAttrFont.h"			// the font STYLE name  (kTextAttrFontStyleBoss)
-#include "ITextAttrUID.h"			// the font FAMILY uid  (kTextAttrFontUIDBoss)
-// (Seven more text-attribute headers stood here until 2026-08-07 - ITextAttrString / WideString /
-// Int32 / Int16 / RealNumber / Boolean / ClassID. BuildWalkSignature used to ask every find
-// attribute for all of them to fingerprint its value by hand. AttributeBossList::IsEqual does that
-// comparison properly, so the probe and its includes are gone; see RememberFindFormat.)
+// (The headers for naming a query in words - the Glyph tab's font and glyph, a style's full path, an
+// attribute describing itself - stood here until 2026-09-28. Their readers were the replace prompt's
+// caption and the saved report, both removed on 2026-09-27.)
 
 // General includes:
-#include "IAttrReport.h"			// AppendDescription - a text attribute states itself, in the user's language
-#include "IObjectModel.h"			// GetIDName - the receiver for an attribute that states nothing
-#include "IStyleInfo.h"				// a paragraph / character style's own name
-#include "IStyleGroupHierarchy.h"	// ...and its FULL path, group names included
-#include "AttributeBossList.h"		// the find attributes the Glyph tab's query carries
-#include "TextAttrID.h"				// kTextAttrFontUIDBoss / kTextAttrFontStyleBoss
+#include "AttributeBossList.h"		// the Find Format list the search remembers (RememberFindFormat)
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
 #include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
@@ -102,7 +90,7 @@
 
 // Project includes:
 #include "KBSSearchEngine.h"
-#include "KBSTrackChange.h"		// IsInFootnote - a footnote's row is always replaced
+#include "KBSTrackChange.h"		// IsInFootnote (a footnote's row cannot be taken back) / ReadText
 #include "KBSBookScope.h"
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -195,43 +183,13 @@ const char* ChapterWalkResultText(ChapterWalkResult result)
 	}
 }
 
-// The shape every chapter note in KBS shares: a count, then up to three names, then "...".
-// KBSBookScope::AppendUnopenableNote sets it and says so outright ("deliberately built to the same
-// shape"); this is the search side's copy, shared by both notes below so they cannot drift from
-// each other the way this file's single-name version had already drifted from its two siblings.
-void AppendChapterNames(PMString& outSummary, const std::vector<PMString>& names)
-{
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		if (i > 0)
-			outSummary.Append(", ");
-		if (i >= 3)								// a status line stays short, even at three lines
-		{
-			outSummary.Append("...");
-			break;
-		}
-		// RAW, with its ampersands as the user typed them: the one place that draws a status line
-		// doubles the ampersands of the WHOLE line on its way to the widget. See the long note in
-		// KBSBookScope::AppendUnopenableNote for what doubling twice looked like.
-		PMString name(names[i]);
-		name.SetTranslatable(kFalse);
-		outSummary.Append(name);
-	}
-}
-
 /** Name the chapters that were never searched at all, and why. Each entry is already "name: reason"
     - the name is the user's and the reason names internals, so neither is a translation key.
-    Appends nothing when every chapter was walked, so the ordinary summary is unchanged. */
+    Appends nothing when every chapter was walked, so the ordinary summary is unchanged. The shape is
+    every chapter note's (KBSBookScope::AppendChapterNote). */
 void AppendUnsearchableNote(PMString& outSummary, const std::vector<PMString>& entries)
 {
-	if (entries.empty())
-		return;
-
-	outSummary.Append("  ");
-	outSummary.AppendNumber(static_cast<int32>(entries.size()));
-	outSummary.Append(" chapter(s) could not be searched (");
-	AppendChapterNames(outSummary, entries);
-	outSummary.Append(").");
+	KBSBookScope::AppendChapterNote(outSummary, "could not be searched", entries, ".");
 }
 
 /** ...and the chapters whose walk BROKE OFF partway. A different sentence from the one above on
@@ -241,14 +199,8 @@ void AppendUnsearchableNote(PMString& outSummary, const std::vector<PMString>& e
     false in one direction and saying nothing at all would be false in the other. */
 void AppendSearchErrorNote(PMString& outSummary, const std::vector<PMString>& names)
 {
-	if (names.empty())
-		return;
-
-	outSummary.Append("  ");
-	outSummary.AppendNumber(static_cast<int32>(names.size()));
-	outSummary.Append(" chapter(s) stopped with a search error (");
-	AppendChapterNames(outSummary, names);
-	outSummary.Append(") - the rest of each was never searched.");
+	KBSBookScope::AppendChapterNote(outSummary, "stopped with a search error", names,
+		" - the rest of each was never searched.");
 }
 
 // (A local AppendUnopenableNote sat here until 2026-08-02. The glyph scan had grown its own copy of
@@ -312,39 +264,9 @@ struct SearchingFlagGuard
 	~SearchingFlagGuard()	{ gSearching = false; }
 };
 
-// The Find/Change dialog's own name for a tab. Used in the status line and on the panel's tab
-// (KBSPanelTitle, 2026-09-27), so the panel can name the tab the user is actually looking at. Not
-// translatable - these are the dialog's labels, which KBS echoes in English throughout.
-const char* SearchModeName(int32 mode)
-{
-	switch (mode)
-	{
-		case IFindChangeOptions::kTextSearch:			return "Text";
-		case IFindChangeOptions::kGrepSearch:			return "GREP";
-		case IFindChangeOptions::kGlyphSearch:			return "Glyph";
-		case IFindChangeOptions::kObjectSearch:			return "Object";
-		case IFindChangeOptions::kTransliterateSearch:	return "Transliterate";
-		case IFindChangeOptions::kColorSearch:			return "Colour";
-		default:										return "";
-	}
-}
-
-// The Find/Change tab in force right now, as a plain int32; -1 when the options cannot be read.
-// Stored on the results so the replace can refuse to re-walk in a different mode.
-int32 CurrentSearchModeValue()
-{
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
-}
-
-// Is the Find/Change dialog set to search BACKWARDS (for the tab in force)? The walk follows it -
-// see GetKBSWalkerScopeOptions - so the search needs to know, to put a page's rows back in reading
-// order (FinalizeChapterHits). false when the options cannot be read.
-bool CurrentSearchWalksBackwards()
-{
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	return (opts != nil) && (opts->GetSearchBackwards(opts->GetSearchMode()) != kFalse);
-}
+// (CurrentSearchWalksBackwards stood here until 2026-09-28, to put a backward walk's rows back in
+// reading order. It read the direction after KBSForwardSearchScope had turned the walk forward, so
+// from 2026-09-26 it always answered false and the reversal it fed never ran.)
 
 // Is there anything to find on the Find/Change panel right now (in the current mode)?
 bool HasFindQuery()
@@ -537,6 +459,22 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 // with no "hidden" mark at all. Adobe asks both: spellpanel's DetermineIfTextIsHidden does the layer
 // test and then IPageItemVisibilityFacade::IsHidden, and states in its own comment that it is the
 // same code as FindChangeClient.cpp - i.e. this is what the Find/Change dialog itself reports.
+//
+// The layer is found the one way both tests below need it: the frame's SPREAD layer (one per
+// spread) points at the DOCUMENT layer that carries the switches - the Layers panel's row. nil when
+// any step cannot be resolved.
+IDocumentLayer* QueryDocLayerOf(IDataBase* db, IHierarchy* frameHier)
+{
+	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
+	if (spreadLayerUID == kInvalidUID)
+		return nil;
+	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
+	if (spreadLayer == nil)
+		return nil;
+	InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
+	return docLayer.forget();
+}
+
 bool IsFrameHidden(IDataBase* db, UID frameUID)
 {
 	if (db == nil || frameUID == kInvalidUID)
@@ -546,17 +484,9 @@ bool IsFrameHidden(IDataBase* db, UID frameUID)
 	if (frameHier == nil)
 		return false;
 
-	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
-	if (spreadLayerUID != kInvalidUID)
-	{
-		InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
-		if (spreadLayer != nil)
-		{
-			InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
-			if (docLayer != nil && !docLayer->IsVisible())
-				return true;
-		}
-	}
+	InterfacePtr<IDocumentLayer> docLayer(QueryDocLayerOf(db, frameHier));
+	if (docLayer != nil && !docLayer->IsVisible())
+		return true;
 
 	// The item's own switch. Asked second because it is the rarer of the two, and asked even when the
 	// layer could not be resolved - "cannot tell about the layer" is not an answer about the item.
@@ -576,17 +506,8 @@ bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 	if (frameHier == nil)
 		return false;
 
-	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
-	if (spreadLayerUID == kInvalidUID)
-		return false;
-	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());
-	if (spreadLayer == nil)
-		return false;
-
-	InterfacePtr<IDocumentLayer> docLayer(db, spreadLayer->GetDocLayerUID(), UseDefaultIID());
-	if (docLayer == nil)
-		return false;
-	return docLayer->IsLocked();
+	InterfacePtr<IDocumentLayer> docLayer(QueryDocLayerOf(db, frameHier));
+	return docLayer != nil && docLayer->IsLocked();
 }
 
 // Do this page item's own lock flags refuse an edit? A page item can carry TWO, independently
@@ -736,15 +657,25 @@ const FrameFacts& LookUpFrame(const UIDRef& docRef, const UIDRef& storyRef, UID 
 	return cache.insert(std::make_pair(key, facts)).first->second;
 }
 
+// What one document's walk learns once and every hit after it reuses: the frames' answers above, and
+// each story's first words (StoryLeadText). Scoped to the walk, so it can never outlive the state it
+// describes. The story's words were read again for EVERY hit until 2026-09-28 - two hundred characters
+// a hit - for a value that only the story's row reads, and that is the same for every hit in it.
+struct WalkCache
+{
+	FrameFactsCache				frames;
+	std::map<UID, PMString>		storyLeads;
+};
+
 //------------------------------------------------------------------------------------
 // WHAT A HIT NEEDS READ OUT OF THE STORY'S TEXT - the three drawn segments, and the hash of the
 // whole match. Every hit wants both, one straight after the other, so they are taken TOGETHER:
 // one ITextModel / IComposeScanner pair for the pair of them, and the matched characters copied
 // ONCE. They used to open the story separately and copy the same range twice over (2026-08-08).
 //
-// The public wrappers further down do the same work for a caller holding a single range - the
-// replace pass rebuilding one row, the jump checking one - and go through the same two helpers,
-// so what the search stored and what those two read can never be computed differently.
+// The public doors further down serve a caller holding a single range - RereadRowText (a row that
+// has moved) goes through ReadHitText itself, HashMatchText (the same-occurrence test) through the
+// same hash - so what the search stored and what those read can never be computed differently.
 //------------------------------------------------------------------------------------
 
 // The most characters a hit row's three segments carry BETWEEN THEM - leading context, match and
@@ -831,7 +762,7 @@ uint64 HashOfWideString(const WideString& text)
 }
 
 // The line around [start, end) in its three drawn segments - see the contract on
-// KBSSearchEngine::SplitLineAroundMatch, which this implements.
+// KBSSearchEngine::RereadRowText, whose segments this makes (and the search's own, through ReadHitText).
 //
 // outMatchWide hands the matched characters back as they were read, so a caller that also wants
 // them hashed does not have to copy them out of the story a second time. It is the CAPPED match,
@@ -1023,10 +954,6 @@ void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResu
 		: HashRangeWithScanner(scanner, start, end);
 }
 
-// Fill a hit from one match (story, [start, end)): its jump anchors, and the containing
-// paragraph's text split into (before / matched / after). The offsets are CODE POINTS, not UTF-16
-// units - see the note at the head of this file, which retracted the UTF-16 wording this comment
-// used to carry.
 // The first words of a story, for its row in the tree (2026-09-27, the story level): up to 24 characters
 // that show, each run of white space read as one space, InDesign's own marker characters (a table's
 // anchor, a footnote's reference, an anchored object, an endnote's mark...) left out, and "..." when the
@@ -1074,18 +1001,38 @@ PMString StoryLeadText(const UIDRef& storyRef)
 	return out;
 }
 
+// Fill a hit from one match (story, [start, end)), as far as 'detail' asks: its jump anchors; then
+// the containing paragraph's text split into (before / matched / after) with the hash of the whole
+// match; then the page, the flags and the story's first words. The offsets are CODE POINTS, not
+// UTF-16 units - see the note at the head of this file, which retracted the UTF-16 wording this
+// comment used to carry.
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
-	FrameFactsCache& frameFacts, KBSResultModel::Hit& outHit)
+	KBSSearchEngine::HitDetail detail, WalkCache& cache, KBSResultModel::Hit& outHit)
 {
 	outHit.storyUID = storyRef.GetUID();
-	outHit.storyLead = StoryLeadText(storyRef);
 	outHit.textStart = start;
 	outHit.textEnd = end;
+	if (detail == KBSSearchEngine::kHitPlace)
+		return;
+
+	// The line's three drawn segments, and the whole match as one number for the same-occurrence
+	// test the JUMP and the replace's row doors run. Both describe THIS match as the search found it,
+	// and both come out of one reading of the story - see ReadHitText. The segments are capped for
+	// drawing; the hash never is, because it is the one that gets compared.
+	ReadHitText(storyRef, start, end, outHit);
+	if (detail == KBSSearchEngine::kHitPlaceAndText)
+		return;
+
+	// The story's first words, for its row in the tree - read once per story per walk.
+	std::map<UID, PMString>::const_iterator lead = cache.storyLeads.find(outHit.storyUID);
+	if (lead == cache.storyLeads.end())
+		lead = cache.storyLeads.insert(std::make_pair(outHit.storyUID, StoryLeadText(storyRef))).first;
+	outHit.storyLead = lead->second;
 
 	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
 	// that follows from the frame comes out of the cache.
 	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
-	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, frameFacts);
+	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, cache.frames);
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
 	// on no page). Name the page of the "+" overset indicator instead (the last placed parcel's
@@ -1101,7 +1048,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
 		if (loc.found)
 		{
-			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, frameFacts);
+			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, cache.frames);
 			if (oversetFacts.hasPage)
 			{
 				// The FACTS are the whole of what the rest of this function reads - the page, the
@@ -1126,21 +1073,11 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// Locked content: found, listed, jumpable - and never replaceable, because InDesign gives no
 	// way to change it. Decided HERE, once, so the row can be built without a check box instead of
 	// offering one that would quietly do nothing.
+	// (A locked row's box is kept off by KBSResultModel's RowHasCheckBox, the one door every tick goes
+	// through. The "checked = false" that stood here until 2026-09-28 changed nothing: a hit starts unticked.)
 	outHit.isLocked = facts->isLocked;
-	// Inside a footnote? Such a row is always replaced - Track Changes records nothing there (2026-09-26).
+	// Inside a footnote? Such a row cannot be taken back - Track Changes records nothing there (2026-09-26).
 	outHit.inFootnote = KBSTrackChange::IsInFootnote(storyRef, start);
-	if (outHit.isLocked)
-		outHit.checked = false;		// a locked hit can never be checked. (AppendChapter ticks the rows that have a box - since 2026-09-26 - and a locked row has none, so this restates it; the statement is about the lock, not about the default.)
-
-	// The line's three drawn segments, and the whole match as one number for the same-occurrence
-	// test the JUMP runs. (The replace ran that test too until 2026-08-05 - see KBSReplaceEngine.h.)
-	// Both describe THIS match as the search found it, and both come out of one reading of the
-	// story - see ReadHitText. The segments are capped for drawing; the hash never is, because it
-	// is the one that gets compared.
-	//
-	// The same two helpers serve the replace pass, which rebuilds a replaced row exactly this way
-	// from the range the replace command hands back.
-	ReadHitText(storyRef, start, end, outHit);
 }
 
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
@@ -1158,8 +1095,12 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // that slice between - asked by the caller once the chapter is open, since a chapter's size is not
 // knowable before then. The walk moves the bar as it goes: a story at a time, each one subdivided
 // by how far into its text the current match sits. nil is allowed for the bar.
+//
+// detail: how much of each hit is filled in (KBSSearchEngine::HitDetail) - everything for the search,
+// less for a caller that re-walks a changed document only to find the rows' places again. The walk is
+// the same either way, and so are the walk orders it stamps.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
-	std::vector<KBSResultModel::Hit>& outHits,
+	KBSSearchEngine::HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
 	int32& ioProgressReported)
@@ -1300,9 +1241,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// 2026-08-08, so the next reader does not have to work out whether they were an oversight.)
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
-	// What each of this document's frames answers about the hits inside it - see FrameFacts. Scoped
-	// to this walk, so it can never outlive the state it describes.
-	FrameFactsCache frameFacts;
+	// What this document's frames and stories answer about the hits inside them - see WalkCache.
+	WalkCache walkCache;
 
 	// (A per-story ITextModel::GetTextChangeCount was collected here until 2026-08-03 and stamped
 	// onto every hit, so the replace could skip its same-occurrence test for a story nobody had
@@ -1447,7 +1387,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// for (2026-08-08). emplace_back hands back the new element itself (C++17), and BuildHit
 		// never touches this vector, so the reference cannot be invalidated under it.
 		KBSResultModel::Hit& hit = outHits.emplace_back();
-		BuildHit(docRef, story, start, end, frameFacts, hit);
+		BuildHit(docRef, story, start, end, detail, walkCache, hit);
 		// The walk order within this chapter, stamped BEFORE FinalizeChapterHits sorts the vector
 		// into page order. The replace pass re-walks the chapter and matches on this number.
 		hit.walkOrder = static_cast<int32>(outHits.size()) - 1;
@@ -1457,23 +1397,13 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		walker->Halt();
 }
 
-// Put a chapter's hits in PAGE order and bake the "P<page>(<n>) " locator onto each hit line
-// (the KESCL convention: page string, section-aware; a within-page ordinal in parens only when
-// the page holds more than one match; "overset" for an overset match, which has no page). The locator
-// rides on the front of preText, so the colour cell draws it in the normal colour ahead of the
-// match. Pure string / index work - no recompose, so no dirty guard needed here.
-//
-// walkedBackwards: the Find/Change dialog was set to search backwards, so the walk handed the hits
-// over last-first. Measured 2026-09-25: the walk follows the dialog's direction whatever the scope
-// options say (see GetKBSWalkerScopeOptions), and the rows of one page then read "cat3, cat2,
-// cat1" - with P1(1) on the LAST occurrence. The hits are turned round first, so the stable sort
-// below leaves them in reading order either way. The walk order stamped on each hit is untouched:
-// that is the replace's key, and the replace walks the same way the search did.
-void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits, bool walkedBackwards = false)
+// Put a chapter's hits in PAGE order and give each its "P<page>(<n>)" locator (the KESCL convention:
+// page string, section-aware; a within-page ordinal in parens only when the page holds more than one
+// match; "overset" for an overset match, which has no page). The locator is a field of its own, drawn
+// ahead of the line in the normal colour. Pure string / index work - no recompose, so no dirty guard
+// needed here.
+void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 {
-	if (walkedBackwards)
-		std::reverse(hits.begin(), hits.end());
-
 	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
 	// same page keep their document (walk) order.
 	std::stable_sort(hits.begin(), hits.end(),
@@ -1484,75 +1414,25 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits, bool walkedBack
 			return pa < pb;
 		});
 
-	// Walk contiguous runs of the same page (equal pageIndex after the sort): the run length is
-	// the page's match count, and the position within the run is the within-page ordinal.
-	size_t i = 0;
-	while (i < hits.size())
-	{
-		size_t j = i;
-		while (j < hits.size() && hits[j].pageIndex == hits[i].pageIndex)
-			++j;
-		const int32 runCount = static_cast<int32>(j - i);
-
-		for (size_t k = i; k < j; ++k)
-		{
-			// The within-page ordinal, shown only when the page holds more than one match. The
-			// locator string itself is built in ONE place - KBSResultModel::BuildHitLocator -
-			// which the post-replace rewrite calls too, so the two cannot drift apart. Every rule
-			// about its shape and its flag words lives there.
-			hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - i) + 1) : 0;
-			KBSResultModel::BuildHitLocator(hits[k]);
-		}
-		i = j;
-	}
+	// The within-page ordinals and the locators, numbered the way a replace's report numbers what it
+	// keeps - one definition for both.
+	KBSResultModel::NumberHitsWithinPages(hits);
 }
 
 } // anonymous namespace
 
-//========================================================================================
-// Entry points for callers that find their ranges some other way than by walking a query.
-//
-// !! Nothing above this line was changed to make these possible. They only open up the helpers
-//   the search itself already calls, so a borrowed hit and a searched hit cannot drift apart.
-//========================================================================================
-
-struct KBSSearchEngine::HitCache
-{
-	FrameFactsCache frames;
-};
-
-KBSSearchEngine::HitCache* KBSSearchEngine::NewHitCache()
-{
-	return new HitCache;
-}
-
-void KBSSearchEngine::DeleteHitCache(HitCache* cache)
-{
-	delete cache;
-}
-
-void KBSSearchEngine::BuildHitForRange(const UIDRef& docRef, const UIDRef& storyRef,
-	TextIndex start, TextIndex end, HitCache* cache, KBSResultModel::Hit& outHit)
-{
-	if (cache == nil)
-		return;
-	BuildHit(docRef, storyRef, start, end, cache->frames, outHit);
-}
-
-void KBSSearchEngine::FinalizeHits(std::vector<KBSResultModel::Hit>& hits)
-{
-	FinalizeChapterHits(hits);
-}
+// (NewHitCache / DeleteHitCache / BuildHitForRange / FinalizeHits stood here until 2026-09-28: the
+// missing-glyph scan built its rows through them. The scan went on 2026-09-27, and they had no caller.)
 
 bool KBSSearchEngine::CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
-	std::vector<KBSResultModel::Hit>& outHits)
+	HitDetail detail, std::vector<KBSResultModel::Hit>& outHits)
 {
 	outHits.clear();
 	bool capped = false;
 	ChapterWalkResult result = kChapterWalked;
 	int32 reported = 0;
-	CollectHitsInDoc(docRef, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions, outHits,
-		capped, result, nil, 0, 0, 1, reported);
+	CollectHitsInDoc(docRef, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions, detail,
+		outHits, capped, result, nil, 0, 0, 1, reported);
 	return result == kChapterWalked;
 }
 
@@ -1577,18 +1457,26 @@ bool SetSessionSearchBackwards(bool16 backwards, IFindChangeOptions::SearchMode 
 	}
 	return true;
 }
+
+// Point the session's search (for the tab in force) the way wanted. True = it was turned, and has to be
+// turned back for outMode; false = it already pointed that way (nothing to turn, nothing to put back),
+// or the settings could not be read or set. The two direction scopes below are this, both ways round.
+bool TurnSessionDirection(bool16 backwards, int32& outMode)
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return false;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	outMode = static_cast<int32>(mode);
+	if ((opts->GetSearchBackwards(mode) != kFalse) == (backwards != kFalse))
+		return false;
+	return SetSessionSearchBackwards(backwards, mode);
+}
 }	// anonymous namespace
 
 KBSForwardSearchScope::KBSForwardSearchScope() : fRestore(false), fMode(0)
 {
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	if (opts == nil)
-		return;
-	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
-	fMode = static_cast<int32>(mode);
-	if (!opts->GetSearchBackwards(mode))
-		return;		// forward already - nothing to turn, nothing to put back
-	fRestore = SetSessionSearchBackwards(kFalse, mode);
+	fRestore = TurnSessionDirection(kFalse, fMode);
 }
 
 KBSForwardSearchScope::~KBSForwardSearchScope()
@@ -1599,16 +1487,8 @@ KBSForwardSearchScope::~KBSForwardSearchScope()
 
 KBSBackwardSearchScope::KBSBackwardSearchScope(bool wanted) : fRestore(false), fMode(0)
 {
-	if (!wanted)
-		return;
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	if (opts == nil)
-		return;
-	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
-	fMode = static_cast<int32>(mode);
-	if (opts->GetSearchBackwards(mode))
-		return;		// backward already - nothing to turn, nothing to put back
-	fRestore = SetSessionSearchBackwards(kTrue, mode);
+	if (wanted)
+		fRestore = TurnSessionDirection(kTrue, fMode);
 }
 
 KBSBackwardSearchScope::~KBSBackwardSearchScope()
@@ -1651,7 +1531,7 @@ void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, 
 	ioReported = target;
 }
 
-bool KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
+bool KBSSearchEngine::CommitSearchMode()
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
@@ -1674,16 +1554,10 @@ bool KBSSearchEngine::CommitSearchMode(Text::GlyphID overrideFindGlyph)
 
 	// Read the glyph BEFORE the mode is committed. Committing a mode is a declaration, and there is
 	// no promise anywhere that it leaves that mode's other settings untouched - so take the value
-	// while it is certainly still there and hand it back afterwards.
-	//
-	// A caller that brought its own glyph wins over the dialog's. That is how the missing-glyph scan
-	// ran until 2026-08-02: it handed over kAnyNotDefGlyphID, which the engine reads as "any notdef,
-	// whatever font this run of text is in". No caller does now (KBSSearchEngine.h, SearchBook): every
-	// one passes kInvalidGlyphID and gets the dialog's own glyph, stated back to the engine unchanged.
+	// while it is certainly still there and hand it back afterwards. (A caller could bring a glyph of
+	// its own instead until 2026-09-28 - the missing-glyph scan's, whose last use was 2026-08-02.)
 	const Text::GlyphID findGlyphID =
-		(overrideFindGlyph != kInvalidGlyphID)
-			? overrideFindGlyph
-			: ((mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID);
+		(mode == IFindChangeOptions::kGlyphSearch) ? opts->GetFindGlyphID() : kInvalidGlyphID;
 
 	// The second axis and the Transliterate tab's query, read before the commits for the same
 	// reason as the glyph above.
@@ -2051,18 +1925,15 @@ bool KBSSearchEngine::IsPositionOverset(const UIDRef& storyRef, TextIndex pos)
 	return FrameUIDForPosition(storyRef, pos) == kInvalidUID;
 }
 
-void KBSSearchEngine::SplitLineAroundMatch(const UIDRef& storyRef, TextIndex start, TextIndex end,
-	PMString& outPre, PMString& outMatch, PMString& outPost)
+void KBSSearchEngine::RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef,
+	TextIndex start, TextIndex end)
 {
-	// One range, opened for this call alone - the shape a caller holding a single hit wants (the
-	// replace pass rebuilding a row, and nothing else today). The search's own hits go through
-	// ReadHitText instead, which reads the segments and the hash off ONE scanner; both end up in
-	// SplitLineWithScanner, so a stored row and a rebuilt one are split identically.
-	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
-
-	WideString matchWide;		// the hash's shortcut, which this caller has no use for
-	SplitLineWithScanner(scanner, start, end, outPre, outMatch, outPost, matchWide);
+	// ReadHitText, the search's own reading - so a stored row and a rebuilt one are split and hashed
+	// identically - into a scratch hit, whose four text fields are then the row's.
+	KBSResultModel::Hit read;
+	ReadHitText(storyRef, start, end, read);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, read.preText, read.matchText, read.postText,
+		read.matchHash);
 }
 
 bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
@@ -2072,8 +1943,8 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 		return false;
 
 	// A posDelta was added in here until 2026-08-05 - how far the REPLACE pass had moved this story
-	// ahead of this point, its own work cancelled out. The replace no longer asks this question at
-	// all, and the jump (now the only caller) moves nothing, so there is nothing left to cancel.
+	// ahead of this point, its own work cancelled out. Every caller now asks about a range its row
+	// carries to where the text stands (see the header), so there is nothing left to cancel.
 	if (start != expectStart)
 		return false;
 
@@ -2104,21 +1975,19 @@ bool KBSSearchEngine::MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex st
 
 uint64 KBSSearchEngine::HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end)
 {
-	// One range, opened for this call alone - see SplitLineAroundMatch above on who wants that
-	// shape. The arithmetic itself is HashRangeWithScanner's, which is also what the search's own
-	// hits go through (ReadHitText), so a hash taken here and one taken at search time are the same
-	// number for the same text. That has to hold: comparing them IS the same-occurrence test.
+	// One range, opened for this call alone - the same-occurrence test's shape. The arithmetic itself
+	// is HashRangeWithScanner's, the same FNV the search's own hits go through (ReadHitText), so a hash
+	// taken here and one taken at search time are the same number for the same text. That has to
+	// hold: comparing them IS the same-occurrence test.
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	return HashRangeWithScanner(scanner, start, end);
 }
 
-int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFindGlyph)
+int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
-	// Forward, whatever the dialog says (2026-09-26) - and put back as the function ends.
-	KBSForwardSearchScope forward;
 
 	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
 	// the progress bar pumps events, so a command could still find its way in here.
@@ -2127,7 +1996,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		outSummary.Append("A search is already running.");
 		return 0;
 	}
-	// ...and the same door for anything ELSE of ours that is running - a replace, or either scan.
+	// ...and the same door for anything ELSE of ours that is running - a replace.
 	// Asked separately from the line above so each keeps the message that is actually true: what
 	// makes a re-entrant call dangerous is two DIFFERENT runs, one of which hands back the chapters
 	// the other is walking (see KBSRunGuard).
@@ -2161,11 +2030,11 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// ***** THE MENU GREYS THE COMMAND ON THESE TABS (2026-09-27, the user's call) ***** through the same
 	// question (CanSearchTab); this stays for a caller that never opened the menu - a script invoking
 	// the action by its ID reaches here whatever the menu says.
-	const int32 tab = CurrentSearchModeValue();
+	const int32 tab = KBSSearchEngine::CurrentSearchMode();
 	if (!KBSSearchEngine::CanSearchTab(tab))
 	{
 		outSummary.Append("The Find/Change dialog is on the ");
-		PMString tabName(SearchModeName(tab));
+		PMString tabName(KBSSearchEngine::TabName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
 		// Short enough to be read whole at the panel's floor - this one composes a tab name into the
@@ -2183,20 +2052,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// (It was refused here until the Japanese version came into use; on a Roman-featureset install
 	// the tab cannot be reached at all, so the transliterate paths simply lie dormant there.)
 
-	// A caller with its own glyph query - the missing-glyph scan was one until 2026-08-02; none is
-	// now - has nothing on the dialog that could be missing, so HasFindQuery is the wrong question for it. What it does need is the GLYPH
-	// TAB: the engine walks in the mode last committed, and a notdef sentinel is a glyph query.
-	// Switching the tab on the user's behalf would change a setting they can see and did not touch,
-	// so this says what to do and stops instead.
-	if (overrideFindGlyph != kInvalidGlyphID)
-	{
-		if (tab != IFindChangeOptions::kGlyphSearch)
-		{
-			outSummary.Append("Set Edit > Find/Change to the Glyph tab first, then run this again.");
-			return 0;
-		}
-	}
-	else if (!HasFindQuery())
+	if (!HasFindQuery())
 	{
 		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
 		// query on another tab is no help and saying so avoids a hunt.
@@ -2212,7 +2068,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		const bool translitTab = (tab == IFindChangeOptions::kTransliterateSearch);
 		outSummary.Append(glyphTab ? "No glyph set on the "
 			: (translitTab ? "No character type set on the " : "No search text set on the "));
-		PMString tabName(SearchModeName(tab));
+		PMString tabName(KBSSearchEngine::TabName(tab));
 		tabName.SetTranslatable(kFalse);
 		outSummary.Append(tabName);
 		outSummary.Append((glyphTab || translitTab)
@@ -2241,6 +2097,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		return 0;
 	}
 
+	// Forward, whatever the dialog says (2026-09-26) - and put back as the function ends. Turned here,
+	// past every refusal above, so a search that is turned away touches no setting at all (it turned
+	// the direction and back for nothing when this stood at the head of the function, until
+	// 2026-09-28), and still ahead of the mode commit below, in the order the two always had.
+	KBSForwardSearchScope forward;
+
 	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
 	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
 	// search driven from this panel ran as plain Text whatever tab was on screen. See
@@ -2251,7 +2113,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// standing - which is why this sits here rather than three lines lower, where it swallowed its
 	// own failure until 2026-08-08 and searched on in whatever mode had been committed last. Moving
 	// it up changes nothing the user can see: it writes back the value it has just read.
-	if (!KBSSearchEngine::CommitSearchMode(overrideFindGlyph))
+	if (!KBSSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
@@ -2329,7 +2191,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// `tab` was taken BEFORE CommitSearchMode, and what belongs on the results is the mode the walk
 	// is about to actually run in. The two agree today - the commit states the value it just read -
 	// but this is the one that would still be right on the day they stopped agreeing.
-	KBSResultModel::SetSearchMode(CurrentSearchModeValue());
+	KBSResultModel::SetSearchMode(KBSSearchEngine::CurrentSearchMode());
 
 	// (What was asked for - the caption at the head of the file "Save Results..." wrote - was recorded
 	// here until that command was removed on 2026-09-27.)
@@ -2360,14 +2222,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	WalkerScopeOptions scopeOptions;
 	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
-	// ...and which way the walk will run - read once for the same reason. The walk follows the
-	// dialog's direction (measured 2026-09-25), so a page's rows come over last-first when it says
-	// backwards, and FinalizeChapterHits turns them back into reading order.
-	const bool walkedBackwards = CurrentSearchWalksBackwards();
-
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
-	// model was cleared above; each chapter is APPENDED as it finishes and the panel is refreshed
-	// right then, so the tree grows chapter by chapter instead of appearing all at once at the end.
+	// model was cleared above; each chapter is APPENDED as it finishes, and the caller draws the
+	// tree once the search returns (see the AppendChapter below).
 	// The progress bar. Shown for BOTH scopes since 2026-07-31 (user's request). It used to be book
 	// scope only, on the reasoning that a one-document search is a single step with nothing to
 	// cancel between - but that reasoning was about CHAPTERS, and the bar is sized in stories: a
@@ -2422,9 +2279,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// result set, and what is missing is the part of them the walk never reached.
 	std::vector<PMString> brokeOff;
 	// ...and the chapters this run OPENED and could not hand back - windowless, so the user can
-	// neither see them nor close them, and each holds its .indd locked. The two scans have always
-	// counted these (KBSBookScope::AppendUnclosedNote); the search discarded the release's answer
-	// until 2026-08-08, the one run of the four that did.
+	// neither see them nor close them, and each holds its .indd locked (KBSBookScope::AppendUnclosedNote).
+	// The search discarded the release's answer until 2026-08-08.
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
@@ -2489,7 +2345,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		std::vector<KBSResultModel::Hit> hits;
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
-		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, hits, docCapped,
+		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, docCapped,
 			walkResult, &progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc,
 			progressReported);
 
@@ -2569,7 +2425,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		// Page-order the hits and bake the "P<page>(<n>) " locator onto each line. This needs the
 		// WHOLE chapter's hits (page order and the within-page ordinal are only known once the
 		// chapter is complete), which is why the flush unit is the chapter, not a fixed hit count.
-		FinalizeChapterHits(hits, walkedBackwards);
+		FinalizeChapterHits(hits);
 
 		KBSResultModel::Chapter chapter;
 		chapter.name = targets[i].shortName;
@@ -2625,6 +2481,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 	// off - and a replace over them would write matches no row lists (KBSResultModel::SetStoppedShort).
 	KBSResultModel::SetStoppedShort(collectionTruncated || !brokeOff.empty());
 
+	// The chapters the run could not fully account for, said the same way whichever way the summary
+	// ends - "No matches" is a lie too if a chapter was skipped, or a walk broke off before its end.
+	PMString chapterNotes;
+	chapterNotes.SetTranslatable(kFalse);
+	AppendUnsearchableNote(chapterNotes, unsearchable);
+	AppendSearchErrorNote(chapterNotes, brokeOff);
+	KBSBookScope::AppendUnopenableNote(chapterNotes, unopenable);
+	KBSBookScope::AppendUnclosedNote(chapterNotes, unclosed);
+
 	// No matches: a plain, friendly line rather than "0 hit(s) in 0 chapter(s)".
 	if (total == 0)
 	{
@@ -2641,12 +2506,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 			outSummary.Append(targets[0].shortName);
 			outSummary.Append("\".");
 		}
-		// "No matches" is a lie if a chapter was skipped, or if a walk broke off before it reached
-		// the end of one - say so here too.
-		AppendUnsearchableNote(outSummary, unsearchable);
-		AppendSearchErrorNote(outSummary, brokeOff);
-		KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
-		KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
+		outSummary.Append(chapterNotes);
 		return 0;
 	}
 
@@ -2696,16 +2556,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary, Text::GlyphID overrideFi
 		outSummary.Append(" in the panel.");
 	}
 
-	AppendUnsearchableNote(outSummary, unsearchable);
-	AppendSearchErrorNote(outSummary, brokeOff);
-	KBSBookScope::AppendUnopenableNote(outSummary, unopenable);
-	KBSBookScope::AppendUnclosedNote(outSummary, unclosed);
-
-	// Recorded for the saved report's "Summary:" heading, and BEFORE the right-click offer below:
-	// the offer is screen furniture, not a statement about the results, and a report has no rows to
-	// right-click. Everything above it - counts, caps, skipped and unclosed chapters - is what a
-	// heading should carry. (The report read the panel's status line until 2026-08-09, and a tick
-	// between the search and the save made the heading say "P1(2)  checked".)
+	outSummary.Append(chapterNotes);
 
 	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - they moved
 	// off the panel flyout on 2026-08-01, because a flyout has no row to ask about and those two have
@@ -2726,12 +2577,26 @@ bool KBSSearchEngine::IsSearching()
 
 const char* KBSSearchEngine::TabName(int32 mode)
 {
-	return SearchModeName(mode);	// the file's own table - one list of tab names, not two
+	// The Find/Change dialog's own name for a tab, for the status line and the panel's tab
+	// (KBSPanelTitle). Not translatable - these are the dialog's labels, which KBS echoes in English
+	// throughout.
+	switch (mode)
+	{
+		case IFindChangeOptions::kTextSearch:			return "Text";
+		case IFindChangeOptions::kGrepSearch:			return "GREP";
+		case IFindChangeOptions::kGlyphSearch:			return "Glyph";
+		case IFindChangeOptions::kObjectSearch:			return "Object";
+		case IFindChangeOptions::kTransliterateSearch:	return "Transliterate";
+		case IFindChangeOptions::kColorSearch:			return "Colour";
+		default:										return "";
+	}
 }
 
 int32 KBSSearchEngine::CurrentSearchMode()
 {
-	return CurrentSearchModeValue();	// the file's own reader - one way to read the tab, not two
+	// Stored on the results too, so the replace can refuse to re-walk in a different mode.
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
 }
 
 bool KBSSearchEngine::CanSearchTab(int32 mode)
