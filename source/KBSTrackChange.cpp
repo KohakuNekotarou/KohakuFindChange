@@ -321,116 +321,18 @@ int32 KBSTrackChange::AcceptAllInDocument(IDataBase* db, PMString& outWhy)
 	return total;
 }
 
-int32 KBSTrackChange::RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes, bool wantDelete)
-{
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil)
-		return 0;
-	int32 done = 0;
-	for (int32 guard = 0; guard < 1; ++guard)	// ONE record - see the header
-	{
-		RedlineIterator* it = redline->NewRedlineIterator(position);
-		if (it == nil)
-			break;
-		bool found = false;
-		for (bool16 more = kTrue; more && it->GetCurrentPosition() <= position; more = it->Increment(kFalse))
-		{
-			if (it->GetCurrentPosition() != position)
-				continue;
-			const VOSRedlineChange* record = it->GetCurrentChangeRecord();
-			if (record == nil)
-				continue;
-			const uint64 time = record->GetTimeStamp();
-			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
-			delete record;
-			if (isDelete == wantDelete && (keepTimes == nil || keepTimes->count(time) == 0))
-			{
-				found = true;
-				break;
-			}
-		}
-		const bool ok = found && it->ProcessReject(nil, kFalse, kFalse);
-		delete it;
-		if (!ok)
-			break;
-		++done;
-	}
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	return done;
-}
-
-bool KBSTrackChange::RejectReplacement(const UIDRef& story, TextIndex insAt, int32 insLen,
-	TextIndex delAnchor, int32 delOffset, int32 delLen, const std::set<uint64>* oldTimes, uint64 onlyTime,
-	PMString& outWhy)
-{
-	// ***** WHOLE RECORDS, THE RUN'S ONLY (2026-09-26, measured). ***** A range reject was tried and: an
-	// insertion's exact range took nothing back, and an insertion range whose start held the touching
-	// neighbour's deletion brought InDesign down (ShuksanTerminate; rangelog-2026-09-26.txt). So every
-	// record is rejected whole by RejectAt, picked by position and time - no change of another run, and
-	// none made before the run (the user's), can be taken, and no range is handed to InDesign at all.
-	// (Picked by author too until 2026-09-27, when records stopped carrying a name of KBS's own.) A
-	// deletion SHARED with a touching row (replaces that wrote nothing) cannot be split this way: that
-	// shape is refused before the write.
-	outWhy.Clear();
-	outWhy.SetTranslatable(kFalse);
-	if (oldTimes == nil && onlyTime == 0)
-	{
-		outWhy = "whose change it is was not told";		// any record there would qualify
-		return false;
-	}
-	std::vector<Record> recs;
-	CollectRecords(story, recs);
-	std::set<uint64> keep;			// the times NOT to take back: an earlier run's, or not this row's
-	if (oldTimes != nil)
-		keep = *oldTimes;
-	if (onlyTime != 0)
-		for (size_t k = 0; k < recs.size(); ++k)
-			if (recs[k].time != onlyTime)
-				keep.insert(recs[k].time);
-	if (delLen > 0)
-	{
-		if (delOffset != 0)
-		{
-			outWhy = "the deletion is shared with a touching row";
-			return false;
-		}
-		if (RejectAt(story, delAnchor, &keep, true) == 0)
-		{
-			outWhy = "no deletion of that replace stands there";
-			return false;
-		}
-	}
-	if (insLen > 0)
-	{
-		// the insertion's pieces, from the last to the first - each whole
-		std::vector<TextIndex> starts;
-		int32 covered = 0;
-		for (size_t k = 0; k < recs.size(); ++k)
-		{
-			if (recs[k].isDelete || keep.count(recs[k].time) != 0)
-				continue;
-			if (recs[k].at >= insAt && recs[k].at + recs[k].len <= insAt + insLen)
-			{
-				starts.push_back(recs[k].at);
-				covered += recs[k].len;
-			}
-		}
-		if (covered != insLen)
-		{
-			outWhy = "the inserted text is not that replace's record, whole";
-			return false;
-		}
-		for (size_t k = starts.size(); k-- > 0; )
-			RejectAt(story, starts[k], &keep, false);
-	}
-	return true;
-}
-
-void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& out)
+// ======================================================================================================
+// THE READ SIDE (2026-09-28): a row's records are the ones carrying its time - KBS hands every row a time
+// no other record can carry (StampForRow, the head of KBSTrackChange.h). Until 2026-09-28 a row's change
+// was found by its texts and the nearest place, pairing records by time (CollectChanges, FindRowChange,
+// FindGroupChange) and taken back by position and "not an earlier run's time" (RejectAt,
+// RejectReplacement).
+// ======================================================================================================
+void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out)
 {
 	out.clear();
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil || !redline->StoryHasChanges())
+	if (redline == nil || times.empty() || !redline->StoryHasChanges())
 		return;
 	RedlineIterator* it = redline->NewRedlineIterator(0);
 	if (it == nil)
@@ -442,76 +344,55 @@ void KBSTrackChange::CollectChanges(const UIDRef& story, std::vector<Change>& ou
 		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
 		if (record == nil)
 			continue;
-		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 		const uint64 time = record->GetTimeStamp();
-		delete record;
-		// pieces of one replace are one run's: records of another run never join them.
-		// ! This pairing leans on the ORDER the iterator hands records over in at one position: where a
-		//   replace's deletion and the next (touching) replace's insertion share a position, the DELETION
-		//   comes first (every record of rangelog-2026-09-26.txt: "at=1 DEL" then "at=1 INS"), so it
-		//   closes the earlier insertion before the later one can be taken for a continuation of it.
-		//   Nothing in redlineiterator.h promises that order; it is what was measured.
-		const bool follows = !out.empty() && !out.back().hasDelete
-			&& out.back().at + out.back().insLen == at && out.back().time == time;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+		if (times.count(time) == 0)
+			continue;
+		Record r;
+		r.at = at;
+		r.len = len;
+		r.isDelete = isDelete;
+		r.time = time;
 		if (isDelete)
 		{
-			PMString deleted;
-			it->DescribeChangeContent(deleted, 0x7fffffff);
-			deleted.SetTranslatable(kFalse);
-			// the deletion anchored right after an insertion is that insertion's pair
-			if (follows)
-			{
-				out.back().hasDelete = true;
-				out.back().deleted = deleted;
-			}
-			else
-			{
-				Change c;
-				c.at = at;
-				c.hasDelete = true;
-				c.deleted = deleted;
-				c.time = time;
-				out.push_back(c);
-			}
+			it->DescribeChangeContent(r.text, 0x7fffffff);
+			r.text.SetTranslatable(kFalse);
 		}
-		else if (follows)
-		{
-			out.back().insLen += len;	// an insertion split into pieces
-		}
-		else
-		{
-			Change c;
-			c.at = at;
-			c.insLen = len;
-			c.time = time;
-			out.push_back(c);
-		}
+		out.push_back(r);
 	}
 	delete it;
-	for (size_t i = 0; i < out.size(); ++i)
-		out[i].inserted = ReadText(story, out[i].at, out[i].insLen);
 }
 
-bool KBSTrackChange::FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
-	TextIndex nearAt, Change& out)
+bool KBSTrackChange::RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
 {
-	std::vector<Change> changes;
-	CollectChanges(story, changes);
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return false;
+	RedlineIterator* it = redline->NewRedlineIterator(at);
+	if (it == nil)
+		return false;
 	bool found = false;
-	int32 best = 0;
-	for (size_t i = 0; i < changes.size(); ++i)
+	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= at; more = it->Increment(kFalse))
 	{
-		if (changes[i].inserted != newText || changes[i].deleted != oldText)
+		if (it->GetCurrentPosition() != at)
 			continue;
-		const int32 distance = (changes[i].at > nearAt) ? changes[i].at - nearAt : nearAt - changes[i].at;
-		if (!found || distance < best)
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+		if (record == nil)
+			continue;
+		const bool del = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const uint64 t = record->GetTimeStamp();
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+		if (del == isDelete && t == time)
 		{
 			found = true;
-			best = distance;
-			out = changes[i];
+			break;
 		}
 	}
-	return found;
+	const bool ok = found && it->ProcessReject(nil, kFalse, kFalse);
+	delete it;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return ok;
 }
 
 bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange)
@@ -537,101 +418,82 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	PMString originalText, replacedText;
 	if (!KBSResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText))
 		return false;
+	const uint64 rowTime = KBSResultModel::GetHitRecordTime(chapterIdx, hitIdx);
+	if (rowTime == 0)
+		return false;		// nothing was recorded for it (a footnote), or it was never replaced
 	outStory = UIDRef(docRef.GetDataBase(), story);
 
-	// ***** A CHANGE BELONGS TO THE ROW NEAREST IT (2026-09-26, case accepted-then-reject). ***** Rows with
-	// the same texts leave changes that look alike; when one row's change is gone (accepted in the Track
-	// Changes panel), "the nearest change with the same texts" is ANOTHER row's, and rejecting it took
-	// the wrong row back. So every change is handed to the nearest replaced row of the same story and
-	// texts, and this row gets only a change handed to it.
-	std::vector<TextIndex> twins;	// the stored starts of every replaced row that looks like this one
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
+	std::set<uint64> own;
+	own.insert(rowTime);
+	std::vector<Record> recs;
+	CollectRecordsOfTimes(outStory, own, recs);
+	Change c;
+	c.time = rowTime;
+	bool haveIns = false;
+	TextIndex delAt = kInvalidTextIndex;
+	for (size_t k = 0; k < recs.size(); ++k)
 	{
-		bool c2 = false, r2 = false, l2 = false;
-		UID s2 = kInvalidUID;
-		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-		uint64 h2 = 0;
-		PMString o2, n2;
-		if (i != hitIdx && KBSResultModel::GetHitFlags(chapterIdx, i, c2, r2, l2) && r2
-			&& KBSResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2) && s2 == story
-			&& KBSResultModel::GetHitChangeTexts(chapterIdx, i, o2, n2) && o2 == originalText && n2 == replacedText)
-			twins.push_back(a2);
+		if (recs[k].isDelete)
+		{
+			if (!c.hasDelete)
+			{
+				c.hasDelete = true;
+				c.deleted = recs[k].text;
+				delAt = recs[k].at;
+			}
+			continue;
+		}
+		if (!haveIns)
+		{
+			c.at = recs[k].at;
+			haveIns = true;
+		}
+		c.insLen += recs[k].len;
 	}
-	// ***** ONLY THE ROW'S OWN RUN (2026-09-26, the user's design): the time stamp its records were made
-	// with, kept when it was replaced. Another run's records - an earlier replace of the same words -
-	// are not candidates at all.
-	const uint64 rowTime = KBSResultModel::GetHitRecordTime(chapterIdx, hitIdx);
-	std::vector<Change> changes;
-	CollectChanges(outStory, changes);
-	bool found = false;
-	int32 best = 0;
-	for (size_t k = 0; k < changes.size(); ++k)
+	if (haveIns)
 	{
-		// ***** ONE REPLACE, TWO CLOCK TICKS (2026-09-28). ***** A replace's insertion and its deletion are
-		// stamped separately, and now and then the clock ticks between the two: 1 replace in 600 of
-		// InDesign's own changeText, 8 ms apart (work/kbs-regress/probe-tick-0928.jsx). CollectChanges
-		// pairs by time, so that replace comes out as a lone insertion followed by a lone deletion - and
-		// this row's change was not found: Reject Change grey, the status "no tracked change of this
-		// replace is left" (case worklist-reject-then-jump, once on 2026-09-27; the user saw the same
-		// line that day). FindGroupChange already took "the deletion standing alone right after the
-		// insertion under its own time" for a touching group; a single row now does the same. The
-		// deletion must hold exactly this row's original text, so another run's record cannot join.
-		Change candidate = changes[k];
-		if (!candidate.hasDelete && !originalText.IsEmpty() && k + 1 < changes.size()
-			&& changes[k + 1].insLen == 0 && changes[k + 1].hasDelete
-			&& changes[k + 1].at == candidate.at + candidate.insLen && changes[k + 1].deleted == originalText)
-		{
-			candidate.hasDelete = true;
-			candidate.deleted = originalText;
-			candidate.deleteTime = changes[k + 1].time;
-		}
-		if (candidate.inserted != replacedText || candidate.deleted != originalText)
-			continue;
-		if (rowTime != 0 && candidate.time != rowTime)
-			continue;
-		const int32 mine = (candidate.at > start) ? candidate.at - start : start - candidate.at;
-		bool someoneNearer = false;
-		for (size_t t = 0; t < twins.size() && !someoneNearer; ++t)
-		{
-			const int32 theirs = (candidate.at > twins[t]) ? candidate.at - twins[t] : twins[t] - candidate.at;
-			if (theirs < mine)
-				someoneNearer = true;
-		}
-		if (someoneNearer)
-			continue;
-		if (!found || mine < best)
-		{
-			found = true;
-			best = mine;
-			outChange = candidate;
-		}
-	}
-	if (found)
+		// ***** THE PIECES MUST READ, WHERE THEY STAND, AS WHAT THE ROW WROTE. ***** Somebody else's text
+		// typed in between (an insertion of theirs splitting the row's) means the row's change is not its
+		// own any more (case signed-user-typed-then-reject) - and a piece accepted in the Track Changes
+		// panel leaves the rest short.
+		c.inserted = ReadText(outStory, c.at, c.insLen);
+		if (c.inserted != replacedText)
+			return false;
+		outChange = c;
 		return true;
-
-	// ***** A TOUCHING GROUP'S MERGED CHANGE (2026-09-27): this row's share of it. *****
+	}
+	if (!replacedText.IsEmpty())
+		return false;		// it wrote text, and no record of it is left (accepted, or rejected in the panel)
+	if (c.hasDelete)
+	{
+		c.at = delAt;
+		outChange = c;
+		return true;
+	}
+	// ***** REPLACED WITH NOTHING, AND JOINED TO A NEIGHBOUR (2026-09-28). ***** A deletion written next to
+	// a touching neighbour's is joined to it and carries the neighbour's time: this row is found through a
+	// deletion of a replaced touching neighbour that stands where this row stands and holds its text
+	// (case touching-empty-both).
 	std::vector<int32> group;
 	ReplacedTouchingGroup(chapterIdx, hitIdx, group);
-	Change merged;
-	UIDRef groupStory;
-	if (group.size() < 2 || !FindGroupChange(chapterIdx, group, groupStory, merged))
-		return false;
-	int32 before = 0;		// the new text of the group's rows in front of this one
-	for (size_t k = 0; k < group.size() && group[k] != hitIdx; ++k)
+	std::set<uint64> theirs;
+	for (size_t g = 0; g < group.size(); ++g)
 	{
-		PMString o2, n2;
-		if (!KBSResultModel::GetHitChangeTexts(chapterIdx, group[k], o2, n2))
-			return false;
-		before += WideString(n2).CharCount();
+		const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, group[g]);
+		if (group[g] != hitIdx && t != 0)
+			theirs.insert(t);
 	}
-	outStory = groupStory;
-	outChange = merged;
-	outChange.at = merged.at + before;
-	outChange.insLen = WideString(replacedText).CharCount();
-	outChange.inserted = replacedText;
-	outChange.deleted = originalText;
-	return true;
+	CollectRecordsOfTimes(outStory, theirs, recs);
+	for (size_t k = 0; k < recs.size(); ++k)
+	{
+		if (recs[k].isDelete && recs[k].at == start && WideString(recs[k].text).IndexOf(WideString(originalText)) >= 0)
+		{
+			c.at = start;
+			outChange = c;
+			return true;
+		}
+	}
+	return false;
 }
 
 void KBSTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
@@ -646,77 +508,6 @@ void KBSTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::
 			&& !KBSResultModel::GetHitInFootnote(chapterIdx, group[k]))
 			outRows.push_back(group[k]);
 	}
-}
-
-bool KBSTrackChange::FindGroupChange(int32 chapterIdx, const std::vector<int32>& rows, UIDRef& outStory, Change& outChange,
-	uint64* outDeleteTime)
-{
-	if (outDeleteTime != nil)
-		*outDeleteTime = 0;
-	if (rows.size() < 2)
-		return false;
-	UIDRef docRef;
-	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || docRef.GetDataBase() == nil
-		|| !KBSBookScope::IsDocStillOpen(docRef))
-		return false;
-	PMString allOriginal, allReplaced;
-	allOriginal.SetTranslatable(kFalse);
-	allReplaced.SetTranslatable(kFalse);
-	UID story = kInvalidUID;
-	TextIndex firstStart = kInvalidTextIndex;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		PMString o, n;
-		UID s = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 h = 0;
-		if (!KBSResultModel::GetHitChangeTexts(chapterIdx, rows[k], o, n)
-			|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[k], s, a, b, h))
-			return false;
-		if (k == 0)
-		{
-			story = s;
-			firstStart = a;
-		}
-		else if (s != story)
-			return false;
-		allOriginal.Append(o);
-		allReplaced.Append(n);
-	}
-	outStory = UIDRef(docRef.GetDataBase(), story);
-	std::vector<Change> changes;
-	CollectChanges(outStory, changes);
-	bool found = false;
-	int32 best = 0;
-	for (size_t k = 0; k < changes.size(); ++k)
-	{
-		Change candidate = changes[k];
-		uint64 deleteTime = candidate.hasDelete ? candidate.time : 0;
-		if (candidate.inserted != allReplaced)
-			continue;
-		// the merged deletion, standing alone right after the merged insertion under its own time
-		if (!allOriginal.IsEmpty() && !candidate.hasDelete && k + 1 < changes.size()
-			&& changes[k + 1].insLen == 0 && changes[k + 1].hasDelete
-			&& changes[k + 1].at == candidate.at + candidate.insLen && changes[k + 1].deleted == allOriginal)
-		{
-			candidate.hasDelete = true;
-			candidate.deleted = allOriginal;
-			deleteTime = changes[k + 1].time;
-		}
-		if (candidate.deleted != allOriginal)
-			continue;
-		const int32 distance = (candidate.at > firstStart) ? candidate.at - firstStart : firstStart - candidate.at;
-		if (!found || distance < best)
-		{
-			found = true;
-			best = distance;
-			outChange = candidate;
-			if (outDeleteTime != nil)
-				*outDeleteTime = deleteTime;
-		}
-	}
-	return found;
 }
 
 bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)

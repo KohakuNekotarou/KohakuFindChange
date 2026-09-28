@@ -3460,36 +3460,6 @@ bool KBSReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 // step below it away. The rollback of a plain sequence is the SDK's own: raise the error state, end it,
 // clear it (CmdUtils.h, SequenceContext).
 // ======================================================================================================
-// One row's replace taken back inside the caller's sequence - the change its records were found as
-// (KBSTrackChange::FindRowChangeForHit, asked by the caller before anything was taken back), its records
-// whole, this row's run only (KBSTrackChange::RejectReplacement), then its original text read back where
-// it stood. Nothing in the model is touched; outAt / outLen say where the original text now stands.
-static bool RejectOneRow(const UIDRef& story, const KBSTrackChange::Change& change, const PMString& originalText,
-	TextIndex& outAt, int32& outLen, PMString& outWhy)
-{
-	outLen = WideString(originalText).CharCount();
-	outAt = change.at;
-	if (change.hasDelete && change.deleteTime != 0 && change.deleteTime != change.time)
-	{
-		// The deletion was stamped a clock tick after the insertion (FindRowChangeForHit): each is
-		// taken back under its own time - the deletion first, as a touching group's merged change is.
-		if (!KBSTrackChange::RejectReplacement(story, change.at, 0, change.at + change.insLen, 0,
-				outLen, nil, change.deleteTime, outWhy)
-			|| (change.insLen > 0 && !KBSTrackChange::RejectReplacement(story, change.at, change.insLen,
-				kInvalidTextIndex, 0, 0, nil, change.time, outWhy)))
-			return false;
-	}
-	else if (!KBSTrackChange::RejectReplacement(story, change.at, change.insLen,
-		change.at + change.insLen, 0, change.hasDelete ? outLen : 0, nil, change.time, outWhy))
-		return false;
-	if (KBSTrackChange::ReadText(story, change.at, outLen) != originalText)
-	{
-		outWhy = "the original text did not come all the way back";
-		return false;
-	}
-	return true;
-}
-
 // ***** A STORY ROW'S ROWS (2026-09-27, the story level). ***** Which of a story's rows each of its menu
 // items acts on: Replace = the TICKED rows that can be replaced (the user's call: "only the ticked
 // ones"); Reject Change = the replaced rows outside a footnote whose tracked change is still there;
@@ -3551,29 +3521,29 @@ bool KBSReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 }
 
 // ***** TAKE A SET OF REPLACED ROWS BACK, IN ONE UNDO STEP (2026-09-27: the row's touching group, or a
-// ***** story's replaced rows). ***** The rows are split into runs of touching rows. Inside a run they go
-// front to back (the runs themselves from the last - below): taking back the LATER of two touching replaces drops the EARLIER one's deletion record
-// (it sits on the later one's first character), while front to back leaves every record whole
-// (2026-09-26, measured). A run InDesign merged into one insertion and one deletion (touching matches
-// replaced one at a time - KBSTrackChange::FindGroupChange) goes back in one reject of those two records;
-// any other row goes back on its own records (RejectOneRow). Any failure rolls all of it back. `rows` =
-// replaced rows outside a footnote (a footnote's row has nothing recorded), in any order.
-// ***** EVERY CHANGE FOUND FIRST, THEN THE RUNS TAKEN BACK FROM THE LAST (2026-09-28). ***** Each row's
-// change is "the change nearest this row's stored start, unless another replaced row with the same texts is
-// nearer" (FindRowChangeForHit). This took the rows back front to back and looked each one up just before
-// its turn - by which time every row behind the ones already taken back stood where it had been before the
-// text shrank, and the rows taken back still read "replaced" at their old places. With many alike replaces
-// close together (1200 "cat"->"kitten" a space apart, case reject-many-alike) the third row's change was
-// then handed to the second row, the third was "not found", and the whole reject was cancelled - every time.
-// Now every change is looked up while nothing has moved. The RUNS are taken back from the last in text
-// order: a run is separated from the next by text, and taking one back moves only what lies after it -
-// all done by then - so each change found is still where it was found when its turn comes. INSIDE a run
-// the rows still go front to back (above: the later of two touching replaces carries the earlier one's
-// deletion record), each change moved first by what the rows in front of it in the run gave back - one
-// run is one stretch of one thread, so that is the whole of its move. The rows follow the text as "this
-// far into this thread" (RowNow, carried past each change as it is made - CarryPastChange), which also
-// carries the rows in cells and footnotes behind a body change and past the threads a taken-back deletion
-// takes with it; their stored places are written once, at the end.
+// ***** story's replaced rows). ***** The rows are split into runs of touching rows. `rows` = replaced rows
+// outside a footnote (a footnote's row has nothing recorded), in any order. Any failure rolls all of it back.
+// ***** EACH RUN BY ITS ROWS' TIMES (2026-09-28). ***** Every record KBS writes carries the time of the row
+// that wrote it (KBSTrackChange.h), so a run's records are exactly the ones carrying one of its rows' times -
+// whatever InDesign did to them: touching replaces written front to back leave one insertion per row but ONE
+// deletion, carrying the LAST row's time; written back to front (a GREP query holding ^) they leave one
+// deletion per row and the later row's insertion split around the earlier row's deletion (both measured,
+// cases touching-reject-first and touching-caret-back). Every row must still have its change
+// (FindRowChangeForHit - its insertion must read as what it wrote); a row without one refuses the whole
+// reject before a thing is written, so a group is never half taken back (case
+// touching-accept-one-then-reject). Inside a run the DELETIONS go first, then the insertions, each time the
+// one furthest on (2026-09-26, measured: taking back a later replace's insertion drops an earlier one's
+// deletion anchored on its first character), and the run's original text must then read back where the run
+// starts. (Until 2026-09-28 a run's change was found by its texts and the nearest place - FindGroupChange -
+// or each row alone - RejectOneRow.)
+// ***** EVERY CHANGE FOUND FIRST, THEN THE RUNS TAKEN BACK FROM THE LAST (2026-09-28). ***** Every change is
+// looked up while nothing has moved. The RUNS are taken back from the last in text order: a run is
+// separated from the next by text, and taking one back moves only what lies after it - all done by then -
+// so each change found is still where it was found when its turn comes. (Front to back, looking each one up
+// just before its turn, cancelled a reject of 1200 alike rows every time: case reject-many-alike.) The rows
+// follow the text as "this far into this thread" (RowNow, carried past each change as it is made -
+// CarryPastChange), which also carries the rows in cells and footnotes behind a body change and past the
+// threads a taken-back deletion takes with it; their stored places are written once, at the end.
 static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRef& docRef, PMString& outStatus)
 {
 	IDataBase* const db = docRef.GetDataBase();
@@ -3606,53 +3576,69 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		lastEnd = b;
 	}
 
-	// What each run takes back: a touching group's merged change (FindGroupChange), or each row's own.
-	// Found now, before anything moves; a row with none refuses the whole reject before a thing is written.
+	// What each run takes back: the records carrying its rows' times. Found now, before anything moves; a
+	// row with no change of its own refuses the whole reject before a thing is written.
 	struct Plan
 	{
-		std::vector<int32>		rows;
-		bool					group;
-		UIDRef					story;
-		KBSTrackChange::Change	change;
-		uint64					deleteTime;		// a group's merged deletion's own time (FindGroupChange)
-		Plan() : group(false), deleteTime(0) {}
+		std::vector<int32>	rows;		// text order
+		UIDRef				story;
+		std::set<uint64>	times;		// the run's rows' times - every record of the run carries one
+		TextIndex			at;			// where the run's new text starts now
+		int32				insLen;		// how long the run's new text is now
+		PMString			allOriginal;
+		std::vector<int32>	lengths;	// each row's original length, in text order
+		Plan() : at(kInvalidTextIndex), insLen(0) {}
 	};
-	std::vector<std::vector<Plan> > runPlans(runs.size());	// one per run, in text order
+	std::vector<Plan> plans(runs.size());
 	std::set<std::pair<UID, TextIndex> > claimed;			// no change taken back twice
 	for (size_t r = 0; r < runs.size(); ++r)
 	{
-		const std::vector<int32>& run = runs[r];
-		if (run.size() >= 2)
+		Plan& p = plans[r];
+		p.rows = runs[r];
+		p.allOriginal.SetTranslatable(kFalse);
+		for (size_t k = 0; k < p.rows.size(); ++k)
 		{
-			Plan p;
-			p.rows = run;
-			p.group = true;
-			if (KBSTrackChange::FindGroupChange(chapterIdx, run, p.story, p.change, &p.deleteTime))
-				runPlans[r].push_back(p);
-		}
-		for (size_t k = 0; runPlans[r].empty() && k < run.size(); ++k)
-		{
-			Plan p;
-			p.rows.push_back(run[k]);
-			if (!KBSTrackChange::FindRowChangeForHit(chapterIdx, run[k], p.story, p.change))
+			KBSTrackChange::Change change;
+			PMString originalText, replacedText;
+			if (!KBSTrackChange::FindRowChangeForHit(chapterIdx, p.rows[k], p.story, change)
+				|| !KBSResultModel::GetHitChangeTexts(chapterIdx, p.rows[k], originalText, replacedText))
 			{
 				outStatus = "Reject Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
 				return false;
 			}
-			runPlans[r].push_back(p);
+			const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, p.rows[k]);
+			if (t != 0)
+				p.times.insert(t);
+			if (p.at == kInvalidTextIndex || change.at < p.at)
+				p.at = change.at;
+			p.insLen += change.insLen;
+			p.allOriginal.Append(originalText);
+			p.lengths.push_back(WideString(originalText).CharCount());
 		}
-		if (runPlans[r].size() > 1 && runPlans[r][0].group)
-			runPlans[r].resize(1);
-	}
-	for (size_t r = 0; r < runPlans.size(); ++r)
-	{
-		for (size_t k = 0; k < runPlans[r].size(); ++k)
+		// ***** THE RUN'S DELETIONS MUST HOLD EXACTLY ITS ROWS' ORIGINAL TEXT (2026-09-28, case
+		// touching-accept-one-then-reject). ***** InDesign joins a deletion to the one it touches, whoever made
+		// either, so a deletion of this run can also hold a neighbour's original text - a neighbour whose own
+		// change is gone (accepted in the Track Changes panel) and so is not in the run. Taking it back would
+		// put that neighbour's text back beside the words it was accepted as, and the read-back below would not
+		// see it (it reads the run's own length only): refused before a thing is written.
 		{
-			if (!claimed.insert(std::make_pair(runPlans[r][k].story.GetUID(), runPlans[r][k].change.at)).second)
+			std::vector<KBSTrackChange::Record> recs;
+			KBSTrackChange::CollectRecordsOfTimes(p.story, p.times, recs);
+			PMString deleted;
+			deleted.SetTranslatable(kFalse);
+			for (size_t k = 0; k < recs.size(); ++k)
+				if (recs[k].isDelete)
+					deleted.Append(recs[k].text);
+			if (deleted != p.allOriginal)
 			{
-				outStatus = "Reject Change: two rows came to the same tracked change - nothing was changed. Search again.";
+				outStatus = "Reject Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
 				return false;
 			}
+		}
+		if (!claimed.insert(std::make_pair(p.story.GetUID(), p.at)).second)
+		{
+			outStatus = "Reject Change: two rows came to the same tracked change - nothing was changed. Search again.";
+			return false;
 		}
 	}
 
@@ -3670,65 +3656,54 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	std::vector<int32> taken;		// every row taken back; others[row] follows where its original text stands
 	PMString why;
 	bool ok = true;
-	for (size_t r = runPlans.size(); r-- > 0 && ok; )
+	// the runs from the last: taking one back moves only what lies after it - all done by then
+	for (size_t r = plans.size(); r-- > 0 && ok; )
 	{
-		int32 shift = 0;		// what the rows in front of this one in the run gave back
-		for (size_t pi = 0; pi < runPlans[r].size() && ok; ++pi)
+		const Plan& p = plans[r];
+		// ***** THE DELETIONS FIRST, THEN THE INSERTIONS - EACH TIME THE ONE FURTHEST ON (2026-09-26,
+		// measured). ***** Taking back a later replace's insertion drops an earlier one's deletion anchored on
+		// its first character. The records are read again after each one: taking one back moves the rest.
+		std::vector<KBSTrackChange::Record> recs;
+		KBSTrackChange::CollectRecordsOfTimes(p.story, p.times, recs);
+		const size_t guard = recs.size() + 1;
+		for (size_t g = 0; g < guard && ok && !recs.empty(); ++g)
 		{
-			Plan p = runPlans[r][pi];
-			p.change.at += shift;
-			if (p.group)
+			size_t pick = recs.size();
+			for (size_t k = 0; k < recs.size(); ++k)
+				if (recs[k].isDelete && (pick == recs.size() || recs[k].at >= recs[pick].at))
+					pick = k;
+			if (pick == recs.size())
+				for (size_t k = 0; k < recs.size(); ++k)
+					if (pick == recs.size() || recs[k].at >= recs[pick].at)
+						pick = k;
+			if (!KBSTrackChange::RejectRecord(p.story, recs[pick].at, recs[pick].time, recs[pick].isDelete))
 			{
-				PMString allOriginal;
-				allOriginal.SetTranslatable(kFalse);
-				std::vector<int32> lengths;
-				for (size_t k = 0; k < p.rows.size() && ok; ++k)
-				{
-					PMString originalText, replacedText;
-					ok = KBSResultModel::GetHitChangeTexts(chapterIdx, p.rows[k], originalText, replacedText);
-					lengths.push_back(WideString(originalText).CharCount());
-					allOriginal.Append(originalText);
-				}
-				const int32 allLen = WideString(allOriginal).CharCount();
-				// the deletion first, then the insertion - each under its own time (FindGroupChange)
-				if (ok && p.change.hasDelete)
-					ok = KBSTrackChange::RejectReplacement(p.story, p.change.at, 0, p.change.at + p.change.insLen, 0,
-						allLen, nil, p.deleteTime, why);
-				if (ok && p.change.insLen > 0)
-					ok = KBSTrackChange::RejectReplacement(p.story, p.change.at, p.change.insLen, kInvalidTextIndex, 0,
-						0, nil, p.change.time, why);
-				if (ok && KBSTrackChange::ReadText(p.story, p.change.at, allLen) != allOriginal)
-				{
-					why = "the original text did not come all the way back";
-					ok = false;
-				}
-				if (ok)
-				{
-					CarryPastChange(db, others, p.story.GetUID(), p.change.at, p.change.insLen, allLen);
-					TextIndex at = p.change.at;
-					for (size_t k = 0; k < p.rows.size(); ++k)
-					{
-						SetRowAt(db, others[static_cast<size_t>(p.rows[k])], p.story.GetUID(), at, at + lengths[k]);
-						taken.push_back(p.rows[k]);
-						at += lengths[k];
-					}
-				}
+				why = "InDesign would not take back a tracked change of this replace";
+				ok = false;
+				break;
 			}
-			else
+			KBSTrackChange::CollectRecordsOfTimes(p.story, p.times, recs);
+		}
+		if (ok && !recs.empty())
+		{
+			why = "a tracked change of this replace was still there after taking it back";
+			ok = false;
+		}
+		const int32 allLen = WideString(p.allOriginal).CharCount();
+		if (ok && KBSTrackChange::ReadText(p.story, p.at, allLen) != p.allOriginal)
+		{
+			why = "the original text did not come all the way back";
+			ok = false;
+		}
+		if (ok)
+		{
+			CarryPastChange(db, others, p.story.GetUID(), p.at, p.insLen, allLen);
+			TextIndex at = p.at;
+			for (size_t k = 0; k < p.rows.size(); ++k)
 			{
-				const int32 row = p.rows[0];
-				PMString originalText, replacedText;
-				TextIndex at = kInvalidTextIndex;
-				int32 len = 0;
-				ok = KBSResultModel::GetHitChangeTexts(chapterIdx, row, originalText, replacedText)
-					&& RejectOneRow(p.story, p.change, originalText, at, len, why);
-				if (ok)
-				{
-					CarryPastChange(db, others, p.story.GetUID(), at, p.change.insLen, len);
-					SetRowAt(db, others[static_cast<size_t>(row)], p.story.GetUID(), at, at + len);
-					taken.push_back(row);
-					shift += len - p.change.insLen;
-				}
+				SetRowAt(db, others[static_cast<size_t>(p.rows[k])], p.story.GetUID(), at, at + p.lengths[k]);
+				taken.push_back(p.rows[k]);
+				at += p.lengths[k];
 			}
 		}
 	}
@@ -3799,8 +3774,8 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	// the pending changes it touches first (AcceptPendingAround), and a neighbour replaced a moment earlier
 	// is exactly such a change. Taking that neighbour along found nothing to reject for it, and the whole
 	// reject was cancelled - so this row could never be taken back at all. A neighbour with no change of its
-	// own left is not part of what can be taken back; the row itself always is (RejectOneRow says why when
-	// its own change is gone).
+	// own left is not part of what can be taken back; the row itself always is (RejectRowsNow says why when
+	// its own change is gone, and refuses when its deletion also holds such a neighbour's text).
 	std::vector<int32> group;
 	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
 	KBSResultModel::GetTouchingGroup(chapterIdx, hitIdx, group);

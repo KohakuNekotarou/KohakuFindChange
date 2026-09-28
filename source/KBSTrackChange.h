@@ -96,6 +96,7 @@ namespace KBSTrackChange
 		int32		len;		// an insertion's length; for a deletion, what the iterator says (1)
 		bool		isDelete;
 		uint64		time;		// VOSRedlineChange::GetTimeStamp - which run made it
+		PMString	text;		// a deletion's deleted text - filled by CollectRecordsOfTimes only
 	};
 
 	/** Is `at` inside a footnote? Track Changes records nothing there (measured 2026-09-26 through
@@ -151,32 +152,21 @@ namespace KBSTrackChange
 	int32 AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy);
 
 
-	/** Reject ONE record standing AT `position` - the deletion when `wantDelete`, else the insertion -
-	    except one whose time stamp is in `keepTimes`. The caller puts in `keepTimes` every time that is
-	    not the row's run: the times that stood before the run (the replace), or every time but the
-	    row's own (Reject Change) - so nobody else's record, and no other run's, can be taken.
-	    ! A time does not name a ROW: several replaces of one run share one (rangelog-2026-09-26.txt), so
-	    it is the position that says which row's record this is.
-	    ***** ONE, AND OF THE KIND ASKED (2026-09-26, case touching-mixed). ***** Touching replaces put the
-	    first one's deletion and the next one's insertion at the SAME position ("catcat" -> "kitten":
-	    deleted "cat"@6 and inserted "k"@6); rejecting "everything of ours there" took the ticked row's
-	    deletion back with the unticked row's insertion. Returns 1 when one was rejected, 0 when none.
-	    Leaves the global error state clear. */
-	int32 RejectAt(const UIDRef& story, TextIndex position, const std::set<uint64>* keepTimes, bool wantDelete);
+	/** Every record of the story carrying one of `times`, in position order - a deletion with its
+	    deleted text. The records of a row, or of a touching group, found by their time alone
+	    (2026-09-28: KBS hands each row a time no other record can carry - the head of this file). */
+	void CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out);
 
-	/** ***** TAKE ONE REPLACE BACK - WHOLE RECORDS, THE ROW'S RUN ONLY (2026-09-26). ***** Its deletion (at
-	    delAnchor; delOffset must be 0 - a deletion shared with a touching row cannot be split) and its
-	    insertion's pieces in [insAt, insAt + insLen), each rejected whole by RejectAt, and only records
-	    whose time stamp is not in oldTimes and, when onlyTime is not 0, is onlyTime. At least one of the
-	    two has to be given: with neither, any record there would qualify (refused). No range is handed to
-	    InDesign (measured: an insertion range with a deletion at its start brought it down). False = not
-	    the run's, or not whole; outWhy says which. Callers read the text back. */
-	bool RejectReplacement(const UIDRef& story, TextIndex insAt, int32 insLen,
-		TextIndex delAnchor, int32 delOffset, int32 delLen, const std::set<uint64>* oldTimes, uint64 onlyTime,
-		PMString& outWhy);
+	/** Take back the ONE record standing at `at` of that kind and of exactly that time - whole: no range
+	    is handed to InDesign (an insertion range with a deletion at its start brought it down,
+	    2026-09-26). True = it was. Leaves the global error state clear.
+	    ***** ONE, AND OF THE KIND ASKED (2026-09-26, case touching-mixed). ***** Touching replaces put one
+	    row's deletion and the next row's insertion at the SAME position ("catcat" -> "kitten": deleted
+	    "cat"@6 and inserted "k"@6). */
+	bool RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
 
-	/** One replacement, paired: the insertion [at, at+insLen) and the deletion anchored at
-	    at+insLen. `inserted` / `deleted` are the texts (deleted read from the deleted-text record). */
+	/** One row's change: its insertion [at, at+insLen) and whether a deletion of its time stands.
+	    `inserted` / `deleted` are the texts (deleted read from the deleted-text record). */
 	struct Change
 	{
 		TextIndex	at;
@@ -184,21 +174,14 @@ namespace KBSTrackChange
 		bool		hasDelete;
 		PMString	inserted;
 		PMString	deleted;
-		uint64		time;		// the records' time stamp - one run's (VOSRedlineChange::GetTimeStamp)
-		uint64		deleteTime;	// the deletion's, when it was stamped a clock tick after the insertion
-								// (0 = the same as time) - see FindRowChangeForHit
-		Change() : at(0), insLen(0), hasDelete(false), time(0), deleteTime(0) {}
+		uint64		time;		// the row's time (Hit::recordTime) - what its records carry
+		Change() : at(0), insLen(0), hasDelete(false), time(0) {}
 	};
 
-	/** Every change in the story, insertions and deletions paired (same time, the deletion right after
-	    the insertion), in position order. Whose it is, is the caller's question - by time. */
-	void CollectChanges(const UIDRef& story, std::vector<Change>& out);
-
-	/** The change that is a row's: inserted == newText and deleted == oldText; of several, the one
-	    nearest `nearAt`. False = none. */
-	bool FindRowChange(const UIDRef& story, const PMString& newText, const PMString& oldText,
-		TextIndex nearAt, Change& out);
-
+	// (RejectAt / RejectReplacement - a row's records taken back by position and "not an earlier run's
+	//  time" - and CollectChanges / FindRowChange / FindGroupChange - a row's change found by its texts and
+	//  the nearest place, pairing records by time - stood here until 2026-09-28. A row's records are
+	//  found by its own time now: CollectRecordsOfTimes, RejectRecord.)
 	// (RecordTimeIn - the time read back off a replaced row's records - stood here until 2026-09-28: a row
 	//  keeps the time it was handed out now, StampForRow.)
 
@@ -209,28 +192,16 @@ namespace KBSTrackChange
 	    Reject Change and Redo (spec section 5). */
 	bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx);
 
-	/** Like RefreshRowFromRecords, and hands the change back too. A row of a touching group whose replaces
-	    InDesign merged (FindGroupChange) gets its own share of the merged change: where its new text
-	    stands in the merged insertion, and its own texts. */
+	/** Like RefreshRowFromRecords, and hands the change back too. The row's own change, by its time
+	    (Hit::recordTime): the insertion pieces carrying it (at = the first, insLen = their sum, which must
+	    read as the row's replaced text) and the deletion carrying it, if any. A row replaced with nothing
+	    whose deletion InDesign joined to a touching neighbour's is found through that neighbour's
+	    deletion. False = no record of the row is left. */
 	bool FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange);
 
-	/** ***** TOUCHING REPLACES MADE ONE AT A TIME ARE MERGED INTO ONE CHANGE (2026-09-27, measured: case
-	    touching-group-reject). ***** Two touching matches replaced one after the other ("catcat" ->
-	    "kittenkitten") leave ONE insertion "kittenkitten" and ONE deletion "catcat" - InDesign joins a
-	    tracked insertion to the one it touches (Change All, one command, had left a pair per replace).
-	    `rows` = the group's replaced rows in text order (two or more). True = a change of the story
-	    inserted all their new texts and deleted all their original texts, joined in that order; the one
-	    nearest the first row is handed back.
-	    ! The merged insertion and deletion do NOT share a time stamp (measured: ...694464 and ...694480 -
-	    the first replace's clock tick and the second's), so CollectChanges does not pair them: the
-	    insertion comes back alone and the deletion right after it alone, and they are joined here. Each
-	    has to be rejected under its own time - outChange.time is the insertion's, outDeleteTime (when
-	    not nil) the deletion's (0 when there is none). */
-	bool FindGroupChange(int32 chapterIdx, const std::vector<int32>& rows, UIDRef& outStory, Change& outChange,
-		uint64* outDeleteTime = nil);
-
-	/** The touching group of a replaced row, as FindGroupChange takes it: the replaced rows outside a
-	    footnote, in text order. */
+	/** The touching group of a replaced row: the replaced rows outside a footnote, in text order. A group
+	    is taken back as one (KBSReplaceEngine RejectRowsNow): touching replaces written front to back
+	    leave ONE deletion, carrying the LAST row's time (the head of this file). */
 	void ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
 }
 
