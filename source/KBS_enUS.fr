@@ -90,6 +90,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
                 // What Edit > Undo calls a Change Checked run (2026-09-26).
                 kKBSReplaceStepKey,				"Replace",
+                // ...and a Reject Change and an Accept All Changes in This Document (2026-09-29).
+                kKBSRejectStepKey,				"Reject Change",
+                kKBSAcceptAllStepKey,			"Accept All Changes",
 
                 // "Save after replace" had three strings here (the box, its note, and the extra
                 // warning that went up when it was ticked) from 2026-08-02 until the feature was

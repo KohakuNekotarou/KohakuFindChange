@@ -74,7 +74,7 @@
 #include "KBSTrackChange.h"		// RefreshRowFromRecords - a replaced row found by its tracked change
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
 #include "KBSSearchEngine.h"		// MatchIsSameOccurrence / EditableFrameForMatch / IsPositionOverset /
-									// CollectDocHits
+									// CollectStoryHits
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KBSReplaceEngine.h"		// QueryUnchangedSinceSearch - a row is looked for again only under its own query
 #include <vector>
@@ -683,6 +683,11 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 	if (!KBSResultModel::GetHitRow(chapterIdx, hitIdx, row)
 		|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
 		return false;
+	// The row's own story, and only that one (2026-09-29, the official-terms audit A-5: the whole document
+	// was walked, and every match in it given its line and hash, to look in one story).
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil || !db->IsValidUID(storyUID))
+		return false;
 	std::vector<KBSResultModel::Hit> hits;
 	{
 		// forward, as the search was
@@ -690,7 +695,7 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 		WalkerScopeOptions scopeOptions;
 		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 		// the places and the line: a candidate is compared by its text and the line around it
-		if (!KBSSearchEngine::CollectDocHits(docRef, scopeOptions, KBSSearchEngine::kHitPlaceAndText, hits))
+		if (!KBSSearchEngine::CollectStoryHits(UIDRef(db, storyUID), scopeOptions, KBSSearchEngine::kHitPlaceAndText, hits))
 			return false;
 	}
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);

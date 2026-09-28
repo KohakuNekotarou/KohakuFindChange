@@ -1125,11 +1125,14 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // detail: how much of each hit is filled in (KBSSearchEngine::HitDetail) - everything for the search,
 // less for a caller that re-walks a changed document only to find a row's place again. The walk is
 // the same either way.
+//
+// onlyStory: walk this one story of the document instead of the whole of it (UIDRef::gNull = the whole
+// document, which is what the search always asks) - the scope the replace's walks take a story at a time.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	KBSSearchEngine::HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
-	int32& ioProgressReported)
+	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull)
 {
 	outResult = kChapterWalked;
 
@@ -1204,7 +1207,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// IWalkerScopeFactoryUtils.h:102-109 documents for it - so what stands behind this line is the
 	// header's contract, not a worked example. (Grepped 2026-08-08: the only callers in the SDK
 	// tree are this file, KBSReplaceEngine and KESCL, all three ours.)
-	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
+	InterfacePtr<ITextWalkerScope> scope(onlyStory == UIDRef::gNull
+		? Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions)
+		: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions));
 	if (scope == nil)
 	{
 		outResult = kChapterNoScope;
@@ -1448,15 +1453,18 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 // (NewHitCache / DeleteHitCache / BuildHitForRange / FinalizeHits stood here until 2026-09-28: the
 // missing-glyph scan built its rows through them. The scan went on 2026-09-27, and they had no caller.)
 
-bool KBSSearchEngine::CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+bool KBSSearchEngine::CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KBSResultModel::Hit>& outHits)
 {
 	outHits.clear();
+	IDataBase* const db = storyRef.GetDataBase();
+	if (db == nil)
+		return false;
 	bool capped = false;
 	ChapterWalkResult result = kChapterWalked;
 	int32 reported = 0;
-	CollectHitsInDoc(docRef, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions, detail,
-		outHits, capped, result, nil, 0, 0, 1, reported);
+	CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit),
+		scopeOptions, detail, outHits, capped, result, nil, 0, 0, 1, reported, storyRef);
 	return result == kChapterWalked;
 }
 

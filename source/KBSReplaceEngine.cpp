@@ -1030,8 +1030,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // ***** DOES THE CHAPTER STILL HOLD WHAT ITS TICKED ROWS DESCRIBE? (2026-08-10, the user's design) *****
 // The resolve pass asks it of every chapter before a character is written. Every ticked row carries the
 // place its match stands at - where the search found it, carried past every change KBS has made since -
-// and this walks the chapter the way the search walked it (the same scope, the same options, from the
-// top), asking two things of every ticked row:
+// and this walks every story that holds one the way the writing walk will (WalkStoryReplacing: the same
+// story scope, the same options, from the top of the story), asking two things of every ticked row:
 //   - is its text still the text that was ticked (MatchIsSameOccurrence - the jump's own test: the same
 //     length and the same characters, the whole match as one hash), and
 //   - does a match of the walk still BEGIN where it does (the same story, the same index)?
@@ -1055,6 +1055,12 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // The END of a match is not compared against the walk: the writing walk asks the length as well, and a
 // ticked row whose match now runs longer or shorter is left there and reported missing, never written.
 //
+// ***** STORY BY STORY, AS THE WRITING WALK GOES (2026-09-29, the official-terms audit A-1). ***** It walked
+// the whole chapter (QueryDocumentWalkerScope) until then - every story, the ones with nothing ticked in
+// them too - where the walk that writes goes one ticked story at a time (QueryStoryWalkerScope). A row is
+// found by its place now, not by how many matches came before it, so the stories with no ticked row have
+// nothing to say; and asking with the writing walk's own scope means what is checked is what will be met.
+//
 // A walk that cannot START (no database, no options, no walker, no scope) answers false - nothing was
 // compared, and the writing walk meets the same failure and stops the whole run ("the text walker could
 // not be started"). A walk that starts and then breaks off answers true through the ticked rows it never
@@ -1073,12 +1079,12 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	if (db == nil)
 		return false;
 
-	// Where the ticked rows start: (story, start) -> how many of them start there (a zero-width GREP match
-	// and a wider one can share a start). A ticked row whose story is gone, whose text is not the text that
-	// was ticked, or whose identity cannot be read is a change like any other - "cannot tell" is not good
-	// enough to rewrite the user's text on.
-	std::map<std::pair<UID, TextIndex>, int32> waiting;
-	int32 waitingCount = 0;
+	// Where the ticked rows start, story by story: story -> (start -> how many of them start there - a
+	// zero-width GREP match and a wider one can share a start). A ticked row whose story is gone, whose text
+	// is not the text that was ticked, or whose identity cannot be read is a change like any other -
+	// "cannot tell" is not good enough to rewrite the user's text on.
+	std::map<UID, std::map<TextIndex, int32> > waiting;
+	std::map<UID, int32> waitingInStory;
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
 	for (int32 i = 0; i < hitCount; ++i)
 	{
@@ -1093,10 +1099,10 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 			|| !db->IsValidUID(story)
 			|| !KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), start, end, story, start, end, hash))
 			return true;
-		++waiting[std::make_pair(story, start)];
-		++waitingCount;
+		++waiting[story][start];
+		++waitingInStory[story];
 	}
-	if (waitingCount == 0)
+	if (waiting.empty())
 		return false;
 
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
@@ -1107,58 +1113,65 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	if (opts == nil || walker == nil)
 		return false;
 
-	// Always a fresh walk from the top of the chapter - the starting point the search had.
-	if (walker->IsWalking())
-		walker->Halt();
-	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions));
-	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
-	if (scope == nil || client == nil)
-		return false;
-	walker->Initialize(client, scope, opts, nil);
-
-	// ***** EVERY EXIT PAST Initialize HALTS. ***** A walker left walking is not merely untidy: it comes
-	// from the session's service registry, and the next caller that guards its own Initialize with
-	// IsWalking CONTINUES it - which is what InDesign's own Find/Change does (SnpFindAndReplace.cpp:772).
-	// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt). The refusal in
-	// the walk below was first written without one (2026-08-10), and it is the likeliest exit of all:
-	// editing the document between the search and the replace is the ordinary way a run ends here.
-	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
-	if (selUtils == nil)
+	for (std::map<UID, std::map<TextIndex, int32> >::iterator s = waiting.begin(); s != waiting.end(); ++s)
 	{
+		// A fresh walk from the top of the story - the scope and the starting point the writing walk has.
 		if (walker->IsWalking())
 			walker->Halt();
-		return false;
-	}
+		InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(UIDRef(db, s->first), scopeOptions));
+		InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+		if (scope == nil || client == nil)
+			return false;
+		walker->Initialize(client, scope, opts, nil);
 
-	// Required critical section around text-walker selection changes, held for the whole chapter - the
-	// same deliberate departure from Adobe's examples that KBSSearchEngine explains: its contents are the
-	// keyboard-focus hand-off (spellpanel names it in SpellCheckWalker.cpp:85), so entering it per match
-	// would run that dance once per match.
-	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
-
-	// How the walk moves forward is the walker's business alone: each find advances it to the next match,
-	// as the official loop runs it (SnpFindAndReplace), and the walk ends when every ticked row has been met,
-	// when the find says there is nothing more - or when it breaks off (kFailure), which leaves the rows it
-	// never reached waiting. The story as well as the index: an index means nothing without its story.
-	while (waitingCount > 0)
-	{
-		UIDRef story;
-		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-		if (RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end) != IFindChangeService::kSuccess)
-			break;
-		const std::map<std::pair<UID, TextIndex>, int32>::iterator here =
-			waiting.find(std::make_pair(story.GetUID(), start));
-		if (here != waiting.end() && here->second > 0)
+		// ***** EVERY EXIT PAST Initialize HALTS. ***** A walker left walking is not merely untidy: it comes
+		// from the session's service registry, and the next caller that guards its own Initialize with
+		// IsWalking CONTINUES it - which is what InDesign's own Find/Change does (SnpFindAndReplace.cpp:772).
+		// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt). The refusal in
+		// the walk below was first written without one (2026-08-10), and it is the likeliest exit of all:
+		// editing the document between the search and the replace is the ordinary way a run ends here.
+		InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
+		if (selUtils == nil)
 		{
-			--here->second;
-			--waitingCount;
+			if (walker->IsWalking())
+				walker->Halt();
+			return false;
 		}
+
+		int32& left = waitingInStory[s->first];
+		{
+			// Required critical section around text-walker selection changes, held for the whole story - the
+			// same deliberate departure from Adobe's examples that KBSSearchEngine explains: its contents are
+			// the keyboard-focus hand-off (spellpanel names it in SpellCheckWalker.cpp:85), so entering it per
+			// match would run that dance once per match.
+			const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+
+			// How the walk moves forward is the walker's business alone: each find advances it to the next
+			// match, as the official loop runs it (SnpFindAndReplace), and the walk ends when every ticked row
+			// of the story has been met, when the find says there is nothing more - or when it breaks off
+			// (kFailure), which leaves the rows it never reached waiting.
+			while (left > 0)
+			{
+				UIDRef story;
+				TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+				if (RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end) != IFindChangeService::kSuccess)
+					break;
+				const std::map<TextIndex, int32>::iterator here = s->second.find(start);
+				if (story.GetUID() == s->first && here != s->second.end() && here->second > 0)
+				{
+					--here->second;
+					--left;
+				}
+			}
+		}
+		if (walker->IsWalking())
+			walker->Halt();
+		// A ticked row the walk never reached is as much a change as one that moved: the match the results
+		// promise is not there to be replaced.
+		if (left > 0)
+			return true;
 	}
-	if (walker->IsWalking())
-		walker->Halt();
-	// A ticked row the walk never reached is as much a change as one that moved: the match the results
-	// promise is not there to be replaced.
-	return waitingCount > 0;
+	return false;
 }
 
 // A SECOND shape lived here from 2026-08-03 to 2026-08-05: ReplaceChapterByChapter ran a SAVING
@@ -2896,9 +2909,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		outStatus = "Reject Change: InDesign would not start a command sequence - nothing was changed.";
 		return false;
 	}
-	PMString name("Reject Change");
-	name.SetTranslatable(kFalse);
-	sequence->SetName(name);
+	sequence->SetName(KBSLoc::Text(kKBSRejectStepKey, KBSJa::kRejectStep));	// English on every UI until 2026-09-29
 	std::vector<int32> taken;		// every row taken back; others[row] follows where its original text stands
 	PMString why;
 	bool ok = true;
@@ -3116,9 +3127,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 		outStatus = "Accept All Changes: InDesign would not start a command sequence - nothing was changed.";
 		return false;
 	}
-	PMString name("Accept All Changes");
-	name.SetTranslatable(kFalse);
-	sequence->SetName(name);
+	sequence->SetName(KBSLoc::Text(kKBSAcceptAllStepKey, KBSJa::kAcceptAllStep));	// English on every UI until 2026-09-29
 	PMString why;
 	why.SetTranslatable(kFalse);
 	const int32 accepted = KBSTrackChange::AcceptAllInDocument(db, why);

@@ -544,6 +544,10 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // What Edit > Undo calls a Change Checked run (2026-09-26, the user's call: "Replace"; Japanese UI
 // through KBSJa::kReplaceStep). See the sequence in KBSReplaceEngine::ReplaceChecked for why it is named.
 #define kKBSReplaceStepKey			kKBSStringPrefix "kKBSReplaceStepKey"
+// ...and what it calls a Reject Change and an Accept All Changes in This Document (2026-09-29: English on
+// every UI until then, beside a Replace that was translated).
+#define kKBSRejectStepKey			kKBSStringPrefix "kKBSRejectStepKey"
+#define kKBSAcceptAllStepKey		kKBSStringPrefix "kKBSAcceptAllStepKey"
 // (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
 //  the alert states the outcome in one sentence and the status line carries what to do next.)
 // (kKBSConfirmUnsavedKey, kKBSConfirmCareKey and the Glyph tab confirmation's labels -

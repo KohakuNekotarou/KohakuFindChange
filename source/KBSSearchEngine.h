@@ -25,7 +25,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
-#include "KBSResultModel.h"		// Hit - CollectDocHits fills them
+#include "KBSResultModel.h"		// Hit - CollectStoryHits fills them
 
 #include <vector>
 
@@ -393,7 +393,7 @@ namespace KBSSearchEngine
 	    twice, until 2026-09-28.) */
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** How much of each match CollectDocHits fills in. A walk costs the same whatever is asked for;
+	/** How much of each match CollectStoryHits fills in. A walk costs the same whatever is asked for;
 	    what differs is how much is then read about every match it lands on. (A kHitPlace - the story
 	    and range alone, for numbering the rows again - went with that numbering on 2026-09-29.) */
 	enum HitDetail
@@ -404,12 +404,14 @@ namespace KBSSearchEngine
 							// words - a search's row
 	};
 
-	/** Every match of the current query in one open document, as the search walks them (not yet in
-	    page order), with the given scope switches, each filled in as far as 'detail' says. For a row
-	    a jump found out of place, looked for again (KBSJump.cpp, RelocateStaleRow - kHitPlaceAndText).
-	    The walk is the search's own. Read-only (the walk's own dirty guard). False = the document
-	    could not be walked. */
-	bool CollectDocHits(const UIDRef& docRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
+	/** Every match of the current query in one story of an open document, as the search's walk meets
+	    them there, with the given scope switches, each filled in as far as 'detail' says. For a row a
+	    jump found out of place, looked for again (KBSJump.cpp, RelocateStaleRow - kHitPlaceAndText).
+	    The story scope is the one the replace's walks take (IWalkerScopeFactoryUtils::
+	    QueryStoryWalkerScope). Read-only (the walk's own dirty guard). False = it could not be walked.
+	    (It was CollectDocHits, over the whole document, until 2026-09-29: the one caller left looks in
+	    one story.) */
+	bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
 		std::vector<KBSResultModel::Hit>& outHits);
 
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
