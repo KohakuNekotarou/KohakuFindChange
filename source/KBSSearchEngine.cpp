@@ -2016,6 +2016,48 @@ uint64 KBSSearchEngine::HashMatchText(const UIDRef& storyRef, TextIndex start, T
 	return HashRangeWithScanner(scanner, start, end);
 }
 
+bool KBSSearchEngine::RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db)
+{
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	KBSResultModel::RowDisplay row;
+	if (db == nil || !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash)
+		|| !KBSResultModel::GetHitRow(chapterIdx, hitIdx, row)
+		|| story == kInvalidUID || !db->IsValidUID(story))
+		return false;
+	const UIDRef storyRef(db, story);
+	// ***** INSIDE THE STORY, before anything reads it. ***** The line's reading asks the scanner for the
+	// paragraph around `start` and does not bound the position itself (SplitLineWithScanner), and a stale
+	// place can lie past a story that has since grown shorter. A place at the very end (after the story's
+	// last return) has no paragraph around it and no match can stand there.
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil)
+		return false;
+	const TextIndex total = model->TotalLength();
+	if (start < 0 || start >= total || end < start || end > total)
+		return false;
+	// the whole match, by its hash (a zero-width row passes here - the line below is its only test)
+	if (!MatchIsSameOccurrence(storyRef, start, end, story, start, end, hash))
+		return false;
+	// ...and the line around it, read the way the search read it
+	KBSResultModel::Hit read;
+	ReadHitText(storyRef, start, end, read);
+	return read.preText == row.preText && read.matchText == row.matchText && read.postText == row.postText;
+}
+
+bool KBSSearchEngine::ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion)
+{
+	// IsValidUID first: a story an earlier replace deleted (an anchored frame's) must not be instantiated.
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
+		return false;
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	if (model == nil)
+		return false;
+	outVersion = model->GetChangeCount();
+	return true;
+}
+
 int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 {
 	outSummary.Clear();
@@ -2410,10 +2452,27 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// it, that ordinary close was counted as "left open with no window" about a chapter that is
 		// not open at all (the scans counted exactly that until 2026-08-08).
 		// (A KBSEditStamp::CapturePending stood here from 2026-08-08 to 2026-08-10, reading every
-		//  story's change counter before the release below closed the chapter. The replace no
-		//  longer asks whether a chapter LOOKS the same - it walks it again and checks that each
-		//  ticked hit still begins where this search left it, which is the same question answered
-		//  by the thing it is actually about. Nothing needs recording here now.)
+		//  story's change counter before the release below closed the chapter, so the replace could WARN
+		//  about an edited chapter in place of walking it. The replace walks it again and checks each
+		//  ticked hit where this search left it - and since 2026-09-29 it ALSO asks the counter, as a door
+		//  beside the walk rather than instead of it: below.)
+		//
+		// ***** EVERY STORY'S VERSION, WHILE THE CHAPTER IS STILL OPEN (2026-09-29, the defect re-check
+		// ***** F-2). ***** ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what
+		// the replace compares before it writes, so a story moved since without KBS (typing, Ctrl+Z) is not
+		// written to. Read in front of the release below, which closes a chapter this search opened.
+		std::map<UID, uint32> storyVersions;
+		{
+			IDataBase* const chapterDB = chapterDocRef.GetDataBase();
+			for (size_t h = 0; h < hits.size(); ++h)
+			{
+				const UID story = hits[h].storyUID;
+				uint32 version = 0;
+				if (storyVersions.count(story) == 0 && KBSSearchEngine::ReadStoryVersion(chapterDB, story, version))
+					storyVersions[story] = version;
+			}
+		}
+
 		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
 		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
 			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
@@ -2465,6 +2524,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		chapter.docRef = targets[i].docRef;
 		chapter.file = targets[i].file;
 		chapter.hits.swap(hits);
+		chapter.storyVersions.swap(storyVersions);
 		const int32 chapterHitCount = static_cast<int32>(chapter.hits.size());
 		total += chapterHitCount;
 		++chaptersWithHits;

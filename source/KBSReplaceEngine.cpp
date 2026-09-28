@@ -181,6 +181,11 @@ struct PendingChapter
 	// counted the chapter's rows over again.
 	int32	checkedCount;
 
+	// The chapter's row stories at the version KBS last recorded when the run began (2026-09-29, the defect
+	// re-check F-2) - the ones that take their new version if the run goes through (NoteStoryVersions). A
+	// ticked row's story is always among them, or the run would not have started (ChapterMovedUnderRows).
+	std::set<UID>	storiesAsLeft;
+
 	PendingChapter() : chapterIdx(-1), opened(false), wasModified(false), tookReplacement(false),
 		checkedCount(0) {}
 };
@@ -790,8 +795,68 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 			return true;
 		return KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
 	}
-	return haveIdentity
-		&& KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), a, b, story, a, b, hash);
+	// The match AND the line around it (2026-09-29, the defect re-check F-2): a row an Undo left on another
+	// occurrence of its own text passed the match's hash alone, and was then read back THERE - from then on
+	// it described that other occurrence, with a line to match (KBSSearchEngine::RowReadsAsFound).
+	return KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db);
+}
+
+// ======================================================================================================
+// ***** A STORY'S VERSION (2026-09-29, the defect re-check F-2 - the user's call: "safety first"). ***** A
+// row's place is carried past every change KBS makes and past nothing else: typing, Ctrl+Z / Ctrl+Shift+Z,
+// the Track Changes panel or a script can move the text under it, and the place can then stand on ANOTHER
+// occurrence of the same text, which the match's hash cannot tell apart ("catcatcatcat", row 1 replaced
+// from its menu, Ctrl+Z: rows 2 and 3 were left on the third and fourth "cat", and a Change Checked wrote
+// there). InDesign keeps a version of every story (ITextModel::GetChangeCount - moved by any change to its
+// text, attributes, tables or inlines, and moved BACK by Undo to exactly the value it had): the search
+// records it for every story holding a hit, each change KBS makes records the new one, and nothing is
+// written to a story whose version is not the one recorded. The price, accepted: an edit ANYWHERE in such
+// a story between the search and the replace means searching again.
+// ======================================================================================================
+
+// Is the story at the version KBS last recorded for it? Nothing recorded, or unreadable, answers no.
+bool StoryAsKBSLeftIt(int32 chapterIdx, IDataBase* db, UID story)
+{
+	uint32 recorded = 0, now = 0;
+	return KBSResultModel::GetStoryVersion(chapterIdx, story, recorded)
+		&& KBSSearchEngine::ReadStoryVersion(db, story, now) && recorded == now;
+}
+
+// The stories holding a row of the chapter.
+void StoriesOfRows(int32 chapterIdx, std::set<UID>& out)
+{
+	out.clear();
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		UID story = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 hash = 0;
+		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) && story != kInvalidUID)
+			out.insert(story);
+	}
+}
+
+// Of `stories`, the ones at the version KBS last recorded - asked BEFORE a change of KBS's own, so that
+// only those take their new version after it (NoteStoryVersions). A story that had already moved without
+// KBS keeps the version it had: taking its new one would vouch for rows nobody has looked at since.
+void StoriesAsKBSLeftThem(int32 chapterIdx, IDataBase* db, const std::set<UID>& stories, std::set<UID>& out)
+{
+	out.clear();
+	for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+		if (StoryAsKBSLeftIt(chapterIdx, db, *s))
+			out.insert(*s);
+}
+
+// After a change KBS made and kept: the stories it found as it had left them take their version now.
+void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& stories)
+{
+	for (std::set<UID>::const_iterator s = stories.begin(); s != stories.end(); ++s)
+	{
+		uint32 now = 0;
+		if (KBSSearchEngine::ReadStoryVersion(db, *s, now))
+			KBSResultModel::SetStoryVersion(chapterIdx, *s, now);
+	}
 }
 
 // ***** THE CHAPTER'S REPLACE (2026-09-27). ***** Every ticked row is written by the walk of its story,
@@ -1043,7 +1108,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // The resolve pass asks it of every chapter before a character is written. Every ticked row carries the
 // place its match stands at - where the search found it, carried past every change KBS has made since -
 // and this walks every story that holds one the way the writing walk will (WalkStoryReplacing: the same
-// story scope, the same options, from the top of the story), asking two things of every ticked row:
+// story scope, the same options, from the top of the story), asking two things of every ticked row (three
+// since the evening of 2026-09-29 - the story's version came in front of them, and the line joined the
+// text: "THREE QUESTIONS" below):
 //   - is its text still the text that was ticked (MatchIsSameOccurrence - the jump's own test: the same
 //     length and the same characters, the whole match as one hash), and
 //   - does a match of the walk still BEGIN where it does (the same story, the same index)?
@@ -1059,13 +1126,19 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 //     "123" edited to "456"), with as many matches before it as there were, passed the count and was
 //     WRITTEN - text nobody ticked. The text is asked now, and the run stops;
 //   - a match added or removed somewhere before a ticked row, the row itself untouched, failed the count
-//     and stopped the run. It goes through now: what is written is what was ticked, where it was.
+//     and stopped the run. It went through from then: what is written is what was ticked, where it was.
+//     ! WRONG AS AN OCCURRENCE, found the same evening (the defect re-check F-2): "where it was" is an
+//     index, and an edit KBS did not see (above all Ctrl+Z) can leave that index on ANOTHER occurrence of
+//     the same text, which place and text pass and the count used to stop. Hence the story's version and
+//     the row's line, asked first (below) - and now any edit in the story stops the run, as the count did
+//     and more.
 // The numbers also had to be kept up: every row menu's Replace and Reject walked the whole chapter again
 // to number the rows afresh (RenumberWalkOrders, 2026-09-27 to 2026-09-29) - a Reject's walk with no tab
 // stated, so a Reject made with the dialog on another tab numbered the rows by that tab's matches.
 //
-// The END of a match is not compared against the walk: the writing walk asks the length as well, and a
-// ticked row whose match now runs longer or shorter is left there and reported missing, never written.
+// (The END of a match was not compared against the walk until the evening of 2026-09-29 - the writing walk
+// asks the length, and left a row whose match ran longer or shorter as missing. It is compared now, so such
+// a row stops the run before anything is written.)
 //
 // ***** STORY BY STORY, AS THE WRITING WALK GOES (2026-09-29, the official-terms audit A-1). ***** It walked
 // the whole chapter (QueryDocumentWalkerScope) until then - every story, the ones with nothing ticked in
@@ -1082,7 +1155,22 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // (Until 2026-09-28 this was ReplaceInChapter(..., verifyOnly = true) - the one-at-a-time chapter walk
 // that wrote until 2026-09-26, with a mode that wrote nothing. Only that mode was still called, and the
 // writing half went on 2026-09-28: git history, 8bf650d and before.)
-bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions)
+//
+// ***** THREE QUESTIONS SINCE THE EVENING OF 2026-09-29 (the defect re-check F-2, the user's call: "safety
+// ***** first"), EACH ONE ENOUGH TO STOP THE RUN. ***** "Place and text" alone (the morning's W-1) passed a
+// row an Undo or the user's typing had left on ANOTHER occurrence of its own text - "catcatcatcat", row 1
+// replaced from its menu, Ctrl+Z, rows 2 and 3 ticked: both stood on the next "cat", and were written
+// there - where the count it replaced had stopped (a match came back in front of them). So, for every row:
+//   1. its STORY is at the version KBS last recorded for it (StoryAsKBSLeftIt - ITextModel::GetChangeCount,
+//      which Undo moves back): any change KBS did not make, anywhere in the story, stops the run;
+//   2. the row still READS as it was found - the whole match AND the line around it
+//      (KBSSearchEngine::RowReadsAsFound), for a version that has come back to the same number;
+//   3. the walk meets a match with the row's start AND its length (the length was left to the writing
+//      walk, which reported such a row missing after writing the others, until then).
+// `onlyRows` = the rows a row menu's Replace is about to write (ReplaceRowsNow asks the same three since
+// 2026-09-29 - it asked the match's hash alone); nil = Change Checked's work, every ticked row.
+bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	const std::set<int32>* onlyRows = nil)
 {
 	// The DATABASE first, the way the search asks it (KBSSearchEngine's CollectHitsInDoc). It is NOT a
 	// liveness test - a UIDRef carries the IDataBase* itself, and "is this document still open?" has one
@@ -1091,27 +1179,33 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	if (db == nil)
 		return false;
 
-	// Where the ticked rows start, story by story: story -> (start -> how many of them start there - a
-	// zero-width GREP match and a wider one can share a start). A ticked row whose story is gone, whose text
-	// is not the text that was ticked, or whose identity cannot be read is a change like any other -
-	// "cannot tell" is not good enough to rewrite the user's text on.
-	std::map<UID, std::map<TextIndex, int32> > waiting;
+	// Where the rows stand, story by story: story -> ((start, end) -> how many of them stand there - a
+	// zero-width GREP match and a wider one can share a start). A row whose story is gone or has moved
+	// without KBS, whose text or line is not the one that was ticked, or whose identity cannot be read is a
+	// change like any other - "cannot tell" is not good enough to rewrite the user's text on.
+	std::map<UID, std::map<std::pair<TextIndex, TextIndex>, int32> > waiting;
 	std::map<UID, int32> waitingInStory;
+	std::map<UID, bool> storyAsLeft;		// the version question, asked once per story
 	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
 	for (int32 i = 0; i < hitCount; ++i)
 	{
 		// A report's own rows keep their ticks, and a report can run a Change Checked on its taken-back
 		// rows (2026-09-27, B): work is what ReplaceInChapterOneByOne writes, by the same rule.
-		if (!KBSResultModel::IsHitCheckedWork(chapterIdx, i))
+		const bool asked = (onlyRows != nil) ? (onlyRows->count(i) != 0) : KBSResultModel::IsHitCheckedWork(chapterIdx, i);
+		if (!asked)
 			continue;
 		UID story = kInvalidUID;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
 		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, start, end, hash)
-			|| !db->IsValidUID(story)
-			|| !KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), start, end, story, start, end, hash))
+			|| story == kInvalidUID || !db->IsValidUID(story))
 			return true;
-		++waiting[story][start];
+		std::map<UID, bool>::const_iterator known = storyAsLeft.find(story);
+		const bool asLeft = (known != storyAsLeft.end())
+			? known->second : (storyAsLeft[story] = StoryAsKBSLeftIt(chapterIdx, db, story));
+		if (!asLeft || !KBSSearchEngine::RowReadsAsFound(chapterIdx, i, db))
+			return true;
+		++waiting[story][std::make_pair(start, end)];
 		++waitingInStory[story];
 	}
 	if (waiting.empty())
@@ -1125,7 +1219,7 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	if (opts == nil || walker == nil)
 		return false;
 
-	for (std::map<UID, std::map<TextIndex, int32> >::iterator s = waiting.begin(); s != waiting.end(); ++s)
+	for (std::map<UID, std::map<std::pair<TextIndex, TextIndex>, int32> >::iterator s = waiting.begin(); s != waiting.end(); ++s)
 	{
 		// A fresh walk from the top of the story - the scope and the starting point the writing walk has.
 		if (walker->IsWalking())
@@ -1168,7 +1262,8 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 				TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 				if (RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end) != IFindChangeService::kSuccess)
 					break;
-				const std::map<TextIndex, int32>::iterator here = s->second.find(start);
+				// the row's start AND its length (the end was not compared until 2026-09-29 - see above)
+				const std::map<std::pair<TextIndex, TextIndex>, int32>::iterator here = s->second.find(std::make_pair(start, end));
 				if (story.GetUID() == s->first && here != s->second.end() && here->second > 0)
 				{
 					--here->second;
@@ -2038,6 +2133,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			changedChapterIdx = ci;
 			break;
 		}
+		// ...and which of the chapter's row stories are as KBS left them: those, and only those, take
+		// their new version if the run goes through (2026-09-29, the defect re-check F-2).
+		{
+			std::set<UID> rowStories;
+			StoriesOfRows(ci, rowStories);
+			StoriesAsKBSLeftThem(ci, docRef.GetDataBase(), rowStories, chapter.storiesAsLeft);
+		}
 	}
 
 	// ASK ONCE MORE, now that the pass is over: the reading at the top only ever sees a cancel that
@@ -2414,6 +2516,17 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	}
 	KBSResultModel::ForgetRowBackup();
 
+	// ***** THE STORIES WRITTEN TO TAKE THEIR NEW VERSION (2026-09-29, the defect re-check F-2). ***** In each
+	// chapter a replacement landed in, the row stories that were as KBS had left them when the run began -
+	// so the next Replace, Reject or Change Checked finds them at the version it knows. A chapter nothing
+	// landed in keeps what it had: it is handed back below, closed with its file as it was. BEFORE
+	// KeepCheckedRows, which renumbers the chapters these indices name.
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+	{
+		if (pending[pi].tookReplacement)
+			NoteStoryVersions(pending[pi].chapterIdx, pending[pi].docRef.GetDataBase(), pending[pi].storiesAsLeft);
+	}
+
 	// NOTHING IS SAVED. Every chapter a replacement LANDED in stays open and unsaved, and the summary
 	// tells the user to deal with it - saving is the only thing that would make such a chapter safe to
 	// close, and "save after replace" went on 2026-08-05 (the header says why).
@@ -2611,22 +2724,33 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		~WindowAfter() { if (want) (void)KBSBookScope::ShowChapterWindow(doc); }
 	} windowAfter(docRef, KBSBookScope::IsHeldDoc(docRef));
 	IDataBase* const db = docRef.GetDataBase();
+	WalkerScopeOptions scopeOptions;
+	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
+	// ***** CHANGE CHECKED'S OWN CHECK, OVER THESE ROWS (2026-09-29, the defect re-check F-2). ***** Each row's
+	// story at the version KBS last recorded, the row still reading as it was found - match and line - and
+	// a match of the walk at its start and length (ChapterMovedUnderRows). It asked the match's hash alone
+	// until then: a row an Undo had left on the next occurrence of its own text was written there.
+	// Forward, like the search - the scope at the head of this function.
+	if (ChapterMovedUnderRows(chapterIdx, docRef, scopeOptions, &rowsToReplace))
+	{
+		outStatus = "Replace: the text of ";
+		outStatus.Append((rowsToReplace.size() == 1) ? "this row" : "a row of this ");
+		if (rowsToReplace.size() != 1)
+			outStatus.Append(unit);
+		outStatus.Append(" has changed since the search (edited, or undone) - search again.");
+		return false;
+	}
+	// The stories this writes to - every one at the version on record, as the check has just said - take
+	// their new version once it has gone through (NoteStoryVersions, below).
+	std::set<UID> writtenStories;
 	for (std::set<int32>::const_iterator r = rowsToReplace.begin(); r != rowsToReplace.end(); ++r)
 	{
 		UID story = kInvalidUID;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
-		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, *r, story, start, end, hash)
-			|| !KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), start, end, story, start, end, hash))
-		{
-			outStatus = (rowsToReplace.size() == 1)
-				? "Replace: the text of this row has changed since the search - search again."
-				: "Replace: the text of a row of this story has changed since the search - search again.";
-			return false;
-		}
+		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, *r, story, start, end, hash))
+			writtenStories.insert(story);
 	}
-	WalkerScopeOptions scopeOptions;
-	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 
 	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, accepted = 0;
 	bool walkFailed = false, cancelled = false, failed = false;
@@ -2677,6 +2801,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		return false;
 	}
 	KBSResultModel::ForgetRowBackup();
+	NoteStoryVersions(chapterIdx, db, writtenStories);	// the next Replace / Reject finds them as KBS left them
 	windowAfter.want = true;		// written to: it has to be seen and saved (a no-op when it has a window)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
@@ -2919,6 +3044,17 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 
 	std::vector<RowNow> others;		// every row as "this far into its thread", carried past each change
 	SnapshotRows(chapterIdx, db, others);
+	// The stories taken back in that were as KBS left them take their new version afterwards (2026-09-29,
+	// the defect re-check F-2). A reject finds its records by their time, whatever moved the text - but one
+	// that had moved without KBS keeps its old version, so the rows nobody has looked at since are not
+	// vouched for by this.
+	std::set<UID> asLeft;
+	{
+		std::set<UID> rejectedIn;
+		for (size_t r = 0; r < plans.size(); ++r)
+			rejectedIn.insert(plans[r].story.GetUID());
+		StoriesAsKBSLeftThem(chapterIdx, db, rejectedIn, asLeft);
+	}
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -2991,6 +3127,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		outStatus.Append(" - the reject was cancelled and the document is as it was.");
 		return false;
 	}
+	NoteStoryVersions(chapterIdx, db, asLeft);
 
 	// every other row where the text has taken it, then the rows taken back where their original text stands
 	std::vector<bool> isTaken(others.size(), false);
@@ -3145,6 +3282,14 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	IDataBase* const db = docRef.GetDataBase();
 	std::vector<RowNow> rows;
 	SnapshotRows(chapterIdx, db, rows);
+	// The row stories that were as KBS left them take their new version afterwards (2026-09-29, the defect
+	// re-check F-2): accepting moves a story's version, and one that had moved without KBS keeps its old one.
+	std::set<UID> asLeft;
+	{
+		std::set<UID> rowStories;
+		StoriesOfRows(chapterIdx, rowStories);
+		StoriesAsKBSLeftThem(chapterIdx, db, rowStories, asLeft);
+	}
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3168,6 +3313,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 		return false;
 	}
 	WriteBackRows(chapterIdx, db, rows, std::vector<bool>(), kRangeOnly);
+	NoteStoryVersions(chapterIdx, db, asLeft);
 	// ***** OURS ONLY, AND THE HIDDEN ONES SAID (2026-09-29, the user's call). ***** The records signed
 	// "KohakuFindChange" - everybody else's changes stay (until then: every change in the document, as
 	// InDesign's own Accept All). The numbers come first: a status line cut short cuts its end.
@@ -3229,11 +3375,9 @@ static void RowsToRedo(int32 chapterIdx, const std::vector<int32>& rows, IDataBa
 		if (KBSResultModel::GetHitOutcome(chapterIdx, rows[k]) != KBSResultModel::kOutcomeRejected
 			|| !KBSReplaceEngine::CanReplaceHit(chapterIdx, rows[k]))
 			continue;
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 hash = 0;
-		if (db == nil || (KBSResultModel::GetHitMatchIdentity(chapterIdx, rows[k], story, a, b, hash)
-			&& KBSSearchEngine::MatchIsSameOccurrence(UIDRef(db, story), a, b, story, a, b, hash)))
+		// the match and its line (RowReadsAsFound, 2026-09-29 - the match's hash alone until then); the
+		// story's version is asked by the Replace this hands the rows to (ReplaceRowsNow)
+		if (db == nil || KBSSearchEngine::RowReadsAsFound(chapterIdx, rows[k], db))
 		{
 			outFit.insert(rows[k]);
 			if (firstOnly)

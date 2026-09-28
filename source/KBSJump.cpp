@@ -820,13 +820,11 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// asking it about a long GREP match only ever compared its first stretch (2026-08-04). The story,
 	// position and length arms are all trivially satisfied here - this side asks about the very
 	// range the row recorded - so what does the work is the hash.
-	UID expectStory = kInvalidUID;
-	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
-	uint64 expectHash = 0;
-	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
-		expectHash);
-	bool sameOccurrence = KBSSearchEngine::MatchIsSameOccurrence(
-		storyRef, start, end, storyUID, start, end, expectHash);
+	// ***** AND THE LINE AROUND IT (2026-09-29, the defect re-check F-2): KBSSearchEngine::RowReadsAsFound.
+	// ***** An Undo can leave a row's place on another occurrence of its own text, which the hash passes -
+	// the jump then marked, and a double click selected, the wrong one. The line tells them apart, and a row
+	// that fails it is looked for again below (RelocateStaleRow asks the same line of its candidates).
+	bool sameOccurrence = KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db);
 	// ...and when it is not, the row may only have been left behind by Undo / Redo (RelocateStaleRow).
 	if (!sameOccurrence && RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
 	{
@@ -1136,23 +1134,17 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// over. So this one refuses. The jump has already put its own message up in this case; this adds
 	// nothing and would only overwrite it.
 	//
-	// ! THE HASH IS THE ONLY ARM THAT DOES ANY WORK HERE, and the three values above it are fetched
-	//   only because GetHitMatchIdentity hands all four back together. This side asks about the very
-	//   range the row recorded - so the story, position and length arms of MatchIsSameOccurrence
-	//   compare the recorded values against themselves and are trivially satisfied. What can still
-	//   differ is the TEXT at that range, which is what the hash carries. (The row's drawn match
-	//   string cannot answer it: that is capped for drawing, so it only ever compared the
-	//   first stretch of a long GREP match - 2026-08-04.) JumpToHit makes the identical call for the
-	//   identical reason; this note is its twin, added 2026-08-09 because without it the three unused
-	//   locals read as an oversight. (It named JumpToHit's line numbers until 2026-08-10, by which
-	//   time they were pointing eleven lines short of the call - a function name cannot go stale.)
-	UID expectStory = kInvalidUID;
-	TextIndex expectStart = kInvalidTextIndex, expectEnd = kInvalidTextIndex;
-	uint64 expectHash = 0;
-	KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, expectStory, expectStart, expectEnd,
-		expectHash);
-	if (!KBSSearchEngine::MatchIsSameOccurrence(storyRef, start, end, storyUID, start, end,
-			expectHash))
+	// ! THE HASH DID THE WORK HERE until 2026-09-29. This side asks about the very range the row
+	//   recorded - so the story, position and length arms of MatchIsSameOccurrence compare the recorded
+	//   values against themselves and are trivially satisfied. What can still differ is the TEXT at that
+	//   range, which is what the hash carries. (The row's drawn match string cannot answer it: that is
+	//   capped for drawing, so it only ever compared the first stretch of a long GREP match -
+	//   2026-08-04.) JumpToHit makes the identical call for the identical reason. (Three locals fetched
+	//   for the call's arguments stood above it, with a note so they did not read as an oversight.)
+	// ***** AND THE LINE AROUND THE MATCH SINCE 2026-09-29 (the defect re-check F-2): RowReadsAsFound, the
+	// ***** jump's own test above. ***** An Undo can leave a row's place on another occurrence of its own
+	// text, which the hash passes - and this would hand the user a selection over it, ready to type over.
+	if (!KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db))
 	{
 		// The jump a moment ago looks for a row left behind by Undo / Redo; a caller that came here
 		// another way gets the same chance (RelocateStaleRow).

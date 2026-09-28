@@ -652,6 +652,25 @@ void KBSResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 	gChapters[chapterIdx].docRef = newDocRef;
 }
 
+bool KBSResultModel::GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const std::map<UID, uint32>& versions = gChapters[chapterIdx].storyVersions;
+	const std::map<UID, uint32>::const_iterator it = versions.find(story);
+	if (it == versions.end())
+		return false;
+	outVersion = it->second;
+	return true;
+}
+
+void KBSResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	gChapters[chapterIdx].storyVersions[story] = version;
+}
+
 void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
 {
 	outHits.clear();

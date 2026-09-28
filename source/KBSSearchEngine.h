@@ -441,6 +441,8 @@ namespace KBSSearchEngine
 	    user a selection over text they never searched for, and how a row whose text was edited
 	    is not written. (This said "asked from KBSJump and nowhere else" until 2026-09-28, a day
 	    after the replace began asking it again.)
+	    ***** SINCE 2026-09-29 EVERY ONE OF THEM ASKS IT THROUGH RowReadsAsFound (below) *****, which
+	    adds the line around the match (the defect re-check F-2) - the direct calls are gone.
 
 	    The REPLACE asked it until 2026-08-05 too, of every row before writing it, and that is what
 	    the position arm was for. It carried a posDelta alongside - how far the replace pass had
@@ -458,6 +460,39 @@ namespace KBSSearchEngine
 	    the answer is false - the safe answer: when in doubt, do not write. */
 	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
 		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash);
+
+	/** ***** DOES THE ROW STILL READ AS IT WAS FOUND? (2026-09-29, the defect re-check F-2) ***** The
+	    test every door asks before it acts on a row's stored place: MatchIsSameOccurrence over that
+	    place - the whole match, by its hash - AND the line around it: the three drawn segments read
+	    again the way the search read them (ReadHitText, RereadRowText's own reading) and compared with
+	    what the row holds. The line is what RelocateStaleRow already asks of a candidate ("the same text
+	    with the same line around it").
+
+	    Why the line as well: a row's place is carried past every change KBS makes, but never past an
+	    Undo or the user's typing, and after those its stored place can stand on ANOTHER occurrence of
+	    the same text. The match's own hash cannot tell them apart - a one-character query (the particle
+	    U+306E) lands on another match a few per cent of the time in running Japanese, and a zero-width
+	    row has no text for the hash at all. Worked through on paper (not measured): "catcatcatcat", row 1 replaced with
+	    "kitten" from its menu, Ctrl+Z - rows 2 and 3 were left three characters on, standing on the third
+	    and fourth "cat", and a Change Checked of rows 2 and 3 wrote there. (The story's version -
+	    ReadStoryVersion - stops that run first; this is the second guard, for a version that has come
+	    back to the same number.)
+
+	    False when the row, its story or its place cannot be read. Asked by the verify walk, the row
+	    menus' Replace / Redo and RowStillStands (KBSReplaceEngine), and the jump and the double click
+	    (KBSJump). */
+	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
+
+	/** A story's VERSION (2026-09-29, the defect re-check F-2): ITextModel::GetChangeCount - the counter
+	    InDesign moves for every change to the story's text, attributes, tables and inlines
+	    (ITextModel.h, GetChangeCount), and moves BACK on Undo to exactly the value it had (measured
+	    2026-08-08, docs/ai-notes/text-change-counters-2026-08-08.md). The results keep it for every story
+	    holding a row (KBSResultModel::SetStoryVersion), taken where KBS last knew the rows to stand - the
+	    search, and each change of its own - and the replace compares it before anything is written: a
+	    story that moved without KBS knowing (typing, Ctrl+Z, the Track Changes panel, a script) is not
+	    written to (the user's call, 2026-09-29: "safety first", a search again rather than a guess).
+	    False when the story cannot be read (no database, a UID that is not valid, no text model). */
+	bool ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion);
 
 	/** Let go of the module's static storage during InDesign's controlled shutdown, so every static
 	    destructor at DLL unload finds nothing left to do.

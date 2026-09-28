@@ -25,6 +25,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
+#include <map>
 #include <vector>
 
 namespace KBSResultModel
@@ -181,6 +182,9 @@ namespace KBSResultModel
 		IDFile					file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// empty = this chapter has NO font level (Find/Change)
+		// Each story's version (ITextModel::GetChangeCount) where KBS last knew the rows in it to stand
+		// (2026-09-29, the defect re-check F-2) - see GetStoryVersion.
+		std::map<UID, uint32>	storyVersions;
 
 		// A `notReached` flag lived here from 2026-08-03 to 2026-08-05, marking a chapter a cancelled
 		// replace never got to so its row could say "cancelled". Only the chapter-at-a-time path could
@@ -442,6 +446,15 @@ namespace KBSResultModel
 	/** Rebind a chapter's document reference (Task 3): after a closed chapter is reopened at jump
 	    time, later jumps must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
+
+	/** A story's VERSION where KBS last knew the chapter's rows in it to stand (2026-09-29, the defect
+	    re-check F-2): ITextModel::GetChangeCount (KBSSearchEngine::ReadStoryVersion), taken by the search
+	    for every story holding a hit, and taken again by each change KBS makes there - only while the
+	    story was still at the version recorded, so a story that moved without KBS is never written off as
+	    "known" (KBSReplaceEngine). False = nothing recorded (or the index is out of range), which the
+	    replace reads as "cannot vouch for this story" and does not write to. */
+	bool GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion);
+	void SetStoryVersion(int32 chapterIdx, UID story, uint32 version);
 
 	/** Select / deselect one hit for replacement. Ignored for anything the panel draws no check box
 	    on - a hit already replaced (the text it matched is gone), a locked one (InDesign offers no
