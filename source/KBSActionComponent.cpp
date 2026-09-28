@@ -111,6 +111,19 @@ bool RefusedWhileRunning()
 	KBSResultTree::ShowStatus(busy);
 	return true;
 }
+
+// The rows after a row menu's command: repainted in place - or the tree rebuilt, when the command threw
+// the results away. A row / story / document Replace or Redo refused on a changed Find/Change query clears
+// them (KBSReplaceEngine::RefuseChangedQuery, whose caller is to redraw the tree), and RefreshRows repaints
+// only the chapters the model still holds: none, so the old rows stayed drawn and answered nothing until
+// the next search (2026-09-29 defect re-check F-1; the jump had the same fault, B-1, fixed the same day).
+void RedrawAfterRowMenu()
+{
+	if (KBSResultModel::HasRun())
+		KBSResultTree::RefreshRows();
+	else
+		KBSResultTree::Rebuild();
+}
 }
 
 /* KBSActionComponent Constructor
@@ -363,7 +376,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSReplaceEngine::RedoChapter(chapter, status);	// no prompt, like Replace
 			else
 				KBSReplaceEngine::ReplaceChapter(chapter, status);
-			KBSResultTree::RefreshRows();
+			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
 		}
@@ -395,7 +408,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSResultModel::SetGroupChecked(chapter, group, check);
 				status = check ? "This story: all checked." : "This story: all unchecked.";
 			}
-			KBSResultTree::RefreshRows();
+			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
 		}
@@ -415,7 +428,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
 			else
 				KBSReplaceEngine::RejectHit(chapter, hit, status);
-			KBSResultTree::RefreshRows();
+			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
 		}
@@ -432,7 +445,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			PMString status;
 			KBSReplaceEngine::AcceptAllInChapter(chapter, status);
-			KBSResultTree::RefreshRows();
+			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
 		}

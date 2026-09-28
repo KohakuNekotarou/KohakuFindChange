@@ -2568,10 +2568,14 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// Forward, as the search was - outside the sequence below (the walk's direction for a GREP query
 	// holding ^ is turned below, also outside it).
 	KBSForwardSearchScope forward;
+	// A changed query CLEARS the results (RefuseChangedQuery) - the action redraws the tree for it
+	// (KBSActionComponent RedrawAfterRowMenu). The refusal says which of its three answers it was: "the
+	// query changed" stood in front of all three until 2026-09-29, the other tab and a tab that could not
+	// be stated included.
 	PMString refusal;
 	if (KBSReplaceEngine::RefuseChangedQuery(refusal))
 	{
-		outStatus = "Replace: the Find/Change query changed since the search - search again. ";
+		outStatus = "Replace: ";
 		outStatus.Append(refusal);
 		return false;
 	}
