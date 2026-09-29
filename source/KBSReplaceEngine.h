@@ -183,7 +183,8 @@ namespace KBSReplaceEngine
 	    walk after this runs in it - and NOTHING IS CLEARED whatever the answer. For a caller that only
 	    has to know: the jump's look for a row Undo moved (KBSJump RelocateStaleRow), which asked
 	    RefuseChangedQuery until then and on a changed query cleared the whole result set in the middle
-	    of a jump. Same rule as RefuseChangedQuery: outside any command sequence. */
+	    of a jump. Same rule as RefuseChangedQuery: outside any command sequence. False on a list rebuilt
+	    from the records (2026-09-29): nothing was searched, so there is nothing it can be unchanged from. */
 	bool QueryUnchangedSinceSearch();
 
 	/** Reject Change on a replaced hit row (2026-09-26): its tracked change - found by
@@ -249,6 +250,24 @@ namespace KBSReplaceEngine
 	/** Is there anything for Accept All Changes by KohakuFindChange to do: the chapter's document open
 	    and holding at least one record signed "KohakuFindChange". */
 	bool CanAcceptAllInChapter(int32 chapterIdx);
+
+	/** ***** ACCEPT CHANGE BY KohakuFindChange (2026-09-29, Show Changes) - Reject Change's twin. ***** The
+	    row's tracked change accepted - with every replaced row touching it whose change is still there, as a
+	    reject takes them (touching replaces written front to back share ONE deletion: accepting part of it
+	    would leave the rest unable to come back) - in ONE undo step ("Accept Change"). The row reads
+	    "accepted" and offers neither Reject nor Accept again. On any row of any list whose change is still
+	    there. All or nothing; false = nothing changed, outStatus says why either way. */
+	bool AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+	/** Is the row's tracked change still there (the Reject / Accept items' greying)? */
+	bool CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx);
+	/** Accept Change on a story row: every replaced row of the story with a change left, one undo step - the
+	    rows Reject Change takes there, so its greying is CanRejectStory's. */
+	bool AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+	/** ***** A RUN ROW'S MENU (2026-09-29, a list rebuilt from the records only). ***** The run's rows in
+	    that document with a change left - taken back (RejectRun) or accepted (AcceptRun), one undo step. */
+	bool RejectRun(int32 chapterIdx, int32 runIdx, PMString& outStatus);
+	bool AcceptRun(int32 chapterIdx, int32 runIdx, PMString& outStatus);
+	bool CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx);
 
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the

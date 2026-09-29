@@ -124,8 +124,11 @@ namespace KBSTrackChange
 	    conditional text is the one cause measured). (From 2026-09-27 to 2026-09-29 it accepted
 	    every change, whoever made it, one whole record at a time - AcceptAllInDocument.) Runs inside the
 	    caller's command sequence. Returns how many were accepted, or -1 when InDesign would not (outWhy
-	    says so - the caller rolls the sequence back). Leaves the error state clear. */
-	int32 AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy);
+	    says so - the caller rolls the sequence back). Leaves the error state clear.
+	    outAcceptedTimes (optional, 2026-09-29) = the times every record of which this took away - a row
+	    carrying one was accepted (re-check R-4). Gathered on the two walks each story is counted by anyway. */
+	int32 AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy,
+		std::set<uint64>* outAcceptedTimes = nil);
 
 	// (IsInsideOwnPendingInsertion - does a match touch the current user's pending insertion, which the
 	//  run then refused - stood here until 2026-09-28. Nothing had called it since the pending changes
@@ -151,6 +154,29 @@ namespace KBSTrackChange
 	    (2026-09-28: KBS hands each row a time no other record can carry - the head of this file). */
 	void CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out);
 
+	/** ***** ONE ROW OF A LIST REBUILT FROM THE RECORDS (2026-09-29, Show Changes by KohakuFindChange). *****
+	    Every record signed "KohakuFindChange" carrying one time: the insertion's pieces (at = the first,
+	    insLen = their sum - the text the replace wrote) and the deletion of that time, if any (its text is
+	    what was replaced). A row replaced with nothing has no insertion: at = the deletion's place, insLen
+	    = 0. Touching replaces written front to back leave ONE deletion, carrying the LAST row's time (the
+	    head of this file) - the earlier rows of such a group come back with hasDelete false.
+	    insertedText = the pieces' own text, joined - what the replace wrote. NOT the text of [at, at+insLen):
+	    a piece split around somebody's typing reads their characters in that range, and FindRowChangeForHit
+	    is to refuse such a row by exactly that difference (re-check R-2, 2026-09-29). */
+	struct SignedRow
+	{
+		uint64		time;
+		TextIndex	at;
+		int32		insLen;
+		PMString	insertedText;
+		bool		hasDelete;
+		TextIndex	delAt;
+		PMString	deletedText;
+		SignedRow() : time(0), at(kInvalidTextIndex), insLen(0), hasDelete(false), delAt(kInvalidTextIndex) {}
+	};
+	/** Every row the story's signed records make, one per time, in position order (Show Changes). */
+	void CollectSignedRows(const UIDRef& story, std::vector<SignedRow>& out);
+
 	/** Take back the ONE record standing at `at` of that kind and of exactly that time - whole: no range
 	    is handed to InDesign (an insertion range with a deletion at its start brought it down,
 	    2026-09-26). True = it was. Leaves the global error state clear.
@@ -158,6 +184,9 @@ namespace KBSTrackChange
 	    row's deletion and the next row's insertion at the SAME position ("catcat" -> "kitten": deleted
 	    "cat"@6 and inserted "k"@6). */
 	bool RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
+	/** RejectRecord's twin (2026-09-29, Accept Change by KohakuFindChange): ACCEPT the one record standing at
+	    `at` of that kind and of exactly that time, whole. True = it was. Leaves the global error state clear. */
+	bool AcceptRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
 
 	/** One row's change: its insertion [at, at+insLen) and whether a deletion of its time stands.
 	    (The two texts and the time rode along until 2026-09-29, and no caller read them: the texts are

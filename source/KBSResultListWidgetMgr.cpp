@@ -25,6 +25,10 @@
 //  The STORY rows (2026-09-27) group each chapter's hits by story. (The level held the FONT rows of
 //  Find Missing Glyphs from 2026-08-02 until that scan was removed on 2026-09-27.)
 //
+//  A fifth kind, the RUN row (2026-09-29, Show Changes by KohakuFindChange): on a list rebuilt from the
+//  Track Changes records, one replace's rows sit under a branch row between the document and its
+//  stories - "<date> <time>  (N)", the branch shape again, one step right of the document row.
+//
 //  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget, applied on top of
 //  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
 //  file also hosts KBSResultTree::Rebuild (the tree lives here). Ported from KESCL's
@@ -238,6 +242,8 @@ public:
 				this->ApplyBookRow(node, widget, rowData);
 			else if (nodeID->IsFontRow())
 				this->ApplyFontRow(nodeID, node, widget, rowData);
+			else if (nodeID->IsRunRow())
+				this->ApplyRunRow(nodeID, node, widget, rowData);
 			else
 				this->ApplyChapterRow(nodeID, node, widget, rowData);
 		}
@@ -268,7 +274,7 @@ public:
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
-		if (nodeID != nil && nodeID->IsFontRow())
+		if (nodeID != nil && (nodeID->IsFontRow() || nodeID->IsRunRow()))
 			return PMReal(kFontLevelIndent);
 		return 0.0;
 	}
@@ -287,7 +293,15 @@ private:
 	// disagree with the tree.
 	PMReal FontShift(int32 chapterIdx) const
 	{
-		return (KBSResultModel::GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
+		return ((KBSResultModel::GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0))
+			+ this->RunShift(chapterIdx);
+	}
+
+	// One more step for the story and hit rows of a chapter that has RUN rows above them (2026-09-29,
+	// Show Changes) - asked from the adapter's own count, like FontShift.
+	PMReal RunShift(int32 chapterIdx) const
+	{
+		return (KBSResultModel::GetDisplayRunCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
 	}
 
 	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
@@ -496,6 +510,25 @@ private:
 			label.AppendNumber(fullCount);
 			label.Append(")");
 		}
+		this->LayOutBranchRow(node, widget, rowData,
+			this->LevelShift() + kFontLevelIndent + this->RunShift(nodeID->GetChapter()), label);
+	}
+
+	// A RUN row (2026-09-29, Show Changes by KohakuFindChange): one replace's rows, "<date> <time>  (N)" -
+	// the branch shape one step right of its document row. No checked count: a list rebuilt from the
+	// records has no boxes.
+	void ApplyRunRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
+		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+	{
+		PMString name;
+		int32 fullCount = 0;
+		if (!KBSResultModel::GetRunDisplay(nodeID->GetChapter(), nodeID->GetRun(), name, fullCount))
+			return;
+		PMString label(name);
+		label.SetTranslatable(kFalse);
+		label.Append("  (");
+		label.AppendNumber(fullCount);
+		label.Append(")");
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift() + kFontLevelIndent, label);
 	}
 
@@ -686,6 +719,10 @@ void KBSResultTree::Rebuild()
 	// its hits at once.
 	for (int32 c = 0; c < chapters; ++c)
 	{
+		// ...and the RUN rows above them the same (2026-09-29, Show Changes): a grouping, not a hiding place.
+		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
+		for (int32 r = 0; r < runs; ++r)
+			treeMgr->ExpandNode(KBSResultNodeID::CreateRun(c, r), kFalse);
 		const int32 groups = KBSResultModel::GetDisplayFontCount(c);
 		for (int32 g = 0; g < groups; ++g)
 			if (KBSResultModel::IsStoryGroup(c, g))
@@ -731,6 +768,10 @@ void KBSResultTree::RefreshRows()
 	for (int32 c = 0; c < chapters; ++c)
 	{
 		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
+		// the run rows (2026-09-29): the story rows' parents there, so the chapter's call stops at them
+		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
+		for (int32 r = 0; r < runs; ++r)
+			treeMgr->NodeChanged(KBSResultNodeID::CreateRun(c, r), kTrue /*childrenChangedAlso*/);
 		const int32 fonts = KBSResultModel::GetDisplayFontCount(c);
 		for (int32 f = 0; f < fonts; ++f)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);

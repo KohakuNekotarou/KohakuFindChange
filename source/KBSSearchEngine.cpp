@@ -87,6 +87,7 @@
 // replace prompt and the saved report on 2026-09-27.)
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
+#include <new>						// std::nothrow - HitBuilder's cache
 
 // Project includes:
 #include "KBSSearchEngine.h"
@@ -1451,7 +1452,31 @@ void FinalizeChapterHits(std::vector<KBSResultModel::Hit>& hits)
 } // anonymous namespace
 
 // (NewHitCache / DeleteHitCache / BuildHitForRange / FinalizeHits stood here until 2026-09-28: the
-// missing-glyph scan built its rows through them. The scan went on 2026-09-27, and they had no caller.)
+// missing-glyph scan built its rows through them. The scan went on 2026-09-27, and they had no caller.
+// Show Changes by KohakuFindChange builds its rows the same way since 2026-09-29 - HitBuilder, below.)
+
+KBSSearchEngine::HitBuilder::HitBuilder() : fCache(new (std::nothrow) WalkCache)
+{
+}
+
+KBSSearchEngine::HitBuilder::~HitBuilder()
+{
+	delete static_cast<WalkCache*>(fCache);
+}
+
+bool KBSSearchEngine::HitBuilder::Build(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
+	KBSResultModel::Hit& outHit)
+{
+	if (fCache == nil)
+		return false;
+	BuildHit(docRef, storyRef, start, end, kHitEverything, *static_cast<WalkCache*>(fCache), outHit);
+	return true;
+}
+
+void KBSSearchEngine::FinalizeHits(std::vector<KBSResultModel::Hit>& hits)
+{
+	FinalizeChapterHits(hits);
+}
 
 bool KBSSearchEngine::CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KBSResultModel::Hit>& outHits)

@@ -15,6 +15,12 @@
 //      font is what the finding is ABOUT - each holding that font's hits;
 //    * the hits themselves when they do not, which is every Find/Change result.
 //  The choice is made per CHAPTER, from the chapter's own groups, so the two can never disagree.
+//  (Since 2026-09-27 the groups are STORIES, and every chapter has them.)
+//
+//  ***** A RUN LEVEL between the document and its stories (2026-09-29, Show Changes by KohakuFindChange). *****
+//  A list rebuilt from the Track Changes records groups a document's rows by the replace that wrote them
+//  first: document -> run -> story -> row. Decided per chapter again, from its own runs (none on every
+//  other list).
 //
 //  See KBSResultNodeID.h for the five node shapes and for why the root sits at -2. Ported from
 //  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KBS shows every chapter
@@ -65,7 +71,14 @@ public:
 			return KBSResultNodeID::Create(nodeID->GetChapter());
 		}
 		if (nodeID->IsFontRow())
-			return KBSResultNodeID::Create(nodeID->GetChapter());	// font -> its document row
+		{
+			// a story row -> its run row when the list has runs, its document row when it has not
+			if (nodeID->GetRun() >= 0)
+				return KBSResultNodeID::CreateRun(nodeID->GetChapter(), nodeID->GetRun());
+			return KBSResultNodeID::Create(nodeID->GetChapter());
+		}
+		if (nodeID->IsRunRow())
+			return KBSResultNodeID::Create(nodeID->GetChapter());	// run -> its document row
 		if (nodeID->IsBookRow())
 			return KBSResultNodeID::CreateRoot();
 		// A document row hangs off the book row when the results came from a book, and off the root
@@ -84,9 +97,14 @@ public:
 			return KBSResultModel::GetDisplayChapterCount();
 		if (nodeID->IsFontRow())
 			return KBSResultModel::GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
+		if (nodeID->IsRunRow())
+			return KBSResultModel::GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
 
-		// A document row: its FONT rows when this chapter's hits name fonts, its hits directly when
-		// they do not.
+		// A document row: its RUN rows when the list has runs (2026-09-29); else its FONT rows when this
+		// chapter's hits name fonts, its hits directly when they do not.
+		const int32 runs = KBSResultModel::GetDisplayRunCount(nodeID->GetChapter());
+		if (runs > 0)
+			return runs;
 		const int32 fonts = KBSResultModel::GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 			return fonts;
@@ -122,10 +140,28 @@ public:
 				return kInvalidNodeID;
 			return KBSResultNodeID::Create(nodeID->GetChapter(), hit);
 		}
+		if (nodeID->IsRunRow())
+		{
+			// The run hands back a CHAPTER-wide group index; the cap wipes out a run's LAST groups, so the
+			// nth displayed one is the nth.
+			if (nth < 0 || nth >= KBSResultModel::GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun()))
+				return kInvalidNodeID;
+			const int32 group = KBSResultModel::GetRunGroup(nodeID->GetChapter(), nodeID->GetRun(), nth);
+			if (group < 0)
+				return kInvalidNodeID;
+			return KBSResultNodeID::CreateFont(nodeID->GetChapter(), group);
+		}
 
 		// A document row. The groups the display cap wipes out are the LAST ones (they are in
 		// first-appearance order and the cap keeps a prefix of the chapter's hits), so the nth
-		// displayed group is simply the nth group.
+		// displayed group is simply the nth group - and the same holds for the runs.
+		const int32 runs = KBSResultModel::GetDisplayRunCount(nodeID->GetChapter());
+		if (runs > 0)
+		{
+			if (nth < 0 || nth >= runs)
+				return kInvalidNodeID;
+			return KBSResultNodeID::CreateRun(nodeID->GetChapter(), nth);
+		}
 		const int32 fonts = KBSResultModel::GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 		{
@@ -151,7 +187,14 @@ public:
 			return (pos >= 0) ? pos : childID->GetHit();
 		}
 		if (childID->IsFontRow())
+		{
+			// under a run row: its place among the run's groups; under a document row: the group itself
+			if (childID->GetRun() >= 0)
+				return KBSResultModel::GetGroupPosInRun(childID->GetChapter(), childID->GetFont());
 			return childID->GetFont();
+		}
+		if (childID->IsRunRow())
+			return childID->GetRun();
 		if (childID->IsBookRow())
 			return 0;		// the root's only child
 		return childID->GetChapter();

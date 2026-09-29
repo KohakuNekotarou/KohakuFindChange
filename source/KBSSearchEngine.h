@@ -414,6 +414,29 @@ namespace KBSSearchEngine
 	bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
 		std::vector<KBSResultModel::Hit>& outHits);
 
+	/** ***** A HIT FROM A RANGE, BUILT THE WAY THE SEARCH BUILDS ITS OWN (2026-09-29, Show Changes by
+	    KohakuFindChange). ***** The rows of a list rebuilt from the Track Changes records are made by the
+	    search's own BuildHit (kHitEverything: the line, the page, the flags, the story's first words), so
+	    they read exactly like a search's. One HitBuilder per document read: it keeps the frames' answers and
+	    the stories' first words for that read, as the search's walk does. (NewHitCache / BuildHitForRange
+	    served the missing-glyph scan the same way until 2026-09-28.) */
+	class HitBuilder
+	{
+	public:
+		HitBuilder();
+		~HitBuilder();
+		/** False = nothing could be built (out of memory) - outHit is then untouched. */
+		bool Build(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResultModel::Hit& outHit);
+	private:
+		HitBuilder(const HitBuilder&);
+		HitBuilder& operator=(const HitBuilder&);
+		void* fCache;		// the walk's cache (KBSSearchEngine.cpp, WalkCache)
+	};
+
+	/** A chapter's hits put in page order, each numbered within its page with its locator - the search's
+	    own finishing pass (FinalizeChapterHits), for Show Changes' rows. */
+	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
+
 	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
 	    asked in this order, none of which may answer no:
 

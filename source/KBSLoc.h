@@ -107,6 +107,8 @@ namespace KBSJa
 	// shows it (the user's call: the name says only KohakuFindChange's changes are accepted).
 	const char16_t kRejectStep[]             = u"変更を却下";
 	const char16_t kAcceptAllStep[]          = u"KohakuFindChange によるすべての変更を承認";
+	// ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29, Show Changes).
+	const char16_t kAcceptStep[]             = u"変更を承認";
 	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert

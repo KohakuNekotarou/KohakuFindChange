@@ -4,9 +4,10 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because two different things
-//  can be running - a search and a replace (four until 2026-09-27, when the missing-glyph and
-//  overset scans were removed) - and every guard has to know about both.
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because three different things
+//  can be running - a search, a replace and Show Changes by KohakuFindChange (four until 2026-09-27,
+//  when the missing-glyph and overset scans were removed; two until Show Changes came, 2026-09-29) -
+//  and every guard has to know about all of them.
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -49,7 +50,7 @@
 
 namespace KBSRunGuard
 {
-	/** Is a search or a replace running right now? */
+	/** Is a search, a replace or a Show Changes by KohakuFindChange (2026-09-29) running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not

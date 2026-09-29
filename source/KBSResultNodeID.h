@@ -4,13 +4,20 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  NodeID class for the result tree. A node is the triple (chapter index, font group, hit index):
+//  NodeID class for the result tree. A node is (chapter index, run, font group, hit index):
 //
-//    (-2, -1, -1)        the hidden root
-//    (-1, -1, -1)        the BOOK row       -> present only while the results came from a book search
-//    (chap, -1, -1)      a document row     -> index into KBSResultModel's chapters
-//    (chap, font, -1)    a STORY row        -> 'font' indexes the chapter's fontGroups (one per story)
-//    (chap, font, hit)   a hit row          -> hit indexes that CHAPTER's hits
+//    (-2, -1, -1, -1)        the hidden root
+//    (-1, -1, -1, -1)        the BOOK row       -> present only while the results came from a book search
+//    (chap, -1, -1, -1)      a document row     -> index into KBSResultModel's chapters
+//    (chap, run, -1, -1)     a RUN row          -> 'run' indexes the chapter's runs (2026-09-29: only a
+//                                                  list rebuilt from the records has them - Show Changes)
+//    (chap, run, font, -1)   a STORY row        -> 'font' indexes the chapter's fontGroups (one per story;
+//                                                  per run and story under a run)
+//    (chap, run, font, hit)  a hit row          -> hit indexes that CHAPTER's hits
+//
+//  run is -1 everywhere on every other list, so those nodes are the triples they were until 2026-09-29.
+//  Like the font group, the run of a story or hit row is DERIVED from the model, never passed in (see
+//  Create(chapter, hit)).
 //
 //  The book row is what tells the user WHICH book was searched, permanently and in the panel
 //  itself rather than in a status line that the next message overwrites. A document-scope search
@@ -46,8 +53,8 @@
 #include "KBSID.h"
 #include "KBSResultModel.h"		// GetHitFontGroup - a hit row derives its font group from the model
 
-/** One node of the result tree: (chapter index, font group, hit index). See the file comment for
-    the five shapes a node can take. */
+/** One node of the result tree: (chapter index, run, font group, hit index). See the file comment for
+    the six shapes a node can take. */
 class KBSResultNodeID : public NodeIDClass
 {
 public:
@@ -57,18 +64,22 @@ public:
 	static NodeID_rv Create() { return new KBSResultNodeID(); }
 
 	/** The hidden root. Use this rather than Create(-1), which now names the book row. */
-	static NodeID_rv CreateRoot() { return new KBSResultNodeID(-2, -1, -1); }
+	static NodeID_rv CreateRoot() { return new KBSResultNodeID(-2, -1, -1, -1); }
 
 	/** The book row. Only ever asked for while KBSResultModel::IsFromBook() is true. */
-	static NodeID_rv CreateBook() { return new KBSResultNodeID(-1, -1, -1); }
+	static NodeID_rv CreateBook() { return new KBSResultNodeID(-1, -1, -1, -1); }
 
 	/** A document row ('chapter' = 0-based chapter index). */
-	static NodeID_rv Create(int32 chapter) { return new KBSResultNodeID(chapter, -1, -1); }
+	static NodeID_rv Create(int32 chapter) { return new KBSResultNodeID(chapter, -1, -1, -1); }
 
-	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). */
+	/** A RUN row under chapter 'chapter' ('run' indexes that chapter's runs - 2026-09-29, Show Changes). */
+	static NodeID_rv CreateRun(int32 chapter, int32 run) { return new KBSResultNodeID(chapter, run, -1, -1); }
+
+	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). Its run is the
+	    group's own (-1 on a list with no runs) - derived here for the reason Create(chapter, hit) gives. */
 	static NodeID_rv CreateFont(int32 chapter, int32 font)
 	{
-		return new KBSResultNodeID(chapter, font, -1);
+		return new KBSResultNodeID(chapter, KBSResultModel::GetGroupRun(chapter, font), font, -1);
 	}
 
 	/** A hit row under chapter 'chapter' ('hit' is the index into that CHAPTER's hits).
@@ -86,7 +97,8 @@ public:
 	    lets nodes be made while the model is empty (during ClearTree, or straight after Clear). */
 	static NodeID_rv Create(int32 chapter, int32 hit)
 	{
-		return new KBSResultNodeID(chapter, KBSResultModel::GetHitFontGroup(chapter, hit), hit);
+		const int32 font = KBSResultModel::GetHitFontGroup(chapter, hit);
+		return new KBSResultNodeID(chapter, KBSResultModel::GetGroupRun(chapter, font), font, hit);
 	}
 
 	virtual ~KBSResultNodeID() {}
@@ -108,6 +120,8 @@ public:
 			return 1;
 		if (fChapter < other->fChapter)	return -1;
 		if (fChapter > other->fChapter)	return 1;
+		if (fRun < other->fRun)	return -1;
+		if (fRun > other->fRun)	return 1;
 		if (fFont < other->fFont)	return -1;
 		if (fFont > other->fFont)	return 1;
 		if (fHit < other->fHit)	return -1;
@@ -115,11 +129,12 @@ public:
 		return 0;
 	}
 
-	virtual NodeIDClass* Clone() const { return new KBSResultNodeID(fChapter, fFont, fHit); }
+	virtual NodeIDClass* Clone() const { return new KBSResultNodeID(fChapter, fRun, fFont, fHit); }
 
 	virtual void Read(IPMStream* stream)
 	{
 		stream->XferInt32(fChapter);
+		stream->XferInt32(fRun);
 		stream->XferInt32(fFont);
 		stream->XferInt32(fHit);
 	}
@@ -127,12 +142,16 @@ public:
 	virtual void Write(IPMStream* stream) const
 	{
 		stream->XferInt32(const_cast<KBSResultNodeID*>(this)->fChapter);
+		stream->XferInt32(const_cast<KBSResultNodeID*>(this)->fRun);
 		stream->XferInt32(const_cast<KBSResultNodeID*>(this)->fFont);
 		stream->XferInt32(const_cast<KBSResultNodeID*>(this)->fHit);
 	}
 
 	/** The chapter's 0-based index into KBSResultModel (negative = root or book row). */
 	int32 GetChapter() const { return fChapter; }
+
+	/** The run this row belongs to (2026-09-29), or -1 on a list with no run level. */
+	int32 GetRun() const { return fRun; }
 
 	/** The font group this row belongs to, or -1 when its chapter has no groups. */
 	int32 GetFont() const { return fFont; }
@@ -143,8 +162,11 @@ public:
 	/** Is this a hit row (a leaf)? */
 	bool16 IsHitRow() const { return fHit >= 0; }
 
-	/** Is this a FONT row - the level that names which font had no glyph? */
+	/** Is this a FONT row - the STORY row since 2026-09-27 (the level once named the font with no glyph)? */
 	bool16 IsFontRow() const { return fChapter >= 0 && fFont >= 0 && fHit < 0; }
+
+	/** Is this a RUN row - one replace's rows on a list rebuilt from the records (2026-09-29)? */
+	bool16 IsRunRow() const { return fChapter >= 0 && fRun >= 0 && fFont < 0 && fHit < 0; }
 
 	/** Is this the book row - the one that names the book the results came from? */
 	bool16 IsBookRow() const { return fChapter == -1 && fHit < 0; }
@@ -157,6 +179,11 @@ public:
 	{
 		PMString s("KBSResultRow ");
 		s.AppendNumber(fChapter);
+		if (fRun >= 0)
+		{
+			s.Append("/r");
+			s.AppendNumber(fRun);
+		}
 		if (fFont >= 0)
 		{
 			s.Append("/f");
@@ -173,10 +200,12 @@ public:
 
 private:
 	// Private constructors force the factory methods, PnlTrvFileNodeID-style.
-	KBSResultNodeID() : fChapter(-2), fFont(-1), fHit(-1) {}
-	KBSResultNodeID(int32 chapter, int32 font, int32 hit) : fChapter(chapter), fFont(font), fHit(hit) {}
+	KBSResultNodeID() : fChapter(-2), fRun(-1), fFont(-1), fHit(-1) {}
+	KBSResultNodeID(int32 chapter, int32 run, int32 font, int32 hit)
+		: fChapter(chapter), fRun(run), fFont(font), fHit(hit) {}
 
 	int32 fChapter;
+	int32 fRun;
 	int32 fFont;
 	int32 fHit;
 };

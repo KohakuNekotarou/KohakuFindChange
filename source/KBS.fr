@@ -483,6 +483,18 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Show Changes by KohakuFindChange (2026-09-29, the user's place): the list rebuilt from the Track
+		// Changes records KBS signed - under Change Checked, a rule between them.
+		kKBSSeparator6ActionID,
+		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKBSSeparator6MenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSShowChangesActionID,
+		kKBSTargetMenuPath
+		kKBSShowChangesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// (Block 2 - Find Missing Glyphs and Find Overset, with the rule above them - was removed on
 		//  2026-09-27: the Book panel's preflight reports both.)
 
@@ -633,6 +645,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSRejectChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Accept Change by KohakuFindChange (2026-09-29): the row's tracked change accepted.
+		kKBSAcceptChangeActionID,
+		kKBSResultHitMenuName
+		kKBSAcceptChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 
 		// ----- A STORY row's right-click menu (2026-09-27, the story level) -----
 		// Popped by KBSResultNodeEH::RButtonDn over a story row: each command over that story's rows.
@@ -644,6 +662,11 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSStoryRejectActionID,
 		kKBSResultStoryMenuName
 		kKBSStoryRejectMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSStoryAcceptActionID,
+		kKBSResultStoryMenuName
+		kKBSStoryAcceptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		kKBSStoryRedoActionID,
@@ -660,6 +683,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSStoryUncheckAllActionID,
 		kKBSResultStoryMenuName
 		kKBSStoryUncheckAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// ----- A RUN row's right-click menu (2026-09-29, Show Changes by KohakuFindChange) -----
+		// Popped by KBSResultNodeEH::RButtonDn over a run row: the run's rows in that document, taken back
+		// or accepted.
+		kKBSRunRejectActionID,
+		kKBSResultRunMenuName
+		kKBSRunRejectMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKBSRunAcceptActionID,
+		kKBSResultRunMenuName
+		kKBSRunAcceptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 	}
@@ -865,7 +901,17 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		kKBSActionComponentBoss,
 		kKBSRejectChangeActionID,
-		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kKBSRejectChangeMenuKey,		// "Reject Change by KohakuFindChange" (2026-09-29; "Reject Change" until then)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Accept Change by KohakuFindChange - a hit row's (2026-09-29), greyed like Reject Change by the row.
+		kKBSActionComponentBoss,
+		kKBSAcceptChangeActionID,
+		kKBSAcceptChangeMenuKey,		// "Accept Change by KohakuFindChange"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -885,7 +931,16 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		kKBSActionComponentBoss,
 		kKBSStoryRejectActionID,
-		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kKBSStoryRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Story" (2026-09-29)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSStoryAcceptActionID,
+		kKBSStoryAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Story" (2026-09-29)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -933,7 +988,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Reject Change - a document row's right-click menu (2026-09-27).
 		kKBSActionComponentBoss,
 		kKBSChapterRejectActionID,
-		kKBSRejectChangeMenuKey,		// "Reject Change"
+		kKBSChapterRejectMenuKey,		// "Reject All Changes by KohakuFindChange in This Document" (2026-09-29)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -960,6 +1015,37 @@ resource ActionDef (kSDKDefActionResourceID)
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// A run row's right-click menu (2026-09-29, Show Changes by KohakuFindChange).
+		kKBSActionComponentBoss,
+		kKBSRunRejectActionID,
+		kKBSRunRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Run"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKBSActionComponentBoss,
+		kKBSRunAcceptActionID,
+		kKBSRunAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Run"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Show Changes by KohakuFindChange (2026-09-29): the flyout's, in the Keyboard Shortcuts editor like
+		// the search and Change Checked (kKBSPanelMenuActionArea). kCustomEnabling so UpdateActionStates greys
+		// it with nothing to read (KBSBookScope::HasScopeTarget) or while a run is up.
+		kKBSActionComponentBoss,
+		kKBSShowChangesActionID,
+		kKBSShowChangesMenuKey,			// "Show Changes by KohakuFindChange"
+		kKBSPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
 
 		// "How to Use...". NO kCustomEnabling, unlike every command above it: this one has nothing
 		// to be enabled against. It reads a text - no document, no result set, no selection - so it

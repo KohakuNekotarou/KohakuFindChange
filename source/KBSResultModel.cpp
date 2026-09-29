@@ -30,6 +30,9 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
+	// Were these rows rebuilt from the Track Changes records (2026-09-29)? See KBSResultModel::SetFromRecords.
+	bool gFromRecords = false;
+
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
@@ -90,6 +93,8 @@ namespace
 	int32 gContextMenuHit = -1;
 	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked (2026-09-27)
 	int32 gContextMenuGroup = -1;
+	int32 gContextMenuRunChapter = -1;		// the run row right-clicked (2026-09-29)
+	int32 gContextMenuRun = -1;
 
 	// Does this row carry a check box? THE one definition of the question, so the commands that set
 	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
@@ -98,6 +103,10 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
+		// A list rebuilt from the records offers no replace at all (2026-09-29, the user's call B).
+		if (gFromRecords)
+			return false;
+
 		// A replace's report offers work only on the rows Reject Change put back (2026-09-27, B). This is
 		// the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
 		// taken back and still open is exactly what makes that question answer no, and every other row
@@ -127,6 +136,12 @@ namespace
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
 	// the hit held before - a search's new hits and the hits KeepCheckedRows carries over alike.
+	//
+	// ***** KEYED BY (RUN, STORY) SINCE 2026-09-29 (Show Changes by KohakuFindChange). ***** On a list rebuilt
+	// from the records a story two runs changed stands under each run, so a group is one story of one run;
+	// every other list has run -1 throughout, where the key is the story alone, as before. Each run's own
+	// list of groups is rebuilt at the end, from the groups (the runs themselves - start and label - are
+	// the builder's and stay).
 	void BuildFontGroups(KBSResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
@@ -136,7 +151,7 @@ namespace
 			int32 found = -1;
 			for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
 			{
-				if (chapter.fontGroups[g].story == hit.storyUID)
+				if (chapter.fontGroups[g].story == hit.storyUID && chapter.fontGroups[g].run == hit.run)
 				{
 					found = static_cast<int32>(g);
 					break;
@@ -147,6 +162,7 @@ namespace
 				KBSResultModel::FontGroup group;
 				group.isStory = true;
 				group.story = hit.storyUID;
+				group.run = hit.run;
 				group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
 				if (!hit.pageString.IsEmpty())
 					group.fontName.Append(hit.pageString);
@@ -160,6 +176,16 @@ namespace
 			hit.fontGroup = found;
 			hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
 			group.hitIndices.push_back(static_cast<int32>(i));
+		}
+
+		// Each run's groups, ascending (a group of a run the chapter does not hold is left out).
+		for (size_t r = 0; r < chapter.runs.size(); ++r)
+			chapter.runs[r].groups.clear();
+		for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
+		{
+			const int32 run = chapter.fontGroups[g].run;
+			if (run >= 0 && run < static_cast<int32>(chapter.runs.size()))
+				chapter.runs[run].groups.push_back(static_cast<int32>(g));
 		}
 	}
 
@@ -199,6 +225,7 @@ void KBSResultModel::Clear()
 	gChapters.clear();
 	gShowingOutcome = false;
 	gFromBook = false;
+	gFromRecords = false;
 	gBookName.Clear();
 	gSearchMode = -1;
 	gWalkSignature.Clear();
@@ -212,6 +239,8 @@ void KBSResultModel::Clear()
 	gContextMenuHit = -1;
 	gContextMenuGroupChapter = -1;
 	gContextMenuGroup = -1;
+	gContextMenuRunChapter = -1;
+	gContextMenuRun = -1;
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
 }
@@ -236,8 +265,21 @@ bool KBSResultModel::IsFromBook()
 	return gFromBook;
 }
 
+void KBSResultModel::SetFromRecords(bool fromRecords)
+{
+	gFromRecords = fromRecords;
+}
+
+bool KBSResultModel::IsFromRecords()
+{
+	return gFromRecords;
+}
+
 bool KBSResultModel::NoRowHasCheckBox()
 {
+	// A list rebuilt from the records has no box anywhere (2026-09-29) - RowHasCheckBox's first answer.
+	if (gFromRecords)
+		return true;
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
 	// ***** EXCEPT A REPORT HOLDING A ROW TAKEN BACK (2026-09-27, B): that row carries a box. *****
@@ -474,6 +516,119 @@ bool KBSResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupId
 		return false;
 	outChapterIdx = gContextMenuGroupChapter;
 	outGroupIdx = gContextMenuGroup;
+	return true;
+}
+
+// ---- The run level (2026-09-29, Show Changes by KohakuFindChange) - see the header. ----
+
+namespace
+{
+	// The run, or nil for an index out of range (either index).
+	const KBSResultModel::RunGroup* RunAt(int32 chapterIdx, int32 runIdx)
+	{
+		if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+			return nil;
+		const std::vector<KBSResultModel::RunGroup>& runs = gChapters[chapterIdx].runs;
+		if (runIdx < 0 || runIdx >= static_cast<int32>(runs.size()))
+			return nil;
+		return &runs[runIdx];
+	}
+}
+
+int32 KBSResultModel::GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx)
+{
+	const RunGroup* run = RunAt(chapterIdx, runIdx);
+	if (run == nil)
+		return 0;
+	// The groups the cap left a hit to: the first N of the run's (they stand in hit order).
+	int32 shown = 0;
+	for (size_t k = 0; k < run->groups.size(); ++k)
+		if (GetDisplayFontHitCount(chapterIdx, run->groups[k]) > 0)
+			++shown;
+	return shown;
+}
+
+int32 KBSResultModel::GetDisplayRunCount(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return 0;
+	int32 shown = 0;
+	for (int32 r = 0; r < static_cast<int32>(gChapters[chapterIdx].runs.size()); ++r)
+		if (GetDisplayRunGroupCount(chapterIdx, r) > 0)
+			++shown;
+	return shown;
+}
+
+bool KBSResultModel::GetRunDisplay(int32 chapterIdx, int32 runIdx, PMString& outLabel, int32& outHitCount)
+{
+	const RunGroup* run = RunAt(chapterIdx, runIdx);
+	if (run == nil)
+		return false;
+	outLabel = run->label;
+	outLabel.SetTranslatable(kFalse);
+	// The FULL count, like every other number the tree reads out (GetFontDisplay).
+	outHitCount = 0;
+	for (size_t k = 0; k < run->groups.size(); ++k)
+		outHitCount += static_cast<int32>(gChapters[chapterIdx].fontGroups[run->groups[k]].hitIndices.size());
+	return true;
+}
+
+int32 KBSResultModel::GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth)
+{
+	const RunGroup* run = RunAt(chapterIdx, runIdx);
+	if (run == nil || nth < 0 || nth >= static_cast<int32>(run->groups.size()))
+		return -1;
+	return run->groups[nth];
+}
+
+int32 KBSResultModel::GetGroupRun(int32 chapterIdx, int32 groupIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return -1;
+	const Chapter& c = gChapters[chapterIdx];
+	if (groupIdx < 0 || groupIdx >= static_cast<int32>(c.fontGroups.size()))
+		return -1;
+	return c.fontGroups[groupIdx].run;
+}
+
+int32 KBSResultModel::GetGroupPosInRun(int32 chapterIdx, int32 groupIdx)
+{
+	const RunGroup* run = RunAt(chapterIdx, GetGroupRun(chapterIdx, groupIdx));
+	if (run == nil)
+		return -1;
+	for (size_t k = 0; k < run->groups.size(); ++k)
+		if (run->groups[k] == groupIdx)
+			return static_cast<int32>(k);
+	return -1;
+}
+
+void KBSResultModel::GetRunHits(int32 chapterIdx, int32 runIdx, std::vector<int32>& outHits)
+{
+	outHits.clear();
+	const RunGroup* run = RunAt(chapterIdx, runIdx);
+	if (run == nil)
+		return;
+	for (size_t k = 0; k < run->groups.size(); ++k)
+	{
+		const std::vector<int32>& idx = gChapters[chapterIdx].fontGroups[run->groups[k]].hitIndices;
+		outHits.insert(outHits.end(), idx.begin(), idx.end());
+	}
+	// The stories' rows interleave in page order: back into the chapter's order.
+	std::sort(outHits.begin(), outHits.end());
+}
+
+void KBSResultModel::SetContextMenuRun(int32 chapterIdx, int32 runIdx)
+{
+	gContextMenuRunChapter = chapterIdx;
+	gContextMenuRun = runIdx;
+}
+
+bool KBSResultModel::GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx)
+{
+	if (RunAt(gContextMenuRunChapter, gContextMenuRun) == nil)
+		return false;
+	outChapterIdx = gContextMenuRunChapter;
+	outRunIdx = gContextMenuRun;
 	return true;
 }
 
@@ -980,6 +1135,24 @@ void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID
 	BuildHitLocator(h);
 }
 
+void KBSResultModel::SetHitAccepted(int32 chapterIdx, int32 hitIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	Chapter& c = gChapters[chapterIdx];
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+		return;
+	Hit& h = c.hits[hitIdx];
+	BackUpRow(chapterIdx, hitIdx, h);
+	// Still replaced - the text it wrote stays - but its records are gone: nothing is left to find by
+	// that time, so it offers neither Reject Change nor Accept Change again (both look the row up by it).
+	h.replaced = true;
+	h.checked = false;
+	h.recordTime = 0;
+	h.outcome = kOutcomeAccepted;
+	BuildHitLocator(h);
+}
+
 void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
@@ -1053,11 +1226,15 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.replaced = true;
 	h.checked = false;
 	// a row taken back and replaced again (2026-09-27, A/B) is an ordinary replaced row once more
-	if (h.outcome == kOutcomeRejected)
-	{
+	// The locator follows at once where the replace changes what it says: a row taken back reads as an
+	// ordinary replaced one again, and a footnote's row says "no track" (2026-09-29) - a row's Replace leaves a
+	// work list, which no pass numbers again afterwards (only a Change Checked's report is - KeepCheckedRows).
+	// Every other row's locator reads the same before and after, so it is not built again for nothing.
+	const bool takenBack = (h.outcome == kOutcomeRejected);
+	if (takenBack)
 		h.outcome = kOutcomeNone;
+	if (takenBack || h.inFootnote)
 		BuildHitLocator(h);
-	}
 }
 
 // (GetHitReplacedRange stood here until 2026-09-25: the replace pass read a replaced row's range
@@ -1166,8 +1343,21 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	// A rejected row says nothing (the user, 2026-09-27: "no 'rejected' when I take one back") - it
 	// reads its original text again, which is what the user asked for; the state is still there for
 	// the menu (Redo); a reader of the panel sees the row's check box come back.
+	// ***** EXCEPT ON A LIST REBUILT FROM THE RECORDS (2026-09-29, the design's section 4). ***** No row
+	// there carries a box, so nothing else would tell a row taken back from one still replaced.
+	else if (hit.outcome == kOutcomeRejected && gFromRecords)
+		hit.locator.Append(" rejected");
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
+	else if (hit.outcome == kOutcomeAccepted)
+		hit.locator.Append(" accepted");	// its change accepted (2026-09-29): final, nothing left to act on
+
+	// ***** "no track" - REPLACED INSIDE A FOOTNOTE (2026-09-29, the user's request). ***** Track Changes
+	// records nothing in a footnote (measured 2026-09-26), so the replace there left no change to take back
+	// or accept, and nothing on the row said so until now (the status line did, once, when it was replaced).
+	// Normal colour, like "locked": a fact about the row, not a failure.
+	if (hit.replaced && hit.inFootnote && hit.outcome == kOutcomeNone)
+		hit.locator.Append(" no track");
 }
 
 void KBSResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)

@@ -377,6 +377,19 @@ DECLARE_PMID(kActionIDSpace, kKBSChapterRejectActionID, kKBSPrefix + 36)
 // back, replaced again with what Find/Change holds now (KBSReplaceEngine::RedoChapter). Named "Replace
 // Again (Current Find/Change Settings)" since 2026-09-29, like the story row's.
 DECLARE_PMID(kActionIDSpace, kKBSChapterRedoActionID, kKBSPrefix + 37)
+// "Show Changes by KohakuFindChange" on the flyout (2026-09-29, the user's design): the list rebuilt from
+// the Track Changes records KBS signed (KBSShowChanges). Under Change Checked, a rule between them.
+DECLARE_PMID(kActionIDSpace, kKBSShowChangesActionID, kKBSPrefix + 38)
+DECLARE_PMID(kActionIDSpace, kKBSSeparator6ActionID, kKBSPrefix + 39)
+// Accept Change by KohakuFindChange on a hit row and on a story row (2026-09-29): the twin of Reject
+// Change there - the row's (or the story's rows') tracked changes accepted (KBSReplaceEngine AcceptHit /
+// AcceptStory).
+DECLARE_PMID(kActionIDSpace, kKBSAcceptChangeActionID, kKBSPrefix + 40)
+DECLARE_PMID(kActionIDSpace, kKBSStoryAcceptActionID, kKBSPrefix + 41)
+// A RUN row's right-click menu (2026-09-29, a list rebuilt from the records only): Reject / Accept the
+// rows of that run in that document (KBSReplaceEngine RejectRun / AcceptRun).
+DECLARE_PMID(kActionIDSpace, kKBSRunRejectActionID, kKBSPrefix + 42)
+DECLARE_PMID(kActionIDSpace, kKBSRunAcceptActionID, kKBSPrefix + 43)
 
 
 // WidgetIDs:
@@ -480,8 +493,19 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 #define kKBSUncheckAllMenuKey			kKBSStringPrefix "kKBSUncheckAllMenuKey"
 // The hit row's own right-click menu (2026-09-26).
 #define kKBSReplaceHitMenuKey			kKBSStringPrefix "kKBSReplaceHitMenuKey"
-#define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
+// The Reject items, one name per level since 2026-09-29 (the user's call: "by KohakuFindChange" in the
+// name, so it says it acts on KBS's changes only). The hit row's keeps the key it always had.
+#define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"		// "Reject Change by KohakuFindChange"
+#define kKBSStoryRejectMenuKey			kKBSStringPrefix "kKBSStoryRejectMenuKey"		// "...in This Story"
+#define kKBSChapterRejectMenuKey		kKBSStringPrefix "kKBSChapterRejectMenuKey"		// "Reject All ...in This Document"
+#define kKBSRunRejectMenuKey			kKBSStringPrefix "kKBSRunRejectMenuKey"			// "...in This Run"
+// ...and their Accept twins (2026-09-29). The document row's is Accept All Changes, below.
+#define kKBSAcceptChangeMenuKey			kKBSStringPrefix "kKBSAcceptChangeMenuKey"		// "Accept Change by KohakuFindChange"
+#define kKBSStoryAcceptMenuKey			kKBSStringPrefix "kKBSStoryAcceptMenuKey"		// "...in This Story"
+#define kKBSRunAcceptMenuKey			kKBSStringPrefix "kKBSRunAcceptMenuKey"			// "...in This Run"
 #define kKBSAcceptAllChangesMenuKey		kKBSStringPrefix "kKBSAcceptAllChangesMenuKey"
+// "Show Changes by KohakuFindChange" (2026-09-29).
+#define kKBSShowChangesMenuKey			kKBSStringPrefix "kKBSShowChangesMenuKey"
 #define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"	// the story and document rows' Redo (2026-09-27) - "Replace Again (Current Find/Change Settings)" since 2026-09-29
 // "How to Use...": the operating reference. English in both string tables, like the rest of the
 // flyout - only the replace's own alerts are translated (see kKBSStaleResultsDocKey). The BODY of the
@@ -518,6 +542,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 #define kKBSResultHitMenuName				"KBSRtMenuResultHit"
 // A story row's own right-click menu (2026-09-27).
 #define kKBSResultStoryMenuName				"KBSRtMenuResultStory"
+// A run row's own right-click menu (2026-09-29, Show Changes by KohakuFindChange).
+#define kKBSResultRunMenuName				"KBSRtMenuResultRun"
 
 // (The Change Checked confirmation prompt's keys - kKBSConfirm* - stood here until 2026-09-27, when
 //  the prompt was removed. The English lives in KBS_enUS.fr; the Japanese in KBSLoc.h.)
@@ -552,6 +578,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // every UI until then, beside a Replace that was translated).
 #define kKBSRejectStepKey			kKBSStringPrefix "kKBSRejectStepKey"
 #define kKBSAcceptAllStepKey		kKBSStringPrefix "kKBSAcceptAllStepKey"
+// ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29, Show Changes).
+#define kKBSAcceptStepKey			kKBSStringPrefix "kKBSAcceptStepKey"
 // (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
 //  the alert states the outcome in one sentence and the status line carries what to do next.)
 // (kKBSConfirmUnsavedKey, kKBSConfirmCareKey and the Glyph tab confirmation's labels -
@@ -587,6 +615,9 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 #define kKBSSearchBookMenuItemPosition		1.0
 #define kKBSReplaceCheckedMenuItemPosition	1.2
 // (Block 2 - the two scans at 1.3 to 1.5 - was removed on 2026-09-27.)
+// Show Changes by KohakuFindChange (2026-09-29, the user's place: under Change Checked, a rule between).
+#define kKBSSeparator6MenuItemPosition		1.3
+#define kKBSShowChangesMenuItemPosition		1.4
 #define kKBSSeparator3MenuItemPosition		2.0
 
 // Block 3 - the six check-mark toggles (the six positions from 2.2 to 2.9; it said "four" at the top of this
@@ -626,12 +657,17 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // The story row's menu (2026-09-27): the three commands, then the two check commands.
 #define kKBSStoryReplaceMenuItemPosition	1.0
 #define kKBSStoryRejectMenuItemPosition		2.0
+#define kKBSStoryAcceptMenuItemPosition		2.5		// 2026-09-29: beside its Reject
 #define kKBSStoryRedoMenuItemPosition		3.0
 #define kKBSStoryCheckAllMenuItemPosition	4.0
 #define kKBSStoryUncheckAllMenuItemPosition	5.0
 // The hit row's menu: Replace first (2026-09-27), then its own 1 and 2.
 #define kKBSReplaceHitMenuItemPosition		0.5
 #define kKBSRejectChangeMenuItemPosition	1.0
+#define kKBSAcceptChangeMenuItemPosition	2.0		// 2026-09-29
+// The run row's menu (2026-09-29).
+#define kKBSRunRejectMenuItemPosition		1.0
+#define kKBSRunAcceptMenuItemPosition		2.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets (Task 2). Offset from the

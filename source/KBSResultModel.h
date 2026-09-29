@@ -55,9 +55,12 @@ namespace KBSResultModel
 							// shows the original text again and can be replaced once more (Redo)
 		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
 							// ticked row deleted (2026-09-26) - Change All's own result; no place to jump to
-		kOutcomeEndnoteLeft	// ticked, in the endnote story, left alone: a match there ends an endnote,
+		kOutcomeEndnoteLeft,// ticked, in the endnote story, left alone: a match there ends an endnote,
 							// and InDesign's replace breaks an endnote at its end (2026-09-27, the
 							// user's call - the whole endnote story is left, Change All works by story)
+		kOutcomeAccepted	// replaced, then its tracked change ACCEPTED with Accept Change by
+							// KohakuFindChange (2026-09-29): the replace is final, nothing is left to
+							// take back or accept - the locator says "accepted"
 	};
 
 	/** One match on one line of one chapter. The three text segments are the line split around
@@ -147,6 +150,10 @@ namespace KBSResultModel
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
+		// The RUN this row belongs to - an index into its chapter's runs - on a list rebuilt from the
+		// Track Changes records (2026-09-29, Show Changes by KohakuFindChange); -1 on every other list,
+		// which has no run level. Set by whoever builds the hits; the groups follow it (AppendChapter).
+		int32		run;
 
 		// checked starts FALSE here and stays so for a search's rows (unticked since 2026-09-27; ticked
 		// from 2026-09-26, unticked from 2026-08-02 - each the user's call).
@@ -154,7 +161,7 @@ namespace KBSResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				recordTime(0), pageOrdinal(0) {}
+				recordTime(0), pageOrdinal(0), run(-1) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree (2026-09-27). The struct keeps the name
@@ -171,7 +178,26 @@ namespace KBSResultModel
 		// rows (KBSReplaceEngine::ReplaceStory and the rest).
 		bool				isStory;
 		UID					story;
-		FontGroup() : isStory(false), story(kInvalidUID) {}
+		// The run the group sits under (Hit::run of its hits, 2026-09-29); -1 = no run level. A story
+		// that two runs changed stands once under each: the groups are keyed by (run, story).
+		int32				run;
+		FontGroup() : isStory(false), story(kInvalidUID), run(-1) {}
+	};
+
+	/** ***** ONE RUN OF A LIST REBUILT FROM THE RECORDS (2026-09-29, Show Changes by KohakuFindChange). *****
+	    Every record KBS signs carries its run's start in its time (KBSTrackChange.h, the head): the rows
+	    whose times share t0 (the time with its low four decimal digits dropped) were written by one
+	    replace. A run row of the tree stands between the document row and the story rows.
+
+	    groups index the chapter's fontGroups, ASCENDING - rebuilt with the groups (AppendChapter,
+	    KeepCheckedRows). The builder hands the hits over sorted by run, so the runs' groups and hits
+	    stand in run order and the display cap cuts the LAST runs first. */
+	struct RunGroup
+	{
+		uint64				t0;		// the run's start - the time of its rows, low four digits dropped
+		PMString			label;	// the run row's text: the run's start as a local date and time
+		std::vector<int32>	groups;	// the run's story groups
+		RunGroup() : t0(0) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -182,6 +208,9 @@ namespace KBSResultModel
 		IDFile					file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// empty = this chapter has NO font level (Find/Change)
+		// The runs (2026-09-29, Show Changes by KohakuFindChange): empty on every list but one rebuilt from
+		// the records, where each hit's run indexes this, newest run first.
+		std::vector<RunGroup>	runs;
 		// Each story's version (ITextModel::GetChangeCount) where KBS last knew the rows in it to stand
 		// (2026-09-29, the defect re-check F-2) - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
@@ -225,6 +254,16 @@ namespace KBSResultModel
 	    Clear(), so it must be set AFTER the scope is resolved. */
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
+
+	/** ***** WERE THESE ROWS REBUILT FROM THE TRACK CHANGES RECORDS (2026-09-29, Show Changes by
+	    KohakuFindChange)? ***** Such a list was searched by nothing: no query, no walk signature, no search
+	    mode - there is nothing to line a replace up with, so it offers NO replace of any kind (the user's
+	    call B: to replace again, search again). While it is on, no row carries a check box
+	    (RowHasCheckBox, NoRowHasCheckBox) and the replace's doors refuse (KBSReplaceEngine). Reject Change
+	    and Accept Change work on it, and a row they took back says so ("rejected" - there is no box to say
+	    it). Set beside SetFromBook, after the commit point; cleared by Clear(). */
+	void SetFromRecords(bool fromRecords);
+	bool IsFromRecords();
 
 	/** Has a command been RUN since the results were last discarded?
 
@@ -375,6 +414,27 @@ namespace KBSResultModel
 	    chapter. */
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
+
+	/** ***** THE RUN LEVEL (2026-09-29, Show Changes by KohakuFindChange). ***** Only a list rebuilt from the
+	    records has one (Chapter::runs); every question below answers 0 / -1 / false / nothing for any other.
+
+	    GetDisplayRunCount: the runs that still show a hit under the panel's cap - the first N, since the
+	    hits stand in run order and the cap keeps a prefix of them (GetDisplayFontCount's reasoning).
+	    GetRunDisplay: the run row's label and its FULL hit count. GetDisplayRunGroupCount / GetRunGroup:
+	    the story rows under a run row, the nth as a chapter-wide group index. GetGroupRun /
+	    GetGroupPosInRun: a story row's parent and its place under it (-1 = no run). GetRunHits: every hit
+	    of the run, chapter-wide indexes in the chapter's order. */
+	int32 GetDisplayRunCount(int32 chapterIdx);
+	bool GetRunDisplay(int32 chapterIdx, int32 runIdx, PMString& outLabel, int32& outHitCount);
+	int32 GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx);
+	int32 GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth);
+	int32 GetGroupRun(int32 chapterIdx, int32 groupIdx);
+	int32 GetGroupPosInRun(int32 chapterIdx, int32 groupIdx);
+	void GetRunHits(int32 chapterIdx, int32 runIdx, std::vector<int32>& outHits);
+	/** The run row a right-click menu was popped over (SetContextMenuGroup's twin); cleared by Clear().
+	    False = none, or no longer in range. */
+	void SetContextMenuRun(int32 chapterIdx, int32 runIdx);
+	bool GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx);
 
 	/** Is this group a STORY group (FontGroup::isStory - a Find/Change result's level)? */
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
@@ -581,6 +641,10 @@ namespace KBSResultModel
 	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
 	    longer replaced, and says "rejected". */
 	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
+	/** Accept Change by KohakuFindChange accepted this row's tracked change (2026-09-29): the replace is final.
+	    It stays replaced, says "accepted", and keeps no record time - there is nothing left to find, so
+	    neither Reject Change nor Accept Change is offered on it again. */
+	void SetHitAccepted(int32 chapterIdx, int32 hitIdx);
 	// (SetHitRedone went with Redo on 2026-09-27: a row taken back is replaced again like any other -
 	//  MarkHitReplaced clears its "taken back".)
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
@@ -730,7 +794,11 @@ namespace KBSResultModel
 	    so "P5+locked" reads as "page 5, overset".
 
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
-	    found changed. Only missing and refused are exclusive, being two values of one field. */
+	    found changed. Only missing and refused are exclusive, being two values of one field.
+
+	    Since 2026-09-29 the locator also says " rejected" (a row taken back, on a list rebuilt from the
+	    records only - it has no box to say it), " accepted" (its change accepted) and " no track" (replaced
+	    inside a footnote, where Track Changes records nothing - the user's request). */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The

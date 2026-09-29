@@ -279,6 +279,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID->IsFontRow() && KBSResultModel::IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 	{
 		KBSResultModel::SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
+		KBSResultModel::SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
 		InterfacePtr<IApplication> storyApp(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IActionManager> storyActionMgr(storyApp != nil ? storyApp->QueryActionManager() : nil);
 		InterfacePtr<IMenuManager> storyMenuMgr(storyActionMgr, UseDefaultIID());
@@ -287,6 +288,20 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		return kTrue;
 	}
 	KBSResultModel::SetContextMenuGroup(-1, -1);
+
+	// ***** A RUN ROW (2026-09-29, Show Changes by KohakuFindChange): its own menu, over that run's rows in
+	// ***** this document. ***** Cleared by every other right-click, like the story row's.
+	if (nodeID->IsRunRow())
+	{
+		KBSResultModel::SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
+		InterfacePtr<IApplication> runApp(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IActionManager> runActionMgr(runApp != nil ? runApp->QueryActionManager() : nil);
+		InterfacePtr<IMenuManager> runMenuMgr(runActionMgr, UseDefaultIID());
+		if (runMenuMgr != nil)
+			runMenuMgr->HandlePopupMenu(kKBSResultRunMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+		return kTrue;
+	}
+	KBSResultModel::SetContextMenuRun(-1, -1);
 
 	if (nodeID->IsHitRow())
 	{

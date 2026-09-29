@@ -42,6 +42,9 @@
 #include "textiterator.h"
 #include "WideString.h"
 
+#include <algorithm>				// CollectSignedRows - position order
+#include <map>						// CollectSignedRows - one row per time
+
 // Project includes:
 #include "KBSBookScope.h"			// IsDocStillOpen - a closed chapter is not read
 #include "KBSID.h"					// kKBSSignRecordsCmdBoss
@@ -84,9 +87,12 @@ bool IsSignAuthor(const PMString& who)
 // hidden condition's text, and its records with it, stand in a thread past the main text: measured,
 // KTRedlineProbe - a record at 9 read at 16 once its condition was hidden). The walk is not gated by
 // StoryHasChanges: what it answers for a story whose records all stand in hidden text is not measured.
-// firstOnly = stop at 1.
-int32 CountSignedRecords(const UIDRef& story, bool firstOnly)
+// firstOnly = stop at 1. outTimes (optional, 2026-09-29, the waste re-check P-2) = every time those records
+// carry, gathered on the same walk - what Accept All compares before and after.
+int32 CountSignedRecords(const UIDRef& story, bool firstOnly, std::set<uint64>* outTimes = nil)
 {
+	if (outTimes != nil)
+		outTimes->clear();
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return 0;
@@ -100,7 +106,11 @@ int32 CountSignedRecords(const UIDRef& story, bool firstOnly)
 		if (record == nil)
 			continue;
 		if (IsSignAuthor(record->GetUserName()))
+		{
 			++n;
+			if (outTimes != nil)
+				outTimes->insert(record->GetTimeStamp());
+		}
 		delete record;		// the caller owns it (redlineiterator.h:137-138)
 	}
 	delete it;
@@ -184,6 +194,10 @@ bool KBSTrackChange::DocumentHasSignedRecords(IDataBase* db)
 	return false;
 }
 
+// (CollectSignedTimes - every signed time of the document, walked once before and once after Accept All to
+//  tell the rows it accepted - stood here for one build on 2026-09-29. AcceptSignedInDocument hands those
+//  times back now, from the walks it makes anyway: the waste re-check P-2.)
+
 int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
@@ -252,9 +266,12 @@ int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 	return done;
 }
 
-int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy)
+int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy,
+	std::set<uint64>* outAcceptedTimes)
 {
 	outLeft = 0;
+	if (outAcceptedTimes != nil)
+		outAcceptedTimes->clear();
 	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
 	if (storyList == nil)
 	{
@@ -268,7 +285,8 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 	for (int32 i = 0; i < count; ++i)
 	{
 		const UIDRef story = storyList->GetNthTextModelUID(i);
-		const int32 before = CountSignedRecords(story, false);
+		std::set<uint64> timesBefore;
+		const int32 before = CountSignedRecords(story, false, (outAcceptedTimes != nil) ? &timesBefore : nil);
 		if (before == 0)
 			continue;
 		// ***** InDesign's OWN ACCEPT ALL, TOLD WHOSE (2026-09-29, the official-terms audit A-4 and the user's
@@ -297,9 +315,15 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 			outWhy = "InDesign would not accept the changes";
 			return -1;
 		}
-		const int32 after = CountSignedRecords(story, false);
+		std::set<uint64> timesAfter;
+		const int32 after = CountSignedRecords(story, false, (outAcceptedTimes != nil) ? &timesAfter : nil);
 		total += before - after;
 		outLeft += after;
+		// the times this accept took away - a row carrying one was accepted (re-check R-4)
+		if (outAcceptedTimes != nil)
+			for (std::set<uint64>::const_iterator t = timesBefore.begin(); t != timesBefore.end(); ++t)
+				if (timesAfter.count(*t) == 0)
+					outAcceptedTimes->insert(*t);
 	}
 	return total;
 }
@@ -357,7 +381,84 @@ void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<u
 	delete it;
 }
 
-bool KBSTrackChange::RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
+void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRow>& out)
+{
+	out.clear();
+	// ***** NO StoryHasChanges() IN FRONT (2026-09-29, the official-terms audit A-1). ***** It answers no for a
+	// story whose only changes stand in hidden conditional text (IRedlineDataStrand.h:107-112), so its rows
+	// would drop out of the list for a reason that has nothing to do with KBS - the ledger's warning
+	// (api-official-examples.md, "walk the tracked changes one by one"). Walking is cheap.
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return;
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	Utils<ITrackChangeUtils> utils;
+	RedlineIterator* it = redline->NewRedlineIterator(0);
+	if (it == nil)
+		return;
+	// One row per time, in the order the times are first met (position order - the walk runs from 0).
+	std::map<uint64, size_t> rowOfTime;
+	for (bool16 more = kTrue; more; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const bool isInsert = (record->GetChangeType() == VOSRedlineChange::kInsert);
+		const bool ours = IsSignAuthor(record->GetUserName());
+		const uint64 time = record->GetTimeStamp();
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+		if (!ours || !(isDelete || (isInsert && len > 0)))
+			continue;
+		std::map<uint64, size_t>::const_iterator known = rowOfTime.find(time);
+		if (known == rowOfTime.end())
+		{
+			SignedRow fresh;
+			fresh.time = time;
+			out.push_back(fresh);
+			known = rowOfTime.insert(std::make_pair(time, out.size() - 1)).first;
+		}
+		SignedRow& row = out[known->second];
+		if (isDelete)
+		{
+			if (row.hasDelete)
+				continue;		// one deletion per time (a second would be a split KBS never writes)
+			row.hasDelete = true;
+			row.delAt = at;
+			// The deleted text as CollectRecordsOfTimes reads it: the guide's utility, the description as the
+			// fallback.
+			if (model != nil && utils)
+				utils->GetDeletedText(model, at, row.deletedText);
+			if (row.deletedText.IsEmpty())
+				it->DescribeChangeContent(row.deletedText, 0x7fffffff);
+			row.deletedText.SetTranslatable(kFalse);
+		}
+		else
+		{
+			if (row.insLen == 0)
+				row.at = at;
+			row.insLen += len;
+			row.insertedText.Append(ReadText(story, at, len));	// the piece's own text (re-check R-2)
+		}
+	}
+	delete it;
+	// A row replaced with nothing stands where its deletion does; then everything in position order.
+	for (size_t k = 0; k < out.size(); ++k)
+	{
+		out[k].insertedText.SetTranslatable(kFalse);
+		if (out[k].insLen == 0)
+			out[k].at = out[k].delAt;
+	}
+	std::stable_sort(out.begin(), out.end(), [](const SignedRow& a, const SignedRow& b) { return a.at < b.at; });
+}
+
+namespace
+{
+// Take back (accept = false) or accept the ONE record standing at `at` of that kind and of exactly that
+// time - RejectRecord's walk, which AcceptRecord shares since 2026-09-29.
+bool ProcessRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete, bool accept)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
@@ -382,10 +483,21 @@ bool KBSTrackChange::RejectRecord(const UIDRef& story, TextIndex at, uint64 time
 			break;
 		}
 	}
-	const bool ok = found && it->ProcessReject(nil, kFalse, kFalse);
+	const bool ok = found && (accept ? it->ProcessAccept(nil, kFalse, kFalse) : it->ProcessReject(nil, kFalse, kFalse));
 	delete it;
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return ok;
+}
+}	// anonymous namespace
+
+bool KBSTrackChange::RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
+{
+	return ProcessRecord(story, at, time, isDelete, false);
+}
+
+bool KBSTrackChange::AcceptRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
+{
+	return ProcessRecord(story, at, time, isDelete, true);
 }
 
 bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange)

@@ -42,12 +42,12 @@
 #include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
 #include "KBSRunGuard.h"		// "is anything of ours running?" - one question, both runs
-#include "KBSTrackChange.h"		// Reject Change / Redo: is this row's tracked change still there?
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
+#include "KBSShowChanges.h"		// "Show Changes by KohakuFindChange" - the list rebuilt from the records
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -174,6 +174,19 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 			PMString summary;
 			KBSSearchEngine::SearchBook(summary);
+			KBSResultTree::Rebuild();
+			KBSResultTree::ShowStatus(summary);
+			break;
+		}
+
+		case kKBSShowChangesActionID:
+		{
+			// Show Changes by KohakuFindChange (2026-09-29): the list rebuilt from the Track Changes records
+			// KBS signed, over the current scope - the search's shape exactly (the engine keeps its own doors
+			// and says why on a refusal; the tree is drawn once, when it returns).
+			KBSPanelTitle::Update();
+			PMString summary;
+			KBSShowChanges::Run(summary);
 			KBSResultTree::Rebuild();
 			KBSResultTree::ShowStatus(summary);
 			break;
@@ -320,6 +333,17 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 
+			// A list rebuilt from the records (2026-09-29, Show Changes) offers no replace - the engine's
+			// door, asked here for the reason the report's door below is: a refusal leaves the tree as it is.
+			// Asked first, because the report's door would call such a list a report.
+			if (KBSResultModel::IsFromRecords())
+			{
+				PMString rebuilt("Change Checked: these rows were rebuilt from Track Changes - search again to replace.");
+				rebuilt.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(rebuilt);
+				break;
+			}
+
 			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
 			// this command out in that state (see UpdateActionStates), but a caller that never went
 			// through the menu - a script invoking the action - lands here whatever the menu says.
@@ -381,8 +405,29 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKBSRunRejectActionID:
+		case kKBSRunAcceptActionID:
+		{
+			// A run row's menu (2026-09-29, a list rebuilt from the records). Nothing stashed = nobody
+			// right-clicked a run row.
+			int32 chapter = -1, run = -1;
+			if (!KBSResultModel::GetContextMenuRun(chapter, run))
+				break;
+			if (RefusedWhileRunning())
+				break;
+			PMString status;
+			if (actionID.Get() == kKBSRunRejectActionID)
+				KBSReplaceEngine::RejectRun(chapter, run, status);
+			else
+				KBSReplaceEngine::AcceptRun(chapter, run, status);
+			RedrawAfterRowMenu();
+			KBSResultTree::ShowStatus(status);
+			break;
+		}
+
 		case kKBSStoryReplaceActionID:
 		case kKBSStoryRejectActionID:
+		case kKBSStoryAcceptActionID:
 		case kKBSStoryRedoActionID:
 		case kKBSStoryCheckAllActionID:
 		case kKBSStoryUncheckAllActionID:
@@ -400,6 +445,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				KBSReplaceEngine::ReplaceStory(chapter, group, status);	// no prompt (the user's call)
 			else if (id == kKBSStoryRejectActionID)
 				KBSReplaceEngine::RejectStory(chapter, group, status);
+			else if (id == kKBSStoryAcceptActionID)
+				KBSReplaceEngine::AcceptStory(chapter, group, status);	// 2026-09-29
 			else if (id == kKBSStoryRedoActionID)
 				KBSReplaceEngine::RedoStory(chapter, group, status);	// no prompt, like Replace
 			else
@@ -415,6 +462,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSReplaceHitActionID:
 		case kKBSRejectChangeActionID:
+		case kKBSAcceptChangeActionID:
 		{
 			// A hit row's right-click menu (2026-09-26). Nothing stashed = nobody right-clicked a hit
 			// row (a script firing the action by ID): do nothing.
@@ -426,6 +474,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString status;
 			if (actionID.Get() == kKBSReplaceHitActionID)
 				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
+			else if (actionID.Get() == kKBSAcceptChangeActionID)
+				KBSReplaceEngine::AcceptHit(chapter, hit, status);	// 2026-09-29
 			else
 				KBSReplaceEngine::RejectHit(chapter, hit, status);
 			RedrawAfterRowMenu();
@@ -618,6 +668,12 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KBSSearchEngine::CanSearchTab(KBSSearchEngine::CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
 		}
+		else if (action == kKBSShowChangesActionID)
+		{
+			// Show Changes by KohakuFindChange (2026-09-29): while the current scope has something to read -
+			// the search's own question (runs are greyed above, before this loop).
+			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
+		}
 		else if (action == kKBSScopeBookActionID)
 		{
 			int16 actionState = kEnabledAction;
@@ -714,7 +770,8 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSStoryReplaceActionID || action == kKBSStoryRejectActionID || action == kKBSStoryRedoActionID
-			|| action == kKBSStoryCheckAllActionID || action == kKBSStoryUncheckAllActionID)
+			|| action == kKBSStoryCheckAllActionID || action == kKBSStoryUncheckAllActionID
+			|| action == kKBSStoryAcceptActionID)
 		{
 			// A story row's menu (2026-09-27): each item while it has something to do in that story.
 			int32 chapter = -1, group = -1;
@@ -723,8 +780,8 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			{
 				if (action == kKBSStoryReplaceActionID)
 					enable = KBSReplaceEngine::CanReplaceStory(chapter, group);
-				else if (action == kKBSStoryRejectActionID)
-					enable = KBSReplaceEngine::CanRejectStory(chapter, group);
+				else if (action == kKBSStoryRejectActionID || action == kKBSStoryAcceptActionID)
+					enable = KBSReplaceEngine::CanRejectStory(chapter, group);	// Accept (2026-09-29): the same rows
 				else if (action == kKBSStoryRedoActionID)
 					enable = KBSReplaceEngine::CanRedoStory(chapter, group);
 				else
@@ -741,18 +798,22 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KBSReplaceEngine::CanReplaceHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKBSRejectChangeActionID)
+		else if (action == kKBSRejectChangeActionID || action == kKBSAcceptChangeActionID)
 		{
-			// A hit row's menu (2026-09-26): Reject Change while the row's tracked change is still there.
-			// (Runs are greyed out above, before this loop. Redo shared this branch until 2026-09-27.)
+			// A hit row's menu (2026-09-26): Reject Change - and its twin Accept Change since 2026-09-29 - while
+			// the row's tracked change is still there. (Runs are greyed out above, before this loop. Redo
+			// shared this branch until 2026-09-27.)
 			int32 chapter = -1, hit = -1;
-			bool enable = false;
-			if (KBSResultModel::GetContextMenuHit(chapter, hit))
-			{
-				UIDRef storyRef;
-				KBSTrackChange::Change change;
-				enable = KBSTrackChange::FindRowChangeForHit(chapter, hit, storyRef, change);
-			}
+			const bool enable = KBSResultModel::GetContextMenuHit(chapter, hit)
+				&& KBSReplaceEngine::CanAcceptOrRejectHit(chapter, hit);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKBSRunRejectActionID || action == kKBSRunAcceptActionID)
+		{
+			// A run row's menu (2026-09-29): while the run has a replaced row with its change left.
+			int32 chapter = -1, run = -1;
+			const bool enable = KBSResultModel::GetContextMenuRun(chapter, run)
+				&& KBSReplaceEngine::CanRejectOrAcceptRun(chapter, run);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSChapterRedoActionID)
