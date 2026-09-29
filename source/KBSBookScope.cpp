@@ -34,9 +34,9 @@
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
-// (IMenuUtils.h was here for InsertAmpersandForDisplay until 2026-08-03. The status line doubles
+// (IMenuUtils.h was here for InsertAmpersandForDisplay until 2026-08-03. The status line doubled
 // its own ampersands for the whole message, so doubling a chapter name here as well ran it twice -
-// see AppendChapterNote.)
+// see AppendChapterNote. Since 2026-09-29 nothing doubles them: the message area draws '&' as it is.)
 #include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
 #include "IPanelControlData.h"	// what QueryActiveBookPanel hands over - the book panel's class is read off it
 #include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
@@ -1152,12 +1152,12 @@ void KBSBookScope::AppendChapterNote(PMString& outSummary, const char* what,
 			outSummary.Append("...");
 			break;
 		}
-		// RAW, with its ampersands as the user typed them. What this builds is a STATUS LINE, and the
-		// one place that draws one doubles the ampersands of the WHOLE line on its way to the widget
-		// (KBSResultListWidgetMgr's WriteStatusWidget, since 2026-07-31). Doubling the name here as
-		// well ran that twice: "A&B.indd" went to "A&&B.indd" and then to "A&&&&B.indd", which a
-		// StaticText draws as "A&&B.indd" (found 2026-08-03 in the defect audit). Anything that starts
-		// drawing this string WITHOUT going through the status line has to do its own doubling,
+		// RAW, with its ampersands as the user typed them. What this builds is a STATUS LINE. Until
+		// 2026-09-29 the one place that draws one doubled the ampersands of the WHOLE line on its way to
+		// a stock StaticText, so doubling the name here as well ran that twice: "A&B.indd" went to
+		// "A&&&&B.indd" and drew as "A&&B.indd" (found 2026-08-03 in the defect audit). The message
+		// area is drawn by hand now and takes '&' as it is (KBSStatusTextView.cpp) - raw is still
+		// right. Anything that starts drawing this string in a STOCK widget has to do its own doubling,
 		// exactly as the tree's rows do (SetColumnText).
 		PMString name(names[i]);
 		name.SetTranslatable(kFalse);

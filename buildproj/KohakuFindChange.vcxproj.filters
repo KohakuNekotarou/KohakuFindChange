@@ -36,6 +36,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSStatusTextView.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSDrawEventHandler.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -156,6 +159,12 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSStatusTextData.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTextDraw.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultTree.h">

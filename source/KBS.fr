@@ -227,6 +227,24 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The panel's MESSAGE AREA (2026-09-29), built the same way as the cell above and for the same
+	 * reason: a replaced row, once selected, shows its text as it was BEFORE the replace here, and
+	 * "which characters were replaced" is a question one colour cannot answer (KBSStatusTextView.cpp).
+	 * Brought over from KCM, whose kKCMStatusTextWidgetBoss replaced the same stock widget.
+	 * ! No ITextControlData of our own: the one kGenericPanelWidgetBoss carries is persistent, and the
+	 *   data implementation writes the message into it for a reader that walks the widgets.
+	 */
+	Class
+	{
+		kKBSStatusTextWidgetBoss,
+		kGenericPanelWidgetBoss,
+		{
+			IID_ICONTROLVIEW, kKBSStatusTextViewImpl,
+			IID_IKBSSTATUSTEXTDATA, kKBSStatusTextDataImpl,
+		}
+	},
+
+	/*
 	 * Result tree row (Task 3): the node boss now carries the click handler that jumps to a hit.
 	 * Shared by the chapter and hit row resources; the handler tells them apart by the node index
 	 * (only hit rows jump).
@@ -1187,6 +1205,15 @@ type KBSColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSColorT
 {
 };
 
+// The panel's message area (2026-09-29): drawn by hand for the same reason (see
+// kKBSStatusTextWidgetBoss). ! The field list is GenericPanelWidget's, NOT StaticMultiLineTextWidget's -
+// gone from the line that uses it are the alignment, the ellipsize style, the ampersand flag, the font,
+// the LINE COUNT and the initial string. The drawing code decides all of them, and the line count is the
+// box's own height now (KBSStatusTextView.cpp). KCM's KCMStatusTextWidget is the same type.
+type KBSStatusTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSStatusTextWidgetBoss)
+{
+};
+
 type KBSResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKBSResultCheckWidgetBoss)
 {
 };
@@ -1316,25 +1343,30 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// ! The old comment here said "3 lines at ~17px", which is what made 52 look right. It was
 		// never measured. If the palette font ever changes size, measure again - the rule is the
 		// remainder, not the number 48.
-		StaticMultiLineTextWidget
+		//
+		// ***** DRAWN BY HAND SINCE 2026-09-29 (KBSStatusTextView.cpp). ***** This was a
+		// StaticMultiLineTextWidget. ONLY THE DRAWING CHANGED: the same WidgetID, the same Frame, the
+		// same binding, the same messages arriving through KBSResultTree::ShowStatus - so
+		// KBSPanelMetrics' 72px and the illustrations sitting on the block's bottom edge are untouched.
+		// What the stock widget could not do is two colours in one box, and this box shows a replaced
+		// row's text as it was BEFORE the replace, where the question is "which characters were
+		// replaced". The same move KCM made with its own message area (kKCMStatusTextWidgetBoss).
+		// ! The stock fields are gone: the alignment (always left), the ellipsize style (a wrapping box
+		//   has no "one line"; the view ends a message that does not fit with an ellipsis), the
+		//   ampersand flag (kFalse in the drawing - no more doubling), the font (the rows' system-script
+		//   palette font) and the LINE COUNT (as many whole lines as the height holds - 4 in both
+		//   languages at the heights above). The initial text is written when the panel is shown
+		//   (KBSResultTree::RestoreStatusOnPanelShow), as it always was in effect.
+		KBSStatusTextWidget
 		(
 			kKBSStaticTextWidgetID,			 // WidgetId
 			kPMRsrcID_None,					 // RsrcId
 			kBindLeft | kBindRight | kBindTop, // Frame binding
 			Frame(5, 6, 256, 54),			 // Frame: left, top, right, bottom (48px = four 12px lines)
 			kTrue, kTrue,					 // Visible, Enabled
-			// StaticTextAttributes: alignment, ellipsize style, convert ampersands. kDontEllipsize
-			// because a wrapping box has somewhere to put the rest of the sentence - the whole point
-			// of the change - and a "..." would throw it away again on the last line.
-			kAlignLeft, kDontEllipsize, kTrue,
-			// StaticMultiLineTextAttr: scroll bar widget, font, pixels between lines, inset.
-			// No scroll bar: four lines are the budget, and one that appeared would sit on top of
-			// the illustration. The rest are KESCM's values for the same kind of box.
-			kInvalidWidgetID,
-			kPaletteWindowFontId,
-			4,
-			2, 0,
-			kKBSStaticTextKey				// Initial text.
+			"",								 // Panel name (none)
+			{
+			}
 		),
 
 		/* The panel's illustration, to the right of the message: hover it for the plug-in's home

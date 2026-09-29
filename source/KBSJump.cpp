@@ -738,7 +738,7 @@ bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID 
 
 }
 
-void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
+bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef docRef;
 	IDFile file;
@@ -751,7 +751,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
 		KBSHitMarker::ClearMarker();
-		return;
+		return false;
 	}
 
 	// ***** A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY (2026-09-27 defect sweep, P-3). ***** A
@@ -762,7 +762,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	{
 		KBSHitMarker::ClearMarker();
 		SayRowHasNoPlace();
-		return;
+		return false;
 	}
 
 	// The chapter may have been closed since the search (the user can close a held window). Bring
@@ -770,7 +770,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 	{
 		KBSHitMarker::ClearMarker();	// it has already said why through the status line
-		return;
+		return false;
 	}
 
 	// ***** A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST (2026-09-26). ***** The record moves
@@ -790,7 +790,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (db == nil)
 	{
 		KBSHitMarker::ClearMarker();
-		return;
+		return false;
 	}
 	const UIDRef storyRef(db, storyUID);
 
@@ -848,7 +848,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		PMString message("Cannot bring that chapter's window to the front.");
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
-		return;
+		return false;
 	}
 
 	// The tour has moved: with "Hide Previous Chapter" ON, every other displayed clean document is
@@ -946,6 +946,7 @@ void KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		}
 		KBSResultTree::ShowStatus(message);
 	}
+	return sameOccurrence;
 }
 
 void KBSJump::ShowChapter(int32 chapterIdx)
@@ -1253,12 +1254,40 @@ void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
+	// ***** THE MESSAGE AREA FOLLOWS THE ROW (2026-09-29, the user's request - "show the text as it was
+	// before, the way KCM does, when a row is selected"). ***** Settled here, the one door, so a click and a
+	// keyboard walk cannot disagree about it:
+	//   * a hit row the jump LANDED on shows its "Source Text:" when it holds a replace (a replaced row, an
+	//     accepted one, a footnote's) - with the rows written side by side with it, as the RECORDS have
+	//     them now (KBSTrackChange::CurrentReplacedGroup: the stored ranges of every row but this one are
+	//     behind any edit made since) - and takes a standing one down when it does not;
+	//   * a jump that did not land has said why through ShowStatus, which takes it down already - or had
+	//     nothing to say, and then the last message comes back rather than another row's text;
+	//   * a document, story or book row has no "before" of its own.
 	if (hitIdx >= 0)
-		JumpToHit(chapterIdx, hitIdx);
+	{
+		if (JumpToHit(chapterIdx, hitIdx))
+		{
+			std::vector<int32> group;
+			bool neighboursRead = false;
+			KBSTrackChange::CurrentReplacedGroup(chapterIdx, hitIdx, group, neighboursRead);
+			if (neighboursRead)
+				KBSResultTree::RefreshRows();		// their lines were read again - show them as they are
+			KBSResultTree::ShowRowsBefore(chapterIdx, group);	// no rows = no replace: takes one down
+		}
+		else
+			KBSResultTree::DropBefore();
+	}
 	else if (chapterIdx >= 0)
+	{
+		KBSResultTree::DropBefore();
 		ShowChapter(chapterIdx);
+	}
 	else if (chapterIdx == -1)
+	{
+		KBSResultTree::DropBefore();
 		ShowBook();
+	}
 }
 
 // End, KBSJump.cpp.

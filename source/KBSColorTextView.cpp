@@ -49,6 +49,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSColorTextView.h"
+#include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
 #include "KBSResultModel.h"		// MarkUpBreaksForDisplay - the pilcrow / return arrow a break draws as
 
 // How far up the widget chain to look for the hilite (see KBSViewOrParentIsHilited). One step is
@@ -76,16 +77,9 @@ static bool16 KBSViewOrParentIsHilited(IControlView* view, int32 stepsLeft)
 	return KBSViewOrParentIsHilited(parentView, stepsLeft - 1);
 }
 
-// Linear blend of two RGB colours (t = 0 -> bg, t = 1 -> fg). Used to fade the context text
-// toward the panel background (the KESCM scrollbar-map trick).
-static RealAGMColor BlendColor(const RealAGMColor& bg, const RealAGMColor& fg, const PMReal& t)
-{
-	const PMReal u = PMReal(1.0) - t;
-	return RealAGMColor(
-		ToDouble(bg.red   * u + fg.red   * t),
-		ToDouble(bg.green * u + fg.green * t),
-		ToDouble(bg.blue  * u + fg.blue  * t));
-}
+// (The blend that fades the context toward the background stood here as a static until 2026-09-29. It
+//  is KBSBlendColor in KBSPanelTextDraw.h now, with the 0.65 it is used at: the panel's message area
+//  fades its context the same way, and two copies would be two things to keep in step.)
 
 // (The break characters are turned into marks by KBSResultModel::MarkUpBreaksForDisplay, which
 //  stood here as a static until 2026-08-04. It moved because the SAVED REPORT has to show a match
@@ -257,13 +251,9 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// fill on a selected row would fade them toward a colour that is not behind them any more.
 	// The matched text is drawn at the full theme text colour; the context (the "P<page>(<n>)"
 	// locator and the rest of the line) is that same colour faded toward the background, so the
-	// match reads at full strength and the context recedes. Tune kContextTextWeight to taste:
-	// 0 = fully the background (invisible), 1 = the full text colour (no fade).
-	//
-	// 0.65 rather than the 0.50 it shipped with (user's call 2026-08-02, "blend it into the
-	// background a little less"): half and half made the surrounding line harder to read than it
-	// needed to be, and the match still stands out at this weight.
-	const PMReal kContextTextWeight(0.65);
+	// match reads at full strength and the context recedes. How far it recedes is
+	// kKBSContextTextWeight (KBSPanelTextDraw.h, with its history) - one number for this cell and the
+	// panel's message area.
 	RealAGMColor bg(0.5, 0.5, 0.5), fg(0.0, 0.0, 0.0);	// sane fallbacks if the query fails
 	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
 	if (colors != nil)
@@ -272,7 +262,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		colors->GetRealAGMColor(isHilited ? kInterfaceHighLightText : kInterfaceTextColor, fg);
 	}
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
-	const RealAGMColor kContextColor = BlendColor(bg, fg, kContextTextWeight);	// faded toward bg
+	const RealAGMColor kContextColor = KBSBlendColor(bg, fg, PMReal(kKBSContextTextWeight));	// faded toward bg
 
 	// The emphasised run: the matched text while these are search results, and the text that
 	// REPLACED it once a replace has run (the panel then lists only what changed, so the new text
@@ -308,14 +298,10 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
 	// keeps that fixed for every row (see KBSResultListWidgetMgr - the check box sits in the margin
 	// rather than pushing its row's text right).
-	// Named rather than passed as bare kFalse, which is how the app's own drawing code writes it
-	// (CRenderingObjectDrawer::DrawRenderObjectUIName). Every call below spells both out instead of
-	// letting the defaults apply, because the defaults in DrawStringUtils.h DISAGREE with each
-	// other: the draw calls default to kFalse but the measure and ellipsize calls default to kTrue.
-	// Taking the defaults would measure a string differently from how it is drawn. '&' has to
-	// survive verbatim here in any case - this is document text, not a menu label.
-	const bool16 kDontConvertAmpersand = kFalse;
-	const bool16 kNoUnderline = kFalse;
+	// Every call below spells out both flags instead of letting the defaults apply - the defaults in
+	// DrawStringUtils.h DISAGREE with each other (KBSPanelTextDraw.h says how, and why '&' survives).
+	const bool16 kDontConvertAmpersand = kKBSDontConvertAmpersand;
+	const bool16 kNoUnderline = kKBSNoUnderline;
 
 	const PMReal kLocatorGap(8.0);		// space between the locator and the line text
 	if (!locator.IsEmpty() && x < rightEdge)
@@ -357,22 +343,60 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		x += StringUtils::PMMeasureString(&gc, s, fontInfo, kDontConvertAmpersand).X();
 	};
 
+	// ***** AN EMPTY MATCH IS A PLACE, AND IT IS DRAWN AS A BAR (2026-09-29, the user's request: "the
+	// bar KCM draws"). ***** A row replaced with nothing, and a zero-width match (^, $, a lookaround),
+	// have no characters at the match, so the line closed up around it and did not say WHERE. The bar
+	// stands in the room of one space (KBSPanelTextDraw.h) and everything below treats it as a match of
+	// that width - so the context gives way around it exactly as it gives way around characters.
+	// ***** EVERY EMPTY MATCH, EVEN WITH NOTHING EITHER SIDE (2026-09-29, the user: "no bar when it was
+	// ***** deleted at the very end"). ***** It was held back when the line had no other text as well, on the
+	// thought that such a row was a position that could not be read. But that is exactly what the LAST
+	// paragraph of a story looks like once its only word is replaced with nothing: a paragraph in the middle
+	// keeps its pilcrow in the trailing context, the last one has none - so the bar went missing there
+	// alone. (A "deleted" row keeps the match it was found with. A match whose story had no text model to
+	// read comes with three empty segments and now draws the bar alone - a place with nothing to show,
+	// which is what the bar says.)
+	// ! The label a reader walks still says "[]" (KBSRowData::SetSegments): the bar is drawn, never
+	//   written.
+	const bool wantCaret = match.IsEmpty();
+
 	const PMReal preW   = pre.IsEmpty()   ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, pre,   fontInfo, kDontConvertAmpersand).X();
-	const PMReal matchW = match.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, match, fontInfo, kDontConvertAmpersand).X();
+	const PMReal matchW = wantCaret
+		? StringUtils::PMMeasureString(&gc, KBSCaretPlaceholder(), fontInfo, kDontConvertAmpersand).X()
+		: (match.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, match, fontInfo, kDontConvertAmpersand).X());
 	const PMReal postW  = post.IsEmpty()  ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, post,  fontInfo, kDontConvertAmpersand).X();
+
+	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel
+	// short of each edge, as KCM's one-line change row draws it.
+	auto drawMatch = [&](const PMString& s)
+	{
+		if (!wantCaret)
+		{
+			drawRun(s, kMatchColor);
+			return;
+		}
+		KBSDrawCaret(gPort, kMatchColor, x, matchW, frame.Top() + PMReal(1.0), frame.Height() - PMReal(2.0));
+		x += matchW;
+	};
 
 	if (preW + matchW + postW <= availWidth)
 	{
 		// The whole line fits: draw the three runs unchanged.
 		drawRun(pre, kContextColor);
-		drawRun(match, kMatchColor);
+		drawMatch(match);
 		drawRun(post, kContextColor);
 	}
 	else if (matchW >= availWidth)
 	{
 		// The match alone overflows the cell: ellipsize the match itself (tail) and drop the context.
-		const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
-		drawRun(m, kMatchColor);
+		// (A bar is one space wide and is drawn as it is.)
+		if (wantCaret)
+			drawMatch(match);
+		else
+		{
+			const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			drawRun(m, kMatchColor);
+		}
 	}
 	else
 	{
@@ -393,7 +417,7 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
 
 		drawRun(preCut, kContextColor);
-		drawRun(match, kMatchColor);
+		drawMatch(match);
 		drawRun(postCut, kContextColor);
 	}
 }

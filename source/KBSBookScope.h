@@ -170,9 +170,9 @@ namespace KBSBookScope
 	    a status line stays short even at three lines. Appends nothing when 'names' is empty, so the
 	    ordinary summary is unchanged.
 
-	    Names are appended RAW, ampersands and all: the one place that draws a status line doubles
-	    them for the whole message (the note at its definition says what doubling twice looked
-	    like). The notes built on it: AppendUnopenableNote, AppendUnclosedNote, and the search's two
+	    Names are appended RAW, ampersands and all: the message area is drawn by hand and takes '&' as
+	    it is (since 2026-09-29; the stock widget before it had the whole line doubled on the way in -
+	    the note at the definition says what doubling twice looked like). The notes built on it: AppendUnopenableNote, AppendUnclosedNote, and the search's two
 	    (KBSSearchEngine.cpp, AppendUnsearchableNote / AppendSearchErrorNote). */
 	void AppendChapterNote(PMString& outSummary, const char* what, const std::vector<PMString>& names,
 		const char* tail);

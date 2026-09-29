@@ -62,3 +62,6 @@ REGISTER_PMINTERFACE(KBSBookPanelCmdWatch, kKBSBookPanelCmdWatchImpl)
 // The replace's signature (2026-09-28): the command and its 64-bit data (KBSSignRecordsCmd.cpp).
 REGISTER_PMINTERFACE(KBSSignRecordsCmd, kKBSSignRecordsCmdImpl)
 REGISTER_PMINTERFACE(KBSInt64Data, kKBSInt64DataImpl)
+// The panel's message area (2026-09-29): its view and its data (KBSStatusTextView.cpp).
+REGISTER_PMINTERFACE(KBSStatusTextView, kKBSStatusTextViewImpl)
+REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)

@@ -40,8 +40,13 @@ namespace KBSJump
 	          and the keyboard walk - go through ActivateNode, which is where the "one activation at a
 	          time" guard lives. Kept public because it is the operation this file is named for and
 	          reads as the header's subject; but a new caller reaching it directly would bypass that
-	          guard, so go through ActivateNode. */
-	void JumpToHit(int32 chapterIdx, int32 hitIdx);
+	          guard, so go through ActivateNode.
+	    @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
+	          still the text the row describes (overset or not). False for every other end: a bad index,
+	          a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
+	          text is no longer there (each of which has said why, or has nothing to say). ActivateNode
+	          reads it to decide whether the row's "Source Text:" goes up (2026-09-29). */
+	bool JumpToHit(int32 chapterIdx, int32 hitIdx);
 
 	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if
 	    the user closed it since the search. Does NOT scroll and raises no marker - a chapter row
@@ -58,6 +63,9 @@ namespace KBSJump
 	/** The single door every result row goes through: a hit row jumps, a chapter row shows its
 	    document, the book row activates its book. Called by the row click and by the keyboard
 	    walk, which is why it exists - two callers must not drift apart.
+	    ***** AND IT SETTLES THE MESSAGE AREA'S "Source Text:" (2026-09-29): ***** a hit row the jump landed on
+	    that holds a replace shows its text as it was before the replace (KBSResultTree::ShowRowsBefore);
+	    any other row - and a jump that did not land - takes a standing one down (DropBefore).
 	    @param chapterIdx the chapter index, or -1 for the book row.
 	    @param hitIdx the hit index, or -1 when the row is not a hit row.
 	    (A third parameter said whether the marker should wait out the double-click interval - the

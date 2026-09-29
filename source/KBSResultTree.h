@@ -19,6 +19,8 @@
 
 #include "PMString.h"
 
+#include <vector>		// ShowRowsBefore's rows
+
 namespace KBSResultTree
 {
 	/** (Re)load the panel's result tree from KBSResultModel. A book result comes up with the book
@@ -49,13 +51,37 @@ namespace KBSResultTree
 	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
 	void RefreshCheckedCounts(int32 chapterIdx);
 
-	/** Write a one-line message to the panel's status read-out (its single-line StaticText). Safe
+	/** Write a message to the panel's message area (drawn by hand since 2026-09-29 - KBSStatusTextView;
+	    a wrapping StaticText before that). Takes the place of a standing "Source Text:" (ShowRowsBefore). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
-	/** Put the status read-out back to what THIS session last had on it - or, when nothing has run
-	    since launch, to the .fr's own initial text. Called from the panel's AutoAttach, and only
+	/** ***** A REPLACED ROW, ONCE SELECTED, SHOWS ITS TEXT AS IT WAS BEFORE THE REPLACE (2026-09-29, the
+	    user's request - "the way KCM does"). ***** The message area reads
+
+	        Source Text:
+	        <the row's words before>  <the text the replace took>  <the row's words after>
+
+	    the taken text at the theme's text colour and the words around it faded, breaks drawn as marks;
+	    a replace that took nothing (an insertion) shows the bar there instead. A row touching others it
+	    was replaced with shows what the whole group took (KBSResultModel::GetRowsBefore).
+	    Put up OVER the last message, which stays kept: no rows (the row holds no replace) - or rows that
+	    are not all replaced, or not rows - take a standing one down instead (DropBefore), and so does
+	    anything that reports through ShowStatus.
+	    Called by the jump once it has landed on the row (KBSJump::ActivateNode), with the group as the
+	    records have it (KBSTrackChange::CurrentReplacedGroup); safe when the panel is closed (the
+	    "Source Text:" is kept, and comes back with the panel).
+	    @param rows the row and the replaced rows written side by side with it, in text order. */
+	void ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& rows);
+
+	/** Take a standing "Source Text:" down and put the last message back (or the opening one, with nothing
+	    run this session). Nothing happens when none is standing. */
+	void DropBefore();
+
+	/** Put the status read-out back to what THIS session last had on it - a standing "Source Text:" first
+	    (ShowRowsBefore), then the last message - or, when nothing has run since launch, to the opening
+	    message (the string table's kKBSStaticTextKey). Called from the panel's AutoAttach, and only
 	    from there.
 
 	    Why it is needed: a widget's string is persisted in the WORKSPACE, so a rebuilt panel comes

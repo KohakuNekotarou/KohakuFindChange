@@ -59,6 +59,7 @@
 #include "LocaleSetting.h"
 #include "PMString.h"
 #include "RsrcSpec.h"
+#include "TextChar.h"		// kTextChar_Ellipse - the mark on a cut "Source Text:"
 #include "Utils.h"
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
 
@@ -68,6 +69,7 @@
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
+#include "IKBSStatusTextData.h"	// the message area's pieces (2026-09-29)
 #include "KBSPanelIcon.h"		// the illustration follows the status line
 
 namespace
@@ -821,19 +823,31 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 // property on 2026-09-27.)
 static PMString gLastStatus;
 
+// ***** THE "Source Text:" A SELECTED REPLACED ROW PUT UP (2026-09-29, ShowRowsBefore). ***** Its pieces, and
+// whether it is standing - kept beside gLastStatus for the same reason: the panel can be closed and
+// shown again while it stands. It stands OVER the last message rather than replacing it, so that
+// selecting a row that has no "before" puts that message back (DropBefore); gLastStatus is not touched.
+static bool gShowingBefore = false;
+static PMString gBeforePre;
+static PMString gBeforeOriginal;
+static PMString gBeforePost;
+
 void KBSResultTree::ShutdownCleanup()
 {
-	// The one static this file keeps, emptied for the reason KBSResultModel empties its five (four
-	// when this line was written; gRunSummary joined them on 2026-08-09 and that list says "ALL
-	// FIVE" - counted again here 2026-08-11): a
-	// PMString still holding storage when the .pln unloads runs its destructor against an application
-	// that has already torn itself down (the KESCL ShutdownCleanup rule).
+	// The statics this file keeps, emptied for the reason KBSResultModel empties its own: a PMString
+	// still holding storage when the .pln unloads runs its destructor against an application that has
+	// already torn itself down (the KESCL ShutdownCleanup rule).
 	//
-	// Added on 2026-08-08. It had been standing since the status line was first kept in the module,
-	// through both of the earlier sweeps that wrote that rule down - KBSResultModel's list even says
-	// "when a static is added above, it is added here too", and KBSSearchEngine's names "a static
-	// PMString" as the example. Neither of them was looking in this file.
+	// gLastStatus was added here on 2026-08-08. It had been standing since the status line was first
+	// kept in the module, through both of the earlier sweeps that wrote that rule down - KBSResultModel's
+	// list even says "when a static is added above, it is added here too", and KBSSearchEngine's names
+	// "a static PMString" as the example. Neither of them was looking in this file. The three pieces of
+	// the "Source Text:" joined it on 2026-09-29, in the same change that added them.
 	gLastStatus.Clear();
+	gShowingBefore = false;
+	gBeforePre.Clear();
+	gBeforeOriginal.Clear();
+	gBeforePost.Clear();
 
 	// (KBSEditStamp::ShutdownCleanup was called from here between 2026-08-08 and 2026-08-09. It is
 	//  on KBSStartupShutdown's own list now, beside every other emptier. A clean-up nested inside
@@ -846,44 +860,70 @@ void KBSResultTree::ShutdownCleanup()
 namespace
 {
 
-/** Draw 'message' on the panel's status read-out. Does nothing when the panel is closed, which is an
-    ordinary state. Shared by ShowStatus and by the restore below, so both spell the message the same
-    way; only ShowStatus decides what the message IS.
+/** Put these pieces on the panel's message area (IKBSStatusTextData.h says what each is). Does nothing
+    when the panel is closed, which is an ordinary state. Shared by every writer below, so they all
+    reach the box the same way; they decide only WHAT it says.
+
+    ***** NO '&' DOUBLING SINCE 2026-09-29. ***** The line names files the user chose, and the stock
+    StaticText this box used to be took a lone '&' as a keyboard accelerator ("A&B.indd" drew as "AB.indd"
+    with the B underlined - reported 2026-07-31), so every message went through InsertAmpersandForDisplay
+    on its way in. The box is drawn by hand now, with convertAmpersand kFalse (KBSStatusTextView.cpp), so
+    the text is the text - and a reader of the widget (KIDMCP's inspect_ui) reads "A&B.indd" rather than
+    the doubled "A&&B.indd" it used to get.
 
     @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
                        there is nothing on screen to force yet, and this runs mid-construction. */
-void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
+void WriteStatusWidget(const PMString& label, const PMString& pre, const PMString& mid,
+	const PMString& post, bool16 wantCaret, bool16 forceRedraw)
 {
-	// Reach the status text through the panel; nil when the panel is closed (do nothing then) - the
-	// same reach Rebuild uses, which is why this lives here rather than in the action component.
+	// Reach the box through the panel; nil when the panel is closed (do nothing then) - the same reach
+	// Rebuild uses, which is why this lives here rather than in the action component.
 	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
 	if (panelData == nil)
 		return;
 	IControlView* textView = panelData->FindWidget(kKBSStaticTextWidgetID);
 	if (textView == nil)
 		return;
-	InterfacePtr<ITextControlData> textData(textView, UseDefaultIID());
+	InterfacePtr<IKBSStatusTextData> textData(textView, UseDefaultIID());
 	if (textData == nil)
 		return;
 
-	// This line names files the user chose - a document's or a book's - and a StaticText takes a
-	// lone '&' as a keyboard accelerator, so "A&B.indd" drew as "AB.indd" with the B underlined
-	// (reported from the panel, 2026-07-31). Doubling each one up is the same thing SetColumnText
-	// above already does for the tree's rows, and what the shipping panels do before handing a
-	// user-entered name to a static text.
-	//
-	// ONLY what is drawn is doubled. gLastStatus keeps the message exactly as it was written, so the
-	// restore below doubles it once, not once per showing.
-	// ! A reader of the WIDGET (KIDMCP's inspect_ui) gets the doubled form: "A&&B.indd".
-	PMString display(message);
-	Utils<IMenuUtils>()->InsertAmpersandForDisplay(&display);
+	textData->SetSegments(label, pre, mid, post, wantCaret);
 
-	// A single-line StaticText does not repaint on SetString alone, so invalidate + force a redraw
-	// (the SDK immediate-StaticText-update rule).
-	textData->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
+	// The pieces are not something the view watches, so it is told to repaint - and forced to at once,
+	// the rule the stock StaticText needed as well (it did not repaint on SetString alone).
 	textView->Invalidate();
 	if (forceRedraw)
 		textView->ForceRedraw();
+}
+
+/** An ordinary message: the sentence alone, in the theme's text colour - what the stock widget drew. */
+void WriteMessage(const PMString& message, bool16 forceRedraw)
+{
+	const PMString kNothing;
+	WriteStatusWidget(kNothing, kNothing, message, kNothing, kFalse, forceRedraw);
+}
+
+/** The "Source Text:" that is standing (ShowRowsBefore): the heading, then the row's line with the text the
+    replace took in the middle - or the bar, when it took nothing (an insertion). */
+void WriteBefore(bool16 forceRedraw)
+{
+	// ***** "Source Text:", KCM's word (the user's call, 2026-09-29 - "Before:" until then). ***** KCM's
+	// message area says the same thing in the same place: the row shows the newer side, the box the older
+	// one. Here the older side is what Track Changes holds as the deletion - what Reject brings back.
+	PMString label("Source Text:");
+	label.SetTranslatable(kFalse);
+	WriteStatusWidget(label, gBeforePre, gBeforeOriginal, gBeforePost,
+		gBeforeOriginal.IsEmpty() ? kTrue : kFalse, forceRedraw);
+}
+
+/** What the box says when nothing has run since launch - the string table's, so it cannot drift from
+    what a freshly installed panel says. */
+PMString InitialMessage()
+{
+	PMString initial(kKBSStaticTextKey);
+	initial.Translate();
+	return initial;
 }
 
 }	// anonymous namespace
@@ -894,24 +934,29 @@ void KBSResultTree::RestoreStatusOnPanelShow()
 	// once more when InDesign is launched - comes back carrying whatever this line last said,
 	// including a message from a session that ended days ago, while the results it described are
 	// long gone (reported 2026-08-02: "the previous message is still there after a restart"). The
-	// .fr's initial text is only ever used the very first time the panel is built.
+	// .fr's initial text was only ever used the very first time the panel was built. (Since 2026-09-29
+	// the box is drawn by hand from pieces nothing persists, and its resource carries no text at all -
+	// so this is the only writer a newly built panel meets.)
 	//
 	// So the panel's show is where the line has to be written, exactly as the tab's name and the
 	// illustration already are: whatever is written here outranks the persisted value.
+	if (gShowingBefore)
+	{
+		// A selected replaced row's "Source Text:" was standing when the panel went away: it comes back
+		// with the panel, the way the message under it would have.
+		WriteBefore(kFalse /*still being built*/);
+		return;
+	}
 	if (!gLastStatus.IsEmpty())
 	{
 		// Something ran in THIS session: put its message back. This also restores the line when the
 		// panel is closed and reopened mid-session, which used to lose it.
-		WriteStatusWidget(gLastStatus, kFalse /*still being built*/);
+		WriteMessage(gLastStatus, kFalse /*still being built*/);
 		return;
 	}
 
-	// Nothing has run since launch, so the line says what a freshly installed panel says. Taken from
-	// the string table rather than spelled out here, so it cannot drift from the .fr's own initial
-	// text - which would show as the old wording flashing up for the instant before this runs.
-	PMString initial(kKBSStaticTextKey);
-	initial.Translate();
-	WriteStatusWidget(initial, kFalse /*still being built*/);
+	// Nothing has run since launch, so the line says what a freshly installed panel says.
+	WriteMessage(InitialMessage(), kFalse /*still being built*/);
 }
 
 void KBSResultTree::ShowStatus(const PMString& message)
@@ -920,6 +965,10 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	// is a panel to draw it on.
 	gLastStatus = message;
 	gLastStatus.SetTranslatable(kFalse);
+
+	// A new message takes the place of a standing "Source Text:" (2026-09-29): it reports something that has
+	// happened since, and a jump that fails says why through here - never under an old row's text.
+	gShowingBefore = false;
 
 	// The illustration follows the same moments this line does, so it is settled here rather than at
 	// every call site. Both directions run through here: an engine reports what it found (the model
@@ -930,7 +979,70 @@ void KBSResultTree::ShowStatus(const PMString& message)
 
 	// The panel is on screen and this is a report of something that just happened, so it is drawn
 	// immediately (the restore path above is the one that must not force a redraw).
-	WriteStatusWidget(message, kTrue /*force the redraw*/);
+	WriteMessage(message, kTrue /*force the redraw*/);
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::ShowRowsBefore / DropBefore - a replaced row's text as it was before the replace
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& rows)
+{
+	PMString pre, original, post;
+	if (!KBSResultModel::GetRowsBefore(chapterIdx, rows, pre, original, post))
+	{
+		// Not a replaced row (or not a row): nothing to show before it, and an older row's "Source Text:"
+		// must not stand beside this one.
+		DropBefore();
+		return;
+	}
+
+	// ***** CUT LONG BEFORE THE BOX HAS TO MEASURE IT. ***** The original text is the WHOLE match (a GREP
+	// across paragraphs, a format-only search: a story's worth), where a row's own is capped at 50
+	// characters for drawing (KBSSearchEngine's kKBSMaxLineChars) - and the box lays its text out by
+	// measuring prefixes, again for every width it tries (KBSStatusTextView.cpp), on every repaint. It
+	// holds four lines, about 120 characters on a Japanese UI; past that the view ends it in an ellipsis
+	// anyway, so the tail is cut here, marked the same way.
+	const int32 kBeforeMaxChars = 300;
+	if (original.CharCount() > kBeforeMaxChars)
+	{
+		// Not through the middle of a surrogate pair (the doubt KBSStatusTextView's KBSSafeCut carries).
+		int32 keep = kBeforeMaxChars;
+		const uint32 at = original.GetChar(keep).GetValue();
+		if (at >= 0xDC00 && at <= 0xDFFF)
+			--keep;
+		original.Truncate(original.CharCount() - keep);
+		original.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+	}
+
+	// The breaks as marks - the pilcrow and the return arrow a hit row draws (the same function). A raw
+	// CR here would be taken by the box as a line break, and "which characters were replaced" would
+	// lose the one that was a paragraph's end.
+	KBSResultModel::MarkUpBreaksForDisplay(pre);
+	KBSResultModel::MarkUpBreaksForDisplay(original);
+	KBSResultModel::MarkUpBreaksForDisplay(post);
+
+	gBeforePre = pre;			gBeforePre.SetTranslatable(kFalse);
+	gBeforeOriginal = original;	gBeforeOriginal.SetTranslatable(kFalse);
+	gBeforePost = post;			gBeforePost.SetTranslatable(kFalse);
+	gShowingBefore = true;
+
+	// The illustration is not settled here: nothing has run, and it follows what runs (ShowStatus).
+	WriteBefore(kTrue /*force the redraw*/);
+}
+
+void KBSResultTree::DropBefore()
+{
+	if (!gShowingBefore)
+		return;		// nothing standing: the message under it is already what the box shows
+	gShowingBefore = false;
+	gBeforePre.Clear();
+	gBeforeOriginal.Clear();
+	gBeforePost.Clear();
+
+	// Back to what the panel said before the row was selected - the last message, untouched by the
+	// "Source Text:" (or, with nothing run this session, the opening one).
+	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
 }
 
 //----------------------------------------------------------------------------------------

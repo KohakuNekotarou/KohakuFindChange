@@ -38,6 +38,7 @@
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
+#include "ITextStoryThread.h"		// a story row's first words: the threads after the body (StoryLeadText)
 #include "ITextWalker.h"			// also declares ITextWalkerClient
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
@@ -76,7 +77,8 @@
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "PersistUtils.h"			// ::GetUIDRef
+#include "PersistUtils.h"			// ::GetUIDRef / ::GetClass (StoryLeadText: which thread is a deletion's)
+#include "InCopySharedID.h"			// kDeletedTextBoss - the thread Track Changes keeps a deletion's text in
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
 #include "WideString.h"
@@ -971,6 +973,30 @@ void ReadHitText(const UIDRef& storyRef, TextIndex start, TextIndex end, KBSResu
 // kTextChar_Ellipse, as a hit row's is. Until then this was a table of fourteen code points that
 // dropped the whole private-use area - so a story opening with gaiji lost them from its row (seen
 // in the regression case: the row read "a-b-c" with the gaiji gone) - and the cut read "...".
+//
+// ***** THE BREAKS ARE KEPT SINCE 2026-09-29 (the user: "show the paragraph mark on the story rows, and
+// the forced line break too" - the marks KCM's story list draws). ***** A paragraph's end (CR) and a
+// forced line break (LF) stay in the text as the characters they are, and the tree draws them as the
+// pilcrow and the return arrow a hit row uses (KBSResultModel::MarkUpBreaksForDisplay, applied where the
+// row's text is built). Each counts as one of the 24. Only a break BETWEEN visible characters is kept:
+// the story's own last CR, and the empty paragraphs at its end, would only say "the story ends here" -
+// which a hit row does not say either (its last paragraph draws no pilcrow) - and the breaks at its
+// HEAD (an empty first paragraph, or the one a table or an anchored object stands in) would put a
+// pilcrow before the first word, where the row's name is read; leading white space was never shown
+// either. White space next to a break is not shown: the break is the separator, and what follows it is
+// an indent.
+//
+// ***** THE STORY'S BODY - ITS PRIMARY THREAD - AND NOTHING ELSE, SINCE 2026-09-29 (the user: "the story
+// row shows the text with the tracked changes in it - the text from before the change"). ***** The first
+// 200 characters of the whole text model were read until then, and a text model holds more than the body:
+// the text Track Changes keeps for a deletion (a thread of its own, kDeletedTextBoss), a table's cells,
+// footnotes, notes - every thread after the body's last CR. A short body was followed on its row by
+// whatever came next: "kittenkitten dog catcat" named a story whose page reads "kittenkitten dog" (the
+// "catcat" was the deletion a replace left). ITextModel::GetPrimaryStoryThreadSpan is the body's length
+// (ITextModel.h: "does not include any characters that are part of story threads for table cells").
+// Only when the body has no WORDS - a frame holding a table and nothing else - are the other threads
+// read, in order, and then never a deletion's (so the row still names the story by its cells: "<sign>
+// cell text", as KCM's story list reads it). A table's anchor shows as its sign wherever it stands.
 PMString StoryLeadText(const UIDRef& storyRef)
 {
 	PMString out;
@@ -979,50 +1005,125 @@ PMString StoryLeadText(const UIDRef& storyRef)
 	InterfacePtr<IComposeScanner> scanner(model, UseDefaultIID());
 	if (model == nil || scanner == nil)
 		return out;
-	const int32 total = model->TotalLength();
-	WideString raw;
-	scanner->CopyText(0, total < 200 ? total : 200, &raw);
+	const int32 kReadAtMost = 200;		// plenty for 24 that show
 	WideString lead;
-	int32 shown = 0;
+	WideString pendingBreaks;	// breaks read since the last visible character - kept once one follows
+	int32 shown = 0;			// what the row shows - the 24
+	int32 words = 0;			// of those, the ones that are text: a table's sign is not (see below)
 	bool pendingSpace = false;
 	bool more = false;
-	for (int32 i = 0; i < raw.CharCount(); ++i)
+	auto scan = [&](const WideString& raw)
 	{
-		const UTF32TextChar c = raw.GetChar(i);
-		const uint32 v = c.GetValue();
-		// ***** IN THIS ORDER, AND WITH TWO NAMED CHARACTERS - BOTH MEASURED (2026-09-28, the
-		// story-lead-chars regression case). ***** The breaks first: IsIgnoredCharacter counts CR / LF
-		// as markers too, and a break reads as a gap. Then the markers, BEFORE white space, because
-		// IsWhiteSpace answered TRUE for the zero-width space (U+200B), which then showed as a space
-		// between two letters. Then white space - with the ideographic space named, because
-		// IsWhiteSpace answered FALSE for it and a Japanese paragraph's indent came through as a
-		// character at the head of the row.
-		if (v == kTextChar_CR || v == kTextChar_LF || v == kTextChar_Tab)
+		for (int32 i = 0; i < raw.CharCount() && !more; ++i)
 		{
-			pendingSpace = (shown > 0);
-			continue;
+			const UTF32TextChar c = raw.GetChar(i);
+			const uint32 v = c.GetValue();
+			// ***** A TABLE'S ANCHOR IS SHOWN, AS ITS SIGN (2026-09-29, the user: "like KCM, a table mark").
+			// ***** Kept as the character itself - the row's text is marked up where it is built, and
+			// KBSResultModel::MarkUpBreaksForDisplay turns it into U+25A6, as it turns the breaks into their
+			// marks. It is one of the 24 but not a WORD (KCM's rule, KCMStoryList.cpp): a body holding a
+			// table and nothing else still goes on to the cells below. Its per-row continuations
+			// (kTextChar_TableContinued) are dropped with the other control characters: one table, one sign.
+			const bool isTableSign = (v == kTextChar_Table);
+			// ***** IN THIS ORDER, AND WITH TWO NAMED CHARACTERS - BOTH MEASURED (2026-09-28, the
+			// story-lead-chars regression case). ***** The breaks first: IsIgnoredCharacter counts CR / LF
+			// as markers too. Then the markers, BEFORE white space, because IsWhiteSpace answered TRUE for
+			// the zero-width space (U+200B), which then showed as a space between two letters. Then white
+			// space - with the ideographic space named, because IsWhiteSpace answered FALSE for it and a
+			// Japanese paragraph's indent came through as a character at the head of the row.
+			if (v == kTextChar_CR || v == kTextChar_LF)
+			{
+				if (shown > 0)
+					pendingBreaks.Append(c);	// (before the first visible character: not shown - see above)
+				pendingSpace = false;		// white space before a break is not shown
+				continue;
+			}
+			if (v == kTextChar_Tab)
+			{
+				pendingSpace = (shown > 0 && pendingBreaks.CharCount() == 0);
+				continue;
+			}
+			if (!isTableSign && (v < kTextChar_Space || v == kTextChar_ObjectReplacementCharacter
+				|| UnicodeClass::IsIgnoredCharacter(c, UnicodeClass::kIgnoreSpellingIgnorable)))
+				continue;
+			if (UnicodeClass::IsWhiteSpace(c) || v == kTextChar_IdeographicSpace)
+			{
+				pendingSpace = (shown > 0 && pendingBreaks.CharCount() == 0);	// after a break: an indent
+				continue;
+			}
+			// A visible character: the breaks before it go in first, each one of the 24.
+			for (int32 b = 0; b < pendingBreaks.CharCount(); ++b)
+			{
+				if (shown >= 24)
+				{
+					more = true;
+					break;
+				}
+				lead.Append(pendingBreaks.GetChar(b));
+				++shown;
+			}
+			pendingBreaks.Clear();
+			if (more)
+				break;
+			if (shown >= 24)
+			{
+				more = true;
+				break;
+			}
+			if (pendingSpace)
+			{
+				lead.Append(UTF32TextChar(kTextChar_Space));
+				pendingSpace = false;
+			}
+			lead.Append(c);
+			++shown;
+			if (!isTableSign)
+				++words;
 		}
-		if (v < kTextChar_Space || v == kTextChar_ObjectReplacementCharacter
-			|| UnicodeClass::IsIgnoredCharacter(c, UnicodeClass::kIgnoreSpellingIgnorable))
-			continue;
-		if (UnicodeClass::IsWhiteSpace(c) || v == kTextChar_IdeographicSpace)
+	};
+	// Where one thread ends and the next is read: its last break is the thread's own end, not a paragraph
+	// mark anybody typed (the story's end, a cell's end) - so it is never shown, and the next thread's words
+	// are set off by a gap, the one a tab leaves (KCM reads `<sign> c` the same way).
+	auto endThread = [&]()
+	{
+		pendingBreaks.Clear();
+		pendingSpace = (shown > 0);
+	};
+
+	// The body first.
+	const int32 total = model->TotalLength();
+	int32 body = model->GetPrimaryStoryThreadSpan();
+	if (body > total)
+		body = total;
+	WideString raw;
+	if (body > 0)
+		scanner->CopyText(0, (body < kReadAtMost) ? body : kReadAtMost, &raw);
+	scan(raw);
+	endThread();
+
+	// No words in it (a table alone - then its sign leads the row - or an anchored object alone): the
+	// threads after it, in text order - a deletion's never (what the page does not show must not name the
+	// story).
+	int32 budget = kReadAtMost;
+	for (TextIndex at = body; words == 0 && !more && at < total && budget > 0; )
+	{
+		TextIndex threadStart = kInvalidTextIndex;
+		int32 threadLen = 0;
+		InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(at, &threadStart, &threadLen));
+		if (thread == nil || threadStart < 0 || threadLen <= 0 || threadStart + threadLen <= at)
+			break;		// no thread to go on with, or one that would not move the walk on
+		if (::GetClass(thread) != kDeletedTextBoss)
 		{
-			pendingSpace = (shown > 0);
-			continue;
+			const int32 len = (threadLen < budget) ? threadLen : budget;
+			WideString part;
+			scanner->CopyText(threadStart, len, &part);
+			scan(part);
+			endThread();
+			budget -= len;
 		}
-		if (shown >= 24)
-		{
-			more = true;
-			break;
-		}
-		if (pendingSpace)
-		{
-			lead.Append(UTF32TextChar(kTextChar_Space));
-			pendingSpace = false;
-		}
-		lead.Append(c);
-		++shown;
+		at = threadStart + threadLen;
 	}
+
 	out = PMString(lead);
 	if (more)
 		out.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));

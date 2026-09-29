@@ -638,6 +638,25 @@ namespace KBSResultModel
 	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
 		PMString& outReplacedText);
 
+	/** What REPLACED rows written side by side read before the replace (2026-09-29 - the panel's
+	    "Source Text:", KBSResultTree::ShowRowsBefore): the first row's leading words, the text they took
+	    joined in text order, the last row's trailing words (a list rebuilt from the records keeps a
+	    group's one deletion on its last row, so a row alone could say nothing). WHICH rows is the caller's
+	    question - KBSTrackChange::CurrentReplacedGroup, which asks the records rather than the stored
+	    ranges. One row is a group of one.
+	    The text is as stored: raw breaks (the caller marks them up), the context cut the way the row's is.
+	    An accepted row and a footnote's row ("no track") are replaced rows too.
+	    @param rows the rows, in text order.
+	    @return false - and three empty strings - for no rows, a row that holds no replace (not replaced,
+	        taken back) or an index out of range. */
+	bool GetRowsBefore(int32 chapterIdx, const std::vector<int32>& rows, PMString& outPre,
+		PMString& outOriginal, PMString& outPost);
+
+	/** Every row of hitIdx's STORY, in the list's order, hitIdx included (2026-09-29). The list's order
+	    is the search's walk order sorted by page, so rows of one story stand in the order of their text
+	    within a thread - which, unlike the stored ranges, no edit can change. */
+	void GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
+
 	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
 	    longer replaced, and says "rejected". */
 	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
@@ -830,7 +849,10 @@ namespace KBSResultModel
 	    cell. The marks take the breaks out of that pass's way, so nothing there changes.)
 
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
-	    table anchors, page number markers (2026-09-26, the user's call: they drew as a box). */
+	    a table's per-row continuations, page number markers (2026-09-26, the user's call: they drew as
+	    a box). ***** A TABLE'S ANCHOR BECOMES U+25A6 since 2026-09-29 ***** - KCM's table sign, the
+	    user's request: `a<table>b` reads `a<sign>b` on a hit row, a story row and the "Source Text:"
+	    alike. */
 	void MarkUpBreaksForDisplay(PMString& s);
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,

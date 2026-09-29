@@ -131,7 +131,9 @@ DECLARE_PMID(kClassIDSpace, kKBSHitMarkerBoss, kKBSPrefix + 17)
 // Signs the tracked changes one replace made - "KohakuFindChange" at the row's time (2026-09-28,
 // KBSSignRecordsCmd.cpp / KBSTrackChange.h).
 DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 19)
+// The panel's message area, drawn by hand (2026-09-29, KBSStatusTextView.cpp): a generic panel with our
+// IControlView and IKBSStatusTextData - the shape of the hit row's cell (+4) and of KCM's message area.
+DECLARE_PMID(kClassIDSpace, kKBSStatusTextWidgetBoss, kKBSPrefix + 19)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 20)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 21)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 22)
@@ -164,7 +166,9 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSPANELVISIBILITYOBSERVER, kKBSPrefix + 2)
 // is an AddIn onto kActiveContextBoss, next to that one. See KBSBookPanelPlacement.cpp. (+ 8, not
 // + 3: see the note above. It was + 3 for an hour, unshipped, until the second re-check caught it.)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKBSPrefix + 8)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 9)
+// What the panel's message area draws, split where its colour changes (2026-09-29, IKBSStatusTextData.h).
+// (+ 9, not + 3: + 3 ... + 7 are the split plan's - see above.)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTATUSTEXTDATA, kKBSPrefix + 9)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 10)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 11)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 12)
@@ -259,6 +263,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSHitMarkerAdornmentImpl, kKBSPrefix + 33
 // The replace's signature (2026-09-28, KBSSignRecordsCmd.cpp). (+ 34 onwards, not + 23: see the note above.)
 DECLARE_PMID(kImplementationIDSpace, kKBSSignRecordsCmdImpl, kKBSPrefix + 34)	// ICommand of kKBSSignRecordsCmdBoss
 DECLARE_PMID(kImplementationIDSpace, kKBSInt64DataImpl, kKBSPrefix + 35)		// IInt64Data (no stock one in the SDK)
+// The panel's message area (2026-09-29, KBSStatusTextView.cpp): its view and its data.
+DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextViewImpl, kKBSPrefix + 36)
+DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKBSPrefix + 37)
 
 
 // ActionIDs:

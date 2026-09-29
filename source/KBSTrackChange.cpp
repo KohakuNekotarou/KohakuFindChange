@@ -620,6 +620,78 @@ void KBSTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::
 	}
 }
 
+void KBSTrackChange::CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows,
+	bool& outRefreshed)
+{
+	outRows.clear();
+	outRefreshed = false;
+	bool checked = false, replaced = false, locked = false;
+	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
+		return;
+	outRows.push_back(hitIdx);
+
+	// Where a row stands NOW: put where its tracked change is first, when it has one of its own (a footnote's
+	// row and an accepted one have none - they keep the range they were given, as the jump does).
+	auto rangeNow = [&](int32 row, TextIndex& outStart, TextIndex& outEnd) -> bool
+	{
+		if (row != hitIdx && RefreshRowFromRecords(chapterIdx, row))
+			outRefreshed = true;
+		UIDRef docRef;
+		IDFile file;
+		UID story = kInvalidUID;
+		return KBSResultModel::GetHitLocation(chapterIdx, row, docRef, file, story, outStart, outEnd)
+			&& outStart != kInvalidTextIndex && outEnd != kInvalidTextIndex;
+	};
+	auto isReplaced = [&](int32 row) -> bool
+	{
+		bool c = false, r = false, l = false;
+		return KBSResultModel::GetHitFlags(chapterIdx, row, c, r, l) && r;
+	};
+
+	TextIndex groupStart = kInvalidTextIndex, groupEnd = kInvalidTextIndex;
+	if (!rangeNow(hitIdx, groupStart, groupEnd))
+		return;
+
+	// ***** OUTWARD FROM THE ROW, IN THE LIST'S ORDER - NOT BY THE STORED RANGES (2026-09-29, the defect
+	// ***** re-check of the "Source Text:"). ***** A stored range is where the row stood when it was last
+	// read, and an edit moves the text under every row of the story at once while only the row clicked is
+	// read again (the jump). Measured with the first version, which grouped by the stored ranges
+	// (KBSResultModel::GetTouchingGroup): "catcat dog" replaced, "ZZ" typed in front, row 2 clicked - row 2
+	// stood at its new place and row 1 at its old one, they no longer met, and the box read
+	// "ZZkitten[catcat] dog" where the text had been "ZZcatcat dog" (case before-group-after-edit-mixed).
+	// The list's ORDER is what no edit changes (KBSResultModel::GetStoryRowsInOrder), so the neighbours are
+	// taken from it, each one read again from its records before it is asked whether it meets the group -
+	// the group and one row either side are read, not the story's every row.
+	std::vector<int32> story;
+	KBSResultModel::GetStoryRowsInOrder(chapterIdx, hitIdx, story);
+	size_t me = 0;
+	while (me < story.size() && story[me] != hitIdx)
+		++me;
+	if (me == story.size())
+		return;
+
+	// Backward: a row whose text ends where the group starts (or past it - the rule GetTouchingGroup keeps).
+	for (size_t k = me; k-- > 0; )
+	{
+		const int32 row = story[k];
+		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
+		if (!isReplaced(row) || !rangeNow(row, s, e) || e < groupStart || s > groupStart)
+			break;		// not written, or not meeting it: nothing before it can meet it either
+		outRows.insert(outRows.begin(), row);
+		groupStart = s;
+	}
+	// Forward, the mirror.
+	for (size_t k = me + 1; k < story.size(); ++k)
+	{
+		const int32 row = story[k];
+		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
+		if (!isReplaced(row) || !rangeNow(row, s, e) || s > groupEnd || e < groupEnd)
+			break;
+		outRows.push_back(row);
+		groupEnd = e;
+	}
+}
+
 bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef storyRef;

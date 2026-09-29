@@ -167,7 +167,11 @@ namespace
 				if (!hit.pageString.IsEmpty())
 					group.fontName.Append(hit.pageString);
 				group.fontName.Append("  ");
-				group.fontName.Append(hit.storyLead);
+				// The story's first words keep their breaks (2026-09-29, KBSSearchEngine's StoryLeadText):
+				// drawn as the marks a hit row draws, by the same function.
+				PMString lead(hit.storyLead);
+				KBSResultModel::MarkUpBreaksForDisplay(lead);
+				group.fontName.Append(lead);
 				group.fontName.SetTranslatable(kFalse);
 				chapter.fontGroups.push_back(group);
 				found = static_cast<int32>(chapter.fontGroups.size()) - 1;
@@ -718,11 +722,23 @@ static const UTF32TextChar kKBSReturnArrow = 0x21B5;
 // marks around an endnote's text and other anchors (U+FEFF), a table's anchor and continuation
 // (0x16 / 0x17), the page number and section markers (0x18 / 0x19), an anchored object (U+FFFC).
 // Display only, like the break marks: the model keeps them as they are.
+// ***** EXCEPT THE TABLE'S ANCHOR SINCE 2026-09-29 - it is shown as kKBSTableSign (the user: "the way KCM
+// does it, a table sign"). ***** Its continuations (one per row after the first) are still dropped: a table
+// is one sign however many rows it has.
 static bool IsHiddenMarker(UTF16TextChar c)
 {
-	return c == 0x04 || c == 0x05 || c == 0x16 || c == 0x17 || c == 0x18 || c == 0x19
+	return c == 0x04 || c == 0x05 || c == kTextChar_TableContinued || c == 0x18 || c == 0x19
 		|| c == 0xFEFF || c == 0xFFFC;
 }
+
+// ***** THE SIGN A TABLE LEAVES IN A ROW (2026-09-29, the user: "can it be like KCM - a table mark between
+// ***** the two characters either side of the table"). ***** U+25A6 SQUARE WITH ORTHOGONAL CROSSHATCH FILL,
+// KCM's kKCMTableSign (KCMStoryList.cpp), and for KCM's reasons: NOT the kanji U+7530 the user remembered -
+// KCM's user turned it down there ("that is Japanese": the sign has to read the same to an English
+// reader) - and not U+229E, which in the palette font reads like InDesign's overset box. It stands where
+// the anchor (kTextChar_Table) stands - a<sign>b, no gap of its own, the anchor IS the place. A code
+// point, not a literal: this file is plain ASCII, and the sign is not in CP932 anyway.
+static const UTF32TextChar kKBSTableSign = 0x25A6;
 
 // See KBSResultModel.h for what this is for and why it is DISPLAY ONLY.
 //
@@ -742,7 +758,8 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 
 	bool16 any = kFalse;
 	for (int32 i = 0; i < n && !any; ++i)
-		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF || IsHiddenMarker(buf[i]));
+		any = (buf[i] == kTextChar_CR || buf[i] == kTextChar_LF || buf[i] == kTextChar_Table
+			|| IsHiddenMarker(buf[i]));
 	if (!any)
 		return;
 
@@ -752,14 +769,14 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 	for (int32 i = 0; i < n; ++i)
 	{
 		const bool marker = IsHiddenMarker(buf[i]);
-		if (!marker && buf[i] != kTextChar_CR && buf[i] != kTextChar_LF)
+		if (!marker && buf[i] != kTextChar_CR && buf[i] != kTextChar_LF && buf[i] != kTextChar_Table)
 			continue;
 		if (i > runStart)
 			out.AppendW(buf + runStart, i - runStart);
 		if (!marker)
-			out.AppendW(buf[i] == kTextChar_CR
-				? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
-				: kKBSReturnArrow);
+			out.AppendW(buf[i] == kTextChar_CR ? static_cast<UTF32TextChar>(kTextChar_PilchrowSign)
+				: buf[i] == kTextChar_LF ? kKBSReturnArrow
+				: kKBSTableSign);
 		runStart = i + 1;
 	}
 	if (n > runStart)
@@ -1115,6 +1132,54 @@ bool KBSResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString&
 	outOriginalText = h.originalText;
 	outReplacedText = h.replacedText;
 	return true;
+}
+
+bool KBSResultModel::GetRowsBefore(int32 chapterIdx, const std::vector<int32>& rows, PMString& outPre,
+	PMString& outOriginal, PMString& outPost)
+{
+	outPre.Clear();			outPre.SetTranslatable(kFalse);
+	outOriginal.Clear();	outOriginal.SetTranslatable(kFalse);
+	outPost.Clear();		outPost.SetTranslatable(kFalse);
+	if (rows.empty() || chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return false;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (rows[k] < 0 || rows[k] >= static_cast<int32>(hits.size()) || !hits[rows[k]].replaced)
+			return false;
+
+	// ***** THE ROWS AS ONE (2026-09-29). ***** Matches written side by side are one run of new text in the
+	// document, and on a list rebuilt from the records their ONE deletion stands on the last row
+	// (KBSShowChanges.cpp) - so a row alone may have no original text to show at all. Their originals
+	// joined in text order are what the group took, whichever list this is: a search's rows each carry
+	// their own match, and joining them gives the same text. Which rows those are is the document's
+	// question, not the model's - the stored ranges go stale with every edit (KBSTrackChange::
+	// CurrentReplacedGroup asks the records).
+	//
+	// The words around them: before the first row, after the last - each row's line is read around its
+	// own range (KBSSearchEngine::ReadHitText), so the first one's leading context is the group's, and the
+	// last one's trailing context is.
+	outPre = hits[rows.front()].preText;
+	outPost = hits[rows.back()].postText;
+	for (size_t k = 0; k < rows.size(); ++k)
+		outOriginal.Append(hits[rows[k]].originalText);
+	outPre.SetTranslatable(kFalse);
+	outOriginal.SetTranslatable(kFalse);
+	outPost.SetTranslatable(kFalse);
+	return true;
+}
+
+void KBSResultModel::GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
+{
+	outRows.clear();
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	if (hitIdx < 0 || hitIdx >= static_cast<int32>(hits.size()))
+		return;
+	const UID story = hits[hitIdx].storyUID;
+	for (size_t i = 0; i < hits.size(); ++i)
+		if (hits[i].storyUID == story)
+			outRows.push_back(static_cast<int32>(i));
 }
 
 void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)

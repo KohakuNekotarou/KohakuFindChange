@@ -213,6 +213,19 @@ namespace KBSTrackChange
 	    Reject Change and Redo (spec section 5). */
 	bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx);
 
+	/** ***** THE REPLACED ROWS WRITTEN SIDE BY SIDE WITH THIS ONE, AS THE DOCUMENT HAS THEM NOW (2026-09-29 -
+	    ***** the message area's "Source Text:", KBSJump::ActivateNode). ***** Taken outward from the row
+	    in the list's order (KBSResultModel::GetStoryRowsInOrder), each neighbour put where its tracked
+	    change stands first (RefreshRowFromRecords) and taken in while its text meets the group's - so an
+	    edit made since the replace, which leaves the stored ranges of every row but the clicked one behind,
+	    does not split the group (the stored-range rule, GetTouchingGroup, did - measured). Reads the group
+	    and one row either side, not the whole story.
+	    The row itself is expected to have been put where it stands already (the jump does it).
+	    @param outRows the rows in text order, hitIdx included; EMPTY when the row holds no replace.
+	    @param outRefreshed true when a neighbour was read again - its line may read differently now, and
+	        the caller repaints the list. */
+	void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed);
+
 	/** Like RefreshRowFromRecords, and hands the change back too. The row's own change, by its time
 	    (Hit::recordTime): the insertion pieces carrying it (at = the first, insLen = their sum, which must
 	    read as the row's replaced text) and the deletion carrying it, if any. A row replaced with nothing
