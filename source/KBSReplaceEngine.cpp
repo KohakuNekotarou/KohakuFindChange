@@ -1169,9 +1169,20 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 //      walk, which reported such a row missing after writing the others, until then).
 // `onlyRows` = the rows a row menu's Replace is about to write (ReplaceRowsNow asks the same three since
 // 2026-09-29 - it asked the match's hash alone); nil = Change Checked's work, every ticked row.
-bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
-	const std::set<int32>* onlyRows = nil)
+// `outWhy` (2026-09-29, the user's call) = which of the three stopped it, for a row menu's refusal to say:
+// question 1 is about the whole story - an edit anywhere in it - and was said as "the text of this row has
+// changed" until then. Change Checked's alert says one sentence for all three and passes nil.
+enum MovedWhy
 {
+	kMovedRow,		// questions 2 and 3, or a row whose identity cannot be read: the row itself
+	kMovedStory		// question 1: the row's story was changed by something other than KBS
+};
+
+bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
+	const std::set<int32>* onlyRows = nil, MovedWhy* outWhy = nil)
+{
+	if (outWhy != nil)
+		*outWhy = kMovedRow;
 	// The DATABASE first, the way the search asks it (KBSSearchEngine's CollectHitsInDoc). It is NOT a
 	// liveness test - a UIDRef carries the IDataBase* itself, and "is this document still open?" has one
 	// honest answer in KBS (KBSBookScope::IsDocStillOpen); what this catches is a UIDRef that never had one.
@@ -1203,7 +1214,13 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 		std::map<UID, bool>::const_iterator known = storyAsLeft.find(story);
 		const bool asLeft = (known != storyAsLeft.end())
 			? known->second : (storyAsLeft[story] = StoryAsKBSLeftIt(chapterIdx, db, story));
-		if (!asLeft || !KBSSearchEngine::RowReadsAsFound(chapterIdx, i, db))
+		if (!asLeft)
+		{
+			if (outWhy != nil)
+				*outWhy = kMovedStory;
+			return true;
+		}
+		if (!KBSSearchEngine::RowReadsAsFound(chapterIdx, i, db))
 			return true;
 		++waiting[story][std::make_pair(start, end)];
 		++waitingInStory[story];
@@ -2672,10 +2689,19 @@ bool KBSReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 		&& KBSResultModel::IsWorkOutcome(KBSResultModel::GetHitOutcome(chapterIdx, hitIdx));
 }
 
+// A status line of ReplaceRowsNow begun with the name of the menu item that asked (2026-09-29, the user's
+// call): Replace Again (Current Find/Change Settings) writes through ReplaceRowsNow too, and its refusals
+// read "Replace:" until then.
+static void StartStatus(PMString& out, bool again)
+{
+	out = again ? "Replace Again: " : "Replace: ";
+}
+
 // The rows of one chapter replaced now, in ONE undo step - the right-click Replace of a row (one row) or
-// of a story (its ticked rows). The callers have asked CanReplaceHit of every row.
+// of a story (its ticked rows), and Replace Again (`again`, RedoRowsNowIn - the rows taken back). The
+// callers have asked CanReplaceHit of every row.
 static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplace, PMString& outStatus,
-	const char* unit = "story")
+	const char* unit = "story", bool again = false)
 {
 	const int32 hitIdx = rowsToReplace.empty() ? -1 : *rowsToReplace.begin();	// the one row, for a row's Replace
 	// Forward, as the search was - outside the sequence below (the walk's direction for a GREP query
@@ -2688,13 +2714,14 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	PMString refusal;
 	if (KBSReplaceEngine::RefuseChangedQuery(refusal))
 	{
-		outStatus = "Replace: ";
+		StartStatus(outStatus, again);
 		outStatus.Append(refusal);
 		return false;
 	}
 	if (!KBSSearchEngine::CommitReplaceSide())
 	{
-		outStatus = "Replace: the Change To in Find/Change could not be stated - nothing was changed.";
+		StartStatus(outStatus, again);
+		outStatus.Append("the Change To in Find/Change could not be stated - nothing was changed.");
 		return false;
 	}
 	// The chapter's document, by its file first (a UIDRef can outlive its document - see
@@ -2703,12 +2730,14 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	IDFile file;
 	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file))
 	{
-		outStatus = "Replace: the document of this row could not be found.";
+		StartStatus(outStatus, again);
+		outStatus.Append("the document of this row could not be found.");
 		return false;
 	}
 	if (!KBSBookScope::ReachChapterDoc(file, docRef))
 	{
-		outStatus = "Replace: the document of this row could not be opened.";
+		StartStatus(outStatus, again);
+		outStatus.Append("the document of this row could not be opened.");
 		return false;
 	}
 	KBSResultModel::RebindChapterDoc(chapterIdx, docRef);
@@ -2731,11 +2760,28 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// a match of the walk at its start and length (ChapterMovedUnderRows). It asked the match's hash alone
 	// until then: a row an Undo had left on the next occurrence of its own text was written there.
 	// Forward, like the search - the scope at the head of this function.
-	if (ChapterMovedUnderRows(chapterIdx, docRef, scopeOptions, &rowsToReplace))
+	MovedWhy movedWhy = kMovedRow;
+	if (ChapterMovedUnderRows(chapterIdx, docRef, scopeOptions, &rowsToReplace, &movedWhy))
 	{
-		outStatus = "Replace: the text of ";
-		outStatus.Append((rowsToReplace.size() == 1) ? "this row" : "a row of this ");
-		if (rowsToReplace.size() != 1)
+		StartStatus(outStatus, again);
+		const bool oneRow = (rowsToReplace.size() == 1);
+		if (movedWhy == kMovedStory)
+		{
+			// ***** THE STORY, NOT THE ROW (2026-09-29, the user's call). ***** An edit anywhere in the story -
+			// typing, Undo, the Track Changes panel, a script - stops it (StoryAsKBSLeftIt), the row's own text
+			// untouched or not; this said "the text of this row has changed" for it until then.
+			if (oneRow)
+				outStatus.Append("the story of this row");
+			else if (PMString(unit) == PMString("document"))
+				outStatus.Append("a story of this document");
+			else
+				outStatus.Append("this story");
+			outStatus.Append(" has changed since the search (edited or undone somewhere in it, not by KBS) - search again.");
+			return false;
+		}
+		outStatus.Append("the text of ");
+		outStatus.Append(oneRow ? "this row" : "a row of this ");
+		if (!oneRow)
 			outStatus.Append(unit);
 		outStatus.Append(" has changed since the search (edited, or undone) - search again.");
 		return false;
@@ -2766,7 +2812,8 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 		if (sequence == nil)
 		{
-			outStatus = "Replace: InDesign would not start a command sequence - nothing was changed.";
+			StartStatus(outStatus, again);
+			outStatus.Append("InDesign would not start a command sequence - nothing was changed.");
 			return false;
 		}
 		sequence->SetName(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep));
@@ -2784,17 +2831,17 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	if (!ok)
 	{
 		KBSResultModel::RollBackRows();
+		StartStatus(outStatus, again);
 		if (endnoteLeft > 0)
-			outStatus = "Replace: the match ends an endnote, and InDesign's replace breaks an endnote there - left as it is.";
+			outStatus.Append("the match ends an endnote, and InDesign's replace breaks an endnote there - left as it is.");
 		else if (locked > 0)
-			outStatus = "Replace: the match is locked now (a locked layer or story) - left as it is.";
+			outStatus.Append("the match is locked now (a locked layer or story) - left as it is.");
 		else if (missing > 0)
-			outStatus = "Replace: the match was not found where the search found it - search again.";
+			outStatus.Append("the match was not found where the search found it - search again.");
 		else if (refused > 0)
-			outStatus = "Replace: InDesign's replace command would not run there - left as it is.";
+			outStatus.Append("InDesign's replace command would not run there - left as it is.");
 		else
 		{
-			outStatus = "Replace: ";
 			outStatus.Append(whyNot.IsEmpty() ? PMString("it did not go through") : whyNot);
 			outStatus.Append(" - nothing was changed.");
 		}
@@ -2805,7 +2852,17 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	windowAfter.want = true;		// written to: it has to be seen and saved (a no-op when it has a window)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
-	if (rowsToReplace.size() == 1)
+	if (again)
+	{
+		// Replace Again's own wording (2026-09-29): "Redone N row(s)" until then, written over this line by
+		// RedoRowsNowIn - which also dropped the "accepted first" note below.
+		outStatus = "Replaced ";
+		outStatus.AppendNumber(replaced);
+		outStatus.Append(" row(s) of this ");
+		outStatus.Append(unit);
+		outStatus.Append(" again with the current Find/Change settings (Track Changes on).");
+	}
+	else if (rowsToReplace.size() == 1)
 		outStatus = KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx)
 			? "Replaced (inside a footnote - Track Changes records nothing there, so it cannot be taken back with Reject Change)."
 			: "Replaced with Track Changes on - Reject Change on the row's right-click menu takes it back.";
@@ -3428,10 +3485,13 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	// (Every line here began "Redo" / "Redone" until 2026-09-29, when the menu item became Replace Again
+	//  (Current Find/Change Settings) - the user's call. ReplaceRowsNow writes the rest, `again` = true.)
 	UIDRef docRef;
 	if (!ChapterDocIfOpen(chapterIdx, docRef))
 	{
-		outStatus.Append("Redo: the document of these rows is not open.");
+		StartStatus(outStatus, true);
+		outStatus.Append("the document of these rows is not open.");
 		return false;
 	}
 	IDataBase* const db = docRef.GetDataBase();
@@ -3442,18 +3502,14 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 	RowsToRedo(chapterIdx, scope, db, rows, skipped, false);
 	if (rows.empty())
 	{
-		outStatus = "Redo: no row of this ";
+		StartStatus(outStatus, true);
+		outStatus.Append("no row of this ");
 		outStatus.Append(unit);
 		outStatus.Append(" taken back with Reject Change can be replaced again (its text has changed since).");
 		return false;
 	}
-	if (!ReplaceRowsNow(chapterIdx, rows, outStatus, unit))
+	if (!ReplaceRowsNow(chapterIdx, rows, outStatus, unit, true))
 		return false;
-	outStatus = "Redone ";
-	outStatus.AppendNumber(static_cast<int32>(rows.size()));
-	outStatus.Append(" row(s) of this ");
-	outStatus.Append(unit);
-	outStatus.Append(" with Track Changes on.");
 	if (skipped > 0)
 	{
 		outStatus.Append(" ");

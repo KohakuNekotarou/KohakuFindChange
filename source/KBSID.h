@@ -361,7 +361,9 @@ DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKBSPrefix + 29)
 DECLARE_PMID(kActionIDSpace, kKBSStoryReplaceActionID, kKBSPrefix + 30)
 DECLARE_PMID(kActionIDSpace, kKBSStoryRejectActionID, kKBSPrefix + 31)
 // A story row's Redo (2026-09-27, the user's call C): the story's rows taken back with Reject Change,
-// replaced again with what Find/Change holds now - the one way to do them all without ticking them.
+// replaced again with what Find/Change holds now - the one way to do them all without ticking them. Its
+// menu name is "Replace Again (Current Find/Change Settings)" since 2026-09-29 (the user's call); the
+// IDs keep "Redo".
 DECLARE_PMID(kActionIDSpace, kKBSStoryRedoActionID, kKBSPrefix + 32)
 DECLARE_PMID(kActionIDSpace, kKBSStoryCheckAllActionID, kKBSPrefix + 33)
 DECLARE_PMID(kActionIDSpace, kKBSStoryUncheckAllActionID, kKBSPrefix + 34)
@@ -372,7 +374,8 @@ DECLARE_PMID(kActionIDSpace, kKBSChapterReplaceActionID, kKBSPrefix + 35)
 // that document whose tracked change is still there (KBSReplaceEngine::RejectChapter).
 DECLARE_PMID(kActionIDSpace, kKBSChapterRejectActionID, kKBSPrefix + 36)
 // "Redo" on a DOCUMENT row's right-click menu (2026-09-27, the user's call): that document's rows taken
-// back, replaced again with what Find/Change holds now (KBSReplaceEngine::RedoChapter).
+// back, replaced again with what Find/Change holds now (KBSReplaceEngine::RedoChapter). Named "Replace
+// Again (Current Find/Change Settings)" since 2026-09-29, like the story row's.
 DECLARE_PMID(kActionIDSpace, kKBSChapterRedoActionID, kKBSPrefix + 37)
 
 
@@ -479,7 +482,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 #define kKBSReplaceHitMenuKey			kKBSStringPrefix "kKBSReplaceHitMenuKey"
 #define kKBSRejectChangeMenuKey			kKBSStringPrefix "kKBSRejectChangeMenuKey"
 #define kKBSAcceptAllChangesMenuKey		kKBSStringPrefix "kKBSAcceptAllChangesMenuKey"
-#define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"	// the story row's Redo (2026-09-27)
+#define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"	// the story and document rows' Redo (2026-09-27) - "Replace Again (Current Find/Change Settings)" since 2026-09-29
 // "How to Use...": the operating reference. English in both string tables, like the rest of the
 // flyout - only the replace's own alerts are translated (see kKBSStaleResultsDocKey). The BODY of the
 // reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single string at

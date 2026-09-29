@@ -224,7 +224,9 @@ namespace KBSReplaceEngine
 	bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 	/** Redo on a story row (2026-09-27, the user's call C): every row of the story taken back with Reject
 	    Change and still holding its original text, replaced again with what Find/Change holds now, ticked
-	    or not; the rest are skipped and counted. One undo step, the list stays as it is. */
+	    or not; the rest are skipped and counted. One undo step, the list stays as it is. The menu item and
+	    every status line it writes say "Replace Again (Current Find/Change Settings)" since 2026-09-29 (the
+	    user's call - "Redo" until then); the function names keep Redo. */
 	bool RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 	bool CanRedoStory(int32 chapterIdx, int32 groupIdx);
 	/** Is there anything for the story row's Replace / Reject Change to do (the menu's greying). */

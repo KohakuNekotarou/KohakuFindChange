@@ -595,7 +595,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSChapterRejectMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Redo (2026-09-27): that document's rows taken back, replaced again.
+		// Replace Again (Current Find/Change Settings) - "Redo" until 2026-09-29 (2026-09-27): that
+		// document's rows taken back, replaced again with what Find/Change holds now.
 		kKBSChapterRedoActionID,
 		kKBSResultRowMenuName
 		kKBSChapterRedoMenuItemPosition,
@@ -894,7 +895,7 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		kKBSActionComponentBoss,
 		kKBSStoryRedoActionID,
-		kKBSRedoMenuKey,				// "Redo" - the story row's (2026-09-27)
+		kKBSRedoMenuKey,				// "Replace Again (Current Find/Change Settings)" - the story row's (2026-09-27; "Redo" until 2026-09-29)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -939,10 +940,11 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Redo - a document row's right-click menu (2026-09-27).
+		// Replace Again (Current Find/Change Settings) - a document row's right-click menu (2026-09-27;
+		// "Redo" until 2026-09-29).
 		kKBSActionComponentBoss,
 		kKBSChapterRedoActionID,
-		kKBSRedoMenuKey,				// "Redo"
+		kKBSRedoMenuKey,				// "Replace Again (Current Find/Change Settings)"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
