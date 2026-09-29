@@ -209,10 +209,18 @@ bool OlderUndoneSharesDoc(size_t i)
 	return false;
 }
 
-// Watch the story: a lazy observer, under IID_ITEXTMODEL (the header says why lazy). ***** NO DETACH, as
-// KCM's has none ***** (KCMStoryFollowObserver.h): the attachment is made at run time and never written into
-// the document, it does nothing when no kept write names the story (Follow's first question), and a
-// document's stories go with the document.
+// The stories being watched, so that a closing document's can be let go of (DocumentClosing).
+std::vector<UIDRef> gWatched;
+
+// Watch the story: a lazy observer, under IID_ITEXTMODEL (the header says why lazy).
+// ***** DETACHED WHEN ITS DOCUMENT CLOSES (2026-09-29) - DocumentClosing. ***** Until then this said "NO
+// DETACH, as KCM's has none: a document's stories go with the document". What is attached is taken off -
+// the observer's side of the bargain, whatever becomes of the subject.
+// !WHAT THIS DID NOT FIX, measured the same day: with All Documents (close one document, Ctrl+Z in the
+//  other) about one Undo in ten was never heard in the regression run - no LazyUpdate at all, attachment in
+//  place - with the detach as without it. Waiting 4 s after the Ctrl+Z before the run's next call heard all
+//  of them: a lazy notification comes at idle, and a run that goes straight on (KIDMCP copies the document
+//  around every script) can miss it. A person who presses Ctrl+Z and looks at the panel gives it that idle.
 void Watch(IDataBase* db, UID story)
 {
 	if (db == nil || story == kInvalidUID)
@@ -224,7 +232,10 @@ void Watch(IDataBase* db, UID story)
 	if (subject == nil || observer == nil)
 		return;
 	if (!subject->IsAttached(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER))
+	{
 		subject->AttachObserver(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER);
+		gWatched.push_back(ref);
+	}
 }
 
 // A write's name on the message line - the menu item that made it.
@@ -496,11 +507,54 @@ bool KBSUndoFollow::Follow(UID story)
 	return true;
 }
 
+void KBSUndoFollow::DocumentClosing(const UIDRef& docRef)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return;
+	for (size_t i = gWatched.size(); i-- > 0; )
+	{
+		if (gWatched[i].GetDataBase() != db)
+			continue;
+		// The document is still whole at this signal (BeforeCloseDoc), so its stories can be asked.
+		InterfacePtr<ISubject> subject(gWatched[i], UseDefaultIID());
+		InterfacePtr<IObserver> observer(gWatched[i], IID_IKBSSTORYUNDOOBSERVER);
+		if (subject != nil && observer != nil
+			&& subject->IsAttached(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER))
+			subject->DetachObserver(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER);
+		gWatched.erase(gWatched.begin() + static_cast<std::ptrdiff_t>(i));
+	}
+}
+
+void KBSUndoFollow::ForgetDocument(const UIDRef& docRef)
+{
+	for (size_t i = gSteps.size(); i-- > 0; )
+	{
+		Step& step = gSteps[i];
+		// Its chapter in the kept whole result sets - found by the document, not by the index: a Change
+		// Checked in between may have dropped chapters and renumbered the rest.
+		KBSResultModel::ModelSnapshot* const sets[2] = { &step.before, &step.after };
+		for (size_t s = 0; s < 2; ++s)
+			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
+				if (sets[s]->chapters[c].docRef == docRef)
+					KBSResultModel::EmptyChapter(sets[s]->chapters[c]);
+		// Its stories. A write of rows is one document's, so one of this document goes whole (and its rows
+		// with it); a Change Checked keeps the stories of the documents still open.
+		std::vector<StoryMoved>& stories = step.stories;
+		for (size_t k = stories.size(); k-- > 0; )
+			if (stories[k].doc == docRef)
+				stories.erase(stories.begin() + static_cast<std::ptrdiff_t>(k));
+		if (stories.empty())
+			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
+	}
+}
+
 void KBSUndoFollow::ShutdownCleanup()
 {
 	// Assigning fresh vectors releases the storage too (the KESCL ShutdownCleanup rule): the kept writes
 	// hold rows, and rows hold PMStrings.
 	std::vector<Step>().swap(gSteps);
+	std::vector<UIDRef>().swap(gWatched);	// (the documents are gone by now; nothing is detached here)
 	CloseRecording();
 }
 

@@ -51,6 +51,13 @@ namespace KBSResultTree
 	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
 	void RefreshCheckedCounts(int32 chapterIdx);
 
+	/** ***** ONE DOCUMENT ROW IS ABOUT TO GO (2026-09-29, All Documents: a document was closed). ***** Tells
+	    the tree BEFORE the model empties the chapter (KBSResultModel::CloseChapter) - ITreeViewMgr's
+	    BeforeNodeDeleted, the way the conditional text panel takes a row out - so only that row and its
+	    children leave, and every other row keeps its place and whether it is open (a Rebuild would close
+	    them all again). Safe when the panel is closed. */
+	void BeforeChapterRowGoes(int32 chapterIdx);
+
 	/** Write a message to the panel's message area (drawn by hand since 2026-09-29 - KBSStatusTextView;
 	    a wrapping StaticText before that). Takes the place of a standing "Source Text:" (ShowRowsBefore). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches

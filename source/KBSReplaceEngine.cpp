@@ -218,6 +218,7 @@ struct RunTotals
 	//  2026-09-28. Nothing had set it since the chapter walk stopped writing on 2026-09-26: a story whose
 	//  walk will not start stops the whole run now, and stoppedByFailure below says why.)
 	int32	chaptersNoWindow;	// a replacement landed, but no window could be opened on it
+	int32	chaptersLeftHidden;	// a replacement landed in a document the user keeps without a window (2026-09-29)
 	// The walk STARTED here and then broke off with an error - a different thing from a chapter that
 	// could not be opened, and from a walk that simply ran out of matches. The
 	// rows it never reached are counted as missing like any others (there is nothing else honest
@@ -264,7 +265,7 @@ struct RunTotals
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
-		  chaptersNoWindow(0), chaptersWalkFailed(0),
+		  chaptersNoWindow(0), chaptersLeftHidden(0), chaptersWalkFailed(0),
 		  missing(0), locked(0), refused(0), endnoteLeft(0), acceptedFirst(0),
 		  haveFirstSkipped(false), haveFirstWalkFailed(false),
 		  cancelled(false), stoppedByError(false), stoppedByFailure(false)
@@ -1488,6 +1489,15 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.AppendNumber(t.chaptersNoWindow);
 		outSummary.Append(" chapter(s) were changed but could not be shown - open them from the book panel to save them.");
 	}
+	// ...and the documents left hidden ON PURPOSE (2026-09-29, Search: = All Documents): the user kept them
+	// without a window - perhaps because they are heavy - so the replace did not open one; the line says so,
+	// since what was written there is not on screen. A click on one of their rows opens a window.
+	if (t.chaptersLeftHidden > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(t.chaptersLeftHidden);
+		outSummary.Append(" document(s) without a window were changed - still hidden.");
+	}
 
 	// One more sentence stood here until 2026-08-05: chapters whose OWN sequence was rolled back,
 	// which only the chapter-at-a-time path could produce. This path wraps the whole run in a single
@@ -2599,10 +2609,21 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// can only be dealt with through a window. It was discarded here until 2026-08-05, when
 	// ShowChapterWindow's answer was also made worth reading ("it already had a window" used to come
 	// back false as well, which is the ordinary case, not a failure).
+	//
+	// ***** EXCEPT A DOCUMENT THE USER KEEPS WITHOUT A WINDOW (2026-09-29, the user's call). ***** Search: =
+	// All Documents lists documents opened without one, and the user may have hidden a heavy one on purpose:
+	// it stays hidden and the summary counts it. The windows this gives are for the chapters KBS itself
+	// opened and holds (a book's) - the ones nobody could reach otherwise.
 	for (size_t pi = 0; pi < pending.size(); ++pi)
 	{
 		if (!pending[pi].tookReplacement)
 			continue;
+		if (!KBSBookScope::IsHeldDoc(pending[pi].docRef) && !KBSBookScope::HasWindow(pending[pi].docRef))
+		{
+			if (KBSBookScope::IsDocStillOpen(pending[pi].docRef))
+				++totals.chaptersLeftHidden;
+			continue;
+		}
 		if (!KBSBookScope::ShowChapterWindow(pending[pi].docRef))
 			++totals.chaptersNoWindow;
 	}

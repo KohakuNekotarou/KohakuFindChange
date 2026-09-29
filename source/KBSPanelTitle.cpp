@@ -143,7 +143,11 @@ void KBSPanelTitle::Update()
 	title.Append(" - ");
 	// The whole word, not "Doc" (user's call 2026-08-01, and again on 2026-09-27 after a few hours of
 	// "Doc" beside the tab name).
-	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : "Document");
+	// With Book Scope off, the Search: KBS follows since 2026-09-29 ("... - Text - Story") as the selection
+	// makes it (Document when the selection does not offer it, as the dialog shows); Document for one it refuses.
+	const char* const searchWord = KBSSearchEngine::SearchScopeName(
+		KBSSearchEngine::SearchScopeForSelection(KBSSearchEngine::CurrentSearchScope()));
+	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : (searchWord[0] != '\0' ? searchWord : "Document"));
 	// A palette label is a candidate translation key like any other UI string, so an untranslated
 	// name would be swapped for whatever the string table happens to hold under it.
 	title.SetTranslatable(kFalse);

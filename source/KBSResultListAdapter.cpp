@@ -122,15 +122,15 @@ public:
 			// the documents hang off the root directly, exactly as they always have.
 			if (KBSResultModel::IsFromBook())
 				return (nth == 0) ? KBSResultNodeID::CreateBook() : kInvalidNodeID;
-			if (nth < 0 || nth >= KBSResultModel::GetDisplayChapterCount())
-				return kInvalidNodeID;
-			return KBSResultNodeID::Create(nth);
+			// The nth SHOWN chapter, which is chapter nth unless a closed document's chapter was emptied in
+			// place before it (2026-09-29, All Documents - KBSResultModel::CloseChapter).
+			const int32 chapter = KBSResultModel::GetShownChapter(nth);
+			return (chapter >= 0) ? KBSResultNodeID::Create(chapter) : kInvalidNodeID;
 		}
 		if (nodeID->IsBookRow())
 		{
-			if (nth < 0 || nth >= KBSResultModel::GetDisplayChapterCount())
-				return kInvalidNodeID;
-			return KBSResultNodeID::Create(nth);
+			const int32 chapter = KBSResultModel::GetShownChapter(nth);
+			return (chapter >= 0) ? KBSResultNodeID::Create(chapter) : kInvalidNodeID;
 		}
 		if (nodeID->IsFontRow())
 		{
@@ -197,7 +197,7 @@ public:
 			return childID->GetRun();
 		if (childID->IsBookRow())
 			return 0;		// the root's only child
-		return childID->GetChapter();
+		return KBSResultModel::GetShownChapterPos(childID->GetChapter());	// GetNthChild's reverse
 	}
 
 	virtual NodeID_rv GetGenericNodeID() const

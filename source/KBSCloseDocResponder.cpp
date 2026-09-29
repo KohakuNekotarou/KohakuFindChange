@@ -67,6 +67,7 @@
 #include "KBSResultTree.h"
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
 #include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
+#include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go (2026-09-29)
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -129,6 +130,10 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// State only - the document is on its way out, so nothing is repainted (KBSHitMarker::ForgetDoc).
 	KBSHitMarker::ForgetDoc(closingDocRef.GetDataBase());
 
+	// ...and the Undo follow takes its observers off the closing document's stories, for every close and
+	// ahead of every exit (2026-09-29, KBSUndoFollow::DocumentClosing): what was attached is detached.
+	KBSUndoFollow::DocumentClosing(closingDocRef);
+
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
 	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
 	// release, the Hide Previous Chapter sweep) can land here from inside one. The run puts its own
@@ -150,7 +155,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// A document-scope result set is one chapter - the searched document - but compare against
 	// every chapter rather than assuming index 0: this stays correct if the model is ever filled
 	// from more than one document without a book.
-	bool ours = false;
+	int32 closingChapter = -1;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
 		UIDRef chapterDocRef;
@@ -159,12 +164,39 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 			continue;
 		if (chapterDocRef == closingDocRef)
 		{
-			ours = true;
+			closingChapter = ci;
 			break;
 		}
 	}
-	if (!ours)
+	if (closingChapter < 0)
 		return;
+
+	// ***** ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (2026-09-29, the user's call). ***** The list is the
+	// open documents', and the others are still open - their rows, their ticks, their Undo stay. The chapter
+	// keeps its place in the model (KBSResultModel::CloseChapter says why) and the kept writes let the
+	// document go too (KBSUndoFollow::ForgetDocument). When it was the last document with rows, the list
+	// goes the way a Document list always has, below.
+	if (KBSResultModel::GetSearchScope() == KBSResultModel::kScopeAllDocuments
+		&& KBSResultModel::GetTotalHitCount() > KBSResultModel::GetHitCount(closingChapter))
+	{
+		PMString closedName;
+		int32 closedCount = 0;
+		KBSResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
+		KBSUndoFollow::ForgetDocument(closingDocRef);
+		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
+		// draws; under it, only that row goes and the others stay as they are (open or closed).
+		const bool overCap = KBSResultModel::GetTotalHitCount() > KBSResultModel::kKBSDisplayHitLimit;
+		if (!overCap)
+			KBSResultTree::BeforeChapterRowGoes(closingChapter);
+		KBSResultModel::CloseChapter(closingChapter);
+		if (overCap)
+			KBSResultTree::Rebuild();
+		PMString msg(closedName);
+		msg.SetTranslatable(kFalse);
+		msg.Append(" was closed - its rows are gone. The other documents' rows stay.");
+		KBSResultTree::ShowStatus(msg);
+		return;
+	}
 
 	// Back to empty. Rebuild draws the now-empty model, and the status line says why the rows
 	// went - a panel that empties itself without a word reads as a crash.

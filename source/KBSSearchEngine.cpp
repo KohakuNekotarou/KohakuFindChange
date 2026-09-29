@@ -29,6 +29,7 @@
 // Interface includes:
 #include "IComposeScanner.h"		// FindSurroundingParagraph / CopyText (the hit line's text)
 #include "IDocument.h"
+#include "IDocumentList.h"			// Search: = All Documents - every open document (2026-09-29)
 #include "IFindChangeOptions.h"
 #include "IFindChangeCmdData.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
@@ -1229,12 +1230,19 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // the same either way.
 //
 // onlyStory: walk this one story of the document instead of the whole of it (UIDRef::gNull = the whole
-// document, which is what the search always asks) - the scope the replace's walks take a story at a time.
+// document) - the scope the replace's walks take a story at a time.
+//
+// fromSelection (2026-09-29, Search:): kStoryScope / kToEndOfStoryScope / kSelectionScope = walk what
+// Edit > Find/Change would walk for that Search: from the CURRENT selection - InDesign builds that scope
+// itself (QueryWalkerScope_UsingSelections, the snippet's and spellpanel's own call), so the range is the
+// dialog's by construction rather than KBS's reading of it. docRef must then be the selection's document
+// (the active one). Anything else = docRef / onlyStory, as before.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	KBSSearchEngine::HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
-	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull)
+	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull,
+	IWalkerScopeFactoryUtils::WalkScopeType fromSelection = IWalkerScopeFactoryUtils::kDocumentScope)
 {
 	outResult = kChapterWalked;
 
@@ -1309,9 +1317,17 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// IWalkerScopeFactoryUtils.h:102-109 documents for it - so what stands behind this line is the
 	// header's contract, not a worked example. (Grepped 2026-08-08: the only callers in the SDK
 	// tree are this file, KBSReplaceEngine and KESCL, all three ours.)
-	InterfacePtr<ITextWalkerScope> scope(onlyStory == UIDRef::gNull
-		? Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions)
-		: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions));
+	//
+	// ...and since 2026-09-29 the selection's form as well, for the three Search: values that start from the
+	// selection - the snippet's own call, so the range is the dialog's (see fromSelection above).
+	const bool bySelection = fromSelection == IWalkerScopeFactoryUtils::kStoryScope
+		|| fromSelection == IWalkerScopeFactoryUtils::kToEndOfStoryScope
+		|| fromSelection == IWalkerScopeFactoryUtils::kSelectionScope;
+	InterfacePtr<ITextWalkerScope> scope(bySelection
+		? Utils<IWalkerScopeFactoryUtils>()->QueryWalkerScope_UsingSelections(fromSelection, scopeOptions)
+		: (onlyStory == UIDRef::gNull
+			? Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions)
+			: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions)));
 	if (scope == nil)
 	{
 		outResult = kChapterNoScope;
@@ -2286,6 +2302,54 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// The same two questions KBSBookScope::HasScopeTarget asks for the menu's grey state; asked
 	// separately here because each one has its own sentence to say.
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
+
+	// ***** Search: (2026-09-29, the user's call A: KBS follows Edit > Find/Change's Search:). *****
+	// Document, All Documents, Story, To End of Story, Selection - with Book Scope OFF. Book Scope ON is
+	// the whole book, which only Document can mean, so any other value is refused rather than quietly
+	// read as Document ("the scope is never changed behind the user's back" - the rule the toggle has
+	// always kept). An unset Search: reads as Document (CurrentSearchScope); a list of stories is
+	// something only a script can set, and the dialog cannot show - refused too.
+	const int32 searchScope = KBSSearchEngine::CurrentSearchScope();
+	const char* const scopeName = KBSSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
+	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
+	//  Document there, so it is no reason to refuse a book)
+	if (fromBook && KBSSearchEngine::SearchScopeForSelection(searchScope) != IWalkerScopeFactoryUtils::kDocumentScope)
+	{
+		outSummary.Append("Book Scope is on, and Search: is ");
+		outSummary.Append(*scopeName != '\0' ? scopeName : "not Document");
+		outSummary.Append(". Set Search: to Document in Edit > Find/Change, or turn Book Scope off.");
+		return 0;
+	}
+	if (!fromBook && *scopeName == '\0')
+	{
+		outSummary.Append("Search: in Edit > Find/Change is set to something this panel cannot follow. Set it to Document, All Documents, Story, To End of Story or Selection.");
+		return 0;
+	}
+	const bool allDocuments = !fromBook && searchScope == IWalkerScopeFactoryUtils::kAllDocumentScope;
+	// Story / To End of Story / Selection start from the selection (and walk the active document).
+	IWalkerScopeFactoryUtils::WalkScopeType selectionScope = (!fromBook
+		&& (searchScope == IWalkerScopeFactoryUtils::kStoryScope || searchScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
+			|| searchScope == IWalkerScopeFactoryUtils::kSelectionScope))
+		? static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(searchScope) : IWalkerScopeFactoryUtils::kDocumentScope;
+	// ***** ONE THE SELECTION DOES NOT OFFER IS SEARCHED AS DOCUMENT - AND SAID (2026-09-29, the user's call:
+	// ***** "the same as InDesign"). ***** The dialog offers Search: values by the selection (SearchScopeForSelection):
+	// with none that fits - Story and nothing selected, Selection and only a caret - it shows Document and
+	// searches the document (measured the same day). So does this; the status line names what happened, so the
+	// scope is not changed out of sight. (Refused with a message until the measurement, the spec's first word.)
+	PMString fellBackNote;
+	fellBackNote.SetTranslatable(kFalse);
+	if (selectionScope != IWalkerScopeFactoryUtils::kDocumentScope
+		&& KBSSearchEngine::SearchScopeForSelection(selectionScope) != selectionScope)
+	{
+		fellBackNote.Append(" Search: is ");
+		fellBackNote.Append(scopeName);
+		fellBackNote.Append(selectionScope == IWalkerScopeFactoryUtils::kSelectionScope ? ", but no text is selected"
+			: selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope ? ", but there is no text cursor"
+			: ", but no text or text frame is selected");
+		fellBackNote.Append(" - the whole document was searched, as Edit > Find/Change does.");
+		selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
+	}
+
 	if (fromBook && !KBSBookScope::HasTargetBook())
 	{
 		outSummary.Append("Book Scope is on, but no book is open.");
@@ -2350,10 +2414,40 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			return 0;
 		}
 	}
+	else if (allDocuments)
+	{
+		// ***** EVERY OPEN DOCUMENT, WINDOW OR NOT (2026-09-29). ***** InDesign's own All Documents searches
+		// a document opened without a window too (measured the same day: app.findText() counted one), so
+		// this does. Each is a "chapter" of the run - the book machinery walks them one at a time and keeps
+		// each one's rows apart - but none is ours to open or close: no file is recorded (a chapter with no
+		// file is found again by its docRef, as the Document search's always has been), and a chapter KBS
+		// holds open from a BOOK search is left out - it is not a document the user opened.
+		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
+		for (int32 d = 0; d < docCount; ++d)
+		{
+			IDocument* doc = docList->GetNthDoc(d);
+			if (doc == nil)
+				continue;
+			KBSBookScope::ChapterDoc one;
+			one.docRef = ::GetUIDRef(doc);
+			if (KBSBookScope::IsHeldDoc(one.docRef))
+				continue;
+			doc->GetName(one.shortName);
+			one.shortName.SetTranslatable(kFalse);
+			targets.push_back(one);
+		}
+		if (targets.empty())
+		{
+			outSummary.Append("No open document to search.");
+			return 0;
+		}
+	}
 	else
 	{
 		// Re-read rather than carried down from the check above: a command has been processed since
 		// (CommitSearchMode), and a pointer to the active document is not ours to assume survived it.
+		// (Story / To End of Story / Selection walk this one too: the selection is the active document's.)
 		IDocument* doc = KBSBookScope::ActiveDocument();
 		if (doc == nil)
 		{
@@ -2372,6 +2466,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// rather than from the toggle keeps an existing result set's display stable if the user flips
 	// Book Scope afterwards.
 	KBSResultModel::SetFromBook(fromBook);
+	// ...and the Search: beside it (2026-09-29), for the same reason: All Documents draws its document rows
+	// closed and says which has no window; a Search: changed afterwards changes nothing on screen.
+	KBSResultModel::SetSearchScope(fromBook ? KBSResultModel::kScopeBook
+		: allDocuments ? KBSResultModel::kScopeAllDocuments
+		: (selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? KBSResultModel::kScopeStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KBSResultModel::kScopeToEndOfStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KBSResultModel::kScopeSelection
+		: KBSResultModel::kScopeDocument);
 
 	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
 	// the two lines around it because it survives finding nothing: a search that returned no hits
@@ -2489,7 +2591,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// keeps the bar moving through chapters that hold no hits at all.
 		PMString taskLine;
 		taskLine.SetTranslatable(kFalse);
-		taskLine.Append("Chapter ");
+		taskLine.Append(allDocuments ? "Document " : "Chapter ");
 		taskLine.AppendNumber(static_cast<int32>(i) + 1);
 		taskLine.Append(" / ");
 		taskLine.AppendNumber(static_cast<int32>(targets.size()));
@@ -2547,7 +2649,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		ChapterWalkResult walkResult = kChapterWalked;
 		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, docCapped,
 			walkResult, &progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc,
-			progressReported);
+			progressReported, UIDRef::gNull, selectionScope);
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
@@ -2719,11 +2821,23 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			outSummary.Append(bookName);
 			outSummary.Append("\".");
 		}
+		else if (allDocuments)
+		{
+			// (2026-09-29) how many were looked at, as the book's "of T chapter(s)" says
+			outSummary.Append(" in ");
+			outSummary.AppendNumber(static_cast<int32>(targets.size()));
+			outSummary.Append(" open document(s).");
+		}
 		else
 		{
+			// the part Search: named (2026-09-29): nothing past it was looked at
+			outSummary.Append((selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? " in the story"
+				: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? " to the end of the story"
+				: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? " in the selection" : "");
 			outSummary.Append(" in document \"");
 			outSummary.Append(targets[0].shortName);
 			outSummary.Append("\".");
+			outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 		}
 		outSummary.Append(chapterNotes);
 		return 0;
@@ -2751,9 +2865,22 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(totalChapStr);
 		outSummary.Append(" chapter(s).");
 	}
+	else if (allDocuments)
+	{
+		// the same "M of T" for All Documents (2026-09-29): the documents that held none are not listed
+		outSummary.Append(" in ");
+		outSummary.AppendNumber(chaptersWithHits);
+		outSummary.Append(" of ");
+		outSummary.AppendNumber(static_cast<int32>(targets.size()));
+		outSummary.Append(" document(s).");
+	}
 	else
 	{
-		outSummary.Append(".");
+		// Story / To End of Story / Selection say so (2026-09-29): the list is not the whole document
+		outSummary.Append((selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? " in the story."
+			: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? " to the end of the story."
+			: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? " in the selection." : ".");
+		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
 	// Two separate caps can bite:
@@ -2816,6 +2943,74 @@ int32 KBSSearchEngine::CurrentSearchMode()
 	// Stored on the results too, so the replace can refuse to re-walk in a different mode.
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	return (opts != nil) ? static_cast<int32>(opts->GetSearchMode()) : -1;
+}
+
+int32 KBSSearchEngine::CurrentSearchScope()
+{
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return -1;
+	const IWalkerScopeFactoryUtils::WalkScopeType scope = opts->GetFindChangeScope(opts->GetSearchMode());
+	// (an unset Search: - see the header)
+	return (scope == IWalkerScopeFactoryUtils::kEmptyScope) ? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope)
+		: static_cast<int32>(scope);
+}
+
+namespace
+{
+// Where a Search: value stands in the dialog's menu, narrowest last - the order the selection unlocks them
+// (SnpFindAndReplace.cpp builds its menu the same way from GetActiveSelectionScope). -1 = not on the menu.
+int32 SearchScopeBreadth(int32 scope)
+{
+	switch (scope)
+	{
+		case IWalkerScopeFactoryUtils::kAllDocumentScope:	return 0;
+		case IWalkerScopeFactoryUtils::kDocumentScope:		return 1;
+		case IWalkerScopeFactoryUtils::kStoryScope:
+		case IWalkerScopeFactoryUtils::kStoryListScope:		return 2;
+		case IWalkerScopeFactoryUtils::kToEndOfStoryScope:	return 3;
+		case IWalkerScopeFactoryUtils::kSelectionScope:		return 4;
+		default:											return -1;
+	}
+}
+}	// anonymous namespace
+
+int32 KBSSearchEngine::SearchScopeForSelection(int32 scope)
+{
+	const int32 wanted = SearchScopeBreadth(scope);
+	if (wanted <= SearchScopeBreadth(IWalkerScopeFactoryUtils::kDocumentScope))
+		return scope;	// All Documents / Document need no selection (and a value off the menu is not ours to change)
+	const int32 offered = SearchScopeBreadth(Utils<IWalkerScopeFactoryUtils>()->GetActiveSelectionScope());
+	return (wanted <= offered) ? scope : static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope);
+}
+
+const char* KBSSearchEngine::SearchScopeName(int32 scope)
+{
+	// The dialog's own words in English, as TabName gives the tabs'.
+	switch (scope)
+	{
+		case IWalkerScopeFactoryUtils::kDocumentScope:		return "Document";
+		case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "All Documents";
+		case IWalkerScopeFactoryUtils::kStoryScope:			return "Story";
+		case IWalkerScopeFactoryUtils::kToEndOfStoryScope:	return "To End of Story";
+		case IWalkerScopeFactoryUtils::kSelectionScope:		return "Selection";
+		default:											return "";
+	}
+}
+
+const char* KBSSearchEngine::FindCommandName(bool bookScopeOn)
+{
+	if (bookScopeOn)
+		return "Find in Book";
+	// what the search will make of Search: with this selection - the dialog's own display
+	switch (SearchScopeForSelection(CurrentSearchScope()))
+	{
+		case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "Find in All Documents";
+		case IWalkerScopeFactoryUtils::kStoryScope:			return "Find in Story";
+		case IWalkerScopeFactoryUtils::kToEndOfStoryScope:	return "Find to End of Story";
+		case IWalkerScopeFactoryUtils::kSelectionScope:		return "Find in Selection";
+		default:											return "Find in Document";
+	}
 }
 
 bool KBSSearchEngine::CanSearchTab(int32 mode)

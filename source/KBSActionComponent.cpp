@@ -124,6 +124,21 @@ void RedrawAfterRowMenu()
 	else
 		KBSResultTree::Rebuild();
 }
+
+// ***** A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (2026-09-29, Search: = All Documents). ***** It went
+// through and nothing opened one - the user may keep a heavy document hidden on purpose - so the line says
+// what the screen cannot show. Asked once the write is over (a book chapter the one-row Replace reopened
+// has been given its window by then). Change Checked counts these in its own summary.
+void NoteNoWindow(bool wrote, int32 chapter, PMString& status)
+{
+	if (!wrote)
+		return;
+	UIDRef docRef;
+	IDFile file;
+	if (KBSResultModel::GetChapterLocation(chapter, docRef, file) && KBSBookScope::IsDocStillOpen(docRef)
+		&& !KBSBookScope::HasWindow(docRef))
+		status.Append(" The document has no window - still hidden.");
+}
 }
 
 /* KBSActionComponent Constructor
@@ -394,12 +409,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
+			bool wrote = false;
 			if (actionID.Get() == kKBSChapterRejectActionID)
-				KBSReplaceEngine::RejectChapter(chapter, status);
+				wrote = KBSReplaceEngine::RejectChapter(chapter, status);
 			else if (actionID.Get() == kKBSChapterRedoActionID)
-				KBSReplaceEngine::RedoChapter(chapter, status);	// no prompt, like Replace
+				wrote = KBSReplaceEngine::RedoChapter(chapter, status);	// no prompt, like Replace
 			else
-				KBSReplaceEngine::ReplaceChapter(chapter, status);
+				wrote = KBSReplaceEngine::ReplaceChapter(chapter, status);
+			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -441,20 +458,22 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString status;
 			status.SetTranslatable(kFalse);
 			const uint32 id = actionID.Get();
+			bool wrote = false;
 			if (id == kKBSStoryReplaceActionID)
-				KBSReplaceEngine::ReplaceStory(chapter, group, status);	// no prompt (the user's call)
+				wrote = KBSReplaceEngine::ReplaceStory(chapter, group, status);	// no prompt (the user's call)
 			else if (id == kKBSStoryRejectActionID)
-				KBSReplaceEngine::RejectStory(chapter, group, status);
+				wrote = KBSReplaceEngine::RejectStory(chapter, group, status);
 			else if (id == kKBSStoryAcceptActionID)
-				KBSReplaceEngine::AcceptStory(chapter, group, status);	// 2026-09-29
+				wrote = KBSReplaceEngine::AcceptStory(chapter, group, status);	// 2026-09-29
 			else if (id == kKBSStoryRedoActionID)
-				KBSReplaceEngine::RedoStory(chapter, group, status);	// no prompt, like Replace
+				wrote = KBSReplaceEngine::RedoStory(chapter, group, status);	// no prompt, like Replace
 			else
 			{
 				const bool check = (id == kKBSStoryCheckAllActionID);
 				KBSResultModel::SetGroupChecked(chapter, group, check);
 				status = check ? "This story: all checked." : "This story: all unchecked.";
 			}
+			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -472,12 +491,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
+			bool wrote = false;
 			if (actionID.Get() == kKBSReplaceHitActionID)
-				KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
+				wrote = KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
 			else if (actionID.Get() == kKBSAcceptChangeActionID)
-				KBSReplaceEngine::AcceptHit(chapter, hit, status);	// 2026-09-29
+				wrote = KBSReplaceEngine::AcceptHit(chapter, hit, status);	// 2026-09-29
 			else
-				KBSReplaceEngine::RejectHit(chapter, hit, status);
+				wrote = KBSReplaceEngine::RejectHit(chapter, hit, status);
+			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -494,7 +515,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
-			KBSReplaceEngine::AcceptAllInChapter(chapter, status);
+			NoteNoWindow(KBSReplaceEngine::AcceptAllInChapter(chapter, status), chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -657,7 +678,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// Glyphs, Find Overset). The action's resource name stays "Search": that is the handle a
 			// script reaches this by (app.menuActions.itemByName("Search")), and it is never what the
 			// user sees, because this line has always renamed it before the menu is drawn.
-			PMString name(KBSBookScope::IsBookScopeOn() ? "Find in Book" : "Find in Document");
+			// ...and with Book Scope off, the Search: of Edit > Find/Change it follows since 2026-09-29 ("Find in
+			// Story", "Find to End of Story" ...).
+			PMString name(KBSSearchEngine::FindCommandName(KBSBookScope::IsBookScopeOn()));
 			name.SetTranslatable(kFalse);
 			listToUpdate->SetNthActionName(i, name);
 			// The name is written whether or not it can run, so a greyed-out item still says which

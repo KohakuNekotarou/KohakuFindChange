@@ -30,6 +30,9 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
+	// The Search: they were searched with (2026-09-29). See KBSResultModel::SetSearchScope.
+	KBSResultModel::SearchScopeKind gSearchScope = KBSResultModel::kScopeDocument;
+
 	// Were these rows rebuilt from the Track Changes records (2026-09-29)? See KBSResultModel::SetFromRecords.
 	bool gFromRecords = false;
 
@@ -267,6 +270,7 @@ void KBSResultModel::Clear()
 	gChapters.clear();
 	gShowingOutcome = false;
 	gFromBook = false;
+	gSearchScope = kScopeDocument;
 	gFromRecords = false;
 	gBookName.Clear();
 	gSearchMode = -1;
@@ -319,6 +323,86 @@ bool KBSResultModel::HasRun()
 bool KBSResultModel::IsFromBook()
 {
 	return gFromBook;
+}
+
+void KBSResultModel::SetSearchScope(SearchScopeKind scope)
+{
+	gSearchScope = scope;
+}
+
+KBSResultModel::SearchScopeKind KBSResultModel::GetSearchScope()
+{
+	return gSearchScope;
+}
+
+void KBSResultModel::CloseChapter(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+		return;
+	// Emptied and unbound, in place (see the header for why the place is kept).
+	EmptyChapter(gChapters[chapterIdx]);
+	// A right-click target inside it names rows that are gone.
+	if (gContextMenuChapter == chapterIdx)
+		gContextMenuChapter = kNoContextMenuChapter;
+	if (gContextMenuHitChapter == chapterIdx)
+	{
+		gContextMenuHitChapter = -1;
+		gContextMenuHit = -1;
+	}
+	if (gContextMenuGroupChapter == chapterIdx)
+	{
+		gContextMenuGroupChapter = -1;
+		gContextMenuGroup = -1;
+	}
+	if (gContextMenuRunChapter == chapterIdx)
+	{
+		gContextMenuRunChapter = -1;
+		gContextMenuRun = -1;
+	}
+}
+
+void KBSResultModel::EmptyChapter(Chapter& chapter)
+{
+	// Swapped with fresh vectors rather than cleared, so the rows' strings are released now rather than at
+	// the next search.
+	std::vector<Hit>().swap(chapter.hits);
+	std::vector<FontGroup>().swap(chapter.fontGroups);
+	std::vector<RunGroup>().swap(chapter.runs);
+	chapter.storyVersions.clear();
+	chapter.docRef = UIDRef(nil, kInvalidUID);
+	chapter.file = IDFile();
+}
+
+int32 KBSResultModel::GetShownChapter(int32 nth)
+{
+	if (nth < 0)
+		return -1;
+	// GetDisplayChapterCount's walk, naming the chapter it reaches
+	int32 before = 0;
+	int32 shown = 0;
+	for (size_t i = 0; i < gChapters.size(); ++i)
+	{
+		if (before >= kKBSDisplayHitLimit)
+			break;
+		if (gChapters[i].hits.empty())
+			continue;
+		if (shown == nth)
+			return static_cast<int32>(i);
+		++shown;
+		before += static_cast<int32>(gChapters[i].hits.size());
+	}
+	return -1;
+}
+
+int32 KBSResultModel::GetShownChapterPos(int32 chapterIdx)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()) || gChapters[chapterIdx].hits.empty())
+		return -1;
+	int32 pos = 0;
+	for (int32 i = 0; i < chapterIdx; ++i)
+		if (!gChapters[i].hits.empty())
+			++pos;
+	return (pos < GetDisplayChapterCount()) ? pos : -1;
 }
 
 void KBSResultModel::SetFromRecords(bool fromRecords)
@@ -455,6 +539,8 @@ int32 KBSResultModel::GetDisplayChapterCount()
 	{
 		if (before >= kKBSDisplayHitLimit)
 			break;
+		if (gChapters[i].hits.empty())
+			continue;	// a chapter CloseChapter emptied (2026-09-29) - kept in place, not shown
 		++shown;
 		before += static_cast<int32>(gChapters[i].hits.size());
 	}

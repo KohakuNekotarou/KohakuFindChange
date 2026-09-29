@@ -181,6 +181,12 @@ namespace KBSBookScope
 	    against the UIDRef without dereferencing its (possibly dead) database. */
 	bool IsDocStillOpen(const UIDRef& docRef);
 
+	/** Is this document open AND showing a window anywhere (front, or behind another tab)? IsDocStillOpen
+	    first - the window question reads the database - then the same all-presentations search the
+	    held-chapter releases ask. (2026-09-29, Search: = All Documents: a document the user keeps without
+	    a window is searched and written, but only a jump opens one - its row says "(no window)".) */
+	bool HasWindow(const UIDRef& docRef);
+
 	/** The full file path of the book the results on the panel came from. false (and an empty
 	    string) when the panel is not showing a book's results.
 

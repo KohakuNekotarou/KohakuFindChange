@@ -175,6 +175,33 @@ namespace KBSSearchEngine
 	    so this header needs no text includes. */
 	int32 CurrentSearchMode();
 
+	/** ***** THE Search: OF THAT TAB (2026-09-29, the user's call A - KBS follows it). ***** Edit >
+	    Find/Change's Search: - Document / All Documents / Story / To End of Story / Selection - as an
+	    IWalkerScopeFactoryUtils::WalkScopeType value (IFindChangeOptions::GetFindChangeScope of the current
+	    tab); -1 when the settings cannot be read. Each tab keeps a Search: of its own.
+	    kEmptyScope is answered as kDocumentScope: it is what a session reads before anything has set
+	    Search: (measured 2026-09-29, straight after a launch), and a user who never opened the dialog
+	    has asked for nothing but the document. */
+	int32 CurrentSearchScope();
+
+	/** ***** WHAT THE SELECTION MAKES OF A Search: (2026-09-29). ***** The dialog offers Search: values by the
+	    selection - InDesign's own answer, IWalkerScopeFactoryUtils::GetActiveSelectionScope, the widest one it
+	    allows (SnpFindAndReplace builds its scope menu from it): nothing selected = All Documents and Document;
+	    a text frame = + Story; a text cursor = + To End of Story; text = + Selection. A value it does not
+	    offer comes back as kDocumentScope - what the dialog then shows and searches (measured the same day:
+	    Story with nothing selected, and Selection with only a caret, searched the whole document); any other
+	    value comes back as it went in. */
+	int32 SearchScopeForSelection(int32 scope);
+
+	/** Search:'s English name for a WalkScopeType value, the way the menu, the panel's tab and the status
+	    line say it: "Document", "All Documents", "Story", "To End of Story", "Selection"; empty otherwise. */
+	const char* SearchScopeName(int32 scope);
+
+	/** The Find command's name for the scope it would search NOW (2026-09-29): "Find in Book" while Book
+	    Scope is on; with it off, Search:'s - "Find in Document", "Find in All Documents", "Find in Story",
+	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
+	const char* FindCommandName(bool bookScopeOn);
+
 	/** Can Find in ... run on this tab? No on Object and Colour, which find page items rather than
 	    text. Asked by the menu (greys the command) and by the search itself (refuses), so the two
 	    cannot disagree. */

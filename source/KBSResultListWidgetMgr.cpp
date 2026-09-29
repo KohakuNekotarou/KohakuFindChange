@@ -71,6 +71,7 @@
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
 #include "IKBSStatusTextData.h"	// the message area's pieces (2026-09-29)
 #include "KBSPanelIcon.h"		// the illustration follows the status line
+#include "KBSBookScope.h"		// HasWindow - a document row's "(no window)" (2026-09-29)
 
 namespace
 {
@@ -450,6 +451,18 @@ private:
 		// that happens.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
+		// ***** A DOCUMENT WITH NO WINDOW (2026-09-29). ***** Search: = All Documents searches those too, as
+		// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
+		// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
+		// takes the note away at the next repaint.
+		if (KBSResultModel::GetSearchScope() == KBSResultModel::kScopeAllDocuments)
+		{
+			UIDRef docRef;
+			IDFile file;
+			if (KBSResultModel::GetChapterLocation(nodeID->GetChapter(), docRef, file)
+				&& KBSBookScope::IsDocStillOpen(docRef) && !KBSBookScope::HasWindow(docRef))
+				label.Append(" (no window)");
+		}
 		label.Append("  (");
 		if (KBSResultModel::NoRowHasCheckBox())
 		{
@@ -708,19 +721,23 @@ void KBSResultTree::Rebuild()
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
 		treeMgr->ExpandNode(KBSResultNodeID::CreateBook(), kFalse);
 	}
-	else
+	else if (KBSResultModel::GetSearchScope() != KBSResultModel::kScopeAllDocuments)
 	{
 		// A single document has just the one chapter, so open it - otherwise the result is one closed
 		// row and the hits take an extra click to reach.
-		for (int32 c = 0; c < chapters; ++c)
-			treeMgr->ExpandNode(KBSResultNodeID::Create(c), kFalse);
+		for (int32 n = 0; n < chapters; ++n)
+			treeMgr->ExpandNode(KBSResultNodeID::Create(KBSResultModel::GetShownChapter(n)), kFalse);
 	}
+	// (All Documents - 2026-09-29, the user's call - leaves its document rows CLOSED, for the book's reason
+	//  above: one document's hits would bury the fact that the others matched at all.)
+	//
 	// ***** THE STORY ROWS COME UP OPEN (2026-09-27, the story level). ***** The level is a grouping, not
 	// a place to hide rows: a story row closed would put every hit one click further away than it was
 	// before the level existed. Opened in a closed chapter too (a book's), so the chapter's arrow shows
 	// its hits at once.
-	for (int32 c = 0; c < chapters; ++c)
+	for (int32 n = 0; n < chapters; ++n)
 	{
+		const int32 c = KBSResultModel::GetShownChapter(n);
 		// ...and the RUN rows above them the same (2026-09-29, Show Changes): a grouping, not a hiding place.
 		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
@@ -767,8 +784,9 @@ void KBSResultTree::RefreshRows()
 	// and with the font level the hit rows are GRANDchildren. A chapter has a few fonts, not a few
 	// thousand, so this stays a handful of calls.
 	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
-	for (int32 c = 0; c < chapters; ++c)
+	for (int32 n = 0; n < chapters; ++n)
 	{
+		const int32 c = KBSResultModel::GetShownChapter(n);	// (chapter n, but for an emptied one before it)
 		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
 		// the run rows (2026-09-29): the story rows' parents there, so the chapter's call stops at them
 		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
@@ -811,6 +829,27 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 			if (KBSResultModel::IsStoryGroup(chapterIdx, g))
 				treeMgr->NodeChanged(KBSResultNodeID::CreateFont(chapterIdx, g), kFalse);
 	}
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::BeforeChapterRowGoes - one document row out, the rest left as they are
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::BeforeChapterRowGoes(int32 chapterIdx)
+{
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKBSPanelWidgetID));
+	if (panelData == nil)
+		return;
+	IControlView* listView = panelData->FindWidget(kKBSResultListWidgetID);
+	if (listView == nil)
+		return;
+	InterfacePtr<ITreeViewMgr> treeMgr(listView, UseDefaultIID());
+	if (treeMgr == nil)
+		return;
+	// A row the tree never showed (past the display cap) is nothing to take out.
+	if (KBSResultModel::GetShownChapterPos(chapterIdx) < 0)
+		return;
+	treeMgr->BeforeNodeDeleted(KBSResultNodeID::Create(chapterIdx));
 }
 
 //----------------------------------------------------------------------------------------

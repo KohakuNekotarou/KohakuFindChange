@@ -91,6 +91,21 @@ namespace KBSUndoFollow
 	    @return true when anything was put back. */
 	bool Follow(UID story);
 
+	/** ***** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING (2026-09-29). ***** Only its rows leave the panel
+	    (KBSResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
+	    write - a write left with none is dropped, as one of a closed document always was - and its chapter is
+	    emptied in every kept whole result set, so an Undo of a Change Checked that also wrote it (it spans
+	    documents; every write of rows is one document's) puts back the other documents' rows and not this
+	    one's. Without it the whole write was dropped at the next follow (a document of it no longer open),
+	    and an Undo in the documents still open went unfollowed.
+	    Called by KBSCloseDocResponder, before the document goes (its UIDRef is still good). */
+	void ForgetDocument(const UIDRef& docRef);
+
+	/** ***** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS (2026-09-29). ***** The observers attached to its
+	    stories are taken off while the document is still whole - what is attached is detached (KBSUndoFollow.cpp,
+	    Watch). Called by KBSCloseDocResponder for every close, ahead of its other exits. */
+	void DocumentClosing(const UIDRef& docRef);
+
 	/** Application shutdown: the kept writes hold rows (PMStrings) - release them. */
 	void ShutdownCleanup();
 }

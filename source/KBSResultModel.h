@@ -255,6 +255,44 @@ namespace KBSResultModel
 	void SetFromBook(bool fromBook);
 	bool IsFromBook();
 
+	/** ***** WHICH Search: THESE RESULTS WERE SEARCHED WITH (2026-09-29). ***** KBS follows Edit > Find/Change's
+	    Search: since that day (KBSSearchEngine::CurrentSearchScope). The list records which one it came from,
+	    the way it records IsFromBook, so a Search: changed afterwards does not change how the rows already on
+	    screen are shown: All Documents draws its document rows CLOSED and says which document has no window;
+	    Story / To End of Story / Selection search one document and are drawn as Document is. kScopeBook =
+	    Book Scope was on (Search: is then Document - any other is refused before the search).
+	    Recorded beside SetFromBook, after the commit point; Clear() puts it back to kScopeDocument. */
+	enum SearchScopeKind
+	{
+		kScopeDocument = 0,
+		kScopeBook,
+		kScopeAllDocuments,
+		kScopeStory,
+		kScopeToEndOfStory,
+		kScopeSelection
+	};
+	void SetSearchScope(SearchScopeKind scope);
+	SearchScopeKind GetSearchScope();
+
+	/** ***** A DOCUMENT OF AN ALL DOCUMENTS LIST WAS CLOSED (2026-09-29, the user's call: only its rows go). *****
+	    Its chapter is emptied - rows, groups, runs, story versions - and unbound (no docRef, no file), but
+	    it KEEPS ITS PLACE: KBSUndoFollow names rows by (chapter, row), and closing up the gap would renumber
+	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
+	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there;
+	    the next KeepCheckedRows drops it with the other empty ones, under a layout of its own. */
+	void CloseChapter(int32 chapterIdx);
+
+	/** CloseChapter's work on a chapter that is not in the model - one of a kept whole result set
+	    (KBSUndoFollow::ForgetDocument, 2026-09-29): its rows, groups, runs and versions gone, no docRef, no file. */
+	void EmptyChapter(Chapter& chapter);
+
+	/** The nth chapter the tree SHOWS - the chapters with rows, under the display cap - as a chapter index;
+	    -1 = none. With no emptied chapter the nth shown is chapter nth, as it always was (2026-09-29). */
+	int32 GetShownChapter(int32 nth);
+
+	/** The reverse: chapter 'chapterIdx''s place among the shown chapters; -1 = not shown. */
+	int32 GetShownChapterPos(int32 chapterIdx);
+
 	/** ***** WERE THESE ROWS REBUILT FROM THE TRACK CHANGES RECORDS (2026-09-29, Show Changes by
 	    KohakuFindChange)? ***** Such a list was searched by nothing: no query, no walk signature, no search
 	    mode - there is nothing to line a replace up with, so it offers NO replace of any kind (the user's
@@ -371,7 +409,8 @@ namespace KBSResultModel
 	int32 GetTotalHitCount();
 
 	/** The number of chapters that have at least one DISPLAYED hit (the tree root's child count
-	    under the display cap). Chapters past the cap are not shown. */
+	    under the display cap). Chapters past the cap are not shown, and neither is one CloseChapter
+	    emptied (2026-09-29) - so the nth of them is GetShownChapter(nth), not chapter nth. */
 	int32 GetDisplayChapterCount();
 
 	/** The number of hits DISPLAYED under chapter 'chapterIdx' - capped in book order so the whole

@@ -1289,11 +1289,14 @@ resource PanelList (kSDKDefPanelResourceID)
 		kKBSPluginID,			// ID of plug-in that owns this panel
 		kIsResizable,
 		kKBSPanelWidgetActionID,	// Action ID to show/hide the panel
-		"",							// panelName empty: placed via altMenu below (Plug-Ins menu, not Window) - like KESCL/KESCM.
-		kKBSPanelPluginsMenuPath,	// Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (walked on the
-									// running menu tree, 2026-08-06 - the parts are KEYS, and both
-									// tables translate them to those words)
-		kKBSPanelPluginsMenuPosition,	// Alternate menu position
+		kKBSPanelWindowMenuName,	// Window > Kohaku Plug-Ins > Kohaku Find/Change (2026-09-29, the user's
+									// call: "like KCM"). *The colon inside this key is what buys the
+									// sub-menu level (PanelList.fh on this field).
+		"",							// *NO ALTERNATE MENU PATH: the panel lives on the Window menu alone,
+									// where InDesign's own panels live. (It sat under Plug-Ins until
+									// 2026-09-29 - an empty panelName means NO Window entry at all, so
+									// Plug-Ins was the only place left for it then.)
+		0.0,						// Alternate menu position - meaningless without a path.
 		kKBSPaletteIconResID, kKBSPluginID,	// PNG icon for the collapsed dock tab
 		c_Panel
 	}

@@ -432,6 +432,11 @@ bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 	return doc != nil && ::GetUIDRef(doc) == docRef;
 }
 
+bool KBSBookScope::HasWindow(const UIDRef& docRef)
+{
+	return IsDocStillOpen(docRef) && DocHasAnyWindow(docRef);
+}
+
 void KBSBookScope::ReleaseHeldDocs()
 {
 	// NOTE: the searched-book path is NOT cleared here. Closing the chapters says nothing about

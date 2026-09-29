@@ -28,7 +28,7 @@
 #include "SDKDef.h"
 
 // Company:
-#define kKBSCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". It is a string-table KEY, not what the user sees: both tables map it to "Kohaku Plug-Ins", so the group reads Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (measured on the real application 2026-08-06 - this note used to claim the group was called KohakuNekotarou). KESCL/KESCM/KT use the same key and the same value, which is what puts all four under one group.
+#define kKBSCompanyKey	"KohakuNekotarou"		// Company name used internally for menu paths and the like. Must be globally unique, only A-Z, 0-9, space and "_". It is a string-table KEY, not what the user sees: both tables map it to "Kohaku Plug-Ins", so the group reads Kohaku Plug-Ins - under Window since 2026-09-29 (kKBSPanelWindowMenuName), under Plug-Ins before (measured on the real application 2026-08-06 - this note used to claim the group was called KohakuNekotarou). KESCL/KESCM/KT use the same key and the same value, which is what puts all four under one group.
 #define kKBSCompanyValue	"KohakuNekotarou"	// Company name displayed externally.
 
 // Plug-in:
@@ -479,7 +479,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 
 // A "Plug-ins" sub-menu path (kKBSPluginsMenuKey / kKBSPluginsMenuPath) stood here from the Dolly
 // template until 2026-08-06. The .fr never used either one: the panel's own entry under that menu
-// is kKBSPanelPluginsMenuPath below, which spells the leaf with kKBSPanelTitleKey, and the flyout
+// was kKBSPanelPluginsMenuPath (on the Window menu since 2026-09-29 - kKBSPanelWindowMenuName), and the flyout
 // hangs off kKBSTargetMenuPath. The string value that went with the key is gone from KBS_enUS.fr
 // too. Menu path macros are not ids and nothing outside this plug-in can name them, so there is
 // nothing to reserve.
@@ -529,10 +529,17 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKBSPrefix + 20)	// ...and
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
 #define kKBSPanelTitleKey					kKBSStringPrefix	"kKBSPanelTitleKey"
-// Panel entry under the Plug-Ins menu, like KESCL/KESCM. The parts are KEYS; on the running menu
-// tree they read Plug-Ins > Kohaku Plug-Ins > Kohaku Find/Change (measured 2026-08-06):
-#define kKBSPanelPluginsMenuPath			kSDKDefPlugInsStandardMenuPath kKBSCompanyKey kSDKDefDelimitMenuPath kKBSPanelTitleKey
-#define kKBSPanelPluginsMenuPosition		101.0
+// *THE WINDOW MENU'S NAME FOR THE PANEL, WITH A SUB-MENU IN FRONT OF IT (2026-09-29, the user's call:
+//  "like KCM", which moved there on 2026-08-27). PanelList.fh on the panelName field: "Can also specify
+//  a submenu here, as in "MyWindowSubmenu:MyPanelName"" - a colon buys a level, and the sub-menu part is
+//  a string KEY, so kKBSCompanyKey reads "Kohaku Plug-Ins" as it did on the Plug-Ins side.
+//  => Window > Kohaku Plug-Ins > Kohaku Find/Change. (KCMUIID.h, kKCMPanelWindowMenuName, is the same.)
+#define kKBSPanelWindowMenuName			kKBSCompanyKey kSDKDefDelimitMenuPath kKBSPanelTitleKey
+// (The panel sat on the Plug-Ins menu until then, through kKBSPanelPluginsMenuPath and
+//  kKBSPanelPluginsMenuPosition; the PanelList's alternate path is empty now and they had no other
+//  reader. !IF ONE IS EVER PUT BACK beside panelName, drop the title key from its end: a MenuDef path
+//  names the menu that HOLDS the item, so with panelName filled in the last part becomes a sub-menu -
+//  "Plug-Ins > Kohaku Plug-Ins > Kohaku Change Marker > Kohaku Change Marker", measured on KCM.)
 #define kKBSStaticTextKey kKBSStringPrefix	"kKBSStaticTextKey"
 #define kKBSInternalPopupMenuNameKey kKBSStringPrefix	"kKBSInternalPopupMenuNameKey"
 // The Keyboard Shortcuts editor's area for the shortcut-assignable actions (2026-09-27, the user's call:
