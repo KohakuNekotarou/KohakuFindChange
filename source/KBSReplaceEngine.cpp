@@ -61,6 +61,7 @@
 #include "KBSSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
 #include "KBSTrackChange.h"	// every replace under Track Changes, its records left (2026-09-26)
+#include "KBSUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo (2026-09-29)
 // (KBSJump.h was included here for IsHidePreviousChapterOn until 2026-08-03. A run that saves now
 // hands every chapter back as it goes, whatever that toggle says - it is about JUMPING, not about
 // what a run does with the chapters it opened for itself. Same call the search stopped making on
@@ -812,6 +813,11 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 // records it for every story holding a hit, each change KBS makes records the new one, and nothing is
 // written to a story whose version is not the one recorded. The price, accepted: an edit ANYWHERE in such
 // a story between the search and the replace means searching again.
+// ***** EXCEPT AN UNDO OR A REDO OF A WRITE OF KBS'S OWN, SINCE 2026-09-29 (KBSUndoFollow). ***** The panel
+// follows those: the rows AND the versions recorded here are put back as they were on that side of the
+// write, so the story is at the version on record again and the rows stand where their text does. The
+// example above ("catcatcatcat", Ctrl+Z) is such an Undo and is followed now (case undo-shift-then-change);
+// typing, an Undo of anything else, the Track Changes panel and a script still stop the write.
 // ======================================================================================================
 
 // Is the story at the version KBS last recorded for it? Nothing recorded, or unreadable, answers no.
@@ -1131,7 +1137,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 //     index, and an edit KBS did not see (above all Ctrl+Z) can leave that index on ANOTHER occurrence of
 //     the same text, which place and text pass and the count used to stop. Hence the story's version and
 //     the row's line, asked first (below) - and now any edit in the story stops the run, as the count did
-//     and more.
+//     and more. (An Undo or a Redo of a write of KBS's own is SEEN since 2026-09-29 - KBSUndoFollow puts
+//     the rows and the versions back with it; the doors below are for every other edit.)
 // The numbers also had to be kept up: every row menu's Replace and Reject walked the whole chapter again
 // to number the rows afresh (RenumberWalkOrders, 2026-09-27 to 2026-09-29) - a Reject's walk with no tab
 // stated, so a Reject made with the dialog on another tab numbered the rows by that tab's matches.
@@ -1160,7 +1167,10 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // ***** first"), EACH ONE ENOUGH TO STOP THE RUN. ***** "Place and text" alone (the morning's W-1) passed a
 // row an Undo or the user's typing had left on ANOTHER occurrence of its own text - "catcatcatcat", row 1
 // replaced from its menu, Ctrl+Z, rows 2 and 3 ticked: both stood on the next "cat", and were written
-// there - where the count it replaced had stopped (a match came back in front of them). So, for every row:
+// there - where the count it replaced had stopped (a match came back in front of them). (That Ctrl+Z - of a
+// write of KBS's own - is followed since 2026-09-29, KBSUndoFollow: the rows go back to where the text is,
+// and rows 2 and 3 are written where they stand. The three questions stand for every other edit.) So, for
+// every row:
 //   1. its STORY is at the version KBS last recorded for it (StoryAsKBSLeftIt - ITextModel::GetChangeCount,
 //      which Undo moves back): any change KBS did not make, anywhere in the story, stops the run;
 //   2. the row still READS as it was found - the whole match AND the line around it
@@ -2231,7 +2241,15 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the
 	// sequence below; this is what lets the PANEL be rolled back with it, so the two cannot end up
 	// telling different stories. Exactly one of RollBackRows / ForgetRowBackup follows.
-	KBSResultModel::BeginRowBackup();
+	// ***** AND THE RUN IS RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (2026-09-29). ***** The recorder starts
+	// that backup (BeginRowBackup stood here until then), reads the version of every row story of the
+	// chapters the resolve pass opened, and copies the WHOLE result set: the run turns the list into its
+	// report (KeepCheckedRows), so an Undo of it has to put the work list back whole. Kept at the end.
+	std::vector<int32> openedChapters;
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+		if (pending[pi].opened)
+			openedChapters.push_back(pending[pi].chapterIdx);
+	KBSUndoFollow::StepRecorder recorder(openedChapters, true);
 
 	{
 	// ONE sequence around EVERY chapter, so a book-wide replace is a SINGLE undo step.
@@ -2607,6 +2625,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// unchecked are dropped - they were never part of the request. A replace that was asked for
 	// nothing at all leaves the results exactly as they were.
 	KBSResultModel::KeepCheckedRows();
+	// The report is what an Undo's work list is put back over, and a Redo puts back.
+	recorder.Keep(KBSUndoFollow::kStepChangeChecked);
 
 	BuildSummary(totals, outSummary);
 	// The chapters the hand-back could not close, at the end of the line - it appends nothing in the
@@ -2820,6 +2840,10 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	bool walkFailed = false, cancelled = false, failed = false;
 	PMString whyNot;
 	bool ok = false;
+	// ***** RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (2026-09-29). ***** The story versions are read and the
+	// row backup started here (it was BeginRowBackup inside the sequence until then); kept below once the
+	// rows show the replace - a failure puts them back, as RollBackRows did.
+	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
 	{
 		// ***** BACKWARDS FOR THE WRITE ONLY (2026-09-28). ***** A query holding ^ is written backwards
 		// (WriteBackward), inside this block and nowhere else. (It stood to the end of the function until
@@ -2835,7 +2859,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			return false;
 		}
 		sequence->SetName(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep));
-		KBSResultModel::BeginRowBackup();
+		// (the row backup was started by the recorder, above)
 		KBSTrackChange::BeginSignedRun();	// the run's time (2026-09-28) - every row it writes is stamped from it
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
@@ -2865,8 +2889,9 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		}
 		return false;
 	}
-	KBSResultModel::ForgetRowBackup();
 	NoteStoryVersions(chapterIdx, db, writtenStories);	// the next Replace / Reject finds them as KBS left them
+	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
+	recorder.Keep(again ? KBSUndoFollow::kStepReplaceAgain : KBSUndoFollow::kStepReplace);
 	windowAfter.want = true;		// written to: it has to be seen and saved (a no-op when it has a window)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
@@ -3140,6 +3165,9 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 			rejectedIn.insert(plans[r].story.GetUID());
 		StoriesAsKBSLeftThem(chapterIdx, db, rejectedIn, asLeft);
 	}
+	// Recorded for the panel's following of Undo (2026-09-29): the row a reject takes back reads "replaced"
+	// again when the reject is undone, and offers Reject Change again. Kept below, once the rows show it.
+	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3241,6 +3269,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	// (The rest were numbered again here by a walk of the whole chapter, 2026-09-27 to 2026-09-29 - in the
 	//  dialog's tab of the moment, which nothing had stated. A Change Checked after this finds each row by
 	//  its place and text, which the lines above have just written.)
+	recorder.Keep(KBSUndoFollow::kStepReject);
 	return true;
 }
 
@@ -3402,6 +3431,8 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 		StoriesOfRows(chapterIdx, rowStories);
 		StoriesAsKBSLeftThem(chapterIdx, db, rowStories, asLeft);
 	}
+	// Recorded for the panel's following of Undo (2026-09-29) - Reject Change's reason.
+	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3443,6 +3474,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 				KBSResultModel::SetHitAccepted(chapterIdx, i);
 		}
 	}
+	recorder.Keep(KBSUndoFollow::kStepAcceptAll);
 	// ***** OURS ONLY, AND THE HIDDEN ONES SAID (2026-09-29, the user's call). ***** The records signed
 	// "KohakuFindChange" - everybody else's changes stay (until then: every change in the document, as
 	// InDesign's own Accept All). The numbers come first: a status line cut short cuts its end.
@@ -3532,6 +3564,9 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 			acceptedIn.insert(s->first);
 		StoriesAsKBSLeftThem(chapterIdx, db, acceptedIn, asLeft);
 	}
+	// Recorded for the panel's following of Undo (2026-09-29): an accept undone gives the row its time back,
+	// and with it Reject Change and Accept Change.
+	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
 	if (sequence == nil)
 	{
@@ -3594,6 +3629,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 	WriteBackRows(chapterIdx, db, others, std::vector<bool>(), kRangeOnly);
 	for (size_t k = 0; k < rows.size(); ++k)
 		KBSResultModel::SetHitAccepted(chapterIdx, rows[k]);
+	recorder.Keep(KBSUndoFollow::kStepAccept);
 	return true;
 }
 

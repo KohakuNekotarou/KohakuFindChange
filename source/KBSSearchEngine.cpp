@@ -2585,8 +2585,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		//
 		// ***** EVERY STORY'S VERSION, WHILE THE CHAPTER IS STILL OPEN (2026-09-29, the defect re-check
 		// ***** F-2). ***** ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what
-		// the replace compares before it writes, so a story moved since without KBS (typing, Ctrl+Z) is not
-		// written to. Read in front of the release below, which closes a chapter this search opened.
+		// the replace compares before it writes, so a story moved since without KBS (typing, Ctrl+Z of
+		// anything but a write of KBS's own - which the panel follows since 2026-09-29, KBSUndoFollow) is
+		// not written to. Read in front of the release below, which closes a chapter this search opened.
 		std::map<UID, uint32> storyVersions;
 		{
 			IDataBase* const chapterDB = chapterDocRef.GetDataBase();

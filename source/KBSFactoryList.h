@@ -65,3 +65,6 @@ REGISTER_PMINTERFACE(KBSInt64Data, kKBSInt64DataImpl)
 // The panel's message area (2026-09-29): its view and its data (KBSStatusTextView.cpp).
 REGISTER_PMINTERFACE(KBSStatusTextView, kKBSStatusTextViewImpl)
 REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)
+// The panel follows an Undo and a Redo (2026-09-29): the lazy observer AddIn'd on kTextStoryBoss
+// (KBSUndoFollow.cpp).
+REGISTER_PMINTERFACE(KBSStoryUndoObserver, kKBSStoryUndoObserverImpl)

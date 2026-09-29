@@ -33,6 +33,7 @@
 #include "KBSResultModel.h"
 #include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
+#include "KBSUndoFollow.h"		// the writes kept for the panel's following of Undo (2026-09-29)
 
 /** Implements IStartupShutdownService for the plug-in. */
 class KBSStartupShutdown : public CPMUnknown<IStartupShutdownService>
@@ -93,6 +94,9 @@ public:
 		KBSHitMarker::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
+		// ...and the writes kept so that the panel can follow an Undo (2026-09-29): each holds rows, and
+		// Change Checked's the whole result set - PMStrings, the kind this list exists for.
+		KBSUndoFollow::ShutdownCleanup();
 		// (KBSEditStamp::ShutdownCleanup stood here from 2026-08-09, and the file it emptied is
 		//  gone: the replace verifies the stored positions against a fresh walk instead of
 		//  fingerprinting each chapter, so there are no stamps to keep. The rule that put it on

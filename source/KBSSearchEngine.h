@@ -491,15 +491,18 @@ namespace KBSSearchEngine
 	    what the row holds. The line is what RelocateStaleRow already asks of a candidate ("the same text
 	    with the same line around it").
 
-	    Why the line as well: a row's place is carried past every change KBS makes, but never past an
-	    Undo or the user's typing, and after those its stored place can stand on ANOTHER occurrence of
+	    Why the line as well: a row's place is carried past every change KBS makes - and, since
+	    2026-09-29, past an Undo or a Redo of one (KBSUndoFollow puts the rows back with it) - but never
+	    past the user's typing or an Undo of anything else, and after those its stored place can stand on
+	    ANOTHER occurrence of
 	    the same text. The match's own hash cannot tell them apart - a one-character query (the particle
 	    U+306E) lands on another match a few per cent of the time in running Japanese, and a zero-width
 	    row has no text for the hash at all. Worked through on paper (not measured): "catcatcatcat", row 1 replaced with
 	    "kitten" from its menu, Ctrl+Z - rows 2 and 3 were left three characters on, standing on the third
 	    and fourth "cat", and a Change Checked of rows 2 and 3 wrote there. (The story's version -
 	    ReadStoryVersion - stops that run first; this is the second guard, for a version that has come
-	    back to the same number.)
+	    back to the same number. That Ctrl+Z of a write of KBS's own is followed since 2026-09-29, and the
+	    rows stand where their text is; the example stands for an edit that is not followed.)
 
 	    False when the row, its story or its place cannot be read. Asked by the verify walk, the row
 	    menus' Replace / Redo and RowStillStands (KBSReplaceEngine), and the jump and the double click
@@ -514,6 +517,9 @@ namespace KBSSearchEngine
 	    search, and each change of its own - and the replace compares it before anything is written: a
 	    story that moved without KBS knowing (typing, Ctrl+Z, the Track Changes panel, a script) is not
 	    written to (the user's call, 2026-09-29: "safety first", a search again rather than a guess).
+	    (Since the same evening KBS knows an Undo or a Redo of a write of its OWN - KBSUndoFollow puts the
+	    recorded version back with the rows - so only a Ctrl+Z of anything else leaves it unknown.) The
+	    same number is what tells KBSUndoFollow a write was undone or redone.
 	    False when the story cannot be read (no database, a UID that is not valid, no text model). */
 	bool ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion);
 

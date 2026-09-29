@@ -169,7 +169,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKBSPrefix + 8)
 // What the panel's message area draws, split where its colour changes (2026-09-29, IKBSStatusTextData.h).
 // (+ 9, not + 3: + 3 ... + 7 are the split plan's - see above.)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTATUSTEXTDATA, kKBSPrefix + 9)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 10)
+// The lazy observer AddIn'd on kTextStoryBoss that lets the panel follow an Undo and a Redo of KBS's own
+// writes (2026-09-29, KBSUndoFollow.cpp). Its own IID because kTextStoryBoss carries other people's
+// IID_IOBSERVER. (+ 10, not + 3: + 3 ... + 7 are the split plan's - see above.)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTORYUNDOOBSERVER, kKBSPrefix + 10)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 11)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 12)
 //DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 13)
@@ -266,6 +269,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSInt64DataImpl, kKBSPrefix + 35)		// IIn
 // The panel's message area (2026-09-29, KBSStatusTextView.cpp): its view and its data.
 DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextViewImpl, kKBSPrefix + 36)
 DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKBSPrefix + 37)
+// The panel follows an Undo and a Redo (2026-09-29, KBSUndoFollow.cpp): the lazy observer on each story a
+// write of KBS's own moved.
+DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
 
 
 // ActionIDs:

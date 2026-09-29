@@ -111,6 +111,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -216,6 +219,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h">

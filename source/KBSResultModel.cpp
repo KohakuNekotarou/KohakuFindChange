@@ -55,18 +55,25 @@ namespace
 	// (gStoppedShort - did the search stop short of its scope - stood here until 2026-09-28. Nothing had
 	// read it since the replace became one match at a time on 2026-09-27; see KBSResultModel.h.)
 
-	// One row copied aside before a replace changed it. See KBSResultModel::BeginRowBackup.
-	struct BackedUpRow
-	{
-		int32					chapter;
-		int32					hit;
-		KBSResultModel::Hit		row;
-	};
-
-	// Only true while a replace is running; empty at every other moment.
+	// The rows copied aside before a write of ours changed them - see KBSResultModel::BeginRowBackup.
+	// (Its own struct, BackedUpRow, until 2026-09-29: the same three fields as RowCopy, which the panel's
+	// following of Undo hands out.)
+	//
+	// Only true while a write of ours is running; empty at every other moment.
 	bool gBackingUpRows = false;
-	std::vector<BackedUpRow> gRowBackup;
+	std::vector<KBSResultModel::RowCopy> gRowBackup;
 	std::set<std::pair<int32, int32> > gRowsBackedUp;	// (chapter, hit) already in gRowBackup
+	// ...and the story versions it recorded (SetStoryVersion), the same way (2026-09-29): an Undo of the
+	// write puts the story back at the version before it, and the record has to follow or the next
+	// write refuses the story as "changed since the search".
+	std::vector<KBSResultModel::VersionCopy> gVersionBackup;
+	std::set<std::pair<int32, UID> > gVersionsBackedUp;	// (chapter, story) already in gVersionBackup
+
+	// Which result set and which layout of it the row indices name - KBSResultModel::GetResultSetId /
+	// GetLayoutGeneration. Both are drawn from one counter, so no two values ever repeat.
+	uint32 gIdCounter = 0;
+	uint32 gResultSetId = 0;
+	uint32 gLayoutGeneration = 0;
 
 	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
 	// taken first is the row as the run found it, and it is the one a rollback has to put back. (Every
@@ -77,11 +84,42 @@ namespace
 	{
 		if (!gBackingUpRows || !gRowsBackedUp.insert(std::make_pair(chapterIdx, hitIdx)).second)
 			return;
-		BackedUpRow saved;
+		KBSResultModel::RowCopy saved;
 		saved.chapter = chapterIdx;
 		saved.hit = hitIdx;
 		saved.row = row;
 		gRowBackup.push_back(saved);
+	}
+
+	// A chapter's recorded version of one story as it stands - `had` false when none is recorded.
+	KBSResultModel::VersionCopy VersionNow(int32 chapterIdx, UID story)
+	{
+		KBSResultModel::VersionCopy v;
+		v.chapter = chapterIdx;
+		v.story = story;
+		if (chapterIdx >= 0 && chapterIdx < static_cast<int32>(gChapters.size()))
+		{
+			const std::map<UID, uint32>& versions = gChapters[chapterIdx].storyVersions;
+			const std::map<UID, uint32>::const_iterator it = versions.find(story);
+			if (it != versions.end())
+			{
+				v.had = true;
+				v.version = it->second;
+			}
+		}
+		return v;
+	}
+
+	// Write a copied version back: recorded again, or taken off when there was none.
+	void PutVersionBack(const KBSResultModel::VersionCopy& v)
+	{
+		if (v.chapter < 0 || v.chapter >= static_cast<int32>(gChapters.size()))
+			return;		// the result set changed underneath - nothing to put it back into
+		std::map<UID, uint32>& versions = gChapters[v.chapter].storyVersions;
+		if (v.had)
+			versions[v.story] = v.version;
+		else
+			versions.erase(v.story);
 	}
 
 	// Which row the result tree's right-click menu was popped over (KBSResultNodeEH stashes it just
@@ -247,6 +285,20 @@ void KBSResultModel::Clear()
 	gContextMenuRun = -1;
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
+	// A new result set, in its first layout (2026-09-29): what KBSUndoFollow kept for the old one names
+	// rows that are gone.
+	gResultSetId = ++gIdCounter;
+	gLayoutGeneration = ++gIdCounter;
+}
+
+uint32 KBSResultModel::GetResultSetId()
+{
+	return gResultSetId;
+}
+
+uint32 KBSResultModel::GetLayoutGeneration()
+{
+	return gLayoutGeneration;
 }
 
 void KBSResultModel::SetFromBook(bool fromBook)
@@ -843,6 +895,9 @@ void KBSResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version
 {
 	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
 		return;
+	// Copied aside like a row (2026-09-29), once, as the write found it.
+	if (gBackingUpRows && gVersionsBackedUp.insert(std::make_pair(chapterIdx, story)).second)
+		gVersionBackup.push_back(VersionNow(chapterIdx, story));
 	gChapters[chapterIdx].storyVersions[story] = version;
 }
 
@@ -1468,6 +1523,8 @@ void KBSResultModel::BeginRowBackup()
 {
 	gRowBackup.clear();
 	gRowsBackedUp.clear();
+	gVersionBackup.clear();
+	gVersionsBackedUp.clear();
 	gBackingUpRows = true;
 }
 
@@ -1479,7 +1536,7 @@ void KBSResultModel::RollBackRows()
 	// several per row, when the one taken FIRST had to be applied last.)
 	for (size_t i = gRowBackup.size(); i > 0; --i)
 	{
-		const BackedUpRow& saved = gRowBackup[i - 1];
+		const RowCopy& saved = gRowBackup[i - 1];
 		if (saved.chapter < 0 || saved.chapter >= static_cast<int32>(gChapters.size()))
 			continue;	// the result set changed underneath - nothing to put the row back into
 		std::vector<Hit>& hits = gChapters[saved.chapter].hits;
@@ -1487,17 +1544,94 @@ void KBSResultModel::RollBackRows()
 			continue;
 		hits[saved.hit] = saved.row;
 	}
+	// The recorded versions too (2026-09-29) - every caller records them only once its write has gone
+	// through, so there is normally nothing here.
+	for (size_t i = 0; i < gVersionBackup.size(); ++i)
+		PutVersionBack(gVersionBackup[i]);
 
 	// Swapping against a temporary releases the storage as well as the contents.
-	std::vector<BackedUpRow>().swap(gRowBackup);
+	std::vector<RowCopy>().swap(gRowBackup);
 	gRowsBackedUp.clear();
+	std::vector<VersionCopy>().swap(gVersionBackup);
+	gVersionsBackedUp.clear();
 }
 
 void KBSResultModel::ForgetRowBackup()
 {
 	gBackingUpRows = false;
-	std::vector<BackedUpRow>().swap(gRowBackup);
+	std::vector<RowCopy>().swap(gRowBackup);
 	gRowsBackedUp.clear();
+	std::vector<VersionCopy>().swap(gVersionBackup);
+	gVersionsBackedUp.clear();
+}
+
+void KBSResultModel::TakeRowBackup(RowStep& out)
+{
+	gBackingUpRows = false;
+	out = RowStep();
+	// "before" is the copy BackUpRow took as the write first changed the row; "after" is the row now.
+	out.before.swap(gRowBackup);
+	out.after.reserve(out.before.size());
+	for (size_t i = 0; i < out.before.size(); ++i)
+	{
+		const RowCopy& was = out.before[i];
+		if (was.chapter < 0 || was.chapter >= static_cast<int32>(gChapters.size()))
+			continue;
+		const std::vector<Hit>& hits = gChapters[was.chapter].hits;
+		if (was.hit < 0 || was.hit >= static_cast<int32>(hits.size()))
+			continue;
+		RowCopy now;
+		now.chapter = was.chapter;
+		now.hit = was.hit;
+		now.row = hits[was.hit];
+		out.after.push_back(now);
+	}
+	out.versionsBefore.swap(gVersionBackup);
+	for (size_t i = 0; i < out.versionsBefore.size(); ++i)
+		out.versionsAfter.push_back(VersionNow(out.versionsBefore[i].chapter, out.versionsBefore[i].story));
+	gRowsBackedUp.clear();
+	gVersionsBackedUp.clear();
+}
+
+void KBSResultModel::ApplyRowStep(const RowStep& step, bool after)
+{
+	const std::vector<RowCopy>& rows = after ? step.after : step.before;
+	for (size_t i = 0; i < rows.size(); ++i)
+	{
+		const RowCopy& r = rows[i];
+		if (r.chapter < 0 || r.chapter >= static_cast<int32>(gChapters.size()))
+			continue;
+		std::vector<Hit>& hits = gChapters[r.chapter].hits;
+		if (r.hit < 0 || r.hit >= static_cast<int32>(hits.size()))
+			continue;
+		hits[r.hit] = r.row;
+	}
+	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
+	for (size_t i = 0; i < versions.size(); ++i)
+		PutVersionBack(versions[i]);
+}
+
+void KBSResultModel::TakeModelSnapshot(ModelSnapshot& out)
+{
+	out.chapters = gChapters;
+	out.showingOutcome = gShowingOutcome;
+	out.layout = gLayoutGeneration;
+}
+
+void KBSResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
+{
+	gChapters = snapshot.chapters;
+	gShowingOutcome = snapshot.showingOutcome;
+	gLayoutGeneration = snapshot.layout;
+	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
+	gContextMenuChapter = kNoContextMenuChapter;
+	gContextMenuHitChapter = -1;
+	gContextMenuHit = -1;
+	gContextMenuGroupChapter = -1;
+	gContextMenuGroup = -1;
+	gContextMenuRunChapter = -1;
+	gContextMenuRun = -1;
+	ForgetRowBackup();
 }
 
 // (DropChapter - erase one chapter and leave the others - was defined here until 2026-08-07. See
@@ -1591,6 +1725,8 @@ int32 KBSResultModel::KeepCheckedRows()
 
 	// From here the panel is a report, not a work list: no row offers a check box.
 	gShowingOutcome = true;
+	// ...with its rows numbered again: an index taken before this names another row now (2026-09-29).
+	gLayoutGeneration = ++gIdCounter;
 	return kept;
 }
 

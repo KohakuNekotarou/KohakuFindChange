@@ -878,7 +878,11 @@ namespace KBSResultModel
 	    the two have to be put back together: this is the panel's half.
 
 	    Exactly one of RollBackRows (the run was cancelled) or ForgetRowBackup (it committed) must
-	    follow, or the copies stay alive until the next replace. */
+	    follow, or the copies stay alive until the next replace.
+	    ***** SINCE 2026-09-29 EVERY WRITE OF KBS'S STARTS IT THROUGH KBSUndoFollow::StepRecorder ***** -
+	    Reject Change and Accept Change too - and the one that commits hands the copies over with
+	    TakeRowBackup (the "before" of an Undo) instead of forgetting them. The story versions a write
+	    records (SetStoryVersion) are copied the same way. */
 	void BeginRowBackup();
 
 	/** Put every remembered row back the way it was and stop remembering. A row is remembered once, as
@@ -888,6 +892,73 @@ namespace KBSResultModel
 	/** Stop remembering and release the copies: the replace committed, so the rows keep what they
 	    were given. */
 	void ForgetRowBackup();
+
+	// ***** THE PANEL FOLLOWS AN UNDO AND A REDO (2026-09-29, the user: "after an Undo the row cannot be
+	// ***** rejected again - the panel should come back with it, the way KCM's does"). ***** A write of KBS's
+	// own is one undo step, and what it did to the rows is kept beside it (KBSUndoFollow): the rows as they
+	// were BEFORE it - the copies BeginRowBackup takes anyway - and as they are AFTER it, and the story
+	// versions it recorded (SetStoryVersion) the same way. An Undo puts the "before" copies back, a Redo the
+	// "after" ones. (Until then the rows stayed as the write left them: the 2026-09-26 decision "A", which
+	// this reverses - a row taken back and undone kept saying "taken back", so its Reject Change was greyed.)
+
+	/** One row, copied. */
+	struct RowCopy
+	{
+		int32	chapter;
+		int32	hit;
+		Hit		row;
+		RowCopy() : chapter(-1), hit(-1) {}
+	};
+
+	/** One story's recorded version (GetStoryVersion), copied - `had` false = none was recorded. */
+	struct VersionCopy
+	{
+		int32	chapter;
+		UID		story;
+		bool	had;
+		uint32	version;
+		VersionCopy() : chapter(-1), story(kInvalidUID), had(false), version(0) {}
+	};
+
+	/** What one write did to the rows: every row and recorded version it changed, before and after.
+	    ***** THE INDICES ARE ONLY GOOD IN THE LAYOUT THEY WERE TAKEN IN ***** (GetLayoutGeneration): a
+	    Change Checked turns the list into its report and numbers the rows again. */
+	struct RowStep
+	{
+		std::vector<RowCopy>		before;
+		std::vector<RowCopy>		after;
+		std::vector<VersionCopy>	versionsBefore;
+		std::vector<VersionCopy>	versionsAfter;
+	};
+
+	/** Stop remembering, as ForgetRowBackup does, and hand the copies over: every row and recorded
+	    version changed since BeginRowBackup, as it was when it was first changed and as it stands now. */
+	void TakeRowBackup(RowStep& out);
+
+	/** Put a step's rows and recorded versions back - its "after" copies (after = true) or its "before"
+	    ones. A row whose index is out of range is passed over. */
+	void ApplyRowStep(const RowStep& step, bool after);
+
+	/** The whole result set - for the one write that reshapes it, Change Checked (KeepCheckedRows). */
+	struct ModelSnapshot
+	{
+		std::vector<Chapter>	chapters;
+		bool					showingOutcome;
+		uint32					layout;
+		ModelSnapshot() : showingOutcome(false), layout(0) {}
+	};
+	void TakeModelSnapshot(ModelSnapshot& out);
+	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they
+	    index the chapters that went). */
+	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
+
+	/** Which result set the rows are: a new number with every Clear (a search, Show Changes, a close) -
+	    a write kept for an Undo belongs to one, and means nothing to the next. */
+	uint32 GetResultSetId();
+
+	/** Which layout of the result set the row indices name: a new number with every Clear and every
+	    KeepCheckedRows that reshaped the list; RestoreModelSnapshot brings its own back. */
+	uint32 GetLayoutGeneration();
 
 	// (DropChapter(int32) stood here - erase one chapter from the results and leave the others - as
 	// groundwork for chapter-level invalidation: closing one chapter of a book would drop that

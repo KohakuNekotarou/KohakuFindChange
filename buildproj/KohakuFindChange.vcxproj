@@ -247,6 +247,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
@@ -289,6 +290,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h"/>
    </ItemGroup>
    <ItemGroup>

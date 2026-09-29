@@ -656,6 +656,9 @@ void SayRowHasNoPlace()
 // which moves the text without telling them. Measured (case del-jump-undo-reject): delete the first of
 // two matches, take it back with Reject Change, press Ctrl+Z, click the second row - its stored place
 // is one character off, and the jump called it "missing" although its text had not been touched.
+// (That Ctrl+Z - of a write of KBS's own - is followed since 2026-09-29: KBSUndoFollow puts the rows back
+// with it, and the case now jumps without looking again. This stays for the edits that are not followed:
+// typing, an Undo of anything else, the Track Changes panel, a script.)
 //
 // So before a jump gives up on a row, the story is walked again under the same query, and the row moves
 // to the ONE match that is the same text with the same line around it (the three segments the row

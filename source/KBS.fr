@@ -395,6 +395,27 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The panel follows an Undo and a Redo of KBS's own writes (2026-09-29, the user: "after an Undo the
+	 * row cannot be rejected again - the panel should come back with it, the way KCM's does"). A LAZY
+	 * observer on each story a write moved, attached at run time in KBSUndoFollow.cpp (this line only puts
+	 * our IID, and so the implementation, onto the boss) - lazy because that is the only notification an
+	 * Undo and a Redo broadcast. The same AddIn as KCM's Story Edits list (KCM.fr, IID_IKCMSTORYFOLLOWOBSERVER).
+	 * Our own IID: kTextStoryBoss carries other people's IID_IOBSERVER.
+	 * A UI plug-in's implementation on a model boss: allowed through an AddIn in the UI plug-in's resource
+	 * (guide vol1-07, Object-Model Rule 2), and not present in a background task - which has neither an
+	 * Undo nor a panel. It is attached, never written into the document.
+	 * *An AddIn that points at UI code - it moves to the UI plug-in's .fr when KBS is split.
+	 */
+	AddIn
+	{
+		kTextStoryBoss,
+		kInvalidClass,
+		{
+			IID_IKBSSTORYUNDOOBSERVER, kKBSStoryUndoObserverImpl,
+		}
+	},
+
+	/*
 	 * ...and the service that tells it when to start and stop: kPaletteMgrService, which calls
 	 * PaletteMgrStarted once the palettes are laid out and PaletteMgrAboutToShutdown just before
 	 * they close (IPaletteMgrService.h). InDesign's own Book panel is the one product user of this
