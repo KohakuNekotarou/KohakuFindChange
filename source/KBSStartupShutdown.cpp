@@ -4,10 +4,11 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Startup/shutdown service. Its job is to retire the marker idle task and empty the module's
-//  file-static state during InDesign's controlled shutdown (on the main thread), so nothing can
-//  fire into - or be destructed against - a half-torn-down application at DLL unload. Ported from
-//  KESCL's KESCLStartupShutdown, minus the Excel machinery KBS does not have.
+//  Startup/shutdown service - THE MODEL HALF'S since 2026-10-01 (the model/UI split; the panel's share is
+//  KBSUIStartupShutdown.cpp). Its job is to start the book-close watcher and to empty the model's
+//  file-static state during InDesign's controlled shutdown (on the main thread), so nothing can be
+//  destructed against a half-torn-down application at DLL unload. Ported from KESCL's
+//  KESCLStartupShutdown, minus the Excel machinery KBS does not have.
 //
 //========================================================================================
 
@@ -22,80 +23,36 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSHitMarker.h"		// the jump marker's static state, emptied at shutdown
-#include "KBSMarkerExpiryIdleTask.h"
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
-#include "KBSPanelTitle.h"
-#include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
-#include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
-#include "KBSPanelState.h"		// the saved settings, read back before anything else runs
-#include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 #include "KBSUndoFollow.h"		// the writes kept for the panel's following of Undo (2026-09-29)
-#include "KBSModelObserver.h"	// the UI half's ear on the model half (2026-10-01)
 
-/** Implements IStartupShutdownService for the plug-in. */
+/** Implements IStartupShutdownService for the model half. */
 class KBSStartupShutdown : public CPMUnknown<IStartupShutdownService>
 {
 public:
 	KBSStartupShutdown(IPMUnknown* boss) : CPMUnknown<IStartupShutdownService>(boss) {}
 	virtual ~KBSStartupShutdown() {}
 
-	/** The panel and the jump marker's text adornment are resource-driven, so the only things to start are the
-	    book-close watcher that retires book-scope results (see KBSBookWatch.cpp) and the subscription
-	    that keeps the "Translucent Panel" toggle applied across the panel being re-opened or moved
-	    (see KBSPanelAlpha.cpp). */
+	/** The only thing the model half starts is the book-close watcher that retires book-scope results
+	    (see KBSBookWatch.cpp). */
 	virtual void Startup()
 	{
-		// The saved settings first: restoring "Translucent Panel = ON" is what puts up the Win32
-		// event hook, and doing it before the subscription below keeps the order the same as a
-		// session where the user switches it on by hand.
-		// *Not the only caller: KBSBookPanelPlacement::Start reads it too, and whichever comes first
-		//  does the read (it is guarded to run once). The order above holds either way - the read
-		//  still comes before the subscription below.
-		KBSLoadPanelStateIfPresent();
 		KBSBookWatchAttach();
-		KBSAttachPanelVisibilityObserver();
-		// The UI half's ear on the model half's notifications (2026-10-01, the model/UI split).
-		KBSModelObserverAttach();
 	}
 
-	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and
-	    never be re-created, before the app tears down) and release the module's static storage, so
-	    every static destructor at DLL unload finds nothing left to do. */
+	/** Release the model's static storage, so every static destructor at DLL unload finds nothing left
+	    to do. */
 	virtual void Shutdown()
 	{
-		// The tab name first, while the UI is still standing: a tab renamed with the current scope
-		// must not be what a saved workspace remembers.
-		KBSPanelTitle::Restore();
 		KBSBookWatchDetach();
-		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
-		KBSModelObserverDetach();
-		// Stop listening before tearing anything down: while attached, the session holds a pointer
-		// into this .pln, and the panel being destroyed during teardown raises a notification.
-		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what
-		//  KBSBookWatchDetach on the line before has always done for its own subject (2026-08-08).
-		KBSDetachPanelVisibilityObserver();
-		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its one-shot
-		// timer and its command interceptor (both hold raw pointers into this .pln). Normally already
-		// done by the palette manager's PaletteMgrAboutToShutdown; this is the backstop for a
-		// shutdown that never went through it. Safe to run twice.
-		KBSBookPanelPlacement::ShutdownCleanup();
-		// The Win32 event hook and the one-shot timer of the translucency toggle. *ICallbackTimer's
-		// callback is a raw function pointer that is not reference counted, and a WinEvent hook left
-		// up is a leaked resource - neither may outlive this .pln.
-		KBSShutdownPanelAlpha();
-		// InDesign's OWN Find/Change dialog again - its window STYLE this time. The same reason as
-		// the WS_EX_LAYERED on the line above: it is somebody else's window, and what we put on it
-		// must not outlive us. *It also restores a MINIMISED dialog before undoing anything - see
-		//  KBSRestoreFindChangeStyle for why that order is not optional.
-		KBSShutdownFindChangeMinimize();
-		KBSMarkerExpiryIdleTask::Shutdown();
-		// After the task that would clear it, and state-only - the marker holds a static PMString
-		// (its document's file) as well as a raw IDataBase*, and neither may still be standing at
-		// DLL unload. Not ClearMarker: that repaints, and the document may be going away already.
+		// State-only - the marker holds a static PMString (its document's file) as well as a raw
+		// IDataBase*, and neither may still be standing at DLL unload. Not ClearMarker: there is nothing to
+		// repaint, and the document may be going away already. (Its countdown is the UI half's, retired by
+		// KBSUIStartupShutdown; after this the marker refuses every call, so a countdown that fires in
+		// between finds nothing to take down.)
 		KBSHitMarker::ShutdownCleanup();
 		KBSBookScope::ShutdownCleanup();
 		KBSResultModel::ShutdownCleanup();
@@ -107,10 +64,8 @@ public:
 		//  fingerprinting each chapter, so there are no stamps to keep. The rule that put it on
 		//  this list stands for everything below - a clean-up nested inside another one cannot be
 		//  found by READING this list, which is the only way anyone ever checks.)
-		// ...and the line the panel last reported: a static PMString of exactly the kind the marker
-		// holds. It joined this list on 2026-08-08, having stood through both of the sweeps that
-		// wrote the rule down (see KBSResultTree::ShutdownCleanup).
-		KBSResultTree::ShutdownCleanup();
+		// (The line the panel last reported - KBSResultTree::ShutdownCleanup - is the UI half's since
+		//  2026-10-01: KBSUIStartupShutdown.)
 		// ...and the search engine's own: the Find Format it remembers is an AttributeBossList
 		// holding references to the dialog's attributes, so letting it go is database work and
 		// belongs here rather than in a static destructor at DLL unload. It was the one piece of

@@ -321,8 +321,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Startup/shutdown service boss (Task 3): retires the marker idle task and clears module state
-	 * during controlled shutdown. kLazyStartupShutdownProviderImpl (API-provided) registers it.
+	 * Startup/shutdown service boss (Task 3) - the MODEL half's since 2026-10-01: starts the book-close
+	 * watcher and clears the model's state during controlled shutdown.
+	 * kLazyStartupShutdownProviderImpl (API-provided) registers it.
 	 */
 	Class
 	{
@@ -330,6 +331,22 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kInvalidClass,
 		{
 			IID_ISTARTUPSHUTDOWN, kKBSStartupShutdownImpl,
+			IID_IK2SERVICEPROVIDER, kLazyStartupShutdownProviderImpl,
+		}
+	},
+
+	/*
+	 * The UI half's startup/shutdown service boss (2026-10-01, the model/UI split - KBSUIStartupShutdown.cpp):
+	 * the saved settings, the windows the panel follows, the marker's countdown and the ear on the model
+	 * half. A boss of its own because a startup/shutdown service is declared per boss.
+	 * *UI code - it goes to the UI plug-in's .fr when KBS is split, and stays lazy there.
+	 */
+	Class
+	{
+		kKBSUIStartupShutdownBoss,
+		kInvalidClass,
+		{
+			IID_ISTARTUPSHUTDOWN, kKBSUIStartupShutdownImpl,
 			IID_IK2SERVICEPROVIDER, kLazyStartupShutdownProviderImpl,
 		}
 	},

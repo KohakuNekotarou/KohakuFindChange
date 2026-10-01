@@ -159,6 +159,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelServices.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIStartupShutdown.cpp">
+         <Filter>Source Files\Plugin</Filter>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h">
