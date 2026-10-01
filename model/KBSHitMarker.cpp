@@ -25,11 +25,11 @@
 // General includes:
 #include "AutoGSave.h"
 #include "CPMUnknown.h"
+#include "FileUtils.h"				// IsEqual - the marker's document confirmed by its file
 #include "GraphicsData.h"
 #include "GraphicTypes.h"			// kPMBlendDifference
+#include "IDFile.h"
 #include "PMRect.h"
-#include "PMString.h"
-#include "SDKFileHelper.h"
 #include "TextDrawPriority.h"		// kTAPassPriForeground
 
 #include <boost/thread/recursive_mutex.hpp>
@@ -55,7 +55,8 @@ typedef boost::recursive_mutex::scoped_lock Lock;
 
 volatile bool16 gHasMark  = kFalse;	// set kTrue only after the rest is filled in; kFalse before it is emptied
 IDataBase*      gDB       = nil;	// an ADDRESS, never read through: see KBSHitMarkerSameDoc
-PMString        gDocPath;			// the file gDB's document lived in when the marker went up ("" = never saved)
+IDFile          gDocFile;			// the file gDB's document lived in when the marker went up...
+bool16          gDocHasFile = kFalse;	// ...if it had one (kFalse = never saved)
 UID             gStory    = kInvalidUID;
 TextIndex       gStart    = 0;
 TextIndex       gEnd      = 0;
@@ -68,35 +69,21 @@ const double kAscentFraction     = 0.85;
 const double kDescentFraction    = 0.10;
 const double kCaretWidthFraction = 0.25;
 
-// The file a database's document lives in - "" when it has none. Only ever called on a database that
-// is certainly alive: the jump's (it has just been in it) and a wax run's (it is being drawn).
-PMString KBSHitMarkerDocPath(IDataBase* db)
-{
-	PMString path;
-	path.SetTranslatable(kFalse);
-	if (db == nil)
-		return path;
-	const IDFile* sysFile = db->GetSysFile();
-	if (sysFile == nil)
-		return path;
-	SDKFileHelper helper(*sysFile);
-	path = helper.GetPath();
-	path.SetTranslatable(kFalse);
-	return path;
-}
-
 // ***** SAME ADDRESS IS NOT SAME DOCUMENT. ***** A closed document's address can be handed to the
 // next document opened, so the address is confirmed by the file (the rule the Draw Event marker kept
-// from 2026-08-04 - memory uidref-reuse-after-close). Two empty paths mean neither was ever saved,
-// and the address stands alone. gDB is compared, never read. Caller holds gLock.
+// from 2026-08-04 - memory uidref-reuse-after-close). Neither ever saved: the address stands alone.
+// gDB is compared, never read; drawnDB is a wax run's, being drawn, so it is certainly alive.
+// ***** THE FILES ARE COMPARED, NOT THEIR PATH STRINGS (API re-audit, 2026-10-02). ***** FileUtils::IsEqual,
+// the rule KBSBookScope's KBSDocumentLivesInFile keeps (and KCM's KCMIsSameDoc) - this compared the two
+// paths' strings until then. Caller holds gLock.
 bool KBSHitMarkerSameDoc(IDataBase* drawnDB)
 {
 	if (drawnDB == nil || drawnDB != gDB)
 		return false;
-	const PMString drawnPath(KBSHitMarkerDocPath(drawnDB));
-	if (drawnPath.IsEmpty() && gDocPath.IsEmpty())
-		return true;
-	return drawnPath == gDocPath;
+	const IDFile* drawnFile = drawnDB->GetSysFile();
+	if (drawnFile == nil || !gDocHasFile)
+		return drawnFile == nil && !gDocHasFile;
+	return FileUtils::IsEqual(*drawnFile, gDocFile) != kFalse;
 }
 
 // Forget where the marker is - gHasMark first, the flag every unlocked reader tests. The one place
@@ -106,7 +93,8 @@ void KBSHitMarkerForget()
 {
 	gHasMark = kFalse;
 	gDB = nil;
-	gDocPath.Clear();
+	gDocFile = IDFile();
+	gDocHasFile = kFalse;
 	gStory = kInvalidUID;
 }
 
@@ -303,13 +291,14 @@ bool KBSHitMarker::SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextI
 		end = start;
 
 	IDataBase* previousDB = nil;
-	const PMString path(KBSHitMarkerDocPath(db));	// taken now, while the document is certainly alive
+	const IDFile* const sysFile = db->GetSysFile();	// read now, while the document is certainly alive
 	{
 		Lock lock(gLock);
 		previousDB = gHasMark ? gDB : nil;
 		gHasMark = kFalse;
 		gDB = db;
-		gDocPath = path;
+		gDocHasFile = (sysFile != nil) ? kTrue : kFalse;
+		gDocFile = (sysFile != nil) ? *sysFile : IDFile();
 		gStory = storyUID;
 		gStart = start;
 		gEnd = end;
@@ -352,7 +341,7 @@ void KBSHitMarker::ShutdownCleanup()
 {
 	gShutdown = kTrue;
 	Lock lock(gLock);
-	KBSHitMarkerForget();	// gDocPath too: a static PMString must not outlive the DLL's teardown
+	KBSHitMarkerForget();	// gDocFile too: a static path must not outlive the DLL's teardown
 }
 
 // End, KBSHitMarker.cpp.

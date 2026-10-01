@@ -58,10 +58,12 @@ namespace KBSJump
 	    again. On success it TAKES THE JUMP'S MARKER BACK DOWN - the inverted rectangle and the
 	    selection say the same thing, and together they make the text unreadable.
 
-	    Refuses, with a reason on the status line, when there is nothing honest to select:
-	      * an OVERSET match - overset text has no on-page selection to make;
-	      * a match whose text is no longer what the search recorded - selecting a stale range would
-	        highlight text the user never searched for.
+	    Refuses when there is nothing honest to select - a row with no place left ("deleted"), a LOCKED
+	    or HIDDEN match, a zero-width one, an OVERSET one, and one whose text is no longer what the
+	    search recorded (a stale range would highlight text the user never searched for). Each says why
+	    on the status line, except the stale one: the jump has already said it. The tests in
+	    SelectHitText are the list - this one had only the overset and the stale cases until the API
+	    re-audit of 2026-10-02.
 
 	    @param chapterIdx the chapter index.
 	    @param hitIdx the hit index.

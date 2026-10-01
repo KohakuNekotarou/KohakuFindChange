@@ -48,7 +48,7 @@ public:
 	virtual void Shutdown()
 	{
 		KBSBookWatchDetach();
-		// State-only - the marker holds a static PMString (its document's file) as well as a raw
+		// State-only - the marker holds a static IDFile (its document's file) as well as a raw
 		// IDataBase*, and neither may still be standing at DLL unload. Not ClearMarker: there is nothing to
 		// repaint, and the document may be going away already. (Its countdown is the UI half's, retired by
 		// KBSUIStartupShutdown; after this the marker refuses every call, so a countdown that fires in
