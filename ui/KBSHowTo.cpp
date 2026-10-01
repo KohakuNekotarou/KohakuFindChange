@@ -11,9 +11,8 @@
 //  as \uXXXX, CAlert as the fallback) is KESCL's, written for the same job.
 //
 //  Why the text is here and not in the string tables: odfrc caps a single string literal at about
-//  3.1KB and this reference is several times that. KESCM's reference, which still sits in its
-//  .fr, is already within 30 bytes of that ceiling and cannot be extended - so KBS starts where
-//  KESCM will have to end up.
+//  3.1KB and this reference is several times that - the reason KESCL moved its own reference into
+//  C++ as well.
 //
 //  NOTE: this file holds Japanese text and MUST stay UTF-8 WITH BOM - without it MSVC reads it as
 //  CP932 and the wide literals below break.
@@ -146,9 +145,8 @@ void AppendJSEscaped(std::string& out, const wchar_t* text)
 
 void KBSHowTo::Show()
 {
-	// Japanese InDesign gets the Japanese reference, everything else the English one - the same split
-	// KBSLoc makes for the replace prompts and the About box, asked through the same one function.
-	// This file spelled the LocaleSetting test out for itself until 2026-08-08.
+	// Japanese InDesign gets the Japanese reference, everything else the English one - asked through
+	// KBSLoc::JapaneseUI (see the header).
 	const wchar_t* const text = KBSLoc::JapaneseUI() ? kHowToJA : kHowToEN;
 
 	Utils<IExtendScriptUtils> esUtils;
@@ -187,11 +185,8 @@ void KBSHowTo::Show()
 	// naming what it belongs to. Same wording as the window title, in both languages, so the two
 	// routes are recognisably the same document.
 	//
-	// ! WINDOWS-SHAPED, and the one thing in this file that a Mac port has to change. The cast below
-	//   works because wchar_t IS a UTF-16 code unit on Windows, which is what AppendW wants. On the
-	//   Mac wchar_t is 32-bit, so the same cast walks the text at half speed reading garbage. The
-	//   ScriptUI route above has no such problem - AppendJSEscaped reads the wide string a character
-	//   at a time and emits ASCII - so it is only this fallback that would need converting first.
+	// The cast below works because wchar_t IS a UTF-16 code unit on Windows, which is what AppendW
+	// wants (the plug-in is Windows-only).
 	PMString fallback;
 	fallback.SetTranslatable(kFalse);
 	fallback.Append("Kohaku Find/Change - How to Use\n\n");

@@ -91,9 +91,7 @@ public:
 		// shutdown - KBSHitMarker::ShutdownCleanup refuses every call after it, so a countdown that fires
 		// in between finds nothing to take down, whichever service InDesign calls first.)
 		KBSMarkerExpiryIdleTask::Shutdown();
-		// ...and the line the panel last reported: a static PMString. It joined the shutdown list on
-		// 2026-08-08, having stood through both of the sweeps that wrote the rule down (see
-		// KBSResultTree::ShutdownCleanup).
+		// ...and the line the panel last reported: a static PMString (see KBSResultTree::ShutdownCleanup).
 		KBSResultTree::ShutdownCleanup();
 	}
 };
