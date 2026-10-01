@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Result tree rebuild entry point. Called after KBSResultModel has been filled by a search or a
-//  scan: reloads the panel's tree widget from the model. What it opens depends on the scope - a
+//  Result tree rebuild entry point. Called after KBSResultModel has been filled by a search or by Show
+//  Changes: reloads the panel's tree widget from the model. What it opens depends on the scope - a
 //  BOOK result opens the book row and leaves the chapters closed (a book-wide run can fill the
 //  panel with one chapter's hits and bury the fact that others matched), a single document opens
 //  its one chapter. No priming is needed to get the expander arrows drawn: this panel draws them
@@ -34,20 +34,19 @@ namespace KBSResultTree
 
 	    Costs one notification per BRANCH row, not per hit: NodeChanged carries childrenChangedAlso,
 	    so the framework refreshes a node's children itself. That is the book row (when there is
-	    one), each chapter, and each of that chapter's FONT rows - the hit rows under a font level
-	    are grandchildren, so the chapter's own call does not reach them. A chapter has a handful of
-	    fonts, not a few thousand, so it stays a handful of calls. ("one per CHAPTER" here until
-	    2026-08-11, which was the count before the font level and the book row.) Rebuild() by
-	    contrast tears the whole tree down and re-expands it, which is what made a large result set
-	    expensive.
+	    one), each chapter, its run rows and its story rows - the hit rows under a story are
+	    grandchildren (or deeper), so the chapter's own call does not reach them. A chapter has a
+	    handful of those, not a few thousand, so it stays a handful of calls. Rebuild() by contrast
+	    tears the whole tree down and re-expands it, which is what made a large result set expensive.
 
 	    It also KEEPS the expansion state, so a chapter the user collapsed stays collapsed (Rebuild
 	    re-expands everything). Safe to call when the panel is closed (does nothing then). */
 	void RefreshRows();
 
-	/** Repaint ONLY the rows that read out a checked count: the book row, and the one chapter row
-	    named here. What a single check box changes and nothing more - the box draws itself, and no
-	    other hit row is affected - so this is what a box's observer calls instead of RefreshRows.
+	/** Repaint ONLY the rows that read out a checked count: the book row, the one chapter row named
+	    here and its story rows. What a single check box changes and nothing more - the box draws
+	    itself, and no other hit row is affected - so this is what a box's observer calls instead of
+	    RefreshRows.
 	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
 	void RefreshCheckedCounts(int32 chapterIdx);
 
@@ -103,14 +102,10 @@ namespace KBSResultTree
 	// (GetLastStatus - the kept line, for the app.kfcStatus script property - went with that
 	//  property on 2026-09-27.)
 
-	/** Release this module's static storage during the controlled shutdown
-	    (KBSStartupShutdown::Shutdown), so no static destructor at DLL unload finds work left to do.
-
-	    One string - the status line above - but it is a PMString, which is exactly the kind of static
-	    the rule was written for: KBSResultModel::ShutdownCleanup and KBSSearchEngine::ShutdownCleanup
-	    both name "a static PMString" as the thing that must be let go here. This one was missed by
-	    both of them until 2026-08-08 (it is the third static to be added without a line in the list;
-	    see KBSResultModel::ShutdownCleanup for the first two). */
+	/** Release this module's static storage during the controlled shutdown (the UI half's,
+	    KBSUIStartupShutdown), so no static destructor at DLL unload finds work left to do: the kept
+	    status line and a standing "Source Text:"'s pieces - PMStrings, exactly the kind of static the
+	    rule was written for (KBSResultModel::ShutdownCleanup). */
 	void ShutdownCleanup();
 
 	/** Say on the status line WHAT was just ticked or cleared, and over WHICH row:
@@ -127,15 +122,6 @@ namespace KBSResultTree
 	    ShowHitCheckStatus below. What went on 2026-08-05 was the COUNT ("<checked> / <total>
 	    checked."), because the book and document rows read that out themselves now; what a single
 	    tick still says is WHICH row it was ("P1(2)  checked").
-
-	    !This paragraph read "Ticking a single box says nothing here (2026-08-05) ... the line would
-	     be overwriting the search's own summary to repeat what is already on screen" until
-	     2026-08-11 - written in the very commit that added ShowHitCheckStatus (d3ffb1c), so it was
-	     never true. And the thing it gave as the reason not to do it is exactly what a single tick
-	     DOES do: overwriting the run's summary on this line is why the summary had to be recorded
-	     separately on 2026-08-09 (KBSResultModel::NoteRunSummary, whose own note states the
-	     behaviour correctly - the saved report's heading had started reading "Summary: P1(2)
-	     checked").
 
 	    @param targetName the row the menu was popped over - a chapter's name, or the book's.
 	    @param nowChecked true = Check All, false = Uncheck All. */

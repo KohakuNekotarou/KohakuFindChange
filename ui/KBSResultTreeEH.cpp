@@ -31,7 +31,7 @@
 //  right expand / collapse keys stay stock.
 //
 //  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on
-//  first QueryInterface, so naming it in KBS.fr is not enough - KBSResultNodeEH's key-focus
+//  first QueryInterface, so naming it in KFCUI.fr is not enough - KBSResultNodeEH's key-focus
 //  hand-off is what brings it into being (and what puts the arrows here at all). See the long
 //  comment there before removing that call.
 //

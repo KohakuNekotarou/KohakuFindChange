@@ -81,23 +81,16 @@ static bool16 KBSViewOrParentIsHilited(IControlView* view, int32 stepsLeft)
 //  is KBSBlendColor in KBSPanelTextDraw.h now, with the 0.65 it is used at: the panel's message area
 //  fades its context the same way, and two copies would be two things to keep in step.)
 
-// (The break characters are turned into marks by KBSResultModel::MarkUpBreaksForDisplay, which
-//  stood here as a static until 2026-08-04. It moved because the SAVED REPORT has to show a match
-//  the same way this cell does, and a second copy of the rule would be a second thing to keep in
-//  step - the same reason BuildHitLocator is one function serving two callers.)
+// (The break characters are turned into marks by KBSResultModel::MarkUpBreaksForDisplay - one rule for
+//  this cell, the story rows, the message area and the label a reader walks.)
 
 //----------------------------------------------------------------------------------------
 // KBSRowData - the per-row data holder (five strings)
 //----------------------------------------------------------------------------------------
 
-/** Non-persistent holder for a hit row's five strings - locator, flag, and the line split into
-    before / matched / after - aggregated on the colour cell's boss beside the view. Written by the
-    widget manager on every apply.
-
-    (Both of these said "three text segments" until 2026-08-11. It was true at the initial import;
-     the locator became a string of its own on 2026-07-23 and the flag word on 2026-07-28, and
-     neither commit came back to the sentence that counted them - the count is in a comment, and
-     nothing makes you edit a comment to add a field.) */
+/** Non-persistent holder for a hit row's strings - locator, flag, and the line split into before /
+    matched / after - aggregated on the colour cell's boss beside the view. Written by the widget
+    manager on every apply. */
 class KBSRowData : public CPMUnknown<IKBSRowData>
 {
 public:
@@ -207,15 +200,11 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	KBSResults()->MarkUpBreaksForDisplay(post);
 
 	// The palette window's SYSTEM SCRIPT font - the same one every OTHER row of this tree already
-	// draws in: the chapter row resource's label widget (kKBSResultChapterLabelWidgetID, in KBS.fr's
+	// draws in: the branch row resource's label widget (kKBSResultChapterLabelWidgetID, in KFCUI.fr's
 	// KBSResultNodeWidget for kKBSResultChapterNodeWidgetRsrcID) declares
 	// kPaletteWindowSystemScriptFontId for both its normal and its hilite font, and the branch rows
 	// are stock static texts that take it from there. This cell asked for kPaletteWindowFontId until
 	// 2026-08-07, which left one row of one tree wanting a different font from the rows above it.
-	// (Named rather than cited as "KBS.fr:1205", which is what stood here from 2026-08-07 until
-	//  2026-08-11: that line was exact when written and the resource has since grown by 22 lines, so
-	//  the number now lands on the expander's frame INSIDE THE SAME RESOURCE - close enough to read
-	//  as right. Same lesson as block 12's: quote by name, since names move with the thing.)
 	//
 	// It is also what the shipping panels reach for whenever a widget has to show text that came
 	// out of a DOCUMENT, or that a user typed: the layer panel stamps it on the layer-name cell
@@ -269,15 +258,16 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// is exactly what the user wants to read - it gets the same emphasis a match does).
 	const RealAGMColor kMatchColor = kFullColor;
 
-	// The accent run: the one word that says why this row could not be acted on (missing /
-	// refused). kInterfaceItemHighLight is the theme's own accent - blue-ish in the light UI,
-	// orange in the dark one - so it stands out without a hardcoded colour that would go wrong
-	// in one theme or the other. The theme table has no red, and none is invented here.
+	// The accent run: the one word that says why this row could not be acted on
+	// (KBSResultModel::BuildHitLocator's words). kInterfaceItemHighLight is the theme's own accent -
+	// blue-ish in the light UI, orange in the dark one - so it stands out without a hardcoded colour
+	// that would go wrong in one theme or the other. The theme table has no red, and none is invented
+	// here.
 	//
 	// On the SELECTED row the accent is dropped and the word is drawn in the ordinary selected-text
 	// colour: the selection fill is itself an accent colour (blue-ish in the light UI), so accent on
 	// accent is the one combination that can come out unreadable. Nothing is lost by it - the reason
-	// is a WORD ("missing" / "refused"), and the colour only ever emphasised it. It is also the row
+	// is a WORD, and the colour only ever emphasised it. It is also the row
 	// the user is already looking at.
 	RealAGMColor accent = fg;
 	if (colors != nil && !isHilited)
@@ -326,10 +316,6 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// neither underlined nor dropped. If the whole line fits it is drawn as-is; when it overflows
 	// the match is kept at full strength and the context is ellipsized around it. The matched run
 	// is the full theme text colour; the context runs are faded.
-	//
-	// A missing-glyph row used to give up to a third of this width to the FONT NAME, drawn
-	// right-aligned. The tree names the font on the row ABOVE the group now (2026-08-02), so the
-	// whole cell goes back to the line.
 	const PMReal availWidth = rightEdge - x;
 	if (availWidth <= PMReal(0.0))
 		return;		// the locator consumed the cell; no room left for the line
@@ -361,9 +347,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const bool wantCaret = match.IsEmpty();
 
 	const PMReal preW   = pre.IsEmpty()   ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, pre,   fontInfo, kDontConvertAmpersand).X();
-	const PMReal matchW = wantCaret
-		? StringUtils::PMMeasureString(&gc, KBSCaretPlaceholder(), fontInfo, kDontConvertAmpersand).X()
-		: (match.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, match, fontInfo, kDontConvertAmpersand).X());
+	const PMReal matchW = StringUtils::PMMeasureString(&gc, wantCaret ? KBSCaretPlaceholder() : match, fontInfo,
+		kDontConvertAmpersand).X();		// (wantCaret is match.IsEmpty(): otherwise there are characters to measure)
 	const PMReal postW  = post.IsEmpty()  ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, post,  fontInfo, kDontConvertAmpersand).X();
 
 	// The match at the running x: its characters, or the bar in their place - spanning the cell a pixel

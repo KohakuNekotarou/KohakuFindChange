@@ -4,13 +4,11 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  IKBSRowData: the per-row draw data for a hit line's colour cell. The line is pre-split (in
-//  KBSSearchEngine, against the paragraph's wide string at the finder's exact offsets) into
-//  three segments - the text before the match, the matched text, and the text after - so the
-//  cell (KBSColorTextView) just paints three runs and never does UTF-16 boundary maths at draw
-//  time. The matched run is drawn in a highlight colour; the rest follows the palette text
-//  colour (theme-adaptive). New to KBS (no KESCL original); the recipe is the multi-colour cell
-//  draw pattern proven against customdatalinkui's DVControlView.
+//  IKBSRowData: the per-row draw data for a hit line's colour cell. The line arrives pre-split (by
+//  the model half, against the paragraph's wide string at the finder's exact offsets) around the
+//  match, so the cell (KBSColorTextView) just paints runs and never does UTF-16 boundary maths at
+//  draw time. New to KBS (no KESCL original); the recipe is the multi-colour cell draw pattern proven
+//  against customdatalinkui's DVControlView.
 //
 //========================================================================================
 
@@ -22,9 +20,10 @@
 #include "KFCUIID.h"
 
 /** The parts a hit row's colour cell paints: the page LOCATOR ("P1(2)", drawn at the full theme
-    text colour), the FLAG word that follows it when the row has one ("missing" / "refused", drawn
-    in the theme's accent), then a gap, then the line split around the match - the text before it,
-    the matched text (full colour), and the text after (before/after are drawn faded).
+    text colour), the FLAG word that follows it when the row has one (drawn in the theme's accent -
+    the words are KBSResultModel::BuildHitLocator's), then a gap, then the line split around the
+    match - the text before it, the matched text (full colour), and the text after (before/after are
+    drawn faded).
     Set by the widget manager on every apply, read by KBSColorTextView::Draw. Non-persistent.
 
     The row's check box is NOT drawn here - it is a real check box widget beside this cell
@@ -32,18 +31,15 @@
 
     A replaced row draws exactly like a found one: after a replace the panel lists only what was
     changed, and the new text is what the user wants to read, so it gets the same emphasis a match
-    does. (The check box next to it is hidden instead - there is nothing left to select.) */
+    does. (The check box next to it is hidden instead - there is nothing left to select - until
+    Reject Change takes it back.) */
 class IKBSRowData : public IPMUnknown
 {
 public:
 	enum { kDefaultIID = IID_IKBSROWDATA };
 
 	/** Replace this row's parts: the page locator, the accent-coloured flag word that follows it
-	    (empty on most rows), and the three line segments. Any may be empty.
-
-	    A missing-glyph row used to carry the FONT NAME here as well, drawn right-aligned against the
-	    cell's edge. The tree groups those rows under a font row instead as of 2026-08-02, so the name
-	    is said once per group rather than once per row, and the whole cell is the line again. */
+	    (empty on most rows), and the three line segments. Any may be empty. */
 	virtual void SetSegments(const PMString& locator, const PMString& flag, const PMString& pre,
 		const PMString& match, const PMString& post) = 0;
 

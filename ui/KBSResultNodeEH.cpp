@@ -43,8 +43,8 @@
 //  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
 //  KBSResultCheckObserver.
 //
-//  RIGHT-click (2026-08-01) pops the rows' context menu - Check All / Uncheck All, which moved here
-//  off the panel flyout the same day. See RButtonDn at the foot of this file.
+//  RIGHT-click (2026-08-01) pops the row's own context menu - the book / document rows', a story row's,
+//  a run row's or a hit row's. See RButtonDn at the foot of this file.
 //
 //========================================================================================
 
@@ -56,7 +56,7 @@
 #include "IEvent.h"				// ShiftKeyDown / CmdKeyDown; GlobalWhere - where to pop the menu
 #include "IEventHandler.h"		// the LIST's handler - the arrow keys' owner (see the hand-off below)
 #include "IKeyBoard.h"			// AcquireKeyFocus - hand the arrows to the list after a click
-#include "IMenuManager.h"		// HandlePopupMenu - pops kKBSResultRowMenuName at the cursor
+#include "IMenuManager.h"		// HandlePopupMenu - pops the rows' menus at the cursor
 #include "ISession.h"
 #include "ITreeNodeIDData.h"	// this node's NodeID
 #include "ITreeViewController.h"	// IsSelected - is this the row the click landed on?
@@ -94,6 +94,17 @@ namespace
 // A file static, not a member: the rows' widgets are recycled as the tree scrolls, and this belongs
 // to "the click going on right now" rather than to any one row. One click happens at a time.
 bool gSelectOnNextButtonUp = false;
+
+// Pop one of the rows' right-click menus (a MenuDef subtree, by its internal name) at the click. The item
+// the user picks fires through the ordinary action component.
+void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
+{
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
+	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
+	if (menuMgr != nil)
+		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, widget);
+}
 
 }
 
@@ -239,16 +250,18 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	return result;
 }
 
-// Right-click on a row: pop Check All / Uncheck All at the cursor. Same machinery as the real Links
-// and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as KESCL's own report rows,
-// which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops the MenuDef subtree
-// named kKBSResultRowMenuName, and the item the user picks fires through the ordinary action
+// Right-click on a row: pop that kind of row's menu at the cursor (PopRowMenu). Same machinery as the
+// real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as KESCL's own report
+// rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a MenuDef
+// subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
 // component. The clicked row is stashed FIRST - the action is handed no widget context of its own,
-// so KBSResultModel::GetContextMenuChapter is how it learns what the menu was about.
+// so the model's context-menu row (KBSResultModel::GetContextMenuChapter and its siblings) is how it
+// learns what the menu was about.
 //
-// What the two commands then reach is exactly the row this was popped over: the BOOK row means every
-// chapter (what the flyout used to do), a document row means that chapter alone. That question is the
-// whole reason the commands moved here - a flyout has no row to ask about.
+// What the book / document rows' commands reach is exactly the row this was popped over: the BOOK row
+// means every chapter (what the flyout used to do), a document row means that chapter alone. That
+// question is the whole reason Check All / Uncheck All moved here (2026-08-01) - a flyout has no row to
+// ask about.
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -263,14 +276,8 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Hit rows carry their own menu since 2026-09-26 - Reject Change and Redo, about THIS row (the
-	// user's call; until then a hit row had no menu, its check box being all a row needed). The row is
-	// stashed first, like the chapter below: the action is handed no widget context of its own. The
-	// click is consumed either way - no stock handling, so the row is not selected and nothing jumps.
+	// Every menu below consumes the click - no stock handling, so the row is not selected and nothing jumps.
 	//
-	// ***** WHY THE ITEMS ARE GREY IS SAID HERE, BEFORE THE MENU. ***** When both are disabled the
-	// popup does not open at all (measured 2026-08-01 with Check All), so the status line is the only
-	// place left to say it.
 	// ***** A STORY ROW (2026-09-27, the story level): its own menu, over that story's rows. *****
 	// Every other right-click clears the story it named, so a story menu item fired later (a script, a
 	// shortcut) cannot act on a story nobody right-clicked this time.
@@ -278,11 +285,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	{
 		KBSResults()->SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
 		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
-		InterfacePtr<IApplication> storyApp(GetExecutionContextSession()->QueryApplication());
-		InterfacePtr<IActionManager> storyActionMgr(storyApp != nil ? storyApp->QueryActionManager() : nil);
-		InterfacePtr<IMenuManager> storyMenuMgr(storyActionMgr, UseDefaultIID());
-		if (storyMenuMgr != nil)
-			storyMenuMgr->HandlePopupMenu(kKBSResultStoryMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+		PopRowMenu(kKBSResultStoryMenuName, e, this);
 		return kTrue;
 	}
 	KBSResults()->SetContextMenuGroup(-1, -1);
@@ -292,15 +295,17 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID->IsRunRow())
 	{
 		KBSResults()->SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
-		InterfacePtr<IApplication> runApp(GetExecutionContextSession()->QueryApplication());
-		InterfacePtr<IActionManager> runActionMgr(runApp != nil ? runApp->QueryActionManager() : nil);
-		InterfacePtr<IMenuManager> runMenuMgr(runActionMgr, UseDefaultIID());
-		if (runMenuMgr != nil)
-			runMenuMgr->HandlePopupMenu(kKBSResultRunMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+		PopRowMenu(kKBSResultRunMenuName, e, this);
 		return kTrue;
 	}
 	KBSResults()->SetContextMenuRun(-1, -1);
 
+	// Hit rows carry their own menu since 2026-09-26 - Replace, Reject Change and Accept Change, about THIS
+	// row (the user's call; until then a hit row had no menu, its check box being all a row needed).
+	//
+	// ***** WHY REJECT CHANGE IS GREY IS SAID HERE, BEFORE THE MENU. ***** When every item is disabled the
+	// popup does not open at all (measured 2026-08-01 with Check All), so the status line is the only
+	// place left to say it.
 	if (nodeID->IsHitRow())
 	{
 		const int32 chapter = nodeID->GetChapter();
@@ -328,11 +333,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}
-		InterfacePtr<IApplication> hitApp(GetExecutionContextSession()->QueryApplication());
-		InterfacePtr<IActionManager> hitActionMgr(hitApp != nil ? hitApp->QueryActionManager() : nil);
-		InterfacePtr<IMenuManager> hitMenuMgr(hitActionMgr, UseDefaultIID());
-		if (hitMenuMgr != nil)
-			hitMenuMgr->HandlePopupMenu(kKBSResultHitMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+		PopRowMenu(kKBSResultHitMenuName, e, this);
 		return kTrue;
 	}
 
@@ -340,18 +341,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		? static_cast<int32>(KBSResultModel::kContextMenuBookRow)
 		: nodeID->GetChapter();
 	KBSResults()->SetContextMenuChapter(target);
-
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	if (app == nil)
-		return kTrue;
-	InterfacePtr<IActionManager> actionMgr(app->QueryActionManager());
-	if (actionMgr == nil)
-		return kTrue;
-	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
-	if (menuMgr == nil)
-		return kTrue;
-
-	menuMgr->HandlePopupMenu(kKBSResultRowMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
+	PopRowMenu(kKBSResultRowMenuName, e, this);
 	return kTrue;
 }
 

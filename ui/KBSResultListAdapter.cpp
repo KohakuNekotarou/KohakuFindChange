@@ -10,19 +10,17 @@
 //  per chapter that holds matches (in book order). A document-scope search has no book row, so its
 //  chapters hang off the root directly, which is the two-level tree KBS started with.
 //
-//  Under a document, one of two things (2026-08-02):
-//    * a FONT node per group when this chapter's hits name fonts - a missing-glyph scan, where the
-//      font is what the finding is ABOUT - each holding that font's hits;
-//    * the hits themselves when they do not, which is every Find/Change result.
-//  The choice is made per CHAPTER, from the chapter's own groups, so the two can never disagree.
-//  (Since 2026-09-27 the groups are STORIES, and every chapter has them.)
+//  Under a document, a STORY node per group (2026-09-27), each holding that story's hits - the code calls
+//  the level FONT, the name it had when it held the fonts of Find Missing Glyphs (removed the same day).
+//  Every chapter's hits are grouped; the branches below that hang hits off the document directly are the
+//  safe answer for a node that names no group, not a shape any list has now.
 //
 //  ***** A RUN LEVEL between the document and its stories (2026-09-29, Show Changes by KohakuFindChange). *****
 //  A list rebuilt from the Track Changes records groups a document's rows by the replace that wrote them
 //  first: document -> run -> story -> row. Decided per chapter again, from its own runs (none on every
 //  other list).
 //
-//  See KBSResultNodeID.h for the five node shapes and for why the root sits at -2. Ported from
+//  See KBSResultNodeID.h for the six node shapes and for why the root sits at -2. Ported from
 //  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KBS shows every chapter
 //  that has hits, no filters) - itself modelled on paneltreeview's adapter.
 //
@@ -42,9 +40,9 @@
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 /** The hierarchy over KBSResultModel: hidden root -> the BOOK row when the results came from a book
-    -> one document node per chapter with hits -> a FONT node per group when the chapter has groups
-    -> one hit node per match. Without a book the document nodes hang off the root itself; without
-    groups the hit nodes hang off their document. */
+    -> one document node per chapter with hits -> (a RUN node per replace, on a list rebuilt from the
+    records) -> a STORY ("font") node per group -> one hit node per match. Without a book the document
+    nodes hang off the root itself. */
 class KBSResultListAdapter : public CPMUnknown<ITreeViewHierarchyAdapter>
 {
 public:
@@ -63,8 +61,8 @@ public:
 			return kInvalidNodeID;	// the root has no parent
 		if (nodeID->IsHitRow())
 		{
-			// A hit hangs off its FONT row when its chapter has groups, and off the document row
-			// itself when it has not - which is the tree a Find/Change result has always had.
+			// A hit hangs off its story ("font") row - and off the document row only when it names no
+			// group, which no list has since 2026-09-27.
 			const int32 font = nodeID->GetFont();
 			if (font >= 0)
 				return KBSResultNodeID::CreateFont(nodeID->GetChapter(), font);
@@ -100,8 +98,8 @@ public:
 		if (nodeID->IsRunRow())
 			return KBSResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
 
-		// A document row: its RUN rows when the list has runs (2026-09-29); else its FONT rows when this
-		// chapter's hits name fonts, its hits directly when they do not.
+		// A document row: its RUN rows when the list has runs (2026-09-29); else its story ("font") rows
+		// (its hits directly only for a chapter with no groups - see the head of the file).
 		const int32 runs = KBSResults()->GetDisplayRunCount(nodeID->GetChapter());
 		if (runs > 0)
 			return runs;
@@ -181,8 +179,7 @@ public:
 			return -1;
 		if (childID->IsHitRow())
 		{
-			// Its place under its FONT row when it has one, and its place in the chapter when it
-			// does not.
+			// Its place under its story ("font") row (its place in the chapter for a hit with no group).
 			const int32 pos = KBSResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
 			return (pos >= 0) ? pos : childID->GetHit();
 		}

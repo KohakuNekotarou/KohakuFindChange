@@ -26,8 +26,8 @@
 //  The middle level held FONTS for Find Missing Glyphs from 2026-08-02 (the font was the unit a fix
 //  applied to). Since 2026-09-27 it holds STORIES - a Find/Change result is grouped by story, the way
 //  KCM's Story mode lists them - and that scan has been removed. The names "font" / FontGroup are
-//  kept from then. A story row has its own menu (Replace / Reject Change / Redo / Check All /
-//  Uncheck All - KBSResultNodeEH::RButtonDn).
+//  kept from then. A story row has its own menu (Replace / Reject Change / Accept Change / Replace
+//  Again / Check All / Uncheck All - KBSResultNodeEH::RButtonDn).
 //
 //  ***** hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
@@ -91,10 +91,9 @@ public:
 	    tree holding two identities for one row loses selections and expansion state in ways that
 	    look random.
 
-	    A chapter with no groups answers -1, which is exactly the value this node carried before the
-	    font level existed, so every existing caller keeps working unchanged. The lookup is
-	    bounds-checked at the model end and answers -1 for anything it cannot resolve, which is what
-	    lets nodes be made while the model is empty (during ClearTree, or straight after Clear). */
+	    The lookup is bounds-checked at the model end and answers -1 for anything it cannot resolve,
+	    which is what lets nodes be made while the model is empty (during ClearTree, or straight after
+	    Clear). */
 	static NodeID_rv Create(int32 chapter, int32 hit)
 	{
 		const int32 font = KBSResults()->GetHitFontGroup(chapter, hit);
@@ -153,7 +152,8 @@ public:
 	/** The run this row belongs to (2026-09-29), or -1 on a list with no run level. */
 	int32 GetRun() const { return fRun; }
 
-	/** The font group this row belongs to, or -1 when its chapter has no groups. */
+	/** The font (story) group this row belongs to, or -1 on a row above the story level (and on a hit
+	    the model could not resolve). */
 	int32 GetFont() const { return fFont; }
 
 	/** The hit index within that chapter (-1 = this is NOT a hit row). */
