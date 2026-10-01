@@ -30,22 +30,12 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         k_enUS,									// Locale Id
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
-                // The model half's six (2026-10-01, the model/UI split): what the model writes itself.
+                // The model half's strings (2026-10-01, the model/UI split): what the model writes itself.
                 // Every other string is the UI half's (ui/KFCUI_enUS.fr).
                 // (The Change Checked confirmation's strings stood here until 2026-09-27, when the
                 // prompt was removed.)
-                // Sits between the query and the closing lines: what is about to be written, then
-                // what could go wrong with it, then what the run leaves behind.
-                //
-                // ***** NOT ON THIS PROMPT - these five are the replace's own alert. ***** An
-                // opening that names what was edited, then what it can cost, then what Cancel does.
-                // Shown once per chapter, as the replace opens that chapter and finds its counters
-                // have moved: the only point at which a chapter the user had CLOSED can be asked.
-                // They were a line on this prompt for one afternoon on 2026-08-08; KBSID.h says why
-                // they left it. ...Many has had no caller since (the alert names one chapter,
-                // because it asks once per chapter).
-                // The run stopped before writing anything: the verify walk found a ticked match
-                // that no longer begins where the search left it.
+                // The replace's own alert, shown INSTEAD of running: the verify walk found a ticked
+                // match that no longer begins where the search left it, and nothing was written.
                 kKBSStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
                 kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
                 // What Edit > Undo calls a Change Checked run (2026-09-26).

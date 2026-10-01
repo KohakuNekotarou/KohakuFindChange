@@ -34,7 +34,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
                 kKBSAboutMenuKey,					kKBSDisplayName "...",
                 // kKBSPluginsMenuKey was here until 2026-08-06. Its menu path macro was never used
-                // by the .fr, so nothing ever asked for this string (see KBSID.h).
+                // by the .fr, so nothing ever asked for this string (see KFCUIID.h).
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
@@ -72,20 +72,18 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
                 kKBSPanelMenuActionArea,		kKBSPanelMenuActionAreaValue,
 
-                // ----- Window strings
-
                 // ----- Panel/dialog strings
                 kKBSPanelTitleKey,				kKBSDisplayName,
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // KBSResultTree::RestoreStatusOnPanelShow reads this key whenever the panel is shown
                 // with nothing run this session - since 2026-09-29 the ONLY reader: the message area is
-                // drawn by hand now and its resource carries no initial text (KBS.fr). Kept here so
+                // drawn by hand now and its resource carries no initial text (KFCUI.fr). Kept here so
                 // the wording is not spelled out in the code. Naming the DOCUMENT command
                 // is always right here, because Book Scope starts OFF at every launch.
                 kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find in Document from this panel's menu.",
 
-                // (The model half's six strings - the replace's own alert and what Edit > Undo calls a
+                // (The model half's strings - the replace's own alert and what Edit > Undo calls a
                 //  KBS write - stayed in model/KBS_enUS.fr with the split, 2026-10-01.)
 
 
@@ -95,7 +93,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // description, a credit and the repository URL, and a separate Japanese wording in
                 // KBSLoc.h - all removed. The separator is a plain space: the Japanese version had
                 // an ideographic comma there, which is the sort of thing that had to go for the two
-                // languages to read alike. Same shape as KESCM's (KESCM_enUS.fr:84).
+                // languages to read alike. Same shape as KCM's (KCMUI_enUS.fr, kKCMAboutBoxStringKey).
                 kKBSAboutBoxStringKey,			kKBSDisplayName " version " kKBSVersion,
 
 

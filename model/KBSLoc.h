@@ -4,10 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace's own alerts and
-//  its undo step name. (The Glyph-tab confirmation dialog's labels went with it on 2026-09-27.)
-//  (The About box was one of these until 2026-08-09;
-//  it now reads the same in every language, so it needs nothing from this file.)
+//  Runtime Japanese for the few strings KBS speaks in Japanese - the replace's own alert and what
+//  Edit > Undo calls KBS's writes - and JapaneseUI() for the How to Use page (KBSHowTo.cpp).
+//  (The About box was one of these until 2026-08-09; it now reads the same in every language.)
 //
 //  There is no jaJP string TABLE any more (2026-08-05, user's call). Every locale reads the
 //  enUS table, and the Japanese is switched in HERE at run time instead, so no CP932 resource
@@ -28,8 +27,6 @@
 #include "LocaleSetting.h"
 #include "PMLocaleIds.h"
 #include "PMString.h"
-
-#include "KBSBoundaryID.h"
 
 namespace KBSLoc
 {
@@ -71,29 +68,15 @@ namespace KBSLoc
 		s.SetTranslatable(kFalse);
 		return s;
 	}
-
-	/** The enUS string-table entry, whatever the UI language - for the strings that are English on
-		purpose. The replace confirmation became one of them on 2026-09-26 (user's call: "Find:" and
-		"Change:", in English). Same finishing as Text(): translated from its key, then marked
-		untranslatable so nothing downstream takes the finished text for a key. */
-	inline PMString English(const char* englishKey)
-	{
-		PMString s(englishKey, PMString::kTranslateDuringCall);
-		s.SetTranslatable(kFalse);
-		return s;
-	}
 }
 
 // The Japanese the jaJP table used to carry, one constant per retired table entry. The keys
 // these pair with live on in KBSID.h and the enUS table - they ARE the English path.
 namespace KBSJa
 {
-	// ----- Change Checked confirmation: NO JAPANESE ANY MORE (2026-09-26, user's call). -----
-	// The prompt is two English lines on every UI - "Find:" and "Change:" - through KBSLoc::English,
-	// and its opening question and closing lines are gone. The Japanese that stood here (the count
-	// question, 検索文字列 / 置換文字列, the empty-box note, 検索形式 / 置換形式, and the unsaved-book
-	// and ご注意下さい lines below) went with it.
-	// ***** NOT PART OF THIS PROMPT - the replace's own alert, shown INSTEAD of running. *****
+	// ----- The replace's own alert, shown INSTEAD of running. -----
+	// (The Change Checked confirmation's Japanese stood above it until 2026-09-26, and the prompt
+	//  itself went on 2026-09-27.)
 	// The run stopped before writing anything: the verify walk found a ticked match that no longer
 	// begins where the search left it (KBSReplaceEngine::TellResultsWentStale). An opening that
 	// names the chapter where there is one to name, then what it means for the user.
@@ -113,12 +96,6 @@ namespace KBSJa
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert
 	//  to state the outcome and the status line to carry what to do next.)
-
-	// ----- About box -----
-	// GONE on 2026-08-09 (user's call): the About box now reads the same in every UI language -
-	// the plug-in's name and version, and nothing else - so there is no Japanese wording of it to
-	// switch in. KBSActionComponent::DoAbout asks the string table directly instead of coming
-	// through Text() above. The English entry is KBS_enUS.fr's kKBSAboutBoxStringKey.
 }
 
 #endif // __KBSLoc_h__
