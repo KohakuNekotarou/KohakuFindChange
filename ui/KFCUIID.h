@@ -536,7 +536,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 
 // ***** HOW TALL ONE ROW OF THE RESULT TREE IS. *****
 //
-// One number, read from BOTH SIDES: KBS.fr gives it to the two row resources above and to the
+// One number, read from BOTH SIDES: KFCUI.fr gives it to the two row resources above and to the
 // tree's four scroll increments, and KBSResultListWidgetMgr answers GetNodeWidgetHeight with it.
 // It was written out six times until 2026-08-09, and the panel now ROUNDS ITS OWN HEIGHT to a
 // multiple of it (KBSPanelView::ConstrainDimensions), so a copy that drifted would leave the

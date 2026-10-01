@@ -28,7 +28,7 @@
 // The search and replace engines, the results, the tracked-change signature, the jump marker's
 // adornment and the observers that keep the results true are declared here; everything the panel
 // needs - its bosses, menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's
-// resource. The six strings this half writes itself (the replace's own alert and what Edit > Undo
+// resource. The strings this half writes itself (the replace's own alert and what Edit > Undo
 // calls a KBS write) stay in KBS_enUS.fr.
 
 // General includes:
@@ -186,8 +186,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * Undo and a Redo broadcast. The same AddIn as KCM's Story Edits list (KCM.fr, IID_IKCMSTORYFOLLOWOBSERVER).
 	 * Our own IID: kTextStoryBoss carries other people's IID_IOBSERVER.
 	 * The MODEL half's (2026-10-01, the split's design section 3): it keeps the results true and tells the
-	 * panel only through KBSModelNotify. (Until the split this note called it UI code bound for the UI
-	 * plug-in - the reading before the stage-1 design.) It answers on the main thread only - a background
+	 * panel only through KBSModelNotify. It answers on the main thread only - a background
 	 * task has neither an Undo nor a panel. It is attached, never written into the document.
 	 */
 	AddIn

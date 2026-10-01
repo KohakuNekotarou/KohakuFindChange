@@ -169,8 +169,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * hovering the picture says where clicking it goes. Nothing else is added - the click itself is
 	 * heard by the panel's observer, which is already there for the tab name.
 	 *
-	 * Same shape as kLinksUIButtonBoss in open/components/linksui, and as KESCM's
-	 * kKESCMIconWidgetBoss - which is where this panel's layout comes from.
+	 * Same shape as kLinksUIButtonBoss in open/components/linksui, and as KCM's
+	 * kKCMIconWidgetBoss - which is where this panel's layout comes from.
 	 */
 	Class
 	{
@@ -341,7 +341,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 *
 	 * It goes on kActiveContextBoss rather than the kSessionBoss above because that is the proven
 	 * arrangement: KESCM carries three observers there, this one among them. (A free-floating
-	 * observer boss did NOT receive these notifications in practice - see KESCM.fr.)
+	 * observer boss did NOT receive these notifications in practice - see KCMUI.fr.)
 	 */
 	AddIn
 	{
@@ -430,16 +430,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// ----- The panel's flyout menu -----
 		// Written here in the order it is DRAWN. What actually decides that order is each item's
-		// position number, and the six blocks those numbers form are laid out in KBSID.h. The
+		// position number, and the blocks those numbers form are laid out in KFCUIID.h. The
 		// separators' names are in the order they were added, not the order they appear in - the
 		// first one written was the rule above About, which is why it is Separator1 down at 10.0.
 
 		// --- Block 1: Find/Change - the search, then the one command that rewrites the documents ---
-		// (the user's order, 2026-09-27: the two scans moved below Change Checked)
 
-		// Find in Document / Find in Book: run the search over the current scope using the settings
-		// in InDesign's own Find/Change dialog. Drawn under whichever of the two names the scope
-		// calls for (see the action definition below).
 		// Open Find/Change... (2026-10-01, the user's call): InDesign's own Find/Change dialog, opened from here -
 		// with no document open as well, where the Edit menu greys it out. Open, type the query, then search.
 		kKBSOpenFindChangeActionID,
@@ -447,6 +443,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSOpenFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Find in <scope>: run the search over the current scope using the settings in InDesign's own
+		// Find/Change dialog. Drawn under the name the scope calls for (see the action definition below).
 		kKBSSearchBookActionID,
 		kKBSTargetMenuPath
 		kKBSSearchBookMenuItemPosition,
@@ -476,16 +474,16 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// (Block 2 - Find Missing Glyphs and Find Overset, with the rule above them - was removed on
 		//  2026-09-27: the Book panel's preflight reports both.)
 
-		// Separator between Change Checked and the toggles.
+		// Separator between Show Changes and the toggles.
 		kKBSSeparator3ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKBSSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// --- Block 3: the check-mark toggles (counted in KBSID.h, next to their positions) ---
+		// --- Block 3: the check-mark toggles (their positions are in KFCUIID.h) ---
 
 		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document. Leads the
-		// block because it is what the three commands in block 1 run on.
+		// block because it is what the commands in block 1 run on.
 		kKBSScopeBookActionID,
 		kKBSTargetMenuPath
 		kKBSBookScopeMenuItemPosition,
@@ -553,7 +551,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// --- Block 5: the two reference items ---
 
 		// "How to Use...": the plug-in's operating reference, in a scrollable dialog (KBSHowTo.cpp).
-		// Between the separator and About, where KESCM puts its own.
+		// Between the separator and About.
 		kKBSHowToActionID,
 		kKBSTargetMenuPath
 		kKBSHowToMenuItemPosition,
@@ -569,10 +567,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// A menu of its own, not part of the flyout above - which is why it is written last here,
 		// after that menu has been laid out from top to bottom. Popped at the cursor by the row event
 		// handler (KBSResultNodeEH::RButtonDn, through IMenuManager::HandlePopupMenu with this
-		// subtree's name). Check All / Uncheck All are its two items; they sat on the flyout until
-		// this date, where they could only ever mean "every hit everywhere". Here they mean the row
-		// the menu was popped over - the BOOK row for all of it, a document row for that chapter
-		// alone - which is why they moved.
+		// subtree's name). Check All / Uncheck All came here from the flyout on that date, where they
+		// could only ever mean "every hit everywhere". Here they mean the row the menu was popped
+		// over - the BOOK row for all of it, a document row for that chapter alone.
 		// Replace (2026-09-27): the ticked rows of the document the menu was popped over, no prompt.
 		kKBSChapterReplaceActionID,
 		kKBSResultRowMenuName
@@ -689,7 +686,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSAboutActionID,	// ActionID.
 		kKBSAboutMenuKey,	// Sub-menu string.
 		// The Help > About Plug-ins entry belongs to the help menu's area, which is what the samples
-		// (basicpanel/BscPnl.fr:200) and KESCM (KESCM.fr:638) both give it. The area only ever
+		// (basicpanel/BscPnl.fr:200) give it. The area only ever
 		// matters to the keyboard shortcut editor, and every action here is invisible in it, but
 		// this is the classification the SDK puts on this one item. The popup's own "About This
 		// Plug-in..." below stays kOtherActionArea - so does basicpanel's (:230).
@@ -708,19 +705,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// The search command. kCustomEnabling is what lets UpdateActionStates rename it to
-		// "Find in Book" / "Find in Document" as the Book Scope toggle flips; without it that hook
-		// is never called for this action.
-		// NOT kDisableIfNoFrontDocument: a book search runs off the Book panel's book (or the active
-		// book as a fallback - KBSBookScope::ResolveTargetBook) and opens
-		// its chapters windowless, so "a book is open but no document window is" is a normal, working
-		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
-		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
-		// "There is nothing to run on" IS answered, but in UpdateActionStates, where the question can
-		// be put to the CURRENT scope (KBSBookScope::HasScopeTarget).
-		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
-		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
-		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
 		// Open Find/Change... (2026-10-01). NOT kDisableIfNoFrontDocument - opening the dialog with no document
 		// is the point of it. In the Keyboard Shortcuts editor under Palette Menus (the user's call, the same
 		// day), like the search below.
@@ -733,6 +717,19 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
+		// The search command. kCustomEnabling is what lets UpdateActionStates rename it for the scope it
+		// would search (KBSSearchEngine::FindCommandName - "Find in Book", "Find in Document", ...);
+		// without it that hook is never called for this action.
+		// NOT kDisableIfNoFrontDocument: a book search runs off the Book panel's book (or the active
+		// book as a fallback - KBSBookScope::ResolveTargetBook) and opens
+		// its chapters windowless, so "a book is open but no document window is" is a normal, working
+		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
+		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
+		// "There is nothing to run on" IS answered, but in UpdateActionStates, where the question can
+		// be put to the CURRENT scope (KBSBookScope::HasScopeTarget).
+		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
+		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
+		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
@@ -813,13 +810,12 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Save Panel Settings. NO kCustomEnabling: there is nothing to enable it against - it writes
-		// the settings down, which is possible with nothing loaded and no results. KESCM's own carries
-		// the same flags for the same reason.
+		// the settings down, which is possible with nothing loaded and no results.
 		// !Without kCustomEnabling this action never reaches UpdateActionStates at all, so the blanket
 		// disable at the top of that method does NOT cover it - the hook completes the enabling only
-		// for actions that ask for it (ActionDefs.h:40). The note here said the opposite until
-		// 2026-08-04. It changes nothing in practice: a run's progress bar is modal, so the flyout
-		// cannot be opened while one is going (measured on the running panel, 2026-08-03).
+		// for actions that ask for it (ActionDefs.h:40). It changes nothing in practice: a run's
+		// progress bar is modal, so the flyout cannot be opened while one is going (measured on the
+		// running panel, 2026-08-03).
 		kKBSActionComponentBoss,
 		kKBSSavePanelSettingsActionID,
 		kKBSSavePanelSettingsMenuKey,	// "Save Panel Settings"
@@ -837,12 +833,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		//  OPEN, and nothing should. A closed chapter is REOPENED by the replace itself
 		//  (KBSReplaceEngine -> KBSBookScope::ReopenChapterDoc), and a document-scope result set is
 		//  retired the moment its document closes (KBSCloseDocResponder) - both cases are answered
-		//  before this command can be reached.
-		// !This note read "guarding it against closed documents has to happen in UpdateActionStates
-		//  (per-hit, via KBSBookScope::IsDocStillOpen)" from the day it was written until
-		//  2026-08-11. That call has never existed in KBSActionComponent.cpp - checked against the
-		//  whole history of the file, not just today's - and it must not: a per-hit door there is
-		//  exactly the one that would grey out a book-wide replace.
+		//  before this command can be reached. A per-hit door there is exactly the one that would grey
+		//  out a book-wide replace.
 		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
 		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
 		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
@@ -877,7 +869,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Replace / Reject Change / Redo - a hit row's right-click menu (2026-09-26, Replace 2026-09-27).
+		// Replace / Reject Change - a hit row's right-click menu (2026-09-26, Replace 2026-09-27).
 		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys them by the row the
 		// menu is over.
 		kKBSActionComponentBoss,
@@ -909,7 +901,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 
-		// A story row's right-click menu (2026-09-27) - the same five names as the rows' own commands.
+		// A story row's right-click menu (2026-09-27) - the same names as the rows' own commands.
 		kKBSActionComponentBoss,
 		kKBSStoryReplaceActionID,
 		kKBSReplaceHitMenuKey,			// "Replace"
@@ -1037,15 +1029,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// "How to Use...". NO kCustomEnabling, unlike every command above it: this one has nothing
-		// to be enabled against. It reads a text - no document, no result set, no selection - so it
-		// stays live with nothing loaded, which is exactly when a first-time user reaches for it.
-		//
-		// !It is NOT caught by the blanket disable at the top of UpdateActionStates either: an action
-		// without kCustomEnabling is never passed to that method, which completes the enabling only
-		// for the ones that ask for it (ActionDefs.h:40). This note claimed the reverse until
-		// 2026-08-04. It changes nothing in practice: the run's progress bar is modal, so the flyout
-		// cannot be opened while one is going (measured on the running panel, 2026-08-03).
+		// "How to Use...". NO kCustomEnabling: this one has nothing to be enabled against. It reads a
+		// text - no document, no result set, no selection - so it stays live with nothing loaded, which
+		// is exactly when a first-time user reaches for it. (Not caught by the blanket disable at the top
+		// of UpdateActionStates either - see Save Panel Settings above.)
 		kKBSActionComponentBoss,
 		kKBSHowToActionID,
 		kKBSHowToMenuKey,				// "How to Use..."
@@ -1072,30 +1059,9 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 {
 	kStringTableRsrcType,
 	{
-		// ONE wild row. This is the shape the SDK samples use when a plug-in ships a single
-		// string table: candlechart/CdlChart.fr:340, basictextadornment/BscTA.fr:345,
-		// customdatalinkui/CusDtLnkUI.fr:437, customdatalink/CusDtLnk.fr:562,
-		// basicshape/BscShp.fr:270 - they all close with this exact line. The other official
-		// shape, a row per locale (basiclocalization/BscL10N.fr:196-219), is for a plug-in that
-		// really carries seventeen translated tables. KBS carries one, so there is nothing for
-		// a per-locale row to select.
-		//
-		// It replaces a list of thirteen named locales that every one of them pointed at this
-		// same enUS table (2026-08-06). That list was NOT equivalent to this line: the lookup
-		// is a match, not a default (LocaleIndex.h:124-134, "Does wildcard matching"), so the
-		// locales absent from it - koKR, zhCN, zhTW, ruRU - matched no row at all and drew
-		// every menu, panel and prompt as its RAW KEY. That exact failure was measured on a
-		// Japanese UI on 2026-08-05 (memory plugin-ui-localization-fr-encoding), and the note
-		// that used to sit here claimed a locale could no longer be stranded - while four
-		// still were.
-		//
-		// The Japanese KBS speaks is not in a table any more (2026-08-05, user's call): it is
-		// switched in at RUN TIME by UI language - see KBSLoc.h. The official jaJP shape
-		// (kInDesignJapaneseFS + a jaJP table) was tried and matched NO row on a Roman-engine
-		// install running a Japanese UI, which is what the development machine was on
-		// 2026-08-05 (it became a true Japanese install - featureSet 'Japn' - on 2026-08-06).
-		// kWildFS is what covers both, because the featureset and the UI language are
-		// separate axes and this table is meant for every combination of them.
+		// ONE wild row, the same as the model half's: model/KBS.fr's LocaleIndex says why (a single
+		// table, matched by every locale; a named-locale list stranded koKR / zhCN / zhTW / ruRU on raw
+		// keys until 2026-08-06; the Japanese is switched in at run time - KBSLoc.h).
 		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
 	}
 };
@@ -1161,9 +1127,9 @@ type KBSPanelWidget(kViewRsrcType) : PalettePanelWidget(ClassID = kKBSPanelWidge
 };
 
 /*
- * Result tree types (Task 2). The list on our tree boss; the row on the STOCK tree node boss
- * (nothing to replace on it yet - the row-click handler arrives in Task 3), shared by the
- * chapter and hit row resources; the hit line's colour cell on our generic-panel boss.
+ * Result tree types (Task 2). The list on our tree boss; the row on our tree node boss (it carries
+ * the row-click handler, KBSResultNodeEH), shared by the branch and hit row resources; the hit
+ * line's colour cell on our generic-panel boss.
  */
 type KBSResultListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKBSResultListWidgetBoss)
 {
@@ -1285,11 +1251,10 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 	kFalse,								// Draw dropshadow
 	kKBSPanelTitleKey,					// Panel name
 	{
-		// Status read-out at the top: the search summary (total hits / chapters, or a scan's own
-		// tally). WRAPPING over several lines, not one line ellipsized (user's call 2026-08-02): the
-		// summaries outgrew a single line some time ago - a scan appends "Text in overset cannot be
-		// checked.", a book search can append the names of chapters it could not open - and the end
-		// of the sentence was the part being thrown away. Bound left/right/top so it widens with
+		// Status read-out at the top: the search summary (total hits / chapters). WRAPPING over
+		// several lines, not one line ellipsized (user's call 2026-08-02): the summaries outgrew a
+		// single line - a book search can append the names of chapters it could not open - and the
+		// end of the sentence was the part being thrown away. Bound left/right/top so it widens with
 		// the panel and stays put vertically.
 		//
 		// ***** THE HEIGHT MUST BE A WHOLE NUMBER OF LINES. ***** A line is 12px on an ENGLISH UI
@@ -1390,7 +1355,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kADBEIconSuiteButtonType,
 		),
 
-		// Result tree: chapter -> hit rows, filling the rest of the panel and bound to all four
+		// Result tree: the result rows, filling the rest of the panel and bound to all four
 		// edges so it grows with the window. Root hidden, single selection, vertical scroll bar
 		// only; scroll increments = one 19px row.
 		KBSResultListWidget
@@ -1423,9 +1388,9 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 };
 
 /*
- * One CHAPTER row of the result tree, created at runtime by KBSResultListWidgetMgr for chapter
- * nodes: a stock expander arrow (hidden by the widget manager on a childless chapter - never in
- * practice) and the chapter's "<name>  (N)" label after the expander's zone. The widget manager
+ * One BRANCH row of the result tree - book, document, run and story alike - created at runtime by
+ * KBSResultListWidgetMgr for every node that is not a hit: a stock expander arrow (hidden by the
+ * widget manager on a childless row) and the "<name>  (N)" label after the expander's zone. The widget manager
  * owns the runtime layout; these frames are only the default state.
  */
 resource KBSResultNodeWidget(kKBSResultChapterNodeWidgetRsrcID + index_enUS)

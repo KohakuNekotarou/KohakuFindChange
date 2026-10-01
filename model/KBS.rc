@@ -69,7 +69,7 @@ BEGIN
             // the file on disk follows the display name (KohakuFindChange.pln) while
             // kKBSPluginName stays at the original KohakuBookSearch so nothing in the ID system
             // moves. The SDK's stock TargetName would append ".sdk"; KBS overrides it in all four
-            // configurations, as KESCM does. kKBSFileName must match the vcxproj TargetName.
+            // configurations, as KCM does. kKBSFileName must match the vcxproj TargetName.
             VALUE "OriginalFilename", kKBSFileName ".pln\0"
             VALUE "ProductName", "Adobe InDesign\0"
             VALUE "ProductVersion", kVersionNumberStr, "\0"
