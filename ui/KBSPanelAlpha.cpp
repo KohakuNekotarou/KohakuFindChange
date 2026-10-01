@@ -613,10 +613,14 @@ static void KBSRestoreOurFindChangeStyle()
 
 	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ::GetWindowLongPtr(h, GWL_EXSTYLE) & ~WS_EX_LAYERED);
-	// *These four flags are the combination Microsoft prescribes for making a SetWindowLongPtr style
-	//  change take: SetWindowPos's Remarks name SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-	//  SWP_FRAMECHANGED literally. SWP_NOACTIVATE is ours, so removing the style cannot pull a
-	//  dialog forward. (The ADDING side deliberately does not do this - see the note there.)
+	// Committed, so removing the style cannot pull the dialog forward. (The ADDING side deliberately
+	// does not commit - see the note there.)
+	KBSCommitWindowStyle(h);
+}
+
+// The flags: see the declaration in KBSPanelAlpha.h.
+void KBSCommitWindowStyle(HWND h)
+{
 	::SetWindowPos(h, nullptr, 0, 0, 0, 0,
 				   SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 	::RedrawWindow(h, nullptr, nullptr,
@@ -670,7 +674,7 @@ bool16 KBSApplyFindChangeTranslucency()
 		//   *Why not add it anyway, for symmetry: SWP_FRAMECHANGED sends WM_NCCALCSIZE to a dialog
 		//     that is OPEN IN FRONT OF THE USER, so it would buy nothing and risk a reflow. Removing
 		//     the style is different - there the window has to be told to redraw without it, which is
-		//     why that side has both SetWindowPos and RedrawWindow.
+		//     why that side commits it (KBSCommitWindowStyle: SetWindowPos and RedrawWindow).
 		//   *Also measured the same day: this dialog's window class is 0x00000008 (CS_DBLCLKS only).
 		//     It carries neither CS_CLASSDC nor CS_PARENTDC, the two class styles MSDN names as
 		//     making WS_EX_LAYERED unsafe to set - so adding it here is within the contract.

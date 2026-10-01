@@ -13,7 +13,8 @@
 
 // Project includes:
 #include "KBSFindChangeMinimize.h"
-#include "KBSPanelAlpha.h"		// KBSQueryFindChangeWindow - the shared lookup of the dialog's window
+#include "KBSPanelAlpha.h"		// KBSQueryFindChangeWindow - the shared lookup of the dialog's window;
+								// KBSCommitWindowStyle
 
 // The dialog's window can be absent at the moment we are told about it, so the style is written
 // again once the events have gone round:
@@ -101,14 +102,7 @@ static void KBSRestoreFindChangeStyle()
 		ex &= ~WS_EX_APPWINDOW;
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ex);
 
-	// *SWP_NOACTIVATE is ours, so putting the frame back cannot pull the dialog forward; the other
-	//  four are the combination Microsoft's SetWindowPos Remarks prescribe for making a
-	//  SetWindowLongPtr style change take effect. Taken from KBSRestoreOurFindChangeStyle, which has
-	//  carried the same set since 2026-08-04.
-	::SetWindowPos(h, nullptr, 0, 0, 0, 0,
-		SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-	::RedrawWindow(h, nullptr, nullptr,
-		RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME | RDW_UPDATENOW);
+	KBSCommitWindowStyle(h);	// the frame put back, without pulling the dialog forward
 }
 
 #endif	// WINDOWS
@@ -171,10 +165,7 @@ bool16 KBSApplyFindChangeMinimizable()
 
 	::SetWindowLongPtr(h, GWL_STYLE,   st | WS_MINIMIZEBOX);
 	::SetWindowLongPtr(h, GWL_EXSTYLE, (ex & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW);
-	::SetWindowPos(h, nullptr, 0, 0, 0, 0,
-		SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-	::RedrawWindow(h, nullptr, nullptr,
-		RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME | RDW_UPDATENOW);
+	KBSCommitWindowStyle(h);
 	return kTrue;
 #else
 	return kFalse;

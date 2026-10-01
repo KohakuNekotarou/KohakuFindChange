@@ -139,6 +139,12 @@ struct HWND__;
 typedef struct HWND__* HWND;
 
 HWND	KBSQueryFindChangeWindow();
+
+// Make a SetWindowLongPtr style change on 'h' take effect without pulling the window forward:
+// SetWindowPos with the combination Microsoft's SetWindowPos Remarks prescribe (SWP_NOMOVE |
+// SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) plus SWP_NOACTIVATE, then a full redraw. Shared by
+// the two features that change the Find/Change dialog's style (each wrote it out until 2026-10-01).
+void	KBSCommitWindowStyle(HWND h);
 #endif
 
 // Throw away what is cached about where the dialog is, so the NEXT ask walks the window list again.
