@@ -17,7 +17,6 @@
 // Interface includes:
 #include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
 #include "IDataBase.h"
-#include "IDocumentPresentation.h"	// the predicate typedef / presentation handle
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
@@ -26,6 +25,7 @@
 #include "CAlert.h"
 #include "CmdUtils.h"
 #include "CPMUnknown.h"
+#include "DocumentPresFindCriteria.h"	// FindPresCriteria::accept_all (WidgetBin - this is the UI half)
 #include "ErrorUtils.h"			// GlobalErrorStatePreserver / PMSetGlobalErrorCode
 #include "LayoutUIID.h"			// kOpenLayoutCmdBoss
 #include "ProgressBar.h"		// RangeProgressBar
@@ -41,23 +41,6 @@
 
 namespace
 {
-	// (Carried from KBSBookScope.cpp on 2026-10-01 with the window test. In the UI half the stock
-	//  FindPresCriteria::accept_all would be reachable; the local predicate is kept as it was.)
-	/** Accepts every presentation.
-
-	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock one exists and is named
-	    FindPresCriteria::accept_all (DocumentPresFindCriteria.h:82), but that file's own preamble
-	    (:40-46) says its implementations "are found in the WidgetBin shared library, so you cannot
-	    use them from a model only plugin. Should the need arise you can create local
-	    implementations" - and prints a two-line example of exactly this shape. So this is the
-	    documented route, not a stand-in for one. (Until 2026-08-08 the note here said we kept our own
-	    because we did not know where the stock objects live, which was no longer true and read like
-	    an avoidable dependency.) KESCL carries the same predicate for the same reason. */
-	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
-	{
-		return true;
-	}
-
 	/** One RangeProgressBar, held for the model half. Its four calls are the bar's own. */
 	class KBSUIProgressBar : public KBSProgressBarUI
 	{
@@ -97,7 +80,11 @@ public:
 	    when they raise one themselves, but a window can be raised behind this module's back - the
 	    book panel lists every chapter, and double-clicking one there windows the very document being
 	    held. A release that closed it then would take a window the user is looking at; and once they
-	    had saved their work, not even the unsaved-work door would stand in the way. */
+	    had saved their work, not even the unsaved-work door would stand in the way.
+
+	    The SDK's own "any presentation" predicate, FindPresCriteria::accept_all, as KCM's UI half uses
+	    it (KCMStoryJump.cpp). A local one stood here while this test lived in a model plug-in, which
+	    cannot reach that predicate: its implementation is in WidgetBin (DocumentPresFindCriteria.h:40-46). */
 	virtual bool DocHasAnyWindow(const UIDRef& docRef)
 	{
 		IDataBase* db = docRef.GetDataBase();
@@ -105,7 +92,7 @@ public:
 			return false;
 		FindPresentation_PreferCriteria noPreference;
 		return Utils<IDocumentUIUtils>()->FindPresentationForDocument(
-			db, KBSAcceptAnyPresentation, noPreference) != nil;
+			db, &FindPresCriteria::accept_all, noPreference) != nil;
 	}
 
 	/** The window half of KBSBookScope::ShowChapterWindow, carried over as it stood. */

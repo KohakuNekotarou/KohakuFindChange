@@ -24,15 +24,179 @@
 #include "IDFile.h"
 #include "PMString.h"
 #include "UIDRef.h"
-#include "KBSModelTypes.h"	// the result set's plain types (Hit, RowDisplay, ...) - shared with the UI half
+#include "KBSModelTypes.h"	// the types shared with the UI half (RowDisplay, ChangeOutcome, ...)
 
 #include <map>
 #include <vector>
 
 namespace KBSResultModel
 {
-	// (The two limits, ChangeOutcome, Hit, FontGroup, RunGroup and Chapter - the result set's plain types -
-	//  stand in KBSModelTypes.h since 2026-10-01: the UI half reads them and must not include this header.)
+	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
+	    chapter, so no query or document can pile up an unbounded result set. Unlike the display cap
+	    (kKBSDisplayHitLimit, KBSModelTypes.h) this bounds the RESULT SET itself; the search says so in
+	    its summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
+	    (It lived in KBSSearchEngine.cpp until 2026-08-03, when the two scans were given it too; they
+	    were removed on 2026-09-27.) */
+	const int32 kKBSCollectHitLimit = 10000;
+
+	/** One match on one line of one chapter. The three text segments are the line split around
+	    the match; the jump anchors (Task 3) point back at the exact occurrence. */
+	struct Hit
+	{
+		PMString	locator;	// the page locator "P<page>(<n>)" / "overset" (drawn at full text
+								// colour, ahead of the line, with one gap between the two - there is
+								// no tab stop: the locator's width varies too much for a fixed
+								// column, see KBSColorTextView)
+		PMString	preText;	// the line's text before the match
+		PMString	matchText;	// the matched text (drawn at full text colour)
+		PMString	postText;	// the line's text after the match
+
+		PMString	pageString;	// the page named in the locator, Pages-panel style. For a visible
+								// match: its own page. For an overset match: the page of the "+"
+								// indicator (or "" when nothing is placed anywhere).
+		int32		pageIndex;	// that page's document order (-1 = no page); sorts hits into page order
+		bool		isOverset;	// match is overset -> the locator gets a trailing " overset"
+								// ("P<page>(<n>) overset")
+		bool		isLocked;	// match sits on a locked layer or in a locked story -> the locator
+								// gets " locked" and the row gets NO check box. InDesign can search
+								// locked content but offers no way to change it ("Search Only"), so
+								// the row is listed and jumpable but never selectable.
+		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " hidden".
+								// Only reachable when the Find/Change dialog's "Include Hidden
+								// Layers" is on, and then the text is composed and jumpable but
+								// draws nothing, so the row has to say why the page looks empty.
+
+		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
+		int32		fontGroupPos;	// to, and where it sits inside that group. -1 before AppendChapter
+								// groups it (every hit has a group since 2026-09-27). Filled by AppendChapter; the
+								// tree reads them to answer "who is my parent" and "which child am
+								// I" without searching.
+
+		UID			storyUID;	// the story the match lives in (within its chapter's database)
+		TextIndex	textStart;	// the match's start position in that story
+		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
+
+		// The WHOLE match, as one number - what the same-occurrence test compares against.
+		// matchText is capped for drawing (the line budget, kKBSMaxLineChars in
+		// KBSSearchEngine.cpp), so it cannot answer "is this still the same text" for a long
+		// GREP match; this can. 0 = never computed, or the text
+		// could not be read, and it never compares equal (see MatchIsSameOccurrence). A zero-width
+		// match (GREP ^ / $ / lookarounds) also stores 0, and is accepted on its length arm
+		// instead - an empty range has no text for the hash to vouch for.
+		uint64		matchHash;
+
+		// --- replace support ---
+		// (A walkOrder stood here until 2026-09-29 - the order the walker handed this match back in,
+		// which Change Checked's verify walk lined its matches up by, and which every row menu's Replace
+		// or Reject numbered again with a walk of the whole chapter. A row is found by its PLACE now:
+		// the verify walk asks for a match at the row's start (ChapterMovedUnderRows), the writing walk
+		// for one at its thread, offset and length (RowOfMatchAnyOrder).)
+		bool		checked;	// selected for replacement. Every row starts UNTICKED (2026-09-27, the
+								// user's call - AppendChapter); the user ticks what is to be replaced.
+		bool		replaced;	// already replaced in this result set - not selectable any more
+		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
+								// reached at all). The locator shows it as a word.
+		// (uint32 storyChangeCount stood here - ITextModel::GetTextChangeCount for this hit's story as
+		// the search left it, so the replace could take an unedited story on trust and skip the
+		// same-occurrence test. Removed 2026-08-03 with the fast path it fed: it was skipping the
+		// POSITION test too, and a query retyped between the search and the replace then rewrote
+		// occurrences the user had never seen.)
+		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
+								// Kept OUT of locator so the cell can paint it separately; built by
+								// BuildHitLocator alongside it. Only "missing" and "refused" earn it - the other
+								// flags stay in locator and read in the normal colour.
+		// --- Track Changes (2026-09-26) ---
+		// The WHOLE text of the match before the replace and the whole text the replace wrote, taken
+		// as it was written (not capped for drawing like matchText). A replaced row's change is found by
+		// its time (recordTime); these are what that change must still read as - its insertion as
+		// replacedText (KBSTrackChange::FindRowChangeForHit), its run's deletions as the originalTexts
+		// (KBSReplaceEngine RejectRowsNow). Empty until the row is replaced.
+		PMString	originalText;
+		PMString	replacedText;
+		// The first characters of the match's STORY (2026-09-27, the story level): what a story row of
+		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
+		// as it has walked it, so the story cannot be read again when the tree draws.
+		PMString	storyLead;
+		// The match sits inside a footnote (2026-09-26). Track Changes records nothing there, so such
+		// a row cannot be taken back (GetHitInFootnote).
+		bool		inFootnote;
+		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
+		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
+		uint64		recordTime;
+		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
+								// show one". Kept as a number rather than only baked into the
+								// locator string, so the locator can be rebuilt at any time.
+		// The RUN this row belongs to - an index into its chapter's runs - on a list rebuilt from the
+		// Track Changes records (2026-09-29, Show Changes by KohakuFindChange); -1 on every other list,
+		// which has no run level. Set by whoever builds the hits; the groups follow it (AppendChapter).
+		int32		run;
+
+		// checked starts FALSE here and stays so for a search's rows (unticked since 2026-09-27; ticked
+		// from 2026-09-26, unticked from 2026-08-02 - each the user's call).
+		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
+				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
+				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
+				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
+				recordTime(0), pageOrdinal(0), run(-1) {}
+	};
+
+	/** One STORY of a chapter's hits - one story row in the tree (2026-09-27). The struct keeps the name
+	    it had when this level held the fonts of Find Missing Glyphs (removed 2026-09-27).
+
+	    hitIndices index the chapter's own hits vector, ASCENDING, which is what lets the display cap
+	    be applied to a group with a lower_bound rather than a scan. */
+	struct FontGroup
+	{
+		PMString			fontName;	// the story row's text ("P3  first words...")
+		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
+		// ***** A STORY GROUP (2026-09-27, the user's call). ***** A Find/Change result groups its hits
+		// by story, the way KCM's Story mode lists stories. A story row carries Replace / Reject Change / Redo / Check All / Uncheck All for its
+		// rows (KBSReplaceEngine::ReplaceStory and the rest).
+		bool				isStory;
+		UID					story;
+		// The run the group sits under (Hit::run of its hits, 2026-09-29); -1 = no run level. A story
+		// that two runs changed stands once under each: the groups are keyed by (run, story).
+		int32				run;
+		FontGroup() : isStory(false), story(kInvalidUID), run(-1) {}
+	};
+
+	/** ***** ONE RUN OF A LIST REBUILT FROM THE RECORDS (2026-09-29, Show Changes by KohakuFindChange). *****
+	    Every record KBS signs carries its run's start in its time (KBSTrackChange.h, the head): the rows
+	    whose times share t0 (the time with its low four decimal digits dropped) were written by one
+	    replace. A run row of the tree stands between the document row and the story rows.
+
+	    groups index the chapter's fontGroups, ASCENDING - rebuilt with the groups (AppendChapter,
+	    KeepCheckedRows). The builder hands the hits over sorted by run, so the runs' groups and hits
+	    stand in run order and the display cap cuts the LAST runs first. */
+	struct RunGroup
+	{
+		uint64				t0;		// the run's start - the time of its rows, low four digits dropped
+		PMString			label;	// the run row's text: the run's start as a local date and time
+		std::vector<int32>	groups;	// the run's story groups
+		RunGroup() : t0(0) {}
+	};
+
+	/** One chapter that holds at least one hit. */
+	struct Chapter
+	{
+		PMString				name;	// the chapter's display name (its file name)
+		UIDRef					docRef;	// current binding (Task 3 jump / reopen)
+		IDFile					file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
+		std::vector<Hit>		hits;
+		std::vector<FontGroup>	fontGroups;	// its story groups - every hit is in one since 2026-09-27
+		// The runs (2026-09-29, Show Changes by KohakuFindChange): empty on every list but one rebuilt from
+		// the records, where each hit's run indexes this, newest run first.
+		std::vector<RunGroup>	runs;
+		// Each story's version (ITextModel::GetChangeCount) where KBS last knew the rows in it to stand
+		// (2026-09-29, the defect re-check F-2) - see GetStoryVersion.
+		std::map<UID, uint32>	storyVersions;
+
+		// A `notReached` flag lived here from 2026-08-03 to 2026-08-05, marking a chapter a cancelled
+		// replace never got to so its row could say "cancelled". Only the chapter-at-a-time path could
+		// produce one, and it went with "save after replace": a cancel now aborts the single sequence
+		// the whole run is wrapped in, so either every chapter was replaced or none was.
+	};
+
 
 	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
 	    then appends each chapter as it finishes. Only chapters with >=1 hit should be appended (empty
@@ -720,7 +884,35 @@ namespace KBSResultModel
 	// "after" ones. (Until then the rows stayed as the write left them: the 2026-09-26 decision "A", which
 	// this reverses - a row taken back and undone kept saying "taken back", so its Reject Change was greyed.)
 
-	// (RowCopy / VersionCopy / RowStep - what one write did to the rows: KBSModelTypes.h.)
+	/** One row, copied. */
+	struct RowCopy
+	{
+		int32	chapter;
+		int32	hit;
+		Hit		row;
+		RowCopy() : chapter(-1), hit(-1) {}
+	};
+
+	/** One story's recorded version (GetStoryVersion), copied - `had` false = none was recorded. */
+	struct VersionCopy
+	{
+		int32	chapter;
+		UID		story;
+		bool	had;
+		uint32	version;
+		VersionCopy() : chapter(-1), story(kInvalidUID), had(false), version(0) {}
+	};
+
+	/** What one write did to the rows: every row and recorded version it changed, before and after.
+	    ***** THE INDICES ARE ONLY GOOD IN THE LAYOUT THEY WERE TAKEN IN ***** (GetLayoutGeneration): a
+	    Change Checked turns the list into its report and numbers the rows again. */
+	struct RowStep
+	{
+		std::vector<RowCopy>		before;
+		std::vector<RowCopy>		after;
+		std::vector<VersionCopy>	versionsBefore;
+		std::vector<VersionCopy>	versionsAfter;
+	};
 
 	/** Stop remembering, as ForgetRowBackup does, and hand the copies over: every row and recorded
 	    version changed since BeginRowBackup, as it was when it was first changed and as it stands now. */
@@ -730,7 +922,14 @@ namespace KBSResultModel
 	    ones. A row whose index is out of range is passed over. */
 	void ApplyRowStep(const RowStep& step, bool after);
 
-	// (ModelSnapshot - the whole result set, for Change Checked: KBSModelTypes.h.)
+	/** The whole result set - for the one write that reshapes it, Change Checked (KeepCheckedRows). */
+	struct ModelSnapshot
+	{
+		std::vector<Chapter>	chapters;
+		bool					showingOutcome;
+		uint32					layout;
+		ModelSnapshot() : showingOutcome(false), layout(0) {}
+	};
 	void TakeModelSnapshot(ModelSnapshot& out);
 	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they
 	    index the chapters that went). */
