@@ -57,7 +57,7 @@
 #include "PalettePanelView.h"
 
 // Project includes:
-#include "KBSID.h"				// kKBSResultListWidgetID / kKBSResultRowHeight (the fallback)
+#include "KFCUIID.h"				// kKBSResultListWidgetID / kKBSResultRowHeight (the fallback)
 #include "KBSPanelMetrics.h"	// the floor, which moves with the message block's height
 
 /** The panel's view: PalettePanelView with a minimum size and row-height rounding.

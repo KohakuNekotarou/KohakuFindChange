@@ -64,7 +64,7 @@
 
 // Project includes:
 #include "IKBSStatusTextData.h"
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the hit rows
 
 // Std includes:

@@ -33,7 +33,7 @@
 #include "Utils.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"		// rebuild the result tree after a search
 #include "KBSJump.h"			// the Hide Previous Chapter toggle lives with the jump logic

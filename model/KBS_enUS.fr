@@ -30,60 +30,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         k_enUS,									// Locale Id
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
-        	 // ----- Menu strings
-                kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
-                kKBSAboutMenuKey,					kKBSDisplayName "...",
-                // kKBSPluginsMenuKey was here until 2026-08-06. Its menu path macro was never used
-                // by the .fr, so nothing ever asked for this string (see KBSID.h).
-
-                kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
-
-                // ----- Command strings
-                kKBSSearchBookMenuKey,			"Search",
-                kKBSBookScopeMenuKey,			"Book Scope",
-                kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
-                kKBSTranslucentPanelMenuKey,	"Translucent Panel",
-                kKBSTranslucentFindChangeMenuKey,	"Translucent Find/Change",
-                kKBSMinimizableFindChangeMenuKey,	"Minimizable Find/Change",
-                kKBSRememberBookPanelMenuKey,	"Remember Book Panel Placement",
-                kKBSSavePanelSettingsMenuKey,	"Save Panel Settings",
-                kKBSReplaceCheckedMenuKey,		"Change Checked",
-                kKBSCheckAllMenuKey,			"Check All",
-                kKBSReplaceHitMenuKey,			"Replace",
-                // The Reject / Accept items name KBS as their author (2026-09-29, the user's call - they act on
-                // KBS's own changes only), one name per level. "Reject Change" until then, on all three rows.
-                kKBSRejectChangeMenuKey,		"Reject Change by KohakuFindChange",
-                kKBSStoryRejectMenuKey,			"Reject Changes by KohakuFindChange in This Story",
-                kKBSChapterRejectMenuKey,		"Reject All Changes by KohakuFindChange in This Document",
-                kKBSRunRejectMenuKey,			"Reject Changes by KohakuFindChange in This Run",
-                kKBSAcceptChangeMenuKey,		"Accept Change by KohakuFindChange",
-                kKBSStoryAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Story",
-                kKBSRunAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Run",
-                kKBSAcceptAllChangesMenuKey,	"Accept All Changes by KohakuFindChange in This Document",
-                kKBSShowChangesMenuKey,			"Show Changes by KohakuFindChange",
-                // The story and document rows' "Redo" until 2026-09-29 (the user's call): the name says
-                // what it writes with - Find/Change as it stands now, not the replace it takes back.
-                kKBSRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
-                kKBSUncheckAllMenuKey,			"Uncheck All",
-                // The operating reference. English in both tables, like the rest of the flyout.
-                kKBSHowToMenuKey,				"How to Use...",
-                // The Keyboard Shortcuts editor's area (kKBSPanelMenuActionArea): files the
-                // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
-                kKBSPanelMenuActionArea,		kKBSPanelMenuActionAreaValue,
-
-                // ----- Window strings
-
-                // ----- Panel/dialog strings
-                kKBSPanelTitleKey,				kKBSDisplayName,
-                // The message line as a freshly opened panel shows it - the plug-in has no search
-                // box of its own, so the first thing to say is where the query is typed.
-                // KBSResultTree::RestoreStatusOnPanelShow reads this key whenever the panel is shown
-                // with nothing run this session - since 2026-09-29 the ONLY reader: the message area is
-                // drawn by hand now and its resource carries no initial text (KBS.fr). Kept here so
-                // the wording is not spelled out in the code. Naming the DOCUMENT command
-                // is always right here, because Book Scope starts OFF at every launch.
-                kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find in Document from this panel's menu.",
-
+                // The model half's six (2026-10-01, the model/UI split): what the model writes itself.
+                // Every other string is the UI half's (ui/KFCUI_enUS.fr).
                 // (The Change Checked confirmation's strings stood here until 2026-09-27, when the
                 // prompt was removed.)
                 // Sits between the query and the closing lines: what is about to be written, then
@@ -111,16 +59,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // "Save after replace" had three strings here (the box, its note, and the extra
                 // warning that went up when it was ticked) from 2026-08-02 until the feature was
                 // removed on 2026-08-05. Their keys are retired in KBSID.h.
-
-		// ----- Misc strings
-                // The About box is the plug-in's NAME AND VERSION, nothing else, and it reads the
-                // same in every UI language (user's call, 2026-08-09). It used to carry a
-                // description, a credit and the repository URL, and a separate Japanese wording in
-                // KBSLoc.h - all removed. The separator is a plain space: the Japanese version had
-                // an ideographic comma there, which is the sort of thing that had to go for the two
-                // languages to read alike. Same shape as KESCM's (KESCM_enUS.fr:84).
-                kKBSAboutBoxStringKey,			kKBSDisplayName " version " kKBSVersion,
-
 
         }
 

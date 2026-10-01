@@ -25,7 +25,7 @@
 #include "CPMUnknown.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly

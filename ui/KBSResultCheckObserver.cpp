@@ -32,7 +32,7 @@
 #include "widgetid.h"				// kTrueStateMessage / kFalseStateMessage
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSResultNodeID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"

@@ -47,7 +47,7 @@
 #include "Utils.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSColorTextView.h"
 #include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)

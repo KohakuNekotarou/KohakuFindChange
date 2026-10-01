@@ -16,7 +16,7 @@
 #include "CIdleTask.h"
 #include "IIdleTaskMgr.h"
 
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSMarkerExpiryIdleTask.h"
 #include "KBSHitMarkerView.h"
 

@@ -38,7 +38,7 @@
 #include "PMString.h"
 
 // Project includes:
-#include "KBSID.h"		// IID_IKBSSTATUSTEXTDATA
+#include "KFCUIID.h"		// IID_IKBSSTATUSTEXTDATA
 
 /** Holds what the panel's message area draws, split where the colour changes. */
 class IKBSStatusTextData : public IPMUnknown

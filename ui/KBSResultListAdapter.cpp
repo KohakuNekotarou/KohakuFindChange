@@ -37,7 +37,7 @@
 #include "CPMUnknown.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSResultNodeID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 

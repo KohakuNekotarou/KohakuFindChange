@@ -50,7 +50,7 @@
 #include "NodeID.h"
 #include "IPMStream.h"
 #include "PMString.h"
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 /** One node of the result tree: (chapter index, run, font group, hit index). See the file comment for

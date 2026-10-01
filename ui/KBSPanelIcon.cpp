@@ -19,7 +19,7 @@
 #include "Utils.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSPanelIcon.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 

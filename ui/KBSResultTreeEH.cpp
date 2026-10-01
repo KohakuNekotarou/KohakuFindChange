@@ -52,7 +52,7 @@
 #include "TreeViewEventHandler.h"	// stock base (source/open/includes/widgets; on the CPP.rsp path)
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSResultNodeID.h"
 #include "KBSJump.h"
 

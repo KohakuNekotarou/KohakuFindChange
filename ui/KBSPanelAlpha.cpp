@@ -49,7 +49,7 @@
 // Project includes:
 #include "KBSPanelAlpha.h"		// kKBSPanelAlphaValue and the chase constants
 #include "KBSFindChangeMinimize.h"	// the minimize box rides the same window-list notification
-#include "KBSID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
+#include "KFCUIID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
 
 // For the observer that follows the panel being shown, hidden, docked or floated:
 #include "CObserver.h"

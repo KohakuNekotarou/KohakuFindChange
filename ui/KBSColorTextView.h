@@ -19,7 +19,7 @@
 
 #include "IPMUnknown.h"
 #include "PMString.h"
-#include "KBSID.h"
+#include "KFCUIID.h"
 
 /** The parts a hit row's colour cell paints: the page LOCATOR ("P1(2)", drawn at the full theme
     text colour), the FLAG word that follows it when the row has one ("missing" / "refused", drawn

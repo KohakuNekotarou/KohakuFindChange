@@ -29,7 +29,7 @@
 #include "PMLocaleIds.h"
 #include "PMString.h"
 
-#include "KBSID.h"
+#include "KBSBoundaryID.h"
 
 namespace KBSLoc
 {

@@ -114,7 +114,7 @@
 #include "WorkspaceID.h"		// kPaletteMgrService, IID_IPALETTEMGRSERVICE
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSBookPanelPlacement.h"
 #include "KBSBookPanelLookup.h"	// IsBookPanel - the one place that decides what a book panel is (KBSBookScope's until 2026-10-01)
 #include "KBSPanelState.h"		// KBSPanelStateWriteKeys and the readers - the settings file, key by key

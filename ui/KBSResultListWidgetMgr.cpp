@@ -64,7 +64,7 @@
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSResultNodeID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"
@@ -181,7 +181,7 @@ public:
 		// one that decides what to do without one.
 		IPMUnknown* newObject = ::CreateObjectNoInit(
 			::GetDataBase(this),
-			RsrcSpec(LocaleSetting::GetLocale(), kKBSPluginID, kViewRsrcType, rsrcID),
+			RsrcSpec(LocaleSetting::GetLocale(), kKFCUIPluginID, kViewRsrcType, rsrcID),
 			IID_ICONTROLVIEW);
 		InterfacePtr<IControlView> view(newObject, UseDefaultIID());
 		if (view != nil)

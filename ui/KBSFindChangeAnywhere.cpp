@@ -32,7 +32,7 @@
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 
 class KBSFindChangeAnywhere : public CPMUnknown<IActionFilter>
 {

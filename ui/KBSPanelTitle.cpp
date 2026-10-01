@@ -40,7 +40,7 @@ namespace GoToURLUtils
 }
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again

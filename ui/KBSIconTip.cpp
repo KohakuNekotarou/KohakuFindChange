@@ -35,7 +35,7 @@
 #include "PMString.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 
 /** The panel illustration's tooltip: the plug-in's own home page, which is where a click goes. */
 class KBSIconTip : public AbstractTip

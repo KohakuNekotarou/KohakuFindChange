@@ -20,7 +20,7 @@
 #include "PMRect.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSPanelIcon.h"		// Count / NthWidgetID - the stacked illustrations move together
 #include "KBSPanelMetrics.h"
 

@@ -19,7 +19,7 @@
 #include "CObserver.h"
 
 // Project includes:
-#include "KBSID.h"
+#include "KFCUIID.h"
 #include "KBSModelObserver.h"
 #include "KBSModelTypes.h"		// KBSNotifyPayload
 #include "KBSResultTree.h"
