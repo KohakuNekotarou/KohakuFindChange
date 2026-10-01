@@ -5,7 +5,7 @@
 //  KohakuFindChange (KBS)
 //
 //  The "Translucent Panel" flyout toggle. Ported from KESCM's KESCMPanelAlpha (2026-08-04),
-//  where it shipped in 1.2.0 - the mechanism is not specific to which panel it is pointed at.
+//  where it shipped in KESCM 1.2.0 - the mechanism is not specific to which panel it is pointed at.
 //
 //  *Windows only. The alpha is put on the panel's window with Win32's
 //    SetLayeredWindowAttributes; on Mac the three calls below still exist but
