@@ -68,7 +68,7 @@
 
 // Project includes:
 #include "KBSJump.h"
-#include "KBSHitMarker.h"
+#include "KBSHitMarkerView.h"		// the marker shown and taken down - the UI half of KBSHitMarker (2026-10-01)
 #include "KBSBookScope.h"
 #include "KBSBookPanelLookup.h"		// BringBookTabForward - a book row's tab (2026-10-01)
 #include "KBSResultModel.h"
@@ -754,7 +754,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// within the second either way; what is being made consistent is what the panel is SAYING.
 	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 		return false;
 	}
 
@@ -764,7 +764,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// asks about that: the overset test, the spread and the wax rectangle would all be handed -1.
 	if (!RowHasPlace(start, end))
 	{
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 		SayRowHasNoPlace();
 		return false;
 	}
@@ -773,7 +773,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// it back windowless by file - see EnsureChapterReachable, which ShowChapter shares.
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 	{
-		KBSHitMarker::ClearMarker();	// it has already said why through the status line
+		KBSHitMarkerView::Hide();	// it has already said why through the status line
 		return false;
 	}
 
@@ -793,7 +793,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
 	{
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 		return false;
 	}
 	const UIDRef storyRef(db, storyUID);
@@ -848,7 +848,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	{
 		// Same rule as the failed reopen above: the view did not move, so the panel says why rather
 		// than leaving a click that appears to do nothing.
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 		PMString message("Cannot bring that chapter's window to the front.");
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
@@ -893,7 +893,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 	}
 	else
 	{
@@ -914,11 +914,11 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// came up about half a second after the view had moved, which is what was asked to go. A
 			// double click now shows the marker for that moment and SelectHitText's ClearMarker takes
 			// it down when the selection is made - exactly what KCM does ("THE MARK COMES DOWN").
-			KBSHitMarker::SetMarker(db, storyUID, start, end);
+			KBSHitMarkerView::Show(db, storyUID, start, end);
 		}
 		else
 		{
-			KBSHitMarker::ClearMarker();
+			KBSHitMarkerView::Hide();
 		}
 	}
 
@@ -1246,7 +1246,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// Only on SUCCESS. Every refusal above returns before this, and there the marker is the only
 	// feedback the click produced - taking it down as well would leave a double click that appears
 	// to do nothing.
-	KBSHitMarker::ClearMarker();
+	KBSHitMarkerView::Hide();
 	return true;
 }
 

@@ -18,7 +18,7 @@
 
 #include "KBSID.h"
 #include "KBSMarkerExpiryIdleTask.h"
-#include "KBSHitMarker.h"
+#include "KBSHitMarkerView.h"
 
 // How long the marker stays up. Short on purpose: it points at the hit, and the view has already
 // been scrolled so the hit is on screen anyway.
@@ -62,13 +62,13 @@ uint32 KBSMarkerExpiryTask::RunTask(uint32 /*flags*/, IdleTimer* /*idleTimer*/)
 	// return kEndOfTime from RunTask, instead you would call UninstallTask and return any value
 	// from RunTask as it will be ignored".
 	//
-	// ClearMarker calls back into Stop(), which uninstalls again. That second call is harmless by
+	// Hide (KBSHitMarker::ClearMarker until 2026-10-01) calls back into Stop(), which uninstalls again. That second call is harmless by
 	// the contract quoted at the top of this file (a task that is not installed, or is currently
 	// running, costs a return value and nothing more).
 	this->UninstallTask();
 
 	if (!sShutdown)
-		KBSHitMarker::ClearMarker();
+		KBSHitMarkerView::Hide();
 
 	return 0;	// one-shot: nothing more to do
 }

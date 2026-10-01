@@ -39,14 +39,21 @@ class IDataBase;
 
 namespace KBSHitMarker
 {
-	/** Put the marker on [start, end) of one story and start its countdown (about a second -
-		KBSMarkerExpiryIdleTask). Replaces whatever marker was up, and repaints the document it was
-		in when that is another one. start == end is a zero-width hit (GREP's ^, say), shown as a
-		thin bar. Ignored after ShutdownCleanup. */
-	void SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end);
+	/** Put the marker on [start, end) of one story, replacing whatever marker was up. start == end is a
+		zero-width hit (GREP's ^, say), shown as a thin bar.
+		***** THE MODEL HALF DRAWS NOTHING (2026-10-01, the model/UI split). ***** Repainting the views and
+		the countdown that takes the marker down again (about a second) are the UI half's - KBSHitMarkerView,
+		which calls this. Until then this repainted and started KBSMarkerExpiryIdleTask itself.
+		@param outPreviousDB the document the marker was in before when that is ANOTHER one (it has to be
+			repainted too), nil otherwise.
+		@return false when nothing was set - after ShutdownCleanup, or with no document or story - and then
+			nothing is to be repainted or counted down. */
+	bool SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end, IDataBase*& outPreviousDB);
 
-	/** Take the marker down now, and repaint its document. Safe when there is none. */
-	void ClearMarker();
+	/** Take the marker down. Safe when there is none.
+		@param outDB the document it was in (to be repainted by the caller), nil when there was none.
+		@return false after ShutdownCleanup, when nothing at all is to be done. */
+	bool ClearMarker(IDataBase*& outDB);
 
 	/** A document is closing: if the marker is in it, forget it WITHOUT repainting (the document is
 		on its way out, and a repaint would reach into it). The address is compared, never read. */

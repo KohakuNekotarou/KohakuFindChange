@@ -12,10 +12,8 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IApplication.h"
 #include "IDataBase.h"
 #include "IDocument.h"
-#include "IDocumentList.h"
 #include "IGlobalTextAdornment.h"
 #include "IGraphicsPort.h"
 #include "IShape.h"					// kPrinting
@@ -31,8 +29,6 @@
 #include "CPMUnknown.h"
 #include "GraphicsData.h"
 #include "GraphicTypes.h"			// kPMBlendDifference
-#include "ILayoutUIUtils.h"
-#include "ILayoutUtils.h"			// InvalidateViews
 #include "PMRect.h"
 #include "PMString.h"
 #include "SDKFileHelper.h"
@@ -44,7 +40,6 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSHitMarker.h"
-#include "KBSMarkerExpiryIdleTask.h"
 
 namespace
 {
@@ -107,26 +102,8 @@ bool KBSHitMarkerSameDoc(IDataBase* drawnDB)
 	return drawnPath == gDocPath;
 }
 
-// Repaint a document so the marker appears or disappears now - an adornment is only consulted while
-// text is being drawn. The address is resolved through the document list first, so a document that
-// has closed in the meantime is never touched (moved here from KBSDrawEventHandler unchanged).
-void KBSHitMarkerRepaint(IDataBase* db)
-{
-	if (db != nil)
-	{
-		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-		InterfacePtr<IDocumentList> docList(app ? app->QueryDocumentList() : nil);
-		IDocument* doc = (docList != nil) ? docList->FindDocByDataBase(db) : nil;
-		if (doc != nil)
-		{
-			Utils<ILayoutUtils>()->InvalidateViews(doc);
-			return;
-		}
-	}
-	IDocument* fdoc = Utils<ILayoutUIUtils>()->GetFrontDocument();
-	if (fdoc != nil)
-		Utils<ILayoutUtils>()->InvalidateViews(fdoc);
-}
+// (KBSHitMarkerRepaint - repaint a document so the marker appears or disappears now - stood here until
+//  2026-10-01. Repainting views is the UI half's: KBSHitMarkerView.cpp, with its notes.)
 
 // The part of this run the marker covers, as character offsets into the run. False when none of it
 // does. Caller holds gLock and has checked gHasMark.
@@ -309,10 +286,11 @@ CREATE_PMINTERFACE(KBSHitMarkerAdornment, kKBSHitMarkerAdornmentImpl)
 // The public face
 //----------------------------------------------------------------------------------------
 
-void KBSHitMarker::SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end)
+bool KBSHitMarker::SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end, IDataBase*& outPreviousDB)
 {
+	outPreviousDB = nil;
 	if (gShutdown || db == nil || storyUID == kInvalidUID)
-		return;
+		return false;
 	if (end < start)
 		end = start;
 
@@ -330,18 +308,17 @@ void KBSHitMarker::SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextI
 		gHasMark = kTrue;
 	}
 	if (previousDB != nil && previousDB != db)
-		KBSHitMarkerRepaint(previousDB);
-	KBSHitMarkerRepaint(db);
-
-	// A pointer, not a highlight: the countdown takes it away again (restarted by every jump).
-	KBSMarkerExpiryIdleTask::Start();
+		outPreviousDB = previousDB;
+	// The repaint of both, and the countdown, are the caller's (KBSHitMarkerView - the UI half).
+	return true;
 }
 
-void KBSHitMarker::ClearMarker()
+bool KBSHitMarker::ClearMarker(IDataBase*& outDB)
 {
+	outDB = nil;
 	if (gShutdown)
-		return;
-	KBSMarkerExpiryIdleTask::Stop();
+		return false;
+	// (The countdown is stopped by the caller - KBSHitMarkerView, the UI half - since 2026-10-01.)
 
 	IDataBase* db = nil;
 	{
@@ -352,8 +329,8 @@ void KBSHitMarker::ClearMarker()
 		gDocPath.Clear();
 		gStory = kInvalidUID;
 	}
-	if (db != nil)
-		KBSHitMarkerRepaint(db);
+	outDB = db;		// repainted by the caller
+	return true;
 }
 
 void KBSHitMarker::ForgetDoc(IDataBase* db)
