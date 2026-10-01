@@ -64,7 +64,7 @@
 void	KBSSavePanelState();
 
 // Reads the JSON file if it is there and applies it (does nothing when there is none).
-// *Called from TWO places, whichever comes first: KBSStartupShutdown::Startup, and
+// *Called from TWO places, whichever comes first: KBSUIStartupShutdown::Startup, and
 //  KBSBookPanelPlacement::Start (the palette manager's PaletteMgrStarted - the startup service is a
 //  LAZY one, and nothing promises it runs before the Book panel needs the placement). Every setting
 //  restored here lives in a module flag, not on a widget, so there is no need to wait for the panel.

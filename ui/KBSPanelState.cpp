@@ -552,7 +552,7 @@ void KBSSavePanelState()
 }
 
 //----------------------------------------------------------------------------------------
-// Restore (once per session - from KBSStartupShutdown::Startup or KBSBookPanelPlacement::Start,
+// Restore (once per session - from KBSUIStartupShutdown::Startup or KBSBookPanelPlacement::Start,
 // whichever comes first; see KBSPanelState.h)
 //----------------------------------------------------------------------------------------
 

@@ -92,7 +92,7 @@ namespace KBSBookPanelPlacement
 	    closes the books BEFORE this, and the interceptor has already written the placement. */
 	void Stop();
 
-	/** Application shutdown (KBSStartupShutdown::Shutdown): stop following and give the timer and the
+	/** Application shutdown (KBSUIStartupShutdown::Shutdown): stop following and give the timer and the
 	    interceptor back, in case Stop was never reached. Safe to call twice. */
 	void ShutdownCleanup();
 }

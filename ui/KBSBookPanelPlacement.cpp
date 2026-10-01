@@ -640,13 +640,19 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
     *Only the TOP is judged here, and that is enough for a yes: a bottom edge that would land below
     the screen is not a reason to give up the whole placement - FitHeightToScreen shortens the panel
     instead. */
-bool TitleBandIsOnScreen(const Placement& p)
+/** The application's monitor information, AddRef'd - or nil (the session can be gone during
+    shutdown). Asked by TitleBandIsOnScreen and FitHeightToScreen. */
+const IMonitorInfo* QueryMonitorInfo()
 {
 	ISession* session = GetExecutionContextSession();
 	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
-	if (app == nil)
-		return false;
-	InterfacePtr<const IMonitorInfo> monInfo(app, UseDefaultIID());
+	InterfacePtr<const IMonitorInfo> monInfo(app, UseDefaultIID());	// nil in, nil out
+	return monInfo.forget();
+}
+
+bool TitleBandIsOnScreen(const Placement& p)
+{
+	InterfacePtr<const IMonitorInfo> monInfo(QueryMonitorInfo());
 	if (monInfo == nil)
 		return false;
 
@@ -693,11 +699,9 @@ bool TitleBandIsOnScreen(const Placement& p)
     the product accepts the same, and so does this. */
 PMPoint FitHeightToScreen(IControlView* panelView, SysCoord panelLeft, SysCoord panelTop, const PMPoint& size)
 {
-	ISession* session = GetExecutionContextSession();
-	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
-	if (panelView == nil || app == nil)
+	if (panelView == nil)
 		return size;
-	InterfacePtr<const IMonitorInfo> monInfo(app, UseDefaultIID());
+	InterfacePtr<const IMonitorInfo> monInfo(QueryMonitorInfo());
 	if (monInfo == nil)
 		return size;
 
@@ -844,8 +848,7 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 	if (!Is(ownGroup, &PaletteRefUtils::IsTabGroup))
 		return;
 
-	// 1-3. Beside the same neighbours - see JoinNeighbours. (0 = none, which ContainerOfPanel already
-	//      answered with an invalid ref before this was a function; the explicit test is the same.)
+	// 1-3. Beside the same neighbours - see JoinNeighbours (a 0 there = none).
 	if (JoinNeighbours(panelMgr, container, p.mate, p.tabIndex, p.nextGroup, p.prevGroup, false))
 		return;
 
@@ -924,7 +927,6 @@ void RestoreNow()
 	const PaletteRef ownDock = FindFloatingDock(container);
 	if (ownDock.IsValid() && !PaletteRefUtils::IsPaletteVisible(ownDock))
 		++gReRestores;
-
 
 	if (gRemembered.docked)
 		RestoreDocked(panelMgr, container, gRemembered);
@@ -1472,11 +1474,12 @@ public:
 	virtual ServiceID GetServiceID() { return kPaletteMgrService; }
 	virtual bool16 IsDefaultServiceProvider() { return kFalse; }
 	// Per session and main thread only: what the product's own provider for this service is
-	// registered as (Service_Registry_Memory_Dump.txt:2761, kBookPanelStartupShutdownBoss).
+	// registered as (Service_Registry_Memory_Dump.txt:2761, kBookPanelStartupShutdownBoss). The main
+	// thread is the base class's answer for a provider in a UI plug-in (CServiceProvider.h:54-56), so
+	// GetThreadingPolicy is not overridden (it returned kMainThreadOnly by hand until 2026-10-02).
 	virtual InstancePerX GetInstantiationPolicy() { return IK2ServiceProvider::kInstancePerSession; }
-	// SetCString, not SetKey: an internal name that never reaches the UI (KBSDrawEventSrvc's reason).
+	// SetCString, not SetKey: an internal name that never reaches the UI, so it is no string-table key.
 	virtual void GetName(PMString* pName) { pName->SetCString("KBSBookPanelService\0"); }
-	virtual IPlugIn::ThreadingPolicy GetThreadingPolicy() const { return IPlugIn::kMainThreadOnly; }
 };
 
 CREATE_PMINTERFACE(KBSBookPanelServiceProvider, kKBSBookPanelServiceProviderImpl)

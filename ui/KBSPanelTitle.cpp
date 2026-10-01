@@ -267,7 +267,7 @@ public:
 		// The Find/Change tab on the name follows the dialog while the panel is up.
 		AttachToFindChangeOptions(this, true);
 
-		// *At startup (KBSStartupShutdown::Startup) the panel manager may not have come up yet, in
+		// *At startup (KBSUIStartupShutdown::Startup) the panel manager may not have come up yet, in
 		// which case the subscription failed - so it is tried again here. IsAttached guards it, so
 		// this cannot subscribe twice.
 		KBSAttachPanelVisibilityObserver();
