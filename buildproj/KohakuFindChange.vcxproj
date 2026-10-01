@@ -292,6 +292,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelTypes.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">

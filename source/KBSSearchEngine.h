@@ -26,6 +26,7 @@
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "KBSResultModel.h"		// Hit - CollectStoryHits fills them
+#include "KBSModelTypes.h"	// HitDetail
 
 #include <vector>
 
@@ -420,16 +421,7 @@ namespace KBSSearchEngine
 	    twice, until 2026-09-28.) */
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** How much of each match CollectStoryHits fills in. A walk costs the same whatever is asked for;
-	    what differs is how much is then read about every match it lands on. (A kHitPlace - the story
-	    and range alone, for numbering the rows again - went with that numbering on 2026-09-29.) */
-	enum HitDetail
-	{
-		kHitPlaceAndText,	// story, range, the three drawn segments and the hash - what finding a
-							// row again compares
-		kHitEverything		// ...and the page, the hidden / locked / footnote flags and the story's first
-							// words - a search's row
-	};
+	// (HitDetail - how much of each match CollectStoryHits fills in: KBSModelTypes.h, since 2026-10-01.)
 
 	/** Every match of the current query in one story of an open document, as the search's walk meets
 	    them there, with the given scope switches, each filled in as far as 'detail' says. For a row a

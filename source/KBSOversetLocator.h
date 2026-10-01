@@ -30,17 +30,9 @@
 #include "BaseType.h"		// TextIndex
 #include "UIDRef.h"			// UID / kInvalidUID
 #include "PMPoint.h"		// PBPMPoint
+#include "KBSModelTypes.h"	// KBSOversetLoc
 
-/** Where the overset "+" locator for a text position is. 'found' is false when nothing in the
-    thread (or any enclosing thread) is placed, so there is no on-page location to point at. */
-struct KBSOversetLoc
-{
-	bool		found;		// true if an outport location was resolved
-	UID			frameUID;	// the frame carrying the "+" (for naming its page)
-	PBPMPoint	outportPb;	// the "+" point in pasteboard coordinates (for scrolling)
-
-	KBSOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
-};
+// (KBSOversetLoc - where the "+" is: KBSModelTypes.h, since 2026-10-01 - the UI's jump reads it.)
 
 /** Resolve the overset "+" locator for text position 'pos' in 'storyRef'. See file header. */
 KBSOversetLoc KBSFindOversetLocator(const UIDRef& storyRef, TextIndex pos);
