@@ -45,7 +45,7 @@ namespace
 const wchar_t* const kHowToEN =
 	L"DISCLAIMER: We cannot take responsibility for any problems that may arise. Use at your own risk.\n"
 	L"\n"
-	L"[Searching (Find in ... on the panel menu)]\n"
+	L"[Searching (Find in ...)]\n"
 	L"- Open Find/Change... on the panel menu opens InDesign's own Find/Change dialog, even when no document is open.\n"
 	L"- Follows InDesign's own Find/Change settings.\n"
 	L"- Searches on the four tabs Text, GREP, Glyph and Transliterate.\n"
@@ -77,7 +77,7 @@ const wchar_t* const kHowToEN =
 const wchar_t* const kHowToJA =
 	L"【免責】 どのような問題が起こっても責任を取れません。ご利用は自己責任でお願いします。\n"
 	L"\n"
-	L"【検索（パネルメニューの Find in …）】\n"
+	L"【検索（Find in …）】\n"
 	L"・パネルメニューの Open Find/Change... で、ドキュメントが開いていなくてもInDesign 本体の「検索と置換」ダイアログが開きます。\n"
 	L"・InDesign本体の検索の設定に従います。\n"
 	L"・テキスト / 正規表現 / 字形 / 文字種変換 の4つのタブで検索できます。\n"
