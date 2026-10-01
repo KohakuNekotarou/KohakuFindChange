@@ -45,11 +45,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSAcceptAllStepKey,			"Accept All Changes by KohakuFindChange",
                 // ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29).
                 kKBSAcceptStepKey,				"Accept Change",
-
-                // "Save after replace" had three strings here (the box, its note, and the extra
-                // warning that went up when it was ticked) from 2026-08-02 until the feature was
-                // removed on 2026-08-05. Their keys are retired in KBSID.h.
-
         }
 
 };

@@ -33,7 +33,7 @@
 
 // Plug-in: (kKBSPluginName, the internal name, is in KBSBoundaryID.h since 2026-10-01 - the UI half's
 // PluginDependency names the model by it.)
-#define kKBSFileName	"KohakuFindChange"			// Base name of the build output: KohakuFindChange.pln, its "(KohakuFindChange Resources)" folder, and the .rc OriginalFilename. MUST match the vcxproj TargetName, which is $(ProjectName) - so the VS project carries this name too. No spaces and no slash, unlike kKBSDisplayName: this one IS a file name. Same three-way split as KESCM (kKESCMPluginName / kKESCMFileName / kKESCMDisplayName).
+#define kKBSFileName	"KohakuFindChange"			// Base name of the build output: KohakuFindChange.pln, its "(KohakuFindChange Resources)" folder, and the .rc OriginalFilename. MUST match the vcxproj TargetName, which is $(ProjectName) - so the VS project carries this name too. No spaces and no slash, unlike kKBSDisplayName: this one IS a file name. Same three-way split as KCM (kKCMPluginName / kKCMFileName / kKCMDisplayName).
 
 // Missing plug-in: (see ExtraPluginInfo resource)
 #define kKBSMissingPluginURLValue		kSDKDefPartnersStandardValue_enUS // URL displayed in Missing Plug-in dialog
@@ -85,10 +85,6 @@ DECLARE_PMID(kClassIDSpace, kKBSHitMarkerBoss, kKBSPrefix + 17)
 // Signs the tracked changes one replace made - "KohakuFindChange" at the row's time (2026-09-28,
 // KBSSignRecordsCmd.cpp / KBSTrackChange.h).
 DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 22)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 23)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 24)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 25)
 
 
 // InterfaceIDs:
@@ -101,21 +97,6 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 // writes (2026-09-29, KBSUndoFollow.cpp). Its own IID because kTextStoryBoss carries other people's
 // IID_IOBSERVER. (+ 10, not + 3: + 3 ... + 7 are the split plan's - see above.)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTORYUNDOOBSERVER, kKBSPrefix + 10)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 11)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 12)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 13)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 14)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 15)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 16)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 17)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 18)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 19)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 20)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 21)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 22)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 23)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 24)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 25)
 
 
 // ImplementationIDs:
@@ -162,11 +143,12 @@ DECLARE_PMID(kImplementationIDSpace, kKBSInt64DataImpl, kKBSPrefix + 35)		// IIn
 DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
 
 
-// StringKeys - the model half's six (KBS_enUS.fr): the replace's own alert and what Edit > Undo calls a
-// KBS write. Every other key is the UI half's (KFCUIID.h, KFCUI_enUS.fr).
-// (The Change Checked confirmation prompt's keys - kKBSConfirm* - stood here until 2026-09-27, when
-//  the prompt was removed. The English lives in KBS_enUS.fr; the Japanese in KBSLoc.h.)
-// ***** NOT PART OF THE CONFIRMATION PROMPT - the replace's own alert, shown INSTEAD of running.
+// StringKeys - the model half's (KBS_enUS.fr): the replace's own alert and what Edit > Undo calls a
+// KBS write. Every other key is the UI half's (KFCUIID.h, KFCUI_enUS.fr). The English lives in
+// KBS_enUS.fr; the Japanese in KBSLoc.h.
+// (The Change Checked confirmation prompt's keys - kKBSConfirm*, and the Glyph tab's kKBSGlyphConfirm* -
+//  stood here until 2026-09-27, when the prompt was removed.)
+// ***** The replace's own alert, shown INSTEAD of running. *****
 //
 // A replace writes the match standing at each ticked row's place, so the rows only mean what they
 // say while the matches are where the search left them, holding the text it found. Since 2026-08-10
@@ -179,8 +161,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
 // per-chapter "carry on / cancel?" alert; and on 2026-08-10 it became this - no question at all,
 // because a work list that has come apart cannot be replaced safely whatever anyone answers.
 //
-// Translated, for the reason the confirmation prompt is: it is about the user's own text. The
-// status line that reports the outcome stays English.
+// Translated, because it is about the user's own text. The status line that reports the outcome
+// stays English.
 // ***** The run STOPPED because the results no longer describe the document. ***** Not a question:
 // the verify walk found a ticked match that no longer begins where the search left it, and nothing
 // has been written (KBSReplaceEngine::TellResultsWentStale). One wording names the chapter, one
@@ -201,15 +183,6 @@ DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
 #define kKBSAcceptStepKey			kKBSStringPrefix "kKBSAcceptStepKey"
 // (kKBSStaleResultsTailKey - "Please search again." - stood here until 2026-08-10. The user's call:
 //  the alert states the outcome in one sentence and the status line carries what to do next.)
-// (kKBSConfirmUnsavedKey, kKBSConfirmCareKey and the Glyph tab confirmation's labels -
-//  kKBSGlyphConfirm*Key - went with the prompt on 2026-09-27.)
-
-// RETIRED 2026-08-05 with the feature they belonged to: the "save after replace" box, its note, and
-// the extra warning that went up when the box was ticked. They stood here from 2026-08-02. Removed
-// from both string tables as well: these describe a run this plug-in no longer performs.
-//#define kKBSSaveAfterReplaceKey		kKBSStringPrefix "kKBSSaveAfterReplaceKey"
-//#define kKBSSaveAfterReplaceNoteKey	kKBSStringPrefix "kKBSSaveAfterReplaceNoteKey"
-//#define kKBSSaveAfterReplaceWarningKey	kKBSStringPrefix "kKBSSaveAfterReplaceWarningKey"
 
 // RETIRED 2026-09-27 (not reused): the script element IDs of app.kfcStatus / app.kfcResults, and
 // with them the four-character ScriptIDs 'pKBs' / 'pKBr' (docs/ai-notes/kes-scriptid-registry.md).

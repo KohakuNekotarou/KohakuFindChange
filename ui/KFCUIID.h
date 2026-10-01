@@ -59,7 +59,7 @@ DECLARE_PMID(kClassIDSpace, kKBSMarkerExpiryIdleTaskBoss, kKFCUIPrefix + 6)
 DECLARE_PMID(kClassIDSpace, kKBSResultCheckWidgetBoss, kKFCUIPrefix + 8)
 // The panel's illustration: the system rollover icon button plus a tooltip of its own, so hovering
 // it says where clicking it goes. Same shape as kLinksUIButtonBoss in open/components/linksui, and
-// as KESCM's kKESCMIconWidgetBoss - which is where the panel this copies got it from.
+// as KCM's kKCMIconWidgetBoss - which is where the panel this copies got it from.
 DECLARE_PMID(kClassIDSpace, kKBSIconWidgetBoss, kKFCUIPrefix + 14)
 // "Remember Book Panel Placement" (2026-09-25): the palette-manager service boss - registered for
 // kPaletteMgrService, the service InDesign's own Book panel hangs off, so it is told when the
@@ -83,8 +83,9 @@ DECLARE_PMID(kClassIDSpace, kKBSUIStartupShutdownBoss, kKFCUIPrefix + 20)
 
 
 // InterfaceIDs:
-// (+ 3 ... + 7 - the boundary's notification protocol, session interfaces and UI services - and the
-//  MessageID are in KBSBoundaryID.h since 2026-10-01: the UI half queries them too.)
+// (The boundary's - the notification protocol, the session interfaces and the UI services - and the
+//  MessageID are at kKBSPrefix + 3 ... + 7 in KBSBoundaryID.h. The "not + 3" notes below date from when
+//  both halves shared kKBSPrefix; kKFCUIPrefix + 3 ... + 7 were never used.)
 // Per-row draw data for a hit line's colour cell: the three text segments (before / matched /
 // after) the cell paints, the match segment in a highlight colour.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSROWDATA, kKFCUIPrefix + 0)
@@ -171,9 +172,7 @@ DECLARE_PMID(kActionIDSpace, kKBSScopeBookActionID, kKFCUIPrefix + 6)
 // (Its MenuDef was removed on 2026-09-27, the user's call - Change Checked sits right under the
 // search now. Not reused.)
 //DECLARE_PMID(kActionIDSpace, kKBSSeparator2ActionID, kKBSPrefix + 7)
-// Replace feature: a separator, the replace command, and the two bulk check toggles. The replace
-// command is declared here but only wired up in Phase 2 - reserving its number now keeps the
-// numbering from shifting later.
+// Replace feature: a separator, the replace command, and the two bulk check commands.
 DECLARE_PMID(kActionIDSpace, kKBSSeparator3ActionID, kKFCUIPrefix + 8)
 DECLARE_PMID(kActionIDSpace, kKBSReplaceCheckedActionID, kKFCUIPrefix + 9)
 DECLARE_PMID(kActionIDSpace, kKBSCheckAllActionID, kKFCUIPrefix + 10)
@@ -246,14 +245,13 @@ DECLARE_PMID(kActionIDSpace, kKBSRejectChangeActionID, kKFCUIPrefix + 25)
 // else's (2026-09-29, the user's call, the author named in the item so it says so; until then it accepted
 // every change, as InDesign's own "Accept All Changes in This Document" does).
 DECLARE_PMID(kActionIDSpace, kKBSAcceptAllChangesActionID, kKFCUIPrefix + 27)
-// The rule between Change Checked and the two scans (2026-09-27, when the scans moved below it).
-// (The rule between Change Checked and the scans, gone with them on 2026-09-27. Not reused.)
+// The rule between Change Checked and the two scans, from and gone with them on 2026-09-27. Not reused.
 //DECLARE_PMID(kActionIDSpace, kKBSSeparator5ActionID, kKBSPrefix + 28)
 // "Replace" on a hit row's right-click menu (2026-09-27, the user's call): replaces that one row, with
 // no prompt; the list stays a work list (KBSReplaceEngine::ReplaceHit).
 DECLARE_PMID(kActionIDSpace, kKBSReplaceHitActionID, kKFCUIPrefix + 29)
 // A STORY row's right-click menu (2026-09-27, the story level): Replace (its ticked rows), Reject Change,
-// Redo, Check All, Uncheck All - each over that story's rows.
+// Accept Change (+ 41), Redo, Check All, Uncheck All - each over that story's rows.
 DECLARE_PMID(kActionIDSpace, kKBSStoryReplaceActionID, kKFCUIPrefix + 30)
 DECLARE_PMID(kActionIDSpace, kKBSStoryRejectActionID, kKFCUIPrefix + 31)
 // A story row's Redo (2026-09-27, the user's call C): the story's rows taken back with Reject Change,
@@ -446,8 +444,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
 // plain literal rather than a translated key.
 #define kKBSResultRowMenuName				"KBSRtMenuResultRow"
-// ...and the HIT rows' menu (2026-09-26): Reject Change and Redo, about that one row. A subtree of its
-// own because the two menus never share an item.
+// ...and the HIT rows' menu (2026-09-26): Replace, Reject Change and Accept Change, about that one row.
+// A subtree of its own because the two menus never share an item.
 #define kKBSResultHitMenuName				"KBSRtMenuResultHit"
 // A story row's own right-click menu (2026-09-27).
 #define kKBSResultStoryMenuName				"KBSRtMenuResultStory"
@@ -456,20 +454,19 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 
 // Menu item positions:
 //
-// The flyout reads in six blocks, parted by five rules (the user's arrangement, 2026-08-04; the two
-// scans moved below Change Checked on 2026-09-27, the user's "B"):
-//    1.0          Find in Document / Find in Book
-//   ---- 1.1
-//    1.2          Change Checked - the one command that writes to the DOCUMENTS
+// The flyout, as KFCUI.fr lays it out (the user's arrangement of 2026-08-04, reworked as items came
+// and went - the scans and Save Results... left on 2026-09-27):
+//    0.5 - 1.2    Open Find/Change..., Find in <scope>, Change Checked (the one command that writes
+//                 to the DOCUMENTS)
 //   ---- 1.3
-//    1.4 - 1.5    the two scans (Find Missing Glyphs, Find Overset)
+//    1.4          Show Changes by KohakuFindChange
 //   ---- 2.0
-//    2.2 - 2.9    the check-mark toggles (listed under "Block 3" below - counted there, not here)
+//    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
-//    4.0 - 5.0    the two commands that write a FILE of our own
+//    4.0          Save Panel Settings - writes a FILE of our own
 //   ---- 10.0
-//   10.5 - 11.0   the two reference items
-// Positions that the new order allowed to stay were left where they were, so only the items that
+//   10.5 - 11.0   How to Use..., About
+// Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
 // Block 1 - the search, then Change Checked right under it (the rule between them was removed on
@@ -484,8 +481,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSShowChangesMenuItemPosition		1.4
 #define kKBSSeparator3MenuItemPosition		2.0
 
-// Block 3 - the six check-mark toggles (the six positions from 2.2 to 2.9; it said "four" at the top of this
-// list and "five" here until 2026-09-25). Book Scope leads: it is the one that decides what the
+// Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
 // commands in block 1 run on. Then Hide Previous Chapter. The next three are window appearance: the
 // two that act on InDesign's OWN Find/Change dialog first (translucency, then the minimize box),
 // and this panel's own translucency. Remember Book Panel Placement closes the block: it is about
@@ -503,15 +499,14 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSSavePanelSettingsMenuItemPosition	4.0
 #define	kKBSSeparator1MenuItemPosition		10.0
 
-// Block 5 - the reference items, the placement KESCM uses (its own is Sep2 9.95 / How to Use 10 /
-// About 12). No rule between them: another one right above About would draw two dividers with a
-// single item between them.
+// Block 5 - the reference items, last. No rule between them: another one right above About would
+// draw two dividers with a single item between them.
 #define kKBSHowToMenuItemPosition			10.5
 #define kKBSAboutThisMenuItemPosition		11.0
 
-// Check All / Uncheck All are the two items of the RESULT ROWS' right-click menu (2026-08-01), not
-// of the flyout, so their positions are that menu's own 1 and 2 - they were 5.0 and 6.0 while they
-// sat under Change Checked on the flyout.
+// The book and document rows' right-click menu (2026-08-01), not the flyout: Check All / Uncheck All
+// at that menu's own 1 and 2 (they were 5.0 and 6.0 while they sat under Change Checked on the flyout),
+// and the document row's commands around them.
 #define kKBSChapterReplaceMenuItemPosition	0.5		// a document row's only (2026-09-27; the book row greys it)
 #define kKBSChapterRejectMenuItemPosition	0.6		// a document row's only (2026-09-27; the book row greys it)
 #define kKBSChapterRedoMenuItemPosition		0.7		// a document row's only (2026-09-27; the book row greys it)
