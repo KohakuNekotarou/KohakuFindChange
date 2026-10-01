@@ -94,7 +94,7 @@ const int32 kGapUnderMessageBlock = 3;
 //     242  2026-08-07  "make the minimum width the size it is now" - off the running panel
 //     266  2026-08-07  the same instruction again (aaf1ba2). This is the number here.
 //
-// 224 was KESCM's fixed width (KESCM.fr:1105), put here so the two would line up when docked
+// 224 was KESCM's fixed width, put here so the two would line up when docked
 // together. That is GIVEN UP, deliberately: a floor is there to stop the panel being dragged down
 // to where it cannot be read, and the width it is read at is this one. Lining up with a sibling
 // was a second job asked of the same number, and the two wanted different answers.

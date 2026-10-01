@@ -10,17 +10,11 @@
 //  Why the floor exists. Every widget on this panel is bound to the edges, so the panel narrows
 //  happily past the point where it says anything: at about half its width the message wraps to five
 //  lines in a box that holds four, and the tree's rows are ellipsized down to nothing. The message
-//  box no longer shows a half-drawn line (KBS.fr sizes it to a whole number of lines), but the text
+//  box no longer shows a half-drawn line (KFCUI.fr sizes it to a whole number of lines), but the text
 //  that no longer fits is text the user cannot read at all.
 //
-//  All three Kohaku panels have a floor, and each gets its width from somewhere else:
-//    KESCL   KESCLReportPanelView.cpp:98-127  (2026-07-20) MEASURES the filter row it places at
-//                                             runtime, over a fixed floor
-//    KESCM   KESCMPanelView.cpp:68-103                     a constant - and a maximum HEIGHT too,
-//                                             because a closed section leaves nothing to show
-//    KBS     here                                          a constant, because every widget sits
-//                                             where the .fr put it
-//  (This file said KESCL was the only one and KESCM had none. It was written when that was true.)
+//  KESCL measures the filter row it places at runtime, over a fixed floor; KCM's is a constant with
+//  a maximum height too; this one is a constant, because every widget sits where the .fr put it.
 //
 //  Why the rounding exists. The floor stops the panel getting too small; it says nothing about
 //  where it stops in between. Dragged to any height the framework likes, the tree ends on a part
@@ -31,7 +25,7 @@
 //  ***** WHAT THAT DOES NOT COVER: ANY HEIGHT THE USER DID NOT DRAG TO. ***** The framework asks
 //  this only when it is about to resize, so a height that arrives another way is never rounded:
 //
-//    * the size the panel OPENS at (KBS.fr, 360). 360 - 61 of fixed part = 299, and 299 / 19 is
+//    * the size the panel OPENS at (KFCUI.fr, 360). 360 - 61 of fixed part = 299, and 299 / 19 is
 //      15.7 rows.
 //    * the moment KBSPanelMetrics::Update moves the tree's top down for a Japanese UI: the tree
 //      loses 24px out of a height that was rounded against the 48px block, so a panel that WAS
@@ -84,18 +78,8 @@ public:
 	virtual PMPoint ConstrainDimensions(const PMPoint& dimensions) const;
 
 	// ***** THE TWO NUMBERS ARE NOT HERE. ***** They are KBSPanelMetrics', because the height one
-	// has to move with the message block, and how tall THAT is depends on the UI language (a
-	// Japanese palette font draws 18px lines where an English one draws 12px). Keeping the floor
-	// and the block in one place is what stops a taller block from quietly eating the result rows
-	// the floor exists to protect.
-	//
-	// What they mean has not changed. The WIDTH is the point past which the panel stops being able
-	// to say anything: every widget is bound to the edges, so it narrows happily until the message
-	// wraps past what its box holds and the tree's rows are ellipsized down to nothing. It is now
-	// what the panel actually measures at the size it is usually left at (user's call, 2026-08-06;
-	// it was 250 from 2026-08-04, measured by eye rather than off the running panel). The HEIGHT
-	// leaves about five 19px rows under the message block - enough for a result set to look like a
-	// list rather than a single row peeping out.
+	// has to move with the message block, and how tall THAT is depends on the UI language. What they
+	// mean and where they came from are written there.
 };
 
 CREATE_PERSIST_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)

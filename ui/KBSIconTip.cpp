@@ -6,7 +6,7 @@
 //
 //  The tooltip on the panel's illustration (kKBSIconWidgetBoss). It shows the very URL that
 //  clicking the picture opens, so the icon is not a button whose destination is a mystery - the
-//  same job KESCM's KESCMIconTip does for its panel.
+//  same job KCM's KCMIconTip does for its panel.
 //
 //  ***** WHY IT DERIVES FROM AbstractTip *****
 //
@@ -22,7 +22,7 @@
 //
 //  It lives in DV_WidgetBin.lib. That was once the reason NOT to use it; the plug-in now links that
 //  library in all four configurations anyway, for its own drawn views (KBSColorTextView,
-//  KBSGlyphView), so the base class costs nothing.
+//  KBSStatusTextView), so the base class costs nothing.
 //
 //========================================================================================
 

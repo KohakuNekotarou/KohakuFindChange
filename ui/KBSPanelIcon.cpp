@@ -29,9 +29,8 @@ namespace
 /** The pictures, in the order Choose() tests them. A new one is a row here plus its id and PNG
     resource; nothing else changes.
 
-    Order matters only in that Choose() returns the FIRST match, so the more specific state has to
-    come before the more general one - which is what a "replaced" picture will need when it arrives
-    (a replace has also been "run"). */
+    Choose() asks the more specific state first (a replace has also been "run"); the order here is
+    the order the pictures were added. */
 const WidgetID kIcons[] =
 {
 	kKBSIconWidgetID,		// nothing has been run yet

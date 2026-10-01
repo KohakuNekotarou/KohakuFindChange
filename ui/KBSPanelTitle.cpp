@@ -32,8 +32,8 @@
 // !! It is declared HERE rather than by including URLUtils.h, because that header is wrong: it puts
 //   GoToURL in "namespace URLUtils", while the exported symbol is
 //   "?GoToURL@GoToURLUtils@@YAXAEBVPMString@@F@Z" = GoToURLUtils::GoToURL(const PMString&, bool16).
-//   Including the header compiles and then fails to link. KESCM carries the same declaration for
-//   the same reason (KESCMActionComponent.cpp).
+//   Including the header compiles and then fails to link. KCM carries the same declaration for
+//   the same reason (KCMActionComponent.cpp).
 namespace GoToURLUtils
 {
 	PUBLIC_DECL void GoToURL(const PMString& goToURL, bool16 isAGoURL);
@@ -69,10 +69,9 @@ void SetTabLabel(const PMString& label)
 	// ***** THE SESSION CAN BE GONE DURING SHUTDOWN. ***** (2026-08-11.)
 	//   This used to write GetExecutionContextSession()->QueryApplication() straight out, which
 	//   dereferences whatever that call returns. KBSPanelAlpha.cpp says of the same function
-	//   "can be nil during shutdown" (:56) and takes the pointer into a variable before using it,
-	//   in all four of its callers.
+	//   "can be nil during shutdown" and takes the pointer into a variable before using it.
 	//   *Why this one matters and the dozen others do not: KBSPanelTitle::Restore is called from
-	//    KBSStartupShutdown::Shutdown (:64) - it is the only entry here that runs during teardown.
+	//    the UI half's shutdown (KBSUIStartupShutdown) - it is the only entry here that runs during teardown.
 	//    The rest of this plug-in reaches the session from inside UI events (a click, a key, a
 	//    draw), where it is certainly alive.
 	//   !No failure has been seen: the tab is restored FIRST in Shutdown, "while the UI is still

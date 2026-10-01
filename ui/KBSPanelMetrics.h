@@ -62,15 +62,14 @@ namespace KBSPanelMetrics
 	    against the OPENING message; the line a stopped replace leaves is 128 characters and was
 	    measurably cut off. The block grew a line and the messages were cut to fit it - the
 	    measurement, and the reasoning for leaving the Roman block at four, are in
-	    KBSPanelMetrics.cpp over the two constants. **This sentence is the one KBS.fr:1060 means
-	      by "if this number changes, change that one too". *****FOUR PLACES STATE THIS ONE FACT,
-	      NOT THREE.***** They are: KBS.fr:1060, this line, KBSPanelMetrics.cpp (the constants
-	      kMessageHeightRoman / kMessageHeightCJK and the note at :113), and
-	      KBSPanelView.cpp:151, which explains why it SUBTRACTS the fixed part instead of adding
-	      it up. This line was left behind in both changes so far (2026-08-08, 2026-08-10) - and
-	      the count above said "three" until 2026-08-11, when the defect re-check found
-	      KBSPanelView.cpp still saying 54px for a block that had been 72 since 08-10. A sentence
-	      that counts the places it has to be kept in step with is worth no more than its count. */
+	    KBSPanelMetrics.cpp over the two constants.
+	    ***** THE SAME FACT IS STATED ELSEWHERE - change them together. ***** The message widget's
+	    note in KFCUI.fr ("if this number changes, change that one too"), the constants
+	    kMessageHeightRoman / kMessageHeightCJK and their notes in KBSPanelMetrics.cpp, and
+	    KBSPanelView::ConstrainDimensions, which explains why it SUBTRACTS the fixed part instead of
+	    adding it up. (This line was left behind twice, 2026-08-08 and 2026-08-10. The list is by
+	    name, not by line: a line number in this plug-in's own files is wrong the next time either
+	    file is edited.) */
 	int32 MessageBlockHeight();
 
 	/** The floor under a drag. The width is what the panel measures at its usual size (measured
