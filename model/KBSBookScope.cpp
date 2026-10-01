@@ -617,7 +617,7 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// is asked in ONE place: callers have to ask it too, to tell this failure from the one below
 	// (see that function's header), and two spellings of one question is how they come to disagree.
 	if (!ChapterHasFile(file))
-		return false;	// a front-document entry carries no file - nothing to reopen
+		return false;	// a document-scope entry carries no file - nothing to reopen
 
 
 	// Is it open already - because the user reopened it, or because an earlier chapter of this very

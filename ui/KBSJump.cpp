@@ -34,7 +34,7 @@
 #include "IOpenLayoutCmdData.h"		// SetPerspective_ - the inherited zoom rides the open command
 #include "IPanorama.h"
 #include "ISelectionManager.h"		// DeselectAll / SelectionExists - clearing before selecting
-#include "ISelectionUtils.h"		// GetActiveSelection - the front document's selection manager
+#include "ISelectionUtils.h"		// GetActiveSelection - the active context's selection (the document the jump fronted)
 #include "ITextModel.h"
 #include "ITextSelectionSuite.h"	// SetTextSelection - the double-click's whole point
 #include "ITool.h"					// IsTextTool - is a text tool already active?

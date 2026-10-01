@@ -242,7 +242,8 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSScopeBookActionID:
 		{
-			// Toggle the search scope: the whole target book (see ResolveTargetBook), or just the front document. Just the
+			// Toggle the search scope: the whole target book (see ResolveTargetBook), or what Find/Change's
+			// Search: names (2026-09-29 - the front document until then). Just the
 			// flag - nothing is closed and the current results stay put. Its check mark and the
 			// search command's name are drawn in UpdateActionStates.
 			KBSChapters()->SetBookScopeOn(!KBSChapters()->IsBookScopeOn());
@@ -589,7 +590,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	}
 
 	// Is there anything for the current scope to run on at all - the target book while Book Scope is
-	// ON, a front document while it is OFF? The three commands that START a run share the answer, so
+	// ON, the active document (IActiveContext) while it is OFF? The three commands that START a run share the answer, so
 	// it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
 	// ask, so a command that is offered can always run and one that cannot is visibly grey rather
 	// than reporting "No open document to search." after the fact (user's call 2026-08-02).

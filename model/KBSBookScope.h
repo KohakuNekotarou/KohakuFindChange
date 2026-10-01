@@ -401,8 +401,8 @@ namespace KBSBookScope
 	    walked a neighbour and reported every row missing, never in the first chapter.
 	    ReopenChapterDoc asks by FILE, which cannot be confused.
 
-	    ***** ONLY A CHAPTER WITH NO FILE FALLS BACK ON ioDocRef ***** - a document-scope row,
-	    the front document, which nothing closed behind anybody - and only while it is still
+	    ***** ONLY A CHAPTER WITH NO FILE FALLS BACK ON ioDocRef ***** - a document-scope row
+	    (one of the documents Search: named), which nothing closed behind anybody - and only while it is still
 	    open. A file that would not open (moved, deleted, in use) gives up: that ioDocRef is the
 	    one the search left.
 

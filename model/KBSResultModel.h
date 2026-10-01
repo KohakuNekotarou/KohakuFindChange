@@ -222,7 +222,7 @@ namespace KBSResultModel
 	/** Forget the results (an empty search, or a teardown that still wants the tree emptied). */
 	void Clear();
 
-	/** Did these results come from a BOOK search (rather than the front document)? Recorded on the
+	/** Did these results come from a BOOK search (rather than what Find/Change's Search: names)? Recorded on the
 	    results themselves rather than read from the Book Scope toggle, so flipping the toggle after
 	    a search does not change how the existing results are displayed.
 

@@ -165,7 +165,8 @@ DECLARE_PMID(kActionIDSpace, kKBSSeparator1ActionID, kKFCUIPrefix + 2)
 DECLARE_PMID(kActionIDSpace, kKBSPopupAboutThisActionID, kKFCUIPrefix + 3)
 DECLARE_PMID(kActionIDSpace, kKBSSearchBookActionID, kKFCUIPrefix + 4)
 DECLARE_PMID(kActionIDSpace, kKBSHidePrevChapterActionID, kKFCUIPrefix + 5)
-// "Book Scope": search the whole book (ON) or just the front document (OFF). Check-mark toggle,
+// "Book Scope": search the whole book (ON) or what Find/Change's Search: names (OFF - the front
+// document until 2026-09-29). Check-mark toggle,
 // the KESCL "Search book" pattern (kKESCLPopupSearchBookActionID).
 DECLARE_PMID(kActionIDSpace, kKBSScopeBookActionID, kKFCUIPrefix + 6)
 // Separator between the search command and the toggles below it (MenuDef only, no ActionDef).
