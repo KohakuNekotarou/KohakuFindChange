@@ -322,4 +322,25 @@ struct KBSOversetLoc
 	KBSOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
 };
 
+/** What one notification from the model half to the UI half carries (2026-10-01, the model/UI split;
+    sent by KBSModelNotify.h, received by KBSModelObserver.cpp). The model never calls the panel: it
+    says what happened on the session's subject, and the panel - when there is one listening - does the
+    drawing. Handed over as ISubject::Change's changedBy and read during delivery only, so `text` may
+    point at the sender's own string. */
+struct KBSNotifyPayload
+{
+	enum Kind
+	{
+		kRebuild = 0,		// the result set changed shape: build the tree again (KBSResultTree::Rebuild)
+		kRefreshRows,		// only what the rows draw changed (KBSResultTree::RefreshRows)
+		kChapterRowGoes,	// chapterIdx's row is about to go (KBSResultTree::BeforeChapterRowGoes)
+		kStatus				// say *text on the message line (KBSResultTree::ShowStatus)
+	};
+	Kind				kind;
+	int32				chapterIdx;
+	const PMString*		text;
+
+	explicit KBSNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
+};
+
 #endif // __KBSModelTypes_h__

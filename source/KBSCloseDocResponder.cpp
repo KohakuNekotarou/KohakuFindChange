@@ -64,7 +64,7 @@
 #include "KBSHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KBSID.h"
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"
+#include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
 #include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
 #include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go (2026-09-29)
@@ -187,14 +187,14 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		// draws; under it, only that row goes and the others stay as they are (open or closed).
 		const bool overCap = KBSResultModel::GetTotalHitCount() > KBSResultModel::kKBSDisplayHitLimit;
 		if (!overCap)
-			KBSResultTree::BeforeChapterRowGoes(closingChapter);
+			KBSNotifyChapterRowGoes(closingChapter);
 		KBSResultModel::CloseChapter(closingChapter);
 		if (overCap)
-			KBSResultTree::Rebuild();
+			KBSNotifyRebuild();
 		PMString msg(closedName);
 		msg.SetTranslatable(kFalse);
 		msg.Append(" was closed - its rows are gone. The other documents' rows stay.");
-		KBSResultTree::ShowStatus(msg);
+		KBSNotifyStatus(msg);
 		return;
 	}
 
@@ -211,11 +211,11 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	KBSResultModel::Clear();
 	KBSBookScope::ReleaseSearchedBook();
 	KBSSearchEngine::ForgetSearchedFindFormat();
-	KBSResultTree::Rebuild();
+	KBSNotifyRebuild();
 
 	PMString cleared("Results cleared - the document was closed.");
 	cleared.SetTranslatable(kFalse);
-	KBSResultTree::ShowStatus(cleared);
+	KBSNotifyStatus(cleared);
 }
 
 // End, KBSCloseDocResponder.cpp.

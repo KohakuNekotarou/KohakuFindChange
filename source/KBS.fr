@@ -355,6 +355,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The UI half's ear on the model half (2026-10-01, the model/UI split): the observer that draws what
+	 * KBSModelNotify.h sends on the session's subject. Attached by the startup (KBSModelObserver.cpp); this
+	 * line only puts our IID, and so the implementation, onto the session.
+	 * *An AddIn that points at UI code - it goes to the UI plug-in's .fr when KBS is split.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKBSMODELOBSERVER, kKBSModelObserverImpl,
+		}
+	},
+
+	/*
 	 * Panel visibility observer (2026-08-04, brought over from KESCM). Subscribes to the panel
 	 * manager's subject and waits for kPaletteVisibilityChangedMessage, which fires whenever a panel
 	 * is opened, closed, restored from an icon or drawer-expanded. The "Translucent Panel" toggle

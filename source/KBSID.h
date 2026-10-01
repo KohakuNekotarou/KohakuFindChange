@@ -134,12 +134,21 @@ DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
 // The panel's message area, drawn by hand (2026-09-29, KBSStatusTextView.cpp): a generic panel with our
 // IControlView and IKBSStatusTextData - the shape of the hit row's cell (+4) and of KCM's message area.
 DECLARE_PMID(kClassIDSpace, kKBSStatusTextWidgetBoss, kKBSPrefix + 19)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 20)
+// The UI half's own startup/shutdown service (2026-10-01, the model/UI split - KBSUIStartupShutdown.cpp):
+// a startup/shutdown service is declared per boss, so the side the panel's work runs on needs a boss of
+// its own. (+ 13 was the first choice of the 2026-08-16 plan; it is a retired id, so it stays spent.)
+DECLARE_PMID(kClassIDSpace, kKBSUIStartupShutdownBoss, kKBSPrefix + 20)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 21)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 22)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 23)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 24)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 25)
+
+
+// MessageIDs:
+// What the model half's notifications are sent as (2026-10-01, KBSModelNotify.h) - one message, whose
+// payload says what happened (KBSNotifyPayload, KBSModelTypes.h). KBS had no message id before this one.
+DECLARE_PMID(kMessageIDSpace, kKBSModelChangedMessage, kKBSPrefix + 0)
 
 
 // InterfaceIDs:
@@ -153,14 +162,19 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
 // docked or floated (kPaletteVisibilityChangedMessage). Its own IID because it is an AddIn onto
 // kActiveContextBoss, which carries observers that are not ours. See KBSPanelAlpha.cpp.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSPANELVISIBILITYOBSERVER, kKBSPrefix + 2)
-// ***** + 3 ... + 7 ARE SPOKEN FOR: the model/UI split plan gives them to its notification and its
-// four facades (docs/superpowers/plans/2026-08-16-kbs-model-ui-split-stage1.md, the ID table). Left
-// commented until that plan lands - do not hand them out to anything else.
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 3)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 4)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 5)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 6)
-//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSINTERFACE, kKBSPrefix + 7)
+// ***** + 3 ... + 7: THE MODEL/UI SPLIT'S BOUNDARY (2026-10-01, docs/superpowers/specs/
+// 2026-10-01-kbs-model-ui-split-design.md section 4). ***** Reserved for it since 2026-08-16.
+// The protocol the model half's notifications travel under (KBSModelNotify.h) - and the IID the UI half's
+// observer is AddIn'd on kSessionBoss with (KBSModelObserver.cpp).
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSMODELOBSERVER, kKBSPrefix + 3)
+// The three session interfaces the UI half reaches the model half through (IKBSResults.h / IKBSRuns.h /
+// IKBSChapters.h, on kSessionBoss).
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSRESULTS, kKBSPrefix + 4)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSRUNS, kKBSPrefix + 5)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSCHAPTERS, kKBSPrefix + 6)
+// The UI services the model half asks for and does without when they are not there (IKBSUIServices.h,
+// implemented by the UI half on kSessionBoss: the progress bar, the windows, the Book panel, the alert).
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSUISERVICES, kKBSPrefix + 7)
 // The observer behind "Remember Book Panel Placement" (2026-09-25): measures InDesign's Book panel as
 // it closes and puts it back when it appears. Its own IID for the reason the one above has one - it
 // is an AddIn onto kActiveContextBoss, next to that one. See KBSBookPanelPlacement.cpp. (+ 8, not
@@ -245,16 +259,17 @@ DECLARE_PMID(kImplementationIDSpace, kKBSPanelViewImpl, kKBSPrefix + 20)
 // the panel. Both in KBSPanelAlpha.cpp.
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelVisibilityObserverImpl, kKBSPrefix + 21)
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelRollOverImpl, kKBSPrefix + 22)
-// ***** + 23 ... + 28 ARE SPOKEN FOR: the model/UI split plan gives them to its notification
-// observer, its four facades and the UI side's startup/shutdown service
-// (docs/superpowers/plans/2026-08-16-kbs-model-ui-split-stage1.md). Left commented until that
-// plan lands - do not hand them out to anything else.
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 23)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 24)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 25)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 26)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 27)
-//DECLARE_PMID(kImplementationIDSpace, kKBSImpl, kKBSPrefix + 28)
+// ***** + 23 ... + 28: THE MODEL/UI SPLIT'S BOUNDARY (2026-10-01). ***** Reserved for it since 2026-08-16.
+// + 23 = the UI half's observer of the model's notifications (KBSModelObserver.cpp);
+// + 24 ... + 26 = the model half's three session interfaces (KBSModelServices.cpp);
+// + 27 = the UI half's own startup/shutdown service (KBSUIStartupShutdown.cpp);
+// + 28 = the UI services the model half asks for (KBSUIServices.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSModelObserverImpl, kKBSPrefix + 23)
+DECLARE_PMID(kImplementationIDSpace, kKBSResultsImpl, kKBSPrefix + 24)
+DECLARE_PMID(kImplementationIDSpace, kKBSRunsImpl, kKBSPrefix + 25)
+DECLARE_PMID(kImplementationIDSpace, kKBSChaptersImpl, kKBSPrefix + 26)
+DECLARE_PMID(kImplementationIDSpace, kKBSUIStartupShutdownImpl, kKBSPrefix + 27)
+DECLARE_PMID(kImplementationIDSpace, kKBSUIServicesImpl, kKBSPrefix + 28)
 // "Remember Book Panel Placement" (2026-09-25): the observer on kActiveContextBoss, and the two
 // halves of the palette-manager service boss (its provider and the IPaletteMgrService itself). All
 // three in KBSBookPanelPlacement.cpp. (+ 29 onwards, not + 23: see the note above.)

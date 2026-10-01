@@ -68,3 +68,5 @@ REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)
 // The panel follows an Undo and a Redo (2026-09-29): the lazy observer AddIn'd on kTextStoryBoss
 // (KBSUndoFollow.cpp).
 REGISTER_PMINTERFACE(KBSStoryUndoObserver, kKBSStoryUndoObserverImpl)
+// The model/UI split's boundary (2026-10-01): the UI half's observer of the model half's notifications.
+REGISTER_PMINTERFACE(KBSModelObserver, kKBSModelObserverImpl)

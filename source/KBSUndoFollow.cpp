@@ -29,7 +29,7 @@
 #include "KBSBookScope.h"		// FindOpenChapterDoc - a chapter's document found again by its file
 #include "KBSReplaceEngine.h"	// IsReplacing - nothing is followed while a replace is up
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"		// the panel drawn again, and its message line
+#include "KBSModelNotify.h"		// the panel drawn again, and its message line - told, never called (2026-10-01)
 #include "KBSRunGuard.h"		// IsAnyRunning - nor while any run of ours is up
 #include "KBSSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KBSUndoFollow.h"
@@ -462,9 +462,9 @@ bool KBSUndoFollow::Follow(UID story)
 	// A reshaped result set is a new tree; rows put back are the same rows drawn again (RefreshRows keeps
 	// what the user had opened and closed).
 	if (reshaped)
-		KBSResultTree::Rebuild();
+		KBSNotifyRebuild();
 	else
-		KBSResultTree::RefreshRows();
+		KBSNotifyRefreshRows();
 	PMString msg;
 	msg.SetTranslatable(kFalse);
 	if (undone > 0 && redone == 0)
@@ -503,7 +503,7 @@ bool KBSUndoFollow::Follow(UID story)
 		msg.AppendNumber(redone);
 		msg.Append(" redone).");
 	}
-	KBSResultTree::ShowStatus(msg);
+	KBSNotifyStatus(msg);
 	return true;
 }
 

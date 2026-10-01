@@ -34,6 +34,7 @@
 #include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 #include "KBSUndoFollow.h"		// the writes kept for the panel's following of Undo (2026-09-29)
+#include "KBSModelObserver.h"	// the UI half's ear on the model half (2026-10-01)
 
 /** Implements IStartupShutdownService for the plug-in. */
 class KBSStartupShutdown : public CPMUnknown<IStartupShutdownService>
@@ -57,6 +58,8 @@ public:
 		KBSLoadPanelStateIfPresent();
 		KBSBookWatchAttach();
 		KBSAttachPanelVisibilityObserver();
+		// The UI half's ear on the model half's notifications (2026-10-01, the model/UI split).
+		KBSModelObserverAttach();
 	}
 
 	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and
@@ -68,6 +71,8 @@ public:
 		// must not be what a saved workspace remembers.
 		KBSPanelTitle::Restore();
 		KBSBookWatchDetach();
+		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
+		KBSModelObserverDetach();
 		// Stop listening before tearing anything down: while attached, the session holds a pointer
 		// into this .pln, and the panel being destroyed during teardown raises a notification.
 		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what

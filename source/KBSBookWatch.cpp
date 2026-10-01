@@ -116,7 +116,7 @@
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
 #include "KBSResultModel.h"
-#include "KBSResultTree.h"
+#include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under ANY run of ours
 #include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
 
@@ -194,12 +194,12 @@ void RetireBookResultsIfGone()
 	// compares against belongs to the rows going away here.
 	KBSResultModel::Clear();
 	KBSSearchEngine::ForgetSearchedFindFormat();
-	KBSResultTree::Rebuild();
+	KBSNotifyRebuild();
 
 	// A panel that empties itself without a word reads as a crash.
 	PMString cleared("Results cleared - the book was closed.");
 	cleared.SetTranslatable(kFalse);
-	KBSResultTree::ShowStatus(cleared);
+	KBSNotifyStatus(cleared);
 }
 
 /** Timer callback. Raw function pointer - it must never outlive this plug-in (see the detach).
