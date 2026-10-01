@@ -22,7 +22,6 @@
 // General includes:
 #include "IDTime.h"					// a run's start as a local date and time
 #include "IDataBase.h"				// SaveRestoreModifiedState
-#include "PersistUtils.h"			// ::GetUIDRef
 #include "KBSProgressBar.h"		// the read's progress + cancel - the bar is the UI half's since 2026-10-01
 #include "WideString.h"				// IDTime::DateToString
 
@@ -273,11 +272,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 			outSummary.Append("No open document.");
 			return 0;
 		}
-		KBSBookScope::ChapterDoc single;
-		single.docRef = ::GetUIDRef(doc);
-		doc->GetName(single.shortName);
-		single.shortName.SetTranslatable(kFalse);
-		targets.push_back(single);
+		targets.push_back(KBSBookScope::DocAsChapter(doc));
 	}
 
 	// On the results, as the search records them - and that these rows came from the records, which
@@ -304,15 +299,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
-		PMString taskLine;
-		taskLine.SetTranslatable(kFalse);
-		taskLine.Append("Chapter ");
-		taskLine.AppendNumber(static_cast<int32>(i) + 1);
-		taskLine.Append(" / ");
-		taskLine.AppendNumber(static_cast<int32>(targets.size()));
-		taskLine.Append(" - ");
-		taskLine.Append(targets[i].shortName);
-		progressBar.SetTaskText(taskLine);
+		KBSSetChapterTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 		if (progressBar.WasCancelled(kFalse))
 		{
@@ -346,9 +333,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 
 		// Handed back HERE, closed on the spot - the search's reasons (SearchBook): one chapter held at a
 		// time, and what was read is plain data now.
-		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
-		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
-			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
+		if (!KBSBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
 		if (docCapped)

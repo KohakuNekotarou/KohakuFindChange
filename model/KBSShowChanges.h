@@ -16,9 +16,10 @@
 //  document -> run -> story -> row - and can be taken back (Reject Change) or accepted (Accept Change),
 //  but not replaced again. To replace again, search again.
 //
-//  The scope is the search's: Book Scope ON = the book the book panel shows, chapter by chapter, each
-//  opened and handed straight back; OFF = the active document. Read-only, like the search: a chapter
-//  never comes out modified.
+//  The scope is the Book Scope toggle's: ON = the book the book panel shows, chapter by chapter, each
+//  opened and handed straight back, as the search does; OFF = the active document (Edit > Find/Change's
+//  Search:, which the search follows since 2026-09-29, is not read here). Read-only, like the search: a
+//  chapter never comes out modified.
 //
 //========================================================================================
 

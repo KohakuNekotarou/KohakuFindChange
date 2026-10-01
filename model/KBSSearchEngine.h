@@ -40,6 +40,11 @@ class KBSProgressBar;		// the run's bar (KBSProgressBar.h) - a RangeProgressBar 
     follows the loop in SearchBook and ReplaceChecked. */
 void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
+/** Put "<noun> <index + 1> / <count> - <name>" on the run's bar ("Chapter 3 / 12 - ch03.indd"), the line the
+    search, the replace and Show Changes each wrote out themselves until 2026-10-01. Text only - the bar's
+    position is KBSAdvanceProgress's. */
+void KBSSetChapterTask(KBSProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
+
 /** ***** KBS SEARCHES AND REPLACES FORWARD ONLY (2026-09-26, the user's call). ***** The results are a
     list, so a direction means nothing to KBS - and a backward search listed matches the replace
     (Change All, that day) did not make (H-5: GREP lookarounds read other text backwards). The one

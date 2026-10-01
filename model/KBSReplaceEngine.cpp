@@ -1518,19 +1518,12 @@ void HandBackChaptersWithNothingInThem(const std::vector<PendingChapter>& pendin
 			}
 		}
 
-		// closeNow: a scheduled close does not run until the current tick has unwound, and this run
+		// On the spot: a scheduled close does not run until the current tick has unwound, and this run
 		// IS that tick - the chapters would stay open, and stay locked, until it was over. The same
 		// call and the same reasoning as the search's per-chapter release (KBSSearchEngine::
 		// SearchBook). Safe here: the command sequence is closed, the walk has halted, and a chapter
 		// the user opened themselves is not on the held list and passes through untouched.
-		//
-		// THREE questions, the shape the search's release shares since 2026-08-08: IsHeldDoc before (a
-		// chapter that was never ours answers false for no fault of anyone's), the release itself,
-		// and IsDocStillOpen after ("the user closed it under the run" is their own doing, not a
-		// chapter left standing).
-		const bool wasOurs = KBSBookScope::IsHeldDoc(pending[pi].docRef);
-		if (!KBSBookScope::ReleaseHeldDoc(pending[pi].docRef, true /*close now*/)
-			&& wasOurs && KBSBookScope::IsDocStillOpen(pending[pi].docRef))
+		if (!KBSBookScope::HandBackHeldDocNow(pending[pi].docRef))
 		{
 			// Named the way the summary's other chapter mentions are (firstSkipped and
 			// firstWalkFailed): the model's display name for the row. Still valid here - this runs before
@@ -2298,22 +2291,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// after the chapter ran would find zero, its hits being marked replaced by then.)
 		const int32 chapterChecked = pending[pi].checkedCount;
 
-		PMString taskLine;
-		taskLine.SetTranslatable(kFalse);
-		taskLine.Append("Chapter ");
-		taskLine.AppendNumber(static_cast<int32>(pi) + 1);
-		taskLine.Append(" / ");
-		taskLine.AppendNumber(static_cast<int32>(pending.size()));
-
 		PMString chapterName;
 		int32 chapterHits = 0;
 		KBSResultModel::GetChapterDisplay(pending[pi].chapterIdx, chapterName, chapterHits);
 		chapterName.SetTranslatable(kFalse);
-		taskLine.Append(" - ");
-		taskLine.Append(chapterName);
-		// The chapter's name goes on the status line WITH its number. The POSITION is moved separately
-		// through KBSAdvanceProgress - SetTaskText only writes text.
-		progressBar.SetTaskText(taskLine);
+		KBSSetChapterTask(progressBar, "Chapter", pi, pending.size(), chapterName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Cancel is asked here, and answered by the bar being moved inside the chapter
@@ -3258,22 +3240,8 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	return true;
 }
 
-// The document of a chapter, if it is open - Reject Change, Redo and Accept All work on the open document
-// only. One question for all of them (2026-09-29): they spelled it out one by one until then, each with a
-// test for no database in front of IsDocStillOpen, which answers false for that itself.
-// ***** BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS (2026-09-29, the defect re-check
-// ***** F-3). ***** It asked IsDocStillOpen of the docRef the results held: a chapter closed and opened again
-// sits at a new address ("not open" - its replaced rows could not be taken back until a click on one
-// rebound it), and a closed chapter's address taken by a document opened later answered for THAT one.
-static bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
-{
-	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file)
-		|| !KBSBookScope::FindOpenChapterDoc(file, outDocRef))
-		return false;
-	KBSResultModel::RebindChapterDoc(chapterIdx, outDocRef);
-	return true;
-}
+// (ChapterDocIfOpen - the document of a chapter, if it is open - stood here until 2026-10-01. It is
+//  KBSTrackChange::ChapterDocIfOpen now, the one a row's records are read through as well.)
 
 // The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together) -
 // what a row's Reject Change and Accept Change act on.
@@ -3307,7 +3275,7 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		outStatus.Append("Reject Change: the document of this row is not open.");
 		return false;
@@ -3336,7 +3304,7 @@ static bool RejectRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		outStatus.Append("Reject Change: the document of this row is not open.");
 		return false;
@@ -3394,7 +3362,7 @@ bool KBSReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& o
 bool KBSReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
 {
 	UIDRef docRef;
-	return ChapterDocIfOpen(chapterIdx, docRef) && KBSTrackChange::DocumentHasSignedRecords(docRef.GetDataBase());
+	return KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef) && KBSTrackChange::DocumentHasSignedRecords(docRef.GetDataBase());
 }
 
 bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
@@ -3402,7 +3370,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		outStatus.Append("Accept All Changes by KohakuFindChange: the document is not open.");
 		return false;
@@ -3622,7 +3590,7 @@ bool KBSReplaceEngine::AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		outStatus.Append("Accept Change: the document of this row is not open.");
 		return false;
@@ -3645,7 +3613,7 @@ static bool AcceptRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		outStatus.Append("Accept Change: the document of this row is not open.");
 		return false;
@@ -3777,7 +3745,7 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 	// (Every line here began "Redo" / "Redone" until 2026-09-29, when the menu item became Replace Again
 	//  (Current Find/Change Settings) - the user's call. ReplaceRowsNow writes the rest, `again` = true.)
 	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
+	if (!KBSTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
 	{
 		StartStatus(outStatus, true);
 		outStatus.Append("the document of these rows is not open.");

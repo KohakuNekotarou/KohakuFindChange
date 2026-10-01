@@ -72,7 +72,7 @@
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "PersistUtils.h"			// ::GetUIDRef / ::GetClass (StoryLeadText: which thread is a deletion's)
+#include "PersistUtils.h"			// ::GetClass (StoryLeadText: which thread is a deletion's)
 #include "InCopySharedID.h"			// kDeletedTextBoss - the thread Track Changes keeps a deletion's text in
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
@@ -1618,6 +1618,20 @@ void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bo
 	ioReported = target;
 }
 
+void KBSSetChapterTask(KBSProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name)
+{
+	PMString taskLine;
+	taskLine.SetTranslatable(kFalse);
+	taskLine.Append(noun);
+	taskLine.Append(" ");
+	taskLine.AppendNumber(static_cast<int32>(index) + 1);
+	taskLine.Append(" / ");
+	taskLine.AppendNumber(static_cast<int32>(count));
+	taskLine.Append(" - ");
+	taskLine.Append(name);
+	bar.SetTaskText(taskLine);
+}
+
 bool KBSSearchEngine::CommitSearchMode()
 {
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
@@ -2389,13 +2403,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			IDocument* doc = docList->GetNthDoc(d);
 			if (doc == nil)
 				continue;
-			KBSBookScope::ChapterDoc one;
-			one.docRef = ::GetUIDRef(doc);
-			if (KBSBookScope::IsHeldDoc(one.docRef))
-				continue;
-			doc->GetName(one.shortName);
-			one.shortName.SetTranslatable(kFalse);
-			targets.push_back(one);
+			const KBSBookScope::ChapterDoc one = KBSBookScope::DocAsChapter(doc);
+			if (!KBSBookScope::IsHeldDoc(one.docRef))
+				targets.push_back(one);
 		}
 		if (targets.empty())
 		{
@@ -2414,11 +2424,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			outSummary.Append("No open document to search.");
 			return 0;
 		}
-		KBSBookScope::ChapterDoc single;
-		single.docRef = ::GetUIDRef(doc);
-		doc->GetName(single.shortName);
-		single.shortName.SetTranslatable(kFalse);
-		targets.push_back(single);
+		targets.push_back(KBSBookScope::DocAsChapter(doc));
 	}
 
 	// Record the scope ON THE RESULTS (KBSResultModel::Clear above wiped the previous value): the
@@ -2549,17 +2555,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
 		// bar names what is being worked on rather than what has just finished. This is also what
 		// keeps the bar moving through chapters that hold no hits at all.
-		PMString taskLine;
-		taskLine.SetTranslatable(kFalse);
-		taskLine.Append(allDocuments ? "Document " : "Chapter ");
-		taskLine.AppendNumber(static_cast<int32>(i) + 1);
-		taskLine.Append(" / ");
-		taskLine.AppendNumber(static_cast<int32>(targets.size()));
-		taskLine.Append(" - ");
-		taskLine.Append(targets[i].shortName);
-		// The chapter's name rides on the status line WITH its number. The bar's POSITION is moved
-		// separately, through KBSAdvanceProgress - SetTaskText only writes text.
-		progressBar.SetTaskText(taskLine);
+		KBSSetChapterTask(progressBar, allDocuments ? "Document" : "Chapter", i, targets.size(), targets[i].shortName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Cancel is asked here, and answered by the bar being moved from inside the walk
@@ -2634,10 +2630,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// guard inside CollectHitsInDoc has already restored the flag, and everything read after
 		// this (FinalizeHits, the Chapter it fills in) is plain values, not database work.
 		//
-		// ***** ASKED FIRST WHETHER IT IS OURS - THE RELEASE'S false CANNOT BE READ ALONE. *****
-		// IsDocStillOpen tells "the user closed it under the run" - which is theirs to do and nothing
-		// being left behind - from a chapter that is genuinely still standing. Without it, that ordinary
-		// close would be counted as "left open with no window" about a chapter that is not open at all.
+		// The release's false cannot be read alone - HandBackHeldDocNow asks whether the chapter was ours
+		// and whether it is still open, so a chapter the user closed under the run is not counted as one
+		// left open with no window.
 		// (A KBSEditStamp::CapturePending stood here from 2026-08-08 to 2026-08-10, reading every
 		//  story's change counter before the release below closed the chapter, so the replace could WARN
 		//  about an edited chapter in place of walking it. The replace walks it again and checks each
@@ -2661,9 +2656,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			}
 		}
 
-		const bool wasOurs = KBSBookScope::IsHeldDoc(chapterDocRef);
-		if (!KBSBookScope::ReleaseHeldDoc(chapterDocRef, true /*close now*/)
-			&& wasOurs && KBSBookScope::IsDocStillOpen(chapterDocRef))
+		if (!KBSBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
 		if (docCapped)

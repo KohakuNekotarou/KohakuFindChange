@@ -226,6 +226,12 @@ namespace KBSTrackChange
 	        the caller repaints the list. */
 	void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed);
 
+	/** The document of a chapter, if it is open - found BY THE CHAPTER'S FILE, and the model rebound to
+	    what it finds (2026-09-29, the defect re-check F-3). The one question for everything that works
+	    on an open document only: a row's records (FindRowChangeForHit), and Reject Change, Accept Change,
+	    Accept All and Replace Again (KBSReplaceEngine - its own copy until 2026-10-01). False = not open. */
+	bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef);
+
 	/** Like RefreshRowFromRecords, and hands the change back too. The row's own change, by its time
 	    (Hit::recordTime): the insertion pieces carrying it (at = the first, insLen = their sum, which must
 	    read as the row's replaced text) and the deletion carrying it, if any. A row replaced with nothing

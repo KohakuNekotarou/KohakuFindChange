@@ -120,6 +120,11 @@ namespace KBSBookScope
 	    made active. */
 	class IDocument* ActiveDocument();
 
+	/** An open document as a run's target (2026-10-01: the search's two non-book scopes and Show
+	    Changes built it by hand): docRef and its name set, no file and no book entry - which is what
+	    tells the engines it is not a book's chapter (see ChapterDoc). */
+	ChapterDoc DocAsChapter(class IDocument* doc);
+
 	/** A chapter that could NOT be turned into a searchable document, and why. Reported rather
 	    than dropped: a chapter missing from the list is indistinguishable from a chapter that
 	    simply held no matches, and there is no way for the user to see through that. */
@@ -130,9 +135,7 @@ namespace KBSBookScope
 	};
 
 	/** List the TARGET book's chapters WITHOUT opening anything - the book the BOOK PANEL is showing,
-	    or the active book when no panel can be reached (ResolveTargetBook). It said "the active
-	    book's chapters" until 2026-08-11, naming the fallback as though it were the rule - while
-	    HasTargetBook, fourteen declarations above, had the order right. Each entry comes back with
+	    or the active book when no panel can be reached (ResolveTargetBook). Each entry comes back with
 	    its file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
 	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
 	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
@@ -294,8 +297,18 @@ namespace KBSBookScope
 	            closed chapters has to read this rather than assume: "nothing of ours was open" and
 	            "we closed what was" are different facts, and only this can tell them apart - and
 	            telling the ordinary "no longer open" from the failures takes IsHeldDoc before plus
-	            IsDocStillOpen after, which is how the four runs count their unclosed chapters. */
+	            IsDocStillOpen after - HandBackHeldDocNow, below. */
 	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
+
+	/** ***** A RUN HANDS A CHAPTER BACK ON THE SPOT - AND SAYS WHETHER ONE OF OURS IS LEFT STANDING
+	    ***** (2026-10-01: the search, Show Changes and the replace asked these three questions each).
+	    ReleaseHeldDoc(docRef, closeNow = true), its false read with the two questions it cannot answer
+	    alone: was the chapter ours (IsHeldDoc, BEFORE - one the user had open is never ours to close),
+	    and is it still open (IsDocStillOpen, AFTER - one the user closed under the run is not left
+	    behind). False ONLY for a chapter of ours still standing - windowless, its .indd locked - which
+	    the run then names (AppendUnclosedNote). closeNow's rule applies: outside any command sequence,
+	    with no walk standing. */
+	bool HandBackHeldDocNow(const UIDRef& docRef);
 
 	/** Is this chapter one WE opened - is it on the held list right now?
 

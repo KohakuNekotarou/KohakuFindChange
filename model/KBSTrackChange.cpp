@@ -76,11 +76,34 @@ IRedlineDataStrand* QueryRedline(const UIDRef& story)
 	return static_cast<IRedlineDataStrand*>(model->QueryStrand(kRedlineStrandBoss, IRedlineDataStrand::kDefaultIID));
 }
 
-bool IsSignAuthor(const PMString& who)
+// "KohakuFindChange" as the records carry it - what the signing writes, Accept All tells InDesign, and the
+// readers compare.
+PMString SignAuthorName()
 {
 	PMString a(KBSTrackChange::kSignAuthor);
 	a.SetTranslatable(kFalse);
-	return who == a;
+	return a;
+}
+
+bool IsSignAuthor(const PMString& who)
+{
+	return who == SignAuthorName();
+}
+
+// ***** A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES (2026-09-29, the official-terms audit A-6). *****
+// ITrackChangeUtils::GetDeletedText reads the deleted-text thread anchored at the deletion - the same text
+// DescribeChangeContent gave for a tab, a return and a footnote reference (measured, KTRedlineProbe deltext:
+// 2 of 2 alike), which stays as the fallback - also when the utility reads nothing there. `it` stands on
+// the deletion. (CollectRecordsOfTimes and CollectSignedRows each read it this way until 2026-10-01.)
+PMString ReadDeletedText(ITextModel* model, Utils<ITrackChangeUtils>& utils, RedlineIterator* it, TextIndex at)
+{
+	PMString text;
+	if (model != nil && utils)
+		utils->GetDeletedText(model, at, text);
+	if (text.IsEmpty())
+		it->DescribeChangeContent(text, 0x7fffffff);
+	text.SetTranslatable(kFalse);
+	return text;
 }
 
 // The story's records signed "KohakuFindChange" - wherever they stand, hidden conditional text included (a
@@ -278,8 +301,7 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 		outWhy = "the document's stories could not be read";
 		return -1;
 	}
-	PMString author(kSignAuthor);
-	author.SetTranslatable(kFalse);
+	const PMString author = SignAuthorName();
 	int32 total = 0;
 	const int32 count = storyList->GetAllTextModelCount();
 	for (int32 i = 0; i < count; ++i)
@@ -364,18 +386,7 @@ void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<u
 		r.isDelete = isDelete;
 		r.time = time;
 		if (isDelete)
-		{
-			// ***** THE DELETED TEXT FROM THE UTILITY THE GUIDE NAMES (2026-09-29, the official-terms audit
-			// ***** A-6). ***** ITrackChangeUtils::GetDeletedText reads the deleted-text thread anchored at the
-			// deletion - the same text DescribeChangeContent gave for a tab, a return and a footnote
-			// reference (measured, KTRedlineProbe deltext: 2 of 2 alike), which stays as the fallback - also
-			// when the utility reads nothing there.
-			if (model != nil && utils)
-				utils->GetDeletedText(model, at, r.text);
-			if (r.text.IsEmpty())
-				it->DescribeChangeContent(r.text, 0x7fffffff);
-			r.text.SetTranslatable(kFalse);
-		}
+			r.text = ReadDeletedText(model, utils, it, at);
 		out.push_back(r);
 	}
 	delete it;
@@ -427,13 +438,7 @@ void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 				continue;		// one deletion per time (a second would be a split KBS never writes)
 			row.hasDelete = true;
 			row.delAt = at;
-			// The deleted text as CollectRecordsOfTimes reads it: the guide's utility, the description as the
-			// fallback.
-			if (model != nil && utils)
-				utils->GetDeletedText(model, at, row.deletedText);
-			if (row.deletedText.IsEmpty())
-				it->DescribeChangeContent(row.deletedText, 0x7fffffff);
-			row.deletedText.SetTranslatable(kFalse);
+			row.deletedText = ReadDeletedText(model, utils, it, at);
 		}
 		else
 		{
@@ -500,6 +505,22 @@ bool KBSTrackChange::AcceptRecord(const UIDRef& story, TextIndex at, uint64 time
 	return ProcessRecord(story, at, time, isDelete, true);
 }
 
+// ***** BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS (2026-09-29, the defect re-check
+// ***** F-3). ***** IsDocStillOpen was asked of the docRef the results held until then: a chapter closed and
+// opened again sits at a new address ("not open" - its replaced rows could not be taken back until a click
+// on one rebound it), and a closed chapter's address taken by a document opened later answered for THAT one.
+// (Each door asked it one by one before 2026-09-29, each with a test for no database in front of
+// IsDocStillOpen, which answers false for that itself.)
+bool KBSTrackChange::ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
+{
+	IDFile file;
+	if (!KBSResultModel::GetChapterLocation(chapterIdx, outDocRef, file)
+		|| !KBSBookScope::FindOpenChapterDoc(file, outDocRef))
+		return false;
+	KBSResultModel::RebindChapterDoc(chapterIdx, outDocRef);
+	return true;
+}
+
 bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange)
 {
 	bool checked = false, replaced = false, locked = false;
@@ -508,15 +529,11 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	// A footnote's row is never taken back - see IsInFootnote.
 	if (KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx))
 		return false;
-	UIDRef docRef;
-	IDFile file;
 	// ***** OPEN, OR NOT AT ALL. ***** A chapter closed since the search leaves a dangling database pointer
-	// behind - asked before anything is read through it. By the chapter's FILE since 2026-09-29 (the defect
-	// re-check F-3, KBSBookScope::FindOpenChapterDoc): the held docRef read a chapter closed and opened
-	// again as "not open", and could be answered for by a document that took a closed chapter's address.
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KBSBookScope::FindOpenChapterDoc(file, docRef))
+	// behind - asked before anything is read through it (ChapterDocIfOpen, above).
+	UIDRef docRef;
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
 		return false;
-	KBSResultModel::RebindChapterDoc(chapterIdx, docRef);
 	UID story = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 	uint64 hash = 0;
@@ -823,8 +840,7 @@ bool KBSTrackChange::SignRecordsNow(const UIDRef& story, TextIndex from, TextInd
 		return true;		// nothing recorded in this story
 	std::vector<Unsigned> found;
 	CollectUnsigned(redline, from, to, stamp, found, nil);
-	PMString author(kSignAuthor);
-	author.SetTranslatable(kFalse);
+	const PMString author = SignAuthorName();
 	bool ok = true;
 	// the insertion's pieces: the signed record over each piece, then the old one off it
 	for (size_t k = 0; k < found.size(); ++k)

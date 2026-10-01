@@ -433,6 +433,12 @@ bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
 	return false;
 }
 
+bool KBSBookScope::HandBackHeldDocNow(const UIDRef& docRef)
+{
+	const bool wasOurs = IsHeldDoc(docRef);
+	return ReleaseHeldDoc(docRef, true /*close now*/) || !wasOurs || !IsDocStillOpen(docRef);
+}
+
 bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 {
 	if (docRef == UIDRef::gNull)
@@ -1002,6 +1008,17 @@ IDocument* KBSBookScope::ActiveDocument()
 	ISession* const session = GetExecutionContextSession();
 	IActiveContext* const context = (session != nil) ? session->GetActiveContext() : nil;
 	return (context != nil) ? context->GetContextDocument() : nil;
+}
+
+KBSBookScope::ChapterDoc KBSBookScope::DocAsChapter(IDocument* doc)
+{
+	ChapterDoc one;
+	if (doc == nil)
+		return one;
+	one.docRef = ::GetUIDRef(doc);
+	doc->GetName(one.shortName);
+	one.shortName.SetTranslatable(kFalse);
+	return one;
 }
 
 void KBSBookScope::AppendChapterNote(PMString& outSummary, const char* what,
