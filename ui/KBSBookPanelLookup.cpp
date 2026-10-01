@@ -22,6 +22,7 @@
 #include "ISession.h"
 
 // General includes:
+#include "FileUtils.h"			// IsEqual - a panel's book and the searched book, compared as files
 #include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "PersistUtils.h"		// ::GetClass / ::GetDataBase
 #include "SDKFileHelper.h"
@@ -206,6 +207,12 @@ void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 	if (!Utils<IBookUIUtils>().Exists())
 		return;	// the active book was still set; the tab is the part we could not do
 
+	// ***** THE BOOKS ARE COMPARED AS FILES, NOT AS PATH STRINGS (API re-audit, 2026-10-02). *****
+	// FileUtils::IsEqual - the rule KBSBookScope's KBSDocumentLivesInFile keeps, and the model half's
+	// MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile. The panel's path string
+	// was compared with == until then.
+	const IDFile wanted(SDKFileHelper(bookPath).GetIDFile());
+
 	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
 	ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID& panelWidgetID) -> bool
 	{
@@ -215,8 +222,7 @@ void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 		if (!GetBookFileFromPanelView(panelView, panelBookFile))
 			return false;
 
-		SDKFileHelper panelFileHelper(panelBookFile);
-		if (!(panelFileHelper.GetPath() == bookPath))
+		if (FileUtils::IsEqual(panelBookFile, wanted) == kFalse)
 			return false;
 
 		// kFalse = do not take the key focus. The keyboard walk calls this while the user is

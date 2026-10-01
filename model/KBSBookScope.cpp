@@ -308,7 +308,7 @@ bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 		return false;
 
 	// The session's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
-	// plug-in asks this (KBSHitMarker.cpp) and how KESCM asks it everywhere. It replaced a
+	// plug-in asks this (the UI half's KBSHitMarkerView.cpp) and how KCM asks it everywhere. It replaced a
 	// walk of GetDocCount/GetNthDoc comparing UIDRefs (block 11 API audit, 2026-08-08).
 	//
 	// ***** THE DATABASE POINTER IS COMPARED, NEVER DEREFERENCED. ***** For a chapter closed since
@@ -518,8 +518,8 @@ void KBSBookScope::ShutdownCleanup()
 	gBookScopeOn = false;
 }
 
-// (KBSAcceptAnyPresentation lived here until 2026-08-05; it moved up into the anonymous namespace
-// when DocHasAnyWindow - which the held-chapter releases ask - joined it there.)
+// (KBSAcceptAnyPresentation lived here until 2026-08-05. It went with DocHasAnyWindow's window search
+// to the UI half on 2026-10-01, and is the SDK's FindPresCriteria::accept_all there - KBSUIServices.cpp.)
 
 // Does this open document live in that file? Asked through IDataBase::GetSysFile - "the file
 // associated with the database" (IDataBase.h:270-274), which is how the SDK's own samples read a
@@ -988,7 +988,7 @@ bool KBSBookScope::GetSearchedBookPath(PMString& outPath)
 
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 {
-	// The path walk, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which
+	// The lookup by file, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which
 	// MakeBookActive needs as well - it wants the book itself, not just whether there is one.
 	return FindOpenBookByPath(bookPath) != nil;
 }
@@ -1136,7 +1136,7 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 
 	// The book this chapter belongs to, found again by path rather than carried along in a static:
 	// a book pointer parked between calls goes stale the moment the user closes the book, and a run
-	// pumps events through its progress bar. Looking it up costs one walk of a handful of books.
+	// pumps events through its progress bar. Looking it up costs one IBookManager::FindOpenBookByName.
 	//
 	// A nil answer here is not fatal - it only costs the two things that need the book itself (the
 	// already-open lookup by content UID, and the reason text for a chapter that will not open).
@@ -1177,8 +1177,9 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 		//
 		// That fix reached ReopenChapterDoc and stopped there. This is the same question asked one
 		// step earlier, so it gets the same answer: a document is this chapter's document when it
-		// LIVES IN THIS CHAPTER'S FILE. Checking costs one string compare, and the material is
-		// already here - this very call hands the file back in openSysFile.
+		// LIVES IN THIS CHAPTER'S FILE. Checking costs one file compare (FileUtils::IsEqual, since
+		// 2026-09-27 - a string compare until then), and the material is already here - this very call
+		// hands the file back in openSysFile.
 		//
 		// Asked through KBSDocumentLivesInFile, which is what ReopenChapterDoc asks, so the two
 		// cannot come to differ.

@@ -202,9 +202,10 @@ namespace KBSBookScope
 	    goes - so this is "the results are gone, and so is the reason those chapters were open". */
 	void ReleaseSearchedBook();
 
-	/** Is a book with this full file path still in the session's open-book list? Compares paths
-	    rather than IBook pointers because the caller is a close notification: the closed book's
-	    IBook is already gone by then, so there is no pointer left to compare. */
+	/** Is a book with this full file path still in the session's open-book list? Asked by FILE
+	    (IBookManager::FindOpenBookByName, the book API's own lookup) rather than by IBook pointer
+	    because the caller is a close notification: the closed book's IBook is already gone by then, so
+	    there is no pointer left to compare. */
 	bool IsBookStillOpen(const PMString& bookPath);
 
 	/** Make the book at 'bookPath' IBookManager's active book - the one every book API answers about.
