@@ -203,9 +203,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSSearchBookActionID:
 		{
 			// Search the target book - the Book panel's, or the active one as a fallback
-			// (KBSBookScope::ResolveTargetBook) - or the front document, with the user's current Find/Change
-			// query. The engine fills KBSResultModel with the hits (grouped by chapter) behind a
-			// modal progress bar; the tree is drawn here, once, when it returns.
+			// (KBSBookScope::ResolveTargetBook) - or what Find/Change's Search: names, with the user's
+			// current Find/Change query. The engine fills KBSResultModel with the hits (grouped by
+			// chapter) behind a modal progress bar; the tree is drawn here, once, when it returns.
 			//
 			// No re-entry test here any more: the ENGINE has one (and so does every other run of
 			// ours), and it puts a reason on the status line where this one silently did nothing.

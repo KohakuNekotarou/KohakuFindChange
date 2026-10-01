@@ -482,7 +482,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// --- Block 3: the check-mark toggles (their positions are in KFCUIID.h) ---
 
-		// Book Scope: toggle (check mark). ON = the whole book, OFF = the front document. Leads the
+		// Book Scope: toggle (check mark). ON = the whole book, OFF = what Edit > Find/Change's Search:
+		// names (2026-09-29; the front document until then). Leads the
 		// block because it is what the commands in block 1 run on.
 		kKBSScopeBookActionID,
 		kKBSTargetMenuPath

@@ -2578,8 +2578,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			break;
 		}
 
-		// Open THIS chapter now. Book scope only - a document-scope target is the front document,
-		// which is already open and never ours to close.
+		// Open THIS chapter now. Book scope only - a document-scope target is an open document
+		// (DocAsChapter), already open and never ours to close.
 		if (fromBook && targets[i].docRef == UIDRef::gNull)
 		{
 			if (!KBSBookScope::OpenChapterDoc(targets[i], &unopenable))

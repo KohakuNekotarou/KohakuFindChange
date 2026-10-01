@@ -1621,8 +1621,8 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 // @param chapterIdx the chapter the mismatch was found in, or -1.
 void TellResultsWentStale(int32 chapterIdx)
 {
-	// A DOCUMENT-scope run has one "chapter" and it is the front document, which has no name to put
-	// here - the book wording would name a chapter of a book that is not there.
+	// A DOCUMENT-scope run's "chapters" are open documents (one, or each open one with Search: = All
+	// Documents), not a book's - the book wording would name a chapter of a book that is not there.
 	PMString msg;
 	if (chapterIdx < 0 || !KBSResultModel::IsFromBook())
 		msg = KBSLoc::Text(kKBSStaleResultsDocKey, KBSJa::kStaleResultsDoc);

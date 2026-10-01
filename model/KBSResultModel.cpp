@@ -1426,14 +1426,18 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 			hit.locator.Append(" overset");
 	}
 
-	// What the row cannot show any other way, each separated by a space, in this order:
-	//   hidden  - on a switched-off layer, so the page will look empty on arrival
-	//   locked  - locked, so the row carries no check box and the replace will not touch it
-	//   missing - the same text could not be found where the search left it
-	//   refused - InDesign's own replace command would not run there
-	// The last two are put there by a replace, or by a jump that finds the text gone, so they never
-	// appear on a fresh search's rows. They stack on either shape: "P1(2) overset hidden locked",
-	// "overset missing", "P7 hidden".
+	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
+	// two kinds of word, kept in two strings:
+	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
+	//     so the page will look empty on arrival), locked (no check box; the replace will not touch it),
+	//     and what has happened to it since: rejected (on a list rebuilt from the records only),
+	//     deleted, accepted, no track;
+	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
+	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
+	//     would not run there), not replaced.
+	// Only hidden and locked come from the search itself; the rest are put there later - by a replace,
+	// Reject / Accept, a jump that finds the text gone, or the records (Show Changes). They stack on
+	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
 	// overset". EVERY word is spelled out in full (user's call, 2026-08-04): these are what explain

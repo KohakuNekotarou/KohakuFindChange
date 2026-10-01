@@ -352,8 +352,8 @@ namespace KBSBookScope
 
 	/** Does this chapter entry name a FILE at all?
 
-	    A DOCUMENT-scope row does not: it is the front document, and it is carried as a docRef with
-	    an empty file beside it. A BOOK chapter is expected to, and MEASURED 2026-08-11 it does even
+	    A DOCUMENT-scope row does not: it is an open document (DocAsChapter), and it is carried as a
+	    docRef with an empty file beside it. A BOOK chapter is expected to, and MEASURED 2026-08-11 it does even
 	    when the .indd has been deleted behind the book's back - the entry keeps the link and the
 	    book calls it MISSING_DOCUMENT, so IBookContent::GetIDFile still answers kTrue with the path
 	    intact (work/kbs-selftest/run-getidfile-probe.ps1).

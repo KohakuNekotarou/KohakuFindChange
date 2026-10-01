@@ -371,7 +371,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 
 // Menu item keys:
 #define kKBSSearchBookMenuKey			kKBSStringPrefix "kKBSSearchBookMenuKey"
-// "Book Scope" toggle: ON = the whole book, OFF = the front document.
+// "Book Scope" toggle: ON = the whole book, OFF = what Edit > Find/Change's Search: names.
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
 // "Translucent Panel" toggle: ON = the panel is drawn faint while it floats, and comes back to solid
