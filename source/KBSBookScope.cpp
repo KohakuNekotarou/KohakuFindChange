@@ -14,42 +14,30 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IApplication.h"		// QueryPanelManager - the panel walk starts here
 #include "IBook.h"
 #include "IBookContent.h"
 #include "IBookContentMgr.h"
 #include "IBookManager.h"
-#include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
 #include "IBookUtils.h"			// FindDocFromContentUID, GetBookContentStatus
-#include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
 #include "IDataBase.h"			// the IDataBase* a UIDRef carries, and GetSysFile
 #include "IDocFileHandler.h"
 #include "IDocument.h"
 #include "IDocumentCommands.h"	// Open by file (windowless reopen)
 #include "IDocumentList.h"
-#include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
-#include "IDocumentPresentation.h"	// the predicate typedef / presentation handle
 #include "IDocumentUtils.h"
 #include "IActiveContext.h"		// GetContextDocument - ActiveDocument, the document-scope half of HasScopeTarget
 #include "IOpenFileCmdData.h"	// kOpenDefault / kUseLockFile
-#include "ICommand.h"			// SetItemList - kOpenLayoutCmdBoss takes the document as its item
-#include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 // (IMenuUtils.h was here for InsertAmpersandForDisplay until 2026-08-03. The status line doubled
 // its own ampersands for the whole message, so doubling a chapter name here as well ran it twice -
 // see AppendChapterNote. Since 2026-09-29 nothing doubles them: the message area draws '&' as it is.)
-#include "IPanelMgr.h"			// GetPanelCount / GetNthPanelInfo - one book panel per open book
-#include "IPanelControlData.h"	// what QueryActiveBookPanel hands over - the book panel's class is read off it
 #include "IOpenedFileInfo.h"	// the file an older-version chapter's conversion was opened from
 #include "ISession.h"
-#include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
 // General includes:
 #include "ErrorUtils.h"			// GlobalErrorStatePreserver / PMSetGlobalErrorCode - an open or a close
 								// that is allowed to fail must not poison the caller's next command
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
 #include "CmdUtils.h"
-#include "LayoutUIID.h"			// kOpenLayoutCmdBoss - give a windowless chapter a real window
-#include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "K2Vector.h"			// the held-chapter list (it came in through IBookUtils.h until 2026-08-08)
 #include "FileUtils.h"		// IsEqual - is this open document that chapter's file
 #include "SDKFileHelper.h"
@@ -60,6 +48,7 @@
 
 // Project includes:
 #include "KBSBookScope.h"
+#include "IKBSUIServices.h"		// the windows and the Book panel are the UI half's (2026-10-01)
 
 namespace
 {
@@ -95,89 +84,8 @@ namespace
 	// gBookSearchOn: OFF searches the front document, ON the whole target book (ResolveTargetBook).
 	bool gBookScopeOn = false;
 
-	/** The ClassID of InDesign's book panel as THIS build numbers it, learned from a live one - or
-	    kInvalidClass while none could be asked yet.
-
-	    ***** Why it is learned rather than written down (2026-09-25). ***** kBookPanelBoss lives in
-	    BOOK PANEL.APLN and is declared in no public header, so until this date the file compared
-	    against 0x10101 - a number read off a 20.5 DEBUG build's object-model dump (2026-07-28,
-	    docs/ai-notes/book-panel-active-tab.md) - backed up by matching the panel's NAME against the
-	    open books' titles. Neither held:
-	      * the number is one build's numbering, and nothing promised the release build of another
-	        version kept it;
-	      * the name half could pick the WRONG PANEL: it accepted any panel whose name merely STARTED
-	        with a book's title, so a book called "Book" made the Bookmarks panel a book panel, and a
-	        book called "Info" the Info panel (the user asked "how do you tell them apart - can it not
-	        get it wrong?", and it could).
-	    A wrong answer was cheap while the only callers read a book FILE off the panel; since Remember
-	    Book Panel Placement it would move and resize somebody else's palette. Both are gone - the
-	    number too, at the user's word: no hard-coded fallback.
-	    IBookUIUtils::QueryActiveBookPanel hands over the active book's own panel (IBookUIUtils.h:83-87),
-	    so its class is the book panel's class by construction, whatever the build numbers it.
-	    Learned once and kept: a class does not change within a session. Nothing is asked while no
-	    book is open - there is no book panel to learn from, and no book panel to find either. */
-	ClassID gLearnedBookPanelClass = kInvalidClass;
-
-	ClassID LearnedBookPanelClass()
-	{
-		if (gLearnedBookPanelClass != kInvalidClass)
-			return gLearnedBookPanelClass;
-
-		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
-		if (bookMgr == nil || bookMgr->GetBookCount() == 0)
-			return kInvalidClass;
-		if (!Utils<IBookUIUtils>().Exists())
-			return kInvalidClass;
-
-		InterfacePtr<IPanelControlData> activeBookPanel(Utils<IBookUIUtils>()->QueryActiveBookPanel());
-		if (activeBookPanel == nil)
-			return kInvalidClass;	// no active book right now - asked again next time
-
-		gLearnedBookPanelClass = ::GetClass(activeBookPanel);
-		return gLearnedBookPanelClass;
-	}
-
-	/** Is this registered panel one of InDesign's book panels?
-
-	    ***** ONE PLACE. ***** Every walk of the panel list in this plug-in asks it here (the two in this
-	    file and KBSBookPanelPlacement's), so how a book panel is recognised is decided once (block 11
-	    API audit, 2026-08-08).
-	    The class learned from a live book panel decides, and nothing else (see LearnedBookPanelClass).
-	    Before one could be asked, the answer is "no": the callers here then fall back to the active
-	    book, and KBSBookPanelPlacement finds no book panel to measure or move. With no book open that
-	    is simply right. With books open but NONE ACTIVE - QueryActiveBookPanel then has nothing to
-	    hand over - their panels go unrecognised until one is; whether InDesign lets that state last
-	    is not measured. */
-	bool IsBookPanelView(IControlView* panelView)
-	{
-		if (panelView == nil)
-			return false;
-		const ClassID learned = LearnedBookPanelClass();
-		if (learned == kInvalidClass)
-			return false;
-		return ::GetClass(panelView) == learned;
-	}
-
-	/** The book file THIS panel is showing; false when the panel could not be resolved.
-
-	    Handing the panel itself in is the whole point: with a real widget IBookUIUtils resolves that
-	    panel's book, where a nil widget falls through to QueryActiveBookPanel - the active book, which
-	    is precisely the value both callers exist to avoid.
-
-	    An empty result is refused here rather than passed on, because further up it would read as
-	    "no book at all" instead of "this panel could not be asked". */
-	bool GetBookFileFromPanelView(IControlView* panelView, IDFile& outFile)
-	{
-		IDFile panelBookFile;
-		Utils<IBookUIUtils>()->GetBookFileFromBookPanel(panelBookFile, panelView);
-
-		SDKFileHelper panelFileHelper(panelBookFile);
-		if (panelFileHelper.GetPath().empty())
-			return false;
-
-		outFile = panelBookFile;
-		return true;
-	}
+	// (The book panel's learned class, IsBookPanelView and GetBookFileFromPanelView stood here until
+	//  2026-10-01 - the UI half's KBSBookPanelLookup.cpp now, with their notes.)
 
 	/** The book's own word for a chapter's state, for the "could not be opened" report. Empty for
 	    a chapter the book considers fine - then the failure is something the book does not track
@@ -286,39 +194,22 @@ namespace
 		return HasUnsavedChanges(docRef);
 	}
 
-	/** Accepts every presentation.
-
-	    ***** A LOCAL PREDICATE IS WHAT ADOBE ASKS FOR HERE. ***** The stock one exists and is named
-	    FindPresCriteria::accept_all (DocumentPresFindCriteria.h:82), but that file's own preamble
-	    (:40-46) says its implementations "are found in the WidgetBin shared library, so you cannot
-	    use them from a model only plugin. Should the need arise you can create local
-	    implementations" - and prints a two-line example of exactly this shape. So this is the
-	    documented route, not a stand-in for one. (Until 2026-08-08 the note here said we kept our own
-	    because we did not know where the stock objects live, which was no longer true and read like
-	    an avoidable dependency.) KESCL carries the same predicate for the same reason. */
-	bool KBSAcceptAnyPresentation(IDocumentPresentation* /*p*/)
-	{
-		return true;
-	}
-
-	/** Does this document have a WINDOW anywhere - front, or behind another tab? The
-	    all-presentations search, because GetFrontmostPresentationForDocument answers nil for a
-	    document sitting behind another tab (ShowChapterWindow has always asked it this way).
+	/** Does this document have a WINDOW anywhere - front, or behind another tab?
 
 	    Asked by the held-chapter releases since 2026-08-05: a window makes a chapter the USER'S,
 	    whoever raised the window. ShowChapterWindow and the jump take a chapter off the held list
 	    when they raise one themselves, but a window can be raised behind this module's back - the
 	    book panel lists every chapter, and double-clicking one there windows the very document being
-	    held. A release that closed it then would take a window the user is looking at; and once they
-	    had saved their work, not even the unsaved-work door would stand in the way. */
+	    held.
+
+	    ***** ASKED OF THE UI HALF SINCE 2026-10-01 (the model/UI split). ***** Presentations are user
+	    interface (IDocumentUIUtils); the all-presentations search and its notes - and the local
+	    predicate Adobe asks for - are IKBSUIServices::DocHasAnyWindow now (KBSUIServices.cpp). No UI
+	    (a background thread, InDesign Server) has no window to show a document in: false. */
 	bool DocHasAnyWindow(const UIDRef& docRef)
 	{
-		IDataBase* db = docRef.GetDataBase();
-		if (db == nil)
-			return false;
-		FindPresentation_PreferCriteria noPreference;
-		return Utils<IDocumentUIUtils>()->FindPresentationForDocument(
-			db, KBSAcceptAnyPresentation, noPreference) != nil;
+		InterfacePtr<IKBSUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		return ui != nil && ui->DocHasAnyWindow(docRef);
 	}
 
 	/** The OPEN book whose file path is 'bookPath', or nil when none has it. Non-owning - the book
@@ -371,8 +262,12 @@ namespace
 		// The panel's book first. Selecting a book's tab switches the panel but does NOT make that
 		// book active (measured 2026-07-27), so a user who picks a tab and runs a search would
 		// otherwise get whatever book was active before - see the long note in ListBookChapters.
+		// ...as the UI half observes it (IKBSUIServices::GetPanelBookFile, 2026-10-01: the Book panel is user
+		// interface). No UI - a background thread, InDesign Server - is "no panel", and the fallback below
+		// answers, the same as an iconised panel always has.
 		IDFile panelBookFile;
-		if (KBSBookScope::GetPanelBookFile(panelBookFile))
+		InterfacePtr<IKBSUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		if (ui != nil && ui->GetPanelBookFile(panelBookFile))
 		{
 			SDKFileHelper panelHelper(panelBookFile);
 			IBook* panelBook = FindOpenBookByPath(panelHelper.GetPath());	// nil = not open, or closing
@@ -567,7 +462,7 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// ***** IT COVERS THE THREE TESTS BELOW AS WELL, not just the close. ***** It stood beneath
 	// them until 2026-08-12, so the three exits they own - no longer open, has a window, holds
 	// unsaved work - returned with whatever those tests had raised still standing. They are not
-	// silent readings: DocHasAnyWindow goes through IDocumentUIUtils and HasUnsavedChanges through
+	// silent readings: DocHasAnyWindow goes through IDocumentUIUtils (in the UI half since 2026-10-01) and HasUnsavedChanges through
 	// QueryDocFileHandler + CanSave, and NONE of the three reports a failure back, which is the
 	// very property the preserver exists for. The bulk sibling has always covered its own copies of
 	// the same three (ReleaseHeldDocs takes the preserver before its loop); this is the same
@@ -577,7 +472,7 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 
 	// ***** IS IT STILL OPEN? ASKED FIRST, AND THE ORDER IS THE WHOLE POINT. *****
 	// Everything below this line reads the document. DocHasAnyWindow takes the database out of the
-	// UIDRef and hands it to IDocumentUIUtils; HasUnsavedChanges hands the UIDRef itself to
+	// UIDRef and hands it to IDocumentUIUtils (through the UI half); HasUnsavedChanges hands the UIDRef itself to
 	// QueryDocFileHandler and then to CanSave. A UIDRef is only (IDataBase*, UID), so for a chapter
 	// that has been closed since it was held that pointer is dangling, and handing it to anything at
 	// all is undefined behaviour. IsDocStillOpen is the one question that does not: it compares the
@@ -953,41 +848,13 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// Windowless (the search opened it that way): give it a real layout window so the user can
 	// see the replacement, undo it by hand, and decide about saving. Nothing is saved here.
 	//
-	// ***** THE WINDOW IS ALLOWED NOT TO APPEAR - this function's false says so - so its error
-	// state stays in here. ***** Preserve, then clear, exactly as the open in ReopenChapterDoc does
-	// (see that note for the SDK's own shape and the contract at ErrorUtils.h:115-117). Placed
-	// ahead of the command rather than inside the failure branch so that all THREE ways this can
-	// end without a window are covered: the command that would not build, the one that failed, and
-	// the one that reported success without producing a presentation.
-	GlobalErrorStatePreserver windowErrorState;
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kOpenLayoutCmdBoss));
-	if (cmd == nil)
-		return false;
-	cmd->SetItemList(UIDList(docRef));
-
-	// The command's data interface, taken BEFORE processing so the result can be read back off it
-	// afterwards. Nothing is set on it - the defaults are what a chapter window should get.
-	//
-	// ***** NO DATA INTERFACE = FAILURE, and the command is not run at all. ***** The recipe this
-	// follows breaks off here too (SDKLayoutHelper.cpp:268-272). It used to run the command anyway
-	// and skip the window test when this was nil, which returned TRUE without having established the
-	// one thing this function's true means - that the chapter now has a window (block 11 API audit,
-	// 2026-08-08).
-	InterfacePtr<IOpenLayoutPresentationCmdData> openData(cmd, IID_IOPENLAYOUTCMDDATA);
-	if (openData == nil)
-		return false;
-
-	if (CmdUtils::ProcessCommand(cmd) != kSuccess)
-		return false;		// whatever it raised goes back with the preserver above
-
-	// Did a window actually appear? SDKLayoutHelper::OpenLayoutWindow (the SDK's own recipe for this
-	// command) does not stop at the return code: it reads GetResultingPresentation() and checks an
-	// IWindow comes out of it, because "the command succeeded" and "there is a window" are two
-	// different statements. Saying so here matters - the caller reports this chapter as shown.
-	InterfacePtr<IWindow> window(openData->GetResultingPresentation(), UseDefaultIID());
-	if (window == nil)
+	// ***** THE WINDOW IS THE UI HALF'S TO OPEN (2026-10-01, the model/UI split). ***** kOpenLayoutCmdBoss
+	// is a boss of the LayoutUI plug-in (LayoutUIID.h), and a model plug-in that instantiates a UI plug-in's
+	// boss is one of the two cases the guide names for "crashes or corrupt documents" (vol1-06, "Problems
+	// when mixing model and UI"). IKBSUIServices::OpenLayoutWindow runs the command and asks for the
+	// window it produced, exactly as this function did; its notes went with it. No UI = no window.
+	InterfacePtr<IKBSUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	if (ui == nil || !ui->OpenLayoutWindow(docRef))
 		return false;
 
 	// It has a window now, so it is the user's - dropping it from the held list keeps a later
@@ -1204,81 +1071,18 @@ bool KBSBookScope::GetSearchedBookPath(PMString& outPath)
 	return !gSearchedBookPath.IsEmpty();
 }
 
-bool KBSBookScope::GetPanelBookFile(IDFile& outFile)
-{
-	if (!Utils<IBookUIUtils>().Exists())
-		return false;
-
-	// Walk every registered panel instead of asking for "the" book panel. Two earlier attempts
-	// failed and are not worth repeating (measured 2026-07-27/28):
-	//   - GetBookPanelWidget() returns nil for us. It is fed by the book panel's OWN actions
-	//     (SetBookPanelWidget), so a command from another panel's flyout finds nothing stored.
-	//   - GetBookFileFromBookPanel(file, nil) falls through to QueryActiveBookPanel(), i.e. the
-	//     ACTIVE book - which is exactly the value we are trying not to use.
-	// The walk works because InDesign creates one book panel per open book (tab count == panel
-	// count) and registers each with IPanelMgr. Details: docs/ai-notes/book-panel-active-tab.md.
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	if (app == nil)
-		return false;
-
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr == nil)
-		return false;
-
-	IDataBase* panelDB = ::GetDataBase(panelMgr);
-	if (panelDB == nil)
-		return false;
-
-	const uint32 panelCount = panelMgr->GetPanelCount();
-	for (uint32 i = 0; i < panelCount; ++i)
-	{
-		UID panelUID;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID))
-			continue;
-
-		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!IsBookPanelView(panelView))
-			continue;
-
-		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
-		// behind another tab still reports itself visible - all three panels came back
-		// "Visible state 1" in the measurement - while only the front tab's kTabPanelContainerType
-		// is visible. Asking panelView->IsVisible() here would match every book panel and pick
-		// whichever came first.
-		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
-		if (!container.IsValid())
-			continue;
-		if (!PaletteRefUtils::IsPaletteVisible(container))
-			continue;
-
-		// Keep looking when this panel could not be asked, rather than handing back a blank file.
-		if (!GetBookFileFromPanelView(panelView, outFile))
-			continue;
-
-		return true;
-	}
-
-	// No visible book panel: it is iconised, its palette is closed, or no book is open at all.
-	// The caller falls back to the active book, which is what the user expects in that state.
-	return false;
-}
-
-bool KBSBookScope::IsBookPanel(IControlView* panelView)
-{
-	// A door onto the anonymous-namespace test, not a second copy of it: that test is "ONE PLACE,
-	// because the hard-coded ClassID can go stale" (block 11 API audit), and a copy here would be
-	// the second place.
-	return IsBookPanelView(panelView);
-}
+// (GetPanelBookFile and IsBookPanel - the walk of InDesign's book panels - stood here until 2026-10-01.
+//  The Book panel is user interface: they are the UI half's now, KBSBookPanelLookup, and this module asks
+//  for the front tab's book through IKBSUIServices::GetPanelBookFile in ResolveTargetBook.)
 
 bool KBSBookScope::IsBookStillOpen(const PMString& bookPath)
 {
 	// The path walk, the IsOpen() test and the reasons for both live in FindOpenBookByPath, which
-	// ActivateBook needs as well - it wants the book itself, not just whether there is one.
+	// MakeBookActive needs as well - it wants the book itself, not just whether there is one.
 	return FindOpenBookByPath(bookPath) != nil;
 }
 
-bool KBSBookScope::ActivateBook(const PMString& bookPath)
+bool KBSBookScope::MakeBookActive(const PMString& bookPath)
 {
 	IBook* book = FindOpenBookByPath(bookPath);		// non-owning pointer - no release
 	if (book == nil)
@@ -1304,50 +1108,8 @@ bool KBSBookScope::ActivateBook(const PMString& bookPath)
 		return false;
 	bookMgr->SetCurrentActiveBook(book);
 
-	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
-	//    panel is found by walking the list and asking each candidate which book it belongs to -
-	//    the WidgetID is numbered per book at runtime, which is why no name can be used here.
-	if (!Utils<IBookUIUtils>().Exists())
-		return true;	// the active book was still set; the tab is the part we could not do
-
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	if (app == nil)
-		return true;
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr == nil)
-		return true;
-	IDataBase* panelDB = ::GetDataBase(panelMgr);
-	if (panelDB == nil)
-		return true;
-
-	const uint32 panelCount = panelMgr->GetPanelCount();
-	for (uint32 i = 0; i < panelCount; ++i)
-	{
-		UID panelUID;
-		WidgetID panelWidgetID;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID, nil, &panelWidgetID))
-			continue;
-
-		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!IsBookPanelView(panelView))
-			continue;
-
-		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is
-		// precisely the one that is NOT in front yet.
-		IDFile panelBookFile;
-		if (!GetBookFileFromPanelView(panelView, panelBookFile))
-			continue;
-
-		SDKFileHelper panelFileHelper(panelBookFile);
-		if (!(panelFileHelper.GetPath() == bookPath))
-			continue;
-
-		// kFalse = do not take the key focus. The keyboard walk calls this while the user is
-		// holding an arrow key on the result tree; handing the focus to the book panel would end
-		// the walk at the first book row.
-		panelMgr->ShowPanelByWidgetID(panelWidgetID, kFalse);
-		break;
-	}
+	// 2. The tab the user can SEE is the UI half's (KBSBookPanelLookup::BringBookTabForward, 2026-10-01 -
+	//    the Book panel is user interface, which a model plug-in may not reach). The caller asks it next.
 	return true;
 }
 

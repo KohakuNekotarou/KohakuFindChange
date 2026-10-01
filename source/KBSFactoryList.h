@@ -70,3 +70,5 @@ REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)
 REGISTER_PMINTERFACE(KBSStoryUndoObserver, kKBSStoryUndoObserverImpl)
 // The model/UI split's boundary (2026-10-01): the UI half's observer of the model half's notifications.
 REGISTER_PMINTERFACE(KBSModelObserver, kKBSModelObserverImpl)
+// ...and the UI services the model half asks for (the bar, the windows, the Book panel, the alert).
+REGISTER_PMINTERFACE(KBSUIServices, kKBSUIServicesImpl)

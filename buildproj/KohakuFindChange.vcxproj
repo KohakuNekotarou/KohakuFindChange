@@ -273,6 +273,24 @@
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.cpp">
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.cpp">
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIServices.cpp">
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+         <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h"/>
@@ -307,6 +325,9 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelTypes.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelNotify.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSUIServices.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">

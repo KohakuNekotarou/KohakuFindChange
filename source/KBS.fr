@@ -370,6 +370,22 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * What the model half asks the UI half for (2026-10-01, the model/UI split - IKBSUIServices.h): the
+	 * progress bar, the windows, the Book panel's front tab and the alert. A UI implementation on a model
+	 * boss, which the guide allows only through an AddIn in the UI plug-in's resource (vol1-07,
+	 * Object-Model Rule 2) - and which a background thread does not see, where the model does without.
+	 * *An AddIn that points at UI code - it goes to the UI plug-in's .fr when KBS is split.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKBSUISERVICES, kKBSUIServicesImpl,
+		}
+	},
+
+	/*
 	 * Panel visibility observer (2026-08-04, brought over from KESCM). Subscribes to the panel
 	 * manager's subject and waits for kPaletteVisibilityChangedMessage, which fires whenever a panel
 	 * is opened, closed, restored from an icon or drawer-expanded. The "Translucent Panel" toggle

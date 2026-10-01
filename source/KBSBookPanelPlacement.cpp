@@ -116,7 +116,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSBookPanelPlacement.h"
-#include "KBSBookScope.h"		// IsBookPanel - the one place that decides what a book panel is
+#include "KBSBookPanelLookup.h"	// IsBookPanel - the one place that decides what a book panel is (KBSBookScope's until 2026-10-01)
 #include "KBSPanelState.h"		// KBSPanelStateWriteKeys and the readers - the settings file, key by key
 #include "KBSResultTree.h"		// ShowStatus - a write that failed is said, not swallowed
 
@@ -293,7 +293,7 @@ int32 WalkBookPanels(IPanelMgr* panelMgr, IControlView** outFirst)
 			continue;
 
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!KBSBookScope::IsBookPanel(panelView))
+		if (!KBSBookPanelLookup::IsBookPanel(panelView))
 			continue;
 
 		// Only a panel that is in a palette counts. Measured 2026-09-25: a closed book's panel is off
@@ -379,7 +379,7 @@ int32 FirstNonBookPanelInGroup(IPanelMgr* panelMgr, const PaletteRef& group)
 	for (uint16 i = 0; i < n; ++i)
 	{
 		IControlView* panel = panelMgr->GetPanelFromPaletteContainer(PaletteRefUtils::GetNthChildOfPalette(group, i));
-		if (panel != nil && !KBSBookScope::IsBookPanel(panel))
+		if (panel != nil && !KBSBookPanelLookup::IsBookPanel(panel))
 			return static_cast<int32>(panel->GetWidgetID().Get());
 	}
 	return 0;

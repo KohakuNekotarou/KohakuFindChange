@@ -74,7 +74,7 @@
 #include "UnicodeClass.h"			// IsWhiteSpace / IsIgnoredCharacter - which characters a story row's first words keep
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
-#include "ProgressBar.h"			// RangeProgressBar - the search's progress + cancel (both scopes)
+#include "KBSProgressBar.h"		// the search's progress + cancel (both scopes) - the bar is the UI half's since 2026-10-01
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
@@ -1240,7 +1240,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	KBSSearchEngine::HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
-	RangeProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
+	KBSProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
 	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull,
 	IWalkerScopeFactoryUtils::WalkScopeType fromSelection = IWalkerScopeFactoryUtils::kDocumentScope)
 {
@@ -1671,7 +1671,7 @@ KBSBackwardSearchScope::~KBSBackwardSearchScope()
 		SetSessionSearchBackwards(kFalse, static_cast<IFindChangeOptions::SearchMode>(fMode));
 }
 
-void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force)
+void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bool force)
 {
 	if (bar == nil)
 		return;
@@ -2558,7 +2558,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// really is a book, plain "Searching..." for a single document.
 	PMString progressTitle(fromBook ? "Searching book..." : "Searching...");
 	progressTitle.SetTranslatable(kFalse);
-	RangeProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
+	KBSProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
 	// Where the bar stands as each chapter starts, and how far it has actually been advanced (that

@@ -23,7 +23,7 @@
 #include "IDTime.h"					// a run's start as a local date and time
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "PersistUtils.h"			// ::GetUIDRef
-#include "ProgressBar.h"			// RangeProgressBar - the read's progress + cancel
+#include "KBSProgressBar.h"		// the read's progress + cancel - the bar is the UI half's since 2026-10-01
 #include "WideString.h"				// IDTime::DateToString
 
 #include <algorithm>				// std::sort - the runs, newest first
@@ -106,7 +106,7 @@ PMString RunLabel(uint64 t0)
 // the frame a position composes into, and composing marks a database modified - a chapter this run
 // opened must come out as clean as it went in, or ReleaseHeldDoc will not close it.
 bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResultModel::Hit>& outHits,
-	std::map<UID, uint32>& outVersions, bool& outCapped, RangeProgressBar* bar, int32 progressBase,
+	std::map<UID, uint32>& outVersions, bool& outCapped, KBSProgressBar* bar, int32 progressBase,
 	int32& ioProgressReported)
 {
 	IDataBase* const db = docRef.GetDataBase();
@@ -293,7 +293,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 
 	PMString progressTitle(fromBook ? "Reading the book's changes..." : "Reading changes...");
 	progressTitle.SetTranslatable(kFalse);
-	RangeProgressBar progressBar(progressTitle, 0,
+	KBSProgressBar progressBar(progressTitle, 0,
 		static_cast<int32>(targets.size()) * kShowChapterProgressSpan, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 	int32 progressBase = 0;

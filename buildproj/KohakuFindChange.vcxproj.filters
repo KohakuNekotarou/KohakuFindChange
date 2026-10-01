@@ -144,6 +144,15 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.cpp">
+         <Filter>Source Files\Plugin</Filter>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.cpp">
+         <Filter>Source Files\Plugin</Filter>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIServices.cpp">
+         <Filter>Source Files\Plugin</Filter>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h">
@@ -240,6 +249,15 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSUIServices.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>

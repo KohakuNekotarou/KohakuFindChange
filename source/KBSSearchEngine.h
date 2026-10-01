@@ -30,7 +30,7 @@
 
 #include <vector>
 
-class RangeProgressBar;
+class KBSProgressBar;		// the run's bar (KBSProgressBar.h) - a RangeProgressBar the UI half holds
 
 /** Move the run's progress bar to an absolute position. ioReported is the position already sent, so
     that advances too small to be worth a repaint can be swallowed (see the .cpp); pass force = true
@@ -40,7 +40,7 @@ class RangeProgressBar;
     was measured both ways on 2026-07-31. WasCancelled has to be ASKED, and asking it only inside the
     chapter loop misses a cancel pressed during the last chapter. See the ask-once-more test that
     follows the loop in SearchBook and ReplaceChecked. */
-void KBSAdvanceProgress(RangeProgressBar* bar, int32& ioReported, int32 target, bool force = false);
+void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
 /** ***** KBS SEARCHES AND REPLACES FORWARD ONLY (2026-09-26, the user's call). ***** The results are a
     list, so a direction means nothing to KBS - and a backward search listed matches the replace

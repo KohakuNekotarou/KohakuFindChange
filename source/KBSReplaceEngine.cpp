@@ -30,7 +30,8 @@
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
 #include "WalkerScopeOptions.h"
-#include "CAlert.h"					// TellResultsWentStale - the chapter moved under its rows
+#include "IKBSUIServices.h"			// TellResultsWentStale - the chapter moved under its rows; the alert is the UI half's (2026-10-01)
+#include "ISession.h"					// GetExecutionContextSession - where IKBSUIServices sits
 #include "CmdUtils.h"				// commands and command sequences
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
@@ -43,7 +44,7 @@
 #include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote's fallback)
 #include "WideString.h"			// Reject Change: the original text's length in code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "ProgressBar.h"		// RangeProgressBar - the replace's progress + cancel, as the search does it
+#include "KBSProgressBar.h"	// the replace's progress + cancel, as the search does it - the bar is the UI half's since 2026-10-01
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
 #include "Utils.h"
 
@@ -654,7 +655,7 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
 	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
-	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
+	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
 	bool& outSignFailed)
 {
 	IDataBase* const db = storyRef.GetDataBase();
@@ -873,7 +874,7 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 // next to are accepted before the first write (outAcceptedFirst = how many). outCancelled / outFailed:
 // the caller aborts the whole run.
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
-	RangeProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
+	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
 	int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed, PMString& outWhyNot,
 	const std::set<int32>* onlyHits = nil)
@@ -1724,7 +1725,15 @@ void TellResultsWentStale(int32 chapterIdx)
 	// a #32770 whose body sits in a hidden Edit child that answers WM_GETTEXT. The wording, the
 	// warning icon and the untouched document are all checked by
 	// work/kbs-selftest/run-stale-alert-shot.ps1.
-	CAlert::WarningAlert(msg);
+	//
+	// ***** SHOWN BY THE UI HALF SINCE 2026-10-01 (the model/UI split). ***** An alert is a user-interface
+	// component, which the guide keeps out of a model plug-in (vol1-06, "UI component content"); the
+	// wording and the moment stay here, and IKBSUIServices::WarningAlert is this same CAlert::WarningAlert.
+	// No UI (a background thread, InDesign Server) = no alert, and the run stops all the same - the
+	// NEVER_INTERACT case described above.
+	InterfacePtr<IKBSUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	if (ui != nil)
+		ui->WarningAlert(msg);
 }
 
 // What CompareQueryWithSearch found - RefuseChangedQuery and QueryUnchangedSinceSearch share it.
@@ -2094,7 +2103,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	GlobalErrorStatePreserver passErrorState;
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
-	RangeProgressBar openBar(progressTitle, 0, static_cast<int32>(pending.size()), kTrue, kTrue);
+	KBSProgressBar openBar(progressTitle, 0, static_cast<int32>(pending.size()), kTrue, kTrue);
 	openBar.DisableChildProgressBars(kTrue);
 
 	for (size_t pi = 0; pi < pending.size(); ++pi)
@@ -2245,7 +2254,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// calls). spellpanel gets its moving bar because it walks with a client it wrote itself. So KBS
 	// counts its own work, which it can do better than the walker anyway: the number of checked hits
 	// is known before the run starts.
-	RangeProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
+	KBSProgressBar progressBar(progressTitle, 0, totalCheckedHits, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
 
 	// Remember every row the run is about to change. A cancel rolls the TEXT back through the

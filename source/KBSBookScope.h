@@ -34,8 +34,6 @@
 
 #include <vector>
 
-class IControlView;
-
 namespace KBSBookScope
 {
 	/** One searchable document: a book chapter (shortName = its file name for the read-out;
@@ -211,38 +209,22 @@ namespace KBSBookScope
 	    IBook is already gone by then, so there is no pointer left to compare. */
 	bool IsBookStillOpen(const PMString& bookPath);
 
-	/** Make the book at 'bookPath' the current one in BOTH senses: IBookManager's active book and
-	    the front tab of the book panel. Those are separate states that do not follow each other -
-	    selecting a tab leaves the active book alone and vice versa - so a caller that means "this
-	    book now" has to say both, which is what this does.
+	/** Make the book at 'bookPath' IBookManager's active book - the one every book API answers about.
 
-	    The tab is brought forward WITHOUT taking the key focus, so a keyboard walk over the result
-	    tree is not interrupted by it.
+	    ***** HALF OF WHAT ActivateBook DID UNTIL 2026-10-01 (the model/UI split). ***** The active book and
+	    the front tab of the book panel are separate states that do not follow each other - selecting a tab
+	    leaves the active book alone and vice versa - so a caller that means "this book now" has to say
+	    both. This is the model's half; the tab is the UI half's (KBSBookPanelLookup::BringBookTabForward),
+	    which the caller asks next.
 
 	    @param bookPath the book's full file path (what GetSearchedBookPath hands back).
-	    @return false when no OPEN book has that path - nothing is changed then. A true return means
-	            the active book was set; the tab follows unless the panel could not be resolved. */
-	bool ActivateBook(const PMString& bookPath);
+	    @return false when no OPEN book has that path - nothing is changed then. True = the active book
+	            was set. */
+	bool MakeBookActive(const PMString& bookPath);
 
-	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
-	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not
-	    make that book active - only touching a chapter inside it does (measured 2026-07-27).
-
-	    Found by walking IPanelMgr: InDesign creates one book panel per open book, and the front
-	    tab is the one whose containing palette is visible (measured 2026-07-28, full write-up in
-	    docs/ai-notes/book-panel-active-tab.md).
-
-	    @return false when no book panel is frontmost - the panel is iconised, its palette is
-	            closed, or no book is open - leaving outFile untouched. Callers fall back to the
-	            active book in that case. */
-	bool GetPanelBookFile(IDFile& outFile);
-
-	/** Is this registered panel one of InDesign's book panels? The ONE place that answers it. The
-	    class is LEARNED from a live book panel (IBookUIUtils::QueryActiveBookPanel) and compared -
-	    no name is matched, because a name that merely begins with a book's title picked the wrong
-	    panel ("Book" -> the Bookmarks panel). Asked by the walks in this file and by
-	    KBSBookPanelPlacement. See LearnedBookPanelClass in the .cpp. */
-	bool IsBookPanel(IControlView* panelView);
+	// (GetPanelBookFile and IsBookPanel - the walk of InDesign's book panels - stood here until 2026-10-01;
+	//  they are the UI half's, KBSBookPanelLookup.h. The front tab's book reaches this module through
+	//  IKBSUIServices::GetPanelBookFile.)
 
 	/** Close the chapters this module opened (the originally-closed ones only). Chapters the
 	    user already had open are never touched. The closes are SCHEDULED

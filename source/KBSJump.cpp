@@ -70,6 +70,7 @@
 #include "KBSJump.h"
 #include "KBSHitMarker.h"
 #include "KBSBookScope.h"
+#include "KBSBookPanelLookup.h"		// BringBookTabForward - a book row's tab (2026-10-01)
 #include "KBSResultModel.h"
 #include "KBSTrackChange.h"		// RefreshRowFromRecords - a replaced row found by its tracked change
 #include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
@@ -1008,12 +1009,17 @@ void KBSJump::ShowBook()
 
 	// A book closed since the search is NOT reopened. The row records which book was SEARCHED; it
 	// is not a request to open a file. Saying so beats a row that appears to do nothing.
-	if (!KBSBookScope::ActivateBook(bookPath))
+	if (!KBSBookScope::MakeBookActive(bookPath))
 	{
 		PMString message("That book is no longer open.");
 		message.SetTranslatable(kFalse);
 		KBSResultTree::ShowStatus(message);
+		return;
 	}
+	// ...and its tab to the front of the book panel: the active book and the front tab are separate states,
+	// and the user who clicks a book row asks for both (KBSBookScope::ActivateBook did the two until
+	// 2026-10-01 - the tab is user interface, the UI half's).
+	KBSBookPanelLookup::BringBookTabForward(bookPath);
 }
 
 bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
