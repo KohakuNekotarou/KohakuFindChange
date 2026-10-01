@@ -351,6 +351,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSRuns.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSChapters.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelAccess.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBoundaryID.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">

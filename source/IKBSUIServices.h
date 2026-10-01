@@ -34,7 +34,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
-#include "KBSID.h"		// IID_IKBSUISERVICES
+#include "KBSBoundaryID.h"	// IID_IKBSUISERVICES
 
 /** One progress bar the UI half has put up for the model half - RangeProgressBar's four calls that the
     engines make, and nothing else. Deleted by the model half when its run is over (KBSProgressBar). */

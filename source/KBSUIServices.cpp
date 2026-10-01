@@ -35,6 +35,7 @@
 #include <new>					// std::nothrow
 
 // Project includes:
+#include "KBSID.h"				// kKBSUIServicesImpl
 #include "IKBSUIServices.h"
 #include "KBSBookPanelLookup.h"
 

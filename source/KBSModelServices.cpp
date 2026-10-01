@@ -14,6 +14,7 @@
 
 #include "CPMUnknown.h"
 
+#include "KBSID.h"				// the implementation ids
 #include "IKBSChapters.h"
 #include "IKBSResults.h"
 #include "IKBSRuns.h"

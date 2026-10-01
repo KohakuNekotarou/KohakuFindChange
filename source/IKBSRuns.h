@@ -31,7 +31,7 @@
 
 #include <vector>
 
-#include "KBSID.h"			// IID_IKBSRUNS
+#include "KBSBoundaryID.h"	// IID_IKBSRUNS
 #include "KBSModelTypes.h"	// the types the methods carry
 
 class IDataBase;
