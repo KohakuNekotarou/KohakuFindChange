@@ -4,7 +4,8 @@
 //
 //  KohakuFindChange (KBS)
 //
-//  The "Translucent Panel" toggle. *Every Win32 dependency in this plug-in is in this one file.
+//  The "Translucent Panel" toggle, and "Translucent Find/Change" beside it. Win32 is reached from
+//  here, KBSFindChangeMinimize.cpp and KBSPanelState.cpp (a grep for windows.h recounts them).
 //
 //  Ported from KESCM's KESCMPanelAlpha.cpp (2026-08-04). Everything below is what that file
 //  established on the real application on 2026-07-29 - see docs/ai-notes/win32-window-transparency.md
@@ -171,14 +172,11 @@ static uint8 KBSEffectiveAlpha(HWND target)
 	return KBSCursorOverWindow(target) ? 255 : kKBSPanelAlphaValue;
 }
 
-// *The same question for InDesign's OWN Find/Change dialog. It had no home of its own until
-//   2026-08-08: the expression stood written out in BOTH of its callers - the applying side and the
-//   hook's test - which is the very split the line above says this file avoids.
+// *The same question for InDesign's OWN Find/Change dialog, kept in one place for its two readers
+//   (the applying side and the hook's test) as the panel's is (until 2026-08-08 both wrote it out).
 //   *It answers for the toggle being OFF as well, exactly as the panel's does. Both callers happen
-//     to have established that already (the applying side deals with OFF separately, the hook only
-//     asks while ON), so that arm is not reached today - but the point of the function is that the
-//     answer to "what alpha belongs on this window" lives in one place, and a caller that does not
-//     check first must still get the right answer.
+//     to have established that already, so that arm is not reached today - but a caller that does
+//     not check first must still get the right answer.
 static uint8 KBSEffectiveFindChangeAlpha(HWND target)
 {
 	if (!sFindChangeTranslucent)
@@ -277,10 +275,6 @@ static bool KBSClassIs(HWND h, const wchar_t* wanted)
 // *The official example, one for each of the first two calls (checked 2026-08-12):
 //    GetPanelFromWidgetID          open/components/linksui/LinksUIUtils.cpp:315 - the product itself
 //    GetPaletteRefContainingPanel  codesnippets/SnpShowPalette.cpp:158
-//   !This line used to say "the first two calls have an official example in SnpShowPalette.cpp:
-//    157-159". That snippet reaches its panel through GetNthPanelInfo and a UID, never from a
-//    WidgetID, so only the second of the two was ever in it - while the first one's example, in the
-//    product's own code, went unnamed.
 //
 // !GetPanelFromWidgetID does NOT AddRef - its declaration (IPanelMgr.h:105-112) carries no release
 //  note, and the one that does say "This has been AddRef'ed, so caller must release it" is
@@ -326,33 +320,23 @@ static HWND sPaletteWnd = nullptr;
 
 // The panel window, cache first. *The OS reuses handles, so a live handle is not enough - the class
 //   name is checked as well before it is used.
-//   !The TITLE is no longer part of this test. It used to be, because the title was also how the
-//    window was FOUND, so the same string had to vouch for a cached handle as well. Now that the
-//    lookup aims at a WidgetID there is no name left to agree with: a handle that is live and is
-//    still an OWL.Palette is either ours or a stale one, and a stale one is dropped by the two
-//    paths that see windows being made and destroyed - the visibility notification, which drops it
-//    outright (KBSForgetPaletteWindow, called from the observer at the foot of this file), and the
-//    hook below, which re-checks the class on every WINDOW event for exactly this reason.
-//   ***THE FIRST OF THOSE TWO ONLY BECAME TRUE ON 2026-08-12.*** The observer called nothing but
-//    KBSApplyPanelTranslucency, which asks THIS function - and this function hands the cache
-//    straight back whenever it is live and still an OWL.Palette. So the only path that dropped
-//    anything was the hook, **and the hook is only up while a toggle is ON**. With both toggles off
-//    nothing was watching at all: an OWL.Palette destroyed then (a workspace change rebuilds them)
-//    whose handle the OS handed on to ANOTHER panel's OWL.Palette would have passed both tests as
-//    ours, and switching the toggle on would have written 77 - and hidden the shadow - on somebody
-//    else's panel. The sentence above has described the fix rather than the code ever since it was
-//    written, on 2026-08-07, alongside the WidgetID lookup it explains.
-//   !***THE EXAMPLE IN BRACKETS IS NOT MEASURED, AND WAS NOT REPRODUCIBLE*** (2026-08-19, from
-//    KESCM's bug recheck B-U9, which was deciding whether to port this guard). On 21.0.2.2 a
-//    diagnostic build printed the cached HWND beside the one IPanelMgr answers with, and the two
-//    NEVER disagreed: closing and reopening the panel, switching workspace (Essentials J ->
-//    Advanced J -> Essentials J) and RESETTING the workspace all left the OWL.Palette handle
-//    untouched, and InDesign's own Pages panel kept its palette window - live, same class, same
-//    title - after the panel itself was closed. Palettes appear to be built once at start-up (the
-//    55-56 hidden pairs KESCM's file header has described since 2026-07-29) and not destroyed
-//    again within a session. So keep the guard - it costs nothing and the two tests above genuinely
-//    cannot tell a recycled handle from ours - but do not quote "a workspace change rebuilds them"
-//    as something that was seen.
+//   (Not the title: the lookup aims at a WidgetID, so there is no name left to agree with.) A handle
+//    that is live and is still an OWL.Palette is either ours or a stale one, and a stale one is
+//    dropped by the two paths that see windows being made and destroyed - the visibility
+//    notification, which drops it outright (KBSForgetPaletteWindow, called from the observer at the
+//    foot of this file, 2026-08-12), and the hook below, which re-checks the class on every WINDOW
+//    event. The first matters because the hook is only up while a toggle is ON: with both off,
+//    nothing else would be watching, and a handle the OS had handed on to ANOTHER panel's OWL.Palette
+//    would pass both tests as ours - switching the toggle on would then write 77 on somebody else's
+//    panel.
+//   !***THAT CASE IS NOT MEASURED, AND WAS NOT REPRODUCIBLE*** (2026-08-19, KESCM's bug recheck B-U9).
+//    On 21.0.2.2 a diagnostic build printed the cached HWND beside the one IPanelMgr answers with,
+//    and the two NEVER disagreed: closing and reopening the panel, switching workspace (Essentials J
+//    -> Advanced J -> Essentials J) and RESETTING the workspace all left the OWL.Palette handle
+//    untouched. Palettes appear to be built once at start-up (the 55-56 hidden pairs the file header
+//    describes) and not destroyed within a session. So keep the guard - it costs nothing, and the
+//    two tests above cannot tell a recycled handle from ours - but do not quote "a workspace change
+//    rebuilds them" as something that was seen.
 static HWND KBSQueryPaletteWindow()
 {
 	if (sPaletteWnd != nullptr && ::IsWindow(sPaletteWnd) && KBSClassIs(sPaletteWnd, L"OWL.Palette"))
@@ -731,8 +715,8 @@ bool16 KBSApplyFindChangeTranslucency()
 static ICallbackTimer* sReapplyTimer = nil;
 static int32           sReapplyLeft  = 0;			// tries left (0 = stop; the runaway guard)
 
-// **KBSShutdownPanelAlpha has run: never build the timer again (2026-08-08, brought over from
-//   KESCM, which added it in its own 2026-08-06 re-check - two days AFTER this file was ported).
+// **KBSShutdownPanelAlpha has run: never build the timer again (2026-08-08, from KESCM's 2026-08-06
+//   re-check).
 //   !What it stops: the observer below is detached at shutdown now, but the toggle can still be ON
 //     and a notification can still be in flight when the panel is destroyed during teardown. That
 //     reaches KBSScheduleReapply, which finds sReapplyTimer == nil and CREATES ANOTHER ONE - after
@@ -879,10 +863,8 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	//     and SHOWN. Being shown is EVENT_OBJECT_SHOW = a window event, so a swap always passes
 	//     through this check at the moment it happens. A window that is never shown is rejected by
 	//     KBSQueryTranslucentTarget anyway, as neither "OWL.Dock" nor "OWL.FrameDrawer".
-	//   !This checked the window's TITLE too until 2026-08-07. It could, because the title was how
-	//     the panel was found in the first place; now that the lookup is a WidgetID (see
-	//     KBSQueryPanelPaletteFromSDK) the class is all there is to check - and it is what the
-	//     reuse it guards against would change.
+	//   (The lookup is a WidgetID - KBSQueryPanelPaletteFromSDK - so the class is all there is to
+	//     check, and it is what the reuse it guards against would change.)
 	if (isWindowEvent)
 	{
 		if (!KBSClassIs(sPaletteWnd, L"OWL.Palette"))
@@ -952,12 +934,8 @@ static void KBSInstallWinEventHook()
 	// **Nothing is ever hooked again once the clean-up has run (2026-08-12), for the same reason
 	//   KBSScheduleReapply refuses to book another timer: a hook that goes up after
 	//   KBSShutdownPanelAlpha has taken one down leaves the OS holding KBSWinEventProc - a raw
-	//   function pointer into this .pln - as the .pln goes down.
-	//   !The two bookings this file makes were guarded differently until today. The timer had two
-	//     defences (this flag, and the observer being detached); the hook had none, so
-	//     KBSSetPanelTranslucent -> KBSUpdateWinEventHook could put one back up after shutdown. No
-	//     caller does that today - the menu is the only one, and it is gone by then - which is why
-	//     it has never been seen. It costs one test to make the asymmetry go away.
+	//   function pointer into this .pln - as the .pln goes down. (No caller does that today - the
+	//   menu is the only one, and it is gone by then - but the two bookings are guarded alike.)
 	if (sPanelAlphaShutdown)
 		return;
 
@@ -978,14 +956,12 @@ static void KBSInstallWinEventHook()
 }
 
 // ***THE HANDLE IS ONLY FORGOTTEN IF THE HOOK REALLY CAME DOWN.*** (2026-08-11.)
-//   !What this used to do: call UnhookWinEvent and set the handle to nullptr regardless. Microsoft
-//     documents three ways that call fails - the handle is invalid, the hook was already removed, or
-//     **it is called from a thread other than the one that installed it** - and on the third one the
-//     hook is STILL LIVE. Dropping the handle there loses the only thing that can ever take it down:
-//     KBSShutdownPanelAlpha would find nullptr, report itself done, and the .pln would go down with
-//     the OS still holding KBSWinEventProc - a raw function pointer into unloaded code.
-//   *That is the very thing this file guards for ICallbackTimer, twice over (the shutdown flag and
-//     the observer detach). The hook is the same kind of booking and had no check at all.
+//   Microsoft documents three ways UnhookWinEvent fails - the handle is invalid, the hook was
+//     already removed, or **it is called from a thread other than the one that installed it** - and
+//     on the third one the hook is STILL LIVE. Dropping the handle there would lose the only thing
+//     that can ever take it down: KBSShutdownPanelAlpha would find nullptr, report itself done, and
+//     the .pln would go down with the OS still holding KBSWinEventProc - a raw function pointer into
+//     unloaded code (the very thing this file guards for ICallbackTimer).
 //   *Keeping the handle costs nothing and leaves the door open: KBSInstallWinEventHook sees a live
 //     handle and does not install a second one, and the next call here tries again.
 //   !All the callers are on the main thread today (the menu item, and Shutdown), which is why this
@@ -1060,16 +1036,12 @@ void        KBSShutdownPanelAlpha() {}
 //
 //   *The observer implementation is aggregated onto kActiveContextBoss in the .fr - the proven
 //     arrangement KESCM uses for its own three observers.
-//   **It IS detached at shutdown, by KBSDetachPanelVisibilityObserver (2026-08-08).
-//     !What stood here until then: "it is never explicitly detached (the boss has the session's
-//       lifetime, and detaching is itself a crash risk)". That was this plug-in contradicting
-//       itself - KBSBookWatch.cpp:293-296 attaches with the opposite reason written next to it
-//       ("linksui carries a live bug from attaching and detaching asymmetrically") and has had a
-//       symmetric KBSBookWatchDetach all along. Two subjects, two answers, one plug-in.
-//     *Which one is right is not a matter of taste here: the subject outliving the .pln is the
-//       whole problem. What the session keeps is a pointer into a plug-in that is being unloaded,
-//       and leaving it there is what makes a late notification reach freed code. The three
-//       attachments below are therefore undone in the same three places.
+//   **It IS detached at shutdown, by KBSDetachPanelVisibilityObserver (2026-08-08 - as KBSBookWatch
+//     has always detached its own, the attach there carrying the reason: "linksui carries a live bug
+//     from attaching and detaching asymmetrically"). The subject outliving the .pln is the whole
+//     problem: what the session keeps is a pointer into a plug-in that is being unloaded, and leaving
+//     it there is what makes a late notification reach freed code. The three attachments below are
+//     therefore undone in the same three places.
 //========================================================================================
 
 //========================================================================================
@@ -1080,7 +1052,7 @@ void        KBSShutdownPanelAlpha() {}
 //   *How: IMouseRollOver (ui/IMouseRollOver.h) is the public interface for giving a widget roll-over
 //     behaviour - MouseEnter / MouseOver / MouseLeave. It is aggregated onto the panel boss
 //     (kKBSPanelWidgetBoss) as IID_IMOUSEROLLOVER in the .fr.
-//     !**Leaving it out of the factory list (KBSFactoryList.h) means it is silently never called**
+//     !**Leaving it out of the factory list (KFCUIFactoryList.h) means it is silently never called**
 //       - CREATE_PMINTERFACE alone is not enough. Suspect that first if it stops working.
 //   *The SDK contains no usage example of IMouseRollOver at all; KESCM established which bosses
 //     implement it from a dump of the real object model (kRollOverIconButtonBoss family,
@@ -1116,27 +1088,19 @@ private:
 
 CREATE_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)
 
-// ***NOTHING IS TOUCHED WHILE THE TOGGLE IS OFF.*** (Corrected 2026-08-11.)
-//   !What stood here: "rejected inside while OFF". **KBSApplyPanelTranslucency does not reject OFF** -
-//     it rejects "no panel", "docked" and Mac. While OFF it still writes alpha 255 to the top-level
-//     window AND shows the shadow with SW_SHOWNA, on every pass of the pointer.
-//   *Two things that costs:
+// ***NOTHING IS TOUCHED WHILE THE TOGGLE IS OFF.*** (2026-08-11; KESCM's 48f0a6b of 2026-08-07.)
+//   **KBSApplyPanelTranslucency does not reject OFF** - it rejects "no panel", "docked" and Mac.
+//     While OFF it still writes alpha 255 to the top-level window AND shows the shadow with
+//     SW_SHOWNA. Called on every pass of the pointer, that would cost two things:
 //     . **another panel's translucency is cancelled**. A floating GROUP of panels shares ONE OWL.Dock,
 //       so if this panel is grouped with one whose own translucency is ON - KESCM's, or a future one
 //       of ours - the 255 written here lands on the very window carrying that panel's 77.
 //     . a shadow the user never asked for is forced out. That is the 2026-07-29 defect's shape:
 //       InDesign does not move a shadow mid-drag, so one shown at the wrong moment is left behind.
-//   ***KESCM had the identical fault and fixed it on 2026-08-07 (48f0a6b, "Leave the OFF target alone
-//     when reapplying translucency") - four days after this file was ported from it. That is the THIRD
-//     time a fix landed in the source file after the port and did not walk over
-//     (the others: the ferror check, block 4 A-2; the re-arming guard, block 14 A-1).
 //   *Where the guard belongs: **in the callers, not inside KBSApplyPanelTranslucency** - the same
-//     conclusion KESCM reached and wrote down. Switching the toggle OFF has to write 255 and put the
-//     shadow back, and that is done by calling this very function from the menu handler
-//     (KBSActionComponent.cpp:218). A guard inside would kill the restore.
-//   *The other three callers - the timer, the Win32 hook and the visibility observer - have asked
-//     this question all along. These two and the panel's AutoAttach (KBSPanelTitle.cpp) were the
-//     three that did not.
+//     conclusion KESCM reached. Switching the toggle OFF has to write 255 and put the shadow back,
+//     and that is done by calling this very function from the menu handler (KBSActionComponent's
+//     FlipAppearanceToggle). A guard inside would kill the restore. Every other caller asks first.
 void KBSPanelRollOver::MouseEnter(const PMPoint& localMousePos)
 {
 	fLastPos = localMousePos;
@@ -1166,19 +1130,12 @@ void KBSPanelRollOver::MouseLeave()
 bool8 KBSPanelRollOver::IsMouseOver() const
 {
 	// *No flag is held, so it is measured on the spot.
-	//   !***THAT IS NOT WHAT THE CONTRACT ASKS FOR*** (corrected 2026-08-12). This said measuring is
-	//     "what this interface's contract asks for ('is the pointer on it NOW')", and the words say
-	//     the opposite: IMouseRollOver.h:50-51 asks whether the mouse is over the control "**as
-	//     determined by the previous calls to MouseEnter/Over/Leave**" - which is precisely the flag
-	//     this class threw away. Measuring gives a better answer than that flag ever did (MouseLeave
-	//     does not fire when the panel is closed, docked, or switched away from with the pointer
-	//     still on it), and having dropped the flag there is nothing else here to answer with - but
-	//     it is a different answer from the one the words describe, not the same one.
-	//   *Where the error came from is worth keeping: KESCM, which this class was ported from, makes
-	//     the same measurement with an honest note beside it - it cites IMouseRollOver.h:50 and says
-	//     the measurement returns a more accurate answer than the contract's wording, but is not
-	//     that wording (KESCMPanelAlpha.cpp:834-836). The port turned the qualification into a
-	//     claim of compliance.
+	//   !***THAT IS NOT WHAT THE CONTRACT ASKS FOR.*** IMouseRollOver.h:50-51 asks whether the mouse is
+	//     over the control "**as determined by the previous calls to MouseEnter/Over/Leave**" - which is
+	//     precisely the flag this class threw away. Measuring gives a better answer than that flag ever
+	//     did (MouseLeave does not fire when the panel is closed, docked, or switched away from with the
+	//     pointer still on it), and having dropped the flag there is nothing else here to answer with -
+	//     but it is a different answer from the one the words describe (KESCM's twin says the same).
 #ifdef WINDOWS
 	// *Nothing is measured while the toggle is OFF. This AddIn exists for the translucency toggle,
 	//   and while it is off nobody uses the answer - whereas KBSQueryPaletteWindow goes out to the
@@ -1264,12 +1221,10 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 		return;
 
 	// **The suspend concerns BOTH windows, so it is answered here - in front of the panel's own guard
-	//   below (2026-08-04 audit).
-	//   !What was wrong: that guard ("nothing to do while the PANEL toggle is off") stood ahead of
-	//     everything, so with only Translucent Find/Change switched on the suspend reached nothing at
-	//     all - and the dialog was left STUCK OPAQUE in precisely the case the panel side documents
-	//     for itself just above: the pointer is on the window, the mouse moves out to another
-	//     application, and not one further cursor event reaches our own-process-only Win32 hook.
+	//   below (2026-08-04 audit). Behind it, with only Translucent Find/Change switched on, the
+	//   suspend would reach nothing, and the dialog would be left STUCK OPAQUE in precisely the case
+	//   documented just above: the pointer is on the window, the mouse moves out to another
+	//   application, and not one further cursor event reaches our own-process-only Win32 hook.
 	//   *Nothing else here needs saying twice: opening and closing the dialog is followed through the
 	//     window list (case 4 above), and the panel's own transitions cannot move the dialog.
 	if (isSuspendMsg && KBSGetFindChangeTranslucent())
@@ -1300,28 +1255,37 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 		KBSScheduleReapply();
 }
 
-void KBSAttachPanelVisibilityObserver()
+// The observer (aggregated onto kActiveContextBoss) and the application its subjects hang off - the
+// same three steps for the attach and the detach. False when either cannot be had: the session can
+// be gone during teardown.
+static bool KBSQueryVisibilityObserver(InterfacePtr<IObserver>& outObs, InterfacePtr<IApplication>& outApp)
 {
 	ISession* session = GetExecutionContextSession();
 	IActiveContext* ctx = (session != nil) ? session->GetActiveContext() : nil;
 	if (ctx == nil)
-		return;
+		return false;
 
-	InterfacePtr<IObserver> obs((IObserver*)ctx->QueryInterface(IID_IKBSPANELVISIBILITYOBSERVER));
-	if (obs == nil)
-		return;
+	outObs.reset((IObserver*)ctx->QueryInterface(IID_IKBSPANELVISIBILITYOBSERVER));
+	if (outObs == nil)
+		return false;
 
-	InterfacePtr<IApplication> app(session->QueryApplication());
-	if (app == nil)
+	outApp.reset(session->QueryApplication());
+	return outApp != nil;
+}
+
+void KBSAttachPanelVisibilityObserver()
+{
+	InterfacePtr<IObserver> obs;
+	InterfacePtr<IApplication> app;
+	if (!KBSQueryVisibilityObserver(obs, app))
 		return;
 
 	// *The panel manager comes up partway through the application's own startup sequence (there is a
 	//   kPanelMgrHasStartedMsg for it), so this can be nil when called from a startup service.
-	//   **That is no longer a reason to give up on the rest (2026-08-04 audit). Returning early here
-	//     took the two APPLICATION subjects below with it - and one of them is what follows InDesign's
-	//     own Find/Change dialog, which has nothing to do with the panel manager. The panel's
-	//     AutoAttach calls this again (KBSPanelTitle.cpp), so the palette subject is picked up then;
-	//     nothing was calling it again on behalf of the window list.
+	//   **That is not a reason to give up on the rest (2026-08-04 audit): one of the two APPLICATION
+	//     subjects below is what follows InDesign's own Find/Change dialog, which has nothing to do
+	//     with the panel manager. The panel's AutoAttach calls this again (KBSPanelTitle.cpp), so the
+	//     palette subject is picked up then; nothing calls it again on behalf of the window list.
 	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
 	if (panelMgr != nil)
 	{
@@ -1370,17 +1334,9 @@ void KBSAttachPanelVisibilityObserver()
 //     flight (KBSPanelAlpha.cpp's timer section).
 void KBSDetachPanelVisibilityObserver()
 {
-	ISession* session = GetExecutionContextSession();
-	IActiveContext* ctx = (session != nil) ? session->GetActiveContext() : nil;
-	if (ctx == nil)
-		return;
-
-	InterfacePtr<IObserver> obs((IObserver*)ctx->QueryInterface(IID_IKBSPANELVISIBILITYOBSERVER));
-	if (obs == nil)
-		return;
-
-	InterfacePtr<IApplication> app(session->QueryApplication());
-	if (app == nil)
+	InterfacePtr<IObserver> obs;
+	InterfacePtr<IApplication> app;
+	if (!KBSQueryVisibilityObserver(obs, app))
 		return;
 
 	// *The panel manager can be down already during teardown; the two application subjects below are

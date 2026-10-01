@@ -70,14 +70,11 @@ void	KBSSetPanelTranslucent(bool16 on);
 //    on some other cue (the pointer arriving, the widgets being rebuilt) has to ask
 //    KBSGetPanelTranslucent first, or it will cancel the translucency of ANY OTHER panel grouped
 //    with this one - a floating group shares one OWL.Dock - and force out a shadow nobody asked for.
-//    !Three callers did not, until 2026-08-11, each saying in a comment that OFF was "rejected
-//     inside". See the note over KBSPanelRollOver::MouseEnter in the .cpp for the whole account.
+//    See the note over KBSPanelRollOver::MouseEnter in the .cpp.
 //  - Does nothing (and does NOT report an error) when the panel is absent or docked
-//  - Callers, all seven: the menu item (KBSActionComponent.cpp), the panel's AutoAttach
+//  - Callers, by name: the menu item (KBSActionComponent.cpp), the panel's AutoAttach
 //    (KBSPanelTitle.cpp), and five in KBSPanelAlpha.cpp itself - the palette-visibility observer,
 //    the chase timer, the Win32 event hook, and KBSPanelRollOver's MouseEnter and MouseLeave.
-//    (Named rather than counted: this list said "the menu item, the AutoAttach and the observer"
-//     while the .cpp's own account of the same set correctly named six of them.)
 //  - Returns kTrue when an alpha actually reached a window; kFalse when there is no panel, when it
 //    is docked, or on Mac. The menu uses that to say "it is on" or "it is on but the panel is
 //    docked", rather than leaving a click with no visible result unexplained.
@@ -99,14 +96,7 @@ bool16	KBSApplyPanelTranslucency();
 //    NOT looked for from Win32 at all: the lookup walks the SDK's IWindowList and takes the dialog
 //    whose panel answers kFindChangeParentWidgetID - a NUMBER, so no UI language can change it.
 //    See the block comment over KBSQueryFindChangeIWindow in KBSPanelAlpha.cpp for the full route.
-//
-//    !This said "the search adds: top-level, owner is the main frame, and the title is one of the
-//     known Find/Change titles" until 2026-08-11. That was the plan the probe above was run for,
-//     never the code that followed it: the .cpp rejects a title list by name ("the title is
-//     translated, so a list of candidate titles would silently miss on any build nobody thought
-//     of"), and the menu command that calls this has always said "never by its title, which is
-//     translated" (KBSActionComponent.cpp). A reader of this header alone would have concluded the
-//     feature cannot work on a translated build - which is the build this is developed on.
+//    (Not by its title either: the title is translated.)
 //----------------------------------------------------------------------------------------
 
 // The toggle's current state (*OFF by default).
@@ -164,13 +154,11 @@ HWND	KBSQueryFindChangeWindow();
 void	KBSForgetFindChangeWindow();
 
 // Start listening for the panel being shown, hidden, docked or floated.
-// *Called from TWO places, and safe to call again: KBSStartupShutdown::Startup, and the panel's own
-//   AutoAttach (KBSPanelTitle.cpp). !The second one is not belt and braces - the panel manager comes
-//   up partway through the application's startup sequence, so at Startup it can still be nil, and
-//   that subscription is picked up on the AutoAttach pass instead. Each attachment asks IsAttached
-//   first, so repeating the call attaches nothing twice.
-//   (Corrected 2026-08-08: this said "called once at startup". The .cpp had it right all along -
-//    see the note at KBSAttachPanelVisibilityObserver's panel-manager branch.)
+// *Called from TWO places, and safe to call again: KBSUIStartupShutdown::Startup, and the panel's
+//   own AutoAttach (KBSPanelTitle.cpp). !The second one is not belt and braces - the panel manager
+//   comes up partway through the application's startup sequence, so at Startup it can still be nil,
+//   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
+//   IsAttached first, so repeating the call attaches nothing twice.
 // *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
 //   (identified on a debug build's Spy, 2026-07-29). Two further subjects hang off kAppBoss - see
 //   the function itself.
@@ -179,13 +167,12 @@ void	KBSAttachPanelVisibilityObserver();
 // Undo every attachment the above makes. Called from the plug-in's shutdown, BEFORE
 // KBSShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
 // *Why it exists (2026-08-08): while attached, the session holds a pointer into this .pln, and a
-//   notification arriving during teardown would run the observer in code that is going away. This is
-//   the same reasoning - and the same shape - as KBSBookWatchDetach, which this plug-in has always
-//   had; until now the two subjects were treated in opposite ways.
+//   notification arriving during teardown would run the observer in code that is going away - the
+//   same reasoning, and the same shape, as KBSBookWatchDetach.
 void	KBSDetachPanelVisibilityObserver();
 
 // Tear down everything this file has put anywhere. Called from the plug-in's shutdown
-// (KBSStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not
+// (KBSUIStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not
 // reference counted, so leaving a booking live while this .pln goes down is a crash. Implemented in
 // KBSPanelAlpha.cpp (empty on Mac). In order:
 //   . the one-shot timer, and the flag that stops another timer or hook being made afterwards
@@ -193,7 +180,7 @@ void	KBSDetachPanelVisibilityObserver();
 //   . ***InDesign's own Find/Change dialog, put back as it was*** - the WS_EX_LAYERED on it is OURS,
 //     and a style plus an alpha left on a window nobody maintains any more would outlive this
 //     plug-in. This one is easy to overlook, being the only thing here that touches somebody else's
-//     window (this comment did overlook it until 2026-08-12).
+//     window.
 //   . the remembered window handles
 void	KBSShutdownPanelAlpha();
 
