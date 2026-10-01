@@ -31,7 +31,7 @@ namespace
 {
 // Repaint a document so the marker appears or disappears now - an adornment is only consulted while
 // text is being drawn. The address is resolved through the document list first, so a document that
-// has closed in the meantime is never touched (moved here from KBSDrawEventHandler unchanged).
+// has closed in the meantime is never touched.
 void KBSHitMarkerRepaint(IDataBase* db)
 {
 	if (db != nil)

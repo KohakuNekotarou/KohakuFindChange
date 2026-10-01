@@ -4,21 +4,22 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Jump-to-hit navigation (Task 3). A hit-row click asks JumpToHit(chapter, hit) to: resolve the
-//  hit's stored location (reopening the chapter windowless if the user closed it), bring that
-//  chapter's window to the front, scroll the view so the match is centred, and raise the marker
-//  on the match's characters (KBSHitMarker - a global text adornment since 2026-09-26) which takes
-//  itself down after about a second. It does NOT select the text - it points at
-//  the match, VS-style. ***** A DOUBLE click does (2026-08-09): SelectHitText switches to the Type
-//  tool and highlights the match, for when pointing is not what was wanted. The two are deliberately
-//  different - a single click can be spent freely because it changes nothing in the document, and
-//  that is only true while it does not select. ***** THE MARKER COMES UP AT ONCE, FROM BOTH DOORS
-//  (2026-09-25). ***** From 2026-08-09 a mouse click's marker was booked for the double-click
-//  interval so that a double click never flashed one; the user asked for it on the same beat as
-//  KCM's Story-mode jump instead, which raises its flash straight away and lets the double click's
-//  selection take it back down (SelectHitText ends in ClearMarker). With "Hide Previous Chapter" ON, every other displayed clean document is
-//  closed as the jump lands. Ported from KESCL's jump machinery (KESCL left untouched), simplified
-//  to a static snapshot (no match-list navigation, no edit-repair, no reverse mode).
+//  Jump-to-hit navigation. A hit-row click (ActivateNode) jumps: it resolves the hit's stored
+//  location (reopening the chapter windowless if the user closed it), brings that chapter's window
+//  to the front, scrolls the view so the match is centred, and raises the marker on the match's
+//  characters (KBSHitMarker - a global text adornment since 2026-09-26) which takes itself down
+//  after about a second. It does NOT select the text - it points at the match, VS-style.
+//  ***** A DOUBLE click does (2026-08-09): SelectHitText switches to the Type tool and highlights the
+//  match, for when pointing is not what was wanted. The two are deliberately different - a single
+//  click can be spent freely because it changes nothing in the document, and that is only true while
+//  it does not select. ***** THE MARKER COMES UP AT ONCE, FROM BOTH DOORS (2026-09-25). ***** From
+//  2026-08-09 a mouse click's marker was booked for the double-click interval so that a double click
+//  never flashed one; the user asked for it on the same beat as KCM's Story-mode jump instead, which
+//  raises its flash straight away and lets the double click's selection take it back down
+//  (SelectHitText ends by taking the marker down). With "Hide Previous Chapter" ON, every other
+//  displayed clean document is closed as the jump lands. Ported from KESCL's jump machinery (KESCL
+//  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
+//  reverse mode).
 //
 //========================================================================================
 
@@ -27,45 +28,18 @@
 
 namespace KBSJump
 {
-	/** Jump to hit 'hitIdx' of chapter 'chapterIdx' in KBSResultModel: front its document, scroll
-	    to the match, raise the marker. Does not select. No-op on a bad index; an unreachable chapter
-	    (missing / locked file) reports through the status line. An overset match has no on-page
-	    location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is
-	    raised - those pixels belong to the indicator, not to the text.
-
-	    The marker comes up at once, whichever door asked (see the note at the head of this header -
-	    the mouse's used to be booked for the double-click interval, and took a parameter to say so).
-
-	    @note NOTHING OUTSIDE THIS FILE CALLS THIS (measured 2026-08-11): both doors - the row click
-	          and the keyboard walk - go through ActivateNode, which is where the "one activation at a
-	          time" guard lives. Kept public because it is the operation this file is named for and
-	          reads as the header's subject; but a new caller reaching it directly would bypass that
-	          guard, so go through ActivateNode.
-	    @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
-	          still the text the row describes (overset or not). False for every other end: a bad index,
-	          a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
-	          text is no longer there (each of which has said why, or has nothing to say). ActivateNode
-	          reads it to decide whether the row's "Source Text:" goes up (2026-09-29). */
-	bool JumpToHit(int32 chapterIdx, int32 hitIdx);
-
-	/** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if
-	    the user closed it since the search. Does NOT scroll and raises no marker - a chapter row
-	    names a document, not a place inside one. Honours "Hide Previous Chapter". No-op on a bad
-	    index; an unreachable chapter reports through the status line. */
-	void ShowChapter(int32 chapterIdx);
-
-	/** Activate the book the results came from: make it IBookManager's current active book AND
-	    bring its tab to the front in the book panel - two separate things that do not follow each
-	    other. A book that has been closed since the search is NOT reopened; the status line says
-	    so. No-op for a document-scope result, which has no book row. */
-	void ShowBook();
-
-	/** The single door every result row goes through: a hit row jumps, a chapter row shows its
-	    document, the book row activates its book. Called by the row click and by the keyboard
-	    walk, which is why it exists - two callers must not drift apart.
-	    ***** AND IT SETTLES THE MESSAGE AREA'S "Source Text:" (2026-09-29): ***** a hit row the jump landed on
-	    that holds a replace shows its text as it was before the replace (KBSResultTree::ShowRowsBefore);
-	    any other row - and a jump that did not land - takes a standing one down (DropBefore).
+	/** The single door every result row goes through: a hit row jumps (front its document, scroll to
+	    the match, raise the marker - an overset match scrolls to the frame's "+" and is not marked), a
+	    chapter row shows its document (no scroll, no marker), the book row activates its book (the
+	    active book AND its tab in the book panel; a book closed since the search is not reopened).
+	    Called by the row click and by the keyboard walk, which is why it exists - two callers must not
+	    drift apart - and it holds the "one activation at a time" guard, which is why the three are in
+	    KBSJump.cpp and not here (JumpToHit, ShowChapter, ShowBook - public until 2026-10-01, with a
+	    note asking new callers to go round them).
+	    ***** AND IT SETTLES THE MESSAGE AREA'S "Source Text:" (2026-09-29): ***** a hit row the jump
+	    landed on that holds a replace shows its text as it was before the replace
+	    (KBSResultTree::ShowRowsBefore); any other row - and a jump that did not land - takes a standing
+	    one down (DropBefore).
 	    @param chapterIdx the chapter index, or -1 for the book row.
 	    @param hitIdx the hit index, or -1 when the row is not a hit row.
 	    (A third parameter said whether the marker should wait out the double-click interval - the
@@ -85,8 +59,7 @@ namespace KBSJump
 	    selection say the same thing, and together they make the text unreadable.
 
 	    Refuses, with a reason on the status line, when there is nothing honest to select:
-	      * an OVERSET match - its "match text" is the scan's own words, and overset text has no
-	        on-page selection to make;
+	      * an OVERSET match - overset text has no on-page selection to make;
 	      * a match whose text is no longer what the search recorded - selecting a stale range would
 	        highlight text the user never searched for.
 
@@ -95,8 +68,8 @@ namespace KBSJump
 	    @return kTrue if a text selection was actually made. */
 	bool SelectHitText(int32 chapterIdx, int32 hitIdx);
 
-	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read by JumpToHit to
-	    decide whether to close other displayed chapters as a jump lands; the flyout drives it.
+	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a
+	    chapter row lands, to decide whether to close the other displayed chapters; the flyout drives it.
 
 	    @note This is the TOGGLE, not the decision. The sweep also needs the results to have come from
 	          a BOOK - it is about chapters, and the menu greys the toggle out in document scope for

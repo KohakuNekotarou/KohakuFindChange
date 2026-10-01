@@ -62,9 +62,9 @@ uint32 KBSMarkerExpiryTask::RunTask(uint32 /*flags*/, IdleTimer* /*idleTimer*/)
 	// return kEndOfTime from RunTask, instead you would call UninstallTask and return any value
 	// from RunTask as it will be ignored".
 	//
-	// Hide (KBSHitMarker::ClearMarker until 2026-10-01) calls back into Stop(), which uninstalls again. That second call is harmless by
-	// the contract quoted at the top of this file (a task that is not installed, or is currently
-	// running, costs a return value and nothing more).
+	// Hide (KBSHitMarker::ClearMarker until 2026-10-01) calls back into Stop(), which uninstalls
+	// again. That second call is harmless by the contract quoted at the top of this file (a task that
+	// is not installed, or is currently running, costs a return value and nothing more).
 	this->UninstallTask();
 
 	if (!sShutdown)
@@ -84,7 +84,7 @@ void KBSMarkerExpiryIdleTask::Start()
 	if (sTask == nil)
 		sTask = ::CreateObject2<IIdleTask>(kKBSMarkerExpiryIdleTaskBoss);
 	if (sTask == nil)
-		return;		// no timer; the marker simply stays up until the next jump/search clears it.
+		return;		// no timer; the marker simply stays up until the next jump moves or clears it.
 
 	// Restart rather than let a running countdown stand: the marker was just (re)shown, so it is
 	// owed the full lifetime from now. Uninstall unconditionally - a pending booking has to come off

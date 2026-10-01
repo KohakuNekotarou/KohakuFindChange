@@ -332,7 +332,7 @@ namespace KBSSearchEngine
 	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
 	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
 	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
-	    the same statement. Asked by the jump - KBSJump::JumpToHit and KBSJump::SelectHitText, the
+	    the same statement. Asked by the jump - KBSJump's JumpToHit and KBSJump::SelectHitText, the
 	    double click that selects the match - through IKBSRuns.
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole

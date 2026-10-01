@@ -5,24 +5,19 @@
 //  KohakuBookSearch (KBS)
 //
 //  One-shot timer that takes the jump marker back off the screen shortly after it appears.
-//  Driven by KBSHitMarker (KBSDrawEventHandler until 2026-09-26): SetMarker arms it, ClearMarker disarms it. This is the plugin's
-//  only CIdleTask - the single justified exception to "avoid idle tasks" (a marker has to expire on
-//  wall-clock time, which nothing else in this plug-in needs).
+//  Driven by KBSHitMarkerView (the UI half of KBSHitMarker since 2026-10-01): Show arms it, Hide
+//  disarms it. This is the plug-in's only CIdleTask - the single justified exception to "avoid idle
+//  tasks" (a marker has to expire on wall-clock time).
 //
-//  ***** WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. ***** The header used to say an
-//  idle task was the SDK's only main-thread "call me back in n ms". It is not: ICallbackTimer is
-//  one too (ICallbackTimer.h:38 - it derives from IIdleTask) and KBSBookWatch's ArmRetireTimer and
-//  KBSPanelAlpha's reapply chase both use it (so did KBSDrawEventHandler's click-settles booking,
-//  until it was removed on 2026-09-25).
-//  (Named rather than numbered: both line references here were pointing at the wrong lines by
-//  2026-08-11 - one of them at a closing brace - and the count "twice" had become three.)
-//  It is not taken here because its callback is a plain function
-//  pointer that nothing reference-counts - its own header spends six words on "Danger!" saying the
-//  supplying plug-in must not be unloaded while that pointer is in the timer, and KBSPanelAlpha.h:110
-//  records the same hazard from experience. A CIdleTask is an interface on a boss: it can be
-//  Released at shutdown and it takes part in KBSStartupShutdown's teardown like everything else.
-//  (Corrected in the block 12 API audit, 2026-08-08 - the DECISION was right, the reason given for
-//  it was not.)
+//  ***** WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. ***** It is a main-thread "call me back in
+//  n ms" too (ICallbackTimer.h:38 - it derives from IIdleTask), and this plug-in uses it elsewhere
+//  (KBSBookWatch, KBSPanelAlpha, KBSBookPanelPlacement and KBSFindChangeMinimize on 2026-10-01 - a
+//  grep for ICallbackTimer recounts them). It is not taken here because its callback is a plain
+//  function pointer that nothing reference-counts - its own header spends six words on "Danger!"
+//  saying the supplying plug-in must not be unloaded while that pointer is in the timer, and the note
+//  on KBSShutdownPanelAlpha (KBSPanelAlpha.h) records the same hazard. A CIdleTask is an interface on
+//  a boss: it can be Released at shutdown, and it takes part in KBSUIStartupShutdown's teardown like
+//  everything else.
 //
 //  Ported from KESCL's KESCLMarkerExpiryIdleTask so the proven, robust teardown is kept exactly.
 //
@@ -31,8 +26,8 @@
 #ifndef __KBSMarkerExpiryIdleTask_h__
 #define __KBSMarkerExpiryIdleTask_h__
 
-/** Jump-marker expiry timer. Only KBSHitMarker should drive this - going through
-    SetMarker / ClearMarker keeps the marker state and the timer in step. */
+/** Jump-marker expiry timer. Only KBSHitMarkerView should drive this - going through
+    Show / Hide keeps the marker state and the timer in step. */
 namespace KBSMarkerExpiryIdleTask
 {
 	/** (Re)start the countdown to clearing the marker. Called every time a marker is shown, so an

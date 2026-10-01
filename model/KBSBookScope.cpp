@@ -67,7 +67,7 @@ namespace
 	//
 	// Read from OUTSIDE through GetSearchedBookPath, by two callers, and both ask about the RESULTS:
 	//   * KBSBookWatch - "the book these results name has been closed, retire them"
-	//   * KBSJump::ShowBook (the UI half, through IKBSChapters) - "the book row was clicked, bring
+	//   * KBSJump's ShowBook (the UI half, through IKBSChapters) - "the book row was clicked, bring
 	//     that book forward"
 	// And read from INSIDE by OpenChapterDoc, which is not about the results at all: it is how a
 	// chapter finds the book it belongs to, having deliberately not parked an IBook* between calls.
@@ -1117,7 +1117,7 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// here puts nothing on the panel at all (every run answers "That book has no chapters."
 	// and returns). Leaving the path standing left that statement true about a book with no results
 	// behind it, which is the one thing the two readers of this value - KBSBookWatch and
-	// KBSJump::ShowBook - are not allowed to be told.
+	// KBSJump's ShowBook - are not allowed to be told.
 	//
 	// Cleared rather than restored to what it was: the callers all clear it through
 	// ReleaseSearchedBook immediately before calling this, so there is no earlier value to go back

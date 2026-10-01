@@ -2744,7 +2744,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 	// Every chapter KBS opened has already been handed back inside the loop - a book search leaves
 	// nothing of its own open, and no .indd locked. The rows carry their chapter's file, so a jump
-	// or a replace reopens whatever it needs (KBSJump::EnsureChapterReachable and the replace
+	// or a replace reopens whatever it needs (KBSJump's EnsureChapterReachable and the replace
 	// engine's own reopen). What that costs is a document load on the first click into a chapter;
 	// what it buys is that searching a book no longer leaves twenty hidden documents behind.
 

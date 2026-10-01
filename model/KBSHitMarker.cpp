@@ -13,7 +13,6 @@
 
 // Interface includes:
 #include "IDataBase.h"
-#include "IDocument.h"
 #include "IGlobalTextAdornment.h"
 #include "IGraphicsPort.h"
 #include "IShape.h"					// kPrinting
@@ -22,7 +21,6 @@
 #include "IWaxLine.h"
 #include "IWaxRenderData.h"
 #include "IWaxRun.h"
-#include "ISession.h"
 
 // General includes:
 #include "AutoGSave.h"
@@ -33,7 +31,6 @@
 #include "PMString.h"
 #include "SDKFileHelper.h"
 #include "TextDrawPriority.h"		// kTAPassPriForeground
-#include "Utils.h"
 
 #include <boost/thread/recursive_mutex.hpp>
 
@@ -100,6 +97,17 @@ bool KBSHitMarkerSameDoc(IDataBase* drawnDB)
 	if (drawnPath.IsEmpty() && gDocPath.IsEmpty())
 		return true;
 	return drawnPath == gDocPath;
+}
+
+// Forget where the marker is - gHasMark first, the flag every unlocked reader tests. The one place
+// ClearMarker, ForgetDoc and ShutdownCleanup empty the state (each wrote the four lines out until
+// 2026-10-01). Caller holds gLock.
+void KBSHitMarkerForget()
+{
+	gHasMark = kFalse;
+	gDB = nil;
+	gDocPath.Clear();
+	gStory = kInvalidUID;
 }
 
 // (KBSHitMarkerRepaint - repaint a document so the marker appears or disappears now - stood here until
@@ -324,10 +332,7 @@ bool KBSHitMarker::ClearMarker(IDataBase*& outDB)
 	{
 		Lock lock(gLock);
 		db = gHasMark ? gDB : nil;
-		gHasMark = kFalse;
-		gDB = nil;
-		gDocPath.Clear();
-		gStory = kInvalidUID;
+		KBSHitMarkerForget();
 	}
 	outDB = db;		// repainted by the caller
 	return true;
@@ -340,20 +345,14 @@ void KBSHitMarker::ForgetDoc(IDataBase* db)
 	Lock lock(gLock);
 	if (gDB != db)
 		return;			// compared, never read
-	gHasMark = kFalse;
-	gDB = nil;
-	gDocPath.Clear();
-	gStory = kInvalidUID;
+	KBSHitMarkerForget();
 }
 
 void KBSHitMarker::ShutdownCleanup()
 {
 	gShutdown = kTrue;
 	Lock lock(gLock);
-	gHasMark = kFalse;
-	gDB = nil;
-	gDocPath.Clear();	// a static PMString must not outlive the DLL's teardown
-	gStory = kInvalidUID;
+	KBSHitMarkerForget();	// gDocPath too: a static PMString must not outlive the DLL's teardown
 }
 
 // End, KBSHitMarker.cpp.

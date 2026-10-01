@@ -9,7 +9,7 @@
 //  sits at the outport (bottom-right, horizontal text) of the LAST frame the thread is placed in.
 //  Shared by three call sites so the geometry is computed one way only (named, so a new one has
 //  somewhere to be added):
-//    * KBSJump::JumpToHit (the UI half, through IKBSRuns::FindOversetLocator) - scrolls the view to
+//    * KBSJump's JumpToHit (the UI half, through IKBSRuns::FindOversetLocator) - scrolls the view to
 //      the "+" point (no marker) when a jumped-to hit is overset.
 //    * KBSSearchEngine's BuildHit - names the page the "+" sits on so an overset hit lists as
 //      "P<page>(n) overset" and sorts into that page instead of being pushed to the end.
