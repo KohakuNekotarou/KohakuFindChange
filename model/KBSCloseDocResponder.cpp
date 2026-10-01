@@ -58,6 +58,7 @@
 
 // General includes:
 #include "CResponder.h"
+#include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in Respond
 
 // Project includes:
 #include "KBSBookScope.h"		// ReleaseSearchedBook - paired with every result Clear()
@@ -90,6 +91,12 @@ CREATE_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
 void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 {
 	if (signalMgr == nil)
+		return;
+
+	// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6). A model plug-in's
+	// responder is also called on a background task's thread, where the document "closing" is the task's
+	// own copy (an export's clone) - and the results are about the user's document, which stays open.
+	if (!IDThreading::IsMainThreadDomain())
 		return;
 
 	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,

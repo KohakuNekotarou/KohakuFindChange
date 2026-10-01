@@ -108,6 +108,7 @@
 
 // ID.h files:
 #include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
+#include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in Update
 #include "BookID.h"				// kCloseBookCmdBoss, IID_IBOOKCONTENT
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
 
@@ -301,6 +302,11 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 {
 	// One cue, one question - see the file header.
 	if (theChange != kCloseBookCmdBoss)
+		return;
+
+	// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6): the results and the
+	// timer below are the session's, and a background task's thread has no business with either.
+	if (!IDThreading::IsMainThreadDomain())
 		return;
 
 	// No searched book? Then no book closing is any of our business - nothing of ours is open and

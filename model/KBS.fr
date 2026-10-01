@@ -66,7 +66,7 @@ resource PluginVersion (kSDKDefPluginVersionResourceID)
 	kKBSCurrentMajorFormatNumber, kKBSCurrentMinorFormatNumber,
 	{ kInDesignProduct },
 	{ kWildFS },
-	kUIPlugIn,
+	kModelPlugIn,		// 2026-10-01, the model/UI split: no UI boss, no UI library, safe on a background thread
 	kKBSVersion
 };
 
@@ -125,7 +125,11 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	/*
 	 * Startup/shutdown service boss (Task 3) - the MODEL half's since 2026-10-01: starts the book-close
 	 * watcher and clears the model's state during controlled shutdown.
-	 * kLazyStartupShutdownProviderImpl (API-provided) registers it.
+	 * kCMainThreadStartupShutdownProviderImpl (API-provided) registers it since 2026-10-01 (it was the lazy
+	 * provider): a model plug-in's startup/shutdown service is otherwise ALSO called as each background
+	 * thread starts and stops (guide vol1-07), and this Shutdown throws the session's results away. The
+	 * shape Adobe uses for a model plug-in that wants the main thread only, with that very reason written
+	 * beside it: private/toolkit/diagnosticlog/DiagLogClass.fr; KCM's model half does the same.
 	 */
 	Class
 	{
@@ -133,7 +137,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kInvalidClass,
 		{
 			IID_ISTARTUPSHUTDOWN, kKBSStartupShutdownImpl,
-			IID_IK2SERVICEPROVIDER, kLazyStartupShutdownProviderImpl,
+			IID_IK2SERVICEPROVIDER, kCMainThreadStartupShutdownProviderImpl,
 		}
 	},
 

@@ -18,6 +18,7 @@
 // General includes:
 #include "CObserver.h"
 #include "IDFile.h"
+#include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in LazyUpdate
 #include "PersistUtils.h"	// ::GetUIDRef - which story a notification is about
 #include "TextID.h"			// IID_ITEXTMODEL - the protocol InDesign raises a story's change under
 
@@ -304,6 +305,10 @@ public:
 	virtual void LazyUpdate(ISubject* theSubject, const PMIID& protocol, const LazyNotificationData* data)
 	{
 		if (protocol != IID_ITEXTMODEL || theSubject == nil)
+			return;
+		// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6): an Undo and a Redo
+		// happen there, and the results it moves are the session's.
+		if (!IDThreading::IsMainThreadDomain())
 			return;
 		(void)KBSUndoFollow::Follow(::GetUIDRef(theSubject).GetUID());
 	}
