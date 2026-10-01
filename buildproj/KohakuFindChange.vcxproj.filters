@@ -15,106 +15,106 @@
       </Filter>
    </ItemGroup>
    <ItemGroup>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSActionComponent.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSActionComponent.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListAdapter.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultListAdapter.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListWidgetMgr.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultListWidgetMgr.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSColorTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSStatusTextView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSStatusTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSDrawEventHandler.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSDrawEventHandler.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSMarkerExpiryIdleTask.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSMarkerExpiryIdleTask.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSJump.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSJump.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSignRecordsCmd.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSignRecordsCmd.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultCheckObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeEH.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultTreeEH.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultTreeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSStartupShutdown.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSStartupShutdown.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSCloseDocResponder.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSCloseDocResponder.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTitle.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelAlpha.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeMinimize.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelState.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelPlacement.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelIcon.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelMetrics.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHowTo.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp">
@@ -126,181 +126,181 @@
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSID.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSID.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSNoStrip.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSNoStrip.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\TriggerResourceDeps.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\TriggerResourceDeps.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
       <ClCompile Include="$(id_sdk_dir)\source\precomp\msvc\VCPlugInHeaders.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelNotify.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelObserver.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelLookup.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUIServices.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarkerView.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelServices.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIStartupShutdown.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUIStartupShutdown.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeAnywhere.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeAnywhere.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSLoc.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSLoc.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFactoryList.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSFactoryList.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultNodeID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSColorTextView.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSStatusTextData.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSStatusTextData.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTextDraw.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTextDraw.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultTree.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultTree.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSDrawEventHandler.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSDrawEventHandler.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSMarkerExpiryIdleTask.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSMarkerExpiryIdleTask.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSJump.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSJump.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTitle.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelAlpha.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeMinimize.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelState.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelPlacement.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelIcon.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelMetrics.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHowTo.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelTypes.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelTypes.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelNotify.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelObserver.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSUIServices.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSUIServices.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelLookup.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarkerView.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSResults.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSResults.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSRuns.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSRuns.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSChapters.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSChapters.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelAccess.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelAccess.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBoundaryID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBoundaryID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>
    <ItemGroup>
-      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\source\KBS.rc">
+      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\model\KBS.rc">
          <Filter>Resource Files</Filter>
       </ResourceCompile>
    </ItemGroup>
    <ItemGroup>
-      <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">
+      <CustomBuild Include="..\..\..\source\sdksamples\KBS\model\KBS.fr">
          <Filter>Resource Files</Filter>
       </CustomBuild>
-      <None Include="..\..\..\source\sdksamples\KBS\source\KBS_enUS.fr">
+      <None Include="..\..\..\source\sdksamples\KBS\model\KBS_enUS.fr">
          <Filter>Resource Files</Filter>
       </None>
    </ItemGroup>

@@ -215,101 +215,101 @@
       </PostBuildEvent>
    </ItemDefinitionGroup>
    <ItemGroup>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSActionComponent.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListAdapter.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultListWidgetMgr.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSStatusTextView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarker.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSMarkerExpiryIdleTask.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSJump.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSSignRecordsCmd.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultCheckObserver.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeEH.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSResultTreeEH.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSStartupShutdown.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSCloseDocResponder.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSIconTip.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSActionComponent.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultListAdapter.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultListWidgetMgr.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSColorTextView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSStatusTextView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarker.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSMarkerExpiryIdleTask.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSJump.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSignRecordsCmd.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultCheckObserver.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultNodeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultTreeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSStartupShutdown.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSCloseDocResponder.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTitle.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelAlpha.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeMinimize.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelState.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelPlacement.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSIconTip.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelIcon.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSPanelMetrics.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHowTo.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSID.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSNoStrip.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\TriggerResourceDeps.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSID.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSNoStrip.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\TriggerResourceDeps.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\precomp\msvc\VCPlugInHeaders.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelNotify.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelObserver.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelLookup.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUIServices.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarkerView.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelServices.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSUIStartupShutdown.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUIStartupShutdown.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeAnywhere.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeAnywhere.cpp">
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -317,90 +317,90 @@
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSLoc.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFactoryList.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookScope.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSSearchEngine.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultModel.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultNodeID.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSColorTextView.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSStatusTextData.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTextDraw.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSResultTree.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarker.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSMarkerExpiryIdleTask.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSJump.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSOversetLocator.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSReplaceEngine.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSTrackChange.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelTitle.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelAlpha.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSFindChangeMinimize.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelState.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelPlacement.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookWatch.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelIcon.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSPanelMetrics.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSRunGuard.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSShowChanges.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSUndoFollow.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHowTo.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelTypes.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelNotify.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelObserver.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSUIServices.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSProgressBar.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBookPanelLookup.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSResults.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSRuns.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSChapters.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelAccess.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSBoundaryID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSLoc.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSFactoryList.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultNodeID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSColorTextView.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSStatusTextData.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTextDraw.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultTree.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarker.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSMarkerExpiryIdleTask.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSJump.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelTitle.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelAlpha.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSFindChangeMinimize.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelState.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelPlacement.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelIcon.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSPanelMetrics.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHowTo.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelTypes.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelObserver.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSUIServices.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookPanelLookup.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarkerView.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSResults.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSRuns.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSChapters.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelAccess.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBoundaryID.h"/>
    </ItemGroup>
    <ItemGroup>
-      <CustomBuild Include="..\..\..\source\sdksamples\KBS\source\KBS.fr">
+      <CustomBuild Include="..\..\..\source\sdksamples\KBS\model\KBS.fr">
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\source" @"KohakuFindChangeodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\source" @"KohakuFindChangeodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\source" @"KohakuFindChangeodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\source" @"KohakuFindChangeodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeodfrc.rsp"
       </Command>
          <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)TriggerResourceDeps.obj;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
       </CustomBuild>
-      <None Include="..\..\..\source\sdksamples\KBS\source\KBS_enUS.fr" />
+      <None Include="..\..\..\source\sdksamples\KBS\model\KBS_enUS.fr" />
    </ItemGroup>
    <ItemGroup>
-      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\source\KBS.rc">
+      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\model\KBS.rc">
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\source\sdksamples\KBS\source;..\..\..\source\sdksamples\KBS\source;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\source\sdksamples\KBS\model;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..\..\source\sdksamples\KBS\source;..\..\..\source\sdksamples\KBS\source;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..\..\source\sdksamples\KBS\model;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\source\sdksamples\KBS\source;..\..\..\source\sdksamples\KBS\source;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\source\sdksamples\KBS\model;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Release|x64'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..\..\source\sdksamples\KBS\source;..\..\..\source\sdksamples\KBS\source;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..\..\source\sdksamples\KBS\model;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       </ResourceCompile>
    </ItemGroup>

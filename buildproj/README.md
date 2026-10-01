@@ -13,11 +13,12 @@ editing a build file there, copy it back here and commit.
 
 ## Restore into a clean SDK checkout
 1. Copy the four files above into `build/win/prj/`.
-2. Copy the plugin sources (this repo's `source/` folder - `.cpp` / `.h` / `.fr` / `.rc` / `.png`)
-   into `source/sdksamples/KBS/source/`. The SDK folder keeps the short name `KBS` - it is not
+2. Copy the plugin sources (this repo's `model/` folder - `.cpp` / `.h` / `.fr` / `.rc` / `.png`)
+   into `source/sdksamples/KBS/model/`. The SDK folder keeps the short name `KBS` - it is not
    renamed along with the project, and the `.vcxproj` and the ODFRC `-i` flag both point at
-   `KBS\source` (the sources moved a level down on 2026-08-10; everything they include resolves
-   against their own folder, so they all have to stay together).
+   `KBS\model` (the sources moved a level down on 2026-08-10 into `source/`, renamed `model/` on
+   2026-10-01 for the model/UI split; everything they include resolves against their own folder,
+   so they all have to stay together).
 3. Register the project in `build/win/prj/SDKSamples.sln`:
    - a `Project(...) = "KohakuFindChange", "KohakuFindChange.vcxproj", "{DD125A1E-99DD-4D59-B001-DEB4D37D34C5}"` / `EndProject` block, and
    - eight `{DD125A1E-99DD-4D59-B001-DEB4D37D34C5}.<Debug|Release>|<x64|x86>.<ActiveCfg|Build.0>` lines in `GlobalSection(ProjectConfigurationPlatforms)`.
