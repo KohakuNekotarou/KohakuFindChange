@@ -103,7 +103,9 @@ DECLARE_PMID(kClassIDSpace, kKBSStatusTextWidgetBoss, kKBSPrefix + 19)
 // a startup/shutdown service is declared per boss, so the side the panel's work runs on needs a boss of
 // its own. (+ 13 was the first choice of the 2026-08-16 plan; it is a retired id, so it stays spent.)
 DECLARE_PMID(kClassIDSpace, kKBSUIStartupShutdownBoss, kKBSPrefix + 20)
-//DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 21)
+// Edit > Find/Change - and Ctrl+F - with no document open (2026-10-01, the user's request): the action filter
+// that takes the "needs a document" bits off InDesign's own Find/Change action (KBSFindChangeAnywhere.cpp).
+DECLARE_PMID(kClassIDSpace, kKBSFindChangeAnywhereBoss, kKBSPrefix + 21)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 22)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 23)
 //DECLARE_PMID(kClassIDSpace, kKBSBoss, kKBSPrefix + 24)
@@ -235,6 +237,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKBSPrefix + 37)
 // The panel follows an Undo and a Redo (2026-09-29, KBSUndoFollow.cpp): the lazy observer on each story a
 // write of KBS's own moved.
 DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
+// Edit > Find/Change with no document open (2026-10-01): the action filter (KBSFindChangeAnywhere.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSFindChangeAnywhereImpl, kKBSPrefix + 39)
 
 
 // ActionIDs:

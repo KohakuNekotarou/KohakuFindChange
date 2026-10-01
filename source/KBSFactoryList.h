@@ -37,6 +37,8 @@ REGISTER_PMINTERFACE(KBSResultTreeEH, kKBSResultTreeEHImpl)
 REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
 // ...and the UI half's own (2026-10-01, the model/UI split).
 REGISTER_PMINTERFACE(KBSUIStartupShutdown, kKBSUIStartupShutdownImpl)
+// Edit > Find/Change with no document open (2026-10-01): the action filter.
+REGISTER_PMINTERFACE(KBSFindChangeAnywhere, kKBSFindChangeAnywhereImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
 // Result invalidation: retire a document-scope result set when its document closes.
