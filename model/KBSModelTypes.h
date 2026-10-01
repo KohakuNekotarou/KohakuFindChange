@@ -64,7 +64,8 @@ namespace KBSResultModel
 	struct RowDisplay
 	{
 		PMString		locator;	// "P1(2) overset hidden locked" - drawn at the full text colour
-		PMString		accentFlag;	// "missing" / "refused", or empty - drawn in the accent colour
+		PMString		accentFlag;	// "missing" / "refused" / "not replaced", or empty - drawn in the accent
+									// colour (BuildHitLocator's tests are the list of both strings)
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
 		PMString		postText;

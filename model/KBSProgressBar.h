@@ -7,8 +7,9 @@
 //  The engines' progress bar (2026-10-01, the model/UI split). It stands where a RangeProgressBar stood
 //  - on the run's stack, with the same four calls - but the bar itself belongs to the UI half: this asks
 //  IKBSUIServices for one, and without the UI (a background thread, InDesign Server) there is no bar,
-//  nothing to cancel, and every call is a no-op. A progress bar is a user-interface component, and the
-//  guide keeps those out of a model plug-in (vol1-06, "UI component content").
+//  nothing to cancel, and every call is a no-op. Not a link matter - RangeProgressBar is PUBLIC_DECL and
+//  a model plug-in could call it - but KBS counts the modal bar among the dialogs the guide lists as user-
+//  interface components (vol1-06, "UI component content"); the user's call (IKBSUIServices.h says more).
 //
 //  The calls behave exactly as RangeProgressBar's did, because they ARE its calls: the UI half's object
 //  wraps a real one (KBSUIServices.cpp). So the modal bar still pumps events while it is up - which is
