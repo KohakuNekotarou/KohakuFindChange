@@ -25,9 +25,9 @@
 //  the only notification an Undo and a Redo broadcast - the same message ids as the Do
 //  (LazyNotificationData.h:50-58); a responder and a command interceptor are not called at all. The same
 //  shape as KCM's Story Edits list (KCMStoryFollowObserver - the user's "the way KCM does").
-//  ***** A UI PLUG-IN'S IMPLEMENTATION ON A MODEL BOSS ***** is allowed through an AddIn in the UI plug-in's
-//  resource (guide vol1-07, "Object-Model Rules" 2), and is not there in a background task - where there
-//  is neither an Undo nor a panel to follow it.
+//  ***** THE MODEL HALF'S SINCE THE SPLIT (2026-10-01) ***** - it keeps the results true and tells the panel
+//  only through KBSModelNotify - and it answers on the main thread only (the gate in LazyUpdate): a
+//  background task has neither an Undo nor a panel to follow it.
 //
 //  ***** WHAT IS NOT FOLLOWED: anything that is not a write of KBS's own ***** - typing, the Track Changes
 //  panel, a script, a replace made before Show Changes rebuilt the list. Those leave the rows as they are,

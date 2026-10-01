@@ -28,10 +28,9 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSBookScope.h"		// FindOpenChapterDoc - a chapter's document found again by its file
-#include "KBSReplaceEngine.h"	// IsReplacing - nothing is followed while a replace is up
 #include "KBSResultModel.h"
 #include "KBSModelNotify.h"		// the panel drawn again, and its message line - told, never called (2026-10-01)
-#include "KBSRunGuard.h"		// IsAnyRunning - nor while any run of ours is up
+#include "KBSRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
 #include "KBSSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KBSUndoFollow.h"
 
@@ -350,9 +349,8 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 		return;
 	fOpen = false;
 
-	Step step;
+	Step step;		// done (the write stands)
 	step.kind = kind;
-	step.done = true;
 	step.resultSet = gPendingResultSet;
 	step.whole = gPendingWhole;
 	step.layoutBefore = gPendingLayout;
@@ -394,8 +392,8 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 bool KBSUndoFollow::Follow(UID story)
 {
 	// A write of ours is standing (its own notifications arrive as its sequence ends), or a run is up
-	// (a search or a replace pumps events behind its bar).
-	if (gRecording || gSteps.empty() || KBSRunGuard::IsAnyRunning() || KBSReplaceEngine::IsReplacing())
+	// (a search or a replace pumps events behind its bar - KBSRunGuard counts the replace too).
+	if (gRecording || gSteps.empty() || KBSRunGuard::IsAnyRunning())
 		return false;
 	// ***** THE CHEAP QUESTION FIRST: does a kept write name this story? ***** Typing in a watched story
 	// reaches here on every keystroke.
@@ -472,41 +470,29 @@ bool KBSUndoFollow::Follow(UID story)
 		KBSNotifyRefreshRows();
 	PMString msg;
 	msg.SetTranslatable(kFalse);
-	if (undone > 0 && redone == 0)
-	{
-		msg.Append("Undo: ");
-		if (undone == 1)
-		{
-			msg.Append(KindName(lastKind));
-			msg.Append(" - the rows are back as they were before it.");
-		}
-		else
-		{
-			msg.AppendNumber(undone);
-			msg.Append(" changes of Kohaku Find/Change - the rows are back as they were before them.");
-		}
-	}
-	else if (redone > 0 && undone == 0)
-	{
-		msg.Append("Redo: ");
-		if (redone == 1)
-		{
-			msg.Append(KindName(lastKind));
-			msg.Append(" - the rows are as they were after it.");
-		}
-		else
-		{
-			msg.AppendNumber(redone);
-			msg.Append(" changes of Kohaku Find/Change - the rows are as they were after them.");
-		}
-	}
-	else
+	if (undone > 0 && redone > 0)
 	{
 		msg.Append("Undo / Redo: the rows follow the document (");
 		msg.AppendNumber(undone);
 		msg.Append(" undone, ");
 		msg.AppendNumber(redone);
 		msg.Append(" redone).");
+	}
+	else
+	{
+		// One way only: "Undo: Replace - the rows are back as they were before it.", "Redo: 3 changes of ..."
+		const bool undo = (undone > 0);
+		const int32 count = undo ? undone : redone;
+		msg.Append(undo ? "Undo: " : "Redo: ");
+		if (count == 1)
+			msg.Append(KindName(lastKind));
+		else
+		{
+			msg.AppendNumber(count);
+			msg.Append(" changes of Kohaku Find/Change");
+		}
+		msg.Append(undo ? " - the rows are back as they were before " : " - the rows are as they were after ");
+		msg.Append(count == 1 ? "it." : "them.");
 	}
 	KBSNotifyStatus(msg);
 	return true;
