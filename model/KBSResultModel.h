@@ -659,7 +659,7 @@ namespace KBSResultModel
 	    !! The DRAWN text (matchText) is deliberately NOT handed out here any more. It is capped
 	    for the row (500 characters at the time), so comparing it judged a long GREP match on its
 	    first 500 and let a rewrite past that point through as "the same occurrence"
-	    (found 2026-08-04). The hash covers the match whole - see KBSSearchEngine::HashMatchText.
+	    (found 2026-08-04). The hash covers the match whole - see HashMatchText (KBSSearchEngine.cpp).
 
 	    Its own getter because it runs once per checked hit, and the two getters it replaces carry
 	    freight it does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies
@@ -768,14 +768,13 @@ namespace KBSResultModel
 
 	    That is exactly what happened between 2026-08-04 and 2026-08-05. The test used to compare
 	    matchText, which this function has always updated, so the pair could not come apart; when
-	    the hash took over as the thing compared (see KBSSearchEngine::HashMatchText), the update
+	    the hash took over as the thing compared (see HashMatchText, KBSSearchEngine.cpp), the update
 	    did not follow it here, and every replaced row lost its jump. Splitting display from
-	    comparison was
-	    right - the drawn text is capped and cannot vouch for a long match - but
+	    comparison was right - the drawn text is capped and cannot vouch for a long match - but
 	    they are still written at the same moment, from the same range.
 
-	    @param newMatchHash KBSSearchEngine::HashMatchText over the range the replace command
-	           reported writing - the SAME range the three segments were read from. */
+	    @param newMatchHash the hash of the whole match (HashMatchText's) over the range the replace
+	           command reported writing - the SAME range the three segments were read from. */
 	void SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
 		const PMString& newMatch, const PMString& newPost, uint64 newMatchHash);
 
@@ -801,8 +800,8 @@ namespace KBSResultModel
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
 	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
 	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
-	    apart. THE one definition - the search's page ordering (KBSSearchEngine.cpp,
-	    FinalizeChapterHits) and a replace's report (KeepCheckedRows) both call it. */
+	    apart. THE one definition - the search's page ordering (KBSSearchEngine::FinalizeHits) and a
+	    replace's report (KeepCheckedRows) both call it. */
 	void NumberHitsWithinPages(std::vector<Hit>& hits);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
@@ -816,15 +815,10 @@ namespace KBSResultModel
 	    BuildReportText, called it too until Save Results... went on 2026-09-27.)
 
 	    ***** DISPLAY ONLY. ***** Never applied to what the model holds. What the model holds is what
-	    a JUMP compares against the document (KBSSearchEngine::MatchIsSameOccurrence, through the
-	    hash taken over the stored range), and a marked-up copy would fail every comparison - a click
-	    on a row would answer "the text is no longer here" about text that had not moved at all.
-	    Callers mark a COPY, at the moment they draw or write it. (Until 2026-08-05 the REPLACE ran
-	    that comparison too, on every row, before writing; it no longer does, and the jump is its only
-	    caller. The rule here is unchanged either way.)
-
-	    (The report flattens what is left afterwards, which is what keeps its tabs from splitting a
-	    cell. The marks take the breaks out of that pass's way, so nothing there changes.)
+	    every door compares against the document (KBSSearchEngine::RowReadsAsFound - the hash taken
+	    over the stored range, and the line around it), and a marked-up copy would fail every
+	    comparison - a click on a row would answer "the text is no longer here" about text that had
+	    not moved at all. Callers mark a COPY, at the moment they draw or write it.
 
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
 	    a table's per-row continuations, page number markers (2026-09-26, the user's call: they drew as

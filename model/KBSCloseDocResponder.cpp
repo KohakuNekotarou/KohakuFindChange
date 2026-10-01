@@ -61,13 +61,13 @@
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in Respond
 
 // Project includes:
-#include "KBSBookScope.h"		// ReleaseSearchedBook - paired with every result Clear()
+#include "KBSBookScope.h"		// ForgetHeldDoc
 #include "KBSHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KBSID.h"
 #include "KBSResultModel.h"
 #include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
-#include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
+#include "KBSSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together
 #include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go (2026-09-29)
 
 /** Retires a document-scope result set when its document is closed.
@@ -208,16 +208,10 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// Back to empty. Rebuild draws the now-empty model, and the status line says why the rows
 	// went - a panel that empties itself without a word reads as a crash.
 	//
-	// ReleaseSearchedBook alongside, without exception: a document-scope result set has no book
-	// behind it, so this call finds nothing to do every time it runs. It is here so that "every
-	// KBSResultModel::Clear() is paired with one" stays a rule with no exceptions to remember -
-	// the next person to add a Clear() elsewhere should not have to work out whether theirs counts.
-	//
-	// ...and the Find Format those rows were searched with, by the same rule and for the same
-	// reason (2026-08-08: it was the one piece of result-set state that had been left out of it).
-	KBSResultModel::Clear();
-	KBSBookScope::ReleaseSearchedBook();
-	KBSSearchEngine::ForgetSearchedFindFormat();
+	// DropResults, without exception: a document-scope result set has no book behind it, so its
+	// ReleaseSearchedBook finds nothing to do every time it runs here - it is one rule with no
+	// exceptions to remember.
+	KBSSearchEngine::DropResults();
 	KBSNotifyRebuild();
 
 	PMString cleared("Results cleared - the document was closed.");

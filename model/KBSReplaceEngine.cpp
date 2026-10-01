@@ -323,7 +323,8 @@ void NoteChapter(int32 chapterIdx, int32& ioCount, PMString& ioFirst, bool& ioHa
 // So the walk below no longer needs a same-occurrence test of its own: by the time it runs, every
 // ticked position has been confirmed and nothing has moved since (the verify pass writes nothing).
 //
-// KBSSearchEngine::MatchIsSameOccurrence and the hash behind it are NOT gone - the JUMP asks them,
+// The same-occurrence test and the hash behind it are NOT gone (KBSSearchEngine::RowReadsAsFound,
+// which every door asks since 2026-09-29) - the JUMP asks them,
 // which is how clicking a row can answer "the replacement is no longer here" instead of scrolling to
 // whatever now sits at that position; so do the row doors (RowStillStands, ReplaceRowsNow, RowsToRedo,
 // since 2026-09-27) and the verify walk (ChapterMovedUnderRows, since 2026-09-29).
@@ -1621,13 +1622,9 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 	BuildSummary(totals, outSummary);
 
 	// ***** BACK TO BEFORE THE SEARCH. ***** The rows were found in text that is not there any more,
-	// which is the whole reason the run stopped. Leaving them
-	// up invites a second run against a list that describes the old text - the same reasoning, and
-	// the same three calls, as RefuseChangedQuery above.
-	//
-	// The three go together, always: ReleaseSearchedBook because "every KBSResultModel::Clear() is
-	// paired with one" (KBSBookScope::ReleaseSearchedBook), and ForgetSearchedFindFormat because the
-	// format the replace's door compares against belongs to the rows going away here.
+	// which is the whole reason the run stopped. Leaving them up invites a second run against a list
+	// that describes the old text - the same reasoning, and the same call, as RefuseChangedQuery above:
+	// DropResults, the rows with the book and the format that describe them.
 	//
 	// The PANEL is not touched from here: the caller redraws the tree and writes this summary to the
 	// status line (KBSActionComponent::DoAction), and the illustration follows the model by itself
@@ -1635,9 +1632,7 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 	// before anything was run.
 	if (resultsAreStale)
 	{
-		KBSResultModel::Clear();
-		KBSBookScope::ReleaseSearchedBook();
-		KBSSearchEngine::ForgetSearchedFindFormat();
+		KBSSearchEngine::DropResults();
 		// ***** SHORT ENOUGH TO BE READ WHOLE. ***** This follows BuildSummary's own cancel sentence,
 		// so what the panel draws is both of them - and at the panel's floor the two used to come to
 		// 128 characters against a box that held about 88: the line stopped at "the document has" and
@@ -1861,13 +1856,11 @@ bool KBSReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 			// leaving them up invites the user to try again against a list that cannot be acted on. Clearing
 			// says plainly that the search has to be re-run, which is the only way forward anyway.
 			//
-			// Paired, always - see KBSBookScope::ReleaseSearchedBook. The caller redraws the tree, so
-			// nothing here touches the panel. The remembered format goes with them, and here it matters
-			// more than anywhere: what was just compared against it is gone, so leaving it standing would
-			// have the NEXT question about a changed query answered from a search whose rows no longer exist.
-			KBSResultModel::Clear();
-			KBSBookScope::ReleaseSearchedBook();
-			KBSSearchEngine::ForgetSearchedFindFormat();
+			// The caller redraws the tree, so nothing here touches the panel. The remembered format goes
+			// with the rows (DropResults), and here it matters more than anywhere: what was just compared
+			// against it is gone, so leaving it standing would have the NEXT question about a changed query
+			// answered from a search whose rows no longer exist.
+			KBSSearchEngine::DropResults();
 			outSummary.Append("The Find/Change query has changed since this search - the results have been cleared. Search again.");
 			return true;
 		default:

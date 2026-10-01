@@ -251,11 +251,8 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 		return 0;
 	}
 
-	// ***** THE COMMIT POINT. ***** The search's three, together (every Clear() forgets the searched book
-	// and the find format beside it - KBSSearchEngine.cpp, where gSearchedFindAttrs is declared).
-	KBSResultModel::Clear();
-	KBSBookScope::ReleaseSearchedBook();
-	KBSSearchEngine::ForgetSearchedFindFormat();
+	// ***** THE COMMIT POINT. ***** The rows go, with the book and the find format that describe them.
+	KBSSearchEngine::DropResults();
 
 	std::vector<KBSBookScope::ChapterDoc> targets;
 	PMString bookName;
@@ -384,9 +381,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 		cancelled = true;
 	if (cancelled)
 	{
-		KBSResultModel::Clear();
-		KBSBookScope::ReleaseSearchedBook();
-		KBSSearchEngine::ForgetSearchedFindFormat();
+		KBSSearchEngine::DropResults();
 		outSummary.Clear();
 		outSummary.SetTranslatable(kFalse);
 		outSummary.Append("Show Changes cancelled.");

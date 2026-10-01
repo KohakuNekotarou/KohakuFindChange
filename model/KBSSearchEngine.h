@@ -6,16 +6,15 @@
 //
 //  The search engine: walks the user's CURRENT Find/Change query across the scope the Book Scope
 //  toggle selects - every chapter of the TARGET book when it is ON (the book the Book panel is
-//  showing, or the active book when no panel can be reached: KBSBookScope::ResolveTargetBook), just
-//  the active document (KBSBookScope::ActiveDocument) when it
-//  is OFF, never a silent fallback between them - and collects the matches into
-//  KBSResultModel, grouped by chapter. Unlike KESCL - which supplied its own literal text and
-//  pinned the mode to plain text - KBS touches nothing on the Find/Change panel: it walks with
-//  whatever the user set there, MODE INCLUDED (Text or GREP). The walk is read-only (a
-//  SaveRestoreModifiedState dirty guard per document).
+//  showing, or the active book when no panel can be reached: KBSBookScope::ResolveTargetBook), what
+//  Edit > Find/Change's Search: names when it is OFF (2026-09-29), never a silent fallback between
+//  them - and collects the matches into KBSResultModel, grouped by chapter. Unlike KESCL - which
+//  supplied its own literal text and pinned the mode to plain text - KBS touches nothing on the
+//  Find/Change panel: it walks with whatever the user set there, MODE INCLUDED (Text or GREP). The
+//  walk is read-only (a SaveRestoreModifiedState dirty guard per document).
 //
 //  Each collected hit carries the line's text pre-split into the three segments the colour cell
-//  paints (before / matched / after) and the jump anchors (story UID + text range) for Task 3.
+//  paints (before / matched / after) and the jump anchors (story UID + text range).
 //
 //========================================================================================
 
@@ -45,11 +44,10 @@ void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bo
     list, so a direction means nothing to KBS - and a backward search listed matches the replace
     (Change All, that day) did not make (H-5: GREP lookarounds read other text backwards). The one
     exception is the replace's writing walk for a GREP query holding ^ (KBSBackwardSearchScope,
-    below). For the
-    life of the object the session's search direction is forward; the user's own setting is put back
-    by the destructor, whatever way the run ends (kSearchBackwardsSilentCmdBoss, the command the
-    2026-09-26 spike measured). Create it OUTSIDE any command sequence: an aborted sequence would take
-    the switch back and leave the restore to set it a second time. */
+    below). For the life of the object the session's search direction is forward; the user's own
+    setting is put back by the destructor, whatever way the run ends (kSearchBackwardsSilentCmdBoss,
+    the command the 2026-09-26 spike measured). Create it OUTSIDE any command sequence: an aborted
+    sequence would take the switch back and leave the restore to set it a second time. */
 class KBSForwardSearchScope
 {
 public:
@@ -83,12 +81,12 @@ private:
 namespace KBSSearchEngine
 {
 	/** Resolve the scope from the Book Scope toggle (the TARGET book's chapters when it is ON - see
-	    the head of this file for which book that is - the
-	    active document when it is OFF - never a silent fallback between them), walk the user's
-	    current Find/Change query across it, fill KBSResultModel with the hits (grouped by
-	    chapter, only chapters with >=1 hit), and build a one-line status summary. Each chapter
-	    the search opened windowless is handed back as soon as it has been walked: the hits' display
-	    text is already extracted, and a jump or a replace reopens a chapter by its file.
+	    the head of this file for which book that is - what Search: names when it is OFF, never a
+	    silent fallback between them), walk the user's current Find/Change query across it, fill
+	    KBSResultModel with the hits (grouped by chapter, only chapters with >=1 hit), and build a
+	    one-line status summary. Each chapter the search opened windowless is handed back as soon as
+	    it has been walked: the hits' display text is already extracted, and a jump or a replace
+	    reopens a chapter by its file.
 
 	    @param outSummary  a ready-to-show status line for the panel.
 	    @return the total number of matches across the scope. */
@@ -233,8 +231,7 @@ namespace KBSSearchEngine
 	    when the walk was measured to follow the dialog's "search backwards" (the walker is handed the
 	    live options), and taken out the next day when KBS began searching and replacing FORWARD ONLY
 	    (KBSForwardSearchScope, round every search, replace and Redo): the dialog's direction no longer
-	    changes anything KBS does. (This paragraph still said "the direction is in it" until the
-	    2026-09-27 defect sweep.)
+	    changes anything KBS does.
 
 	    Everything on the CHANGE side stays out: it decides what gets written rather than what gets
 	    found.
@@ -249,21 +246,10 @@ namespace KBSSearchEngine
 	    still the same one. Called once per search, beside BuildWalkSignature; a search that cannot
 	    read the settings simply remembers nothing, and FindFormatHasChanged then says "cannot tell".
 
-	    ***** THE LIST COMPARES ITSELF. ***** AttributeBossList::IsEqual is a deep compare over every
-	    attribute in both lists (AttributeBossList.h:179-182), which is exactly the question being
-	    asked and is not one this plug-in can answer from outside: there is no generic "read this
-	    attribute's value" call, so KBS used to probe each attribute through nine value interfaces and
-	    fingerprint whatever answered. An attribute answering none of the nine went into that
-	    fingerprint as its CLASS alone - so "same condition, different value" was invisible, and with
-	    the per-hit same-occurrence test gone (2026-08-05) that is a wrong replacement made in
-	    silence. The copy is shallow (Duplicate, AttributeBossList.h:157: the attributes' reference
-	    counts go up), held in a boost::shared_ptr the way chmlfilter does it
-	    (CHMLFiltTextHelper.cpp:134).
-
-	    @note The operators are no help - AttributeBossList keeps operator== and operator!= private
-	          (:245-252) - which is a normal C++ way of steering callers to the named method, not a
-	          sign that the comparison is unavailable. A comment in this file said the opposite for
-	          months. */
+	    ***** THE LIST COMPARES ITSELF ***** (AttributeBossList::IsEqual, a deep compare - why a copy
+	    rather than a description is the note over this function in the .cpp). The copy is shallow
+	    (Duplicate, AttributeBossList.h:157: the attributes' reference counts go up), held in a
+	    boost::shared_ptr the way chmlfilter does it (CHMLFiltTextHelper.cpp:134). */
 	void RememberFindFormat();
 
 	/** Has the Find Format changed since RememberFindFormat was called?
@@ -274,23 +260,20 @@ namespace KBSSearchEngine
 	            walk signature follows). */
 	bool FindFormatHasChanged();
 
-	/** Drop what RememberFindFormat kept. PAIR THIS WITH EVERY KBSResultModel::Clear(), exactly as
-	    KBSBookScope::ReleaseSearchedBook is paired with one - the remembered format describes the
-	    rows that are being thrown away, so it has no business outliving them.
-
-	    The rule is worth having no exceptions to even where a particular call has nothing to do
-	    (a scan's results are not a Find/Change query, and the search's own commit point overwrites
-	    the memory a moment later anyway): that is the same reasoning KBSCloseDocResponder gives for
-	    calling ReleaseSearchedBook on a document-scope result set. Until 2026-08-08 this was kept in
-	    step by hand at two of the places that clear the model, and the comment in the .cpp said
-	    there were only those two. (The pairing was put right that day.)
-
-	    ***** THE PLACES ARE NAMED IN THE .cpp, NOT COUNTED HERE. ***** This sentence said EIGHT,
-	    then NINE, and was wrong both times - the second time because 2026-08-10's verify pass gave
-	    the replace a SECOND clearing exit and no number in any comment moved. A count is the one
-	    kind of claim that goes stale without anybody editing the line it is on, so the list lives
-	    in one place and is spelled by name (the same decision block 4 took for KBSPanelMetrics). */
+	/** Drop what RememberFindFormat kept. It goes with EVERY KBSResultModel::Clear(), exactly as
+	    KBSBookScope::ReleaseSearchedBook does - the remembered format describes the rows that are
+	    being thrown away, so it has no business outliving them. DropResults does all three. */
 	void ForgetSearchedFindFormat();
+
+	/** ***** THROW THE RESULTS AWAY - ALL OF WHAT DESCRIBES THEM (2026-10-01). ***** The rows
+	    (KBSResultModel::Clear), the book they were searched in and the chapters it holds open
+	    (KBSBookScope::ReleaseSearchedBook) and the Find Format they were found with
+	    (ForgetSearchedFindFormat): one fact, so every place that throws the results away calls this
+	    rather than keeping the three in step by hand. Worth having no exceptions to even where a
+	    part has nothing to do - the search's own commit point remembers the format again a moment
+	    later. (KBSBookWatch hands its book back first, unconditionally, and clears the rest only when
+	    the panel shows that book - so it pairs the other two itself.) */
+	void DropResults();
 
 	/** The walker scope options EVERY KBS walk uses: the five switches read straight off the
 	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
@@ -344,18 +327,8 @@ namespace KBSSearchEngine
 	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
 	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
 	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
-	    the same statement.
-
-	    (This said "its ONE caller" from the day it arrived - 2026-08-08, block 12's audit, when
-	    that was true - until the fifth audit of this block, 2026-08-10. There are TWO:
-	    KBSJump::JumpToHit and KBSJump::SelectHitText, the double click that selects the match,
-	    which arrived on 2026-08-09 and did not come back to the sentence that had counted its
-	    callers. Sharing one answer between them is the whole point, so the second caller
-	    strengthens the reason rather than weakening it - but a count in a comment is a claim like
-	    any other. Named rather than cited by line: both citations here read :624 and :866 until
-	    2026-08-11, by which time the calls were at :709 and :957. The file they point at says so
-	    itself - "a function name cannot go stale" - and that decision had not travelled back
-	    along the citation.)
+	    the same statement. Asked by the jump - KBSJump::JumpToHit and KBSJump::SelectHitText, the
+	    double click that selects the match - through IKBSRuns.
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
 	          THREAD (and is the only test that answers for a table cell overflowing on its own).
@@ -367,26 +340,6 @@ namespace KBSSearchEngine
 	            nothing useful in either case: the overset locator and the wax geometry both fail
 	            on the same nil, so the marker is cleared and the view stays put. */
 	bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos);
-
-	/** The whole of a match, boiled down to one 64-bit number.
-
-	    WHAT IT REPLACED: a CopyMatchText that handed the matched characters back as a PMString,
-	    capped at 500 characters because a row only ever draws one line. The
-	    same-occurrence test compared that capped copy - so a GREP match of 2000 characters was
-	    judged on its first 500, and a rewrite past that point went through as "the same
-	    occurrence" (found 2026-08-04). This reads the match WHOLE and keeps nothing but the hash,
-	    so the length of the match costs one number either way.
-
-	    64-bit, not 32: a collision here means "the text changed and we replaced it anyway", which
-	    is the one direction this plug-in must not fail in.
-
-	    @return the hash, or 0 when the text could not be read at all. 0 is treated as "cannot
-	            vouch for this" by MatchIsSameOccurrence - it never compares equal. A ZERO-WIDTH
-	            range also answers 0, but never reaches that test: MatchIsSameOccurrence accepts an
-	            empty range on its length arm alone, since there is no text left to disagree about
-	            (GREP's ^ / $ / lookarounds hand through start == end; found the hard way
-	            2026-08-09, when every ^ hit read as missing on an untouched document). */
-	uint64 HashMatchText(const UIDRef& storyRef, TextIndex start, TextIndex end);
 
 	/** Give a row what [start, end) reads NOW - the three segments it paints and the hash of the
 	    whole match - in one KBSResultModel::SetHitSegments. For the callers that have just moved a
@@ -411,8 +364,8 @@ namespace KBSSearchEngine
 	    MATCH, and a normal-coloured segment there would show it as text lying outside it.
 
 	    Display only; the same-occurrence test reads none of the three segments (it compares the
-	    whole match through HashMatchText). Any of the three may come back empty; all three are
-	    empty when the position cannot be read.
+	    whole match through its hash - HashMatchText in the .cpp). Any of the three may come back
+	    empty; all three are empty when the position cannot be read.
 
 	    The same one reading of the story the search's own hits get: one scanner for both halves,
 	    the matched characters copied once and hashed from that copy whenever they are the whole
@@ -420,26 +373,8 @@ namespace KBSSearchEngine
 	    twice, until 2026-09-28.) */
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** How much of each match CollectStoryHits fills in. A walk costs the same whatever is asked for;
-	    what differs is how much is then read about every match it lands on. (A kHitPlace - the story
-	    and range alone, for numbering the rows again - went with that numbering on 2026-09-29.) */
-	enum HitDetail
-	{
-		kHitPlaceAndText,	// story, range, the three drawn segments and the hash - what finding a
-							// row again compares
-		kHitEverything		// ...and the page, the hidden / locked / footnote flags and the story's first
-							// words - a search's row
-	};
-
-	/** Every match of the current query in one story of an open document, as the search's walk meets
-	    them there, with the given scope switches, each filled in as far as 'detail' says. For a row a
-	    jump found out of place, looked for again (KBSJump.cpp, RelocateStaleRow - kHitPlaceAndText).
-	    The story scope is the one the replace's walks take (IWalkerScopeFactoryUtils::
-	    QueryStoryWalkerScope). Read-only (the walk's own dirty guard). False = it could not be walked.
-	    (It was CollectDocHits, over the whole document, until 2026-09-29: the one caller left looks in
-	    one story.) */
-	bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions, HitDetail detail,
-		std::vector<KBSResultModel::Hit>& outHits);
+	// (HitDetail and CollectStoryHits stood here until 2026-10-01, for RelocateStaleRow in KBSJump.cpp.
+	//  The model/UI split brought that here, and they went inside the .cpp with it.)
 
 	/** ***** A HIT FROM A RANGE, BUILT THE WAY THE SEARCH BUILDS ITS OWN (2026-09-29, Show Changes by
 	    KohakuFindChange). ***** The rows of a list rebuilt from the Track Changes records are made by the
@@ -461,75 +396,35 @@ namespace KBSSearchEngine
 	};
 
 	/** A chapter's hits put in page order, each numbered within its page with its locator - the search's
-	    own finishing pass (FinalizeChapterHits), for Show Changes' rows. */
+	    own finishing pass, and Show Changes' (2026-09-29). */
 	void FinalizeHits(std::vector<KBSResultModel::Hit>& hits);
 
-	/** Is the match at [start, end) the SAME occurrence a stored hit describes? FOUR questions,
-	    asked in this order, none of which may answer no:
-
-	      - same story          (a match in another story is never the one the row means)
-	      - same position       (start == expectStart)
-	      - same LENGTH         (end - start == expectEnd - expectStart)
-	      - same text, WHOLE    (the stored hash covers every character of the match)
-
-	    ***** THE FOURTH IS NOT ASKED OF A ZERO-WIDTH MATCH. ***** A match with start == end - what
-	    GREP's ^ / $ / lookarounds hand back - has no text for the fourth question to be about, and
-	    its stored hash is 0, which that question reads as "could not vouch for this" and refuses.
-	    So an empty range that has satisfied the first three is accepted there and then (2026-08-09,
-	    after every ^ hit read as missing on a document nobody had touched). This list said "all of
-	    which must answer yes" until the fifth audit of this block, 2026-08-10 - the fix went into
-	    HashMatchText's @return and into the .cpp, and stopped one door short of here.
-
-	    ***** WHO ASKS. ***** The jump - KBSJump::JumpToHit, and KBSJump::SelectHitText, the double
-	    click that selects the match (the same pair that share IsPositionOverset above) - and, since
-	    the row menus of 2026-09-27, the replace's row doors in KBSReplaceEngine.cpp:
-	    RowStillStands, ReplaceRowsNow and RowsToRedo; since 2026-09-29, Change Checked's verify walk
-	    (ChapterMovedUnderRows) of every ticked row. Each asks about the very range its row
-	    recorded, so the first three questions are satisfied by construction and the hash is what
-	    does the work - the answer being how the panel can say "the replacement is no longer here"
-	    instead of scrolling to whatever took its place, how the double click refuses to hand the
-	    user a selection over text they never searched for, and how a row whose text was edited
-	    is not written. (This said "asked from KBSJump and nowhere else" until 2026-09-28, a day
-	    after the replace began asking it again.)
-	    ***** SINCE 2026-09-29 EVERY ONE OF THEM ASKS IT THROUGH RowReadsAsFound (below) *****, which
-	    adds the line around the match (the defect re-check F-2) - the direct calls are gone.
-
-	    The REPLACE asked it until 2026-08-05 too, of every row before writing it, and that is what
-	    the position arm was for. It carried a posDelta alongside - how far the replace pass had
-	    already moved the text in this story, its own replacements cancelled out, so that whatever
-	    difference was left was the USER's editing. Both went together (KBSReplaceEngine::
-	    ReplaceChecked), and the posDelta has not come back with the row doors: a row now carries
-	    its own range past every change KBS makes, so what it asks about is already where it stands.
-
-	    ***** The last two questions arrived on 2026-08-04. ***** Until then the text was compared
-	    through the row's DRAWN match, capped at 500 characters - so a GREP match of 2000 characters
-	    was judged on its first 500, and neither a rewrite past the cap nor a change of length was
-	    seen.
-
-	    expectHash 0 means the search could not read that match, so nothing can be vouched for and
-	    the answer is false - the safe answer: when in doubt, do not write. */
-	bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex end,
-		UID expectStoryUID, TextIndex expectStart, TextIndex expectEnd, uint64 expectHash);
+	// (MatchIsSameOccurrence and HashMatchText stood here until 2026-10-01. Since 2026-09-29 every door
+	//  asks through RowReadsAsFound, below, so they went inside the .cpp, their notes with them.)
 
 	/** ***** DOES THE ROW STILL READ AS IT WAS FOUND? (2026-09-29, the defect re-check F-2) ***** The
-	    test every door asks before it acts on a row's stored place: MatchIsSameOccurrence over that
-	    place - the whole match, by its hash - AND the line around it: the three drawn segments read
+	    test every door asks before it acts on a row's stored place: the match's own test over that
+	    place - the same story, position and length, and the whole match by its hash
+	    (MatchIsSameOccurrence, in the .cpp) - AND the line around it: the three drawn segments read
 	    again the way the search read them (ReadHitText, RereadRowText's own reading) and compared with
 	    what the row holds. The line is what RelocateStaleRow already asks of a candidate ("the same text
-	    with the same line around it").
+	    with the same line around it"). The answer is how the panel can say "the replacement is no
+	    longer here" instead of scrolling to whatever took its place, how the double click refuses to
+	    hand the user a selection over text they never searched for, and how a row whose text was
+	    edited is not written.
 
 	    Why the line as well: a row's place is carried past every change KBS makes - and, since
 	    2026-09-29, past an Undo or a Redo of one (KBSUndoFollow puts the rows back with it) - but never
 	    past the user's typing or an Undo of anything else, and after those its stored place can stand on
-	    ANOTHER occurrence of
-	    the same text. The match's own hash cannot tell them apart - a one-character query (the particle
-	    U+306E) lands on another match a few per cent of the time in running Japanese, and a zero-width
-	    row has no text for the hash at all. Worked through on paper (not measured): "catcatcatcat", row 1 replaced with
-	    "kitten" from its menu, Ctrl+Z - rows 2 and 3 were left three characters on, standing on the third
-	    and fourth "cat", and a Change Checked of rows 2 and 3 wrote there. (The story's version -
-	    ReadStoryVersion - stops that run first; this is the second guard, for a version that has come
-	    back to the same number. That Ctrl+Z of a write of KBS's own is followed since 2026-09-29, and the
-	    rows stand where their text is; the example stands for an edit that is not followed.)
+	    ANOTHER occurrence of the same text. The match's own hash cannot tell them apart - a
+	    one-character query (the particle U+306E) lands on another match a few per cent of the time in
+	    running Japanese, and a zero-width row has no text for the hash at all. Worked through on paper
+	    (not measured): "catcatcatcat", row 1 replaced with "kitten" from its menu, Ctrl+Z - rows 2 and 3
+	    were left three characters on, standing on the third and fourth "cat", and a Change Checked of
+	    rows 2 and 3 wrote there. (The story's version - ReadStoryVersion - stops that run first; this
+	    is the second guard, for a version that has come back to the same number. That Ctrl+Z of a
+	    write of KBS's own is followed since 2026-09-29, and the rows stand where their text is; the
+	    example stands for an edit that is not followed.)
 
 	    False when the row, its story or its place cannot be read. Asked by the verify walk, the row
 	    menus' Replace / Redo and RowStillStands (KBSReplaceEngine), and the jump and the double click

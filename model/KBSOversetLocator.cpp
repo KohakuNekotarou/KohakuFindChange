@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Implementation of the overset "+" locator shared by KBSJump and KBSSearchEngine. See
-//  KBSOversetLocator.h for the rationale.
+//  Implementation of the overset "+" locator shared by KBSSearchEngine and, through IKBSRuns, the
+//  UI half's KBSJump. See KBSOversetLocator.h for the rationale.
 //
 //========================================================================================
 

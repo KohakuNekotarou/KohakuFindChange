@@ -195,7 +195,8 @@ namespace KBSBookScope
 	bool GetSearchedBookPath(PMString& outPath);
 
 	/** Let go of the book the results came from: forget the path AND close whatever chapters are
-	    still held for it. Pair this with every KBSResultModel::Clear().
+	    still held for it. It goes with every KBSResultModel::Clear() - KBSSearchEngine::DropResults
+	    does the two together.
 
 	    The two halves are one operation on purpose. Nothing else remembers which book a held
 	    chapter belongs to, so a path dropped on its own strands them with their .indd files locked
