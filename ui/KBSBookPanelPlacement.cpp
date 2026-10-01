@@ -83,7 +83,7 @@
 
 // Interface includes:
 #include "IActiveContext.h"		// where the observer implementation lives (kActiveContextBoss)
-#include "IApplication.h"		// QueryPanelManager
+#include "IApplication.h"		// the application boss - IMonitorInfo sits on it
 #include "IBookManager.h"		// GetBookCount - is the book about to close the last one?
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
 #include "ICommand.h"			// what the interceptor is handed (its class says which command)
@@ -256,57 +256,34 @@ ICommandInterceptor* gCmdWatch = nil;
 // The palette tree
 //----------------------------------------------------------------------------------------
 
-/** The panel manager, AddRef'd - or nil: during startup it may not exist yet, and during teardown
-    the session can already be gone. */
-IPanelMgr* QueryPanelManager()
-{
-	ISession* session = GetExecutionContextSession();
-	if (session == nil)
-		return nil;
-	InterfacePtr<IApplication> app(session->QueryApplication());
-	if (app == nil)
-		return nil;
-	return app->QueryPanelManager();
-}
+// (QueryPanelManager stood here until 2026-10-01 - KBSBookPanelLookup::QueryPanelManager now, beside the
+//  walk of the book panels it starts.)
 
-/** Walk the registered panels: how many are book panels, and (when asked) the first of them,
-    AddRef'd. InDesign makes one book panel per open book and registers each with IPanelMgr; the
-    WidgetID is numbered per book at run time, so walking is the only way to find them
-    (docs/ai-notes/book-panel-active-tab.md - the same walk KBSBookScope uses). */
+/** How many book panels there are, and (when asked) the first of them, AddRef'd - through the one walk
+    of them (KBSBookPanelLookup::ForEachBookPanel). */
 int32 WalkBookPanels(IPanelMgr* panelMgr, IControlView** outFirst)
 {
 	if (outFirst != nil)
 		*outFirst = nil;
-	if (panelMgr == nil)
-		return 0;
-
-	IDataBase* panelDB = ::GetDataBase(panelMgr);
-	if (panelDB == nil)
-		return 0;
 
 	int32 count = 0;
-	const uint32 panelCount = panelMgr->GetPanelCount();
-	for (uint32 i = 0; i < panelCount; ++i)
+	KBSBookPanelLookup::ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
 	{
-		UID panelUID;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID))
-			continue;
-
-		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!KBSBookPanelLookup::IsBookPanel(panelView))
-			continue;
-
 		// Only a panel that is in a palette counts. Measured 2026-09-25: a closed book's panel is off
 		// the list by the next look, so this has never had to act - it is here because nothing
 		// PROMISES the list is pruned, and a stale entry would keep the count at one.
 		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
 		if (!container.IsValid())
-			continue;
+			return false;
 
 		++count;
 		if (outFirst != nil && *outFirst == nil)
-			*outFirst = panelView.forget();
-	}
+		{
+			panelView->AddRef();
+			*outFirst = panelView;
+		}
+		return false;
+	});
 	return count;
 }
 
@@ -569,7 +546,7 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 /** Measure the book panel that is open now, if any. */
 bool MeasureOpenBookPanel(Placement& out)
 {
-	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 	IControlView* first = nil;
 	WalkBookPanels(panelMgr, &first);
 	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
@@ -927,7 +904,7 @@ void RestoreNow()
 	if (!gOn || !gRemembered.IsUsable())
 		return;
 
-	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 	IControlView* first = nil;
 	WalkBookPanels(panelMgr, &first);
 	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
@@ -1061,7 +1038,7 @@ void MaybeRestoreAgain()
 {
 	if (!gRemembered.IsUsable() || !gRemembered.docked || gReRestores >= kKBSBookPanelMaxReRestores)
 		return;
-	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 	IControlView* first = nil;
 	WalkBookPanels(panelMgr, &first);
 	InterfacePtr<IControlView> bookPanel(first);	// takes over the reference WalkBookPanels added
@@ -1080,7 +1057,7 @@ void MaybeRestoreAgain()
     some now. The one place the "zero to some" question is asked. */
 void RecountAndMaybeRestore()
 {
-	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 	const int32 previous = gBookPanelCount;
 	gBookPanelCount = WalkBookPanels(panelMgr, nil);
 
@@ -1109,7 +1086,7 @@ void AttachObserver(bool attach)
 	if (obs == nil)
 		return;
 
-	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 	if (panelMgr == nil)
 		return;
 
@@ -1234,7 +1211,7 @@ void KBSBookPanelPlacement::ToggleAndSave(PMString& outStatus)
 	// the first notification after ticking the box would move it.
 	if (gOn)
 	{
-		InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+		InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
 		gBookPanelCount = WalkBookPanels(panelMgr, nil);
 	}
 

@@ -76,9 +76,8 @@ namespace
 
 	/** Is this registered panel one of InDesign's book panels?
 
-	    ***** ONE PLACE. ***** Every walk of the panel list in this plug-in asks it here (the two in this
-	    file and KBSBookPanelPlacement's), so how a book panel is recognised is decided once (block 11
-	    API audit, 2026-08-08).
+	    ***** ONE PLACE. ***** Every walk of the panel list in this plug-in asks it here (ForEachBookPanel,
+	    and KBSBookPanelPlacement through IsBookPanel), so how a book panel is recognised is decided once.
 	    The class learned from a live book panel decides, and nothing else (see LearnedBookPanelClass).
 	    Before one could be asked, the answer is "no": the callers here then fall back to the active
 	    book, and KBSBookPanelPlacement finds no book panel to measure or move. With no book open that
@@ -117,88 +116,20 @@ namespace
 	}
 }
 
-bool KBSBookPanelLookup::GetPanelBookFile(IDFile& outFile)
+IPanelMgr* KBSBookPanelLookup::QueryPanelManager()
 {
-	if (!Utils<IBookUIUtils>().Exists())
-		return false;
-
-	// Walk every registered panel instead of asking for "the" book panel. Two earlier attempts
-	// failed and are not worth repeating (measured 2026-07-27/28):
-	//   - GetBookPanelWidget() returns nil for us. It is fed by the book panel's OWN actions
-	//     (SetBookPanelWidget), so a command from another panel's flyout finds nothing stored.
-	//   - GetBookFileFromBookPanel(file, nil) falls through to QueryActiveBookPanel(), i.e. the
-	//     ACTIVE book - which is exactly the value we are trying not to use.
-	// The walk works because InDesign creates one book panel per open book (tab count == panel
-	// count) and registers each with IPanelMgr. Details: docs/ai-notes/book-panel-active-tab.md.
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	ISession* session = GetExecutionContextSession();
+	if (session == nil)
+		return nil;
+	InterfacePtr<IApplication> app(session->QueryApplication());
 	if (app == nil)
-		return false;
-
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
-	if (panelMgr == nil)
-		return false;
-
-	IDataBase* panelDB = ::GetDataBase(panelMgr);
-	if (panelDB == nil)
-		return false;
-
-	const uint32 panelCount = panelMgr->GetPanelCount();
-	for (uint32 i = 0; i < panelCount; ++i)
-	{
-		UID panelUID;
-		if (!panelMgr->GetNthPanelInfo(i, panelUID))
-			continue;
-
-		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
-		if (!IsBookPanelView(panelView))
-			continue;
-
-		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
-		// behind another tab still reports itself visible - all three panels came back
-		// "Visible state 1" in the measurement - while only the front tab's kTabPanelContainerType
-		// is visible. Asking panelView->IsVisible() here would match every book panel and pick
-		// whichever came first.
-		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
-		if (!container.IsValid())
-			continue;
-		if (!PaletteRefUtils::IsPaletteVisible(container))
-			continue;
-
-		// Keep looking when this panel could not be asked, rather than handing back a blank file.
-		if (!GetBookFileFromPanelView(panelView, outFile))
-			continue;
-
-		return true;
-	}
-
-	// No visible book panel: it is iconised, its palette is closed, or no book is open at all.
-	// The caller falls back to the active book, which is what the user expects in that state.
-	return false;
+		return nil;
+	return app->QueryPanelManager();
 }
 
-bool KBSBookPanelLookup::IsBookPanel(IControlView* panelView)
+void KBSBookPanelLookup::ForEachBookPanel(IPanelMgr* panelMgr,
+	const std::function<bool(IControlView* panelView, const WidgetID& panelWidgetID)>& visit)
 {
-	// A door onto the anonymous-namespace test, not a second copy of it: that test is "ONE PLACE,
-	// because the hard-coded ClassID can go stale" (block 11 API audit), and a copy here would be
-	// the second place.
-	return IsBookPanelView(panelView);
-}
-
-void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
-{
-	// (Until 2026-10-01 this was the second half of KBSBookScope::ActivateBook, which made the book the
-	//  active one first - that half is the model's, KBSBookScope::MakeBookActive, and the caller asks it
-	//  before this. The numbering below is ActivateBook's.)
-	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
-	//    panel is found by walking the list and asking each candidate which book it belongs to -
-	//    the WidgetID is numbered per book at runtime, which is why no name can be used here.
-	if (!Utils<IBookUIUtils>().Exists())
-		return;	// the active book was still set; the tab is the part we could not do
-
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	if (app == nil)
-		return;
-	InterfacePtr<IPanelMgr> panelMgr(app->QueryPanelManager());
 	if (panelMgr == nil)
 		return;
 	IDataBase* panelDB = ::GetDataBase(panelMgr);
@@ -216,23 +147,84 @@ void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 		InterfacePtr<IControlView> panelView(panelDB, panelUID, UseDefaultIID());
 		if (!IsBookPanelView(panelView))
 			continue;
+		if (visit(panelView, panelWidgetID))
+			return;
+	}
+}
 
+bool KBSBookPanelLookup::GetPanelBookFile(IDFile& outFile)
+{
+	if (!Utils<IBookUIUtils>().Exists())
+		return false;
+
+	// Walk every registered panel instead of asking for "the" book panel. Two earlier attempts
+	// failed and are not worth repeating (measured 2026-07-27/28):
+	//   - GetBookPanelWidget() returns nil for us. It is fed by the book panel's OWN actions
+	//     (SetBookPanelWidget), so a command from another panel's flyout finds nothing stored.
+	//   - GetBookFileFromBookPanel(file, nil) falls through to QueryActiveBookPanel(), i.e. the
+	//     ACTIVE book - which is exactly the value we are trying not to use.
+	// The walk works because InDesign creates one book panel per open book (tab count == panel
+	// count) and registers each with IPanelMgr. Details: docs/ai-notes/book-panel-active-tab.md.
+	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	bool found = false;
+	ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
+	{
+		// The front tab is decided on the CONTAINER, never on the panel. A book panel sitting
+		// behind another tab still reports itself visible - all three panels came back
+		// "Visible state 1" in the measurement - while only the front tab's kTabPanelContainerType
+		// is visible. Asking panelView->IsVisible() here would match every book panel and pick
+		// whichever came first.
+		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
+		if (!container.IsValid() || !PaletteRefUtils::IsPaletteVisible(container))
+			return false;
+
+		// Keep looking when this panel could not be asked, rather than handing back a blank file.
+		found = GetBookFileFromPanelView(panelView, outFile);
+		return found;
+	});
+
+	// None: no visible book panel - it is iconised, its palette is closed, or no book is open at all.
+	// The caller falls back to the active book, which is what the user expects in that state.
+	return found;
+}
+
+bool KBSBookPanelLookup::IsBookPanel(IControlView* panelView)
+{
+	// A door onto the anonymous-namespace test, not a second copy of it: a copy here would be a
+	// second place where a book panel is recognised.
+	return IsBookPanelView(panelView);
+}
+
+void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
+{
+	// (Until 2026-10-01 this was the second half of KBSBookScope::ActivateBook, which made the book the
+	//  active one first - that half is the model's, KBSBookScope::MakeBookActive, and the caller asks it
+	//  before this. The numbering below is ActivateBook's.)
+	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
+	//    panel is found by walking the list and asking each candidate which book it belongs to -
+	//    the WidgetID is numbered per book at runtime, which is why no name can be used here.
+	if (!Utils<IBookUIUtils>().Exists())
+		return;	// the active book was still set; the tab is the part we could not do
+
+	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());
+	ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID& panelWidgetID) -> bool
+	{
 		// Unlike GetPanelBookFile, visibility is NOT a filter here: the tab we are looking for is
 		// precisely the one that is NOT in front yet.
 		IDFile panelBookFile;
 		if (!GetBookFileFromPanelView(panelView, panelBookFile))
-			continue;
+			return false;
 
 		SDKFileHelper panelFileHelper(panelBookFile);
 		if (!(panelFileHelper.GetPath() == bookPath))
-			continue;
+			return false;
 
 		// kFalse = do not take the key focus. The keyboard walk calls this while the user is
 		// holding an arrow key on the result tree; handing the focus to the book panel would end
 		// the walk at the first book row.
 		panelMgr->ShowPanelByWidgetID(panelWidgetID, kFalse);
-		break;
-	}
+		return true;
+	});
 }
 
 // End, KBSBookPanelLookup.cpp.

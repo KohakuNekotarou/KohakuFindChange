@@ -40,7 +40,7 @@ namespace KBSBookScope
 	    file = the chapter's .indd so a closed chapter can be reopened later; contentUID = its
 	    entry in the book, which OpenChapterDoc needs to ask the book API about it).
 
-	    docRef is null until the chapter is opened. A document-scope target is built by hand with
+	    docRef is null until the chapter is opened. A document-scope target (DocAsChapter) comes with
 	    docRef already set and contentUID left invalid - that is what tells the engines apart.
 
 	    hasFile is what IBookContent::GetIDFile ANSWERED, kept rather than discarded: the header
@@ -59,8 +59,9 @@ namespace KBSBookScope
 		ChapterDoc() : contentUID(kInvalidUID), hasFile(false) {}
 	};
 
-	/** Is the search scope the whole book (ON) or just the active document (OFF)? Session state
-	    only - every launch starts OFF, like KESCL's "Search book" toggle. */
+	/** Is the search scope the whole book (ON), or what Edit > Find/Change's Search: names (OFF -
+	    2026-09-29; the active document until then)? Session state only - every launch starts OFF,
+	    like KESCL's "Search book" toggle. */
 	bool IsBookScopeOn();
 
 	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL
@@ -74,18 +75,11 @@ namespace KBSBookScope
 	    cheap look: nothing is opened, listed or held.
 
 	    The one answer to "would a book run have a book", asked by the menu gate (HasScopeTarget)
-	    and by all three engines' front doors. Until 2026-08-09 those four asked only whether a book
-	    was ACTIVE, while the run resolved the PANEL's book - the same question answered two ways, so
-	    a book on show in the panel with no active book behind it was turned away at every door the
-	    run has, even though the run itself could have searched it.
-
-	    ***** And it asks that through the run's own resolver, not a copy of it. ***** The 2026-08-09
-	    fix spelled those two steps out a second time here, and the second spelling came out of the
-	    same commit one door short: it accepted an active book that was already broadcasting its
-	    close, which the run drops. Both go through ResolveTargetBook since the block 11 re-audit
-	    (2026-08-10) - see the .cpp. (KBSBookScope::HasActiveBook was removed with that change: its
-	    last caller was the fallback here, and "is a book active" is not a question anything in this
-	    plug-in wants the answer to.) */
+	    and by the front doors of the search and Show Changes - through the run's own resolver
+	    (ResolveTargetBook in the .cpp), not a copy of it. Until 2026-08-09 those doors asked only
+	    whether a book was ACTIVE, while the run resolved the PANEL's book - the same question
+	    answered two ways, so a book on show in the panel with no active book behind it was turned
+	    away at every door the run has. */
 	bool HasTargetBook();
 
 	/** Is there anything for the CURRENT scope to run on - a targetable book while Book Scope is
@@ -173,8 +167,8 @@ namespace KBSBookScope
 
 	    Names are appended RAW, ampersands and all: the message area is drawn by hand and takes '&' as
 	    it is (since 2026-09-29; the stock widget before it had the whole line doubled on the way in -
-	    the note at the definition says what doubling twice looked like). The notes built on it: AppendUnopenableNote, AppendUnclosedNote, and the search's two
-	    (KBSSearchEngine.cpp, AppendUnsearchableNote / AppendSearchErrorNote). */
+	    the note at the definition says what doubling twice looked like). Every chapter note is built on
+	    it - AppendUnopenableNote, AppendUnclosedNote, the search's two and Show Changes' one. */
 	void AppendChapterNote(PMString& outSummary, const char* what, const std::vector<PMString>& names,
 		const char* tail);
 
@@ -242,30 +236,28 @@ namespace KBSBookScope
 	    been saved. This is the distinction CloseDisplayedDocsIfClean has always made - it skips a
 	    dirty document for exactly this reason - now made here as well.
 
-	    ***** WHOSE unsaved work this door protects, corrected 2026-08-08. ***** It used to say the
-	    test was "reachable in ordinary use: a jump opens a chapter and gives it a window, the user
-	    replaces in it or simply types in it". THAT CASE CANNOT REACH THIS TEST. A chapter that
-	    gains a window stops being held at that moment (ForgetHeldDoc - both ShowChapterWindow and
-	    KBSJump call it), and even where one slips through, the DocHasAnyWindow test above drops it
-	    first. Nobody can type into a document with no window. A SCRIPT can open one windowless and
-	    modify it, but such a document was not opened by us and is never held - ReopenChapterDoc
-	    rebinds to an already-open document without holding it, whoever opened it and however.
+	    ***** WHOSE unsaved work this door protects. ***** Not the user's typing in a chapter a jump
+	    opened: a chapter that gains a window stops being held at that moment (ForgetHeldDoc - both
+	    ShowChapterWindow and KBSJump call it), and even where one slips through, the window test
+	    drops it first. Nobody can type into a document with no window. A SCRIPT can open one
+	    windowless and modify it, but such a document was not opened by us and is never held -
+	    ReopenChapterDoc rebinds to an already-open document without holding it, whoever opened it.
 
 	    What does reach here is windowless AND dirty AND held, and only this plug-in can produce
 	    that combination: a chapter a REPLACE wrote to whose window would not open (the run reports
 	    it as chaptersNoWindow). So the work being protected is the user's REPLACEMENTS, not their
-	    typing. Same conclusion - do not close it - for a different reason, and worth keeping
-	    straight: the wrong reason makes this test look reachable far more often than it is.
+	    typing.
 
 	    A chapter whose close cannot go through at all (no file handler, or CanClose refuses) is
-	    kept the same way (2026-08-08): dropping it - which is what happened before, the list having
-	    been taken up front - left it windowless with its .indd locked and nothing able to hand it
-	    back for the rest of the session.
+	    kept the same way (2026-08-08): dropped, it would sit windowless with its .indd locked and
+	    nothing able to hand it back for the rest of the session.
 
 	    ***** And a chapter found with a WINDOW is dropped from the list, not closed. ***** A window
 	    makes it the user's whoever raised it - the book panel can window a held chapter behind this
-	    module's back - and a visible document is one the user can deal with themselves. Same rule as
-	    ReleaseHeldDoc's. */
+	    module's back - and a visible document is one the user can deal with themselves.
+
+	    Every one of these verdicts is ReleaseHeldDoc's: this hands each held chapter to it, on a
+	    schedule (2026-10-01 - the same tests were written out here a second time until then). */
 	void ReleaseHeldDocs();
 
 	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
@@ -347,18 +339,13 @@ namespace KBSBookScope
 	    or replaced into it since (user, 2026-08-03: "a document the user opened by jumping should
 	    not be closed, even if nothing was replaced in it").
 
-	    ***** WHO CALLS IT, by name - and it is no longer only "wherever a window is given". *****
+	    ***** WHO CALLS IT, by name - not only "wherever a window is given". *****
 	      * ShowChapterWindow, both exits (it opened one, or it found one already there);
-	      * KBSJump, twice, when a jump brings a chapter to the front;
+	      * KBSJump (the UI half, through IKBSChapters), twice, when a jump brings a chapter to the front;
 	      * CloseDisplayedDocsIfClean, on every document it is about to close - a window makes it the
 	        user's whoever raised it, so the claim goes whether or not the close goes through;
 	      * KBSCloseDocResponder, on EVERY document close in the session (2026-08-09), so a chapter
 	        somebody else closed cannot leave a dangling (IDataBase*, UID) on the held list.
-	    The last two are not "a window was given" at all, which is why the sentence that described
-	    this as window-raising only had drifted: it named two callers when there were five, and the
-	    two it missed are the ones that do not fit its description. Listed by name rather than
-	    counted - a count can be right today and wrong at the next call site, and cannot be checked
-	    without a grep (block 4's decision).
 
 	    Does nothing when the chapter is not held, so it is safe to call on any document. */
 	void ForgetHeldDoc(const UIDRef& docRef);
@@ -373,12 +360,11 @@ namespace KBSBookScope
 
 	    ***** "Expected to", not "always". ***** That header promises nothing of the kind - it
 	    "returns kTrue if a file can be obtained for the book content, kFalse otherwise"
-	    (IBookContent.h:121-125) - and this line read "A BOOK chapter always does" until the same
-	    day, while naming that very call as its authority. What rests on it is not small: the two
-	    callers below read a false as "this is a document-scope row", and that is the answer allowed
-	    to fall back on a docRef the search left behind. So the answer is now kept where the book
-	    gives it (ChapterDoc::hasFile) rather than assumed here, and the one door that could act on
-	    an unchecked document - OpenChapterDoc's already-open lookup - no longer does.
+	    (IBookContent.h:121-125). What rests on it is not small: the callers below read a false as
+	    "this is a document-scope row", and that is the answer allowed to fall back on a docRef the
+	    search left behind. So the answer is kept where the book gives it (ChapterDoc::hasFile) rather
+	    than assumed here, and the one door that could act on an unchecked document - OpenChapterDoc's
+	    already-open lookup - does not.
 
 	    ***** That difference is what tells ReopenChapterDoc's two failures apart. ***** It answers
 	    false both when there was nothing to open BY and when the file would not open, and a caller
@@ -398,9 +384,8 @@ namespace KBSBookScope
 	    returned in outDocRef. false = cannot reopen (missing file, locked) - or there was no file to
 	    open by at all, which ChapterHasFile is what tells apart.
 	    Used by every run that walks a book's chapters (through OpenChapterDoc), by the replace's
-	    resolve pass, and by the jump - a chapter is closed as soon as each walk is done with it, so
-	    this is how any of them reaches one again. (It said "Task 3 jump ... held chapter closed by the
-	    user" until 2026-09-27: true of its first caller only.) */
+	    resolve pass, and by the jump (through ReachChapterDoc) - a chapter is closed as soon as each
+	    walk is done with it, so this is how any of them reaches one again. */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
 
 	/** A result chapter's document, LIVE - the one question the jump (KBSJump
@@ -428,8 +413,9 @@ namespace KBSBookScope
 	/** ReachChapterDoc WITHOUT THE OPEN (2026-09-29, the defect re-check F-3): the chapter's
 	    document if it is open now - by its file, the same lookup ReopenChapterDoc makes before it
 	    opens anything; a chapter with no file (a document-scope row) by IsDocStillOpen(ioDocRef).
-	    For Reject Change, Redo and Accept All Changes by KohakuFindChange, which act on an open
-	    document only, and for a replaced row's record lookup (KBSTrackChange::FindRowChangeForHit).
+	    For everything that acts on an open document only - through KBSTrackChange::ChapterDocIfOpen,
+	    which rebinds the model as well (Reject Change, Accept Change, Accept All, Replace Again, a
+	    replaced row's record lookup) - and for KBSUndoFollow and a hit row's right-click.
 	    They asked IsDocStillOpen of the docRef the results held until then: a chapter the user had
 	    closed and opened again read "not open" (a new address) - and one whose address a
 	    document opened later had taken read as THAT document (the 2026-08-04 fault above).
@@ -454,15 +440,12 @@ namespace KBSBookScope
 	    needs no save, on schedule - whoever opened it. The exception document (the one a jump just
 	    landed in) and any windowless held chapter survive. (Runs close each chapter as they finish
 	    with it since 2026-08-02, so a windowless held chapter is left only by a failure - a jump or
-	    a replace whose window did not appear. This called them "the reopen cache" until 2026-09-27;
-	    there has been no cache since.)
+	    a replace whose window did not appear.)
 
 	    "Needs no save" is IDocFileHandler::CanSave, "modified OR UNSAVED" - so what stays is not
-	    only the DIRTY document this line used to name, but also the one that has never been saved at
-	    all: the untitled document the user just made with Ctrl+N, which reads as unmodified and was
-	    being closed without a prompt until 2026-08-10. See HasUnsavedChanges in the .cpp for the
-	    measurement. (Said "Dirty documents stay" until 2026-08-11, which is the sentence the fix
-	    made incomplete - the .cpp's own note was corrected on the day and this one was not.)
+	    only a dirty document but also one that has never been saved at all: the untitled document
+	    the user just made with Ctrl+N, which reads as unmodified and was being closed without a
+	    prompt until 2026-08-10. See HasUnsavedChanges in the .cpp for the measurement.
 	    The one exception to CanSave is a CONVERSION of an older InDesign's chapter, which it calls
 	    unsaved from the start: that is asked what was written to it (HasUnsavedWork in the .cpp,
 	    2026-09-25), so a converted chapter a jump opened goes like any other clean one. */

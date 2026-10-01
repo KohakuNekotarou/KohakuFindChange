@@ -18,10 +18,27 @@
 #include "IDFile.h"
 #include "PMString.h"
 
+#include <functional>
+
 class IControlView;
+class IPanelMgr;
 
 namespace KBSBookPanelLookup
 {
+	/** The panel manager, AddRef'd - or nil: during startup it may not exist yet, and during teardown
+	    the session can already be gone. */
+	IPanelMgr* QueryPanelManager();
+
+	/** ***** THE ONE WALK OF THE BOOK PANELS (2026-10-01: GetPanelBookFile, BringBookTabForward and
+	    ***** KBSBookPanelPlacement each wrote the loop out until then). ***** Every panel registered with
+	    panelMgr that is one of InDesign's book panels (IsBookPanel), in the manager's order, is handed to
+	    `visit` with its WidgetID, until `visit` answers true. InDesign makes one book panel per open book
+	    and registers each with IPanelMgr, and the WidgetID is numbered per book at run time - so walking
+	    is the only way to find them (docs/ai-notes/book-panel-active-tab.md). Nothing is walked for a nil
+	    manager. */
+	void ForEachBookPanel(IPanelMgr* panelMgr,
+		const std::function<bool(IControlView* panelView, const WidgetID& panelWidgetID)>& visit);
+
 	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
 	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not make
 	    that book active - only touching a chapter inside it does (measured 2026-07-27).
@@ -33,7 +50,7 @@ namespace KBSBookPanelLookup
 
 	/** Is this registered panel one of InDesign's book panels? The ONE place that answers it - the class
 	    is learned from a live book panel (IBookUIUtils::QueryActiveBookPanel) and compared, never a name.
-	    Asked by the walks in this file and by KBSBookPanelPlacement. */
+	    Asked by ForEachBookPanel and by KBSBookPanelPlacement. */
 	bool IsBookPanel(IControlView* panelView);
 
 	/** Bring the tab of the open book at 'bookPath' to the front of the book panel, WITHOUT taking the

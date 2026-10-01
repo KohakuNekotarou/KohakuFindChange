@@ -15,9 +15,8 @@
 //
 //  Book scope is deliberately left alone here - for the RESULTS. A book chapter carries its .indd
 //  file, so it can be reopened (KBSBookScope::ReopenChapterDoc) and dropping twenty chapters'
-//  results because one chapter was closed would throw away work. Book results are retired by the
-//  book-side responder instead, which is a separate step (IID_ICLOSEBOOKMSG has no example
-//  anywhere in the SDK, so it gets its own round of testing).
+//  results because one chapter was closed would throw away work. Book results are retired when the
+//  BOOK closes, by KBSBookWatch (an observer: a book close has no signal to respond to).
 //
 //  One piece of bookkeeping DOES run for every close, whatever the scope: the closing document
 //  comes off the held-chapter list (ForgetHeldDoc, 2026-08-09) - see the comment in Respond.
@@ -37,15 +36,12 @@
 //  emptied itself while its document stayed open would read as work lost at random.
 //
 //  No "was it us who closed it?" guard is needed at document scope. KBS calls IDocFileHandler::Close
-//  in three places - all of them in KBSBookScope - and none can close the searched document:
-//    * ReleaseHeldDocs and ReleaseHeldDoc close only chapters a BOOK search opened windowless, and
-//      document scope holds none (nothing goes on the held list without a chapter file to open by);
+//  in KBSBookScope only, and none of its closes can close the searched document (named, not counted):
+//    * ReleaseHeldDoc (which ReleaseHeldDocs goes through) closes only chapters a BOOK run opened
+//      windowless, and document scope holds none (nothing goes on the held list without a chapter
+//      file to open by);
 //    * the Hide Previous Chapter sweep (CloseDisplayedDocsIfClean) passes the jumped-to document as
 //      its exception.
-//  This said "exactly two places" while there were three - the single-chapter release was left out,
-//  and it is the one a run calls between chapters - so the places are named rather than counted.
-//  A guard becomes necessary when book results start being retired: it belongs with that step, not
-//  this one.
 //
 //========================================================================================
 
@@ -100,19 +96,12 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 
 	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,
-	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL: this test used to
-	// say "an unsaved document being closed carries no reference to compare against", and that was
-	// measured to be wrong on 2026-08-08 - a never-saved document, closed unsaved, arrived here
-	// with a valid UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
-	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md).
-	//
-	// The distinction earns this much comment because of what the wrong reason concealed. If an
-	// unsaved close really did pass through here, its document-scope results would outlive their
-	// document - and a document-scope chapter carries no file, so the replace's resolve pass would
-	// be left asking IsDocStillOpen of a dead UIDRef, which a reused address can answer YES for
-	// about a DIFFERENT document (the 2026-08-04 fault). "This guard skips unsaved documents"
-	// described a hole; what it actually is is a nil test in front of a comparison, with nothing
-	// known to produce the nil.
+	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL - not an unsaved
+	// document either: measured 2026-08-08, a never-saved document closed unsaved arrived here with a
+	// valid UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
+	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md). Were it otherwise, its document-scope results
+	// would outlive their document, and the replace would ask IsDocStillOpen of a dead UIDRef (the
+	// 2026-08-04 address-reuse fault).
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)
 		return;
@@ -159,9 +148,8 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (chapterCount <= 0)
 		return;
 
-	// A document-scope result set is one chapter - the searched document - but compare against
-	// every chapter rather than assuming index 0: this stays correct if the model is ever filled
-	// from more than one document without a book.
+	// A Document / Story / Selection result set is one chapter - the searched document - and an All
+	// Documents one is a chapter per open document (2026-09-29), so every chapter is compared.
 	int32 closingChapter = -1;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{

@@ -24,20 +24,19 @@
 //
 //  Guarding each run against ITSELF does not cover either case: both need two DIFFERENT runs. So
 //  the question is asked HERE, about all of them at once, and every caller asks this instead of
-//  naming the engines one at a time. By name, because a count goes stale where a list does not
-//  (this comment said "the three kinds of caller" while there were six call sites, the three it
-//  omitted having arrived one at a time):
+//  naming the engines one at a time. By name, because a count goes stale where a list does not:
 //
-//    * the panel's actions (KBSActionComponent): UpdateActionStates greys everything out, and
-//      RefusedWhileRunning turns away a command that arrives anyway;
-//    * each engine's own front door (KBSSearchEngine / KBSReplaceEngine), for a caller that never
-//      went through the menu - a script firing an
-//      action by ID reaches the engine whatever the menu says;
-//    * the book-close watcher (KBSBookWatch, twice: at the cue and again in the deferred callback),
-//      whose question would otherwise release the chapters a run is walking. It used to ask only
-//      about the SEARCH, which left the replace (and the two scans, while they existed) unprotected;
+//    * the panel's actions (KBSActionComponent, the UI half - through IKBSRuns): UpdateActionStates
+//      greys everything out, and RefusedWhileRunning turns away a command that arrives anyway;
+//    * each run's own front door (KBSSearchEngine, KBSReplaceEngine, KBSShowChanges), for a caller
+//      that never went through the menu - a script firing an action by ID reaches the engine
+//      whatever the menu says;
+//    * the book-close watcher (KBSBookWatch, twice: the deferred callback, and the question it asks -
+//      which the no-timer fallback asks directly), whose question would otherwise release the
+//      chapters a run is walking;
 //    * the document-close responder (KBSCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
+//    * the Undo follow (KBSUndoFollow::Follow), which would otherwise put rows back under a run.
 //    (the report writer - KBSReportSave - and the script provider - app.kfcStatus / app.kfcResults -
 //     asked too, until they were removed on 2026-09-27.)
 //

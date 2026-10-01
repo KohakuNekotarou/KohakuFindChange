@@ -50,10 +50,9 @@
 //  chapters back in the same breath. So when this gate is false, what is left open is only what
 //  REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
 //  unsaved work or when its close is refused, and those two outlive the path that named their book.
-//  (This said "there is nothing of ours left open", which was written before those two doors
-//  existed - 2026-08-08 - and is the stronger claim of the two.) Nothing is stranded by it: the
-//  next run of any kind calls ReleaseSearchedBook on its way in and tries them again, and a chapter
-//  kept for unsaved work is one a replace has already reported to the user.
+//  Nothing is stranded by it: the next search or Show Changes calls ReleaseSearchedBook on its way in
+//  (KBSSearchEngine::DropResults) and tries them again, and a chapter kept for unsaved work is one a
+//  replace has already reported to the user.
 //
 //  (Until 2026-08-02 the gate asked about the HELD CHAPTERS. That was honest while a book run kept
 //  every chapter it opened; now a run closes each chapter as soon as it has walked it, so the held
@@ -143,9 +142,9 @@ void RetireBookResultsIfGone()
 	// a book, then start a run inside the wait below.) The caller re-arms, so the cue is deferred
 	// rather than dropped, and the book will still be gone when it is finally asked.
 	//
-	// This asked only about the SEARCH until 2026-08-02, which left the replace and both scans
-	// unguarded - and the replace is the worst of them to interrupt, since it holds an open command
-	// sequence over the documents this would close. See KBSRunGuard.
+	// This asked only about the SEARCH until 2026-08-02, which left the replace unguarded - and the
+	// replace is the worst run to interrupt, since it holds an open command sequence over the documents
+	// this would close. See KBSRunGuard.
 	if (KBSRunGuard::IsAnyRunning())
 		return;
 
@@ -172,12 +171,6 @@ void RetireBookResultsIfGone()
 	// chapter-count test in here, closing the book after a 0-hit search released the chapters but
 	// left that row sitting there and the panel said nothing at all - which also made it impossible
 	// to tell from the screen whether the close had even been noticed.)
-	//
-	// ! "(0)" is what that row says again as of 2026-08-11. It read "(0/0 checked)" in between: the
-	//   rows started reading out "(N/M checked)" on 2026-08-05 and the fall-back to a plain total,
-	//   added 35 minutes later, covered the lists with no boxes and not the list with no rows. This
-	//   sentence is the only place in the plug-in that describes what that row shows, and it is the
-	//   only reason the wording was noticed at all - so it is worth keeping exact.
 	const bool showingThatBooksResults = KBSResultModel::IsFromBook();
 
 	// The chapters go back FIRST, and unconditionally: leaving them open would strand hidden
@@ -216,12 +209,11 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// A run of ours is walking the very chapters this would hand back - wait it out by returning a
 	// POSITIVE value, which re-arms without calling StartTimer from inside the callback.
 	//
-	// ***** THAT RE-ARM IS AN OBSERVED BEHAVIOUR, NOT A PROMISE - and this line said otherwise
-	// ***** until 2026-08-12. ***** IIdleTask::RunTask documents its return as "the number of
-	// milliseconds to sleep before running again" (IIdleTask.h:195) and ICallbackTimer derives from
-	// IIdleTask, but the timer's OWN header describes what it registers as "a one time only
-	// callback" (ICallbackTimer.h:42) and says nothing about what the callback's return value does
-	// with it.
+	// ***** THAT RE-ARM IS AN OBSERVED BEHAVIOUR, NOT A PROMISE. ***** IIdleTask::RunTask documents its
+	// return as "the number of milliseconds to sleep before running again" (IIdleTask.h:195) and
+	// ICallbackTimer derives from IIdleTask, but the timer's OWN header describes what it registers as
+	// "a one time only callback" (ICallbackTimer.h:42) and says nothing about what the callback's
+	// return value does with it.
 	//
 	// ***** AND THE SDK'S ONE WORKED EXAMPLE NEVER TAKES THIS PATH. ***** ICallbackTimer has exactly
 	// one caller in the whole SDK - publiclib/links/HTTPAssetLinkResourceHandler.cpp - and its
@@ -229,16 +221,14 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// timer to fire again they do it from OUTSIDE the callback: StopTimer, Release, build another and
 	// StartTimer it (:645-658). So the one example that exists exercises the "remove me" return and
 	// nothing else, and the positive-value re-arm below is used by nobody but this plug-in.
-	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.)
-	//
-	// KBSPanelAlpha's re-apply chain rests on the same inference and has always said so in as many
-	// words; this side stated it as fact, which is one question answered two ways in one plug-in.
+	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.
+	// KBSPanelAlpha's re-apply chain rests on the same inference.)
 	//
 	// ***** WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. ***** The cue is dropped and this book's
-	// chapters are not handed back HERE - but the next search calls ReleaseSearchedBook on its way
-	// in and hands them back then (KBSSearchEngine.cpp, beside its KBSResultModel::Clear()). A REPLACE
-	// does not: it keeps the searched book on purpose, its results being still on the panel. So the
-	// worst case is a book's results left on the panel, and any chapter that refused to close left
+	// chapters are not handed back HERE - but the next search or Show Changes calls ReleaseSearchedBook
+	// on its way in and hands them back then (KBSSearchEngine::DropResults, at its commit point). A
+	// REPLACE does not: it keeps the searched book on purpose, its results being still on the panel. So
+	// the worst case is a book's results left on the panel, and any chapter that refused to close left
 	// locked, until the next search - not a permanent strand. Named rather than assumed, because a
 	// fallback nobody has written down is one the next change can remove without noticing.
 	if (KBSRunGuard::IsAnyRunning())

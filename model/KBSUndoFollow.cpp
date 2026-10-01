@@ -386,7 +386,7 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 bool KBSUndoFollow::Follow(UID story)
 {
 	// A write of ours is standing (its own notifications arrive as its sequence ends), or a run is up
-	// (a search or a replace pumps events behind its bar - KBSRunGuard counts the replace too).
+	// (a search, a replace or Show Changes pumps events behind its bar - KBSRunGuard counts all three).
 	if (gRecording || gSteps.empty() || KBSRunGuard::IsAnyRunning())
 		return false;
 	// ***** THE CHEAP QUESTION FIRST: does a kept write name this story? ***** Typing in a watched story

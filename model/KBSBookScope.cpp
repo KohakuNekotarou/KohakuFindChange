@@ -5,9 +5,7 @@
 //  KohakuBookSearch (KBS)
 //
 //  Book-wide search scope implementation. See KBSBookScope.h for the overall contract.
-//  Ported from KESCLBookScope (KESCL left untouched). (This said the toggle and the jump-time
-//  reopen were "omitted in this Step-1 subset" until 2026-09-27, long after both had arrived -
-//  gBookScopeOn and ReopenChapterDoc.)
+//  Ported from KESCLBookScope (KESCL left untouched).
 //
 //========================================================================================
 
@@ -59,10 +57,8 @@ namespace
 	// IBookUtils' own OriginallyCloseDocInfo - the container OpenOneDocument fills in and
 	// CloseDocumentsInBook drains - and this plug-in stopped calling BOTH of those in 2026-07 (no UI
 	// suppression on that open, no UI flag or command mode on that close; the reasons are at
-	// OpenChapterDoc and ReleaseHeldDocs). Keeping their container afterwards only suggested a
-	// partnership that is not there: the note here still read "OpenOneDocument records exactly those
-	// in here" and "uses this record to stay under the open-database cap", in the present tense,
-	// about calls that had been gone for six weeks (found in the block 11 API audit, 2026-08-08).
+	// OpenChapterDoc and ReleaseHeldDoc). Keeping their container afterwards only suggested a
+	// partnership that is not there.
 	K2Vector<UIDRef> gHeldDocs;
 
 	// Which book the RESULTS on the panel came from (its full file path). NOT "which book we hold
@@ -71,17 +67,18 @@ namespace
 	//
 	// Read from OUTSIDE through GetSearchedBookPath, by two callers, and both ask about the RESULTS:
 	//   * KBSBookWatch - "the book these results name has been closed, retire them"
-	//   * KBSJump::ShowBook - "the book row was clicked, bring that book forward"
+	//   * KBSJump::ShowBook (the UI half, through IKBSChapters) - "the book row was clicked, bring
+	//     that book forward"
 	// And read from INSIDE by OpenChapterDoc, which is not about the results at all: it is how a
 	// chapter finds the book it belongs to, having deliberately not parked an IBook* between calls.
-	// That third reader was standing here while this note said "two things read this ... not about
-	// open documents", one function away.
 	//
-	// Let go through ReleaseSearchedBook, which every KBSResultModel::Clear() is paired with.
+	// Let go through ReleaseSearchedBook, which goes with every KBSResultModel::Clear()
+	// (KBSSearchEngine::DropResults).
 	PMString gSearchedBookPath;
 
 	// The search-scope toggle. Session state only (every launch starts OFF), like KESCL's
-	// gBookSearchOn: OFF searches the front document, ON the whole target book (ResolveTargetBook).
+	// gBookSearchOn: ON searches the whole target book (ResolveTargetBook); OFF, what Edit >
+	// Find/Change's Search: names (2026-09-29 - the front document until then).
 	bool gBookScopeOn = false;
 
 	// (The book panel's learned class, IsBookPanelView and GetBookFileFromPanelView stood here until
@@ -131,11 +128,8 @@ namespace
 	    well - CanSave, then CanClose, then Close: SDKLayoutHelper.cpp:200-217.)
 
 	    ***** A document this cannot be asked about is NOT closed. ***** No file handler means no
-	    answer, and the safe answer to "would closing this lose something" is yes. It reads the
-	    opposite way round from the note that stood here before ("a document with no database reads
-	    as nothing to lose"), and it changes nothing at any of the three call sites: each one
-	    already refuses to close a document whose handler will not come (they simply refused a few
-	    lines further down). Verified call site by call site, 2026-08-10. */
+	    answer, and the safe answer to "would closing this lose something" is yes - which every close
+	    reaches anyway: each one refuses a document whose handler will not come. */
 	bool HasUnsavedChanges(const UIDRef& docRef)
 	{
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
@@ -167,8 +161,8 @@ namespace
 	}
 
 	/** HasUnsavedChanges, with the one kind of document it answers wrongly for put right: the
-	    question every close in this module asks - the two held-chapter releases and the
-	    hide-previous-chapter sweep.
+	    question every close in this module asks - the held-chapter release (ReleaseHeldDoc, which
+	    ReleaseHeldDocs goes through) and the hide-previous-chapter sweep.
 
 	    ***** THE ONE DIFFERENCE IS A CONVERTED CHAPTER. ***** CanSave says "modified OR unsaved", and a
 	    conversion is unsaved from the moment it exists, so it read as work to protect after every
@@ -254,9 +248,8 @@ namespace
 	    could have searched or it starts a run that reports "no book" - which is the shape this
 	    plug-in keeps being bitten by.
 
-	    They were written as two spellings of the same two steps on 2026-08-09, and the second step
-	    came out differently: the run dropped an active book that was already closing (IsOpen), and
-	    the menu gate did not (found in the block 11 re-audit, 2026-08-10). Both now read this. */
+	    They were two spellings of the same two steps from 2026-08-09 to 2026-08-10, and the second
+	    had already come out differently (the run dropped an active book that was already closing). */
 	IBook* ResolveTargetBook()
 	{
 		// The panel's book first. Selecting a book's tab switches the panel but does NOT make that
@@ -338,82 +331,17 @@ void KBSBookScope::ReleaseHeldDocs()
 	// which book the panel is showing - and since every run closes its chapters as it goes, doing
 	// so would blank the path while a full result set is still up (which broke both readers named
 	// on gSearchedBookPath).
-	if (gHeldDocs.size() == 0)
-		return;
-
-	// Take the list first, so a re-entrant call finds it already empty instead of scheduling
-	// the closes twice.
-	K2Vector<UIDRef> held;
-	held = gHeldDocs;
-	gHeldDocs.clear();
-
-	// Close each chapter through the stock document close. kSchedule defers each close until the
-	// current notification / idle tick has unwound; kSuppressUI + the search-time dirty guard =
-	// no save prompt. Skip chapters the user closed already (a dead UIDRef must not reach the
-	// close machinery).
 	//
-	// WHY NOT the book API's own IBookUtils::CloseDocumentsInBook(OriginallyCloseDocInfo&), which
-	// is the documented partner of the OpenOneDocument this list came from: it takes no UI flag and
-	// no command mode, so it closes IMMEDIATELY and with whatever UI it likes. KESCL called it here
-	// and CRASHED (2026-07-17) - the toggle it ran from was a widget notification, and closing a
-	// document in the middle of one is the wrong context. That helper is written for InDesign's own
-	// TOC / index commands, which run from a command, not from a notification. Do not "improve"
-	// this back to it. (docs/ai-notes/book-api.md)
-	//
-	// ***** THESE CLOSES HAND THE ERROR STATE BACK THE WAY THEY FOUND IT. ***** Close reports
-	// nothing at all (IDocFileHandler.h:101), so a failure inside it can only speak through the
-	// global error state - and one left standing fails every command after it, starting with the
-	// next chapter's close. PRESERVE, THEN CLEAR is the pair Adobe's own base class spells out
-	// (CDialogObserver.cpp:392-394; the contract is ErrorUtils.h:115-117): the preserver puts the
-	// CALLER's state back when this function returns, and the clear before each close keeps one
-	// chapter's failure from shadowing the next.
-	//
-	// A bare PMSetGlobalErrorCode(kSuccess) after each Close stood here from 2026-08-09 to
-	// 2026-08-10. It cleared whatever the caller had standing as well, which is not this function's
-	// to decide - the same correction the replace's resolve pass took on 2026-08-10, which had not
-	// walked over to the three closes in this file (found in the block 11 re-audit).
-	GlobalErrorStatePreserver closeErrorState;
-
+	// ***** EACH ONE THROUGH ReleaseHeldDoc, ON A SCHEDULE (2026-10-01). ***** This wrote the same four
+	// questions and the same close out a second time until then - "the same function written twice, and
+	// only one of them was covered", as a note in that one said of the error-state guard. Every verdict
+	// is that function's: no longer open = dropped, a window = dropped and left to the user, unsaved work
+	// or a refused close = kept on the list for a later call, otherwise closed (kSchedule - this runs
+	// from notifications). A copy is walked, because ReleaseHeldDoc edits the list; a chapter a
+	// re-entrant call has already handed back is no longer on it and answers false here.
+	const K2Vector<UIDRef> held = gHeldDocs;
 	for (int32 i = 0; i < static_cast<int32>(held.size()); ++i)
-	{
-		if (!IsDocStillOpen(held[i]))
-			continue;
-
-		// ***** A window makes it the user's, whoever raised it. ***** Not closed, and DROPPED
-		// rather than put back on the list (the list was taken and cleared above, so skipping is
-		// dropping): a windowed chapter is not something a later sweep may close either, and the
-		// user can see it and close it themselves. See DocHasAnyWindow for how a held chapter
-		// comes to have a window at all.
-		if (DocHasAnyWindow(held[i]))
-			continue;
-
-		// ***** Unsaved work in it? Then it is not ours to close. ***** Put it BACK on the held
-		// list: it is still a chapter this plug-in opened, so once it has been saved a later call
-		// hands it back like any other. Leaving it off the list instead would mean nothing ever
-		// closes it again. See HasUnsavedChanges for what closing it would cost, and
-		// HasUnsavedWork for the converted chapter it is asked differently of (2026-09-25).
-		if (HasUnsavedWork(held[i]))
-		{
-			gHeldDocs.push_back(held[i]);
-			continue;
-		}
-
-		// ***** A close that cannot go through leaves the chapter HELD, like unsaved work above. *****
-		// The list was taken and cleared at the top, so a plain `continue` here is a silent drop:
-		// until 2026-08-08 these two answers stranded the chapter - windowless, its .indd locked,
-		// and off the one list that could ever hand it back. Put it back instead, so a later call
-		// gets another try (the same treatment the unsaved door above gives its chapter).
-		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(held[i]));
-		if (docFileHandler == nil || !docFileHandler->CanClose(held[i]))
-		{
-			gHeldDocs.push_back(held[i]);
-			continue;
-		}
-		// Cleared before the close, not after it: a standing error would fail this one (see the
-		// preserver above for whose error state is being taken away here, and whose is not).
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		docFileHandler->Close(held[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
-	}
+		(void)ReleaseHeldDoc(held[i]);
 }
 
 bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
@@ -459,21 +387,19 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	if (heldIndex < 0)
 		return false;
 
-	// ***** AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN. ***** Preserve, then clear -
-	// the same pair, and for the same reasons, as the loop in ReleaseHeldDocs (see the long note
-	// there; the contract is ErrorUtils.h:115-117). This one matters most of the three, because a
-	// run calls it with kProcess BETWEEN chapters, and an error left here would fail the next
-	// chapter's whole walk.
+	// ***** AND FROM HERE ON THE ERROR STATE IS THIS FUNCTION'S OWN - PRESERVE, THEN CLEAR. ***** Close
+	// reports nothing at all (IDocFileHandler.h:101), so a failure inside it can only speak through the
+	// global error state - and one left standing fails every command after it, starting with the next
+	// chapter's close (or, with kProcess BETWEEN a run's chapters, the next chapter's whole walk). The
+	// pair is the one Adobe's own base class spells out (CDialogObserver.cpp:392-394; the contract is
+	// ErrorUtils.h:115-117): the preserver puts the CALLER's state back when this returns - clearing it
+	// is not this function's to decide - and the clear in front of the close keeps one chapter's failure
+	// from shadowing the next.
 	//
-	// ***** IT COVERS THE THREE TESTS BELOW AS WELL, not just the close. ***** It stood beneath
-	// them until 2026-08-12, so the three exits they own - no longer open, has a window, holds
-	// unsaved work - returned with whatever those tests had raised still standing. They are not
-	// silent readings: DocHasAnyWindow goes through IDocumentUIUtils (in the UI half since 2026-10-01) and HasUnsavedChanges through
-	// QueryDocFileHandler + CanSave, and NONE of the three reports a failure back, which is the
-	// very property the preserver exists for. The bulk sibling has always covered its own copies of
-	// the same three (ReleaseHeldDocs takes the preserver before its loop); this is the same
-	// function written twice, and only one of them was covered - the shape this plug-in keeps being
-	// bitten by. The clear stays where it was, immediately in front of the close.
+	// ***** IT COVERS THE THREE TESTS BELOW AS WELL, not just the close. ***** They are not silent
+	// readings: DocHasAnyWindow goes through IDocumentUIUtils (in the UI half since 2026-10-01) and
+	// HasUnsavedChanges through QueryDocFileHandler + CanSave, and NONE of the three reports a failure
+	// back, which is the very property the preserver exists for.
 	GlobalErrorStatePreserver closeErrorState;
 
 	// ***** IS IT STILL OPEN? ASKED FIRST, AND THE ORDER IS THE WHOLE POINT. *****
@@ -482,19 +408,9 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// QueryDocFileHandler and then to CanSave. A UIDRef is only (IDataBase*, UID), so for a chapter
 	// that has been closed since it was held that pointer is dangling, and handing it to anything at
 	// all is undefined behaviour. IsDocStillOpen is the one question that does not: it compares the
-	// pair against the session's open-document list without following it.
-	//
-	// (This named HasUnsavedChanges as "the first of them" and quoted db->IsModified() as what it
-	// called. Neither is so any more: DocHasAnyWindow went in above it on 2026-08-05, and the
-	// unsaved question became IDocFileHandler::CanSave on 2026-08-10. The DANGER is unchanged, which
-	// is how the sentence survived two edits to the code it describes.)
-	//
-	// ReleaseHeldDocs has always asked in this order (see the loop there). This one asked in the
-	// opposite one until 2026-08-05 - the same two questions, in one module, answered two different
-	// ways, which is the shape this plug-in keeps being bitten by. The callers all happen to hand
-	// over a chapter they have just opened, so nothing reached it; the header, however, states
-	// outright that a chapter which "is no longer open" may be passed in, and that promise has to
-	// hold.
+	// pair against the session's open-document list without following it. ReleaseHeldDocs hands over
+	// chapters the user may have closed since, and the header promises that a chapter which "is no
+	// longer open" may be passed in.
 	//
 	// Off the list when it goes, because a chapter nobody has open any more is not something a later
 	// call can hand back either.
@@ -522,33 +438,31 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// ***** Unsaved work in it? Then it is not ours to close. ***** Asked BEFORE it comes off the
 	// list, so it stays held and a later call can hand it back once it has been saved. Reached when
 	// a chapter this plug-in opened has been written to and not saved - which since 2026-08-08 is
-	// known to mean ONE thing: a replace landed in it and its window would not open. "The user
-	// typing in a chapter a jump opened for them", named here until then, cannot get this far: the
-	// window test just above drops it, and a jump takes its chapter off the held list anyway
-	// (ForgetHeldDoc). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges - and
-	// HasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by
-	// "has never been saved", the thing every conversion is (2026-09-25).
+	// known to mean ONE thing: a replace landed in it and its window would not open (the window test
+	// just above drops anything a user could type into). The whole of it is in ReleaseHeldDocs'
+	// header. See HasUnsavedChanges - and HasUnsavedWork, which asks it of a converted chapter by what
+	// was WRITTEN rather than by "has never been saved", the thing every conversion is (2026-09-25).
 	if (HasUnsavedWork(docRef))
 		return false;
 
-	// The same close ReleaseHeldDocs uses, one document at a time: kSchedule defers it until the
-	// current notification / idle tick has unwound, and kSuppressUI plus the run's dirty guard
-	// (IDataBase::SaveRestoreModifiedState, which wraps every walk) means no save prompt.
+	// The stock document close: kSchedule defers it until the current notification / idle tick has
+	// unwound, and kSuppressUI plus the run's dirty guard (IDataBase::SaveRestoreModifiedState, which
+	// wraps every walk) means no save prompt.
 	//
-	// Do NOT "improve" this to IBookUtils::CloseDocumentsInBook: it takes no UI flag and no command
-	// mode, closes immediately, and crashed KESCL in 2026-07-17 when called from a notification.
-	// See the longer note on ReleaseHeldDocs.
+	// WHY NOT the book API's own IBookUtils::CloseDocumentsInBook(OriginallyCloseDocInfo&), the
+	// documented partner of the OpenOneDocument this plug-in stopped calling: it takes no UI flag and
+	// no command mode, so it closes IMMEDIATELY and with whatever UI it likes. KESCL called it and
+	// CRASHED (2026-07-17) - the toggle it ran from was a widget notification, and closing a document in
+	// the middle of one is the wrong context. That helper is written for InDesign's own TOC / index
+	// commands, which run from a command. Do not "improve" this back to it. (docs/ai-notes/book-api.md)
 	//
 	// ***** A REFUSED CLOSE STAYS HELD, exactly as unsaved work does. ***** These two exits sat
 	// BELOW the erase until 2026-08-08, so a chapter whose close was refused fell off the held list
 	// in the same breath as it failed - windowless, its .indd locked, and no later ReleaseHeldDocs
-	// able to find it again. The unsaved door above has always kept its chapter listed so a later
-	// call can hand it back; a refusal is the same situation with a different cause, so it keeps
-	// the claim the same way.
+	// able to find it again.
 	//
-	// Cleared immediately in front of the close, exactly as the bulk sibling clears in front of
-	// each of its own - a standing error would fail this one. WHOSE state is being taken away here
-	// and whose is not: see the preserver at the top of this function.
+	// Cleared immediately in front of the close - a standing error would fail this one. WHOSE state is
+	// being taken away here and whose is not: see the preserver at the top of this function.
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
 	InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(docRef));
@@ -572,14 +486,10 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// implementation this SDK ships - InCopy's - which asserts on it outright: "Close() illegal with
 	// open document windows and cmdMode == kProcess" (InCopyDocUtils::DoClose, at
 	// incopyfileactions/utils/InCopyDocUtils.cpp:1376-1383). That is InCopy's document file handler,
-	// NOT the layout handler that will take our chapters; this note called it "the standard handler
-	// ... IDocFileHandler::Close's own implementation" until 2026-08-11, which is more than the
-	// source shows (a grep for the assert text finds this one site and nothing else). It is still
-	// the only statement anyone has made about that combination, and it is not a rule worth testing:
-	// the DocHasAnyWindow door above returns before this line for every windowed chapter, so what
-	// reaches here is windowless by construction. Keep that order if either test is ever moved
-	// (recorded in the block 11 re-audit, 2026-08-10 - the contract was being met, but nothing here
-	// said so).
+	// NOT the layout handler that will take our chapters, but it is the only statement anyone has made
+	// about that combination, and it is not a rule worth testing: the DocHasAnyWindow door above
+	// returns before this line for every windowed chapter, so what reaches here is windowless by
+	// construction. Keep that order if either test is ever moved.
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
 	return true;
@@ -822,20 +732,17 @@ bool KBSBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// keeps a dangling (IDataBase*, UID) away from all of them (2026-08-09, the pre-submission
 	// re-check). False is also the true answer: a chapter nobody has open cannot be given a window.
 	//
-	// ! A DOOR, NOT A KNOWN CASE. This said a scheduled close "can land in between" because the run's
-	//   progress bars pump events. What was MEASURED (2026-08-04) points the other way: a close this
-	//   module scheduled did not run until the run was over (the .idlk files stayed until then). So
-	//   no path is known that closes a chapter under a run; the test stays because it costs nothing
-	//   and the thing it guards against would be a crash. (Corrected 2026-09-27.)
+	// ! A DOOR, NOT A KNOWN CASE. What was MEASURED (2026-08-04): a close this module scheduled did
+	//   not run until the run was over (the .idlk files stayed until then). So no path is known that
+	//   closes a chapter under a run; the test stays because it costs nothing and the thing it guards
+	//   against would be a crash.
 	if (!IsDocStillOpen(docRef))
 		return false;
 
 	// Does it already have a window - front, or behind another tab? Then leave it alone. Asked
-	// through DocHasAnyWindow, which is where this module keeps that question (it wrote the search
-	// out by hand here until the block 11 API audit, 2026-08-08, making three copies of it in one
-	// file). That function has to be the ALL-presentations search: GetFrontmostPresentationForDocument
-	// answers nil for a document sitting behind another tab, and acting on that would open a SECOND
-	// window on the same document.
+	// through DocHasAnyWindow, which is where this module keeps that question. It has to be the
+	// ALL-presentations search: GetFrontmostPresentationForDocument answers nil for a document sitting
+	// behind another tab, and acting on that would open a SECOND window on the same document.
 	//
 	// ***** TRUE, NOT FALSE: the question this answers is "can the user see this chapter?" *****
 	// It returned false here until 2026-08-05, which put "it already had a window" and "the window
@@ -904,9 +811,8 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 			continue;	// the document the jump just landed in stays
 
 		// A document with something to save would want saving - leave it to the user. Asked
-		// through the same HasUnsavedChanges the held-chapter releases ask; this tested
-		// db == nil || IsModified() by hand until the block 11 API audit (2026-08-08), which is
-		// one module holding two opinions about one state.
+		// through the same question the held-chapter releases ask (it tested db == nil ||
+		// IsModified() by hand until 2026-08-08).
 		//
 		// ***** THIS LOOP IS THE ONE THE QUESTION ITSELF WAS WRONG FOR. ***** Unlike the two
 		// held-chapter releases - whose documents were all opened from a chapter file - this walks
@@ -925,15 +831,15 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 
 		// Only documents that HAVE a window go: a windowless held chapter is not this sweep's to close
 		// (the releases take it). Runs close chapters as they go, so one is left only when a jump or a
-		// replace could not give it a window. (Called "the reopen cache" until 2026-09-27.)
+		// replace could not give it a window.
 		if (!DocHasAnyWindow(ref))
 			continue;	// windowless - keep it held
 
 		toClose.push_back(ref);
 	}
 
-	// The same preserve-then-clear pair the two held-chapter releases use (the long note is in
-	// ReleaseHeldDocs): Close reports nothing back, and this sweep runs in the MIDDLE of a jump -
+	// The same preserve-then-clear pair the held-chapter releases use (the long note is in
+	// ReleaseHeldDoc): Close reports nothing back, and this sweep runs in the MIDDLE of a jump -
 	// an error left standing would fail the jump's next step, while clearing the caller's own
 	// would be deciding for the jump that its error state did not matter.
 	GlobalErrorStatePreserver closeErrorState;
@@ -946,15 +852,12 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		// windowed chapter is DROPPED from the list rather than put back on it. So the claim goes
 		// whether or not the close below goes through.
 		//
-		// Which is why this is NOT the "erased before a refused close" fault the two held-chapter
+		// Which is why this is NOT the "erased before a refused close" fault the held-chapter
 		// releases had to correct on 2026-08-08. There, a chapter whose close was refused fell off
 		// the one list that could ever hand it back and sat windowless with its .indd locked; here
-		// a refusal leaves a document the user can see and close themselves. The note here used to
-		// give the other reason ("a closed held chapter must come off before its close"), which is
-		// the reason KESCL's sweep states for the OPPOSITE order - handler and CanClose first, so a
-		// document that will not be closed stays listed (KESCLBookScope.cpp:272-278). That order is
-		// right there, because that sweep can take windowless documents as well; it is not what
-		// this one does (block 11 re-audit, 2026-08-10).
+		// a refusal leaves a document the user can see and close themselves. (KESCL's sweep takes the
+		// OPPOSITE order - handler and CanClose first, KESCLBookScope.cpp:272-278 - because it can take
+		// windowless documents as well; this one cannot.)
 		KBSBookScope::ForgetHeldDoc(toClose[i]);
 
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(toClose[i]));
@@ -974,17 +877,8 @@ bool KBSBookScope::HasTargetBook()
 	// with. ***** ListBookChapters calls ResolveTargetBook too, so the menu's grey state and the
 	// run itself cannot come to different answers - which is the whole reason this exists. Nothing
 	// here opens, lists or holds anything: it reads a palette's file field and asks IBookManager.
-	//
-	// It was written on 2026-08-09 as its own copy of those two steps ("the SAME two-step answer
-	// ListBookChapters gives", the note here said), and the copy came out a door short: it took an
-	// active book that was already broadcasting its close, which the run drops. Same day, same
-	// commit, one of the two spellings updated - so the gate built to end that split had quietly
-	// re-opened it (block 11 re-audit, 2026-08-10). There is one spelling now.
-	//
-	// (KBSBookScope::HasActiveBook stood beside this until then; its last caller was the fallback
-	// that used to be written out here, and it went with it. The bare "is a book active" question
-	// has no user left: every door in this plug-in wants the book a run would TARGET, and those are
-	// not the same question.)
+	// (KBSBookScope::HasActiveBook stood beside this until 2026-08-10: every door wants the book a run
+	// would TARGET, which is not "is a book active".)
 	return ResolveTargetBook() != nil;
 }
 
@@ -1146,9 +1040,8 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// reached, which keeps the old behaviour rather than failing outright.
 	//
 	// Both steps - and the closing-book door on each of them - live in ResolveTargetBook, which the
-	// menu's grey state asks as well (HasTargetBook). They were two copies of the same two steps
-	// until the block 11 re-audit (2026-08-10), and the copies had already drifted by one test.
-	// Non-owning pointer, whichever step answered: nothing here is released.
+	// menu's grey state asks as well (HasTargetBook). Non-owning pointer, whichever step answered:
+	// nothing here is released.
 	IBook* book = ResolveTargetBook();
 	if (book == nil)
 		return false;
