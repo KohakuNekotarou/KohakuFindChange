@@ -27,6 +27,7 @@
 #include "KBSModelTypes.h"	// the types shared with the UI half (RowDisplay, ChangeOutcome, ...)
 
 #include <map>
+#include <set>			// GetChapterStories
 #include <vector>
 
 namespace KBSResultModel
@@ -497,6 +498,10 @@ namespace KBSResultModel
 	    replace reads as "cannot vouch for this story" and does not write to. */
 	bool GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion);
 	void SetStoryVersion(int32 chapterIdx, UID story, uint32 version);
+
+	/** The stories holding a row of the chapter (2026-10-01: the replace and KBSUndoFollow each walked
+	    the rows for this themselves). Empty for an index out of range. */
+	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
 
 	/** Select / deselect one hit for replacement. Ignored for anything the panel draws no check box
 	    on - a hit already replaced (the text it matched is gone), a locked one (InDesign offers no

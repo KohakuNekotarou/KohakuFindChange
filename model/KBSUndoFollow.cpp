@@ -114,23 +114,17 @@ void ReadChapterStories(int32 chapterIdx, std::vector<StoryMoved>& out)
 	if (!KBSBookScope::FindOpenChapterDoc(file, found))
 		return;
 	IDataBase* const db = found.GetDataBase();
-	std::set<UID> seen;
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
+	std::set<UID> stories;
+	KBSResultModel::GetChapterStories(chapterIdx, stories);
+	for (std::set<UID>::const_iterator story = stories.begin(); story != stories.end(); ++story)
 	{
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 hash = 0;
-		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) || story == kInvalidUID
-			|| !seen.insert(story).second)
-			continue;
 		uint32 version = 0;
-		if (!KBSSearchEngine::ReadStoryVersion(db, story, version))
+		if (!KBSSearchEngine::ReadStoryVersion(db, *story, version))
 			continue;
 		StoryMoved s;
 		s.file = file;
 		s.doc = found;
-		s.story = story;
+		s.story = *story;
 		s.before = version;
 		s.now = db;
 		out.push_back(s);

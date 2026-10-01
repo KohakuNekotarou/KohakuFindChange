@@ -16,8 +16,8 @@
 //  a replacement made that the search never listed is stepped over, and its row is reported missing
 //  rather than written (H-8). A GREP query holding ^ is walked backward (the direction is set before
 //  anything is written, outside the sequence). The pending tracked changes a ticked match sits in or
-//  next to are accepted first; the replaces' own records are LEFT in the document, told apart by their time stamp: they are
-//  what Reject Change, Redo and the jump find a row by.
+//  next to are accepted first; the replaces' own records are LEFT in the document, told apart by their
+//  time stamp: they are what Reject Change, Redo and the jump find a row by.
 //  (From 2026-09-26 to 2026-09-27 each story got InDesign's Change All instead and the rows NOT ticked
 //  were taken back; that went in the 2026-09-27 cleanup - git history, c876bc7 and before.)
 //
@@ -59,14 +59,13 @@ namespace KBSReplaceEngine
 	    ***** START IF THEY ARE NOT. (User's design, 2026-08-10.)
 	    The rows were found at positions the search recorded, and the run lines what it writes up with
 	    them - so if the document has moved since the search in a way that adds, removes or shifts a
-	    match, the rows no longer describe it. (This paragraph described the one-at-a-time walk, where
-	    the Nth match was replaced for the Nth checked row, until the 2026-09-27 defect sweep; the
-	    reason for the check is unchanged.)
+	    match, the rows no longer describe it.
 
 	    So each chapter is walked before it is written. That walk writes nothing: for every ticked row
-	    it asks whether the row's text is still the text that was ticked, and whether a match of the
-	    walk still BEGINS where the row does. One that is not - or one ticked row the walk never
-	    reaches - and the whole run stops, with an alert saying so and the results cleared
+	    it asks whether the row's story is at the version KBS left it at, whether the row still reads
+	    as it was found, and whether a match of the walk still stands at the row's start and length
+	    (the three questions at ChapterMovedUnderRows in the .cpp). One that does not - or one ticked
+	    row the walk never reaches - and the whole run stops, with an alert saying so and the results cleared
 	    (TellResultsWentStale, and the verify pass in the resolve loop). Only if every chapter passes
 	    does the second walk open a command sequence and write. (It lined the Nth match of the walk up
 	    with the row numbered N, and did not read the text, until 2026-09-29 - see
@@ -87,8 +86,7 @@ namespace KBSReplaceEngine
 
 	    The same test used to stand INSIDE the replacing walk, per hit, until 2026-08-05. See the
 	    note above the walk in KBSReplaceEngine.cpp for why it could not work there and what remains
-	    of it (the JUMP still asks it, so a click on a row can still answer "the replacement is no
-	    longer here").
+	    of it (KBSSearchEngine::RowReadsAsFound, which the jump and the row menus' doors ask).
 
 	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
 	    allowed to make the total quietly come up short. The ways that happens since 2026-09-26:
@@ -181,7 +179,7 @@ namespace KBSReplaceEngine
 	/** RefuseChangedQuery's question WITHOUT ITS CONSEQUENCES (2026-09-29): true when the Find/Change
 	    settings still describe the search the results came from. The tab is stated all the same - a
 	    walk after this runs in it - and NOTHING IS CLEARED whatever the answer. For a caller that only
-	    has to know: the jump's look for a row Undo moved (KBSJump RelocateStaleRow), which asked
+	    has to know: the jump's look for a row Undo moved (KBSSearchEngine::RelocateStaleRow), which asked
 	    RefuseChangedQuery until then and on a changed query cleared the whole result set in the middle
 	    of a jump. Same rule as RefuseChangedQuery: outside any command sequence. False on a list rebuilt
 	    from the records (2026-09-29): nothing was searched, so there is nothing it can be unchanged from. */
@@ -189,17 +187,18 @@ namespace KBSReplaceEngine
 
 	/** Reject Change on a replaced hit row (2026-09-26): its tracked change - found by
 	    KBSTrackChange::FindRowChangeForHit - is rejected, deletion and insertion, in ONE undo step, and
-	    the row shows its original text again ("rejected"). All the way back or not at all: when the
+	    the row shows its original text again (the word "rejected" only on a list rebuilt from the
+	    records, where no check box comes back to say it). All the way back or not at all: when the
 	    original text does not stand where the change stood afterwards, the step is rolled back.
 	    False = nothing changed; outStatus says why either way. */
 	bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** Replace on a hit row's right-click menu (2026-09-27, the user's call): that one row, ticked or
 	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
-	    list stays a work list: the row reads "replaced", every other row is moved to where its text now
-	    stands. Refused - nothing changed, outStatus says why - when
-	    the query changed since the search, the row's text is not the one the search found, the chapter
-	    cannot be opened, or the row would not be replaced (locked since, missing, an endnote's end). */
+	    list stays a work list: the row shows its new text and loses its box, every other row is moved to
+	    where its text now stands. Refused - nothing changed, outStatus says why - when the query changed
+	    since the search, the row's text is not the one the search found, the chapter cannot be opened,
+	    or the row would not be replaced (locked since, missing, an endnote's end). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no

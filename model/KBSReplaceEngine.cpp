@@ -35,11 +35,7 @@
 #include "CmdUtils.h"				// commands and command sequences
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
-// (ITextModel.h was here for GetTextChangeCount, which fed the trusted-story fast path. Removed
-// 2026-08-03 with that path - see the note over MatchStillStandsHere. It is back since 2026-09-26
-// for a different job: QueryStoryThread / FindStoryThread, which is how a row's position is kept
-// as "this far into this thread" - see RowNow.)
-#include "ITextModel.h"
+#include "ITextModel.h"				// QueryStoryThread / FindStoryThread - a row kept as "this far into this thread" (RowNow)
 #include "ITextStoryThread.h"
 #include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote's fallback)
 #include "WideString.h"			// Reject Change: the original text's length in code points
@@ -63,10 +59,6 @@
 #include "KBSBookScope.h"		// reopening a chapter the user closed since the search
 #include "KBSTrackChange.h"	// every replace under Track Changes, its records left (2026-09-26)
 #include "KBSUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo (2026-09-29)
-// (KBSJump.h was included here for IsHidePreviousChapterOn until 2026-08-03. A run that saves now
-// hands every chapter back as it goes, whatever that toggle says - it is about JUMPING, not about
-// what a run does with the chapters it opened for itself. Same call the search stopped making on
-// 2026-08-02, for the same reason.)
 
 namespace
 {
@@ -192,22 +184,11 @@ struct PendingChapter
 		checkedCount(0) {}
 };
 
-// ***** A CountCheckedInChapter STOOD HERE UNTIL 2026-08-08, AND THE MODEL ALREADY ANSWERED IT.
-// ***** It asked "how many of this chapter's hits are checked and not yet replaced" with its own
-// loop over GetHitCount / GetHitFlags - which is KBSResultModel::GetChapterCheckedCount, by the
-// same rule (checked && !replaced), with the same out-of-range answer, and that is the question
-// the tree's chapter row reads out as "(N/M checked)". Two spellings of one question is how they
-// come to disagree; the run asks the model now.
-//
-// The 2026-08-07 pass that cut this from three calls per chapter down to one did not notice that
-// the surviving call was still a private copy of the model's own.
+// (A CountCheckedInChapter stood here until 2026-08-08 - a private copy of
+//  KBSResultModel::GetChapterCheckedCount, which the run asks now.)
 
-// Everything a run has to say about itself, in one place. It used to be seventeen locals in
-// ReplaceChecked; they were gathered up when a second way through that function arrived on
-// 2026-08-03 (the chapter-at-a-time path, which saved). That path was removed with "save after
-// replace" on 2026-08-05 and there is one way through again - but the structure earns its keep on
-// its own: the counters are what the summary is built from, and they are easier to follow gathered
-// than scattered.
+// Everything a run has to say about itself, in one place: the counters are what the summary is built
+// from, and they are easier to follow gathered than scattered.
 //
 // Counters only - no decisions. BuildSummary says nothing about a counter that stayed zero.
 struct RunTotals
@@ -324,10 +305,10 @@ void NoteChapter(int32 chapterIdx, int32& ioCount, PMString& ioFirst, bool& ioHa
 // ticked position has been confirmed and nothing has moved since (the verify pass writes nothing).
 //
 // The same-occurrence test and the hash behind it are NOT gone (KBSSearchEngine::RowReadsAsFound,
-// which every door asks since 2026-09-29) - the JUMP asks them,
-// which is how clicking a row can answer "the replacement is no longer here" instead of scrolling to
-// whatever now sits at that position; so do the row doors (RowStillStands, ReplaceRowsNow, RowsToRedo,
-// since 2026-09-27) and the verify walk (ChapterMovedUnderRows, since 2026-09-29).
+// which every door asks since 2026-09-29) - the JUMP asks them, which is how clicking a row can answer
+// "the replacement is no longer here" instead of scrolling to whatever now sits at that position; so do
+// the row doors (RowStillStands, ReplaceRowsNow, RowsToRedo, since 2026-09-27) and the verify walk
+// (ChapterMovedUnderRows, since 2026-09-29).
 
 // Where one of the chapter's rows stands in the text NOW - where the search found it, carried past
 // every replacement this pass has made since - or, for a row this pass replaced, where its new text
@@ -770,11 +751,11 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 
 // ***** IS THE ROW'S STORED PLACE STILL ITS TEXT? (2026-09-27 re-check.) ***** A row is carried and read
 // back only when it is: a replaced row is first put where its tracked change stands (the record moves
-// with the text - RefreshRowFromRecords), any other row must still hold the text the search hashed
-// (MatchIsSameOccurrence - the jump's own test). An edit made since can have moved the rest - reading
-// such a row back at its old place took the line AND the hash from the wrong characters, so a click
-// then selected them (measured, case edit-then-reject: "ZZkitt"); left alone, it says "missing" when
-// clicked, which is the truth.
+// with the text - RefreshRowFromRecords), any other row must still read as it was found
+// (KBSSearchEngine::RowReadsAsFound - the jump's own test). An edit made since can have moved the rest -
+// reading such a row back at its old place took the line AND the hash from the wrong characters, so a
+// click then selected them (measured, case edit-then-reject: "ZZkitt"); left alone, it says "missing"
+// when clicked, which is the truth.
 bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 {
 	bool checked = false, replaced = false, locked = false;
@@ -801,7 +782,7 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 	}
 	// The match AND the line around it (2026-09-29, the defect re-check F-2): a row an Undo left on another
 	// occurrence of its own text passed the match's hash alone, and was then read back THERE - from then on
-	// it described that other occurrence, with a line to match (KBSSearchEngine::RowReadsAsFound).
+	// it described that other occurrence, with a line to match.
 	return KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db);
 }
 
@@ -829,21 +810,6 @@ bool StoryAsKBSLeftIt(int32 chapterIdx, IDataBase* db, UID story)
 	uint32 recorded = 0, now = 0;
 	return KBSResultModel::GetStoryVersion(chapterIdx, story, recorded)
 		&& KBSSearchEngine::ReadStoryVersion(db, story, now) && recorded == now;
-}
-
-// The stories holding a row of the chapter.
-void StoriesOfRows(int32 chapterIdx, std::set<UID>& out)
-{
-	out.clear();
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	for (int32 i = 0; i < hitCount; ++i)
-	{
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 hash = 0;
-		if (KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, a, b, hash) && story != kInvalidUID)
-			out.insert(story);
-	}
 }
 
 // Of `stories`, the ones at the version KBS last recorded - asked BEFORE a change of KBS's own, so that
@@ -1117,15 +1083,12 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 // The resolve pass asks it of every chapter before a character is written. Every ticked row carries the
 // place its match stands at - where the search found it, carried past every change KBS has made since -
 // and this walks every story that holds one the way the writing walk will (WalkStoryReplacing: the same
-// story scope, the same options, from the top of the story), asking two things of every ticked row (three
-// since the evening of 2026-09-29 - the story's version came in front of them, and the line joined the
-// text: "THREE QUESTIONS" below):
-//   - is its text still the text that was ticked (MatchIsSameOccurrence - the jump's own test: the same
-//     length and the same characters, the whole match as one hash), and
-//   - does a match of the walk still BEGIN where it does (the same story, the same index)?
-// A row that fails either, or one the walk never reaches, means the document is not the one the results
-// describe, and the caller stops the whole run before a character is written. It writes nothing, marks no
-// row and moves no bar.
+// story scope, the same options, from the top of the story), asking THREE QUESTIONS of every ticked row
+// (below): is its story at the version KBS left it at, does the row still read as it was found
+// (KBSSearchEngine::RowReadsAsFound - the jump's own test), and does a match of the walk still stand at
+// its start and length? A row that fails any of them, or one the walk never reaches, means the document is
+// not the one the results describe, and the caller stops the whole run before a character is written. It
+// writes nothing, marks no row and moves no bar.
 //
 // ***** BY PLACE AND TEXT, NOT BY COUNT (2026-09-29, the user's call: safe, even if slower). ***** Until
 // then it lined the Nth match of the walk up with the row numbered N (Hit::walkOrder) and read no text.
@@ -1311,19 +1274,12 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	return false;
 }
 
-// A SECOND shape lived here from 2026-08-03 to 2026-08-05: ReplaceChapterByChapter ran a SAVING
-// run one chapter at a time - open, replace, close its own sequence, save, hand it back - so that
-// a book of twenty chapters was never all open at once. It went with "save after replace" itself,
-// and had to: a chapter that has not been written to disk cannot be closed, because closing it
-// would throw its replacements away. There is nothing that shape can do without the save. A
-// machine that cannot hold a whole book open is served by ticking fewer rows (user, 2026-08-05).
+// (ReplaceChapterByChapter - the SAVING run, a chapter at a time - stood here from 2026-08-03 to
+//  2026-08-05; the header says why it went.)
 
-// The status line, from the counters alone.
-//
-// Split out from ReplaceChecked when a second way through the run arrived (the chapter-at-a-time
-// path, 2026-08-03 to 2026-08-05). It reads RunTotals and nothing else - no document, no model, no
-// session state - and it is worth keeping that way: the wording of a run is then decided in one
-// place, from one set of facts.
+// The status line, from the counters alone. It reads RunTotals and nothing else - no document, no model,
+// no session state - and it is worth keeping that way: the wording of a run is then decided in one place,
+// from one set of facts.
 //
 // Every checked hit that was not replaced is named here rather than being allowed to make the total
 // quietly come up short. That rule is what most of these branches exist for.
@@ -1429,8 +1385,9 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	//
 	// It took a distinction to see this at all: the walker commands answer with a whole enum
 	// (IFindChangeService.h:43 - five members, of which the four in RunWalkerCmd's table can arrive
-	// here) and KBS used to read every one of them that was not kSuccess as "nothing here". Adobe's own loop keeps them apart - SnpFindAndReplace.cpp:796
-	// returns the result untouched and :644-648 turns kFailure, and only kFailure, into a failure.
+	// here) and KBS used to read every one of them that was not kSuccess as "nothing here". Adobe's own
+	// loop keeps them apart - SnpFindAndReplace.cpp:796 returns the result untouched and :644-648 turns
+	// kFailure, and only kFailure, into a failure.
 	if (t.chaptersWalkFailed > 0)
 	{
 		outSummary.Append(" ");
@@ -1668,9 +1625,6 @@ int32 StopBeforeAnythingIsWritten(const std::vector<PendingChapter>& pending, Ru
 // CAlert.h:218-226: "If showAlert is kFalse, no alerts will be displayed") and the run stops all the
 // same: the caller returns through StopBeforeAnythingIsWritten either way, and a scripted run reads
 // what happened off the panel's status line (app.kfcStatus until 2026-09-27; KIDMCP's inspect_ui now).
-// (That citation read CAlert.h:178-183 until 2026-08-10, which is the argument list of a call this
-// file does not make - WarningAlertWithDontShowAgain. The fact was measured and is right; only the
-// line was pointing at the wrong function.)
 // @param chapterIdx the chapter the mismatch was found in, or -1.
 void TellResultsWentStale(int32 chapterIdx)
 {
@@ -1992,13 +1946,10 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// Nothing is half done.
 	RunTotals totals;
 
-	// ***** ONE WAY THROUGH, and it opens every chapter it has work in. ***** A second shape stood
-	// here from 2026-08-03 to 2026-08-05 - chapter at a time, for runs that SAVED - and it went with
-	// the save: a chapter that has not been written to disk cannot be closed, so a run that does not
-	// save has no choice but to hold every chapter it touches until the end.
-	//
-	// What the user gets in exchange is that Cancel is absolute: one sequence around everything, so
-	// stopping the run puts the whole book back.
+	// ***** ONE WAY THROUGH, and it opens every chapter it has work in. ***** A run that does not save
+	// has no choice but to hold every chapter it touches until the end (the header says why); what the
+	// user gets in exchange is that Cancel is absolute: one sequence around everything, so stopping the
+	// run puts the whole book back.
 
 	// How much work the run has to get through - what the bar is sized with. Counted BEFORE anything
 	// is opened, because the bar has to be up while the chapters are being opened: that is the slow
@@ -2010,13 +1961,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// The run's chapter list is born HERE as well: a chapter with nothing checked is not in it -
 	// not opened, not walked, not a step of the bar - and every chapter that is in it carries its
 	// count with it (PendingChapter::checkedCount, which is also where the reasons the number
-	// stays right are). Until 2026-08-07 that count was taken up to three times per chapter -
-	// here, at the door of the resolve pass below, and again as each chapter's turn came - three
-	// passes over the same rows for an answer that cannot change while the run stands.
-	//
-	// ...and it is the MODEL that counts, since 2026-08-08. The one reading left was still a
-	// private loop of this file's own; GetChapterCheckedCount is the same question asked where the
-	// tree's chapter row asks it. See the note where that loop used to live.
+	// stays right are), counted once, by the model (GetChapterCheckedCount - the question the
+	// tree's chapter row asks).
 	std::vector<PendingChapter> pending;
 	int32 totalCheckedHits = 0;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
@@ -2087,12 +2033,11 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// brace of this pass. The clear is the other half: the pass should not START on an error either,
 	// since a standing one fails whatever it does next (opening a chapter, above all).
 	//
-	// Clearing WITHOUT preserving is what stood here for one hour on 2026-08-10, as a single
-	// PMSetGlobalErrorCode in front of the sequence. It worked, but it decided for this function's
-	// CALLER that their error state did not matter, and it guarded only the one path that reaches
-	// the sequence - the pass's early exits leaked. This guards every way out of the pass, including
-	// the two that return through StopBeforeAnythingIsWritten (which keeps a clear of its own: it
-	// closes documents after this scope has already ended).
+	// Clearing WITHOUT preserving (one hour on 2026-08-10) decided for this function's CALLER that
+	// their error state did not matter, and guarded only the one path that reaches the sequence. This
+	// guards every way out of the pass, including the two that return through
+	// StopBeforeAnythingIsWritten (which keeps a clear of its own: it closes documents after this scope
+	// has already ended).
 	GlobalErrorStatePreserver passErrorState;
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
@@ -2190,7 +2135,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// their new version if the run goes through (2026-09-29, the defect re-check F-2).
 		{
 			std::set<UID> rowStories;
-			StoriesOfRows(ci, rowStories);
+			KBSResultModel::GetChapterStories(ci, rowStories);
 			StoriesAsKBSLeftThem(ci, docRef.GetDataBase(), rowStories, chapter.storiesAsLeft);
 		}
 	}
@@ -2541,8 +2486,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 			// IsDocStillOpen FIRST - the same rule, spelled the same way, as this loop's twin in
 			// HandBackChaptersWithNothingInThem: docRef is only (IDataBase*, UID), and for a
 			// chapter closed under the run that pointer is dangling, so SetModified through it is
-			// undefined behaviour. The twin got its guard on 2026-08-09; this was the one deref of
-			// the pair that the same sweep missed (found in the pre-submission re-check).
+			// undefined behaviour.
 			if (!KBSBookScope::IsDocStillOpen(pending[pi].docRef))
 				continue;
 			IDataBase* const chapterDB = pending[pi].docRef.GetDataBase();
@@ -2666,11 +2610,11 @@ bool KBSReplaceEngine::IsReplacing()
 // ======================================================================================================
 // ***** REPLACE ONE ROW, FROM ITS RIGHT-CLICK MENU (2026-09-27, the user's call). ***** No prompt; the
 // Track Changes note goes on the status line afterwards. The list stays a WORK LIST - unlike Change
-// Checked, which turns it into a report - so the row reads "replaced" and every other row is carried
+// Checked, which turns it into a report - so the row shows its new text and every other row is carried
 // to where its text now stands, ready for the next Replace or a Change Checked. One undo step
-// ("Replace"). The same doors as Change Checked, asked for this row: the query unchanged
-// (RefuseChangedQuery), the row's text still the one the search found (MatchIsSameOccurrence - the
-// jump's own test), and only the pending changes the row sits in or next to accepted first.
+// ("Replace"). The same doors as Change Checked, asked for these rows: the query unchanged
+// (RefuseChangedQuery), the verify walk's three questions (ChapterMovedUnderRows), and only the pending
+// changes the rows sit in or next to accepted first.
 // ======================================================================================================
 
 // (RenumberWalkOrders stood here from 2026-09-27 to 2026-09-29: after every row menu's Replace and
@@ -2753,6 +2697,32 @@ bool KBSReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 static void StartStatus(PMString& out, bool again)
 {
 	out = again ? "Replace Again: " : "Replace: ";
+}
+
+// ***** THE ROW MENUS' SEQUENCE - ONE UNDO STEP, ROLLED BACK WHOLE ON A FAILURE (2026-09-26). ***** A PLAIN
+// sequence, as KCM's own reject is (KCMFacades.cpp, RejectImportChange): an abortable sequence, ended, was
+// measured to take the undo step below it away. Its rollback is the SDK's own: raise the error state, end
+// it, clear it (CmdUtils.h, SequenceContext) - EndPlainSequence. Begun with the name the Undo menu shows;
+// nil = InDesign would not start one, and outStatus then says so after `what` ("Reject Change: " ...).
+static ICommandSequence* BeginPlainSequence(const PMString& stepName, const char* what, PMString& outStatus)
+{
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	if (sequence == nil)
+	{
+		outStatus = what;
+		outStatus.Append("InDesign would not start a command sequence - nothing was changed.");
+		return nil;
+	}
+	sequence->SetName(stepName);
+	return sequence;
+}
+
+static void EndPlainSequence(ICommandSequence* sequence, bool ok)
+{
+	if (!ok)
+		ErrorUtils::PMSetGlobalErrorCode(kFailure);
+	CmdUtils::EndCommandSequence(sequence);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 }
 
 // The rows of one chapter replaced now, in ONE undo step - the right-click Replace of a row (one row) or
@@ -2874,24 +2844,17 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		// backwards with it: case caret-row-then-change.)
 		const KBSBackwardSearchScope writeDirection(WriteBackward());
 
-		ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+		ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep),
+			again ? "Replace Again: " : "Replace: ", outStatus);
 		if (sequence == nil)
-		{
-			StartStatus(outStatus, again);
-			outStatus.Append("InDesign would not start a command sequence - nothing was changed.");
 			return false;
-		}
-		sequence->SetName(KBSLoc::Text(kKBSReplaceStepKey, KBSJa::kReplaceStep));
 		// (the row backup was started by the recorder, above)
 		KBSTrackChange::BeginSignedRun();	// the run's time (2026-09-28) - every row it writes is stamped from it
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
 			replaced, missing, locked, refused, endnoteLeft, accepted, walkFailed, cancelled, failed, whyNot, &rowsToReplace);
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
-		if (!ok)
-			ErrorUtils::PMSetGlobalErrorCode(kFailure);
-		CmdUtils::EndCommandSequence(sequence);
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		EndPlainSequence(sequence, ok);
 	}
 	if (!ok)
 	{
@@ -2964,10 +2927,7 @@ bool KBSReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 }
 
 // ======================================================================================================
-// Reject Change (2026-09-26) - see the header. The sequence is a PLAIN one, as KCM's own reject is
-// (KCMFacades.cpp, RejectImportChange): an abortable sequence, ended, was measured to take the undo
-// step below it away. The rollback of a plain sequence is the SDK's own: raise the error state, end it,
-// clear it (CmdUtils.h, SequenceContext).
+// Reject Change (2026-09-26) - see the header. One plain sequence (BeginPlainSequence says why plain).
 // ======================================================================================================
 // ***** A STORY ROW'S OR A DOCUMENT ROW'S ROWS (2026-09-27). ***** The rows of a story (groupIdx >= 0) or of
 // the whole document (groupIdx < 0) - one scope for every menu item of the two rows. (Replace and Reject
@@ -3052,6 +3012,18 @@ bool KBSReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 {
 	std::vector<int32> rows;
 	return RowsToReject(chapterIdx, groupIdx, rows, true);
+}
+
+// What the records' deletions hold, in their order - for the door Reject Change and Accept Change both ask:
+// it must be exactly the rows' original text (see THE RUN'S DELETIONS in RejectRowsNow).
+static PMString DeletedTextOf(const std::vector<KBSTrackChange::Record>& recs)
+{
+	PMString deleted;
+	deleted.SetTranslatable(kFalse);
+	for (size_t k = 0; k < recs.size(); ++k)
+		if (recs[k].isDelete)
+			deleted.Append(recs[k].text);
+	return deleted;
 }
 
 // ***** TAKE A SET OF REPLACED ROWS BACK, IN ONE UNDO STEP (2026-09-27: the row's touching group, or a
@@ -3157,12 +3129,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		// see it (it reads the run's own length only): refused before a thing is written.
 		{
 			KBSTrackChange::CollectRecordsOfTimes(p.story, p.times, p.recs);
-			PMString deleted;
-			deleted.SetTranslatable(kFalse);
-			for (size_t k = 0; k < p.recs.size(); ++k)
-				if (p.recs[k].isDelete)
-					deleted.Append(p.recs[k].text);
-			if (deleted != p.allOriginal)
+			if (DeletedTextOf(p.recs) != p.allOriginal)
 			{
 				outStatus = "Reject Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
 				return false;
@@ -3188,16 +3155,14 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 			rejectedIn.insert(plans[r].story.GetUID());
 		StoriesAsKBSLeftThem(chapterIdx, db, rejectedIn, asLeft);
 	}
-	// Recorded for the panel's following of Undo (2026-09-29): the row a reject takes back reads "replaced"
+	// Recorded for the panel's following of Undo (2026-09-29): the row a reject takes back is a replaced row
 	// again when the reject is undone, and offers Reject Change again. Kept below, once the rows show it.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	// (the step's name was English on every UI until 2026-09-29)
+	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSRejectStepKey, KBSJa::kRejectStep),
+		"Reject Change: ", outStatus);
 	if (sequence == nil)
-	{
-		outStatus = "Reject Change: InDesign would not start a command sequence - nothing was changed.";
 		return false;
-	}
-	sequence->SetName(KBSLoc::Text(kKBSRejectStepKey, KBSJa::kRejectStep));	// English on every UI until 2026-09-29
 	std::vector<int32> taken;		// every row taken back; others[row] follows where its original text stands
 	PMString why;
 	bool ok = true;
@@ -3262,10 +3227,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 			}
 		}
 	}
-	if (!ok)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	EndPlainSequence(sequence, ok);
 	if (!ok)
 	{
 		outStatus = "Reject Change: ";
@@ -3313,6 +3275,33 @@ static bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 	return true;
 }
 
+// The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together) -
+// what a row's Reject Change and Accept Change act on.
+//
+// ***** ONLY THE NEIGHBOURS WHOSE CHANGE IS STILL THERE (2026-09-27, case touching-group-redo-reject). *****
+// A neighbour's change can be gone while the row still reads as replaced: the replace of THIS row accepts
+// the pending changes it touches first (AcceptPendingAround), and a neighbour replaced a moment earlier
+// is exactly such a change. Taking that neighbour along found nothing to reject for it, and the whole
+// reject was cancelled - so this row could never be taken back at all. A neighbour with no change of its
+// own left is not part of what can be taken back; the row itself always is (RejectRowsNow says why when
+// its own change is gone, and refuses when its deletion also holds such a neighbour's text).
+static void RowWithTouchingChanges(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
+{
+	std::vector<int32> group;
+	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
+	KBSTrackChange::ReplacedTouchingGroup(chapterIdx, hitIdx, group);	// the replaced rows outside a footnote
+	outRows.clear();
+	for (size_t k = 0; k < group.size(); ++k)
+	{
+		UIDRef storyRef;
+		KBSTrackChange::Change change;
+		if (group[k] == hitIdx || KBSTrackChange::FindRowChangeForHit(chapterIdx, group[k], storyRef, change))
+			outRows.push_back(group[k]);
+	}
+	if (outRows.empty())
+		outRows.push_back(hitIdx);
+}
+
 bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
 	outStatus.Clear();
@@ -3323,28 +3312,8 @@ bool KBSReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 		outStatus.Append("Reject Change: the document of this row is not open.");
 		return false;
 	}
-	// The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together).
-	//
-	// ***** ONLY THE NEIGHBOURS WHOSE CHANGE IS STILL THERE (2026-09-27, case touching-group-redo-reject). *****
-	// A neighbour's change can be gone while the row still reads "replaced": the replace of THIS row accepts
-	// the pending changes it touches first (AcceptPendingAround), and a neighbour replaced a moment earlier
-	// is exactly such a change. Taking that neighbour along found nothing to reject for it, and the whole
-	// reject was cancelled - so this row could never be taken back at all. A neighbour with no change of its
-	// own left is not part of what can be taken back; the row itself always is (RejectRowsNow says why when
-	// its own change is gone, and refuses when its deletion also holds such a neighbour's text).
-	std::vector<int32> group;
-	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
-	KBSTrackChange::ReplacedTouchingGroup(chapterIdx, hitIdx, group);	// the replaced rows outside a footnote
 	std::vector<int32> rows;
-	for (size_t k = 0; k < group.size(); ++k)
-	{
-		UIDRef storyRef;
-		KBSTrackChange::Change change;
-		if (group[k] == hitIdx || KBSTrackChange::FindRowChangeForHit(chapterIdx, group[k], storyRef, change))
-			rows.push_back(group[k]);
-	}
-	if (rows.empty())
-		rows.push_back(hitIdx);
+	RowWithTouchingChanges(chapterIdx, hitIdx, rows);
 	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
 		return false;
 	// On a list rebuilt from the records (2026-09-29) there is no box and no Replace: what to do next is to
@@ -3400,10 +3369,12 @@ static bool RejectRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMS
 	return RejectRowsOf(chapterIdx, scope, unit, outStatus);
 }
 
+// (The document rows' Can* asked chapterIdx >= 0 && < GetChapterCount() in front of their scope until
+//  2026-10-01; the model's own range check answers an empty scope for that already.)
 bool KBSReplaceEngine::CanRejectChapter(int32 chapterIdx)
 {
 	std::vector<int32> rows;
-	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && RowsToReject(chapterIdx, -1, rows, true);
+	return RowsToReject(chapterIdx, -1, rows, true);
 }
 
 bool KBSReplaceEngine::RejectChapter(int32 chapterIdx, PMString& outStatus)
@@ -3451,27 +3422,21 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	std::set<UID> asLeft;
 	{
 		std::set<UID> rowStories;
-		StoriesOfRows(chapterIdx, rowStories);
+		KBSResultModel::GetChapterStories(chapterIdx, rowStories);
 		StoriesAsKBSLeftThem(chapterIdx, db, rowStories, asLeft);
 	}
 	// Recorded for the panel's following of Undo (2026-09-29) - Reject Change's reason.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSAcceptAllStepKey, KBSJa::kAcceptAllStep),
+		"Accept All Changes by KohakuFindChange: ", outStatus);
 	if (sequence == nil)
-	{
-		outStatus = "Accept All Changes by KohakuFindChange: InDesign would not start a command sequence - nothing was changed.";
 		return false;
-	}
-	sequence->SetName(KBSLoc::Text(kKBSAcceptAllStepKey, KBSJa::kAcceptAllStep));	// English on every UI until 2026-09-29
 	PMString why;
 	why.SetTranslatable(kFalse);
 	int32 left = 0;
 	std::set<uint64> acceptedTimes;		// the rows carrying one were accepted (re-check R-4)
 	const int32 accepted = KBSTrackChange::AcceptSignedInDocument(db, left, why, &acceptedTimes);
-	if (accepted < 0)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	EndPlainSequence(sequence, accepted >= 0);
 	if (accepted < 0)
 	{
 		outStatus = "Accept All Changes by KohakuFindChange: ";
@@ -3565,12 +3530,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 			allOriginal.Append(originals[k].second);
 		std::vector<KBSTrackChange::Record>& recs = recsOfStory[s->first];
 		KBSTrackChange::CollectRecordsOfTimes(UIDRef(db, s->first), s->second, recs);
-		PMString deleted;
-		deleted.SetTranslatable(kFalse);
-		for (size_t k = 0; k < recs.size(); ++k)
-			if (recs[k].isDelete)
-				deleted.Append(recs[k].text);
-		if (deleted != allOriginal)
+		if (DeletedTextOf(recs) != allOriginal)
 		{
 			outStatus = "Accept Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
 			return false;
@@ -3590,13 +3550,10 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 	// Recorded for the panel's following of Undo (2026-09-29): an accept undone gives the row its time back,
 	// and with it Reject Change and Accept Change.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSAcceptStepKey, KBSJa::kAcceptStep),
+		"Accept Change: ", outStatus);
 	if (sequence == nil)
-	{
-		outStatus = "Accept Change: InDesign would not start a command sequence - nothing was changed.";
 		return false;
-	}
-	sequence->SetName(KBSLoc::Text(kKBSAcceptStepKey, KBSJa::kAcceptStep));
 	PMString why;
 	bool ok = true;
 	// ***** ONE READING, THEN EVERY RECORD IN ORDER (2026-09-29, the waste re-check P-1). ***** The records
@@ -3637,10 +3594,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 			KBSTrackChange::CollectRecordsOfTimes(storyRef, s->second, recs);	// what is left - normally none
 		}
 	}
-	if (!ok)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	EndPlainSequence(sequence, ok);
 	if (!ok)
 	{
 		outStatus = "Accept Change: ";
@@ -3673,17 +3627,9 @@ bool KBSReplaceEngine::AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outSt
 		outStatus.Append("Accept Change: the document of this row is not open.");
 		return false;
 	}
-	// The row with the replaced rows touching it whose change is still there - RejectHit's group, and for
-	// its reason: a touching group written front to back shares one deletion.
-	std::vector<int32> group;
-	KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
-	KBSTrackChange::ReplacedTouchingGroup(chapterIdx, hitIdx, group);
+	// RejectHit's group, for its reason: a touching group written front to back shares one deletion.
 	std::vector<int32> rows;
-	for (size_t k = 0; k < group.size(); ++k)
-		if (group[k] == hitIdx || CanAcceptOrRejectHit(chapterIdx, group[k]))
-			rows.push_back(group[k]);
-	if (rows.empty())
-		rows.push_back(hitIdx);
+	RowWithTouchingChanges(chapterIdx, hitIdx, rows);
 	if (!AcceptRowsNow(chapterIdx, rows, docRef, outStatus))
 		return false;
 	outStatus = (rows.size() > 1)
@@ -3770,12 +3716,18 @@ static bool ReplaceRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 bool KBSReplaceEngine::CanReplaceChapter(int32 chapterIdx)
 {
 	std::set<int32> rows;
-	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && RowsToReplace(chapterIdx, -1, rows, true);
+	return RowsToReplace(chapterIdx, -1, rows, true);
 }
 
 bool KBSReplaceEngine::ReplaceChapter(int32 chapterIdx, PMString& outStatus)
 {
 	return ReplaceRowsIn(chapterIdx, -1, "document", outStatus);
+}
+
+// Replace on a story row (2026-09-27): that story's TICKED rows (the user's call), one undo step.
+bool KBSReplaceEngine::ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
+{
+	return ReplaceRowsIn(chapterIdx, groupIdx, "story", outStatus);
 }
 
 // ***** Redo on a story row (2026-09-27, the user's call C). ***** The story's rows taken back with Reject
@@ -3818,30 +3770,6 @@ static bool CanRedoRows(int32 chapterIdx, int32 groupIdx)
 }
 
 // Redo over a story or a document: see RowsToRedo. `unit` = "story" / "document", for the status line.
-static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus);
-
-bool KBSReplaceEngine::CanRedoStory(int32 chapterIdx, int32 groupIdx)
-{
-	return CanRedoRows(chapterIdx, groupIdx);
-}
-
-bool KBSReplaceEngine::CanRedoChapter(int32 chapterIdx)
-{
-	return chapterIdx >= 0 && chapterIdx < KBSResultModel::GetChapterCount() && CanRedoRows(chapterIdx, -1);
-}
-
-bool KBSReplaceEngine::RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
-{
-	return RedoRowsNowIn(chapterIdx, groupIdx, "story", outStatus);
-}
-
-bool KBSReplaceEngine::RedoChapter(int32 chapterIdx, PMString& outStatus)
-{
-	if (chapterIdx < 0 || chapterIdx >= KBSResultModel::GetChapterCount())
-		return false;
-	return RedoRowsNowIn(chapterIdx, -1, "document", outStatus);
-}
-
 static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus)
 {
 	outStatus.Clear();
@@ -3880,10 +3808,26 @@ static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PM
 	return true;
 }
 
-// Replace on a story row (2026-09-27): that story's TICKED rows (the user's call), one undo step.
-bool KBSReplaceEngine::ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
+bool KBSReplaceEngine::CanRedoStory(int32 chapterIdx, int32 groupIdx)
 {
-	return ReplaceRowsIn(chapterIdx, groupIdx, "story", outStatus);
+	return CanRedoRows(chapterIdx, groupIdx);
+}
+
+bool KBSReplaceEngine::CanRedoChapter(int32 chapterIdx)
+{
+	return CanRedoRows(chapterIdx, -1);
+}
+
+bool KBSReplaceEngine::RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
+{
+	return RedoRowsNowIn(chapterIdx, groupIdx, "story", outStatus);
+}
+
+// (An out-of-range index returned false here with nothing in outStatus until 2026-10-01; it now meets
+//  RedoRowsNowIn's "not open", the way RejectChapter and ReplaceChapter always have.)
+bool KBSReplaceEngine::RedoChapter(int32 chapterIdx, PMString& outStatus)
+{
+	return RedoRowsNowIn(chapterIdx, -1, "document", outStatus);
 }
 
 // End, KBSReplaceEngine.cpp.

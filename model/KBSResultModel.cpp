@@ -1002,6 +1002,15 @@ void KBSResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version
 	c->storyVersions[story] = version;
 }
 
+void KBSResultModel::GetChapterStories(int32 chapterIdx, std::set<UID>& outStories)
+{
+	outStories.clear();
+	if (const Chapter* c = ChapterAt(chapterIdx))
+		for (size_t hi = 0; hi < c->hits.size(); ++hi)
+			if (c->hits[hi].storyUID != kInvalidUID)
+				outStories.insert(c->hits[hi].storyUID);
+}
+
 void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
 {
 	outHits.clear();
