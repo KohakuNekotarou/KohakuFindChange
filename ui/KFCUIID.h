@@ -76,9 +76,10 @@ DECLARE_PMID(kClassIDSpace, kKBSStatusTextWidgetBoss, kKFCUIPrefix + 19)
 // a startup/shutdown service is declared per boss, so the side the panel's work runs on needs a boss of
 // its own. (+ 13 was the first choice of the 2026-08-16 plan; it is a retired id, so it stays spent.)
 DECLARE_PMID(kClassIDSpace, kKBSUIStartupShutdownBoss, kKFCUIPrefix + 20)
-// Edit > Find/Change - and Ctrl+F - with no document open (2026-10-01, the user's request): the action filter
-// that takes the "needs a document" bits off InDesign's own Find/Change action (KBSFindChangeAnywhere.cpp).
-DECLARE_PMID(kClassIDSpace, kKBSFindChangeAnywhereBoss, kKFCUIPrefix + 21)
+// RETIRED 2026-10-01 (not reused): the action filter that took the "needs a document" bits off InDesign's
+// own Edit > Find/Change, so the menu and Ctrl+F worked with no document open. The user's call the same
+// day: KBS leaves InDesign's menu alone - the panel's Open Find/Change... opens the dialog instead.
+//DECLARE_PMID(kClassIDSpace, kKBSFindChangeAnywhereBoss, kKFCUIPrefix + 21)
 
 
 // InterfaceIDs:
@@ -152,8 +153,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSBookPanelCmdWatchImpl, kKFCUIPrefix + 3
 // The panel's message area (2026-09-29, KBSStatusTextView.cpp): its view and its data.
 DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextViewImpl, kKFCUIPrefix + 36)
 DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKFCUIPrefix + 37)
-// Edit > Find/Change with no document open (2026-10-01): the action filter (KBSFindChangeAnywhere.cpp).
-DECLARE_PMID(kImplementationIDSpace, kKBSFindChangeAnywhereImpl, kKFCUIPrefix + 39)
+// RETIRED 2026-10-01 (not reused): the action filter's implementation - see kKFCUIPrefix + 21 in the class ids.
+//DECLARE_PMID(kImplementationIDSpace, kKBSFindChangeAnywhereImpl, kKFCUIPrefix + 39)
 
 
 // ActionIDs:
@@ -285,6 +286,10 @@ DECLARE_PMID(kActionIDSpace, kKBSStoryAcceptActionID, kKFCUIPrefix + 41)
 // rows of that run in that document (KBSReplaceEngine RejectRun / AcceptRun).
 DECLARE_PMID(kActionIDSpace, kKBSRunRejectActionID, kKFCUIPrefix + 42)
 DECLARE_PMID(kActionIDSpace, kKBSRunAcceptActionID, kKFCUIPrefix + 43)
+// "Open Find/Change..." on the flyout (2026-10-01, the user's call): InDesign's own Edit > Find/Change dialog,
+// opened from the panel - with no document open too. Shortcut-assignable (the user's call, the same day).
+// The first number past the split: + 44 was never spent at kKBSPrefix either.
+DECLARE_PMID(kActionIDSpace, kKBSOpenFindChangeActionID, kKFCUIPrefix + 44)
 
 
 // WidgetIDs:
@@ -407,6 +412,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single string at
 // about 3.1KB and this text is several times that.
 #define kKBSHowToMenuKey				kKBSStringPrefix "kKBSHowToMenuKey"
+// "Open Find/Change..." (2026-10-01).
+#define kKBSOpenFindChangeMenuKey		kKBSStringPrefix "kKBSOpenFindChangeMenuKey"
 
 // Other StringKeys:
 #define kKBSAboutBoxStringKey	kKBSStringPrefix "kKBSAboutBoxStringKey"
@@ -467,6 +474,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 
 // Block 1 - the search, then Change Checked right under it (the rule between them was removed on
 // 2026-09-27, the user's call), then a rule. The scope both run on is set by Book Scope.
+// Open Find/Change... leads the block (2026-10-01): open the dialog, type the query, then search.
+#define kKBSOpenFindChangeMenuItemPosition	0.5
 #define kKBSSearchBookMenuItemPosition		1.0
 #define kKBSReplaceCheckedMenuItemPosition	1.2
 // (Block 2 - the two scans at 1.3 to 1.5 - was removed on 2026-09-27.)

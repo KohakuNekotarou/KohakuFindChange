@@ -46,8 +46,8 @@
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of
 //  this feature is named in the .cpp and only there - KBSPanelState asks this file for them.
 //
-//  *UI code (IPanelMgr, PaletteRefUtils, IControlView): it belongs to the UI half when KBS is split
-//   into model and UI plug-ins.
+//  *UI code (IPanelMgr, PaletteRefUtils, IControlView): the UI half's (KohakuFindChangeUI) since the
+//   model/UI split of 2026-10-01.
 //
 //========================================================================================
 

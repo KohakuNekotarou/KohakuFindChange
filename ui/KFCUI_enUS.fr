@@ -67,6 +67,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSUncheckAllMenuKey,			"Uncheck All",
                 // The operating reference. English in both tables, like the rest of the flyout.
                 kKBSHowToMenuKey,				"How to Use...",
+                kKBSOpenFindChangeMenuKey,		"Open Find/Change...",
                 // The Keyboard Shortcuts editor's area (kKBSPanelMenuActionArea): files the
                 // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
                 kKBSPanelMenuActionArea,		kKBSPanelMenuActionAreaValue,

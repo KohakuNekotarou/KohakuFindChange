@@ -5,6 +5,18 @@ Searches the front document, or every chapter of the active book (.indb) at once
 ## Adobe Exchange
 https://exchange.adobe.com/apps/cc/205698/kohakufindchange
 
+## Two plug-ins / プラグインは2本
+From 1.2.0 the plug-in comes as **two files that are installed together**, as the InDesign SDK asks
+of a plug-in with a user interface: `KohakuFindChange.pln` (the search and replace - `model/`) and
+`KohakuFindChangeUI.pln` (the panel - `ui/`), each with its `(… Resources)` folder.
+Updating from 1.0.0 resets the keyboard shortcuts assigned to it and the panel's place: open the
+panel again from Window > Kohaku Plug-Ins > Kohaku Find/Change.
+
+1.2.0 から、SDK の求めに従い**2本1組**です（`KohakuFindChange.pln`＝検索・置換、
+`KohakuFindChangeUI.pln`＝パネル。それぞれの `(… Resources)` フォルダーとともに入れてください）。
+1.0.0 から更新すると、割り当てたキーボードショートカットとパネルの位置がリセットされます
+（ウィンドウ > Kohaku Plug-Ins > Kohaku Find/Change から開き直してください）。
+
 ## Official binaries / 公式バイナリ
 
 The only official builds are the ones distributed through **Adobe Exchange** above.
@@ -31,7 +43,7 @@ published row is never removed.
 Verify / 照合方法 (PowerShell):
 
 ```powershell
-Get-FileHash -Algorithm SHA256 KohakuFindChange.pln
+Get-FileHash -Algorithm SHA256 KohakuFindChange.pln, KohakuFindChangeUI.pln
 ```
 
 ## Sponsors 支援

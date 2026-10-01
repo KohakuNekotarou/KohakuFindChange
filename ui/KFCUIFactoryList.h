@@ -36,8 +36,6 @@ REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 REGISTER_PMINTERFACE(KBSResultTreeEH, kKBSResultTreeEHImpl)
 // The UI half's own startup/shutdown service (2026-10-01, the model/UI split).
 REGISTER_PMINTERFACE(KBSUIStartupShutdown, kKBSUIStartupShutdownImpl)
-// Edit > Find/Change with no document open (2026-10-01): the action filter.
-REGISTER_PMINTERFACE(KBSFindChangeAnywhere, kKBSFindChangeAnywhereImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
 // Panel tab name: writes the scope onto the tab when the panel appears.

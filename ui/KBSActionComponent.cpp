@@ -28,7 +28,10 @@
 // General includes:
 #include "CActionComponent.h"
 #include "CAlert.h"
+#include "IActionManager.h"		// PerformAction - Open Find/Change runs InDesign's own Edit > Find/Change
 #include "IActionStateList.h"	// UpdateActionStates: check mark for the Hide Previous Chapter toggle
+#include "IApplication.h"		// QueryActionManager
+#include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
 #include "PreferenceUtils.h"	// QuerySessionPreferences
 #include "Utils.h"
 
@@ -162,6 +165,23 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// The whole reference, in a scrollable dialog. Everything about it - which language,
 			// the ScriptUI window, the CAlert fallback - is in KBSHowTo.cpp; nothing to decide here.
 			KBSHowTo::Show();
+			break;
+		}
+
+		case kKBSOpenFindChangeActionID:
+		{
+			// Open Find/Change... (2026-10-01, the user's call): InDesign's own Edit > Find/Change dialog,
+			// opened from the panel - with no document open as well (a book alone on screen), where the
+			// Edit menu greys it out. The dialog itself needs no document; only the menu's enabling asks
+			// for one, and a panel item has its own. It runs the product's action through the action
+			// manager, the way linksui's buttons run theirs (LinksUIButtonObserver.cpp) - so the dialog
+			// opens exactly as Edit > Find/Change opens it, and nothing of InDesign's own menu is changed.
+			// (From 2026-10-01 until this item, an IActionFilter took the "needs a document" bit off the
+			// Edit menu's action instead; the user preferred KBS to leave InDesign's menu alone.)
+			InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+			InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
+			if (actionMgr != nil)
+				actionMgr->PerformAction(ac, kFindDialogActionID, mousePoint, widget);
 			break;
 		}
 

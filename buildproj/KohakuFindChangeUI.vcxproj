@@ -219,7 +219,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelLookup.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelPlacement.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeAnywhere.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.cpp"/>

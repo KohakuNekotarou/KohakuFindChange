@@ -27,9 +27,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeAnywhere.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

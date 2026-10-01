@@ -279,22 +279,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/*
-	 * Edit > Find/Change - and Ctrl+F - with no document open (2026-10-01, the user's request): an action filter
-	 * that takes the "needs a document" bits off InDesign's own Find/Change action as it is added
-	 * (KBSFindChangeAnywhere.cpp). The three lines IActionFilter.h prints, as customactionfilter (CstAFlt.fr) has them.
-	 * UI code: this half's since the split (2026-10-01).
-	 */
-	Class
-	{
-		kKBSFindChangeAnywhereBoss,
-		kInvalidClass,
-		{
-			IID_IACTIONFILTER, kKBSFindChangeAnywhereImpl,
-			IID_IK2SERVICEPROVIDER, kActionFilterProviderImpl,
-			IID_IPMPERSIST, kPMPersistImpl,
-		}
-	},
+	// (kKBSFindChangeAnywhereBoss - an action filter that took the "needs a document" bits off InDesign's own
+	//  Edit > Find/Change - stood here on 2026-10-01 for a day. The user's call: KBS leaves InDesign's menu
+	//  alone, and the panel's Open Find/Change... opens the dialog instead.)
 
 	/*
 	 * The UI half's startup/shutdown service boss (2026-10-01, the model/UI split - KBSUIStartupShutdown.cpp):
@@ -453,6 +440,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// Find in Document / Find in Book: run the search over the current scope using the settings
 		// in InDesign's own Find/Change dialog. Drawn under whichever of the two names the scope
 		// calls for (see the action definition below).
+		// Open Find/Change... (2026-10-01, the user's call): InDesign's own Find/Change dialog, opened from here -
+		// with no document open as well, where the Edit menu greys it out. Open, type the query, then search.
+		kKBSOpenFindChangeActionID,
+		kKBSTargetMenuPath
+		kKBSOpenFindChangeMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		kKBSSearchBookActionID,
 		kKBSTargetMenuPath
 		kKBSSearchBookMenuItemPosition,
@@ -727,6 +721,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		// ***** IN THE KEYBOARD SHORTCUTS EDITOR (2026-09-27, the user's call) *****, under Palette Menus
 		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
 		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
+		// Open Find/Change... (2026-10-01). NOT kDisableIfNoFrontDocument - opening the dialog with no document
+		// is the point of it. In the Keyboard Shortcuts editor under Palette Menus (the user's call, the same
+		// day), like the search below.
+		kKBSActionComponentBoss,
+		kKBSOpenFindChangeActionID,
+		kKBSOpenFindChangeMenuKey,		// "Open Find/Change..."
+		kKBSPanelMenuActionArea,
+		kNormalAction,
+		kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
 		kKBSActionComponentBoss,
 		kKBSSearchBookActionID,
 		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
