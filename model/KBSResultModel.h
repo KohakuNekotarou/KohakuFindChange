@@ -150,14 +150,14 @@ namespace KBSResultModel
 		PMString			fontName;	// the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// ***** A STORY GROUP (2026-09-27, the user's call). ***** A Find/Change result groups its hits
-		// by story, the way KCM's Story mode lists stories. A story row carries Replace / Reject Change / Redo / Check All / Uncheck All for its
-		// rows (KBSReplaceEngine::ReplaceStory and the rest).
-		bool				isStory;
+		// by story, the way KCM's Story mode lists stories, and every group is one (an isStory flag said
+		// so until 2026-10-01). A story row carries Replace / Reject Change / Accept Change / Redo / Check
+		// All / Uncheck All for its rows (KBSReplaceEngine::ReplaceStory and the rest).
 		UID					story;
 		// The run the group sits under (Hit::run of its hits, 2026-09-29); -1 = no run level. A story
 		// that two runs changed stands once under each: the groups are keyed by (run, story).
 		int32				run;
-		FontGroup() : isStory(false), story(kInvalidUID), run(-1) {}
+		FontGroup() : story(kInvalidUID), run(-1) {}
 	};
 
 	/** ***** ONE RUN OF A LIST REBUILT FROM THE RECORDS (2026-09-29, Show Changes by KohakuFindChange). *****
@@ -373,8 +373,7 @@ namespace KBSResultModel
 	/** The number of hits under chapter 'chapterIdx' (uncapped, the full stored count). */
 	int32 GetHitCount(int32 chapterIdx);
 
-	/** The total number of hits across ALL chapters (uncapped) - for the status summary and a
-	    future export. */
+	/** The total number of hits across ALL chapters (uncapped) - for the status summary. */
 	int32 GetTotalHitCount();
 
 	/** The number of chapters that have at least one DISPLAYED hit (the tree root's child count
@@ -389,9 +388,9 @@ namespace KBSResultModel
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
 
-	/** How many FONT rows this chapter shows - the groups that still have a displayed hit under the
-	    panel's cap. ZERO means this chapter has no font level at all, which is how the tree knows to
-	    hang the hits off the chapter itself: a Find/Change result names no font.
+	/** How many STORY rows this chapter shows - the groups that still have a displayed hit under the
+	    panel's cap. ("Font" in the names below is the level's old name - it held the fonts of Find
+	    Missing Glyphs until 2026-09-27.)
 
 	    The groups that lose everything to the cap are the LAST ones (they are in first-appearance
 	    order, and the cap keeps a prefix of the chapter's hits), so the displayed groups are the
@@ -402,13 +401,9 @@ namespace KBSResultModel
 	    cap. 0 for an index out of range, and for a group the cap cut off entirely. */
 	int32 GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx);
 
-	/** A font node's display: the font's name and its FULL hit count - uncapped, like every other
-	    number the tree reads out: what a row holds, not what the panel drew of it. (This said
-	    "so the row can say 'shown / total' the way a chapter row does" until 2026-08-11. Both rows
-	    stopped saying that on 2026-08-05 - a count of what is DRAWN was the panel talking about
-	    itself - and the reason outlived the thing it was the reason for.) A group whose font could
-	    not be named answers "(unknown font)" rather than an empty label. false = index out of
-	    range. */
+	/** A story row's display: its text ("P3  first words...") and its FULL hit count - uncapped, like
+	    every other number the tree reads out: what a row holds, not what the panel drew of it.
+	    false = index out of range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
 
 	/** The 'nth' hit of one font group, as an index into the CHAPTER's hits - the translation the
@@ -416,10 +411,9 @@ namespace KBSResultModel
 	    range. */
 	int32 GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth);
 
-	/** Which font group a hit belongs to, and where it sits inside that group: the tree's "who is my
-	    parent" and "which child am I". -1 for an index out of range, and for a chapter with no
-	    groups - which is the same answer, and means the same thing to the tree: hang off the
-	    chapter. */
+	/** Which story group a hit belongs to, and where it sits inside that group: the tree's "who is my
+	    parent" and "which child am I". -1 for an index out of range (every hit has a group since
+	    2026-09-27). */
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
 
@@ -444,7 +438,8 @@ namespace KBSResultModel
 	void SetContextMenuRun(int32 chapterIdx, int32 runIdx);
 	bool GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx);
 
-	/** Is this group a STORY group (FontGroup::isStory - a Find/Change result's level)? */
+	/** Is this one of the chapter's story groups? Every group is one since 2026-09-27, so this is the
+	    index's range (the tree asks it of a node before using it). */
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
 	/** Every hit of the group, chapter-wide indexes in the chapter's order (empty when out of range). */
 	void GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits);
@@ -605,8 +600,8 @@ namespace KBSResultModel
 	void SetContextMenuChapter(int32 chapterIdx);
 	int32 GetContextMenuChapter();
 
-	/** The hit row the right-click menu was popped over (2026-09-26: Reject Change and Redo act on
-	    it). Cleared with the result set; false when no hit row is stashed or it is out of range. */
+	/** The hit row the right-click menu was popped over (2026-09-26: Replace, Reject Change and Accept
+	    Change act on it). Cleared with the result set; false when no hit row is stashed or it is out of range. */
 	void SetContextMenuHit(int32 chapterIdx, int32 hitIdx);
 	bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx);
 

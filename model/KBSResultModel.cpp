@@ -94,36 +94,6 @@ namespace
 		gRowBackup.push_back(saved);
 	}
 
-	// A chapter's recorded version of one story as it stands - `had` false when none is recorded.
-	KBSResultModel::VersionCopy VersionNow(int32 chapterIdx, UID story)
-	{
-		KBSResultModel::VersionCopy v;
-		v.chapter = chapterIdx;
-		v.story = story;
-		if (chapterIdx >= 0 && chapterIdx < static_cast<int32>(gChapters.size()))
-		{
-			const std::map<UID, uint32>& versions = gChapters[chapterIdx].storyVersions;
-			const std::map<UID, uint32>::const_iterator it = versions.find(story);
-			if (it != versions.end())
-			{
-				v.had = true;
-				v.version = it->second;
-			}
-		}
-		return v;
-	}
-
-	// Write a copied version back: recorded again, or taken off when there was none.
-	void PutVersionBack(const KBSResultModel::VersionCopy& v)
-	{
-		if (v.chapter < 0 || v.chapter >= static_cast<int32>(gChapters.size()))
-			return;		// the result set changed underneath - nothing to put it back into
-		std::map<UID, uint32>& versions = gChapters[v.chapter].storyVersions;
-		if (v.had)
-			versions[v.story] = v.version;
-		else
-			versions.erase(v.story);
-	}
 
 	// Which row the result tree's right-click menu was popped over (KBSResultNodeEH stashes it just
 	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
@@ -136,6 +106,69 @@ namespace
 	int32 gContextMenuGroup = -1;
 	int32 gContextMenuRunChapter = -1;		// the run row right-clicked (2026-09-29)
 	int32 gContextMenuRun = -1;
+
+	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
+	// RestoreModelSnapshot).
+	void ForgetContextMenus()
+	{
+		gContextMenuChapter = KBSResultModel::kNoContextMenuChapter;
+		gContextMenuHitChapter = -1;
+		gContextMenuHit = -1;
+		gContextMenuGroupChapter = -1;
+		gContextMenuGroup = -1;
+		gContextMenuRunChapter = -1;
+		gContextMenuRun = -1;
+	}
+
+	// ***** THE INDEXES, ASKED IN ONE PLACE. ***** A chapter, a row, a story group - or nil when an index
+	// is out of range, which is how a repaint racing a rebuild (or a stale node id) reads "nothing" rather
+	// than crashing. Every getter and setter below starts here; RunAt, further down, is the run level's.
+	KBSResultModel::Chapter* ChapterAt(int32 chapterIdx)
+	{
+		return (chapterIdx >= 0 && chapterIdx < static_cast<int32>(gChapters.size())) ? &gChapters[chapterIdx] : nil;
+	}
+
+	KBSResultModel::Hit* HitAt(int32 chapterIdx, int32 hitIdx)
+	{
+		KBSResultModel::Chapter* c = ChapterAt(chapterIdx);
+		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
+	}
+
+	KBSResultModel::FontGroup* GroupAt(int32 chapterIdx, int32 groupIdx)
+	{
+		KBSResultModel::Chapter* c = ChapterAt(chapterIdx);
+		return (c != nil && groupIdx >= 0 && groupIdx < static_cast<int32>(c->fontGroups.size())) ? &c->fontGroups[groupIdx] : nil;
+	}
+
+	// A chapter's recorded version of one story as it stands - `had` false when none is recorded.
+	KBSResultModel::VersionCopy VersionNow(int32 chapterIdx, UID story)
+	{
+		KBSResultModel::VersionCopy v;
+		v.chapter = chapterIdx;
+		v.story = story;
+		if (const KBSResultModel::Chapter* c = ChapterAt(chapterIdx))
+		{
+			const std::map<UID, uint32>::const_iterator it = c->storyVersions.find(story);
+			if (it != c->storyVersions.end())
+			{
+				v.had = true;
+				v.version = it->second;
+			}
+		}
+		return v;
+	}
+
+	// Write a copied version back: recorded again, or taken off when there was none.
+	void PutVersionBack(const KBSResultModel::VersionCopy& v)
+	{
+		KBSResultModel::Chapter* c = ChapterAt(v.chapter);
+		if (c == nil)
+			return;		// the result set changed underneath - nothing to put it back into
+		if (v.had)
+			c->storyVersions[v.story] = v.version;
+		else
+			c->storyVersions.erase(v.story);
+	}
 
 	// Does this row carry a check box? THE one definition of the question, so the commands that set
 	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
@@ -167,6 +200,36 @@ namespace
 	bool IsCheckedWork(const KBSResultModel::Hit& hit)
 	{
 		return hit.checked && RowHasCheckBox(hit);
+	}
+
+	// One chapter's rows, for the whole-model and the one-chapter versions of the same question
+	// (SetAllChecked / SetChapterChecked, GetCheckedCount / GetChapterCheckedCount, GetCheckableCount /
+	// GetChapterCheckableCount). The rows that carry no check box are not ticked by Check All either -
+	// otherwise the model would hold checked hits the panel shows no box for.
+	void SetBoxesIn(std::vector<KBSResultModel::Hit>& hits, bool checked)
+	{
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+			if (RowHasCheckBox(hits[hi]))
+				hits[hi].checked = checked;
+	}
+
+	int32 CountBoxesIn(const std::vector<KBSResultModel::Hit>& hits)
+	{
+		int32 count = 0;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+			if (RowHasCheckBox(hits[hi]))
+				++count;
+		return count;
+	}
+
+	// Checked and still waiting: a REPLACED row does not count, because it is no longer waiting to be done.
+	int32 CountCheckedWorkIn(const std::vector<KBSResultModel::Hit>& hits)
+	{
+		int32 count = 0;
+		for (size_t hi = 0; hi < hits.size(); ++hi)
+			if (IsCheckedWork(hits[hi]))
+				++count;
+		return count;
 	}
 
 	// ***** GROUP A CHAPTER'S HITS BY STORY (2026-09-27, the user's call) - the tree's middle level. *****
@@ -201,7 +264,6 @@ namespace
 			if (found < 0)
 			{
 				KBSResultModel::FontGroup group;
-				group.isStory = true;
 				group.story = hit.storyUID;
 				group.run = hit.run;
 				group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
@@ -280,13 +342,7 @@ void KBSResultModel::Clear()
 	//  outside this model describes these rows any more.)
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
-	gContextMenuChapter = kNoContextMenuChapter;
-	gContextMenuHitChapter = -1;
-	gContextMenuHit = -1;
-	gContextMenuGroupChapter = -1;
-	gContextMenuGroup = -1;
-	gContextMenuRunChapter = -1;
-	gContextMenuRun = -1;
+	ForgetContextMenus();
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
 	// A new result set, in its first layout (2026-09-29): what KBSUndoFollow kept for the old one names
@@ -337,10 +393,11 @@ KBSResultModel::SearchScopeKind KBSResultModel::GetSearchScope()
 
 void KBSResultModel::CloseChapter(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return;
 	// Emptied and unbound, in place (see the header for why the place is kept).
-	EmptyChapter(gChapters[chapterIdx]);
+	EmptyChapter(*c);
 	// A right-click target inside it names rows that are gone.
 	if (gContextMenuChapter == chapterIdx)
 		gContextMenuChapter = kNoContextMenuChapter;
@@ -396,7 +453,8 @@ int32 KBSResultModel::GetShownChapter(int32 nth)
 
 int32 KBSResultModel::GetShownChapterPos(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()) || gChapters[chapterIdx].hits.empty())
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil || c->hits.empty())
 		return -1;
 	int32 pos = 0;
 	for (int32 i = 0; i < chapterIdx; ++i)
@@ -434,10 +492,8 @@ bool KBSResultModel::IsWorkOutcome(ChangeOutcome outcome)
 
 bool KBSResultModel::IsHitCheckedWork(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	return hitIdx >= 0 && hitIdx < static_cast<int32>(hits.size()) && IsCheckedWork(hits[hitIdx]);
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && IsCheckedWork(*h);
 }
 
 bool KBSResultModel::AnyRejectedRowOpen()
@@ -516,9 +572,8 @@ int32 KBSResultModel::GetChapterCount()
 
 int32 KBSResultModel::GetHitCount(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
-	return static_cast<int32>(gChapters[chapterIdx].hits.size());
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? static_cast<int32>(c->hits.size()) : 0;
 }
 
 int32 KBSResultModel::GetTotalHitCount()
@@ -549,50 +604,49 @@ int32 KBSResultModel::GetDisplayChapterCount()
 
 int32 KBSResultModel::GetDisplayHitCount(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return 0;
 	const int32 before = HitsBeforeChapter(chapterIdx);
 	if (before >= kKBSDisplayHitLimit)
 		return 0;	// the cap ran out before this chapter
 	const int32 remaining = kKBSDisplayHitLimit - before;
-	const int32 full = static_cast<int32>(gChapters[chapterIdx].hits.size());
+	const int32 full = static_cast<int32>(c->hits.size());
 	return (full < remaining) ? full : remaining;
 }
 
 bool KBSResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	outName = c.name;
+	outName = c->name;
 	outName.SetTranslatable(kFalse);
-	outHitCount = static_cast<int32>(c.hits.size());
+	outHitCount = static_cast<int32>(c->hits.size());
 	return true;
 }
 
 int32 KBSResultModel::GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
-	const Chapter& c = gChapters[chapterIdx];
-	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
+	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
+	if (group == nil)
 		return 0;
 
 	// The chapter's own share of the cap, then this group's share of that. hitIndices is ascending,
 	// so the count is simply where the cap falls inside it.
 	const int32 shown = GetDisplayHitCount(chapterIdx);
-	const std::vector<int32>& idx = c.fontGroups[fontIdx].hitIndices;
+	const std::vector<int32>& idx = group->hitIndices;
 	return static_cast<int32>(std::lower_bound(idx.begin(), idx.end(), shown) - idx.begin());
 }
 
 int32 KBSResultModel::GetDisplayFontCount(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return 0;
-	const Chapter& c = gChapters[chapterIdx];
 
 	int32 shownGroups = 0;
-	for (int32 g = 0; g < static_cast<int32>(c.fontGroups.size()); ++g)
+	for (int32 g = 0; g < static_cast<int32>(c->fontGroups.size()); ++g)
 	{
 		if (GetDisplayFontHitCount(chapterIdx, g) > 0)
 			++shownGroups;
@@ -602,21 +656,16 @@ int32 KBSResultModel::GetDisplayFontCount(int32 chapterIdx)
 
 bool KBSResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	return groupIdx >= 0 && groupIdx < static_cast<int32>(c.fontGroups.size()) && c.fontGroups[groupIdx].isStory;
+	// Every group is a story group since the font level went (2026-09-27; a FontGroup::isStory said so
+	// until 2026-10-01, written true by the one place that makes a group) - so this is the index's range.
+	return GroupAt(chapterIdx, groupIdx) != nil;
 }
 
 void KBSResultModel::GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits)
 {
 	outHits.clear();
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	const Chapter& c = gChapters[chapterIdx];
-	if (groupIdx < 0 || groupIdx >= static_cast<int32>(c.fontGroups.size()))
-		return;
-	outHits = c.fontGroups[groupIdx].hitIndices;
+	if (const FontGroup* group = GroupAt(chapterIdx, groupIdx))
+		outHits = group->hitIndices;
 }
 
 int32 KBSResultModel::GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx)
@@ -665,15 +714,11 @@ bool KBSResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupId
 
 namespace
 {
-	// The run, or nil for an index out of range (either index).
+	// The run, or nil for an index out of range (either index) - ChapterAt's shape, one level down.
 	const KBSResultModel::RunGroup* RunAt(int32 chapterIdx, int32 runIdx)
 	{
-		if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-			return nil;
-		const std::vector<KBSResultModel::RunGroup>& runs = gChapters[chapterIdx].runs;
-		if (runIdx < 0 || runIdx >= static_cast<int32>(runs.size()))
-			return nil;
-		return &runs[runIdx];
+		const KBSResultModel::Chapter* c = ChapterAt(chapterIdx);
+		return (c != nil && runIdx >= 0 && runIdx < static_cast<int32>(c->runs.size())) ? &c->runs[runIdx] : nil;
 	}
 }
 
@@ -692,10 +737,11 @@ int32 KBSResultModel::GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx)
 
 int32 KBSResultModel::GetDisplayRunCount(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return 0;
 	int32 shown = 0;
-	for (int32 r = 0; r < static_cast<int32>(gChapters[chapterIdx].runs.size()); ++r)
+	for (int32 r = 0; r < static_cast<int32>(c->runs.size()); ++r)
 		if (GetDisplayRunGroupCount(chapterIdx, r) > 0)
 			++shown;
 	return shown;
@@ -725,12 +771,8 @@ int32 KBSResultModel::GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth)
 
 int32 KBSResultModel::GetGroupRun(int32 chapterIdx, int32 groupIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return -1;
-	const Chapter& c = gChapters[chapterIdx];
-	if (groupIdx < 0 || groupIdx >= static_cast<int32>(c.fontGroups.size()))
-		return -1;
-	return c.fontGroups[groupIdx].run;
+	const FontGroup* group = GroupAt(chapterIdx, groupIdx);
+	return (group != nil) ? group->run : -1;
 }
 
 int32 KBSResultModel::GetGroupPosInRun(int32 chapterIdx, int32 groupIdx)
@@ -776,60 +818,41 @@ bool KBSResultModel::GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx)
 
 bool KBSResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
+	if (group == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
-		return false;
-
-	const FontGroup& group = c.fontGroups[fontIdx];
-	outName = group.fontName;			// the story row's text - see BuildFontGroups
+	outName = group->fontName;			// the story row's text - see BuildFontGroups
 	outName.SetTranslatable(kFalse);
-	outHitCount = static_cast<int32>(group.hitIndices.size());
+	outHitCount = static_cast<int32>(group->hitIndices.size());
 	return true;
 }
 
 int32 KBSResultModel::GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
+	if (group == nil || nth < 0 || nth >= static_cast<int32>(group->hitIndices.size()))
 		return -1;
-	const Chapter& c = gChapters[chapterIdx];
-	if (fontIdx < 0 || fontIdx >= static_cast<int32>(c.fontGroups.size()))
-		return -1;
-	const std::vector<int32>& idx = c.fontGroups[fontIdx].hitIndices;
-	if (nth < 0 || nth >= static_cast<int32>(idx.size()))
-		return -1;
-	return idx[nth];
+	return group->hitIndices[nth];
 }
 
 int32 KBSResultModel::GetHitFontGroup(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return -1;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return -1;
-	return c.hits[hitIdx].fontGroup;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->fontGroup : -1;
 }
 
 int32 KBSResultModel::GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return -1;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return -1;
-	return c.hits[hitIdx].fontGroupPos;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->fontGroupPos : -1;
 }
 
 bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
+	const Hit& h = *hp;
 	out.locator = h.locator;
 	out.accentFlag = h.accentFlag;
 	out.preText = h.preText;
@@ -928,74 +951,65 @@ void KBSResultModel::MarkUpBreaksForDisplay(PMString& s)
 bool KBSResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 	PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
-	outLocator = h.locator;
-	outPre = h.preText;
-	outMatch = h.matchText;
-	outPost = h.postText;
+	outLocator = h->locator;
+	outPre = h->preText;
+	outMatch = h->matchText;
+	outPost = h->postText;
 	return true;
 }
 
 bool KBSResultModel::GetHitLocation(int32 chapterIdx, int32 hitIdx,
 	UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return false;
 	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
 	outDocRef = c.docRef;
 	outFile = c.file;
-	outStoryUID = h.storyUID;
-	outStart = h.textStart;
-	outEnd = h.textEnd;
+	outStoryUID = h->storyUID;
+	outStart = h->textStart;
+	outEnd = h->textEnd;
 	return true;
 }
 
 void KBSResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	gChapters[chapterIdx].docRef = newDocRef;
+	if (Chapter* c = ChapterAt(chapterIdx))
+		c->docRef = newDocRef;
 }
 
 bool KBSResultModel::GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const VersionCopy v = VersionNow(chapterIdx, story);
+	if (!v.had)
 		return false;
-	const std::map<UID, uint32>& versions = gChapters[chapterIdx].storyVersions;
-	const std::map<UID, uint32>::const_iterator it = versions.find(story);
-	if (it == versions.end())
-		return false;
-	outVersion = it->second;
+	outVersion = v.version;
 	return true;
 }
 
 void KBSResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return;
 	// Copied aside like a row (2026-09-29), once, as the write found it.
 	if (gBackingUpRows && gVersionsBackedUp.insert(std::make_pair(chapterIdx, story)).second)
 		gVersionBackup.push_back(VersionNow(chapterIdx, story));
-	gChapters[chapterIdx].storyVersions[story] = version;
+	c->storyVersions[story] = version;
 }
 
 void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
 {
 	outHits.clear();
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* mep = HitAt(chapterIdx, hitIdx);
+	if (mep == nil)
 		return;
 	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(hits.size()))
-		return;
-	const Hit& me = hits[hitIdx];
+	const Hit& me = *mep;
 	// the story's rows with a place, in text order
 	std::vector<std::pair<TextIndex, int32> > order;
 	for (size_t i = 0; i < hits.size(); ++i)
@@ -1021,10 +1035,8 @@ void KBSResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vecto
 
 void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return;
 	// The same question the panel asks before it draws a box, asked here so the model can never hold
 	// a checked hit that no row offered - a replace's report above all, where only the rows taken back
@@ -1035,69 +1047,46 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	// left out had to be taken back, and neither a deletion shared by touching matches nor anything in a
 	// footnote can be. The replace writes only the ticked matches now, so every box is the row's own.
 	// (Reject Change still takes a touching group together - GetTouchingGroup.)
-	if (RowHasCheckBox(c.hits[hitIdx]))
-		c.hits[hitIdx].checked = checked;
+	if (RowHasCheckBox(*h))
+		h->checked = checked;
 }
 
 uint64 KBSResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return 0;
-	return c.hits[hitIdx].recordTime;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->recordTime : 0;
 }
 
 void KBSResultModel::SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	BackUpRow(chapterIdx, hitIdx, c.hits[hitIdx]);
-	c.hits[hitIdx].recordTime = time;
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->recordTime = time;
 }
 
 bool KBSResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	return c.hits[hitIdx].inFootnote;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && h->inFootnote;
 }
 
 bool KBSResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked)
 {
-	outChecked = false;
-	outReplaced = false;
-	outLocked = false;
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	outChecked = c.hits[hitIdx].checked;
-	outReplaced = c.hits[hitIdx].replaced;
-	outLocked = c.hits[hitIdx].isLocked;
-	return true;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	outChecked = h != nil && h->checked;
+	outReplaced = h != nil && h->replaced;
+	outLocked = h != nil && h->isLocked;
+	return h != nil;
 }
 
 bool KBSResultModel::GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden)
 {
-	outLocked = false;
-	outHidden = false;
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	outLocked = c.hits[hitIdx].isLocked;
-	outHidden = c.hits[hitIdx].isHidden;
-	return true;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	outLocked = h != nil && h->isLocked;
+	outHidden = h != nil && h->isHidden;
+	return h != nil;
 }
 
 void KBSResultModel::SetAllChecked(bool checked)
@@ -1107,87 +1096,39 @@ void KBSResultModel::SetAllChecked(bool checked)
 	// so once per row.
 	if (NoRowHasCheckBox())
 		return;
-
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		std::vector<Hit>& hits = gChapters[ci].hits;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			// The rows that carry no check box are not touched by Check All either - otherwise
-			// the model would hold checked hits the panel shows no box for.
-			if (!RowHasCheckBox(hits[hi]))
-				continue;
-			hits[hi].checked = checked;
-		}
-	}
+		SetBoxesIn(gChapters[ci].hits, checked);
 }
 
 void KBSResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
 {
 	if (NoRowHasCheckBox())
 		return;		// the same short cut SetAllChecked takes, over one chapter
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return;
-
-	std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	for (size_t hi = 0; hi < hits.size(); ++hi)
-	{
-		if (!RowHasCheckBox(hits[hi]))
-			continue;
-		hits[hi].checked = checked;
-	}
+	if (Chapter* c = ChapterAt(chapterIdx))
+		SetBoxesIn(c->hits, checked);
 }
 
 int32 KBSResultModel::GetCheckedCount()
 {
 	int32 count = 0;
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		const std::vector<Hit>& hits = gChapters[ci].hits;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			if (IsCheckedWork(hits[hi]))
-				++count;
-		}
-	}
+		count += CountCheckedWorkIn(gChapters[ci].hits);
 	return count;
 }
 
 int32 KBSResultModel::GetChapterCheckedCount(int32 chapterIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
-
-	// Same rule as GetCheckedCount, applied to one chapter: a REPLACED row does not count, because
-	// it is no longer waiting to be done.
-	int32 count = 0;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	for (size_t hi = 0; hi < hits.size(); ++hi)
-	{
-		if (IsCheckedWork(hits[hi]))
-			++count;
-	}
-	return count;
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? CountCheckedWorkIn(c->hits) : 0;
 }
-
-// (GetCheckedChapterCount was defined here until 2026-08-10 - see the note where it was declared
-// in KBSResultModel.h.)
 
 int32 KBSResultModel::GetCheckableCount()
 {
 	if (NoRowHasCheckBox())
 		return 0;	// no row of this list has a box, so Check All / Uncheck All grey out
-
 	int32 count = 0;
 	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		const std::vector<Hit>& hits = gChapters[ci].hits;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			if (RowHasCheckBox(hits[hi]))
-				++count;
-		}
-	}
+		count += CountBoxesIn(gChapters[ci].hits);
 	return count;
 }
 
@@ -1195,17 +1136,8 @@ int32 KBSResultModel::GetChapterCheckableCount(int32 chapterIdx)
 {
 	if (NoRowHasCheckBox())
 		return 0;	// no row has a box, whichever chapter the menu was popped over
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return 0;
-
-	int32 count = 0;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	for (size_t hi = 0; hi < hits.size(); ++hi)
-	{
-		if (RowHasCheckBox(hits[hi]))
-			++count;
-	}
-	return count;
+	const Chapter* c = ChapterAt(chapterIdx);
+	return (c != nil) ? CountBoxesIn(c->hits) : 0;
 }
 
 void KBSResultModel::SetContextMenuChapter(int32 chapterIdx)
@@ -1226,9 +1158,7 @@ void KBSResultModel::SetContextMenuHit(int32 chapterIdx, int32 hitIdx)
 
 bool KBSResultModel::GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx)
 {
-	if (gContextMenuHitChapter < 0 || gContextMenuHitChapter >= static_cast<int32>(gChapters.size()))
-		return false;
-	if (gContextMenuHit < 0 || gContextMenuHit >= static_cast<int32>(gChapters[gContextMenuHitChapter].hits.size()))
+	if (HitAt(gContextMenuHitChapter, gContextMenuHit) == nil)
 		return false;
 	outChapterIdx = gContextMenuHitChapter;
 	outHitIdx = gContextMenuHit;
@@ -1237,41 +1167,29 @@ bool KBSResultModel::GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx)
 
 KBSResultModel::ChangeOutcome KBSResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
-		return kOutcomeNone;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return kOutcomeNone;
-	return c.hits[hitIdx].outcome;
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->outcome : kOutcomeNone;
 }
 
 void KBSResultModel::SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
 	const PMString& replacedText)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
-	BackUpRow(chapterIdx, hitIdx, h);
-	h.originalText = originalText;	h.originalText.SetTranslatable(kFalse);
-	h.replacedText = replacedText;	h.replacedText.SetTranslatable(kFalse);
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->originalText = originalText;	h->originalText.SetTranslatable(kFalse);
+	h->replacedText = replacedText;	h->replacedText.SetTranslatable(kFalse);
 }
 
 bool KBSResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
 	PMString& outReplacedText)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || (!h->replaced && h->outcome != kOutcomeRejected))
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
-	if (!h.replaced && h.outcome != kOutcomeRejected)
-		return false;
-	outOriginalText = h.originalText;
-	outReplacedText = h.replacedText;
+	outOriginalText = h->originalText;
+	outReplacedText = h->replacedText;
 	return true;
 }
 
@@ -1281,9 +1199,10 @@ bool KBSResultModel::GetRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 	outPre.Clear();			outPre.SetTranslatable(kFalse);
 	outOriginal.Clear();	outOriginal.SetTranslatable(kFalse);
 	outPost.Clear();		outPost.SetTranslatable(kFalse);
-	if (rows.empty() || chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (rows.empty() || c == nil)
 		return false;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	const std::vector<Hit>& hits = c->hits;
 	for (size_t k = 0; k < rows.size(); ++k)
 		if (rows[k] < 0 || rows[k] >= static_cast<int32>(hits.size()) || !hits[rows[k]].replaced)
 			return false;
@@ -1312,12 +1231,11 @@ bool KBSResultModel::GetRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 void KBSResultModel::GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
 {
 	outRows.clear();
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil)
 		return;
+	const UID story = h->storyUID;
 	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(hits.size()))
-		return;
-	const UID story = hits[hitIdx].storyUID;
 	for (size_t i = 0; i < hits.size(); ++i)
 		if (hits[i].storyUID == story)
 			outRows.push_back(static_cast<int32>(i));
@@ -1325,12 +1243,10 @@ void KBSResultModel::GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::ve
 
 void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
 	h.storyUID = storyUID;
 	h.textStart = start;
@@ -1343,12 +1259,10 @@ void KBSResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID
 
 void KBSResultModel::SetHitAccepted(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
 	// Still replaced - the text it wrote stays - but its records are gone: nothing is left to find by
 	// that time, so it offers neither Reject Change nor Accept Change again (both look the row up by it).
@@ -1361,12 +1275,10 @@ void KBSResultModel::SetHitAccepted(int32 chapterIdx, int32 hitIdx)
 
 void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
 	h.textStart = kInvalidTextIndex;
 	h.textEnd = kInvalidTextIndex;
@@ -1378,23 +1290,21 @@ void KBSResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 
 bool KBSResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	outDocRef = c.docRef;
-	outFile = c.file;
+	outDocRef = c->docRef;
+	outFile = c->file;
 	return true;
 }
 
 bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID,
 	TextIndex& outStart, TextIndex& outEnd, uint64& outHash)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	const Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return false;
-	const Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return false;
-	const Hit& h = c.hits[hitIdx];
+	const Hit& h = *hp;
 	outStoryUID = h.storyUID;
 	outStart = h.textStart;
 	outEnd = h.textEnd;
@@ -1408,12 +1318,10 @@ bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& ou
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStoryUID,
 	TextIndex newStart, TextIndex newEnd)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
 
 	// The locator (page) is kept: a replacement does not move the line to another page in any
@@ -1451,12 +1359,10 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start,
 	TextIndex end)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	BackUpRow(chapterIdx, hitIdx, h);
 	h.storyUID = storyUID;
 	h.textStart = start;
@@ -1466,12 +1372,10 @@ void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, UID storyUID, T
 void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMString& newPre,
 	const PMString& newMatch, const PMString& newPost, uint64 newMatchHash)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 
 	// Asked here too, whether or not MarkHitReplaced has already copied this row aside: BackUpRow
 	// takes the first copy only, so nothing here relies on the earlier call having happened.
@@ -1586,12 +1490,10 @@ void KBSResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
 
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()))
+	Hit* hp = HitAt(chapterIdx, hitIdx);
+	if (hp == nil)
 		return;
-	Chapter& c = gChapters[chapterIdx];
-	if (hitIdx < 0 || hitIdx >= static_cast<int32>(c.hits.size()))
-		return;
-	Hit& h = c.hits[hitIdx];
+	Hit& h = *hp;
 	if (h.replaced)
 		return;		// it WAS replaced - nothing went wrong with it
 	BackUpRow(chapterIdx, hitIdx, h);
@@ -1623,12 +1525,8 @@ void KBSResultModel::RollBackRows()
 	for (size_t i = gRowBackup.size(); i > 0; --i)
 	{
 		const RowCopy& saved = gRowBackup[i - 1];
-		if (saved.chapter < 0 || saved.chapter >= static_cast<int32>(gChapters.size()))
-			continue;	// the result set changed underneath - nothing to put the row back into
-		std::vector<Hit>& hits = gChapters[saved.chapter].hits;
-		if (saved.hit < 0 || saved.hit >= static_cast<int32>(hits.size()))
-			continue;
-		hits[saved.hit] = saved.row;
+		if (Hit* h = HitAt(saved.chapter, saved.hit))	// nil: the result set changed underneath
+			*h = saved.row;
 	}
 	// The recorded versions too (2026-09-29) - every caller records them only once its write has gone
 	// through, so there is normally nothing here.
@@ -1661,15 +1559,13 @@ void KBSResultModel::TakeRowBackup(RowStep& out)
 	for (size_t i = 0; i < out.before.size(); ++i)
 	{
 		const RowCopy& was = out.before[i];
-		if (was.chapter < 0 || was.chapter >= static_cast<int32>(gChapters.size()))
-			continue;
-		const std::vector<Hit>& hits = gChapters[was.chapter].hits;
-		if (was.hit < 0 || was.hit >= static_cast<int32>(hits.size()))
+		const Hit* h = HitAt(was.chapter, was.hit);
+		if (h == nil)
 			continue;
 		RowCopy now;
 		now.chapter = was.chapter;
 		now.hit = was.hit;
-		now.row = hits[was.hit];
+		now.row = *h;
 		out.after.push_back(now);
 	}
 	out.versionsBefore.swap(gVersionBackup);
@@ -1683,15 +1579,8 @@ void KBSResultModel::ApplyRowStep(const RowStep& step, bool after)
 {
 	const std::vector<RowCopy>& rows = after ? step.after : step.before;
 	for (size_t i = 0; i < rows.size(); ++i)
-	{
-		const RowCopy& r = rows[i];
-		if (r.chapter < 0 || r.chapter >= static_cast<int32>(gChapters.size()))
-			continue;
-		std::vector<Hit>& hits = gChapters[r.chapter].hits;
-		if (r.hit < 0 || r.hit >= static_cast<int32>(hits.size()))
-			continue;
-		hits[r.hit] = r.row;
-	}
+		if (Hit* h = HitAt(rows[i].chapter, rows[i].hit))
+			*h = rows[i].row;
 	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
 	for (size_t i = 0; i < versions.size(); ++i)
 		PutVersionBack(versions[i]);
@@ -1710,13 +1599,7 @@ void KBSResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	gShowingOutcome = snapshot.showingOutcome;
 	gLayoutGeneration = snapshot.layout;
 	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
-	gContextMenuChapter = kNoContextMenuChapter;
-	gContextMenuHitChapter = -1;
-	gContextMenuHit = -1;
-	gContextMenuGroupChapter = -1;
-	gContextMenuGroup = -1;
-	gContextMenuRunChapter = -1;
-	gContextMenuRun = -1;
+	ForgetContextMenus();
 	ForgetRowBackup();
 }
 
