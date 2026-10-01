@@ -68,8 +68,10 @@ public:
 		KBSPanelTitle::Restore();
 		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
 		KBSModelObserverDetach();
-		// Stop listening before tearing anything down: while attached, the session holds a pointer
-		// into this .pln, and the panel being destroyed during teardown raises a notification.
+		// Stop listening before tearing anything down: while attached, the panel manager and the
+		// application each hold a pointer to an observer whose code is in this .pln (KBSPanelAlpha.cpp,
+		// KBSAttachPanelVisibilityObserver), and the panel being destroyed during teardown raises a
+		// notification.
 		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what
 		//  KBSBookWatchDetach has always done for its own subject (2026-08-08).
 		KBSDetachPanelVisibilityObserver();
