@@ -23,7 +23,7 @@
 #include "Utils.h"
 
 // Project includes:
-#include "KBSHitMarker.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSHitMarkerView.h"
 #include "KBSMarkerExpiryIdleTask.h"
 
@@ -54,7 +54,7 @@ void KBSHitMarkerRepaint(IDataBase* db)
 void KBSHitMarkerView::Show(IDataBase* db, UID storyUID, TextIndex start, TextIndex end)
 {
 	IDataBase* previousDB = nil;
-	if (!KBSHitMarker::SetMarker(db, storyUID, start, end, previousDB))
+	if (!KBSChapters()->SetMarker(db, storyUID, start, end, previousDB))
 		return;
 	if (previousDB != nil)
 		KBSHitMarkerRepaint(previousDB);
@@ -67,7 +67,7 @@ void KBSHitMarkerView::Show(IDataBase* db, UID storyUID, TextIndex start, TextIn
 void KBSHitMarkerView::Hide()
 {
 	IDataBase* db = nil;
-	if (!KBSHitMarker::ClearMarker(db))
+	if (!KBSChapters()->ClearMarker(db))
 		return;
 	KBSMarkerExpiryIdleTask::Stop();
 	if (db != nil)

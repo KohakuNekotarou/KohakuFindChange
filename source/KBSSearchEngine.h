@@ -528,6 +528,15 @@ namespace KBSSearchEngine
 	    (KBSJump). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
+	/** ***** A ROW WHOSE PLACE HAS MOVED UNDER IT, LOOKED FOR AGAIN (2026-09-27, the user's call B). *****
+	    Before the jump gives up on a row that does not read as found, the row's story is walked again under
+	    the same query, and the row moves to the ONE match with the same text and the same line around it
+	    that no other row stands on. Rows not replaced only. The jump's (KBSJump.cpp) until 2026-10-01, when
+	    the model/UI split brought it here - it is a walk and the rows put right; the notes are at the
+	    definition. True = the row was moved, and ioStart / ioEnd are its new place. */
+	bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
+		TextIndex& ioStart, TextIndex& ioEnd);
+
 	/** A story's VERSION (2026-09-29, the defect re-check F-2): ITextModel::GetChangeCount - the counter
 	    InDesign moves for every change to the story's text, attributes, tables and inlines
 	    (ITextModel.h, GetChangeCount), and moves BACK on Undo to exactly the value it had (measured

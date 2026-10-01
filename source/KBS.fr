@@ -355,6 +355,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The three doors the UI half reaches the model half through (2026-10-01, the model/UI split -
+	 * IKBSResults.h / IKBSRuns.h / IKBSChapters.h, forwarding in KBSModelServices.cpp). On the session
+	 * because what is behind them is session state; the model's own implementations, so they stay in the
+	 * model plug-in's .fr when KBS is split.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKBSRESULTS, kKBSResultsImpl,
+			IID_IKBSRUNS, kKBSRunsImpl,
+			IID_IKBSCHAPTERS, kKBSChaptersImpl,
+		}
+	},
+
+	/*
 	 * The UI half's ear on the model half (2026-10-01, the model/UI split): the observer that draws what
 	 * KBSModelNotify.h sends on the session's subject. Attached by the startup (KBSModelObserver.cpp); this
 	 * line only puts our IID, and so the implementation, onto the session.

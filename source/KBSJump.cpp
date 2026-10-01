@@ -69,15 +69,10 @@
 // Project includes:
 #include "KBSJump.h"
 #include "KBSHitMarkerView.h"		// the marker shown and taken down - the UI half of KBSHitMarker (2026-10-01)
-#include "KBSBookScope.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSBookPanelLookup.h"		// BringBookTabForward - a book row's tab (2026-10-01)
-#include "KBSResultModel.h"
-#include "KBSTrackChange.h"		// RefreshRowFromRecords - a replaced row found by its tracked change
-#include "KBSOversetLocator.h"		// KBSFindOversetLocator - the shared overset "+" locator
-#include "KBSSearchEngine.h"		// MatchIsSameOccurrence / EditableFrameForMatch / IsPositionOverset /
 									// CollectStoryHits
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
-#include "KBSReplaceEngine.h"		// QueryUnchangedSinceSearch - a row is looked for again only under its own query
 #include <vector>
 
 namespace
@@ -110,7 +105,7 @@ namespace
 	    already on screen behave. */
 	bool ShouldHidePreviousChapter()
 	{
-		return gHidePrevChapterOn && KBSResultModel::IsFromBook();
+		return gHidePrevChapterOn && KBSResults()->IsFromBook();
 	}
 
 	//------------------------------------------------------------------------------------
@@ -298,7 +293,7 @@ namespace
 	// the hit's own locator was built from - an overset match names the frame carrying the "+".
 	UID SpreadForMatch(const UIDRef& storyRef, TextIndex pos)
 	{
-		const UID frameUID = KBSSearchEngine::EditableFrameForMatch(storyRef, pos);
+		const UID frameUID = KBSRuns()->EditableFrameForMatch(storyRef, pos);
 		if (frameUID == kInvalidUID)
 			return kInvalidUID;
 		InterfacePtr<IHierarchy> frameHier(storyRef.GetDataBase(), frameUID, UseDefaultIID());
@@ -467,7 +462,7 @@ namespace
 	{
 		if (LayoutOfDocIsFrontmost(docRef))
 		{
-			KBSBookScope::ForgetHeldDoc(docRef);	// already in front and visible - see below
+			KBSChapters()->ForgetHeldDoc(docRef);	// already in front and visible - see below
 			return true;
 		}
 
@@ -564,7 +559,7 @@ namespace
 		// KBSBookScope::ShowChapterWindow has always said this about the window IT opens after a
 		// replace. This is the same statement about the window a JUMP opens - the case that was
 		// missing, and the one that reaches the user first.
-		KBSBookScope::ForgetHeldDoc(docRef);
+		KBSChapters()->ForgetHeldDoc(docRef);
 		return true;
 	}
 
@@ -578,9 +573,9 @@ namespace
 	{
 		// By file first; the docRef the results hold only for a chapter with no file - see
 		// KBSBookScope::ReachChapterDoc, which the replace asks too.
-		if (KBSBookScope::ReachChapterDoc(file, ioDocRef))
+		if (KBSChapters()->ReachChapterDoc(file, ioDocRef))
 		{
-			KBSResultModel::RebindChapterDoc(chapterIdx, ioDocRef);
+			KBSResults()->RebindChapterDoc(chapterIdx, ioDocRef);
 			return true;
 		}
 
@@ -652,93 +647,9 @@ void SayRowHasNoPlace()
 	KBSResultTree::ShowStatus(message);
 }
 
-// ***** A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (2026-09-27, the user's call B). *****
-// The rows keep their places themselves, and follow every change KBS makes - but not Edit > Undo / Redo,
-// which moves the text without telling them. Measured (case del-jump-undo-reject): delete the first of
-// two matches, take it back with Reject Change, press Ctrl+Z, click the second row - its stored place
-// is one character off, and the jump called it "missing" although its text had not been touched.
-// (That Ctrl+Z - of a write of KBS's own - is followed since 2026-09-29: KBSUndoFollow puts the rows back
-// with it, and the case now jumps without looking again. This stays for the edits that are not followed:
-// typing, an Undo of anything else, the Track Changes panel, a script.)
-//
-// So before a jump gives up on a row, the story is walked again under the same query, and the row moves
-// to the ONE match that is the same text with the same line around it (the three segments the row
-// drew) and that no other row stands on. None, or more than one, and it is missing as before - a guess
-// between two look-alikes would be worse than saying so. Rows not replaced only: a replaced row is found
-// by its tracked change (KBSTrackChange::RefreshRowFromRecords), before this is asked. True = the row was
-// moved; ioStart / ioEnd are its new place.
-bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
-	TextIndex& ioStart, TextIndex& ioEnd)
-{
-	bool checked = false, replaced = false, locked = false;
-	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || replaced)
-		return false;
-	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
-	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,
-	// and clears nothing. (It asked RefuseChangedQuery itself until 2026-09-29, which on a changed query
-	// cleared the whole result set and handed the chapters back in the middle of a jump, the tree left
-	// drawing rows the model no longer held.)
-	if (!KBSReplaceEngine::QueryUnchangedSinceSearch())
-		return false;
-	KBSResultModel::RowDisplay row;
-	UID story = kInvalidUID;
-	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-	uint64 hash = 0;
-	if (!KBSResultModel::GetHitRow(chapterIdx, hitIdx, row)
-		|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
-		return false;
-	// The row's own story, and only that one (2026-09-29, the official-terms audit A-5: the whole document
-	// was walked, and every match in it given its line and hash, to look in one story).
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil || !db->IsValidUID(storyUID))
-		return false;
-	std::vector<KBSResultModel::Hit> hits;
-	{
-		// forward, as the search was
-		KBSForwardSearchScope forward;
-		WalkerScopeOptions scopeOptions;
-		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
-		// the places and the line: a candidate is compared by its text and the line around it
-		if (!KBSSearchEngine::CollectStoryHits(UIDRef(db, storyUID), scopeOptions, KBSSearchEngine::kHitPlaceAndText, hits))
-			return false;
-	}
-	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
-	int32 found = -1;
-	int32 count = 0;
-	for (size_t h = 0; h < hits.size() && count < 2; ++h)
-	{
-		const KBSResultModel::Hit& cand = hits[h];
-		if (cand.storyUID != storyUID || cand.matchHash != hash
-			|| (cand.textEnd - cand.textStart) != (ioEnd - ioStart)
-			|| cand.preText != row.preText || cand.postText != row.postText)
-			continue;
-		// a place another row already stands on is that row's
-		bool taken = false;
-		for (int32 i = 0; i < hitCount && !taken; ++i)
-		{
-			UID s2 = kInvalidUID;
-			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-			uint64 h2 = 0;
-			if (i != hitIdx && KBSResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
-				&& s2 == cand.storyUID && a2 == cand.textStart && b2 == cand.textEnd)
-				taken = true;
-		}
-		if (taken)
-			continue;
-		found = static_cast<int32>(h);
-		++count;
-	}
-	if (count != 1)
-		return false;
-	const KBSResultModel::Hit& to = hits[static_cast<size_t>(found)];
-	KBSResultModel::SetHitRange(chapterIdx, hitIdx, to.storyUID, to.textStart, to.textEnd);
-	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, to.preText, to.matchText, to.postText, to.matchHash);
-	if (KBSResultModel::GetHitOutcome(chapterIdx, hitIdx) == KBSResultModel::kOutcomeMissing)
-		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeNone);	// found after all
-	ioStart = to.textStart;
-	ioEnd = to.textEnd;
-	return true;
-}
+// (RelocateStaleRow - a row whose place moved under it, looked for again by walking its story under the
+//  same query - stood here until 2026-10-01. It is model work - a walk, and the rows put right - so it is
+//  KBSSearchEngine::RelocateStaleRow now, reached through IKBSRuns; its notes went with it.)
 
 }
 
@@ -752,7 +663,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// not move the view clears it, and these two used to be the exceptions - leaving the previous
 	// hit's marker standing over a row that had just refused to go anywhere. It expires by itself
 	// within the second either way; what is being made consistent is what the panel is SAYING.
-	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
+	if (!KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
 		KBSHitMarkerView::Hide();
 		return false;
@@ -781,9 +692,9 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// with the text, so an edit made since the replace does not put the jump off. Asked only now,
 	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
 	// rejected, a footnote's row) = the stored range and its hash, as before.
-	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+	if (KBSRuns()->RefreshRowFromRecords(chapterIdx, hitIdx))
 	{
-		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
+		KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
 		// The row's text was taken again as well (an edit since the replace moves what stands around it):
 		// repaint, or the panel goes on showing the old line. Found 2026-09-27 by reading the panel itself
 		// (case jump-after-edit) - the model was right, the screen was not.
@@ -828,9 +739,9 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// ***** An Undo can leave a row's place on another occurrence of its own text, which the hash passes -
 	// the jump then marked, and a double click selected, the wrong one. The line tells them apart, and a row
 	// that fails it is looked for again below (RelocateStaleRow asks the same line of its candidates).
-	bool sameOccurrence = KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db);
+	bool sameOccurrence = KBSRuns()->RowReadsAsFound(chapterIdx, hitIdx, db);
 	// ...and when it is not, the row may only have been left behind by Undo / Redo (RelocateStaleRow).
-	if (!sameOccurrence && RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
+	if (!sameOccurrence && KBSRuns()->RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
 	{
 		sameOccurrence = true;
 		KBSResultTree::RefreshRows();
@@ -840,7 +751,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
 	// used). This file wrote that walk out by hand until the block 12 API audit, 2026-08-08, and its
 	// copy answered "not overset" to the failures the original folds into "no frame of its own".
-	const bool overset = KBSSearchEngine::IsPositionOverset(storyRef, start);
+	const bool overset = KBSRuns()->IsPositionOverset(storyRef, start);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, report the match without moving the view.
@@ -859,7 +770,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// closed again (scheduled). The landed-in document is the exception. Book results only - see
 	// ShouldHidePreviousChapter.
 	if (ShouldHidePreviousChapter())
-		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
+		KBSChapters()->CloseDisplayedDocsIfClean(docRef);
 
 	// ***** ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW. ***** The spread change and the
 	// scroll used to find their own view through two different calls that do not mean the same
@@ -890,7 +801,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// now (KBSHitMarker), handed the story and the whole range, and drawn on every line of it.
 	if (overset)
 	{
-		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
+		const KBSOversetLoc loc = KBSRuns()->FindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KBSHitMarkerView::Hide();
@@ -934,7 +845,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		// match text is what the REPLACE wrote, so finding something else in its place means the
 		// replacement is gone, undone or edited away, not that the search's text has moved.
 		bool checked = false, replaced = false, locked = false;
-		KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked);
+		KBSResults()->GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked);
 
 		PMString message;
 		message.SetTranslatable(kFalse);
@@ -944,7 +855,7 @@ bool KBSJump::JumpToHit(int32 chapterIdx, int32 hitIdx)
 		}
 		else
 		{
-			KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
+			KBSResults()->SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeMissing);
 			KBSResultTree::RefreshRows();
 			message.Append("Not found - the text is no longer where the search left it. Search again.");
 		}
@@ -957,7 +868,7 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 {
 	UIDRef docRef;
 	IDFile file;
-	if (!KBSResultModel::GetChapterLocation(chapterIdx, docRef, file))
+	if (!KBSResults()->GetChapterLocation(chapterIdx, docRef, file))
 		return;
 
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
@@ -996,7 +907,7 @@ void KBSJump::ShowChapter(int32 chapterIdx)
 	// we landed. The landed-in document is the exception. Book results only - see
 	// ShouldHidePreviousChapter.
 	if (ShouldHidePreviousChapter())
-		KBSBookScope::CloseDisplayedDocsIfClean(docRef);
+		KBSChapters()->CloseDisplayedDocsIfClean(docRef);
 }
 
 void KBSJump::ShowBook()
@@ -1004,12 +915,12 @@ void KBSJump::ShowBook()
 	// Which book the results came from. The SEARCHED PATH, not the model's display name: that name
 	// is the file name only, and two books in different folders can share one.
 	PMString bookPath;
-	if (!KBSBookScope::GetSearchedBookPath(bookPath) || bookPath.IsEmpty())
+	if (!KBSChapters()->GetSearchedBookPath(bookPath) || bookPath.IsEmpty())
 		return;		// a document-scope result has no book row to click in the first place
 
 	// A book closed since the search is NOT reopened. The row records which book was SEARCHED; it
 	// is not a request to open a file. Saying so beats a row that appears to do nothing.
-	if (!KBSBookScope::MakeBookActive(bookPath))
+	if (!KBSChapters()->MakeBookActive(bookPath))
 	{
 		PMString message("That book is no longer open.");
 		message.SetTranslatable(kFalse);
@@ -1036,7 +947,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	IDFile file;
 	UID storyUID = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	if (!KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
+	if (!KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 		return false;
 
 	// A "deleted" row has no range at all (P-3, see JumpToHit) - said before the zero-width test below,
@@ -1060,7 +971,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// foot of this function). Here nothing replaces it, so it remains what it always was: the answer
 	// to "where is it?" - which is the whole of what a double click on these rows can give.
 	bool hitLocked = false, hitHidden = false;
-	KBSResultModel::GetHitReach(chapterIdx, hitIdx, hitLocked, hitHidden);
+	KBSResults()->GetHitReach(chapterIdx, hitIdx, hitLocked, hitHidden);
 	if (hitLocked || hitHidden)
 	{
 		PMString message(hitLocked
@@ -1095,9 +1006,9 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// with the text, so an edit made since the replace does not put the jump off. Asked only now,
 	// with the chapter reachable (a closed one has just been reopened); no record of ours (accepted,
 	// rejected, a footnote's row) = the stored range and its hash, as before.
-	if (KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx))
+	if (KBSRuns()->RefreshRowFromRecords(chapterIdx, hitIdx))
 	{
-		KBSResultModel::GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
+		KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
 		// The row's text was taken again as well (an edit since the replace moves what stands around it):
 		// repaint, or the panel goes on showing the old line. Found 2026-09-27 by reading the panel itself
 		// (case jump-after-edit) - the model was right, the screen was not.
@@ -1130,7 +1041,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// (JumpToHit clears it: those pixels belong to the "+" indicator, not to the text). Nothing is
 	// done about it here either way; this function only takes the marker down when a SELECTION
 	// replaces it.
-	if (KBSSearchEngine::IsPositionOverset(storyRef, start))
+	if (KBSRuns()->IsPositionOverset(storyRef, start))
 	{
 		PMString message("An overset match has no text on the page to select.");
 		message.SetTranslatable(kFalse);
@@ -1154,11 +1065,11 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// ***** AND THE LINE AROUND THE MATCH SINCE 2026-09-29 (the defect re-check F-2): RowReadsAsFound, the
 	// ***** jump's own test above. ***** An Undo can leave a row's place on another occurrence of its own
 	// text, which the hash passes - and this would hand the user a selection over it, ready to type over.
-	if (!KBSSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db))
+	if (!KBSRuns()->RowReadsAsFound(chapterIdx, hitIdx, db))
 	{
 		// The jump a moment ago looks for a row left behind by Undo / Redo; a caller that came here
 		// another way gets the same chance (RelocateStaleRow).
-		if (!RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
+		if (!KBSRuns()->RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
 			return false;
 		KBSResultTree::RefreshRows();
 	}
@@ -1279,7 +1190,7 @@ void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		{
 			std::vector<int32> group;
 			bool neighboursRead = false;
-			KBSTrackChange::CurrentReplacedGroup(chapterIdx, hitIdx, group, neighboursRead);
+			KBSRuns()->CurrentReplacedGroup(chapterIdx, hitIdx, group, neighboursRead);
 			if (neighboursRead)
 				KBSResultTree::RefreshRows();		// their lines were read again - show them as they are
 			KBSResultTree::ShowRowsBefore(chapterIdx, group);	// no rows = no replace: takes one down

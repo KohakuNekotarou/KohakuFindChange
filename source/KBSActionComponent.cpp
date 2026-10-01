@@ -34,20 +34,15 @@
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSSearchEngine.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"		// rebuild the result tree after a search
 #include "KBSJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
-#include "KBSBookScope.h"		// the Book Scope toggle's session state
-#include "KBSResultModel.h"		// the check state Check All / Uncheck All flips
-#include "KBSReplaceEngine.h"	// Change Checked
 #include "KBSPanelTitle.h"		// the panel's tab name carries the current scope
-#include "KBSRunGuard.h"		// "is anything of ours running?" - one question, both runs
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
-#include "KBSShowChanges.h"		// "Show Changes by KohakuFindChange" - the list rebuilt from the records
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -104,9 +99,9 @@ namespace
 // the row menus' cases and Change Checked's until 2026-09-29.)
 bool RefusedWhileRunning()
 {
-	if (!KBSRunGuard::IsAnyRunning())
+	if (!KBSRuns()->IsAnyRunning())
 		return false;
-	PMString busy(KBSRunGuard::BusyMessage());
+	PMString busy(KBSRuns()->BusyMessage());
 	busy.SetTranslatable(kFalse);
 	KBSResultTree::ShowStatus(busy);
 	return true;
@@ -119,7 +114,7 @@ bool RefusedWhileRunning()
 // the next search (2026-09-29 defect re-check F-1; the jump had the same fault, B-1, fixed the same day).
 void RedrawAfterRowMenu()
 {
-	if (KBSResultModel::HasRun())
+	if (KBSResults()->HasRun())
 		KBSResultTree::RefreshRows();
 	else
 		KBSResultTree::Rebuild();
@@ -135,8 +130,8 @@ void NoteNoWindow(bool wrote, int32 chapter, PMString& status)
 		return;
 	UIDRef docRef;
 	IDFile file;
-	if (KBSResultModel::GetChapterLocation(chapter, docRef, file) && KBSBookScope::IsDocStillOpen(docRef)
-		&& !KBSBookScope::HasWindow(docRef))
+	if (KBSResults()->GetChapterLocation(chapter, docRef, file) && KBSChapters()->IsDocStillOpen(docRef)
+		&& !KBSChapters()->HasWindow(docRef))
 		status.Append(" The document has no window - still hidden.");
 }
 }
@@ -188,7 +183,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			KBSPanelTitle::Update();
 
 			PMString summary;
-			KBSSearchEngine::SearchBook(summary);
+			KBSRuns()->SearchBook(summary);
 			KBSResultTree::Rebuild();
 			KBSResultTree::ShowStatus(summary);
 			break;
@@ -201,7 +196,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// and says why on a refusal; the tree is drawn once, when it returns).
 			KBSPanelTitle::Update();
 			PMString summary;
-			KBSShowChanges::Run(summary);
+			KBSRuns()->ShowChanges(summary);
 			KBSResultTree::Rebuild();
 			KBSResultTree::ShowStatus(summary);
 			break;
@@ -215,7 +210,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Toggle the search scope: the whole target book (see ResolveTargetBook), or just the front document. Just the
 			// flag - nothing is closed and the current results stay put. Its check mark and the
 			// search command's name are drawn in UpdateActionStates.
-			KBSBookScope::SetBookScopeOn(!KBSBookScope::IsBookScopeOn());
+			KBSChapters()->SetBookScopeOn(!KBSChapters()->IsBookScopeOn());
 			// The flyout closes with the click, so the scope it just set is written where it stays
 			// readable: the panel's own tab.
 			KBSPanelTitle::Update();
@@ -351,7 +346,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A list rebuilt from the records (2026-09-29, Show Changes) offers no replace - the engine's
 			// door, asked here for the reason the report's door below is: a refusal leaves the tree as it is.
 			// Asked first, because the report's door would call such a list a report.
-			if (KBSResultModel::IsFromRecords())
+			if (KBSResults()->IsFromRecords())
 			{
 				PMString rebuilt("Change Checked: these rows were rebuilt from Track Changes - search again to replace.");
 				rebuilt.SetTranslatable(kFalse);
@@ -365,7 +360,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Asked before the checked count: the rows the last run never reached keep their check so
 			// the report can account for them, so GetCheckedCount() is still positive. Same wording
 			// as the engine's own door.
-			if (KBSResultModel::NoRowHasCheckBox())		// a report - with no row taken back in it
+			if (KBSResults()->NoRowHasCheckBox())		// a report - with no row taken back in it
 			{
 				PMString report("This is the last replace's report - search again to replace more.");
 				report.SetTranslatable(kFalse);
@@ -373,7 +368,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			}
 
-			if (KBSResultModel::GetCheckedCount() <= 0)
+			if (KBSResults()->GetCheckedCount() <= 0)
 			{
 				PMString nothing("Nothing checked.");
 				nothing.SetTranslatable(kFalse);
@@ -389,7 +384,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// step and every chapter is left open and unsaved, and the rows' own menus had already gone
 			// without one. What the prompt said about Track Changes is said on the status line instead.
 			PMString summary;
-			const int32 replaced = KBSReplaceEngine::ReplaceChecked(summary);
+			const int32 replaced = KBSRuns()->ReplaceChecked(summary);
 			if (replaced > 0)
 				summary.Append(" Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back.");
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
@@ -403,19 +398,19 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// A DOCUMENT row's menu (2026-09-27): that document's ticked rows, no prompt. The book row (and
 			// nothing stashed - a script firing the action by ID) does nothing.
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			if (chapter < 0 || chapter >= KBSResults()->GetChapterCount())
 				break;
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
 			bool wrote = false;
 			if (actionID.Get() == kKBSChapterRejectActionID)
-				wrote = KBSReplaceEngine::RejectChapter(chapter, status);
+				wrote = KBSRuns()->RejectChapter(chapter, status);
 			else if (actionID.Get() == kKBSChapterRedoActionID)
-				wrote = KBSReplaceEngine::RedoChapter(chapter, status);	// no prompt, like Replace
+				wrote = KBSRuns()->RedoChapter(chapter, status);	// no prompt, like Replace
 			else
-				wrote = KBSReplaceEngine::ReplaceChapter(chapter, status);
+				wrote = KBSRuns()->ReplaceChapter(chapter, status);
 			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
@@ -428,15 +423,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A run row's menu (2026-09-29, a list rebuilt from the records). Nothing stashed = nobody
 			// right-clicked a run row.
 			int32 chapter = -1, run = -1;
-			if (!KBSResultModel::GetContextMenuRun(chapter, run))
+			if (!KBSResults()->GetContextMenuRun(chapter, run))
 				break;
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
 			if (actionID.Get() == kKBSRunRejectActionID)
-				KBSReplaceEngine::RejectRun(chapter, run, status);
+				KBSRuns()->RejectRun(chapter, run, status);
 			else
-				KBSReplaceEngine::AcceptRun(chapter, run, status);
+				KBSRuns()->AcceptRun(chapter, run, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -451,7 +446,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// A story row's menu (2026-09-27). Nothing stashed = nobody right-clicked a story row.
 			int32 chapter = -1, group = -1;
-			if (!KBSResultModel::GetContextMenuGroup(chapter, group))
+			if (!KBSResults()->GetContextMenuGroup(chapter, group))
 				break;
 			if (RefusedWhileRunning())
 				break;
@@ -460,17 +455,17 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			const uint32 id = actionID.Get();
 			bool wrote = false;
 			if (id == kKBSStoryReplaceActionID)
-				wrote = KBSReplaceEngine::ReplaceStory(chapter, group, status);	// no prompt (the user's call)
+				wrote = KBSRuns()->ReplaceStory(chapter, group, status);	// no prompt (the user's call)
 			else if (id == kKBSStoryRejectActionID)
-				wrote = KBSReplaceEngine::RejectStory(chapter, group, status);
+				wrote = KBSRuns()->RejectStory(chapter, group, status);
 			else if (id == kKBSStoryAcceptActionID)
-				wrote = KBSReplaceEngine::AcceptStory(chapter, group, status);	// 2026-09-29
+				wrote = KBSRuns()->AcceptStory(chapter, group, status);	// 2026-09-29
 			else if (id == kKBSStoryRedoActionID)
-				wrote = KBSReplaceEngine::RedoStory(chapter, group, status);	// no prompt, like Replace
+				wrote = KBSRuns()->RedoStory(chapter, group, status);	// no prompt, like Replace
 			else
 			{
 				const bool check = (id == kKBSStoryCheckAllActionID);
-				KBSResultModel::SetGroupChecked(chapter, group, check);
+				KBSResults()->SetGroupChecked(chapter, group, check);
 				status = check ? "This story: all checked." : "This story: all unchecked.";
 			}
 			NoteNoWindow(wrote, chapter, status);
@@ -486,18 +481,18 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A hit row's right-click menu (2026-09-26). Nothing stashed = nobody right-clicked a hit
 			// row (a script firing the action by ID): do nothing.
 			int32 chapter = -1, hit = -1;
-			if (!KBSResultModel::GetContextMenuHit(chapter, hit))
+			if (!KBSResults()->GetContextMenuHit(chapter, hit))
 				break;
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
 			bool wrote = false;
 			if (actionID.Get() == kKBSReplaceHitActionID)
-				wrote = KBSReplaceEngine::ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
+				wrote = KBSRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the user's call, 2026-09-27)
 			else if (actionID.Get() == kKBSAcceptChangeActionID)
-				wrote = KBSReplaceEngine::AcceptHit(chapter, hit, status);	// 2026-09-29
+				wrote = KBSRuns()->AcceptHit(chapter, hit, status);	// 2026-09-29
 			else
-				wrote = KBSReplaceEngine::RejectHit(chapter, hit, status);
+				wrote = KBSRuns()->RejectHit(chapter, hit, status);
 			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
@@ -509,13 +504,13 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// A document row's right-click menu (2026-09-27): the tracked changes signed "KohakuFindChange" in
 			// that chapter's document (anybody's until 2026-09-29). The book row (and nothing stashed - a
 			// script firing the action by ID) does nothing.
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			if (chapter < 0 || chapter >= KBSResultModel::GetChapterCount())
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			if (chapter < 0 || chapter >= KBSResults()->GetChapterCount())
 				break;
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
-			NoteNoWindow(KBSReplaceEngine::AcceptAllInChapter(chapter, status), chapter, status);
+			NoteNoWindow(KBSRuns()->AcceptAllInChapter(chapter, status), chapter, status);
 			RedrawAfterRowMenu();
 			KBSResultTree::ShowStatus(status);
 			break;
@@ -536,7 +531,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// Either way this covers every STORED hit, including the ones past the panel's display cap
 			// (kKBSDisplayHitLimit) - most of them scrolled out of sight, which is why the status line
 			// says afterwards which row it was done over.
-			const int32 target = KBSResultModel::GetContextMenuChapter();
+			const int32 target = KBSResults()->GetContextMenuChapter();
 			if (target == KBSResultModel::kNoContextMenuChapter)
 				break;
 			const bool check = (actionID.Get() == kKBSCheckAllActionID);
@@ -549,14 +544,14 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString targetName;
 			if (target == KBSResultModel::kContextMenuBookRow)
 			{
-				targetName = KBSResultModel::GetBookName();
-				KBSResultModel::SetAllChecked(check);
+				targetName = KBSResults()->GetBookName();
+				KBSResults()->SetAllChecked(check);
 			}
 			else
 			{
 				int32 targetHits = 0;
-				KBSResultModel::GetChapterDisplay(target, targetName, targetHits);
-				KBSResultModel::SetChapterChecked(target, check);
+				KBSResults()->GetChapterDisplay(target, targetName, targetHits);
+				KBSResults()->SetChapterChecked(target, check);
 			}
 			targetName.SetTranslatable(kFalse);
 
@@ -621,7 +616,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// Every run, through KBSRunGuard - the search and the replace (and the two scans until they went,
 	// 2026-09-27). The replace needs it at least as much as the search: it works with a command
 	// sequence standing open, and a second walk underneath would Halt() its walker mid-walk.
-	if (KBSRunGuard::IsAnyRunning())
+	if (KBSRuns()->IsAnyRunning())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
 			listToUpdate->SetNthActionState(i, kDisabled_Unselected);
@@ -638,7 +633,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// that are written out beside the action definitions: that flag would grey the commands out with
 	// a book open and no document window - the state a book run is FOR - and it skips this hook, so
 	// the search command would also lose the name that carries the scope.
-	const bool16 haveTarget = KBSBookScope::HasScopeTarget() ? kTrue : kFalse;
+	const bool16 haveTarget = KBSChapters()->HasScopeTarget() ? kTrue : kFalse;
 
 	// How many rows still carry a check box in the range Check All / Uncheck All would act on. That
 	// range is the row their right-click menu was popped over (2026-08-01), so it is read here rather
@@ -658,7 +653,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// walk the context row's hits, up to kKBSCollectHitLimit of them. That is the 2026-08-08 finding
 	// above seen from the other menu: hoisting is justified by two readers, and the readers have to
 	// be on the LIST BEING ENABLED. Only the walk moved; the answer is the same one it always was.
-	const int32 contextChapter = KBSResultModel::GetContextMenuChapter();
+	const int32 contextChapter = KBSResults()->GetContextMenuChapter();
 	int32 contextCheckable = -1;		// not counted yet - see the two commands at the end of the loop
 
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
@@ -680,7 +675,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// user sees, because this line has always renamed it before the menu is drawn.
 			// ...and with Book Scope off, the Search: of Edit > Find/Change it follows since 2026-09-29 ("Find in
 			// Story", "Find to End of Story" ...).
-			PMString name(KBSSearchEngine::FindCommandName(KBSBookScope::IsBookScopeOn()));
+			PMString name(KBSRuns()->FindCommandName(KBSChapters()->IsBookScopeOn()));
 			name.SetTranslatable(kFalse);
 			listToUpdate->SetNthActionName(i, name);
 			// The name is written whether or not it can run, so a greyed-out item still says which
@@ -688,7 +683,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// ...and grey on the Object and Colour tabs too (2026-09-27, the user's call): they find page
 			// items, which this panel does not list. The same question the search asks (CanSearchTab).
 			const bool canRun = haveTarget
-				&& KBSSearchEngine::CanSearchTab(KBSSearchEngine::CurrentSearchMode());
+				&& KBSRuns()->CanSearchTab(KBSRuns()->CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSShowChangesActionID)
@@ -700,7 +695,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		else if (action == kKBSScopeBookActionID)
 		{
 			int16 actionState = kEnabledAction;
-			if (KBSBookScope::IsBookScopeOn())
+			if (KBSChapters()->IsBookScopeOn())
 				actionState |= kSelectedAction;		// ON: show the check mark (OFF is the default)
 			listToUpdate->SetNthActionState(i, actionState);
 		}
@@ -714,7 +709,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// stops it sat grey - the same lock-out the 2026-08-03 note in KBSJump.cpp records
 			// closing from the other side. The check mark stays visible through the lock
 			// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
-			const bool reachable = KBSBookScope::IsBookScopeOn() || KBSResultModel::IsFromBook();
+			const bool reachable = KBSChapters()->IsBookScopeOn() || KBSResults()->IsFromBook();
 			int16 actionState = reachable ? kEnabledAction : kDisabled_Unselected;
 			if (KBSJump::IsHidePreviousChapterOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
@@ -787,8 +782,8 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// rather than the smaller number the panel displays. Taken here rather than above the
 			// loop because this is the only action that reads it. The cap is named rather than
 			// spelled out: this comment read "5000" long after the ceiling became 10000.
-			const int32 checkedCount = KBSResultModel::GetCheckedCount();
-			const bool16 canReplace = (checkedCount > 0 && !KBSResultModel::NoRowHasCheckBox())
+			const int32 checkedCount = KBSResults()->GetCheckedCount();
+			const bool16 canReplace = (checkedCount > 0 && !KBSResults()->NoRowHasCheckBox())
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
@@ -798,17 +793,17 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// A story row's menu (2026-09-27): each item while it has something to do in that story.
 			int32 chapter = -1, group = -1;
-			bool enable = KBSResultModel::GetContextMenuGroup(chapter, group);
+			bool enable = KBSResults()->GetContextMenuGroup(chapter, group);
 			if (enable)
 			{
 				if (action == kKBSStoryReplaceActionID)
-					enable = KBSReplaceEngine::CanReplaceStory(chapter, group);
+					enable = KBSRuns()->CanReplaceStory(chapter, group);
 				else if (action == kKBSStoryRejectActionID || action == kKBSStoryAcceptActionID)
-					enable = KBSReplaceEngine::CanRejectStory(chapter, group);	// Accept (2026-09-29): the same rows
+					enable = KBSRuns()->CanRejectStory(chapter, group);	// Accept (2026-09-29): the same rows
 				else if (action == kKBSStoryRedoActionID)
-					enable = KBSReplaceEngine::CanRedoStory(chapter, group);
+					enable = KBSRuns()->CanRedoStory(chapter, group);
 				else
-					enable = !KBSResultModel::NoRowHasCheckBox();
+					enable = !KBSResults()->NoRowHasCheckBox();
 			}
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
@@ -817,8 +812,8 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// A hit row's menu (2026-09-27): Replace while the row is a Find/Change match not yet replaced,
 			// not locked and with nothing said about it (KBSReplaceEngine::CanReplaceHit).
 			int32 chapter = -1, hit = -1;
-			const bool enable = KBSResultModel::GetContextMenuHit(chapter, hit)
-				&& KBSReplaceEngine::CanReplaceHit(chapter, hit);
+			const bool enable = KBSResults()->GetContextMenuHit(chapter, hit)
+				&& KBSRuns()->CanReplaceHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSRejectChangeActionID || action == kKBSAcceptChangeActionID)
@@ -827,38 +822,38 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// the row's tracked change is still there. (Runs are greyed out above, before this loop. Redo
 			// shared this branch until 2026-09-27.)
 			int32 chapter = -1, hit = -1;
-			const bool enable = KBSResultModel::GetContextMenuHit(chapter, hit)
-				&& KBSReplaceEngine::CanAcceptOrRejectHit(chapter, hit);
+			const bool enable = KBSResults()->GetContextMenuHit(chapter, hit)
+				&& KBSRuns()->CanAcceptOrRejectHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSRunRejectActionID || action == kKBSRunAcceptActionID)
 		{
 			// A run row's menu (2026-09-29): while the run has a replaced row with its change left.
 			int32 chapter = -1, run = -1;
-			const bool enable = KBSResultModel::GetContextMenuRun(chapter, run)
-				&& KBSReplaceEngine::CanRejectOrAcceptRun(chapter, run);
+			const bool enable = KBSResults()->GetContextMenuRun(chapter, run)
+				&& KBSRuns()->CanRejectOrAcceptRun(chapter, run);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSChapterRedoActionID)
 		{
 			// A document row's menu (2026-09-27): while that document has a row taken back.
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			const bool enable = chapter >= 0 && KBSReplaceEngine::CanRedoChapter(chapter);
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSRuns()->CanRedoChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSChapterRejectActionID)
 		{
 			// A document row's menu (2026-09-27): while that document has a replaced row to take back.
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			const bool enable = chapter >= 0 && KBSReplaceEngine::CanRejectChapter(chapter);
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSRuns()->CanRejectChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSChapterReplaceActionID)
 		{
 			// A document row's menu (2026-09-27): while that document has a ticked row to replace. The book
 			// row greys it (Change Checked is the whole book's).
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			const bool enable = chapter >= 0 && KBSReplaceEngine::CanReplaceChapter(chapter);
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			const bool enable = chapter >= 0 && KBSRuns()->CanReplaceChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSAcceptAllChangesActionID)
@@ -866,9 +861,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// A document row's menu (2026-09-27): only while that document is open and holds a tracked
 			// change signed "KohakuFindChange" (anybody's until 2026-09-29). The book row greys it (the
 			// command is about one document).
-			const int32 chapter = KBSResultModel::GetContextMenuChapter();
-			const bool enable = chapter >= 0 && chapter < KBSResultModel::GetChapterCount()
-				&& KBSReplaceEngine::CanAcceptAllInChapter(chapter);
+			const int32 chapter = KBSResults()->GetContextMenuChapter();
+			const bool enable = chapter >= 0 && chapter < KBSResults()->GetChapterCount()
+				&& KBSRuns()->CanAcceptAllInChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKBSCheckAllActionID || action == kKBSUncheckAllActionID)
@@ -891,9 +886,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			{
 				contextCheckable = 0;
 				if (contextChapter == KBSResultModel::kContextMenuBookRow)
-					contextCheckable = KBSResultModel::GetCheckableCount();
+					contextCheckable = KBSResults()->GetCheckableCount();
 				else if (contextChapter != KBSResultModel::kNoContextMenuChapter)
-					contextCheckable = KBSResultModel::GetChapterCheckableCount(contextChapter);
+					contextCheckable = KBSResults()->GetChapterCheckableCount(contextChapter);
 			}
 			const bool16 haveCheckable = (contextCheckable > 0) ? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);

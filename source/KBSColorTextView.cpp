@@ -50,7 +50,7 @@
 #include "KBSID.h"
 #include "KBSColorTextView.h"
 #include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
-#include "KBSResultModel.h"		// MarkUpBreaksForDisplay - the pilcrow / return arrow a break draws as
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 // How far up the widget chain to look for the hilite (see KBSViewOrParentIsHilited). One step is
 // all this panel needs (cell -> row); the extra steps only keep it working if the row ever gains
@@ -133,9 +133,9 @@ public:
 				line.Append(fFlag);
 			}
 			PMString preShown(fPre), matchShown(fMatch), postShown(fPost);
-			KBSResultModel::MarkUpBreaksForDisplay(preShown);
-			KBSResultModel::MarkUpBreaksForDisplay(matchShown);
-			KBSResultModel::MarkUpBreaksForDisplay(postShown);
+			KBSResults()->MarkUpBreaksForDisplay(preShown);
+			KBSResults()->MarkUpBreaksForDisplay(matchShown);
+			KBSResults()->MarkUpBreaksForDisplay(postShown);
 			line.Append("  ");
 			line.Append(preShown);
 			line.Append("[");
@@ -202,9 +202,9 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 
 	// Break characters become visible marks BEFORE anything is measured or ellipsized below: every
 	// width taken from here on has to be the width of what is actually drawn.
-	KBSResultModel::MarkUpBreaksForDisplay(pre);
-	KBSResultModel::MarkUpBreaksForDisplay(match);
-	KBSResultModel::MarkUpBreaksForDisplay(post);
+	KBSResults()->MarkUpBreaksForDisplay(pre);
+	KBSResults()->MarkUpBreaksForDisplay(match);
+	KBSResults()->MarkUpBreaksForDisplay(post);
 
 	// The palette window's SYSTEM SCRIPT font - the same one every OTHER row of this tree already
 	// draws in: the chapter row resource's label widget (kKBSResultChapterLabelWidgetID, in KBS.fr's

@@ -34,7 +34,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSResultNodeID.h"
-#include "KBSResultModel.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"
 
 /** Watches one hit row's check box and mirrors the click into KBSResultModel. */
@@ -91,7 +91,7 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	// row can be taken off like any other - the replace writes only the ticked matches again. (From
 	// 2026-09-26 the model moved a whole touching group and refused to take a footnote's row off, and
 	// this said so on the status line.)
-	KBSResultModel::SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
+	KBSResults()->SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
 
 	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
 	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.
@@ -104,7 +104,7 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	// What the line adds is the identity of the row that just changed, which is worth having when
 	// the list is long enough that the row is nowhere near the pointer.
 	PMString locator, pre, match, post;
-	if (KBSResultModel::GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
+	if (KBSResults()->GetHitDisplay(nodeID->GetChapter(), nodeID->GetHit(), locator, pre, match, post))
 		KBSResultTree::ShowHitCheckStatus(locator, nowChecked);
 }
 

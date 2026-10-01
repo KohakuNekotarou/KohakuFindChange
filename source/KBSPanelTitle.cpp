@@ -41,13 +41,12 @@ namespace GoToURLUtils
 
 // Project includes:
 #include "KBSID.h"
-#include "KBSBookScope.h"		// IsBookScopeOn - the only input to the name
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
 #include "KBSPanelMetrics.h"	// how tall the message block has to be in this UI language
 #include "KBSPanelTitle.h"
 #include "KBSResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
-#include "KBSSearchEngine.h"	// TabName / CurrentSearchMode - the Find/Change tab on the name
 
 namespace
 {
@@ -134,7 +133,7 @@ void KBSPanelTitle::Update()
 	// ***** THE FIND/CHANGE TAB, THEN THE SCOPE (2026-09-27, the user's call) *****:
 	// "Kohaku Find/Change - Text - Book", "... - GREP - Document". The tab is the one the dialog is on NOW,
 	// which is what the next Find in ... will search with. Left out when the settings cannot be read.
-	const char* const tab = KBSSearchEngine::TabName(KBSSearchEngine::CurrentSearchMode());
+	const char* const tab = KBSRuns()->TabName(KBSRuns()->CurrentSearchMode());
 	if (tab[0] != '\0')
 	{
 		title.Append(" - ");
@@ -145,9 +144,9 @@ void KBSPanelTitle::Update()
 	// "Doc" beside the tab name).
 	// With Book Scope off, the Search: KBS follows since 2026-09-29 ("... - Text - Story") as the selection
 	// makes it (Document when the selection does not offer it, as the dialog shows); Document for one it refuses.
-	const char* const searchWord = KBSSearchEngine::SearchScopeName(
-		KBSSearchEngine::SearchScopeForSelection(KBSSearchEngine::CurrentSearchScope()));
-	title.Append(KBSBookScope::IsBookScopeOn() ? "Book" : (searchWord[0] != '\0' ? searchWord : "Document"));
+	const char* const searchWord = KBSRuns()->SearchScopeName(
+		KBSRuns()->SearchScopeForSelection(KBSRuns()->CurrentSearchScope()));
+	title.Append(KBSChapters()->IsBookScopeOn() ? "Book" : (searchWord[0] != '\0' ? searchWord : "Document"));
 	// A palette label is a candidate translation key like any other UI string, so an untranslated
 	// name would be swapped for whatever the string table happens to hold under it.
 	title.SetTranslatable(kFalse);

@@ -99,6 +99,7 @@
 #include "KBSResultModel.h"
 #include "KBSRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KBSOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
+#include "KBSReplaceEngine.h"	// QueryUnchangedSinceSearch - RelocateStaleRow looks again only under its own query
 
 namespace
 {
@@ -3034,6 +3035,96 @@ void KBSSearchEngine::ShutdownCleanup()
 	// them on 2026-08-08 - the list arrived on 2026-08-07 and nothing was added here for it, so it
 	// was the one piece of module state with no controlled point to be let go at.
 	ForgetFindFormat();
+}
+
+// ***** CARRIED HERE FROM KBSJump.cpp ON 2026-10-01 (the model/UI split) *****, unchanged: walking a story
+// and putting a row right is the model half's work. The jump asks it through IKBSRuns.
+// ***** A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (2026-09-27, the user's call B). *****
+// The rows keep their places themselves, and follow every change KBS makes - but not Edit > Undo / Redo,
+// which moves the text without telling them. Measured (case del-jump-undo-reject): delete the first of
+// two matches, take it back with Reject Change, press Ctrl+Z, click the second row - its stored place
+// is one character off, and the jump called it "missing" although its text had not been touched.
+// (That Ctrl+Z - of a write of KBS's own - is followed since 2026-09-29: KBSUndoFollow puts the rows back
+// with it, and the case now jumps without looking again. This stays for the edits that are not followed:
+// typing, an Undo of anything else, the Track Changes panel, a script.)
+//
+// So before a jump gives up on a row, the story is walked again under the same query, and the row moves
+// to the ONE match that is the same text with the same line around it (the three segments the row
+// drew) and that no other row stands on. None, or more than one, and it is missing as before - a guess
+// between two look-alikes would be worse than saying so. Rows not replaced only: a replaced row is found
+// by its tracked change (KBSTrackChange::RefreshRowFromRecords), before this is asked. True = the row was
+// moved; ioStart / ioEnd are its new place.
+bool KBSSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
+	TextIndex& ioStart, TextIndex& ioEnd)
+{
+	bool checked = false, replaced = false, locked = false;
+	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || replaced)
+		return false;
+	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
+	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,
+	// and clears nothing. (It asked RefuseChangedQuery itself until 2026-09-29, which on a changed query
+	// cleared the whole result set and handed the chapters back in the middle of a jump, the tree left
+	// drawing rows the model no longer held.)
+	if (!KBSReplaceEngine::QueryUnchangedSinceSearch())
+		return false;
+	KBSResultModel::RowDisplay row;
+	UID story = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KBSResultModel::GetHitRow(chapterIdx, hitIdx, row)
+		|| !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+		return false;
+	// The row's own story, and only that one (2026-09-29, the official-terms audit A-5: the whole document
+	// was walked, and every match in it given its line and hash, to look in one story).
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil || !db->IsValidUID(storyUID))
+		return false;
+	std::vector<KBSResultModel::Hit> hits;
+	{
+		// forward, as the search was
+		KBSForwardSearchScope forward;
+		WalkerScopeOptions scopeOptions;
+		KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
+		// the places and the line: a candidate is compared by its text and the line around it
+		if (!KBSSearchEngine::CollectStoryHits(UIDRef(db, storyUID), scopeOptions, KBSSearchEngine::kHitPlaceAndText, hits))
+			return false;
+	}
+	const int32 hitCount = KBSResultModel::GetHitCount(chapterIdx);
+	int32 found = -1;
+	int32 count = 0;
+	for (size_t h = 0; h < hits.size() && count < 2; ++h)
+	{
+		const KBSResultModel::Hit& cand = hits[h];
+		if (cand.storyUID != storyUID || cand.matchHash != hash
+			|| (cand.textEnd - cand.textStart) != (ioEnd - ioStart)
+			|| cand.preText != row.preText || cand.postText != row.postText)
+			continue;
+		// a place another row already stands on is that row's
+		bool taken = false;
+		for (int32 i = 0; i < hitCount && !taken; ++i)
+		{
+			UID s2 = kInvalidUID;
+			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+			uint64 h2 = 0;
+			if (i != hitIdx && KBSResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
+				&& s2 == cand.storyUID && a2 == cand.textStart && b2 == cand.textEnd)
+				taken = true;
+		}
+		if (taken)
+			continue;
+		found = static_cast<int32>(h);
+		++count;
+	}
+	if (count != 1)
+		return false;
+	const KBSResultModel::Hit& to = hits[static_cast<size_t>(found)];
+	KBSResultModel::SetHitRange(chapterIdx, hitIdx, to.storyUID, to.textStart, to.textEnd);
+	KBSResultModel::SetHitSegments(chapterIdx, hitIdx, to.preText, to.matchText, to.postText, to.matchHash);
+	if (KBSResultModel::GetHitOutcome(chapterIdx, hitIdx) == KBSResultModel::kOutcomeMissing)
+		KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, KBSResultModel::kOutcomeNone);	// found after all
+	ioStart = to.textStart;
+	ioEnd = to.textEnd;
+	return true;
 }
 
 // End, KBSSearchEngine.cpp.

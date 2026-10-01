@@ -156,6 +156,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\source\KBSModelServices.cpp">
+         <Filter>Source Files\Plugin</Filter>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSID.h">
@@ -264,6 +267,18 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSHitMarkerView.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSResults.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSRuns.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\IKBSChapters.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\source\KBSModelAccess.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>

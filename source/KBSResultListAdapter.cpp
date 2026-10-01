@@ -39,7 +39,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSResultNodeID.h"
-#include "KBSResultModel.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 /** The hierarchy over KBSResultModel: hidden root -> the BOOK row when the results came from a book
     -> one document node per chapter with hits -> a FONT node per group when the chapter has groups
@@ -83,7 +83,7 @@ public:
 			return KBSResultNodeID::CreateRoot();
 		// A document row hangs off the book row when the results came from a book, and off the root
 		// when they came from a single document - which is the two-level tree KBS has always had.
-		return KBSResultModel::IsFromBook() ? KBSResultNodeID::CreateBook() : KBSResultNodeID::CreateRoot();
+		return KBSResults()->IsFromBook() ? KBSResultNodeID::CreateBook() : KBSResultNodeID::CreateRoot();
 	}
 
 	virtual int32 GetNumChildren(const NodeID& node) const
@@ -92,23 +92,23 @@ public:
 		if (nodeID == nil || nodeID->IsHitRow())
 			return 0;	// hit rows are the leaves
 		if (nodeID->IsRoot())
-			return KBSResultModel::IsFromBook() ? 1 : KBSResultModel::GetDisplayChapterCount();
+			return KBSResults()->IsFromBook() ? 1 : KBSResults()->GetDisplayChapterCount();
 		if (nodeID->IsBookRow())
-			return KBSResultModel::GetDisplayChapterCount();
+			return KBSResults()->GetDisplayChapterCount();
 		if (nodeID->IsFontRow())
-			return KBSResultModel::GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
+			return KBSResults()->GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
 		if (nodeID->IsRunRow())
-			return KBSResultModel::GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
+			return KBSResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
 
 		// A document row: its RUN rows when the list has runs (2026-09-29); else its FONT rows when this
 		// chapter's hits name fonts, its hits directly when they do not.
-		const int32 runs = KBSResultModel::GetDisplayRunCount(nodeID->GetChapter());
+		const int32 runs = KBSResults()->GetDisplayRunCount(nodeID->GetChapter());
 		if (runs > 0)
 			return runs;
-		const int32 fonts = KBSResultModel::GetDisplayFontCount(nodeID->GetChapter());
+		const int32 fonts = KBSResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 			return fonts;
-		return KBSResultModel::GetDisplayHitCount(nodeID->GetChapter());
+		return KBSResults()->GetDisplayHitCount(nodeID->GetChapter());
 	}
 
 	virtual NodeID_rv GetNthChild(const NodeID& node, const int32& nth) const
@@ -120,22 +120,22 @@ public:
 		{
 			// The book row is the root's only child while the results came from a book. Without one
 			// the documents hang off the root directly, exactly as they always have.
-			if (KBSResultModel::IsFromBook())
+			if (KBSResults()->IsFromBook())
 				return (nth == 0) ? KBSResultNodeID::CreateBook() : kInvalidNodeID;
 			// The nth SHOWN chapter, which is chapter nth unless a closed document's chapter was emptied in
 			// place before it (2026-09-29, All Documents - KBSResultModel::CloseChapter).
-			const int32 chapter = KBSResultModel::GetShownChapter(nth);
+			const int32 chapter = KBSResults()->GetShownChapter(nth);
 			return (chapter >= 0) ? KBSResultNodeID::Create(chapter) : kInvalidNodeID;
 		}
 		if (nodeID->IsBookRow())
 		{
-			const int32 chapter = KBSResultModel::GetShownChapter(nth);
+			const int32 chapter = KBSResults()->GetShownChapter(nth);
 			return (chapter >= 0) ? KBSResultNodeID::Create(chapter) : kInvalidNodeID;
 		}
 		if (nodeID->IsFontRow())
 		{
 			// The group hands back a CHAPTER-wide hit index - which is what a node names.
-			const int32 hit = KBSResultModel::GetFontGroupHit(nodeID->GetChapter(), nodeID->GetFont(), nth);
+			const int32 hit = KBSResults()->GetFontGroupHit(nodeID->GetChapter(), nodeID->GetFont(), nth);
 			if (hit < 0)
 				return kInvalidNodeID;
 			return KBSResultNodeID::Create(nodeID->GetChapter(), hit);
@@ -144,9 +144,9 @@ public:
 		{
 			// The run hands back a CHAPTER-wide group index; the cap wipes out a run's LAST groups, so the
 			// nth displayed one is the nth.
-			if (nth < 0 || nth >= KBSResultModel::GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun()))
+			if (nth < 0 || nth >= KBSResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun()))
 				return kInvalidNodeID;
-			const int32 group = KBSResultModel::GetRunGroup(nodeID->GetChapter(), nodeID->GetRun(), nth);
+			const int32 group = KBSResults()->GetRunGroup(nodeID->GetChapter(), nodeID->GetRun(), nth);
 			if (group < 0)
 				return kInvalidNodeID;
 			return KBSResultNodeID::CreateFont(nodeID->GetChapter(), group);
@@ -155,21 +155,21 @@ public:
 		// A document row. The groups the display cap wipes out are the LAST ones (they are in
 		// first-appearance order and the cap keeps a prefix of the chapter's hits), so the nth
 		// displayed group is simply the nth group - and the same holds for the runs.
-		const int32 runs = KBSResultModel::GetDisplayRunCount(nodeID->GetChapter());
+		const int32 runs = KBSResults()->GetDisplayRunCount(nodeID->GetChapter());
 		if (runs > 0)
 		{
 			if (nth < 0 || nth >= runs)
 				return kInvalidNodeID;
 			return KBSResultNodeID::CreateRun(nodeID->GetChapter(), nth);
 		}
-		const int32 fonts = KBSResultModel::GetDisplayFontCount(nodeID->GetChapter());
+		const int32 fonts = KBSResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 		{
 			if (nth < 0 || nth >= fonts)
 				return kInvalidNodeID;
 			return KBSResultNodeID::CreateFont(nodeID->GetChapter(), nth);
 		}
-		if (nth < 0 || nth >= KBSResultModel::GetDisplayHitCount(nodeID->GetChapter()))
+		if (nth < 0 || nth >= KBSResults()->GetDisplayHitCount(nodeID->GetChapter()))
 			return kInvalidNodeID;
 		return KBSResultNodeID::Create(nodeID->GetChapter(), nth);
 	}
@@ -183,21 +183,21 @@ public:
 		{
 			// Its place under its FONT row when it has one, and its place in the chapter when it
 			// does not.
-			const int32 pos = KBSResultModel::GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
+			const int32 pos = KBSResults()->GetHitFontGroupPos(childID->GetChapter(), childID->GetHit());
 			return (pos >= 0) ? pos : childID->GetHit();
 		}
 		if (childID->IsFontRow())
 		{
 			// under a run row: its place among the run's groups; under a document row: the group itself
 			if (childID->GetRun() >= 0)
-				return KBSResultModel::GetGroupPosInRun(childID->GetChapter(), childID->GetFont());
+				return KBSResults()->GetGroupPosInRun(childID->GetChapter(), childID->GetFont());
 			return childID->GetFont();
 		}
 		if (childID->IsRunRow())
 			return childID->GetRun();
 		if (childID->IsBookRow())
 			return 0;		// the root's only child
-		return KBSResultModel::GetShownChapterPos(childID->GetChapter());	// GetNthChild's reverse
+		return KBSResults()->GetShownChapterPos(childID->GetChapter());	// GetNthChild's reverse
 	}
 
 	virtual NodeID_rv GetGenericNodeID() const

@@ -51,7 +51,7 @@
 #include "IPMStream.h"
 #include "PMString.h"
 #include "KBSID.h"
-#include "KBSResultModel.h"		// GetHitFontGroup - a hit row derives its font group from the model
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 /** One node of the result tree: (chapter index, run, font group, hit index). See the file comment for
     the six shapes a node can take. */
@@ -79,7 +79,7 @@ public:
 	    group's own (-1 on a list with no runs) - derived here for the reason Create(chapter, hit) gives. */
 	static NodeID_rv CreateFont(int32 chapter, int32 font)
 	{
-		return new KBSResultNodeID(chapter, KBSResultModel::GetGroupRun(chapter, font), font, -1);
+		return new KBSResultNodeID(chapter, KBSResults()->GetGroupRun(chapter, font), font, -1);
 	}
 
 	/** A hit row under chapter 'chapter' ('hit' is the index into that CHAPTER's hits).
@@ -97,8 +97,8 @@ public:
 	    lets nodes be made while the model is empty (during ClearTree, or straight after Clear). */
 	static NodeID_rv Create(int32 chapter, int32 hit)
 	{
-		const int32 font = KBSResultModel::GetHitFontGroup(chapter, hit);
-		return new KBSResultNodeID(chapter, KBSResultModel::GetGroupRun(chapter, font), font, hit);
+		const int32 font = KBSResults()->GetHitFontGroup(chapter, hit);
+		return new KBSResultNodeID(chapter, KBSResults()->GetGroupRun(chapter, font), font, hit);
 	}
 
 	virtual ~KBSResultNodeID() {}

@@ -69,10 +69,8 @@
 #include "KBSID.h"
 #include "KBSResultNodeID.h"
 #include "KBSJump.h"
-#include "KBSResultModel.h"		// SetContextMenuChapter - which row the menu is about to act on
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"		// ShowStatus - why a hit row's menu has nothing to offer
-#include "KBSTrackChange.h"		// RefreshRowFromRecords - is this row's tracked change still there?
-#include "KBSBookScope.h"		// FindOpenChapterDoc - or is its document simply not open?
 
 namespace
 {
@@ -276,10 +274,10 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	// ***** A STORY ROW (2026-09-27, the story level): its own menu, over that story's rows. *****
 	// Every other right-click clears the story it named, so a story menu item fired later (a script, a
 	// shortcut) cannot act on a story nobody right-clicked this time.
-	if (nodeID->IsFontRow() && KBSResultModel::IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
+	if (nodeID->IsFontRow() && KBSResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 	{
-		KBSResultModel::SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
-		KBSResultModel::SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
+		KBSResults()->SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
+		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
 		InterfacePtr<IApplication> storyApp(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IActionManager> storyActionMgr(storyApp != nil ? storyApp->QueryActionManager() : nil);
 		InterfacePtr<IMenuManager> storyMenuMgr(storyActionMgr, UseDefaultIID());
@@ -287,13 +285,13 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 			storyMenuMgr->HandlePopupMenu(kKBSResultStoryMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
 		return kTrue;
 	}
-	KBSResultModel::SetContextMenuGroup(-1, -1);
+	KBSResults()->SetContextMenuGroup(-1, -1);
 
 	// ***** A RUN ROW (2026-09-29, Show Changes by KohakuFindChange): its own menu, over that run's rows in
 	// ***** this document. ***** Cleared by every other right-click, like the story row's.
 	if (nodeID->IsRunRow())
 	{
-		KBSResultModel::SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
+		KBSResults()->SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
 		InterfacePtr<IApplication> runApp(GetExecutionContextSession()->QueryApplication());
 		InterfacePtr<IActionManager> runActionMgr(runApp != nil ? runApp->QueryActionManager() : nil);
 		InterfacePtr<IMenuManager> runMenuMgr(runActionMgr, UseDefaultIID());
@@ -301,29 +299,29 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 			runMenuMgr->HandlePopupMenu(kKBSResultRunMenuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, this);
 		return kTrue;
 	}
-	KBSResultModel::SetContextMenuRun(-1, -1);
+	KBSResults()->SetContextMenuRun(-1, -1);
 
 	if (nodeID->IsHitRow())
 	{
 		const int32 chapter = nodeID->GetChapter();
 		const int32 hit = nodeID->GetHit();
-		KBSResultModel::SetContextMenuHit(chapter, hit);
+		KBSResults()->SetContextMenuHit(chapter, hit);
 		bool checked = false, replaced = false, locked = false;
-		KBSResultModel::GetHitFlags(chapter, hit, checked, replaced, locked);
-		if (KBSResultModel::GetHitInFootnote(chapter, hit))
+		KBSResults()->GetHitFlags(chapter, hit, checked, replaced, locked);
+		if (KBSResults()->GetHitInFootnote(chapter, hit))
 		{
 			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}
-		else if (replaced && !KBSTrackChange::RefreshRowFromRecords(chapter, hit))
+		else if (replaced && !KBSRuns()->RefreshRowFromRecords(chapter, hit))
 		{
 			// A closed document is said as such (2026-09-29, the defect re-check F-3): the records may all
 			// be there, and the row reads "no tracked change" only because nothing is open to read them in.
 			UIDRef rowDoc;
 			IDFile rowFile;
-			const bool open = KBSResultModel::GetChapterLocation(chapter, rowDoc, rowFile)
-				&& KBSBookScope::FindOpenChapterDoc(rowFile, rowDoc);
+			const bool open = KBSResults()->GetChapterLocation(chapter, rowDoc, rowFile)
+				&& KBSChapters()->FindOpenChapterDoc(rowFile, rowDoc);
 			PMString why(open
 				? "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?)."
 				: "Reject Change: the document of this row is not open - open it to take the replace back.");
@@ -341,7 +339,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	const int32 target = nodeID->IsBookRow()
 		? static_cast<int32>(KBSResultModel::kContextMenuBookRow)
 		: nodeID->GetChapter();
-	KBSResultModel::SetContextMenuChapter(target);
+	KBSResults()->SetContextMenuChapter(target);
 
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	if (app == nil)

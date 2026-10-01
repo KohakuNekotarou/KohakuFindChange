@@ -21,7 +21,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSPanelIcon.h"
-#include "KBSResultModel.h"		// HasRun - the one input to the choice
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 
 namespace
 {
@@ -52,7 +52,7 @@ WidgetID Choose()
 	// replace asked for nothing never sets it (KeepCheckedRows leaves the results alone), and
 	// Clear() puts it back down - so a fresh search, or a document closing, restores the picture
 	// below without this needing to know about either.
-	if (KBSResultModel::IsShowingReplaceOutcome())
+	if (KBSResults()->IsShowingReplaceOutcome())
 		return kKBSIconChangedWidgetID;
 
 	// One question, asked of the model rather than of the status line: the close responders put a
@@ -60,7 +60,7 @@ WidgetID Choose()
 	// results away, so an empty-or-not test on the text would leave the panel showing the wrong
 	// picture after a close. HasRun is cleared by Clear(), which is exactly what those responders
 	// call.
-	return KBSResultModel::HasRun() ? kKBSIconFoundWidgetID : kKBSIconWidgetID;
+	return KBSResults()->HasRun() ? kKBSIconFoundWidgetID : kKBSIconWidgetID;
 }
 
 }	// anonymous namespace

@@ -66,12 +66,11 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSResultNodeID.h"
-#include "KBSResultModel.h"
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
 #include "IKBSStatusTextData.h"	// the message area's pieces (2026-09-29)
 #include "KBSPanelIcon.h"		// the illustration follows the status line
-#include "KBSBookScope.h"		// HasWindow - a document row's "(no window)" (2026-09-29)
 
 namespace
 {
@@ -287,7 +286,7 @@ private:
 	// step when there is a book row above them, nothing when there is not.
 	PMReal LevelShift() const
 	{
-		return KBSResultModel::IsFromBook() ? kBookLevelIndent : PMReal(0.0);
+		return KBSResults()->IsFromBook() ? kBookLevelIndent : PMReal(0.0);
 	}
 
 	// How far right this chapter's HIT rows sit because of the font level: one step when the chapter
@@ -296,7 +295,7 @@ private:
 	// disagree with the tree.
 	PMReal FontShift(int32 chapterIdx) const
 	{
-		return ((KBSResultModel::GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0))
+		return ((KBSResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0))
 			+ this->RunShift(chapterIdx);
 	}
 
@@ -304,7 +303,7 @@ private:
 	// Show Changes) - asked from the adapter's own count, like FontShift.
 	PMReal RunShift(int32 chapterIdx) const
 	{
-		return (KBSResultModel::GetDisplayRunCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
+		return (KBSResults()->GetDisplayRunCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
 	}
 
 	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
@@ -365,7 +364,7 @@ private:
 	// rows on 2026-08-05 - docs/ai-notes/kbs-checked-readout-audit-2026-08-05.md).
 	static void AppendDisplayCapNote(PMString& label)
 	{
-		if (KBSResultModel::GetTotalHitCount() <= KBSResultModel::kKBSDisplayHitLimit)
+		if (KBSResults()->GetTotalHitCount() <= KBSResultModel::kKBSDisplayHitLimit)
 			return;
 		label.Append("  - first ");
 		label.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
@@ -402,19 +401,19 @@ private:
 		// away) - so a fully checked chapter of locked-and-free hits reads short of its own total on
 		// purpose. The alternative, a denominator that leaves them out, would disagree with the hit
 		// count every other part of the panel reports.
-		PMString label(KBSResultModel::GetBookName());
+		PMString label(KBSResults()->GetBookName());
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (KBSResultModel::NoRowHasCheckBox() || KBSResultModel::GetTotalHitCount() == 0)
+		if (KBSResults()->NoRowHasCheckBox() || KBSResults()->GetTotalHitCount() == 0)
 		{
-			label.AppendNumber(KBSResultModel::GetTotalHitCount());
+			label.AppendNumber(KBSResults()->GetTotalHitCount());
 			label.Append(")");
 		}
 		else
 		{
-			label.AppendNumber(KBSResultModel::GetCheckedCount());
+			label.AppendNumber(KBSResults()->GetCheckedCount());
 			label.Append("/");
-			label.AppendNumber(KBSResultModel::GetTotalHitCount());
+			label.AppendNumber(KBSResults()->GetTotalHitCount());
 			label.Append(" checked)");
 		}
 		AppendDisplayCapNote(label);
@@ -428,7 +427,7 @@ private:
 	{
 		PMString name;
 		int32 fullCount = 0;
-		if (!KBSResultModel::GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
+		if (!KBSResults()->GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
 			return;
 
 		// "<name>  (N/M checked)" - the same read-out the book row carries, for this chapter alone
@@ -455,29 +454,29 @@ private:
 		// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
 		// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
 		// takes the note away at the next repaint.
-		if (KBSResultModel::GetSearchScope() == KBSResultModel::kScopeAllDocuments)
+		if (KBSResults()->GetSearchScope() == KBSResultModel::kScopeAllDocuments)
 		{
 			UIDRef docRef;
 			IDFile file;
-			if (KBSResultModel::GetChapterLocation(nodeID->GetChapter(), docRef, file)
-				&& KBSBookScope::IsDocStillOpen(docRef) && !KBSBookScope::HasWindow(docRef))
+			if (KBSResults()->GetChapterLocation(nodeID->GetChapter(), docRef, file)
+				&& KBSChapters()->IsDocStillOpen(docRef) && !KBSChapters()->HasWindow(docRef))
 				label.Append(" (no window)");
 		}
 		label.Append("  (");
-		if (KBSResultModel::NoRowHasCheckBox())
+		if (KBSResults()->NoRowHasCheckBox())
 		{
 			label.AppendNumber(fullCount);
 			label.Append(")");
 		}
 		else
 		{
-			label.AppendNumber(KBSResultModel::GetChapterCheckedCount(nodeID->GetChapter()));
+			label.AppendNumber(KBSResults()->GetChapterCheckedCount(nodeID->GetChapter()));
 			label.Append("/");
 			label.AppendNumber(fullCount);
 			label.Append(" checked)");
 		}
 		// A document's results have no book row above this one, so the note goes here instead.
-		if (!KBSResultModel::IsFromBook())
+		if (!KBSResults()->IsFromBook())
 			AppendDisplayCapNote(label);
 
 		// A chapter a cancelled replace never reached used to say "cancelled" here (2026-08-03). Only
@@ -496,7 +495,7 @@ private:
 	{
 		PMString name;
 		int32 fullCount = 0;
-		if (!KBSResultModel::GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
+		if (!KBSResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
 		// "<font>  (N)". The count is ROWS, not glyphs: a run of boxes side by side is one row, so
@@ -513,9 +512,9 @@ private:
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
 		// A STORY row (2026-09-27) reads out its checked count the way a document row does.
-		if (KBSResultModel::IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()) && !KBSResultModel::NoRowHasCheckBox())
+		if (KBSResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()) && !KBSResults()->NoRowHasCheckBox())
 		{
-			label.AppendNumber(KBSResultModel::GetGroupCheckedCount(nodeID->GetChapter(), nodeID->GetFont()));
+			label.AppendNumber(KBSResults()->GetGroupCheckedCount(nodeID->GetChapter(), nodeID->GetFont()));
 			label.Append("/");
 			label.AppendNumber(fullCount);
 			label.Append(" checked)");
@@ -537,7 +536,7 @@ private:
 	{
 		PMString name;
 		int32 fullCount = 0;
-		if (!KBSResultModel::GetRunDisplay(nodeID->GetChapter(), nodeID->GetRun(), name, fullCount))
+		if (!KBSResults()->GetRunDisplay(nodeID->GetChapter(), nodeID->GetRun(), name, fullCount))
 			return;
 		PMString label(name);
 		label.SetTranslatable(kFalse);
@@ -555,7 +554,7 @@ private:
 		// One question, not four: the strings, the flags, the outcome and the accent word all come
 		// from the same hit, and the row wants all of them.
 		KBSResultModel::RowDisplay row;
-		if (!KBSResultModel::GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
+		if (!KBSResults()->GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
 			return;
 
 		// Reasons a row has NOTHING to select. THE MODEL ANSWERS ALL OF THEM IN ONE FIELD
@@ -598,7 +597,7 @@ private:
 		// Asked HERE as well as through row.hasCheckBox because the two want different things: the
 		// row wants to know whether IT has a box, and the cell's frame below wants to know whether
 		// the WHOLE LIST has none (only then may the column move).
-		const bool everyRowLostBox = KBSResultModel::NoRowHasCheckBox();
+		const bool everyRowLostBox = KBSResults()->NoRowHasCheckBox();
 		const bool noCheckBox = !row.hasCheckBox;
 
 		// Draw our own indent: the check box sits where the hit row's content starts (one expander
@@ -714,19 +713,19 @@ void KBSResultTree::Rebuild()
 	// reports children, which does not depend on the node ever having been expanded). The
 	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
 	// manager overrides it.
-	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
-	if (KBSResultModel::IsFromBook())
+	const int32 chapters = KBSResults()->GetDisplayChapterCount();
+	if (KBSResults()->IsFromBook())
 	{
 		// The book row is the root's only child, so leaving it closed would show a panel with one
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
 		treeMgr->ExpandNode(KBSResultNodeID::CreateBook(), kFalse);
 	}
-	else if (KBSResultModel::GetSearchScope() != KBSResultModel::kScopeAllDocuments)
+	else if (KBSResults()->GetSearchScope() != KBSResultModel::kScopeAllDocuments)
 	{
 		// A single document has just the one chapter, so open it - otherwise the result is one closed
 		// row and the hits take an extra click to reach.
 		for (int32 n = 0; n < chapters; ++n)
-			treeMgr->ExpandNode(KBSResultNodeID::Create(KBSResultModel::GetShownChapter(n)), kFalse);
+			treeMgr->ExpandNode(KBSResultNodeID::Create(KBSResults()->GetShownChapter(n)), kFalse);
 	}
 	// (All Documents - 2026-09-29, the user's call - leaves its document rows CLOSED, for the book's reason
 	//  above: one document's hits would bury the fact that the others matched at all.)
@@ -737,14 +736,14 @@ void KBSResultTree::Rebuild()
 	// its hits at once.
 	for (int32 n = 0; n < chapters; ++n)
 	{
-		const int32 c = KBSResultModel::GetShownChapter(n);
+		const int32 c = KBSResults()->GetShownChapter(n);
 		// ...and the RUN rows above them the same (2026-09-29, Show Changes): a grouping, not a hiding place.
-		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
+		const int32 runs = KBSResults()->GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
 			treeMgr->ExpandNode(KBSResultNodeID::CreateRun(c, r), kFalse);
-		const int32 groups = KBSResultModel::GetDisplayFontCount(c);
+		const int32 groups = KBSResults()->GetDisplayFontCount(c);
 		for (int32 g = 0; g < groups; ++g)
-			if (KBSResultModel::IsStoryGroup(c, g))
+			if (KBSResults()->IsStoryGroup(c, g))
 				treeMgr->ExpandNode(KBSResultNodeID::CreateFont(c, g), kFalse);
 	}
 }
@@ -777,22 +776,22 @@ void KBSResultTree::RefreshRows()
 	// It carries "(N/M checked)" now (2026-08-05), so it goes stale the moment anything is ticked -
 	// which is exactly what this function is called for. Only drawn on a book search; NodeChanged
 	// on a node the tree does not hold is harmless.
-	if (KBSResultModel::IsFromBook())
+	if (KBSResults()->IsFromBook())
 		treeMgr->NodeChanged(KBSResultNodeID::CreateBook(), kFalse /*children handled below*/);
 
 	// The chapter AND each of its font rows, because childrenChangedAlso reaches a node's children -
 	// and with the font level the hit rows are GRANDchildren. A chapter has a few fonts, not a few
 	// thousand, so this stays a handful of calls.
-	const int32 chapters = KBSResultModel::GetDisplayChapterCount();
+	const int32 chapters = KBSResults()->GetDisplayChapterCount();
 	for (int32 n = 0; n < chapters; ++n)
 	{
-		const int32 c = KBSResultModel::GetShownChapter(n);	// (chapter n, but for an emptied one before it)
+		const int32 c = KBSResults()->GetShownChapter(n);	// (chapter n, but for an emptied one before it)
 		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
 		// the run rows (2026-09-29): the story rows' parents there, so the chapter's call stops at them
-		const int32 runs = KBSResultModel::GetDisplayRunCount(c);
+		const int32 runs = KBSResults()->GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateRun(c, r), kTrue /*childrenChangedAlso*/);
-		const int32 fonts = KBSResultModel::GetDisplayFontCount(c);
+		const int32 fonts = KBSResults()->GetDisplayFontCount(c);
 		for (int32 f = 0; f < fonts; ++f)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);
 	}
@@ -818,15 +817,15 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 	// row and that chapter's row read out and NOTHING else: the box that was clicked draws itself,
 	// and every other hit row is unaffected. RefreshRows would repaint every chapter and every font
 	// row in the panel to say the same thing.
-	if (KBSResultModel::IsFromBook())
+	if (KBSResults()->IsFromBook())
 		treeMgr->NodeChanged(KBSResultNodeID::CreateBook(), kFalse);
 	if (chapterIdx >= 0)
 	{
 		treeMgr->NodeChanged(KBSResultNodeID::Create(chapterIdx), kFalse);
 		// ...and its STORY rows, which read out a checked count too (2026-09-27)
-		const int32 groups = KBSResultModel::GetDisplayFontCount(chapterIdx);
+		const int32 groups = KBSResults()->GetDisplayFontCount(chapterIdx);
 		for (int32 g = 0; g < groups; ++g)
-			if (KBSResultModel::IsStoryGroup(chapterIdx, g))
+			if (KBSResults()->IsStoryGroup(chapterIdx, g))
 				treeMgr->NodeChanged(KBSResultNodeID::CreateFont(chapterIdx, g), kFalse);
 	}
 }
@@ -847,7 +846,7 @@ void KBSResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 	if (treeMgr == nil)
 		return;
 	// A row the tree never showed (past the display cap) is nothing to take out.
-	if (KBSResultModel::GetShownChapterPos(chapterIdx) < 0)
+	if (KBSResults()->GetShownChapterPos(chapterIdx) < 0)
 		return;
 	treeMgr->BeforeNodeDeleted(KBSResultNodeID::Create(chapterIdx));
 }
@@ -1028,7 +1027,7 @@ void KBSResultTree::ShowStatus(const PMString& message)
 void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& rows)
 {
 	PMString pre, original, post;
-	if (!KBSResultModel::GetRowsBefore(chapterIdx, rows, pre, original, post))
+	if (!KBSResults()->GetRowsBefore(chapterIdx, rows, pre, original, post))
 	{
 		// Not a replaced row (or not a row): nothing to show before it, and an older row's "Source Text:"
 		// must not stand beside this one.
@@ -1057,9 +1056,9 @@ void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 	// The breaks as marks - the pilcrow and the return arrow a hit row draws (the same function). A raw
 	// CR here would be taken by the box as a line break, and "which characters were replaced" would
 	// lose the one that was a paragraph's end.
-	KBSResultModel::MarkUpBreaksForDisplay(pre);
-	KBSResultModel::MarkUpBreaksForDisplay(original);
-	KBSResultModel::MarkUpBreaksForDisplay(post);
+	KBSResults()->MarkUpBreaksForDisplay(pre);
+	KBSResults()->MarkUpBreaksForDisplay(original);
+	KBSResults()->MarkUpBreaksForDisplay(post);
 
 	gBeforePre = pre;			gBeforePre.SetTranslatable(kFalse);
 	gBeforeOriginal = original;	gBeforeOriginal.SetTranslatable(kFalse);
@@ -1090,7 +1089,7 @@ void KBSResultTree::DropBefore()
 
 void KBSResultTree::ShowCheckAllStatus(const PMString& targetName, bool nowChecked)
 {
-	if (KBSResultModel::GetTotalHitCount() == 0)
+	if (KBSResults()->GetTotalHitCount() == 0)
 		return;		// no results: leave whatever the search left on the line
 
 	// "<name>  all checked" - the row's own name first, spaced the way the tree spaces its label
