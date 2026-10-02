@@ -84,6 +84,7 @@
 // replace prompt and the saved report on 2026-09-27.)
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
+#include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 #include <new>						// std::nothrow - HitBuilder's cache
 
 // Project includes:
@@ -1160,31 +1161,39 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // onlyStory: walk this one story of the document instead of the whole of it (UIDRef::gNull = the whole
 // document) - the scope the replace's walks take a story at a time.
 //
-// fromSelection (2026-09-29, Search:): kStoryScope / kToEndOfStoryScope / kSelectionScope = walk what
-// Edit > Find/Change would walk for that Search: from the CURRENT selection - InDesign builds that scope
-// itself (QueryWalkerScope_UsingSelections, the snippet's and spellpanel's own call), so the range is the
-// dialog's by construction rather than KBS's reading of it. docRef must then be the selection's document
-// (the active one). Anything else = docRef / onlyStory, as before.
+// searchScope (2026-10-02, the API re-audit S-1 - the user: "KBS uses the official Find/Change's settings as
+// they are, so follow the official way as far as it goes"): a Search: value - Document, All Documents,
+// Story, To End of Story, Selection - and the walk is the one Edit > Find/Change itself would walk for it,
+// from the current selection: InDesign builds the scope (QueryWalkerScope_UsingSelections, called exactly as
+// SnpFindAndReplace.cpp:774 calls it, with the dialog's five switches as spellpanel passes its options), so
+// the range is the dialog's by construction rather than KBS's reading of it. docRef is not used then: the
+// hits are filed by the document each one's story is in (outHitDBs, one per hit), and every open document
+// gets the dirty guard, since an All Documents walk can compose in any of them. (Story / To End of Story /
+// Selection took this path from 2026-09-29; Document walked the active document through
+// QueryDocumentWalkerScope, and All Documents each open document the same way, until 2026-10-02.)
+// kEmptyScope (the default) = docRef / onlyStory: a book's chapter, or one story.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	KBSProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
 	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull,
-	IWalkerScopeFactoryUtils::WalkScopeType fromSelection = IWalkerScopeFactoryUtils::kDocumentScope)
+	IWalkerScopeFactoryUtils::WalkScopeType searchScope = IWalkerScopeFactoryUtils::kEmptyScope,
+	std::vector<IDataBase*>* outHitDBs = nil)
 {
 	outResult = kChapterWalked;
+	const bool bySearchScope = (searchScope != IWalkerScopeFactoryUtils::kEmptyScope);
 
 	// FIRST, before anything touches the database: every step below (SaveRestoreModifiedState,
 	// QueryDocumentWalkerScope) takes it, and without this the whole function just falls through
 	// its nil checks and returns an empty hit list, which the caller cannot tell apart from "no
-	// matches here".
+	// matches here". (Not for a Search: walk, which takes no document - see searchScope above.)
 	//
 	// This is NOT a liveness test, despite what it looks like: a UIDRef carries the IDataBase*
 	// itself, so a document closed underneath us leaves a dangling pointer here, not a nil one.
 	// "Is this document still open?" only has one honest answer in KBS and it is
 	// KBSBookScope::IsDocStillOpen. What this catches is a UIDRef that never had a database.
 	IDataBase* chapterDB = docRef.GetDataBase();
-	if (chapterDB == nil)
+	if (!bySearchScope && chapterDB == nil)
 	{
 		outResult = kChapterNoDatabase;
 		return;
@@ -1197,7 +1206,24 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		return;
 	}
 
-	IDataBase::SaveRestoreModifiedState dirtyGuard(chapterDB);
+	// The dirty guard (IDataBase.h: "an operation which is logically const on the database") - on the one
+	// document, or on every open one for a Search: walk, which can compose in any of them. Held in a vector
+	// for the second case only because the count is not known until here; each is the class as it stands.
+	std::vector<std::unique_ptr<IDataBase::SaveRestoreModifiedState> > dirtyGuards;
+	if (!bySearchScope)
+		dirtyGuards.emplace_back(new IDataBase::SaveRestoreModifiedState(chapterDB));
+	else
+	{
+		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
+		for (int32 d = 0; d < docCount; ++d)
+		{
+			IDocument* const doc = docList->GetNthDoc(d);
+			IDataBase* const db = (doc != nil) ? ::GetDataBase(doc) : nil;
+			if (db != nil)
+				dirtyGuards.emplace_back(new IDataBase::SaveRestoreModifiedState(db));
+		}
+	}
 
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	if (registry == nil)
@@ -1238,21 +1264,16 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// these options, or it would meet other matches than the hits list. Handed in by the caller,
 	// which reads them once for the whole run.
 	//
-	// !! ADOBE CALLS THIS NOWHERE. Every other step of this walk is the shape SnpFindAndReplace
-	// uses, but the snippet builds its scope from the SELECTION
-	// (QueryWalkerScope_UsingSelections, :774) because it is driving Find Next from a dialog. A
-	// panel that lists a whole document has to say so instead, and the document form is the one
-	// IWalkerScopeFactoryUtils.h:102-109 documents for it - so what stands behind this line is the
-	// header's contract, not a worked example. (Grepped 2026-08-08: the only callers in the SDK
-	// tree are this file, KBSReplaceEngine and KESCL, all three ours.)
+	// A Search: walk takes the dialog's own scope - QueryWalkerScope_UsingSelections, the call
+	// SnpFindAndReplace.cpp:774 makes with the Search: it has just read (see searchScope above).
 	//
-	// ...and since 2026-09-29 the selection's form as well, for the three Search: values that start from the
-	// selection - the snippet's own call, so the range is the dialog's (see fromSelection above).
-	const bool bySelection = fromSelection == IWalkerScopeFactoryUtils::kStoryScope
-		|| fromSelection == IWalkerScopeFactoryUtils::kToEndOfStoryScope
-		|| fromSelection == IWalkerScopeFactoryUtils::kSelectionScope;
-	InterfacePtr<ITextWalkerScope> scope(bySelection
-		? Utils<IWalkerScopeFactoryUtils>()->QueryWalkerScope_UsingSelections(fromSelection, scopeOptions)
+	// !! A BOOK'S CHAPTER (and one story) TAKE A FORM ADOBE CALLS NOWHERE. The dialog has no Search: for a
+	// book, so there is no selection-based scope to ask for: a chapter is walked by the document form
+	// IWalkerScopeFactoryUtils.h:102-109 documents for it (one story by the story form beside it) - what
+	// stands behind those two is the header's contract, not a worked example. (Grepped 2026-08-08, again
+	// 2026-10-02: the only callers in the SDK tree are this file, KBSReplaceEngine and KESCL, all ours.)
+	InterfacePtr<ITextWalkerScope> scope(bySearchScope
+		? Utils<IWalkerScopeFactoryUtils>()->QueryWalkerScope_UsingSelections(searchScope, scopeOptions)
 		: (onlyStory == UIDRef::gNull
 			? Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions)
 			: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions)));
@@ -1319,8 +1340,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// 2026-08-08, so the next reader does not have to work out whether they were an oversight.)
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
-	// What this document's frames and stories answer about the hits inside them - see WalkCache.
-	WalkCache walkCache;
+	// What each document's frames and stories answer about the hits inside them - see WalkCache. One per
+	// document: a Search: walk of All Documents meets several, and UIDs mean nothing across them.
+	std::map<IDataBase*, WalkCache> walkCaches;
 
 	// (A per-story ITextModel::GetTextChangeCount was collected here until 2026-08-03 and stamped
 	// onto every hit, so the replace could skip its same-occurrence test for a story nobody had
@@ -1334,7 +1356,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// the one it is in now is. The walk visits a story at a time, so a change of story means the one
 	// before it is done - whatever order the walker chose to take them in.
 	int32 storiesDone = 0;
-	UID progressStory = kInvalidUID;
+	UIDRef progressStory;		// with its database: an All Documents walk crosses documents
 	int32 progressStoryLength = 0;
 
 	while (true)
@@ -1413,11 +1435,11 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// reads the flag that click sets, and is asked between chapters (see the note on the section above).
 		if (progressBar != nil)
 		{
-			if (story.GetUID() != progressStory)
+			if (story != progressStory)
 			{
-				if (progressStory != kInvalidUID)
+				if (progressStory.GetDataBase() != nil)
 					++storiesDone;
-				progressStory = story.GetUID();
+				progressStory = story;
 				// The story is already loaded - the walk is standing in it - so this costs nothing.
 				InterfacePtr<ITextModel> progressModel(story, UseDefaultIID());
 				progressStoryLength = (progressModel != nil) ? progressModel->TotalLength() : 0;
@@ -1461,8 +1483,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// asked for (2026-08-08). emplace_back hands back the new element itself (C++17), and BuildHit
 		// never touches this vector, so the reference cannot be invalidated under it.
 		// (The walk order was stamped on it here until 2026-09-29 - see where Hit::walkOrder stood.)
+		// The match's own document: docRef for a chapter, the story's for a Search: walk (searchScope).
+		IDataBase* const storyDB = story.GetDataBase();
+		const UIDRef hitDocRef = bySearchScope
+			? UIDRef(storyDB, (storyDB != nil) ? storyDB->GetRootUID() : kInvalidUID) : docRef;
 		KBSResultModel::Hit& hit = outHits.emplace_back();
-		BuildHit(docRef, story, start, end, detail, walkCache, hit);
+		BuildHit(hitDocRef, story, start, end, detail, walkCaches[storyDB], hit);
+		if (outHitDBs != nil)
+			outHitDBs->push_back(storyDB);
 	}
 
 	if (walker->IsWalking())
@@ -2396,10 +2424,12 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	{
 		// ***** EVERY OPEN DOCUMENT, WINDOW OR NOT (2026-09-29). ***** InDesign's own All Documents searches
 		// a document opened without a window too (measured the same day: app.findText() counted one), so
-		// this does. Each is a "chapter" of the run - the book machinery walks them one at a time and keeps
-		// each one's rows apart - but none is ours to open or close: no file is recorded (a chapter with no
-		// file is found again by its docRef, as the Document search's always has been), and a chapter KBS
-		// holds open from a BOOK search is left out - it is not a document the user opened.
+		// this does. Each is a "chapter" of the run - its rows kept apart from the others' - but none is ours
+		// to open or close: no file is recorded (a chapter with no file is found again by its docRef, as the
+		// Document search's always has been), and a chapter KBS holds open from a BOOK search is left out -
+		// it is not a document the user opened. Since 2026-10-02 they are not walked one by one: the dialog's
+		// own All Documents scope is walked ONCE and each match filed under its document (the walk below);
+		// this list is what the matches are filed under, in this order, and the T of "M of T document(s)".
 		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
 		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
 		for (int32 d = 0; d < docCount; ++d)
@@ -2554,12 +2584,154 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// neither see them nor close them, and each holds its .indd locked (KBSBookScope::AppendUnclosedNote).
 	// The search discarded the release's answer until 2026-08-08.
 	std::vector<PMString> unclosed;
-	for (size_t i = 0; i < targets.size(); ++i)
+
+	// ***** EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN (2026-09-29, the defect re-check F-2). *****
+	// ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
+	// before it writes, so a story moved since without KBS (typing, Ctrl+Z of anything but a write of KBS's
+	// own - which the panel follows since 2026-09-29, KBSUndoFollow) is not written to. A book's chapter has
+	// it read in front of the release that closes a chapter this search opened.
+	auto readStoryVersions = [](const UIDRef& docRef, const std::vector<KBSResultModel::Hit>& hits,
+		std::map<UID, uint32>& outVersions)
+	{
+		IDataBase* const db = docRef.GetDataBase();
+		for (size_t h = 0; h < hits.size(); ++h)
+		{
+			const UID story = hits[h].storyUID;
+			uint32 version = 0;
+			if (outVersions.count(story) == 0 && KBSSearchEngine::ReadStoryVersion(db, story, version))
+				outVersions[story] = version;
+		}
+	};
+	// One target's hits into the model as a chapter - the book's chapters and the Book Scope OFF walk's
+	// documents alike. Page-orders the hits and bakes the "P<page>(<n>) " locator onto each line: this needs
+	// the WHOLE chapter's hits (page order and the within-page ordinal are only known once it is complete),
+	// which is why the flush unit is the chapter, not a fixed hit count.
+	//
+	// Into the model only. The tree is drawn ONCE, by the caller, when the search returns: the progress bar
+	// is modal, so while it is up the panel cannot be read or clicked and a per-chapter rebuild would be work
+	// nobody sees. Handed over rather than copied: the model takes the hits and leaves the Chapter empty
+	// (the count is taken before the handover).
+	auto fileChapter = [&](const KBSBookScope::ChapterDoc& target, std::vector<KBSResultModel::Hit>& hits,
+		std::map<UID, uint32>& storyVersions)
+	{
+		KBSSearchEngine::FinalizeHits(hits);
+		KBSResultModel::Chapter chapter;
+		chapter.name = target.shortName;
+		chapter.name.SetTranslatable(kFalse);
+		chapter.docRef = target.docRef;
+		chapter.file = target.file;
+		chapter.hits.swap(hits);
+		chapter.storyVersions.swap(storyVersions);
+		total += static_cast<int32>(chapter.hits.size());
+		++chaptersWithHits;
+		KBSResultModel::AppendChapter(std::move(chapter));
+	};
+
+	// ***** BOOK SCOPE OFF: ONE WALK OF THE DIALOG'S OWN SCOPE (2026-10-02, the API re-audit S-1 - the user:
+	// ***** "KBS uses the official Find/Change's settings as they are, so follow the official way as far as it
+	// ***** goes"). ***** Whatever Search: says - Document, All Documents, Story, To End of Story, Selection - the
+	// walk is the scope Edit > Find/Change builds for it (QueryWalkerScope_UsingSelections, as
+	// SnpFindAndReplace.cpp:774 calls it; CollectHitsInDoc's searchScope), walked once, and every match is filed
+	// under the document its story is in, in the order of `targets`. Until then Document walked the active
+	// document by the document form, and All Documents each open document by it, one by one.
+	// A match in a document `targets` does not hold - the scope walking somewhere KBS did not expect, never
+	// seen - gets a chapter of its own after them; one in a chapter KBS holds from a book search is left out,
+	// as `targets` leaves it out. One step for the bar: the walk is sized by every target's stories.
+	if (!fromBook)
+	{
+		const IWalkerScopeFactoryUtils::WalkScopeType walkScope =
+			allDocuments ? IWalkerScopeFactoryUtils::kAllDocumentScope : selectionScope;
+		if (allDocuments)
+		{
+			PMString taskLine("All Documents - ");
+			taskLine.SetTranslatable(kFalse);
+			taskLine.AppendNumber(static_cast<int32>(targets.size()));
+			taskLine.Append(" open document(s)");
+			progressBar.SetTaskText(taskLine);
+		}
+		else
+			KBSSetChapterTask(progressBar, "Document", 0, 1, targets[0].shortName);
+		KBSAdvanceProgress(&progressBar, progressReported, 0, true /*force*/);
+
+		if (progressBar.WasCancelled(kFalse))
+			cancelled = true;
+		else
+		{
+			int32 storiesTotal = 0;
+			for (size_t t = 0; t < targets.size(); ++t)
+				storiesTotal += CountSearchableStories(targets[t].docRef);
+			if (storiesTotal < 1)
+				storiesTotal = 1;
+
+			std::vector<KBSResultModel::Hit> hits;
+			std::vector<IDataBase*> hitDBs;
+			bool capped = false;
+			ChapterWalkResult walkResult = kChapterWalked;
+			CollectHitsInDoc(UIDRef::gNull, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions,
+				kHitEverything, hits, capped, walkResult, &progressBar, 0, progressTotal, storiesTotal,
+				progressReported, UIDRef::gNull, walkScope, &hitDBs);
+			KBSAdvanceProgress(&progressBar, progressReported, progressTotal, true /*force*/);
+			if (capped)
+				collectionTruncated = true;
+
+			PMString walkName(allDocuments ? PMString("All open documents") : targets[0].shortName);
+			walkName.SetTranslatable(kFalse);
+			if (walkResult == kChapterWalkFailed)
+				brokeOff.push_back(walkName);		// its hits are real and are filed below
+			else if (walkResult != kChapterWalked)
+			{
+				PMString entry(walkName);
+				const PMString why(ChapterWalkResultText(walkResult));
+				if (!why.IsEmpty())
+				{
+					entry.Append(": ");
+					entry.Append(why);
+				}
+				entry.SetTranslatable(kFalse);
+				unsearchable.push_back(entry);
+			}
+
+			if (!cancelled)
+			{
+				std::vector<std::vector<KBSResultModel::Hit> > perTarget(targets.size());
+				for (size_t k = 0; k < hits.size() && k < hitDBs.size(); ++k)
+				{
+					IDataBase* const db = hitDBs[k];
+					size_t t = 0;
+					while (t < targets.size() && targets[t].docRef.GetDataBase() != db)
+						++t;
+					if (t == targets.size())
+					{
+						const UIDRef docRef(db, (db != nil) ? db->GetRootUID() : kInvalidUID);
+						InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+						if (doc == nil || KBSBookScope::IsHeldDoc(docRef))
+							continue;
+						targets.push_back(KBSBookScope::DocAsChapter(doc));
+						perTarget.push_back(std::vector<KBSResultModel::Hit>());
+					}
+					perTarget[t].push_back(std::move(hits[k]));
+				}
+				for (size_t t = 0; t < targets.size(); ++t)
+				{
+					if (perTarget[t].empty())
+						continue;
+					std::map<UID, uint32> storyVersions;
+					readStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
+					fileChapter(targets[t], perTarget[t], storyVersions);
+				}
+			}
+		}
+	}
+
+	// ***** BOOK SCOPE ON: CHAPTER BY CHAPTER ***** - the dialog has no Search: for a book, so each chapter is
+	// opened, walked by the document form and handed back in turn (the `fromBook &&` keeps this loop the
+	// book's alone since 2026-10-02).
+	for (size_t i = 0; fromBook && i < targets.size(); ++i)
 	{
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
 		// bar names what is being worked on rather than what has just finished. This is also what
 		// keeps the bar moving through chapters that hold no hits at all.
-		KBSSetChapterTask(progressBar, allDocuments ? "Document" : "Chapter", i, targets.size(), targets[i].shortName);
+		KBSSetChapterTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Cancel is asked here, and answered by the bar being moved from inside the walk
@@ -2582,9 +2754,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			break;
 		}
 
-		// Open THIS chapter now. Book scope only - a document-scope target is an open document
-		// (DocAsChapter), already open and never ours to close.
-		if (fromBook && targets[i].docRef == UIDRef::gNull)
+		// Open THIS chapter now (one the user already had open has its docRef).
+		if (targets[i].docRef == UIDRef::gNull)
 		{
 			if (!KBSBookScope::OpenChapterDoc(targets[i], &unopenable))
 			{
@@ -2609,7 +2780,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		ChapterWalkResult walkResult = kChapterWalked;
 		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, docCapped,
 			walkResult, &progressBar, progressBase, kKBSChapterProgressSpan, storiesInDoc,
-			progressReported, UIDRef::gNull, selectionScope);
+			progressReported);
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
@@ -2641,24 +2812,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		//  story's change counter before the release below closed the chapter, so the replace could WARN
 		//  about an edited chapter in place of walking it. The replace walks it again and checks each
 		//  ticked hit where this search left it - and since 2026-09-29 it ALSO asks the counter, as a door
-		//  beside the walk rather than instead of it: below.)
-		//
-		// ***** EVERY STORY'S VERSION, WHILE THE CHAPTER IS STILL OPEN (2026-09-29, the defect re-check
-		// ***** F-2). ***** ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what
-		// the replace compares before it writes, so a story moved since without KBS (typing, Ctrl+Z of
-		// anything but a write of KBS's own - which the panel follows since 2026-09-29, KBSUndoFollow) is
-		// not written to. Read in front of the release below, which closes a chapter this search opened.
+		//  beside the walk rather than instead of it: readStoryVersions, in front of the release.)
 		std::map<UID, uint32> storyVersions;
-		{
-			IDataBase* const chapterDB = chapterDocRef.GetDataBase();
-			for (size_t h = 0; h < hits.size(); ++h)
-			{
-				const UID story = hits[h].storyUID;
-				uint32 version = 0;
-				if (storyVersions.count(story) == 0 && KBSSearchEngine::ReadStoryVersion(chapterDB, story, version))
-					storyVersions[story] = version;
-			}
-		}
+		readStoryVersions(chapterDocRef, hits, storyVersions);
 
 		if (!KBSBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
@@ -2698,33 +2854,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		if (hits.empty())
 			continue;
 
-		// Page-order the hits and bake the "P<page>(<n>) " locator onto each line. This needs the
-		// WHOLE chapter's hits (page order and the within-page ordinal are only known once the
-		// chapter is complete), which is why the flush unit is the chapter, not a fixed hit count.
-		KBSSearchEngine::FinalizeHits(hits);
-
-		KBSResultModel::Chapter chapter;
-		chapter.name = targets[i].shortName;
-		chapter.name.SetTranslatable(kFalse);
-		chapter.docRef = targets[i].docRef;
-		chapter.file = targets[i].file;
-		chapter.hits.swap(hits);
-		chapter.storyVersions.swap(storyVersions);
-		const int32 chapterHitCount = static_cast<int32>(chapter.hits.size());
-		total += chapterHitCount;
-		++chaptersWithHits;
-
-		// Into the model only. The tree is drawn ONCE, by the caller, when the search returns: the
-		// progress bar is modal, so while it is up the panel cannot be read or clicked and a
-		// per-chapter rebuild would be work nobody sees. (Growing the tree chapter by chapter used
-		// to be how the search showed it was alive; the bar does that now, and does it for chapters
-		// that hold no hits at all - which the growing tree never could.)
-		//
-		// Handed over rather than copied: the model takes the hits and leaves this Chapter empty.
-		// Safe because it is a fresh one per pass of this loop and the count above was taken before
-		// the handover - and it is the point of the swap() four lines up, which used to be undone by
-		// a copy on this line (2026-08-08).
-		KBSResultModel::AppendChapter(std::move(chapter));
+		// (Growing the tree chapter by chapter used to be how the search showed it was alive; the bar does
+		// that now, and does it for chapters that hold no hits at all - which the growing tree never could.)
+		fileChapter(targets[i], hits, storyVersions);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
