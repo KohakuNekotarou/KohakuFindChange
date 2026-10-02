@@ -77,8 +77,9 @@ namespace KBSBookPanelPlacement
 	    (or read at startup) is written again. */
 	void AppendSaveKeys(std::vector<std::pair<std::string, std::string> >& keys);
 
-	/** At startup: the toggle and the placement from the settings file's text. Nothing is moved here -
-	    what puts the placement on a book panel is this file, when one appears. */
+	/** The toggle and the placement from the settings file's text, when the file is read - at startup or
+	    at PaletteMgrStarted, whichever comes first (KBSLoadPanelStateIfPresent reads once). Nothing is
+	    moved here - what puts the placement on a book panel is this file, when one appears. */
 	void LoadFromSettings(const std::string& text);
 
 	/** The palette manager has laid its palettes out (IPaletteMgrService::PaletteMgrStarted): start
@@ -92,7 +93,7 @@ namespace KBSBookPanelPlacement
 	    closes the books BEFORE this, and the interceptor has already written the placement. */
 	void Stop();
 
-	/** Application shutdown (KBSUIStartupShutdown::Shutdown): stop following and give the timer and the
+	/** Application shutdown (KBSUIStartupShutdown::Shutdown): stop following and give the timers and the
 	    interceptor back, in case Stop was never reached. Safe to call twice. */
 	void ShutdownCleanup();
 }

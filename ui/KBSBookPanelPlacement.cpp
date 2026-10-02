@@ -33,14 +33,16 @@
 //
 //    4. a one-shot ICallbackTimer that puts the placement back a moment after the Book panel
 //       appears, not inside the notification: OWL lays palettes out asynchronously
-//       (PaletteRefUtils.h:40-41). 100ms was enough on the machine it was measured on.
+//       (PaletteRefUtils.h:40-41). 100ms was enough on the machine it was measured on. (Since
+//       2026-09-27 it also puts it back again, later, when InDesign throws the panel out of the dock
+//       - kKBSBookPanelReRestoreDelayMs - and a second timer looks at the Home screen - gHomeTimer.)
 //
 //  ***** FLOATING: THE DOCK AND THE PANEL ARE MEASURED SEPARATELY, AND ON PURPOSE. *****
 //    Position = the FLOATING DOCK's top-left (GetPalettePosition). SetPalettePosition only takes a
 //      floating Dock, Toolbar or ControlBar (PaletteRefUtils.h:361-366), so the palette tree is
 //      walked up from the panel's container to that dock - the walk KESCM used when it moved its own
 //      panel to the cursor (2026-07-10, removed later with that feature). Measured on 21.0.2: the
-//      Book panel's container is four steps below its floating dock (tab group, tab pane, dock).
+//      Book panel's container is three steps below its floating dock (tab group, tab pane, dock).
 //    Size = the book PANEL's frame. A floating panel is resized by resizing the panel view - that is
 //      what the product does (LinksUIUtils.cpp:650-653, :720-723); SetPaletteSize is its route for a
 //      DOCKED palette only. Measured 2026-09-25: moving the dock window itself with SetWindowPos to
@@ -633,13 +635,6 @@ void RememberAndWrite(const Placement& p, bool sayFailure)
 // Putting it back
 //----------------------------------------------------------------------------------------
 
-/** Would the palette's title band land on a screen if put here? Asked of the screen that holds most
-    of the rectangle (IMonitorInfo::GetBestScreenRect handles more than one monitor - KCM's
-    KeepPanelOnScreen asks it the same way). "Cannot tell" answers no: a palette left where it
-    opened is a smaller fault than one put where nobody can reach it.
-    *Only the TOP is judged here, and that is enough for a yes: a bottom edge that would land below
-    the screen is not a reason to give up the whole placement - FitHeightToScreen shortens the panel
-    instead. */
 /** The application's monitor information, AddRef'd - or nil (the session can be gone during
     shutdown). Asked by TitleBandIsOnScreen and FitHeightToScreen. */
 const IMonitorInfo* QueryMonitorInfo()
@@ -650,6 +645,13 @@ const IMonitorInfo* QueryMonitorInfo()
 	return monInfo.forget();
 }
 
+/** Would the palette's title band land on a screen if put here? Asked of the screen that holds most
+    of the rectangle (IMonitorInfo::GetBestScreenRect handles more than one monitor - KCM's
+    KeepPanelOnScreen asks it the same way). "Cannot tell" answers no: a palette left where it
+    opened is a smaller fault than one put where nobody can reach it.
+    *Only the TOP is judged here, and that is enough for a yes: a bottom edge that would land below
+    the screen is not a reason to give up the whole placement - FitHeightToScreen shortens the panel
+    instead. */
 bool TitleBandIsOnScreen(const Placement& p)
 {
 	InterfacePtr<const IMonitorInfo> monInfo(QueryMonitorInfo());
@@ -687,7 +689,7 @@ bool TitleBandIsOnScreen(const Placement& p)
 
     ***** WHY IT IS ASKED OF THE PLACE TO COME, NOT READ OFF THE VIEW AS THE PRODUCT DOES. *****
     linksui only RESIZES its panel where it stands; this file also MOVES it, and OWL applies a
-    SetPalettePosition asynchronously (PaletteRefUtils.h:40-42). Measured 2026-09-25 with the product's
+    SetPalettePosition asynchronously (PaletteRefUtils.h:40-41). Measured 2026-09-25 with the product's
     shape (resize, then read GetBBox/WindowToGlobal): the view still stood at the old place - bottom
     694, on the 728 screen, so nothing was shrunk - and a moment later the dock arrived at the new
     place with its bottom at 971, well off the screen. Reading after the layout would need
@@ -1103,7 +1105,8 @@ void AttachObserver(bool attach)
 		subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IPANELMGR, IID_IKBSBOOKPANELOBSERVER);
 }
 
-/** Drop a pending restore and give the timer back. The ONE place it is released. */
+/** Drop a pending restore and give the timers back - the restore's and the Home screen's. The ONE
+    place either is released. */
 void DisarmRestoreTimer()
 {
 	if (gHomeTimer != nil)
