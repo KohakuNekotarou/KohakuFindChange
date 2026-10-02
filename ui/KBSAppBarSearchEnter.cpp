@@ -184,22 +184,30 @@ static std::wstring GlyphDescription(const IFindChangeOptions* opts)
 	return out;
 }
 
-// The Transliterate tab's query - the character type it finds - in the words KBS uses everywhere: English.
+// The Transliterate tab's query - the character type it finds - in InDesign's UI language, in the very words its
+// Transliterate tab shows (the user's call, 2026-10-03: the English names this first had were not the UI's).
+// The keys are InDesign's own string keys, read off its string tables on disk (idrc_PMST - the Find and Change
+// Panel's for all but Kanji, which the dialog does not offer; that one is CompFontMgr's, a Required plug-in):
+// e.g. "Half-width Katakana" = jaJP "hankaku katakana", "kWesternArabicDigits" = "Arabic Digits (0, 1, ...)".
+// kTranslateDuringCall looks the key up in the string tables of every loaded plug-in; a key not found stays as
+// it is - English-like words, never an empty field.
 static std::wstring CharacterTypeName(IFindChangeOptions::CharacterType type)
 {
+	ConstCString key = nil;
 	switch (type)
 	{
-		case IFindChangeOptions::kKanji:				return L"Kanji";
-		case IFindChangeOptions::kHalfWidthKatakana:	return L"Half-width Katakana";
-		case IFindChangeOptions::kHalfWidthRoman:		return L"Half-width Roman";
-		case IFindChangeOptions::kFullWidthHiragana:	return L"Full-width Hiragana";
-		case IFindChangeOptions::kFullWidthKatakana:	return L"Full-width Katakana";
-		case IFindChangeOptions::kFullWidthRoman:		return L"Full-width Roman";
-		case IFindChangeOptions::kWesternArabicDigits:	return L"Western Arabic Digits";
-		case IFindChangeOptions::kArabicIndicDigits:	return L"Arabic-Indic Digits";
-		case IFindChangeOptions::kFarsiDigits:			return L"Farsi Digits";
+		case IFindChangeOptions::kKanji:				key = "Kanji"; break;
+		case IFindChangeOptions::kHalfWidthKatakana:	key = "Half-width Katakana"; break;
+		case IFindChangeOptions::kHalfWidthRoman:		key = "Half-width Roman Symbols"; break;
+		case IFindChangeOptions::kFullWidthHiragana:	key = "Full-width Hiragana"; break;
+		case IFindChangeOptions::kFullWidthKatakana:	key = "Full-width Katakana"; break;
+		case IFindChangeOptions::kFullWidthRoman:		key = "Full-width Roman Symbols"; break;
+		case IFindChangeOptions::kWesternArabicDigits:	key = "kWesternArabicDigits"; break;
+		case IFindChangeOptions::kArabicIndicDigits:	key = "kArabicIndicDigits"; break;
+		case IFindChangeOptions::kFarsiDigits:			key = "kFarsiDigits"; break;
 		default:										return std::wstring();
 	}
+	return WideOf(PMString(key, PMString::kTranslateDuringCall));
 }
 
 struct KBSAppBarFieldSearch { HWND found; };
