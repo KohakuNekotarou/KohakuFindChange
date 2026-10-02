@@ -258,8 +258,14 @@ namespace KBSBookScope
 	    module's back - and a visible document is one the user can deal with themselves.
 
 	    Every one of these verdicts is ReleaseHeldDoc's: this hands each held chapter to it, on a
-	    schedule (2026-10-01 - the same tests were written out here a second time until then). */
-	void ReleaseHeldDocs();
+	    schedule (2026-10-01 - the same tests were written out here a second time until then).
+
+	    closeNow = true closes on the spot instead (ReleaseHeldDoc's closeNow, and its rule: outside any
+	    command sequence, with no walk standing). The search asks for it at its commit point (2026-10-02,
+	    the block 8 re-read B8-2): a SCHEDULED close leaves the chapter open, and no longer held, until the
+	    run is over - so an All Documents walk met it, listed it as a document of the user's, and lost its
+	    rows when the close went through after the search. */
+	void ReleaseHeldDocs(bool closeNow = false);
 
 	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
 	    chapter the user already had open is not held and is left alone, so a run can hand back every

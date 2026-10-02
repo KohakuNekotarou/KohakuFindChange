@@ -17,6 +17,8 @@
 #include "IParcelList.h"		// GetLastParcelKey / GetParcelFrameUID / GetParcelBounds
 #include "IGeometry.h"
 #include "ITableUtils.h"		// InsideTable / TableToPrimaryTextIndex
+#include "ITextStoryThread.h"	// GetDictUID - the dictionary a footnote's thread belongs to
+#include "ITextStoryThreadDict.h"	// GetAnchorTextRange - where that footnote's reference stands
 
 // General includes:
 #include "ParcelKey.h"			// ParcelKey::IsValid
@@ -73,6 +75,24 @@ namespace
 		}
 		return false;
 	}
+
+	// One step out of a thread that hangs from a character of its parent - a footnote, whose reference character
+	// stands in the text it belongs to - to that character's position: where its dictionary is anchored
+	// (ITextStoryThreadDict::GetAnchorTextRange, as SnpManipulateTextModel.cpp:648 asks it). pos itself when
+	// the thread hangs from nothing: the primary thread's dictionary and an unanchored one say so through
+	// wasAnchored (ITextStoryThreadDict.h:51-61), and then there is nowhere further out to go.
+	TextIndex AnchorOfThread(ITextModel* textModel, IDataBase* db, TextIndex pos)
+	{
+		InterfacePtr<ITextStoryThread> thread(textModel->QueryStoryThread(pos, nil, nil));
+		if (thread == nil)
+			return pos;
+		InterfacePtr<ITextStoryThreadDict> dict(db, thread->GetDictUID(), UseDefaultIID());
+		if (dict == nil)
+			return pos;
+		bool16 anchored = kFalse;
+		const Text::StoryRange anchor = dict->GetAnchorTextRange(&anchored);
+		return anchored ? anchor.Start(nil) : pos;
+	}
 }
 
 KBSOversetLoc KBSFindOversetLocator(const UIDRef& storyRef, TextIndex pos)
@@ -93,18 +113,22 @@ KBSOversetLoc KBSFindOversetLocator(const UIDRef& storyRef, TextIndex pos)
 		return loc;
 	}
 
-	// Nothing placed in this thread: if it is inside a table, the table (or the row holding this
-	// cell) is pushed out of a parent frame, so the cell itself is gone and the "+" lives on an
-	// ancestor thread. Climb the table-anchor chain out of any nested tables until an ancestor has a
-	// placed parcel - ultimately the main frame's "+". Guarded against non-progress / deep nesting.
+	// Nothing placed in this thread: the "+" lives on an ancestor thread. Inside a table, the table (or
+	// the row holding this cell) is pushed out of a parent frame, so the cell itself is gone; inside a
+	// FOOTNOTE, its reference character is overset, so the footnote was never placed at all (2026-10-02,
+	// the block 8 re-read B8-1 - this climbed out of tables only, and an overset footnote's match had no
+	// "+" to name: no page on its row, no frame for the lock test, so the replace could write where the
+	// body text beside it was refused). Climb out - the table anchor, or the footnote's reference - until
+	// an ancestor has a placed parcel: ultimately the main frame's "+". Guarded against non-progress /
+	// deep nesting.
 	TextIndex cur = pos;
 	for (int32 guard = 0; guard < 32; ++guard)
 	{
-		if (!Utils<ITableUtils>()->InsideTable(textModel, cur))
-			break;
-		const TextIndex up = Utils<ITableUtils>()->TableToPrimaryTextIndex(textModel, cur);
+		const TextIndex up = Utils<ITableUtils>()->InsideTable(textModel, cur)
+			? Utils<ITableUtils>()->TableToPrimaryTextIndex(textModel, cur)
+			: AnchorOfThread(textModel, db, cur);
 		if (up == cur)
-			break;	// no progress
+			break;	// no progress - nothing further out
 		cur = up;
 		if (LocateInThread(textModel, db, cur, loc.frameUID, loc.outportPb))
 		{

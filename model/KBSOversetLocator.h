@@ -18,8 +18,9 @@
 //      the row gets a check box and whether the replace refuses it.
 //
 //  When the position's own thread has nothing placed (a table or one of its rows is pushed out of
-//  its frame, so the cell itself is gone), the walk climbs the table-anchor chain out of any nested
-//  tables until an ancestor thread IS placed - ultimately the main frame's "+".
+//  its frame, so the cell itself is gone; a footnote whose reference character is overset, so it was
+//  never placed - 2026-10-02, B8-1), the walk climbs out - the table's anchor, the footnote's
+//  reference - through any nesting until an ancestor thread IS placed: ultimately the main frame's "+".
 //
 //========================================================================================
 #ifndef __KBSOversetLocator_h__

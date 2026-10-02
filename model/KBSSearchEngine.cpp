@@ -1168,16 +1168,18 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // document) - the scope the replace's walks take a story at a time.
 //
 // searchScope (2026-10-02, the API re-audit S-1 - the user: "KBS uses the official Find/Change's settings as
-// they are, so follow the official way as far as it goes"): a Search: value - Document, All Documents,
-// Story, To End of Story, Selection - and the walk is the one Edit > Find/Change itself would walk for it,
-// from the current selection: InDesign builds the scope (QueryWalkerScope_UsingSelections, called exactly as
-// SnpFindAndReplace.cpp:774 calls it, with the dialog's five switches as spellpanel passes its options), so
-// the range is the dialog's by construction rather than KBS's reading of it. docRef is not used then: the
-// hits are filed by the document each one's story is in (outHitDBs, one per hit), and every open document
-// gets the dirty guard, since an All Documents walk can compose in any of them. (Story / To End of Story /
-// Selection took this path from 2026-09-29; Document walked the active document through
-// QueryDocumentWalkerScope, and All Documents each open document the same way, until 2026-10-02.)
-// kEmptyScope (the default) = docRef / onlyStory: a book's chapter, or one story.
+// they are, so follow the official way as far as it goes"): a Search: value, and the walk is the one
+// Edit > Find/Change itself would walk for it, from the current selection: InDesign builds the scope
+// (QueryWalkerScope_UsingSelections, called exactly as SnpFindAndReplace.cpp:774 calls it, with the dialog's
+// five switches as spellpanel passes its options), so the range is the dialog's by construction rather than
+// KBS's reading of it. docRef is not used then: the hits are filed by the document each one's story is in
+// (outHitDBs, one per hit), and every open document gets the dirty guard. ! Such a walk STARTS at the
+// selection and loops back (IWalkerScopeFactoryUtils.h:169-171), so SearchBook asks it only where the
+// selection decides the range - To End of Story, Selection, and which story a Story search is in - and walks
+// the rest from the top (the block 8 re-read B8-3: Document and All Documents took this path from the
+// morning's ca9dd9b to the evening of 2026-10-02, and their rows came in the caret's order).
+// kEmptyScope (the default) = docRef / onlyStory: a document, a book's chapter, or one story - from the top.
+// outHitDBs is filled on either path.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KBSResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
@@ -2437,6 +2439,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// ***** THE COMMIT POINT. ***** Past this line the run owns the panel: the old results are gone
 	// whatever happens next - and the book and the format they were found with go with them (the format
 	// is remembered again a few lines below; DropResults is one rule with no exceptions to remember).
+	//
+	// ***** THE CHAPTERS THE OLD RESULTS HELD GO NOW, NOT ON A SCHEDULE (2026-10-02, the block 8 re-read
+	// ***** B8-2). ***** DropResults hands them back with kSchedule - it is called from notifications too -
+	// and a scheduled close runs only once this run is over. Until then such a chapter is still open but no
+	// longer held, so the All Documents list below took it for a document of the user's: it was walked,
+	// listed, and its rows went a moment after the search when the close went through. Closed here, before
+	// anything is listed, in the context the book loop below closes its own chapters in. A chapter with
+	// unsaved work, or one with a window, is not closed - ReleaseHeldDoc's verdicts, unchanged.
+	KBSBookScope::ReleaseHeldDocs(true /*close now*/);
 	KBSSearchEngine::DropResults();
 
 	std::vector<KBSBookScope::ChapterDoc> targets;
@@ -2467,9 +2478,10 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// this does. Each is a "chapter" of the run - its rows kept apart from the others' - but none is ours
 		// to open or close: no file is recorded (a chapter with no file is found again by its docRef, as the
 		// Document search's always has been), and a chapter KBS holds open from a BOOK search is left out -
-		// it is not a document the user opened. Since 2026-10-02 they are not walked one by one: the dialog's
-		// own All Documents scope is walked ONCE and each match filed under its document (the walk below);
-		// this list is what the matches are filed under, in this order, and the T of "M of T document(s)".
+		// it is not a document the user opened. Each is walked from the top by the document form, in this order
+		// (the walk below; the dialog's own All Documents scope was walked once instead from the morning of
+		// 2026-10-02 to the evening, and started at the caret - B8-3), and this list is what the matches are
+		// filed under, and the T of "M of T document(s)".
 		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
 		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
 		for (int32 d = 0; d < docCount; ++d)
@@ -2667,20 +2679,29 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		KBSResultModel::AppendChapter(std::move(chapter));
 	};
 
-	// ***** BOOK SCOPE OFF: ONE WALK OF THE DIALOG'S OWN SCOPE (2026-10-02, the API re-audit S-1 - the user:
-	// ***** "KBS uses the official Find/Change's settings as they are, so follow the official way as far as it
-	// ***** goes"). ***** Whatever Search: says - Document, All Documents, Story, To End of Story, Selection - the
-	// walk is the scope Edit > Find/Change builds for it (QueryWalkerScope_UsingSelections, as
-	// SnpFindAndReplace.cpp:774 calls it; CollectHitsInDoc's searchScope), walked once, and every match is filed
-	// under the document its story is in, in the order of `targets`. Until then Document walked the active
-	// document by the document form, and All Documents each open document by it, one by one.
-	// A match in a document `targets` does not hold - the scope walking somewhere KBS did not expect, never
-	// seen - gets a chapter of its own after them; one in a chapter KBS holds from a book search is left out,
-	// as `targets` leaves it out. One step for the bar: the walk is sized by every target's stories.
+	// ***** BOOK SCOPE OFF: THE RANGE IS THE DIALOG'S, THE ORDER IS FROM THE TOP (2026-10-02). *****
+	// The RANGE is whatever Search: says - Document, All Documents, Story, To End of Story, Selection - the way
+	// Edit > Find/Change reads it (the API re-audit S-1 - the user: "KBS uses the official Find/Change's settings
+	// as they are, so follow the official way as far as it goes").
+	//
+	// ***** THE ORDER IS FROM THE TOP, WHEREVER THE CARET IS (the block 8 re-read B8-3, the user's call A). *****
+	// The dialog's own scope, given a selection, starts AT it and loops back to the head
+	// (IWalkerScopeFactoryUtils.h:169-171) - Find Next's order, one match at a time from where the user stands.
+	// A list keeps its walk's order within a page (FinalizeHits), so walking that scope numbered the lower
+	// story's match P1(1) whenever the caret stood in it (sc-selection-caret, sc-show-ignores-scope - from the
+	// morning's ca9dd9b, which walked every Search: value that way, to the evening). Where the selection decides
+	// only where a walk STARTS, the walk now starts at the top:
+	//   Document         the active document, by the document form - its range does not depend on the selection;
+	//   All Documents    each open document by it in turn, in `targets`' order - each one a walk of its own, named
+	//                    on its own in the summary's notes (as before the morning);
+	//   Story            the dialog's own Story scope is asked WHICH story - its first match answers, since every
+	//                    match of a Story walk is in that story - and that story is walked by the story form;
+	//   To End of Story, Selection   the dialog's own scope: both run forward from the selection, no loop back.
+	// Every match is filed under the document its story is in, in the order of `targets`. A match in a document
+	// `targets` does not hold - the scope walking somewhere KBS did not expect, never seen - gets a chapter of its
+	// own after them; one in a chapter KBS holds from a book search is left out, as `targets` leaves it out.
 	if (!fromBook)
 	{
-		const IWalkerScopeFactoryUtils::WalkScopeType walkScope =
-			allDocuments ? IWalkerScopeFactoryUtils::kAllDocumentScope : selectionScope;
 		if (allDocuments)
 		{
 			PMString taskLine("All Documents - ");
@@ -2693,74 +2714,139 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			KBSSetChapterTask(progressBar, "Document", 0, 1, targets[0].shortName);
 		KBSAdvanceProgress(&progressBar, progressReported, 0, true /*force*/);
 
-		if (progressBar.WasCancelled(kFalse))
-			cancelled = true;
-		else
+		// What a walk that did not end cleanly owes the summary, named for what was walked: one that broke off
+		// keeps its hits (they are real, and filed below), one that never ran is named with its reason.
+		auto noteWalk = [&](const PMString& walkName, ChapterWalkResult walkResult)
 		{
-			int32 storiesTotal = 0;
-			for (size_t t = 0; t < targets.size(); ++t)
-				storiesTotal += CountSearchableStories(targets[t].docRef);
-			if (storiesTotal < 1)
-				storiesTotal = 1;
-
-			std::vector<KBSResultModel::Hit> hits;
-			std::vector<IDataBase*> hitDBs;
-			bool capped = false;
-			ChapterWalkResult walkResult = kChapterWalked;
-			CollectHitsInDoc(UIDRef::gNull, static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit), scopeOptions,
-				kHitEverything, hits, capped, walkResult, &progressBar, 0, progressTotal, storiesTotal,
-				progressReported, UIDRef::gNull, walkScope, &hitDBs);
-			KBSAdvanceProgress(&progressBar, progressReported, progressTotal, true /*force*/);
-			if (capped)
-				collectionTruncated = true;
-
-			PMString walkName(allDocuments ? PMString("All open documents") : targets[0].shortName);
-			walkName.SetTranslatable(kFalse);
-			if (walkResult == kChapterCancelled)
-				cancelled = true;
-			else if (walkResult == kChapterWalkFailed)
-				brokeOff.push_back(walkName);		// its hits are real and are filed below
-			else if (walkResult != kChapterWalked)
+			PMString name(walkName);
+			name.SetTranslatable(kFalse);
+			if (walkResult == kChapterWalkFailed)
+				brokeOff.push_back(name);
+			else if (walkResult != kChapterWalked && walkResult != kChapterCancelled)
 			{
-				PMString entry(walkName);
 				const PMString why(ChapterWalkResultText(walkResult));
 				if (!why.IsEmpty())
 				{
-					entry.Append(": ");
-					entry.Append(why);
+					name.Append(": ");
+					name.Append(why);
 				}
-				entry.SetTranslatable(kFalse);
-				unsearchable.push_back(entry);
+				unsearchable.push_back(name);
 			}
+		};
 
-			if (!cancelled)
+		// One list for every walk below, in walk order, each hit with the database it was found in. The ceiling
+		// is the whole search's: CollectHitsInDoc counts what the list already holds.
+		std::vector<KBSResultModel::Hit> hits;
+		std::vector<IDataBase*> hitDBs;
+		const size_t limit = static_cast<size_t>(KBSResultModel::kKBSCollectHitLimit);
+		if (progressBar.WasCancelled(kFalse))
+			cancelled = true;
+		else if (allDocuments)
+		{
+			// A slice of the bar per document, the way the book's chapters share it.
+			for (size_t t = 0; t < targets.size(); ++t)
 			{
-				std::vector<std::vector<KBSResultModel::Hit> > perTarget(targets.size());
-				for (size_t k = 0; k < hits.size() && k < hitDBs.size(); ++k)
+				const int32 base = static_cast<int32>(t) * kKBSChapterProgressSpan;
+				KBSSetChapterTask(progressBar, "Document", t, targets.size(), targets[t].shortName);
+				KBSAdvanceProgress(&progressBar, progressReported, base, true /*force*/);
+				if (t > 0 && progressBar.WasCancelled(kFalse))
 				{
-					IDataBase* const db = hitDBs[k];
-					size_t t = 0;
-					while (t < targets.size() && targets[t].docRef.GetDataBase() != db)
-						++t;
-					if (t == targets.size())
-					{
-						const UIDRef docRef(db, (db != nil) ? db->GetRootUID() : kInvalidUID);
-						InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
-						if (doc == nil || KBSBookScope::IsHeldDoc(docRef))
-							continue;
-						targets.push_back(KBSBookScope::DocAsChapter(doc));
-						perTarget.push_back(std::vector<KBSResultModel::Hit>());
-					}
-					perTarget[t].push_back(std::move(hits[k]));
+					cancelled = true;
+					break;
 				}
-				for (size_t t = 0; t < targets.size(); ++t)
+				int32 storiesInDoc = CountSearchableStories(targets[t].docRef);
+				if (storiesInDoc < 1)
+					storiesInDoc = 1;
+				bool capped = false;
+				ChapterWalkResult walkResult = kChapterWalked;
+				CollectHitsInDoc(targets[t].docRef, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
+					&progressBar, base, kKBSChapterProgressSpan, storiesInDoc, progressReported, UIDRef::gNull,
+					IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
+				if (walkResult == kChapterCancelled)
 				{
-					if (perTarget[t].empty())
+					cancelled = true;
+					break;
+				}
+				noteWalk(targets[t].shortName, walkResult);
+				if (capped)
+				{
+					collectionTruncated = true;		// the list is full: the documents after this one are not walked
+					break;
+				}
+			}
+		}
+		else
+		{
+			int32 storiesTotal = CountSearchableStories(targets[0].docRef);
+			if (storiesTotal < 1)
+				storiesTotal = 1;
+			bool capped = false;
+			ChapterWalkResult walkResult = kChapterWalked;
+			if (selectionScope == IWalkerScopeFactoryUtils::kDocumentScope)
+			{
+				CollectHitsInDoc(targets[0].docRef, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
+					&progressBar, 0, progressTotal, storiesTotal, progressReported, UIDRef::gNull,
+					IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
+			}
+			else if (selectionScope == IWalkerScopeFactoryUtils::kStoryScope)
+			{
+				// Which story: the dialog's own Story scope, to its first match. No match = nothing to list.
+				std::vector<KBSResultModel::Hit> first;
+				std::vector<IDataBase*> firstDBs;
+				bool firstCapped = false;
+				int32 noBar = 0;
+				CollectHitsInDoc(UIDRef::gNull, 1, scopeOptions, kHitPlaceAndText, first, firstCapped, walkResult,
+					nil, 0, 0, 1, noBar, UIDRef::gNull, IWalkerScopeFactoryUtils::kStoryScope, &firstDBs);
+				IDataBase* const storyDB = (!first.empty() && !firstDBs.empty()) ? firstDBs[0] : nil;
+				if (walkResult == kChapterWalked && storyDB != nil)
+				{
+					CollectHitsInDoc(UIDRef(storyDB, storyDB->GetRootUID()), limit, scopeOptions, kHitEverything, hits,
+						capped, walkResult, &progressBar, 0, progressTotal, storiesTotal, progressReported,
+						UIDRef(storyDB, first[0].storyUID), IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
+				}
+			}
+			else
+			{
+				CollectHitsInDoc(UIDRef::gNull, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
+					&progressBar, 0, progressTotal, storiesTotal, progressReported, UIDRef::gNull, selectionScope,
+					&hitDBs);
+			}
+			if (capped)
+				collectionTruncated = true;
+			if (walkResult == kChapterCancelled)
+				cancelled = true;
+			else
+				noteWalk(targets[0].shortName, walkResult);
+		}
+		KBSAdvanceProgress(&progressBar, progressReported, progressTotal, true /*force*/);
+
+		if (!cancelled)
+		{
+			std::vector<std::vector<KBSResultModel::Hit> > perTarget(targets.size());
+			for (size_t k = 0; k < hits.size() && k < hitDBs.size(); ++k)
+			{
+				IDataBase* const db = hitDBs[k];
+				size_t t = 0;
+				while (t < targets.size() && targets[t].docRef.GetDataBase() != db)
+					++t;
+				if (t == targets.size())
+				{
+					const UIDRef docRef(db, (db != nil) ? db->GetRootUID() : kInvalidUID);
+					InterfacePtr<IDocument> doc(docRef, UseDefaultIID());
+					if (doc == nil || KBSBookScope::IsHeldDoc(docRef))
 						continue;
-					std::map<UID, uint32> storyVersions;
-					readStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
-					fileChapter(targets[t], perTarget[t], storyVersions);
+					targets.push_back(KBSBookScope::DocAsChapter(doc));
+					perTarget.push_back(std::vector<KBSResultModel::Hit>());
 				}
+				perTarget[t].push_back(std::move(hits[k]));
+			}
+			for (size_t t = 0; t < targets.size(); ++t)
+			{
+				if (perTarget[t].empty())
+					continue;
+				std::map<UID, uint32> storyVersions;
+				readStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
+				fileChapter(targets[t], perTarget[t], storyVersions);
 			}
 		}
 	}

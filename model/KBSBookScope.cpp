@@ -46,6 +46,7 @@
 
 // Project includes:
 #include "KBSBookScope.h"
+#include "KBSDiag.h"			// KBS_DIAG_FAULT / KBS_DIAG_LOG - a test build's fault switch (compiled out of a shipping one)
 #include "IKBSUIServices.h"		// the windows and the Book panel are the UI half's (2026-10-01)
 
 namespace
@@ -325,7 +326,7 @@ bool KBSBookScope::HasWindow(const UIDRef& docRef)
 	return IsDocStillOpen(docRef) && DocHasAnyWindow(docRef);
 }
 
-void KBSBookScope::ReleaseHeldDocs()
+void KBSBookScope::ReleaseHeldDocs(bool closeNow)
 {
 	// NOTE: the searched-book path is NOT cleared here. Closing the chapters says nothing about
 	// which book the panel is showing - and since every run closes its chapters as it goes, doing
@@ -337,11 +338,12 @@ void KBSBookScope::ReleaseHeldDocs()
 	// only one of them was covered", as a note in that one said of the error-state guard. Every verdict
 	// is that function's: no longer open = dropped, a window = dropped and left to the user, unsaved work
 	// or a refused close = kept on the list for a later call, otherwise closed (kSchedule - this runs
-	// from notifications). A copy is walked, because ReleaseHeldDoc edits the list; a chapter a
-	// re-entrant call has already handed back is no longer on it and answers false here.
+	// from notifications - unless the caller asks for closeNow, see the header). A copy is walked, because
+	// ReleaseHeldDoc edits the list; a chapter a re-entrant call has already handed back is no longer on it
+	// and answers false here.
 	const K2Vector<UIDRef> held = gHeldDocs;
 	for (int32 i = 0; i < static_cast<int32>(held.size()); ++i)
-		(void)ReleaseHeldDoc(held[i]);
+		(void)ReleaseHeldDoc(held[i], closeNow);
 }
 
 bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
@@ -364,6 +366,16 @@ bool KBSBookScope::IsHeldDoc(const UIDRef& docRef)
 bool KBSBookScope::HandBackHeldDocNow(const UIDRef& docRef)
 {
 	const bool wasOurs = IsHeldDoc(docRef);
+#ifdef KBS_DIAG
+	// Test builds only: the fault switch keep-held (KBSDiag.h) leaves a chapter of ours held, clean and
+	// windowless after its run - the state a window that would not open leaves behind (2026-10-02, B8-2's
+	// case held-chapter-alldocs). Answered as handed back, so the run's summary says nothing about it.
+	if (wasOurs && KBS_DIAG_FAULT("keep-held"))
+	{
+		KBS_DIAG_LOG("FAULT keep-held: doc=%p uid=%u stays held", (void*)docRef.GetDataBase(), docRef.GetUID().Get());
+		return true;
+	}
+#endif
 	return ReleaseHeldDoc(docRef, true /*close now*/) || !wasOurs || !IsDocStillOpen(docRef);
 }
 
