@@ -297,8 +297,8 @@ DECLARE_PMID(kActionIDSpace, kKBSRunAcceptActionID, kKFCUIPrefix + 43)
 // The first number past the split: + 44 was never spent at kKBSPrefix either.
 DECLARE_PMID(kActionIDSpace, kKBSOpenFindChangeActionID, kKFCUIPrefix + 44)
 // "Link the Application Bar's Search Field to This Panel" on the flyout (2026-10-02, the user's design): a
-// check-mark toggle. ON = Return in the search field of InDesign's application bar searches with this panel (the
-// field's text as a Text search). OFF by default. See KBSAppBarSearchEnter.h.
+// check-mark toggle. ON = the search field of InDesign's application bar shows Find/Change's query, and Return in
+// it searches with this panel (2026-10-03). OFF by default. See KBSAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKBSAppBarSearchEnterActionID, kKFCUIPrefix + 45)
 
 

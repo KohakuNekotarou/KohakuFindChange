@@ -293,9 +293,9 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				"Minimizable Find/Change", ": on - applies when the Find/Change dialog is open.");
 			break;
 
-		// "Link the Application Bar's Search Field to This Panel" (2026-10-02, the user's design): Return in
-		// the search field of InDesign's application bar searches with this panel - on the Text tab while the
-		// field's triangle is on Adobe Stock, on the GREP tab while it is on Adobe Help (2026-10-03).
+		// "Link the Application Bar's Search Field to This Panel" (2026-10-02, the user's design): the search
+		// field of InDesign's application bar shows the query of the tab Find/Change is on, and Return in it
+		// searches with this panel (2026-10-03; the triangle no longer chooses the tab).
 		// *Windows only, OFF by default.
 		// Everything - what was measured, the hook, why that field's own menu could not take an item - is in
 		// KBSAppBarSearchEnter.h.

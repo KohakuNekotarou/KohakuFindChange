@@ -211,9 +211,10 @@ namespace KBSSearchEngine
 	bool CanSearchTab(int32 mode);
 
 	/** Put `text` into Edit > Find/Change on the tab `mode` names - IFindChangeOptions::kTextSearch or
-	    kGrepSearch, nothing else: that tab made current, and its Find what set to `text`. For "Search the
-	    Application Bar's Text with This Panel (Enter)" (2026-10-02, the user's design; the Text tab whatever tab
-	    was on - and since 2026-10-03, the user's call, the GREP tab when the field's triangle is on Adobe Help).
+	    kGrepSearch, nothing else: that tab made current, and its Find what set to `text`. For "Link the
+	    Application Bar's Search Field to This Panel" (2026-10-02, the user's design): Return in that field on the
+	    Text or GREP tab, with text that differs from the tab's (2026-10-03 - the tab is the one the dialog is on;
+	    the field's triangle no longer chooses it).
 	    Through the dialog's own commands, kFindSearchModeCmdBoss and kFindStringCmdBoss, in the shape
 	    SnpFindAndReplace gives them (ProcessFindChangeCommandInt32 / ProcessFindChangeCommandString) - so the
 	    dialog shows what will be searched, and the search that follows reads it like any other. The other
