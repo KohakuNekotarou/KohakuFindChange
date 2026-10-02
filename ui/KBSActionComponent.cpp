@@ -42,7 +42,7 @@
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
-#include "KBSAppBarSearchEnter.h"	// "Search the Application Bar's Text with This Panel (Enter)"
+#include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel"
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 
@@ -293,7 +293,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				"Minimizable Find/Change", ": on - applies when the Find/Change dialog is open.");
 			break;
 
-		// "Search the Application Bar's Text with This Panel (Enter)" (2026-10-02, the user's design): Return in
+		// "Link the Application Bar's Search Field to This Panel" (2026-10-02, the user's design): Return in
 		// the search field of InDesign's application bar searches with this panel - on the Text tab while the
 		// field's triangle is on Adobe Stock, on the GREP tab while it is on Adobe Help (2026-10-03).
 		// *Windows only, OFF by default.
@@ -301,7 +301,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// KBSAppBarSearchEnter.h.
 		case kKBSAppBarSearchEnterActionID:
 			FlipAppearanceToggle(KBSGetAppBarSearchEnter, KBSSetAppBarSearchEnter, KBSApplyAppBarSearchEnter,
-				"Application Bar search (Enter)", ": on - works while the Application Bar's search field is shown.");
+				"Application Bar link", ": on - works while the Application Bar's search field is shown.");
 			break;
 
 		// "Remember Book Panel Placement": InDesign's own Book panel is measured as it closes (and

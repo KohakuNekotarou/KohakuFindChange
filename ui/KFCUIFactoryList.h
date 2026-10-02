@@ -53,6 +53,9 @@ REGISTER_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)
 // service boss's two halves (KBSBookPanelPlacement.cpp). A boss in the .fr naming an implementation
 // that is not registered here takes InDesign down at load time.
 REGISTER_PMINTERFACE(KBSBookPanelObserver, kKBSBookPanelObserverImpl)
+// "Link the Application Bar's Search Field to This Panel" (2026-10-03): the observer on kActiveContextBoss that
+// makes the field follow Find/Change (KBSAppBarSearchEnter.cpp).
+REGISTER_PMINTERFACE(KBSAppBarMirrorObserver, kKBSAppBarMirrorObserverImpl)
 REGISTER_PMINTERFACE(KBSBookPanelServiceProvider, kKBSBookPanelServiceProviderImpl)
 REGISTER_PMINTERFACE(KBSBookPanelPaletteMgrService, kKBSBookPanelPaletteMgrServiceImpl)
 REGISTER_PMINTERFACE(KBSBookPanelCmdWatch, kKBSBookPanelCmdWatchImpl)

@@ -353,6 +353,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * "Link the Application Bar's Search Field to This Panel" (2026-10-03): the observer that makes the
+	 * application bar's search field show what Edit > Find/Change holds. On kActiveContextBoss for the same
+	 * reason as the one above; attached to the Find/Change settings while the toggle is ON
+	 * (KBSAppBarSearchEnter.cpp). An AddIn that points at UI code, in this half's resource.
+	 */
+	AddIn
+	{
+		kActiveContextBoss,
+		kInvalidClass,
+		{
+			IID_IKBSAPPBARMIRROROBSERVER, kKBSAppBarMirrorObserverImpl,
+		}
+	},
+
+	/*
 	 * "Remember Book Panel Placement" (2026-09-25): the observer that puts InDesign's own Book panel
 	 * back where it was when it appears (kPaletteVisibilityChangedMessage, on the panel manager's
 	 * subject - the subject the observer above listens to). Measuring it as it closes is the command
@@ -503,7 +518,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSTranslucentFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Search the Application Bar's Text with This Panel (Enter): toggle (check mark). Return in the search
+		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
 		// field of InDesign's application bar searches with this panel. *Windows only. KBSAppBarSearchEnter.h.
 		kKBSAppBarSearchEnterActionID,
 		kKBSTargetMenuPath
@@ -793,11 +808,11 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Search the Application Bar's Text with This Panel (Enter). kCustomEnabling for the check mark, like
+		// Link the Application Bar's Search Field to This Panel. kCustomEnabling for the check mark, like
 		// the toggles beside it. Not greyed out while the field is hidden: the flag is what is being set.
 		kKBSActionComponentBoss,
 		kKBSAppBarSearchEnterActionID,
-		kKBSAppBarSearchEnterMenuKey,	// "Search the Application Bar's Text with This Panel (Enter)" (toggle, check mark)
+		kKBSAppBarSearchEnterMenuKey,	// "Link the Application Bar's Search Field to This Panel" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

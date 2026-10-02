@@ -30,7 +30,7 @@
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
-#include "KBSAppBarSearchEnter.h"	// "Search the Application Bar's Text with This Panel (Enter)": its hook off at the end
+#include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel": its hook off at the end
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSResultTree.h"		// the status line's static PMString

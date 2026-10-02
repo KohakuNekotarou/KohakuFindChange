@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KBS)
 //
-//  "Search the Application Bar's Text with This Panel (Enter)" - the implementation. See
+//  "Link the Application Bar's Search Field to This Panel" - the implementation. See
 //  KBSAppBarSearchEnter.h for what was measured before any of this was written.
 //
 //========================================================================================
@@ -15,16 +15,31 @@
 #include "IActionManager.h"		// PerformAction - this panel's Find, run the way the flyout runs it
 #include "IActiveContext.h"
 #include "IApplication.h"		// QueryActionManager
-#include "IBoolData.h"			// the session's Adobe Stock / Adobe Help choice - TabForTriangle
-#include "IFindChangeOptions.h"	// kTextSearch / kGrepSearch - the tab the query goes to
+#include "IFindChangeOptions.h"	// the dialog's tab and its query - what the field shows, where its text goes
+#include "IObserver.h"
 #include "IPanelMgr.h"			// IsPanelWithWidgetIDShown / ShowPanelByWidgetID - the panel up before it is filled
 #include "ISession.h"
+#include "ISubject.h"			// the Find/Change settings' subject - where their changes arrive
+#include "TextWalkerServiceProviderID.h"	// IID_IFINDCHANGEOPTIONS - the protocol those changes arrive on
+
+// The Glyph tab's query shown as a character (GlyphDescription): its font is two attributes on that tab's list.
+#include "AttributeBossList.h"
+#include "IFontFamily.h"		// QueryFace - the font the glyph id belongs to
+#include "IGlyphUtils.h"		// GetUnicodeForGlyphID
+#include "IPMFont.h"
+#include "ITextAttrFont.h"		// kTextAttrFontStyleBoss's value - the style name
+#include "ITextAttrUID.h"		// kTextAttrFontUIDBoss's value - the font family
+#include "TextAttrID.h"
 
 // The search runs once the key has gone through the loop - never inside the hook (see RunPendingSearch):
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
 #include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
 
 // General includes:
+#include "CObserver.h"
+#include "PreferenceUtils.h"	// QuerySessionPreferences - the Find/Change settings, as the engine reads them
+#include "Utils.h"
+
 #include "PMString.h"
 #include "WideString.h"
 
@@ -88,18 +103,142 @@ static std::wstring FieldText(HWND field)
 	return text;
 }
 
-// Which tab the field's text goes to - the user's call (2026-10-03): the field's triangle on Adobe Stock = the
-// Text tab, on Adobe Help = the GREP tab. That choice is remembered on the session: kSessionBoss's IID_IBOOLDATA,
-// kStockSearchPrefImpl (AppUIID.h) - the only IBoolData on that boss in the 20.5 boss dump.
-// **true = Adobe HELP, false = Adobe Stock - MEASURED (2026-10-03, the user on the live application: one Return
-// on each choice, the panel's tab name showing the tab used). The implementation's name reads the other way;
-// the first build took true for Stock and the user saw both choices reversed. Unreadable = the Text tab.
-static int32 TabForTriangle()
+// ***** THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (2026-10-03, the user's design). *****
+// While the toggle is ON, the field carries the query of the tab the dialog is on - the find string of Text and
+// GREP, the glyph of Glyph, the character type of Transliterate - and follows it as it changes (Object and
+// Colour, which this panel does not search, leave the field alone). Measured in a spike the same day (branch
+// spike/2026-10-03-appbar-mirror): a settings change arrives on IID_IFINDCHANGEOPTIONS for every keystroke in
+// Find what, not only at Done; the field's usual "Adobe Stock" is real text in the Edit (so a cue banner shows
+// only while the field is focused and empty), and WM_SETTEXT shows at once; InDesign puts its own text back when
+// a menu is used, which the user accepted - the next change writes ours again.
+// (The day's first design took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - and
+//  was dropped once the field showed the dialog's own query. What it measured stays in the note:
+//  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
+
+static std::wstring WideOf(const PMString& s)
 {
-	InterfacePtr<IBoolData> stockSearch(GetExecutionContextSession(), IID_IBOOLDATA);
-	if (stockSearch != nil && stockSearch->Get())
-		return IFindChangeOptions::kGrepSearch;
-	return IFindChangeOptions::kTextSearch;
+	int32 units = 0;
+	const UTF16TextChar* buf = s.GrabUTF16Buffer(&units);
+	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
+}
+
+static std::wstring WideOf(const WideString& s)
+{
+	int32 units = 0;
+	const UTF16TextChar* buf = s.GrabUTF16Buffer(&units);
+	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
+}
+
+static void AppendCodePoint(std::wstring& out, UTF32TextChar c)
+{
+	const uint32 v = c.GetValue();
+	if (v >= 0x10000)
+	{
+		out += static_cast<wchar_t>(0xD800 + ((v - 0x10000) >> 10));
+		out += static_cast<wchar_t>(0xDC00 + ((v - 0x10000) & 0x3FF));
+	}
+	else
+		out += static_cast<wchar_t>(v);
+}
+
+// The Glyph tab's query as the field can show it: the character the glyph stands for (when the font says),
+// then the glyph id and the font - "<char> (GID 8123, Kozuka Mincho Pr6N R)". The font is the two attributes the
+// dialog keeps on that tab's list, kTextAttrFontUIDBoss (the family) and kTextAttrFontStyleBoss (the style),
+// read the way SnpInsertGlyph.cpp reads them off text.
+static std::wstring GlyphDescription(const IFindChangeOptions* opts)
+{
+	const Text::GlyphID gid = opts->GetFindGlyphID();
+	if (gid == kInvalidGlyphID)
+		return std::wstring();
+	std::wstring character, font;
+	IDataBase* const db = opts->GetUIDAttrDB();
+	const AttributeBossList* list = (db != nil) ? opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch) : nil;
+	if (list != nil)
+	{
+		InterfacePtr<const ITextAttrUID> familyAttr(
+			static_cast<const ITextAttrUID*>(list->QueryByClassID(kTextAttrFontUIDBoss, IID_ITEXTATTRUID)));
+		InterfacePtr<const ITextAttrFont> styleAttr(
+			static_cast<const ITextAttrFont*>(list->QueryByClassID(kTextAttrFontStyleBoss, IID_ITEXTATTRFONT)));
+		InterfacePtr<IFontFamily> family(familyAttr != nil ? db : nil, familyAttr != nil ? familyAttr->Get() : kInvalidUID, UseDefaultIID());
+		if (family != nil)
+		{
+			const PMString style = (styleAttr != nil) ? styleAttr->GetFontName() : PMString();
+			font = WideOf(family->GetDisplayFamilyName());
+			if (!style.empty())
+				font += L" " + WideOf(style);
+			InterfacePtr<IPMFont> face(family->QueryFace(style));
+			Utils<IGlyphUtils> glyphUtils;
+			if (face != nil && glyphUtils)
+			{
+				const UTF32TextChar c = glyphUtils->GetUnicodeForGlyphID(face, gid);
+				if (c.GetValue() != 0)
+					AppendCodePoint(character, c);
+			}
+		}
+	}
+	std::wstring out = character.empty() ? std::wstring() : character + L" ";
+	out += L"(GID " + std::to_wstring(static_cast<int32>(gid));
+	if (!font.empty())
+		out += L", " + font;
+	out += L")";
+	return out;
+}
+
+// The Transliterate tab's query - the character type it finds - in the words KBS uses everywhere: English.
+static std::wstring CharacterTypeName(IFindChangeOptions::CharacterType type)
+{
+	switch (type)
+	{
+		case IFindChangeOptions::kKanji:				return L"Kanji";
+		case IFindChangeOptions::kHalfWidthKatakana:	return L"Half-width Katakana";
+		case IFindChangeOptions::kHalfWidthRoman:		return L"Half-width Roman";
+		case IFindChangeOptions::kFullWidthHiragana:	return L"Full-width Hiragana";
+		case IFindChangeOptions::kFullWidthKatakana:	return L"Full-width Katakana";
+		case IFindChangeOptions::kFullWidthRoman:		return L"Full-width Roman";
+		case IFindChangeOptions::kWesternArabicDigits:	return L"Western Arabic Digits";
+		case IFindChangeOptions::kArabicIndicDigits:	return L"Arabic-Indic Digits";
+		case IFindChangeOptions::kFarsiDigits:			return L"Farsi Digits";
+		default:										return std::wstring();
+	}
+}
+
+struct KBSAppBarFieldSearch { HWND found; };
+static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp);
+static BOOL CALLBACK FindMainFrame(HWND w, LPARAM lp);
+
+static HWND AppBarField()
+{
+	HWND main = nullptr;
+	::EnumWindows(FindMainFrame, reinterpret_cast<LPARAM>(&main));
+	KBSAppBarFieldSearch s = { nullptr };
+	if (main != nullptr)
+		::EnumChildWindows(main, FindAppBarField, reinterpret_cast<LPARAM>(&s));
+	return s.found;
+}
+
+// Write the dialog's query into the field. Only what changed is written: an unchanged write would still move
+// the caret of a field the user is in.
+static void MirrorFindChangeIntoField()
+{
+	if (sShutdown || !sAppBarSearchEnter)
+		return;
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+		return;
+	std::wstring text;
+	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
+	switch (mode)
+	{
+		case IFindChangeOptions::kTextSearch:
+		case IFindChangeOptions::kGrepSearch:			text = WideOf(opts->GetFindString(mode)); break;
+		case IFindChangeOptions::kGlyphSearch:			text = GlyphDescription(opts); break;
+		case IFindChangeOptions::kTransliterateSearch:	text = CharacterTypeName(opts->GetFindCharacterType()); break;
+		default:										return;		// Object, Colour: not this panel's
+	}
+	const HWND field = AppBarField();
+	if (field == nullptr || FieldText(field) == text)
+		return;
+	::SendMessageW(field, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
 }
 
 // The search, on the main thread at the next idle - once the Return has gone through the message loop. Not in
@@ -117,14 +256,24 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	if (panelMgr != nil && !panelMgr->IsPanelWithWidgetIDShown(kKBSPanelWidgetID))
 		panelMgr->ShowPanelByWidgetID(kKBSPanelWidgetID, kFalse);
 
-	PMString query(WideString(text.c_str(), static_cast<int32>(text.size())));
-	query.SetTranslatable(kFalse);
-	if (!KBSRuns()->SetQuery(query, TabForTriangle()))
+	// The field's text goes into the dialog only on the Text and GREP tabs, and only when it differs from what that
+	// tab already holds (the field shows that, so an untouched field changes nothing). On every other tab the
+	// field's text is ignored and the dialog's own query is searched as it stands - the user's call (2026-10-03).
+	// Object and Colour are refused by the search itself, with its own words on the status line.
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	const IFindChangeOptions::SearchMode mode = (opts != nil) ? opts->GetSearchMode() : IFindChangeOptions::kTextSearch;
+	if ((mode == IFindChangeOptions::kTextSearch || mode == IFindChangeOptions::kGrepSearch)
+		&& (opts == nil || WideOf(opts->GetFindString(mode)) != text))
 	{
-		PMString msg("The Application Bar's text could not be put into Find/Change - nothing was searched.");
-		msg.SetTranslatable(kFalse);
-		KBSResultTree::ShowStatus(msg);
-		return IIdleTask::kEndOfTime;
+		PMString query(WideString(text.c_str(), static_cast<int32>(text.size())));
+		query.SetTranslatable(kFalse);
+		if (!KBSRuns()->SetQuery(query, mode))
+		{
+			PMString msg("The Application Bar's text could not be put into Find/Change - nothing was searched.");
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+			return IIdleTask::kEndOfTime;
+		}
 	}
 
 	// This panel's Find, run as the flyout runs it - the same action, so the same doors, the same progress
@@ -179,8 +328,6 @@ static void UnhookAppBar()
 	}
 }
 
-struct KBSAppBarFieldSearch { HWND found; };
-
 static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp)
 {
 	if (IsAppBarSearchField(w))
@@ -205,6 +352,49 @@ static BOOL CALLBACK FindMainFrame(HWND w, LPARAM lp)
 
 #endif	// WINDOWS
 
+// The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID
+// (KFCUI.fr), as the panel-visibility and Book-panel observers are: that boss carries observers that are not
+// ours, and it is there for the whole session - this one is attached while the toggle is ON, panel or no panel.
+class KBSAppBarMirrorObserver : public CObserver
+{
+public:
+	KBSAppBarMirrorObserver(IPMUnknown* boss) : CObserver(boss, IID_IKBSAPPBARMIRROROBSERVER) {}
+	virtual ~KBSAppBarMirrorObserver() {}
+
+	virtual void Update(const ClassID& /*theChange*/, ISubject* /*theSubject*/, const PMIID& protocol, void* /*changedBy*/)
+	{
+#ifdef WINDOWS
+		if (protocol == IID_IFINDCHANGEOPTIONS)
+			MirrorFindChangeIntoField();
+#else
+		(void)protocol;
+#endif
+	}
+};
+
+CREATE_PMINTERFACE(KBSAppBarMirrorObserver, kKBSAppBarMirrorObserverImpl)
+
+// Attach (or detach) that observer to the Find/Change settings - the subject KBSPanelTitle's tab name listens
+// to, on the same protocol. Nothing when the session is gone (teardown).
+static void AttachMirrorObserver(bool attach)
+{
+	ISession* const session = GetExecutionContextSession();
+	IActiveContext* const ctx = (session != nil) ? session->GetActiveContext() : nil;
+	if (ctx == nil)
+		return;
+	InterfacePtr<IObserver> obs(static_cast<IObserver*>(ctx->QueryInterface(IID_IKBSAPPBARMIRROROBSERVER)));
+	InterfacePtr<IFindChangeOptions> settings(QuerySessionPreferences<IFindChangeOptions>());
+	InterfacePtr<ISubject> subject(settings, UseDefaultIID());
+	if (obs == nil || subject == nil)
+		return;
+	const bool attached = subject->IsAttached(ISubject::kRegularAttachment, obs, IID_IFINDCHANGEOPTIONS,
+		IID_IKBSAPPBARMIRROROBSERVER) != kFalse;
+	if (attach && !attached)
+		subject->AttachObserver(ISubject::kRegularAttachment, obs, IID_IFINDCHANGEOPTIONS, IID_IKBSAPPBARMIRROROBSERVER);
+	else if (!attach && attached)
+		subject->DetachObserver(ISubject::kRegularAttachment, obs, IID_IFINDCHANGEOPTIONS, IID_IKBSAPPBARMIRROROBSERVER);
+}
+
 bool16 KBSGetAppBarSearchEnter()
 {
 	return sAppBarSearchEnter;
@@ -223,6 +413,11 @@ void KBSSetAppBarSearchEnter(bool16 on)
 		if (sRunTimer != nil)
 			sRunTimer->StopTimer();
 	}
+	// The field follows the dialog while ON - and shows its query at once, not only at the next change.
+	if (!sShutdown)
+		AttachMirrorObserver(on != kFalse);
+	if (on)
+		MirrorFindChangeIntoField();
 #endif
 }
 
@@ -246,8 +441,10 @@ bool16 KBSApplyAppBarSearchEnter()
 void KBSShutdownAppBarSearchEnter()
 {
 #ifdef WINDOWS
-	// Order: nothing new from now on, then the hook off, then the booking stopped and the timer let go.
+	// Order: nothing new from now on, then the observer and the hook off, then the booking stopped and the timer
+	// let go.
 	sShutdown = true;
+	AttachMirrorObserver(false);
 	UnhookAppBar();
 	sPendingText.clear();
 	if (sRunTimer != nil)

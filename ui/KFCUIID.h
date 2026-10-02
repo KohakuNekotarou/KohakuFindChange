@@ -101,6 +101,10 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKPANELOBSERVER, kKFCUIPrefix + 8)
 // What the panel's message area draws, split where its colour changes (2026-09-29, IKBSStatusTextData.h).
 // (+ 9, not + 3: + 3 ... + 7 are the split plan's - see above.)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTATUSTEXTDATA, kKFCUIPrefix + 9)
+// The observer that makes the application bar's search field show what Edit > Find/Change holds (2026-10-03,
+// KBSAppBarSearchEnter.cpp). Its own IID for the reason the two observers above have one: an AddIn onto
+// kActiveContextBoss.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSAPPBARMIRROROBSERVER, kKFCUIPrefix + 10)
 
 
 // ImplementationIDs:
@@ -156,6 +160,9 @@ DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextViewImpl, kKFCUIPrefix + 36)
 DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKFCUIPrefix + 37)
 // RETIRED 2026-10-01 (not reused): the action filter's implementation - see kKFCUIPrefix + 21 in the class ids.
 //DECLARE_PMID(kImplementationIDSpace, kKBSFindChangeAnywhereImpl, kKFCUIPrefix + 39)
+// The application bar's search field following Find/Change (2026-10-03, KBSAppBarSearchEnter.cpp). (+ 40: the
+// next number after the retired + 39.)
+DECLARE_PMID(kImplementationIDSpace, kKBSAppBarMirrorObserverImpl, kKFCUIPrefix + 40)
 
 
 // ActionIDs:
@@ -289,7 +296,7 @@ DECLARE_PMID(kActionIDSpace, kKBSRunAcceptActionID, kKFCUIPrefix + 43)
 // opened from the panel - with no document open too. Shortcut-assignable (the user's call, the same day).
 // The first number past the split: + 44 was never spent at kKBSPrefix either.
 DECLARE_PMID(kActionIDSpace, kKBSOpenFindChangeActionID, kKFCUIPrefix + 44)
-// "Search the Application Bar's Text with This Panel (Enter)" on the flyout (2026-10-02, the user's design): a
+// "Link the Application Bar's Search Field to This Panel" on the flyout (2026-10-02, the user's design): a
 // check-mark toggle. ON = Return in the search field of InDesign's application bar searches with this panel (the
 // field's text as a Text search). OFF by default. See KBSAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKBSAppBarSearchEnterActionID, kKFCUIPrefix + 45)
@@ -388,7 +395,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSMinimizableFindChangeMenuKey	kKBSStringPrefix "kKBSMinimizableFindChangeMenuKey"
 // "Remember Book Panel Placement": InDesign's own Book panel comes back where it was closed.
 #define kKBSRememberBookPanelMenuKey	kKBSStringPrefix "kKBSRememberBookPanelMenuKey"
-// "Search the Application Bar's Text with This Panel (Enter)": Return in the application bar's search field searches here.
+// "Link the Application Bar's Search Field to This Panel": Return in the application bar's search field searches here.
 #define kKBSAppBarSearchEnterMenuKey	kKBSStringPrefix "kKBSAppBarSearchEnterMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
