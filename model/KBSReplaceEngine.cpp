@@ -1668,9 +1668,11 @@ void TellResultsWentStale(int32 chapterIdx)
 	// warning icon and the untouched document are all checked by
 	// work/kbs-selftest/run-stale-alert-shot.ps1.
 	//
-	// ***** SHOWN BY THE UI HALF SINCE 2026-10-01 (the model/UI split). ***** An alert is a user-interface
-	// component, which the guide keeps out of a model plug-in (vol1-06, "UI component content"); the
-	// wording and the moment stay here, and IKBSUIServices::WarningAlert is this same CAlert::WarningAlert.
+	// ***** SHOWN BY THE UI HALF SINCE 2026-10-01 (the model/UI split). ***** Not a link matter - CAlert is
+	// PUBLIC_DECL, and Adobe's own model plug-in incopyfileactions calls it - but KBS counts an alert among
+	// the dialogs the guide lists as user-interface components (vol1-06, "UI component content"): the user's
+	// call (IKBSUIServices.h says more). The wording and the moment stay here, and
+	// IKBSUIServices::WarningAlert is this same CAlert::WarningAlert.
 	// No UI (a background thread, InDesign Server) = no alert, and the run stops all the same - the
 	// NEVER_INTERACT case described above.
 	InterfacePtr<IKBSUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
@@ -2169,8 +2171,9 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// note there for why the run cannot carry a single bar across both.
 	//
 	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters, between
-	// the STORIES of a chapter (ReplaceInChapterOneByOne - a story's walk holds the walker's critical
-	// section, so it is not asked inside one), and once more when the loop ends. A Cancel pressed
+	// the STORIES of a chapter (ReplaceInChapterOneByOne - not inside a story's walk: a choice, not a
+	// constraint of the walker's critical section, inside which the bar is already moved and so pumped -
+	// KBSSearchEngine's note on that section), and once more when the loop ends. A Cancel pressed
 	// during a story is heard when that story is done; the whole sequence is then aborted and every
 	// character put back. (The stories were Change All's from 2026-09-26 to 2026-09-27, one command
 	// each; before that, the one-at-a-time walk ran a chapter at a time and was asked between chapters.)

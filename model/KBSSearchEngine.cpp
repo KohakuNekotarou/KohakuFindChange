@@ -1301,9 +1301,13 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// (AcquireKeyFocus + SelectRange on an edit box). Entering and leaving it per match would run
 	// that dance thousands of times in one search.
 	//
-	// The price of holding it: UI work must not be pumped inside it, which is why the progress bar's
-	// cancel is only asked between chapters (see SearchBook). Do not "correct" this to the one-command
-	// shape without measuring both. (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
+	// What holding it does NOT keep out: the progress bar's SetPosition pumps the event queue - that is what
+	// lets the Cancel button take a click at all (KBSAdvanceProgress; KIDMCP measured the same on 2026-08-28)
+	// - and the walk below moves the bar every few matches, inside this section, as it always has. (This note
+	// said UI work must not be pumped inside it and that this was why Cancel is asked between chapters only;
+	// the walk has pumped through it from the start. WHEN Cancel is asked is a choice, not a constraint of
+	// this section - 2026-10-02, the API re-audit.) Do not "correct" this to the one-command shape without
+	// measuring both. (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
 	//
 	// ***** THE REST OF THIS INTERFACE IS DELIBERATELY LEFT ALONE. ***** It also carries
 	// InitTextWalkerTerminator / TerminateTextWalkerTerminator, which spellpanel DOES call
@@ -1404,9 +1408,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		UIDRef story = cmdData->GetRange(start, end);
 
 		// Move the bar. A story we have not seen before means the one before it is finished; within a
-		// story, the position is how far into its text this match sits. Safe inside the walker's
-		// critical section: this only repaints, unlike WasCancelled, which pumps events and is
-		// therefore asked between chapters only.
+		// story, the position is how far into its text this match sits. This pumps the event queue, inside
+		// the walker's critical section - which is how a click on Cancel is taken at all; WasCancelled only
+		// reads the flag that click sets, and is asked between chapters (see the note on the section above).
 		if (progressBar != nil)
 		{
 			if (story.GetUID() != progressStory)
