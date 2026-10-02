@@ -29,7 +29,7 @@
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "ICommand.h"
 #include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CommitSearchMode
-#include "IStringData.h"			// kFindStringCmdBoss's string - SetTextQuery
+#include "IStringData.h"			// kFindStringCmdBoss's string - SetQuery
 #include "IBoolData.h"				// kFindChangeGlyphIDCmdBoss: which side of the glyph search is being set
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
@@ -3232,11 +3232,13 @@ const char* KBSSearchEngine::FindCommandName(bool bookScopeOn)
 	}
 }
 
-bool KBSSearchEngine::SetTextQuery(const PMString& text)
+bool KBSSearchEngine::SetQuery(const PMString& text, int32 mode)
 {
+	// The Text and GREP tabs only - the two whose Find what is a plain string.
+	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+		return false;
 	// The tab first, then the string - the snippet's order (Do_FindText states the mode before the find string).
-	if (!CommitFindChangeInt(kFindSearchModeCmdBoss, static_cast<int32>(IFindChangeOptions::kTextSearch),
-		static_cast<int32>(IFindChangeOptions::kTextSearch)))
+	if (!CommitFindChangeInt(kFindSearchModeCmdBoss, mode, mode))
 		return false;
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindStringCmdBoss));
 	if (cmd == nil)
@@ -3246,7 +3248,7 @@ bool KBSSearchEngine::SetTextQuery(const PMString& text)
 	if (value == nil || modeData == nil)
 		return false;
 	value->Set(text);
-	modeData->Set(static_cast<int32>(IFindChangeOptions::kTextSearch));
+	modeData->Set(mode);
 	return ProcessFindChangeCmd(cmd);
 }
 

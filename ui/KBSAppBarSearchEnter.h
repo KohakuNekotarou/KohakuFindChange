@@ -7,8 +7,9 @@
 //  "Search the Application Bar's Text with This Panel (Enter)" - the flyout toggle (2026-10-02, the user's
 //  design): while it is ON, Return in the search field of InDesign's APPLICATION BAR (the one with the
 //  Adobe Stock / Adobe Help triangle) searches with this panel instead - the field's text put into
-//  Edit > Find/Change as a Text search (KBSSearchEngine::SetTextQuery: the Text tab, its Find what), and
-//  this panel's Find run on it. OFF by default; OFF = the field is not touched at all.
+//  Edit > Find/Change (KBSSearchEngine::SetQuery: the tab made current, its Find what set), and this panel's
+//  Find run on it. The tab follows the triangle (2026-10-03, the user's call): Adobe Stock = the Text tab,
+//  Adobe Help = the GREP tab. OFF by default; OFF = the field is not touched at all.
 //
 //  *Windows only. On Mac the calls below exist and do nothing.
 //

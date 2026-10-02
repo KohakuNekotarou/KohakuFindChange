@@ -210,14 +210,16 @@ namespace KBSSearchEngine
 	    cannot disagree. */
 	bool CanSearchTab(int32 mode);
 
-	/** Put `text` into Edit > Find/Change as a TEXT search: the Text tab made current, and its Find what set
-	    to `text` (2026-10-02, "Search the Application Bar's Text with This Panel (Enter)" - the user's call:
-	    the Text tab, whatever tab was on). Through the dialog's own commands, kFindSearchModeCmdBoss and
-	    kFindStringCmdBoss, in the shape SnpFindAndReplace gives them (ProcessFindChangeCommandInt32 /
-	    ProcessFindChangeCommandString) - so the dialog shows what will be searched, and the search that
-	    follows reads it like any other. The other settings (switches, Find Format, Search:) are the
-	    user's and are left as they are. False = a command failed; nothing should be searched then. */
-	bool SetTextQuery(const PMString& text);
+	/** Put `text` into Edit > Find/Change on the tab `mode` names - IFindChangeOptions::kTextSearch or
+	    kGrepSearch, nothing else: that tab made current, and its Find what set to `text`. For "Search the
+	    Application Bar's Text with This Panel (Enter)" (2026-10-02, the user's design; the Text tab whatever tab
+	    was on - and since 2026-10-03, the user's call, the GREP tab when the field's triangle is on Adobe Help).
+	    Through the dialog's own commands, kFindSearchModeCmdBoss and kFindStringCmdBoss, in the shape
+	    SnpFindAndReplace gives them (ProcessFindChangeCommandInt32 / ProcessFindChangeCommandString) - so the
+	    dialog shows what will be searched, and the search that follows reads it like any other. The other
+	    settings (switches, Find Format, Search:) are the user's and are left as they are. False = another
+	    tab asked for, or a command failed; nothing should be searched then. */
+	bool SetQuery(const PMString& text, int32 mode);
 
 	// (CharacterTypeName, HasFindFormatSet / HasChangeFormatSet, DescribeFormatSetting and
 	// DescribeCurrentChange - the captions the replace prompt and the saved report printed - were

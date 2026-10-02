@@ -130,8 +130,9 @@ public:
 	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KBSReplaceEngine::StoryChangesHidden. */
 	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) = 0;
-	/** = KBSSearchEngine::SetTextQuery (2026-10-02, appended at the end like the two above). */
-	virtual bool SetTextQuery(const PMString& text) = 0;
+	/** = KBSSearchEngine::SetQuery (2026-10-02, appended at the end like the two above; given its mode on
+	    2026-10-03, before any build of it had shipped). */
+	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
 };
 
 #endif // __IKBSRuns_h__

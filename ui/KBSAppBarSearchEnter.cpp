@@ -15,6 +15,8 @@
 #include "IActionManager.h"		// PerformAction - this panel's Find, run the way the flyout runs it
 #include "IActiveContext.h"
 #include "IApplication.h"		// QueryActionManager
+#include "IBoolData.h"			// the session's Adobe Stock / Adobe Help choice - TabForTriangle
+#include "IFindChangeOptions.h"	// kTextSearch / kGrepSearch - the tab the query goes to
 #include "IPanelMgr.h"			// IsPanelWithWidgetIDShown / ShowPanelByWidgetID - the panel up before it is filled
 #include "ISession.h"
 
@@ -29,7 +31,7 @@
 // Project includes:
 #include "KBSAppBarSearchEnter.h"
 #include "KBSBookPanelLookup.h"	// QueryPanelManager
-#include "KBSModelAccess.h"		// KBSRuns()->SetTextQuery - the Find/Change settings are the model half's
+#include "KBSModelAccess.h"		// KBSRuns()->SetQuery - the Find/Change settings are the model half's
 #include "KBSResultTree.h"		// ShowStatus - a query that could not be set is said
 #include "KFCUIID.h"			// kKBSSearchBookActionID, kKBSPanelWidgetID
 
@@ -86,6 +88,20 @@ static std::wstring FieldText(HWND field)
 	return text;
 }
 
+// Which tab the field's text goes to - the user's call (2026-10-03): the field's triangle on Adobe Stock = the
+// Text tab, on Adobe Help = the GREP tab. That choice is remembered on the session: kSessionBoss's IID_IBOOLDATA,
+// kStockSearchPrefImpl (AppUIID.h) - the only IBoolData on that boss in the 20.5 boss dump.
+// **true = Adobe HELP, false = Adobe Stock - MEASURED (2026-10-03, the user on the live application: one Return
+// on each choice, the panel's tab name showing the tab used). The implementation's name reads the other way;
+// the first build took true for Stock and the user saw both choices reversed. Unreadable = the Text tab.
+static int32 TabForTriangle()
+{
+	InterfacePtr<IBoolData> stockSearch(GetExecutionContextSession(), IID_IBOOLDATA);
+	if (stockSearch != nil && stockSearch->Get())
+		return IFindChangeOptions::kGrepSearch;
+	return IFindChangeOptions::kTextSearch;
+}
+
 // The search, on the main thread at the next idle - once the Return has gone through the message loop. Not in
 // the hook: a search puts up a modal progress bar and processes commands, and a hook procedure is the middle
 // of somebody else's GetMessage.
@@ -103,7 +119,7 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 
 	PMString query(WideString(text.c_str(), static_cast<int32>(text.size())));
 	query.SetTranslatable(kFalse);
-	if (!KBSRuns()->SetTextQuery(query))
+	if (!KBSRuns()->SetQuery(query, TabForTriangle()))
 	{
 		PMString msg("The Application Bar's text could not be put into Find/Change - nothing was searched.");
 		msg.SetTranslatable(kFalse);

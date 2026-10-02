@@ -141,7 +141,7 @@ public:
 	virtual void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed) { KBSTrackChange::CurrentReplacedGroup(chapterIdx, hitIdx, outRows, outRefreshed); }
 	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) { return KBSTrackChange::RowChangeIsHidden(chapterIdx, hitIdx); }
 	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) { return KBSReplaceEngine::StoryChangesHidden(chapterIdx, groupIdx); }
-	virtual bool SetTextQuery(const PMString& text) { return KBSSearchEngine::SetTextQuery(text); }
+	virtual bool SetQuery(const PMString& text, int32 mode) { return KBSSearchEngine::SetQuery(text, mode); }
 };
 
 CREATE_PMINTERFACE(KBSRunsSession, kKBSRunsImpl)
