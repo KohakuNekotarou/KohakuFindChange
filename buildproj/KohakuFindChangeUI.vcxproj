@@ -227,6 +227,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSMarkerExpiryIdleTask.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSModelObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelAlpha.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarMenuSpike.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelIcon.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelMetrics.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelState.cpp"/>

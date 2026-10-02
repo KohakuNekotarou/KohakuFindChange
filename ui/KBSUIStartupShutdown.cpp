@@ -35,6 +35,10 @@
 #include "KBSResultTree.h"		// the status line's static PMString
 #include "KBSModelObserver.h"	// the UI half's ear on the model half (2026-10-01)
 
+// SPIKE (branch spike/2026-10-02-appbar-menu only): the application bar menu probe - KBSAppBarMenuSpike.cpp
+void KBSAppBarMenuSpikeStart();
+void KBSAppBarMenuSpikeStop();
+
 /** Implements IStartupShutdownService for the UI half. */
 class KBSUIStartupShutdown : public CPMUnknown<IStartupShutdownService>
 {
@@ -57,6 +61,7 @@ public:
 		KBSAttachPanelVisibilityObserver();
 		// The UI half's ear on the model half's notifications (2026-10-01, the model/UI split).
 		KBSModelObserverAttach();
+		KBSAppBarMenuSpikeStart();	// SPIKE
 	}
 
 	/** Put the panel tab's name back, retire the marker idle task (it must leave the queue, and never
@@ -66,6 +71,7 @@ public:
 		// The tab name first, while the UI is still standing: a tab renamed with the current scope
 		// must not be what a saved workspace remembers.
 		KBSPanelTitle::Restore();
+		KBSAppBarMenuSpikeStop();	// SPIKE
 		// Symmetric with the attach in Startup: while attached the session holds a pointer into this .pln.
 		KBSModelObserverDetach();
 		// Stop listening before tearing anything down: while attached, the panel manager and the
