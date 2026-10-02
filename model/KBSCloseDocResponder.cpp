@@ -58,6 +58,7 @@
 
 // Project includes:
 #include "KBSBookScope.h"		// ForgetHeldDoc
+#include "KBSDiag.h"			// KBS_DIAG_LOG - which way a close went, in a test build (compiled out of a shipping one)
 #include "KBSHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KBSID.h"
 #include "KBSResultModel.h"
@@ -108,6 +109,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	const UIDRef closingDocRef = signalData->GetDocument();
 	if (closingDocRef == UIDRef::gNull)
 		return;
+	KBS_DIAG_LOG("CLOSE doc=%p uid=%u", (void*)closingDocRef.GetDataBase(), closingDocRef.GetUID().Get());
 
 	// ***** THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. ***** Until
 	// 2026-08-09 nothing took a held chapter off gHeldDocs when someone ELSE closed it (the user,
@@ -136,11 +138,17 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// results up when it finishes, so nothing stale survives being skipped here. Same rule as the
 	// book-close watcher's, asked the same way (KBSRunGuard).
 	if (KBSRunGuard::IsAnyRunning())
+	{
+		KBS_DIAG_LOG("CLOSE - a run of ours is up: the results are left to it");
 		return;
+	}
 
 	// Book results survive a chapter closing - see the file header.
 	if (KBSResultModel::IsFromBook())
+	{
+		KBS_DIAG_LOG("CLOSE - book results: they stay");
 		return;
+	}
 
 	// Nothing on display, nothing to retire. This signal fires for every document close in the
 	// session, so past the held-list bookkeeping above it leaves as early as it can.
@@ -164,7 +172,10 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		}
 	}
 	if (closingChapter < 0)
+	{
+		KBS_DIAG_LOG("CLOSE - not a document of the list");
 		return;
+	}
 
 	// ***** ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (2026-09-29, the user's call). ***** The list is the
 	// open documents', and the others are still open - their rows, their ticks, their Undo stay. The chapter
@@ -177,6 +188,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		PMString closedName;
 		int32 closedCount = 0;
 		KBSResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
+		KBS_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KBSUndoFollow::ForgetDocument(closingDocRef);
 		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
 		// draws; under it, only that row goes and the others stay as they are (open or closed).
@@ -199,6 +211,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// DropResults, without exception: a document-scope result set has no book behind it, so its
 	// ReleaseSearchedBook finds nothing to do every time it runs here - it is one rule with no
 	// exceptions to remember.
+	KBS_DIAG_LOG("CLOSE - chapter %d was the list's last: the results are dropped", closingChapter);
 	KBSSearchEngine::DropResults();
 	KBSNotifyRebuild();
 

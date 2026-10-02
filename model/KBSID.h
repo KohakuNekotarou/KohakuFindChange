@@ -85,6 +85,10 @@ DECLARE_PMID(kClassIDSpace, kKBSHitMarkerBoss, kKBSPrefix + 17)
 // Signs the tracked changes one replace made - "KohakuFindChange" at the row's time (2026-09-28,
 // KBSSignRecordsCmd.cpp / KBSTrackChange.h).
 DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
+// The mark every write of KBS's own leaves in its undo step (2026-10-02, S-1, KBSUndoFollow.cpp): a command that
+// changes nothing and raises a ModelChange on its document's subject, so the panel hears that step's Undo and
+// Redo through an observer on the document. (+ 22: + 19 ... + 21 went to the UI half at the split.)
+DECLARE_PMID(kClassIDSpace, kKBSUndoMarkCmdBoss, kKBSPrefix + 22)
 
 
 // InterfaceIDs:
@@ -93,10 +97,15 @@ DECLARE_PMID(kClassIDSpace, kKBSSignRecordsCmdBoss, kKBSPrefix + 18)
 // The session-attached observer that retires a book-scope result set when its book closes. Its own
 // IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKBSBOOKWATCH, kKBSPrefix + 1)
-// The lazy observer AddIn'd on kTextStoryBoss that lets the panel follow an Undo and a Redo of KBS's own
-// writes (2026-09-29, KBSUndoFollow.cpp). Its own IID because kTextStoryBoss carries other people's
-// IID_IOBSERVER. (+ 10, not + 3: + 3 ... + 7 are the split plan's - see above.)
-DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTORYUNDOOBSERVER, kKBSPrefix + 10)
+// RETIRED 2026-10-02 (not reused): the lazy observer AddIn'd on kTextStoryBoss that let the panel follow an
+// Undo and a Redo (2026-09-29). A story InDesign purged from memory came back without it (S-1: the second
+// document's Ctrl+Z went unheard 12 times in 18) - the observer rides on the document now (+ 11, + 12).
+//DECLARE_PMID(kInterfaceIDSpace, IID_IKBSSTORYUNDOOBSERVER, kKBSPrefix + 10)
+// The panel follows an Undo and a Redo (2026-10-02, KBSUndoFollow.cpp): the lazy observer AddIn'd on kDocBoss -
+// its own IID, because kDocBoss carries other people's IID_IOBSERVER - and the protocol the mark of a KBS write
+// (kKBSUndoMarkCmdBoss) raises its ModelChange under.
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSDOCUNDOOBSERVER, kKBSPrefix + 11)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKBSUNDOMARK, kKBSPrefix + 12)
 
 
 // ImplementationIDs:
@@ -138,9 +147,13 @@ DECLARE_PMID(kImplementationIDSpace, kKBSHitMarkerAdornmentImpl, kKBSPrefix + 33
 // The replace's signature (2026-09-28, KBSSignRecordsCmd.cpp). (+ 34 onwards, not + 23: see the note above.)
 DECLARE_PMID(kImplementationIDSpace, kKBSSignRecordsCmdImpl, kKBSPrefix + 34)	// ICommand of kKBSSignRecordsCmdBoss
 DECLARE_PMID(kImplementationIDSpace, kKBSInt64DataImpl, kKBSPrefix + 35)		// IInt64Data, a command's plain one (the SDK ships only kPersistInt64DataImpl - KBSSignRecordsCmd.cpp)
-// The panel follows an Undo and a Redo (2026-09-29, KBSUndoFollow.cpp): the lazy observer on each story a
-// write of KBS's own moved.
-DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
+// RETIRED 2026-10-02 (not reused): the lazy observer on each story a write of KBS's own moved (2026-09-29) -
+// see IID_IKBSSTORYUNDOOBSERVER above for why it went.
+//DECLARE_PMID(kImplementationIDSpace, kKBSStoryUndoObserverImpl, kKBSPrefix + 38)
+// The panel follows an Undo and a Redo (2026-10-02, KBSUndoFollow.cpp): the mark command, and the lazy observer
+// on the document that hears it. (+ 40: + 39 went to the UI half at the split.)
+DECLARE_PMID(kImplementationIDSpace, kKBSUndoMarkCmdImpl, kKBSPrefix + 40)
+DECLARE_PMID(kImplementationIDSpace, kKBSDocUndoObserverImpl, kKBSPrefix + 41)
 
 
 // StringKeys - the model half's (KBS_enUS.fr): the replace's own alert and what Edit > Undo calls a

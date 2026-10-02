@@ -51,6 +51,7 @@
 
 // Project includes:
 #include "KBSReplaceEngine.h"
+#include "KBSDiag.h"			// KBS_DIAG_LOG - why a write was refused, in a test build (compiled out of a shipping one)
 #include "KBSID.h"				// the string keys the stale-results alert and the Undo step are worded from
 #include "KBSLoc.h"				// runtime Japanese - the jaJP string table is gone (2026-08-05)
 #include "KBSResultModel.h"
@@ -809,8 +810,11 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 bool StoryAsKBSLeftIt(int32 chapterIdx, IDataBase* db, UID story)
 {
 	uint32 recorded = 0, now = 0;
-	return KBSResultModel::GetStoryVersion(chapterIdx, story, recorded)
-		&& KBSSearchEngine::ReadStoryVersion(db, story, now) && recorded == now;
+	const bool had = KBSResultModel::GetStoryVersion(chapterIdx, story, recorded);
+	const bool read = had && KBSSearchEngine::ReadStoryVersion(db, story, now);
+	KBS_DIAG_LOG("DOOR version chapter=%d story=%u recorded=%s%u now=%s%u -> %s", chapterIdx, story.Get(),
+		had ? "" : "none:", recorded, read ? "" : "unread:", now, (read && recorded == now) ? "as left" : "MOVED");
+	return read && recorded == now;
 }
 
 // Of `stories`, the ones at the version KBS last recorded - asked BEFORE a change of KBS's own, so that
@@ -1203,18 +1207,26 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 		uint64 hash = 0;
 		if (!KBSResultModel::GetHitMatchIdentity(chapterIdx, i, story, start, end, hash)
 			|| story == kInvalidUID || !db->IsValidUID(story))
+		{
+			KBS_DIAG_LOG("DOOR moved chapter=%d row=%d - its identity cannot be read (story=%u)", chapterIdx, i, story.Get());
 			return true;
+		}
 		std::map<UID, bool>::const_iterator known = storyAsLeft.find(story);
 		const bool asLeft = (known != storyAsLeft.end())
 			? known->second : (storyAsLeft[story] = StoryAsKBSLeftIt(chapterIdx, db, story));
 		if (!asLeft)
 		{
+			KBS_DIAG_LOG("DOOR moved chapter=%d row=%d - its story %u is not at the version on record", chapterIdx, i, story.Get());
 			if (outWhy != nil)
 				*outWhy = kMovedStory;
 			return true;
 		}
 		if (!KBSSearchEngine::RowReadsAsFound(chapterIdx, i, db))
+		{
+			KBS_DIAG_LOG("DOOR moved chapter=%d row=%d - its text at [%d,%d) is not what was found", chapterIdx, i,
+				(int)start, (int)end);
 			return true;
+		}
 		++waiting[story][std::make_pair(start, end)];
 		++waitingInStory[story];
 	}
@@ -2452,6 +2464,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		totals.cancelled = true;
 	}
 
+	// ***** THE MARK (2026-10-02, S-1): in every chapter a replacement landed in, inside this sequence, so the
+	// ***** run's Undo and Redo are heard on its documents (KBSUndoFollow::MarkWrite). ***** After the error
+	// state was read above, and a mark that fails puts it back as it found it: the run is never decided by it.
+	if (!totals.cancelled)
+		for (size_t pi = 0; pi < pending.size(); ++pi)
+			if (pending[pi].tookReplacement)
+				KBSUndoFollow::MarkWrite(pending[pi].docRef.GetDataBase());
+
 	if (totals.cancelled)
 		CmdUtils::AbortCommandSequence(seq);
 	else
@@ -2857,6 +2877,8 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
 			replaced, missing, locked, refused, endnoteLeft, accepted, walkFailed, cancelled, failed, whyNot, &rowsToReplace);
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
+		if (ok)
+			KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
 		EndPlainSequence(sequence, ok);
 	}
 	if (!ok)
@@ -3273,6 +3295,8 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 			}
 		}
 	}
+	if (ok)
+		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
 	EndPlainSequence(sequence, ok);
 	if (!ok)
 	{
@@ -3468,6 +3492,8 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	int32 left = 0;
 	std::set<uint64> acceptedTimes;		// the rows carrying one were accepted (re-check R-4)
 	const int32 accepted = KBSTrackChange::AcceptSignedInDocument(db, left, why, &acceptedTimes);
+	if (accepted >= 0)
+		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
 	EndPlainSequence(sequence, accepted >= 0);
 	if (accepted < 0)
 	{
@@ -3626,6 +3652,8 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 			KBSTrackChange::CollectRecordsOfTimes(storyRef, s->second, recs);	// what is left - normally none
 		}
 	}
+	if (ok)
+		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
 	EndPlainSequence(sequence, ok);
 	if (!ok)
 	{

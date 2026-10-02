@@ -33,9 +33,10 @@ REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 // The replace's signature (2026-09-28): the command and its 64-bit data (KBSSignRecordsCmd.cpp).
 REGISTER_PMINTERFACE(KBSSignRecordsCmd, kKBSSignRecordsCmdImpl)
 REGISTER_PMINTERFACE(KBSInt64Data, kKBSInt64DataImpl)
-// The panel follows an Undo and a Redo (2026-09-29): the lazy observer AddIn'd on kTextStoryBoss
-// (KBSUndoFollow.cpp).
-REGISTER_PMINTERFACE(KBSStoryUndoObserver, kKBSStoryUndoObserverImpl)
+// The panel follows an Undo and a Redo (KBSUndoFollow.cpp): the mark a write leaves, and the lazy observer
+// AddIn'd on kDocBoss that hears it (2026-10-02 - on kTextStoryBoss from 2026-09-29 until then).
+REGISTER_PMINTERFACE(KBSUndoMarkCmd, kKBSUndoMarkCmdImpl)
+REGISTER_PMINTERFACE(KBSDocUndoObserver, kKBSDocUndoObserverImpl)
 // The model half's three session interfaces (KBSModelServices.cpp).
 REGISTER_PMINTERFACE(KBSResultsSession, kKBSResultsImpl)
 REGISTER_PMINTERFACE(KBSRunsSession, kKBSRunsImpl)

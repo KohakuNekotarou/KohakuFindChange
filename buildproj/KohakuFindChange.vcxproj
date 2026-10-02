@@ -89,7 +89,7 @@
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
          <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
-         <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
          <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -121,7 +121,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
          <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChange.pch</PrecompiledHeaderOutputFile>
@@ -154,7 +154,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
@@ -189,7 +189,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangecpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>

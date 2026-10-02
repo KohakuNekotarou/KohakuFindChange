@@ -180,21 +180,36 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * The panel follows an Undo and a Redo of KBS's own writes (2026-09-29, the user: "after an Undo the
-	 * row cannot be rejected again - the panel should come back with it, the way KCM's does"). A LAZY
-	 * observer on each story a write moved, attached at run time in KBSUndoFollow.cpp (this line only puts
-	 * our IID, and so the implementation, onto the boss) - lazy because that is the only notification an
-	 * Undo and a Redo broadcast. The same AddIn as KCM's Story Edits list (KCM.fr, IID_IKCMSTORYFOLLOWOBSERVER).
-	 * Our own IID: kTextStoryBoss carries other people's IID_IOBSERVER.
-	 * The MODEL half's (2026-10-01, the split's design section 3): it keeps the results true and tells the
-	 * panel only through KBSModelNotify. It answers on the main thread only - a background
-	 * task has neither an Undo nor a panel. It is attached, never written into the document.
+	 * row cannot be rejected again - the panel should come back with it, the way KCM's does").
+	 * ***** ON THE DOCUMENT SINCE 2026-10-02 (S-1). ***** Every write leaves a mark in its undo step
+	 * (kKBSUndoMarkCmdBoss, below): a ModelChange on its document's subject, under IID_IKBSUNDOMARK. This
+	 * LAZY observer hears it on the Do, the Undo and the Redo alike - lazy because that is the only
+	 * notification an Undo and a Redo broadcast (ISubject.h:78-82). KCM's ticks and paws ride the same road
+	 * (KCM.fr, IID_IKCMMARKSOBSERVER). Until then the observer sat on each story a write moved (kTextStoryBoss),
+	 * and a story InDesign purged from memory - it does, switching documents - came back without it: the
+	 * second document's Ctrl+Z went unheard 12 times in 18. A document is not purged while it is open.
+	 * Our own IID: kDocBoss carries other people's IID_IOBSERVER. Attached at run time in KBSUndoFollow.cpp
+	 * (this line only puts our IID, and so the implementation, onto the boss), never written into the
+	 * document. The MODEL half's: it keeps the results true and tells the panel only through
+	 * KBSModelNotify, and answers on the main thread only - a background task has neither an Undo nor a panel.
 	 */
 	AddIn
 	{
-		kTextStoryBoss,
+		kDocBoss,
 		kInvalidClass,
 		{
-			IID_IKBSSTORYUNDOOBSERVER, kKBSStoryUndoObserverImpl,
+			IID_IKBSDOCUNDOOBSERVER, kKBSDocUndoObserverImpl,
+		}
+	},
+
+	/** The mark (2026-10-02, KBSUndoFollow.cpp): processed inside every write of KBS's own, it changes nothing
+		and raises a ModelChange on its document's subject from DoNotify. ItemList: the document's root. */
+	Class
+	{
+		kKBSUndoMarkCmdBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMAND,		kKBSUndoMarkCmdImpl,
 		}
 	},
 

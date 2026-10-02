@@ -21,6 +21,7 @@
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
 // Project includes:
+#include "KBSDiag.h"	// KBS_DIAG_LOG - a row's outcome as it is set, in a test build (compiled out of a shipping one)
 #include "KBSResultModel.h"
 
 namespace
@@ -1508,6 +1509,8 @@ void KBSResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
 void KBSResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
+	KBS_DIAG_LOG("OUTCOME chapter=%d row=%d outcome=%d%s", chapterIdx, hitIdx, (int)outcome,
+		(hp == nil) ? " (no such row)" : (hp->replaced ? " (replaced - not set)" : ""));
 	if (hp == nil)
 		return;
 	Hit& h = *hp;

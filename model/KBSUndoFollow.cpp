@@ -11,23 +11,28 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "ICommand.h"
 #include "IDataBase.h"
 #include "IObserver.h"
 #include "ISubject.h"
 
 // General includes:
+#include "CmdUtils.h"
 #include "CObserver.h"
+#include "Command.h"
+#include "ErrorUtils.h"
 #include "IDFile.h"
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in LazyUpdate
-#include "PersistUtils.h"	// ::GetUIDRef - which story a notification is about
-#include "TextID.h"			// IID_ITEXTMODEL - the protocol InDesign raises a story's change under
+#include "UIDList.h"
 
+#include <algorithm>		// std::find - the documents watched
 #include <set>
 #include <utility>			// std::move - a kept write carries its rows
 
 // Project includes:
 #include "KBSID.h"
 #include "KBSBookScope.h"		// FindOpenChapterDoc - a chapter's document found again by its file
+#include "KBSDiag.h"			// KBS_DIAG_LOG - the test build's trace (compiled out of a shipping build)
 #include "KBSResultModel.h"
 #include "KBSModelNotify.h"		// the panel drawn again, and its message line - told, never called (2026-10-01)
 #include "KBSRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
@@ -213,39 +218,68 @@ bool OlderUndoneSharesDoc(size_t i)
 	return false;
 }
 
-// The stories being watched, so that a closing document's can be let go of (DocumentClosing).
-std::vector<UIDRef> gWatched;
-
-// Watch the story: a lazy observer, under IID_ITEXTMODEL (the header says why lazy).
-// ***** DETACHED WHEN ITS DOCUMENT CLOSES (2026-09-29) - DocumentClosing. ***** Until then this said "NO
-// DETACH, as KCM's has none: a document's stories go with the document". What is attached is taken off -
-// the observer's side of the bargain, whatever becomes of the subject.
-// !WHAT THIS DID NOT FIX, measured the same day: with All Documents (close one document, Ctrl+Z in the
-//  other) about one Undo in ten was never heard in the regression run - no LazyUpdate at all, attachment in
-//  place - with the detach as without it. Waiting 4 s after the Ctrl+Z before the run's next call heard all
-//  of them: a lazy notification comes at idle, and a run that goes straight on (KIDMCP copies the document
-//  around every script) can miss it. A person who presses Ctrl+Z and looks at the panel gives it that idle.
-// !AND WAITING DID NOT COVER IT ALL (2026-10-02, measured): with TWO documents in the list, the Ctrl+Z in the
-//  second one went unheard 12 times in 18 - 4 s of idle after it, and 10 s more, with a script between the
-//  write and its Ctrl+Z and without one, with a Change Checked among the writes and with rows alone; where
-//  the story's version was read, it was back at exactly the one the follow looks for. Every single-document
-//  probe (eight) heard its Ctrl+Z. Not explained yet (docs/ai-notes/kbs-block6-6b-defect-recheck-2026-10-02.md,
-//  S-1).
-void Watch(IDataBase* db, UID story)
+#ifdef KBS_DIAG
+// The test build's picture of every kept write: its stories with the versions it waits for and the one each
+// story has now - what decides a follow, laid out (KBSDiag.h).
+void DiagSteps(const char* when)
 {
-	if (db == nil || story == kInvalidUID)
+	KBS_DIAG_LOG("  STEPS %s n=%u set(now)=%u layout(now)=%u", when, (unsigned)gSteps.size(),
+		KBSResultModel::GetResultSetId(), KBSResultModel::GetLayoutGeneration());
+	for (size_t i = 0; i < gSteps.size(); ++i)
+	{
+		const Step& s = gSteps[i];
+		KBS_DIAG_LOG("    [%u] kind=%d done=%d whole=%d set=%u layout=%u->%u stories=%u", (unsigned)i, (int)s.kind,
+			s.done ? 1 : 0, s.whole ? 1 : 0, s.resultSet, s.layoutBefore, s.layoutAfter, (unsigned)s.stories.size());
+		for (size_t k = 0; k < s.stories.size(); ++k)
+		{
+			const StoryMoved& m = s.stories[k];
+			uint32 v = 0;
+			const bool read = (m.now != nil) && KBSSearchEngine::ReadStoryVersion(m.now, m.story, v);
+			KBS_DIAG_LOG("      now=%p story=%u before=%u after=%u version=%s%u", (void*)m.now, m.story.Get(),
+				m.before, m.after, read ? "" : "?", v);
+		}
+	}
+}
+#define KBS_DIAG_STEPS(when) DiagSteps(when)
+#else
+#define KBS_DIAG_STEPS(when) ((void)0)
+#endif
+
+// ***** WHO TELLS US OF AN UNDO: THE DOCUMENT, NOT THE STORY (2026-10-02, S-1). *****
+// Every write leaves a mark in its own undo step (KBSUndoFollow::MarkWrite - kKBSUndoMarkCmdBoss raises a
+// ModelChange on its document's subject), and a LAZY observer on that subject hears the mark again on the
+// step's Undo and Redo ("At Undo, the runtimes queue up the same message ids that were queued up in Do",
+// LazyNotificationData.h:50-58). KCM's ticks and paws ride the same road (KCMPageMarksCmd.cpp).
+// Until 2026-10-02 the observer sat on each STORY a write moved, under IID_ITEXTMODEL. InDesign purges a story
+// it is not using from memory - switching documents does it - and the story it builds again does not carry the
+// attachment: measured in a test build (KBSDiag.h), the subject of the same story came back as another object
+// and IsAttached said no, and the second document's Ctrl+Z went unheard 12 times in 18. A reference held on
+// the story stopped the purge and every Undo the panel had to follow was followed (5 of 5, in four runs) -
+// which is what proved it - but holding the model's objects is not how the product listens; it watches the
+// document, which is not purged while it is open (the layer, links and timing panels attach their lazy
+// observers to the document's subject).
+// Attached at run time, never written into the document; let go of when the document closes (DocumentClosing).
+std::vector<IDataBase*> gWatchedDocs;	// compared, never dereferenced once their document has closed
+
+void WatchDoc(IDataBase* db)
+{
+	if (db == nil)
 		return;
-	const UIDRef ref(db, story);
-	InterfacePtr<ISubject> subject(ref, UseDefaultIID());
-	// Asked for by OUR IID: kTextStoryBoss carries other people's IID_IOBSERVER (KBS.fr).
-	InterfacePtr<IObserver> observer(ref, IID_IKBSSTORYUNDOOBSERVER);
+	const UID root = db->GetRootUID();
+	if (root == kInvalidUID)
+		return;
+	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
+	// Asked for by OUR IID: kDocBoss carries other people's IID_IOBSERVER (KBS.fr).
+	InterfacePtr<IObserver> observer(db, root, IID_IKBSDOCUNDOOBSERVER);
 	if (subject == nil || observer == nil)
 		return;
-	if (!subject->IsAttached(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER))
+	if (!subject->IsAttached(ISubject::kLazyAttachment, observer, IID_IKBSUNDOMARK, IID_IKBSDOCUNDOOBSERVER))
 	{
-		subject->AttachObserver(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER);
-		gWatched.push_back(ref);
+		subject->AttachObserver(ISubject::kLazyAttachment, observer, IID_IKBSUNDOMARK, IID_IKBSDOCUNDOOBSERVER);
+		KBS_DIAG_LOG("WATCH doc=%p subject=%p observer=%p", (void*)db, (void*)subject.get(), (void*)observer.get());
 	}
+	if (std::find(gWatchedDocs.begin(), gWatchedDocs.end(), db) == gWatchedDocs.end())
+		gWatchedDocs.push_back(db);
 }
 
 // A write's name on the message line - the menu item that made it.
@@ -275,8 +309,7 @@ void KeepStep(Step& step)
 	for (size_t i = gSteps.size(); i-- > 0; )
 		if (!gSteps[i].done && ShareDoc(gSteps[i], step))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
-	for (size_t k = 0; k < step.stories.size(); ++k)
-		Watch(step.stories[k].now, step.stories[k].story);
+	// (Each moved story was watched here until 2026-10-02 - the mark has put the observer on its document.)
 	gSteps.push_back(std::move(step));
 
 	// The limits (see kMaxSteps): the oldest first; past the whole-result-set limit, the oldest of those
@@ -295,18 +328,63 @@ void KeepStep(Step& step)
 		gSteps.erase(gSteps.begin(), gSteps.begin() + static_cast<std::ptrdiff_t>(oldest + 1));
 		--wholeCount;
 	}
+	KBS_DIAG_STEPS("kept");
 }
 
 }	// anonymous namespace
 
 //========================================================================================
-// The observer.
+// The mark a write leaves, and the observer that hears it.
 //========================================================================================
-class KBSStoryUndoObserver : public CObserver
+
+/** kKBSUndoMarkCmdBoss: changes nothing. Its work is DoNotify - the ModelChange its undo step will raise again
+	on an Undo and a Redo. ItemList: the document's root (fItemList is also how the step knows its database). */
+class KBSUndoMarkCmd : public Command
 {
 public:
-	KBSStoryUndoObserver(IPMUnknown* boss) : CObserver(boss, IID_IKBSSTORYUNDOOBSERVER) {}
-	virtual ~KBSStoryUndoObserver() {}
+	KBSUndoMarkCmd(IPMUnknown* boss) : Command(boss) {}
+	virtual ~KBSUndoMarkCmd() {}
+
+protected:
+	/** Deliberately empty: the mark is the notification. */
+	virtual void Do() {}
+	virtual void DoNotify();
+	virtual PMString* CreateName();
+};
+
+CREATE_PMINTERFACE(KBSUndoMarkCmd, kKBSUndoMarkCmdImpl)
+
+void KBSUndoMarkCmd::DoNotify()
+{
+	IDataBase* const db = fItemList.GetDataBase();
+	if (db == nil)
+		return;
+	const UID root = db->GetRootUID();
+	if (root == kInvalidUID)
+		return;
+	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
+	if (subject == nil)
+		return;
+	// A ModelChange, not a Change: only that is replayed on an Undo and a Redo, and only from a subject inside a
+	// database with undo support (ISubject.h:61-82) - the document's own. No lazy data: the observer reads the
+	// story versions again, which is what it does with a nil one anyway (IObserver.h:101-106).
+	subject->ModelChange(kKBSUndoMarkCmdBoss, IID_IKBSUNDOMARK, this);
+}
+
+PMString* KBSUndoMarkCmd::CreateName()
+{
+	// Never on the Edit menu: it runs inside a write's own named sequence, whose name is the step's.
+	PMString* name = new PMString("Kohaku Find/Change");
+	name->SetTranslatable(kFalse);
+	return name;
+}
+
+/** The lazy observer AddIn'd on kDocBoss (KBS.fr): a write of KBS's was done, undone or redone in this document. */
+class KBSDocUndoObserver : public CObserver
+{
+public:
+	KBSDocUndoObserver(IPMUnknown* boss) : CObserver(boss, IID_IKBSDOCUNDOOBSERVER) {}
+	virtual ~KBSDocUndoObserver() {}
 
 	/** Deliberately empty: the work is in LazyUpdate, the only one of the two an Undo and a Redo reach. */
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy) {}
@@ -315,17 +393,39 @@ public:
 		versions say (KBSUndoFollow::Follow). */
 	virtual void LazyUpdate(ISubject* theSubject, const PMIID& protocol, const LazyNotificationData* data)
 	{
-		if (protocol != IID_ITEXTMODEL || theSubject == nil)
+		KBS_DIAG_LOG("LAZY doc subject=%p proto=0x%x data=%p main=%d", (void*)theSubject, protocol.Get(),
+			(const void*)data, IDThreading::IsMainThreadDomain() ? 1 : 0);
+		if (protocol != IID_IKBSUNDOMARK || theSubject == nil)
 			return;
 		// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6): an Undo and a Redo
 		// happen there, and the results it moves are the session's.
 		if (!IDThreading::IsMainThreadDomain())
 			return;
-		(void)KBSUndoFollow::Follow(::GetUIDRef(theSubject).GetUID());
+		(void)KBSUndoFollow::Follow();
 	}
 };
 
-CREATE_PMINTERFACE(KBSStoryUndoObserver, kKBSStoryUndoObserverImpl)
+CREATE_PMINTERFACE(KBSDocUndoObserver, kKBSDocUndoObserverImpl)
+
+void KBSUndoFollow::MarkWrite(IDataBase* db)
+{
+	if (db == nil)
+		return;
+	// The observer first: the step's Undo and Redo are heard by whatever is attached when they happen.
+	WatchDoc(db);
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kKBSUndoMarkCmdBoss));
+	if (cmd == nil)
+		return;
+	cmd->SetItemList(UIDList(db, db->GetRootUID()));
+	// ***** A MARK THAT FAILS MUST NOT TAKE THE WRITE WITH IT. ***** The write's sequence decides by the global
+	// error state as it ends, and the write has already gone through: a mark that could not be processed costs
+	// the panel this step's following, never the user's replace.
+	const ErrorCode before = ErrorUtils::PMGetGlobalErrorCode();
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess && before == kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	KBS_DIAG_LOG("MARK doc=%p err=%d", (void*)db, (int)err);
+}
 
 //========================================================================================
 // Recording.
@@ -391,6 +491,8 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 	}
 	CloseRecording();
 
+	KBS_DIAG_LOG("KEEP kind=%d whole=%d moved=%u set=%u/%u", (int)kind, step.whole ? 1 : 0,
+		(unsigned)step.stories.size(), step.resultSet, KBSResultModel::GetResultSetId());
 	// A write that moved no story has nothing an Undo could take back; one that threw the results away
 	// (a refused Replace clears them - KBSReplaceEngine::RefuseChangedQuery) has no rows left to follow.
 	if (step.stories.empty() || step.resultSet != KBSResultModel::GetResultSetId())
@@ -401,25 +503,20 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 //========================================================================================
 // Following.
 //========================================================================================
-bool KBSUndoFollow::Follow(UID story)
+bool KBSUndoFollow::Follow()
 {
-	// A write of ours is standing (its own notifications arrive as its sequence ends), or a run is up
-	// (a search, a replace or Show Changes pumps events behind its bar - KBSRunGuard counts all three).
+	KBS_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording ? 1 : 0, (unsigned)gSteps.size(),
+		KBSRunGuard::IsAnyRunning() ? 1 : 0);
+	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, a
+	// replace or Show Changes pumps events behind its bar - KBSRunGuard counts all three).
 	if (gRecording || gSteps.empty() || KBSRunGuard::IsAnyRunning())
 		return false;
-	// ***** THE CHEAP QUESTION FIRST: does a kept write name this story? ***** Typing in a watched story
-	// reaches here on every keystroke.
-	if (story != kInvalidUID)
-	{
-		bool named = false;
-		for (size_t i = 0; i < gSteps.size() && !named; ++i)
-			for (size_t k = 0; k < gSteps[i].stories.size() && !named; ++k)
-				named = (gSteps[i].stories[k].story == story);
-		if (!named)
-			return false;
-	}
+	// (A story's notification came here with its UID until 2026-10-02, and a step that named no such story was
+	//  passed over first - the cheap answer to typing, which reached here on every keystroke. Only KBS's own
+	//  writes leave a mark, so nothing but their Undo and Redo comes now.)
 	DropOtherResultSets();
 	ResolveDocs();
+	KBS_DIAG_STEPS("resolved");
 	if (gSteps.empty())
 		return false;
 
@@ -446,6 +543,7 @@ bool KBSUndoFollow::Follow(UID story)
 				if (!gSteps[i].done && !OlderUndoneSharesDoc(i) && AllAt(gSteps[i], true))
 					pick = i;
 		}
+		KBS_DIAG_LOG("  pick=%d undo=%d", (pick == gSteps.size()) ? -1 : (int)pick, undo ? 1 : 0);
 		if (pick == gSteps.size())
 			break;
 		Step& step = gSteps[pick];
@@ -454,6 +552,7 @@ bool KBSUndoFollow::Follow(UID story)
 		// longer be followed, and it is dropped rather than written onto the wrong rows.
 		if (KBSResultModel::GetLayoutGeneration() != (undo ? step.layoutAfter : step.layoutBefore))
 		{
+			KBS_DIAG_LOG("  layout mismatch - dropped %u", (unsigned)pick);
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(pick));
 			continue;
 		}
@@ -471,6 +570,7 @@ bool KBSUndoFollow::Follow(UID story)
 			++redone;
 		lastKind = step.kind;
 	}
+	KBS_DIAG_LOG("  followed undone=%d redone=%d", undone, redone);
 	if (undone + redone == 0)
 		return false;
 
@@ -515,18 +615,18 @@ void KBSUndoFollow::DocumentClosing(const UIDRef& docRef)
 	IDataBase* const db = docRef.GetDataBase();
 	if (db == nil)
 		return;
-	for (size_t i = gWatched.size(); i-- > 0; )
-	{
-		if (gWatched[i].GetDataBase() != db)
-			continue;
-		// The document is still whole at this signal (BeforeCloseDoc), so its stories can be asked.
-		InterfacePtr<ISubject> subject(gWatched[i], UseDefaultIID());
-		InterfacePtr<IObserver> observer(gWatched[i], IID_IKBSSTORYUNDOOBSERVER);
-		if (subject != nil && observer != nil
-			&& subject->IsAttached(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER))
-			subject->DetachObserver(ISubject::kLazyAttachment, observer, IID_ITEXTMODEL, IID_IKBSSTORYUNDOOBSERVER);
-		gWatched.erase(gWatched.begin() + static_cast<std::ptrdiff_t>(i));
-	}
+	const std::vector<IDataBase*>::iterator watched = std::find(gWatchedDocs.begin(), gWatchedDocs.end(), db);
+	if (watched == gWatchedDocs.end())
+		return;
+	gWatchedDocs.erase(watched);
+	// The document is still whole at this signal (BeforeCloseDoc), so its subject can be asked.
+	const UID root = db->GetRootUID();
+	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
+	InterfacePtr<IObserver> observer(db, root, IID_IKBSDOCUNDOOBSERVER);
+	if (subject != nil && observer != nil
+		&& subject->IsAttached(ISubject::kLazyAttachment, observer, IID_IKBSUNDOMARK, IID_IKBSDOCUNDOOBSERVER))
+		subject->DetachObserver(ISubject::kLazyAttachment, observer, IID_IKBSUNDOMARK, IID_IKBSDOCUNDOOBSERVER);
+	KBS_DIAG_LOG("DOCCLOSING detach doc=%p", (void*)db);
 }
 
 void KBSUndoFollow::ForgetDocument(const UIDRef& docRef)
@@ -557,7 +657,7 @@ void KBSUndoFollow::ShutdownCleanup()
 	// Assigning fresh vectors releases the storage too (the KESCL ShutdownCleanup rule): the kept writes
 	// hold rows, and rows hold PMStrings.
 	std::vector<Step>().swap(gSteps);
-	std::vector<UIDRef>().swap(gWatched);	// (the documents are gone by now; nothing is detached here)
+	std::vector<IDataBase*>().swap(gWatchedDocs);	// (the documents are gone by now; nothing is detached here)
 	CloseRecording();
 }
 

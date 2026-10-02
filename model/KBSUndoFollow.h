@@ -20,11 +20,16 @@
 //  "replaced" again - and its Reject Change is offered again (the rows' own recorded versions come back
 //  with them, so the replace's F-2 door finds the story as KBS left it).
 //
-//  ***** WHO TELLS US: A LAZY OBSERVER ON EACH STORY WRITTEN TO ***** (IID_IKBSSTORYUNDOOBSERVER, AddIn'd on
-//  kTextStoryBoss, attached at run time), listening under the SDK's own IID_ITEXTMODEL. Lazy because lazy is
-//  the only notification an Undo and a Redo broadcast - the same message ids as the Do
-//  (LazyNotificationData.h:50-58); a responder and a command interceptor are not called at all. The same
-//  shape as KCM's Story Edits list (KCMStoryFollowObserver - the user's "the way KCM does").
+//  ***** WHO TELLS US: THE MARK EACH WRITE LEAVES IN ITS UNDO STEP, HEARD ON THE DOCUMENT (2026-10-02). *****
+//  Every write processes kKBSUndoMarkCmdBoss inside its own sequence (MarkWrite): a command that changes
+//  nothing and raises a ModelChange on its document's subject. A LAZY observer on that subject
+//  (IID_IKBSDOCUNDOOBSERVER, AddIn'd on kDocBoss, attached at run time) hears it again on the step's Undo and
+//  Redo - lazy because lazy is the only notification an Undo and a Redo broadcast, the same message ids as
+//  the Do (LazyNotificationData.h:50-58); a responder and a command interceptor are not called at all. KCM's
+//  ticks and paws ride the same road (KCMPageMarksCmd.cpp).
+//  (From 2026-09-29 to 2026-10-02 the observer sat on each STORY a write moved, under IID_ITEXTMODEL, the way
+//   KCM's Story Edits list still does. A story InDesign purged from memory came back without it, and with
+//   two documents in the list the second one's Ctrl+Z went unheard 12 times in 18 - S-1, KBSUndoFollow.cpp.)
 //  ***** THE MODEL HALF'S SINCE THE SPLIT (2026-10-01) ***** - it keeps the results true and tells the panel
 //  only through KBSModelNotify - and it answers on the main thread only (the gate in LazyUpdate): a
 //  background task has neither an Undo nor a panel to follow it.
@@ -39,9 +44,11 @@
 #ifndef __KBSUndoFollow_h__
 #define __KBSUndoFollow_h__
 
-#include "UIDRef.h"		// UID
+#include "UIDRef.h"		// UIDRef
 
 #include <vector>
+
+class IDataBase;
 
 namespace KBSUndoFollow
 {
@@ -83,14 +90,20 @@ namespace KBSUndoFollow
 		StepRecorder& operator=(const StepRecorder&);
 	};
 
+	/** ***** THE MARK (2026-10-02). ***** Processed by every write of KBS's own INSIDE its command sequence,
+	    once it has written and before the sequence ends - so the mark is part of the write's one undo step -
+	    for each document it wrote to. Puts the observer on the document first; a mark that cannot be
+	    processed leaves the write's error state as it found it (the panel loses this step's following, the
+	    user keeps the write). */
+	void MarkWrite(IDataBase* db);
+
 	/** ***** THE WORK OF THE OBSERVER. ***** Every kept write an Undo or a Redo has moved - the newest one
 	    first for an Undo, the oldest first for a Redo, never past a write in the same document that has not
 	    moved (a Change Checked, which puts every document's rows back, counts as in every document - since
 	    2026-10-02) - has its rows put back, and the panel is drawn again and says so on its message line.
-	    `story` = the story that sent the notification, or kInvalidUID; nothing is done unless a kept write
-	    names it (typing in a story no write touched costs one comparison).
+	    Called when a write's mark is heard (its Do, Undo or Redo) - the versions say which.
 	    @return true when anything was put back. */
-	bool Follow(UID story);
+	bool Follow();
 
 	/** ***** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING (2026-09-29). ***** Only its rows leave the panel
 	    (KBSResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
@@ -102,9 +115,9 @@ namespace KBSUndoFollow
 	    Called by KBSCloseDocResponder, before the document goes (its UIDRef is still good). */
 	void ForgetDocument(const UIDRef& docRef);
 
-	/** ***** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS (2026-09-29). ***** The observers attached to its
-	    stories are taken off while the document is still whole - what is attached is detached (KBSUndoFollow.cpp,
-	    Watch). Called by KBSCloseDocResponder for every close, ahead of its other exits. */
+	/** ***** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS (2026-09-29). ***** The observer attached to it
+	    (its stories' until 2026-10-02) is taken off while the document is still whole - what is attached is
+	    detached. Called by KBSCloseDocResponder for every close, ahead of its other exits. */
 	void DocumentClosing(const UIDRef& docRef);
 
 	/** Application shutdown: the kept writes hold rows (PMStrings) - release them. */
