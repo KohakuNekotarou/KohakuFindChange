@@ -776,9 +776,12 @@ static uint32 KBSReapplyTimerProc(void* /*refPtr*/)
 	//   8 runs became 2 (measured rp=2). The return value IS the reschedule, so returning the delay
 	//   is how it continues.
 	//   !ICallbackTimer's published contract is one-shot ("register a one time only callback"), so
-	//     this chain rests on an observed behaviour rather than a promise. Even where it does not
-	//     hold, the next notification re-arms unconditionally in KBSScheduleReapply, so it can never
-	//     get stuck at "never runs again".
+	//     this chain rests on an inference rather than a promise - and NOT on a measurement: what was
+	//     measured is the old way failing (rp=2); whether this way runs all 8 is listed as unmeasured
+	//     (docs/ai-notes/kescm-selfreview-2026-07-29.md; until 2026-10-02 this said "an observed
+	//     behaviour"). KT's app.ktProbe "callbacktimer" measures it. Even where it does not hold, the
+	//     next notification re-arms unconditionally in KBSScheduleReapply, so it can never get stuck at
+	//     "never runs again".
 	if (sReapplyLeft > 0)
 		return kKBSPanelAlphaReapplyDelayMillis;
 
