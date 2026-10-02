@@ -4,17 +4,20 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The result model: the last book search's hits, grouped by chapter, that the result tree
+//  The result model: the last search's hits, grouped by chapter, that the result tree
 //  (KBSResultListAdapter / KBSResultListWidgetMgr) displays. A tiny session-global store - the
 //  KBS analog of KESCL's KESCLBatchCheck, minus its filters / reverse mode / per-value rows,
-//  because the KBS tree is shallow: book -> document -> hit for a book search, and document -> hit
-//  for a document search, which has no book row at all.
+//  because the KBS tree is shallow: book -> document -> story -> hit for a book search, and
+//  document -> story -> hit for a document search, which has no book row at all. (A list rebuilt
+//  from the Track Changes records has a run level between a document and its stories -
+//  KBSResultNodeID.h draws every shape a node can take.)
 //
 //  Each hit already carries its display text pre-split into three PMString segments (the text
 //  before the match, the matched text, and the text after) so the colour cell just paints three
 //  runs and no UTF-16 boundary maths happens at draw time (the split is done once, in
 //  KBSSearchEngine, against the paragraph's wide string at the finder's exact match offsets).
-//  The jump anchors (story UID + text range) are collected now but only consumed in Task 3.
+//  The jump anchors (story UID + text range) are what the jump, the hit marker and the replace find
+//  the match by.
 //
 //========================================================================================
 
@@ -41,7 +44,7 @@ namespace KBSResultModel
 	const int32 kKBSCollectHitLimit = 10000;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
-	    the match; the jump anchors (Task 3) point back at the exact occurrence. */
+	    the match; the jump anchors point back at the exact occurrence. */
 	struct Hit
 	{
 		PMString	locator;	// the page locator "P<page>(<n>)" / "overset" (drawn at full text
@@ -75,7 +78,7 @@ namespace KBSResultModel
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
-		TextIndex	textEnd;	// the match's end position (Task 3 marker rectangle)
+		TextIndex	textEnd;	// the match's end position (where the hit marker's rectangle ends)
 
 		// The WHOLE match, as one number - what the same-occurrence test compares against.
 		// matchText is capped for drawing (the line budget, kKBSMaxLineChars in
@@ -104,8 +107,8 @@ namespace KBSResultModel
 		// occurrences the user had never seen.)
 		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
 								// Kept OUT of locator so the cell can paint it separately; built by
-								// BuildHitLocator alongside it. Only "missing" and "refused" earn it - the other
-								// flags stay in locator and read in the normal colour.
+								// BuildHitLocator alongside it. Only "missing", "refused" and "not replaced" earn
+								// it - the other flags stay in locator and read in the normal colour.
 		// --- Track Changes (2026-09-26) ---
 		// The WHOLE text of the match before the replace and the whole text the replace wrote, taken
 		// as it was written (not capped for drawing like matchText). A replaced row's change is found by
@@ -152,8 +155,8 @@ namespace KBSResultModel
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// ***** A STORY GROUP (2026-09-27, the user's call). ***** A Find/Change result groups its hits
 		// by story, the way KCM's Story mode lists stories, and every group is one (an isStory flag said
-		// so until 2026-10-01). A story row carries Replace / Reject Change / Accept Change / Redo / Check
-		// All / Uncheck All for its rows (KBSReplaceEngine::ReplaceStory and the rest).
+		// so until 2026-10-01). A story row carries Replace / Reject Change / Accept Change / Replace Again
+		// (Redo in the code) / Check All / Uncheck All for its rows (KBSReplaceEngine::ReplaceStory and the rest).
 		UID					story;
 		// The run the group sits under (Hit::run of its hits, 2026-09-29); -1 = no run level. A story
 		// that two runs changed stands once under each: the groups are keyed by (run, story).
@@ -181,8 +184,8 @@ namespace KBSResultModel
 	struct Chapter
 	{
 		PMString				name;	// the chapter's display name (its file name)
-		UIDRef					docRef;	// current binding (Task 3 jump / reopen)
-		IDFile					file;	// the chapter's .indd (Task 3 reopen of a closed chapter)
+		UIDRef					docRef;	// current binding (RebindChapterDoc after a reopen)
+		IDFile					file;	// the chapter's .indd (to reopen a closed chapter)
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// its story groups - every hit is in one since 2026-09-27
 		// The runs (2026-09-29, Show Changes by KohakuFindChange): empty on every list but one rebuilt from
@@ -325,12 +328,13 @@ namespace KBSResultModel
 	    therefore re-walks with a different query and meets a different set of matches from the one
 	    the rows list.
 
-	    ***** AND SINCE 2026-08-05 THAT WOULD BE WRITTEN. ***** This note used to end "Nothing wrong
-	    is written - the same-occurrence test refuses each one - but the whole run comes back
-	    'missing'". That test is gone (see KBSReplaceEngine.h), so comparing this against the current
-	    mode is no longer about explaining a run that failed harmlessly: it is one of the two things
-	    standing between a changed query and the wrong occurrences being rewritten. The other is
-	    KBSSearchEngine::BuildWalkSignature. */
+	    ***** AND FROM 2026-08-05 THAT WOULD HAVE BEEN WRITTEN. ***** This note used to end "Nothing
+	    wrong is written - the same-occurrence test refuses each one - but the whole run comes back
+	    'missing'". That test left the replacing walk on 2026-08-05; it came back before the run
+	    (ChapterMovedUnderRows, 2026-08-10) and at every door (KBSSearchEngine::RowReadsAsFound,
+	    2026-09-29) - KBSReplaceEngine.h says where. So comparing this against the current mode is not
+	    about explaining a run that failed harmlessly: with KBSSearchEngine::BuildWalkSignature it is
+	    what refuses a replace under a changed query before anything is written. */
 	void SetSearchMode(int32 mode);
 	int32 GetSearchMode();
 
@@ -481,13 +485,14 @@ namespace KBSResultModel
 	bool GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 		PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost);
 
-	/** A hit's jump anchors (Task 3): the chapter's document / file and the match's story +
-	    text range. false = index out of range. */
+	/** A hit's jump anchors: the chapter's document / file and the match's story + text range.
+	    false = index out of range. */
 	bool GetHitLocation(int32 chapterIdx, int32 hitIdx,
 		UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd);
 
-	/** Rebind a chapter's document reference (Task 3): after a closed chapter is reopened at jump
-	    time, later jumps must use the live database, not the dead one from search time. */
+	/** Rebind a chapter's document reference: after a closed chapter is reopened - by a jump, a
+	    replace or Reject Change - later calls must use the live database, not the dead one from
+	    search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
 	/** A story's VERSION where KBS last knew the chapter's rows in it to stand (2026-09-29, the defect
@@ -566,11 +571,11 @@ namespace KBSResultModel
 	// (GetCheckedChapterCount - how many CHAPTERS hold at least one checked, unreplaced hit - stood
 	//  here. Its one caller was the confirmation prompt's closing line, which named the number;
 	//  that line has stated the case instead of counting it since 2026-08-07
-	//  (KBSReplaceConfirmDialog::BuildUnsavedLine - itself gone since 2026-09-26), and nothing has read the count since. It was
-	//  kept for three days as "a real question about the model, cheap to answer" and removed on
-	//  2026-08-10 for the reason DropChapter was removed above it: a function nobody runs is a
-	//  guess about what a future caller will want, and this file had already decided that once.
-	//  git has it.)
+	//  (KBSReplaceConfirmDialog::BuildUnsavedLine - itself gone since 2026-09-26), and nothing has
+	//  read the count since. It was kept for three days as "a real question about the model, cheap to
+	//  answer" and removed on 2026-08-10 for the reason DropChapter was (see where it stood, at the end
+	//  of this namespace): a function nobody runs is a guess about what a future caller will want, and
+	//  this file had already decided that once. git has it.)
 
 	/** How many hits COULD be checked at all: every hit that is neither replaced nor locked, i.e.
 	    every row that actually has a check box (uncapped). Zero means no row has one - the panel is
@@ -584,7 +589,8 @@ namespace KBSResultModel
 	int32 GetChapterCheckableCount(int32 chapterIdx);
 
 	/** Which row the result tree's right-click menu was popped over. KBSResultNodeEH stashes it
-	    immediately before HandlePopupMenu and the Check All / Uncheck All actions read it back - an
+	    immediately before HandlePopupMenu and the book and document rows' commands (Check All /
+	    Uncheck All, and since 2026-09-27 Replace and the rest) read it back - an
 	    action component is handed no widget context of its own. (The pattern is KESCL's
 	    KESCLBatchCheck::SetContextMenuNode, which its "Copy as Text" row menu uses the same way.)
 
@@ -598,7 +604,7 @@ namespace KBSResultModel
 	     right-clicked (KBSResultNodeEH, just before the menu pops), so no menu acts on an index from
 	     before the renumbering; the range check stands behind it for a caller arriving by ActionID.
 	     (Until the 2026-09-27 defect sweep this said the row menu does not open at all after a
-	     replace. Since 2026-09-26 it does - Reject Change, Redo, Accept All Changes by KohakuFindChange.)
+	     replace. Since 2026-09-26 it does - Reject Change and the commands that came after it.)
 	     Anything that ever drops chapters WITHOUT a right-click in between has to reset this the way
 	     Clear() does. */
 	// (kContextMenuBookRow / kNoContextMenuChapter: KBSModelTypes.h.)
@@ -617,7 +623,8 @@ namespace KBSResultModel
 	    reads them from the document - the model reads no text - and hands them over here. */
 	void SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
 		const PMString& replacedText);
-	/** False when the row holds no replace (never replaced, or out of range). */
+	/** False when the row was neither replaced nor taken back (a row taken back keeps the texts of
+	    the replace it undid), or the index is out of range. */
 	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
 		PMString& outReplacedText);
 
@@ -717,18 +724,21 @@ namespace KBSResultModel
 
 	    ***** THE STORY IS TAKEN FROM THE COMMAND, NOT LEFT AS THE ROW HAD IT. ***** It used to be
 	    left alone, on the reasoning that the walk could only ever land a checked hit on the story
-	    that hit was found in - which the same-occurrence test guaranteed, by refusing to write
-	    anything that had moved. That test went on 2026-08-05 (see KBSReplaceEngine.h), and with it
-	    the guarantee: an edit that removes a whole frame between the search and the replace makes the
-	    Nth match a match in a LATER story. The row then held one story with the other story's range,
-	    so the line read back at the end of the chapter, and the hash taken from it, both came from
-	    text that has nothing to do with this row (SetHitSegments, SetHitRange).
+	    that hit was found in - which the same-occurrence test inside the walk guaranteed, by refusing
+	    to write anything that had moved. That test left the walk on 2026-08-05 (KBSReplaceEngine.h),
+	    and with it the guarantee: an edit that removed a whole frame between the search and the
+	    replace made the Nth match a match in a LATER story. The row then held one story with the other
+	    story's range, so the line read back at the end of the chapter, and the hash taken from it, both
+	    came from text that has nothing to do with this row (SetHitSegments, SetHitRange). (Since then
+	    the run refuses a row that has moved before it starts - ChapterMovedUnderRows - and the walk
+	    finds a row by its place - RowOfMatchAnyOrder; what the command reports writing is still the
+	    one answer that cannot be wrong.)
 
 	    The three displayed segments are deliberately NOT set here: several matches can share one
 	    paragraph, and a line read at the moment ITS match was written still shows the later matches
 	    in that paragraph unreplaced. The replace pass fills them in once the chapter is finished -
-	    see SetHitSegments and SetHitRange. Until then the row still shows what the search found,
-	    which is why a run that is cancelled between the two can be rolled back as one.
+	    see SetHitSegments and SetHitRange. Until then the row still shows what the search found. (A
+	    cancel puts each row back whole either way - BeginRowBackup.)
 
 	    ***** THE RANGE GIVEN HERE IS WHERE THE TEXT WAS WRITTEN, NOT WHERE IT ENDS UP. ***** A later
 	    replacement in the same story can move it - the walk does not go in TextIndex order (see
@@ -786,8 +796,8 @@ namespace KBSResultModel
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the post-replace thinning both call it, so the two can no longer drift apart.
 
-	        P<page>(<n>) overset hidden locked  -> hit.locator
-	        missing | refused                   -> hit.accentFlag, drawn after it in accent colour
+	        P<page>(<n>) overset hidden locked     -> hit.locator
+	        missing | refused | not replaced       -> hit.accentFlag, drawn after it in accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
 	    spaces and spelled out IN FULL rather than clipped, because each one explains a row the user
@@ -795,11 +805,13 @@ namespace KBSResultModel
 	    so "P5+locked" reads as "page 5, overset".
 
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
-	    found changed. Only missing and refused are exclusive, being two values of one field.
+	    found changed. Only the words that come from the row's outcome exclude each other, being values
+	    of one field: missing, refused, not replaced, and on the locator rejected, deleted, accepted.
 
-	    Since 2026-09-29 the locator also says " rejected" (a row taken back, on a list rebuilt from the
-	    records only - it has no box to say it), " accepted" (its change accepted) and " no track" (replaced
-	    inside a footnote, where Track Changes records nothing - the user's request). */
+	    The locator also says " deleted" (gone with the object another ticked row deleted), and since
+	    2026-09-29 " rejected" (a row taken back, on a list rebuilt from the records only - it has no box
+	    to say it), " accepted" (its change accepted) and " no track" (replaced inside a footnote, where
+	    Track Changes records nothing - the user's request). */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
@@ -811,19 +823,22 @@ namespace KBSResultModel
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break
-	    (LF) - in place. A string holding neither is left exactly as it came.
+	    (LF) - in place. A string holding none of the characters below is left exactly as it came.
 
-	    THE one definition, called where a match is shown: the panel's cell (KBSColorTextView - where
-	    it draws, and where it measures). Since 2026-08-04 a match is carried WHOLE however many
-	    paragraphs it spans, and a raw break draws with no width - the paragraphs either side of it
-	    run together and read as one piece of text - so it has to be marked. (The saved report,
-	    BuildReportText, called it too until Save Results... went on 2026-09-27.)
+	    THE one definition, called where the document's text is shown: the panel's cell
+	    (KBSColorTextView - where it draws, and where it measures), a story row's first words
+	    (BuildFontGroups) and the "Source Text:" line (KBSResultListWidgetMgr). Since 2026-08-04 a
+	    match is carried WHOLE however many paragraphs it spans, and a raw break draws with no width -
+	    the paragraphs either side of it run together and read as one piece of text - so it has to be
+	    marked. (The saved report, BuildReportText, called it too until Save Results... went on
+	    2026-09-27.)
 
-	    ***** DISPLAY ONLY. ***** Never applied to what the model holds. What the model holds is what
-	    every door compares against the document (KBSSearchEngine::RowReadsAsFound - the hash taken
-	    over the stored range, and the line around it), and a marked-up copy would fail every
-	    comparison - a click on a row would answer "the text is no longer here" about text that had
-	    not moved at all. Callers mark a COPY, at the moment they draw or write it.
+	    ***** DISPLAY ONLY. ***** Never applied to a row's own texts. Those are what every door
+	    compares against the document (KBSSearchEngine::RowReadsAsFound - the hash taken over the
+	    stored range, and the line around it), and a marked-up copy would fail every comparison - a
+	    click on a row would answer "the text is no longer here" about text that had not moved at all.
+	    Callers mark a COPY, at the moment they draw it. (The one marked string the model keeps is a
+	    story row's label, FontGroup::fontName, which nothing compares.)
 
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
 	    a table's per-row continuations, page number markers (2026-09-26, the user's call: they drew as
@@ -939,11 +954,11 @@ namespace KBSResultModel
 
 	// (DropChapter(int32) stood here - erase one chapter from the results and leave the others - as
 	// groundwork for chapter-level invalidation: closing one chapter of a book would drop that
-	// chapter rather than the whole result set. It was never called: the feature it was for has not
+	// chapter rather than the whole result set. It was never called: the feature it was for had not
 	// been written, and a function nobody has run is a guess about what that feature will need,
-	// not a head start on it. Removed 2026-08-07 (git has it if the
-	// chapter-level work does land - and it would want reviewing then anyway, since dropping a
-	// chapter has to renumber the fontGroups the same way KeepCheckedRows does).
+	// not a head start on it. Removed 2026-08-07. The feature came on 2026-09-29 as CloseChapter,
+	// and the guess would have been wrong: it does not erase the chapter but empties it in place,
+	// because erasing would renumber the chapters after it and cut their rows off from their Undo.)
 }
 
 #endif // __KBSResultModel_h__

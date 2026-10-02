@@ -15,7 +15,7 @@
 // General includes:
 #include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign and the hidden markers - see MarkUpBreaksForDisplay
 
-#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group
+#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group; std::sort
 #include <set>			// the rows already copied aside - see BackUpRow
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
@@ -98,7 +98,7 @@ namespace
 	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
 	// negative values it can hold.
 	int32 gContextMenuChapter = KBSResultModel::kNoContextMenuChapter;
-	// ...and which HIT row, for the hit row's own menu (Reject Change / Redo, 2026-09-26). -1 = none.
+	// ...and which HIT row, for the hit row's own menu (2026-09-26: Replace, Reject Change, Accept Change). -1 = none.
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
 	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked (2026-09-27)
@@ -1467,7 +1467,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
 	// A rejected row says nothing (the user, 2026-09-27: "no 'rejected' when I take one back") - it
 	// reads its original text again, which is what the user asked for; the state is still there for
-	// the menu (Redo); a reader of the panel sees the row's check box come back.
+	// the story and document rows' Replace Again (Redo in the code); a reader of the panel sees the
+	// row's check box come back.
 	// ***** EXCEPT ON A LIST REBUILT FROM THE RECORDS (2026-09-29, the design's section 4). ***** No row
 	// there carries a box, so nothing else would tell a row taken back from one still replaced.
 	else if (hit.outcome == kOutcomeRejected && gFromRecords)
@@ -1627,8 +1628,9 @@ int32 KBSResultModel::KeepCheckedRows()
 	// anything. A row counts as asked about when any of these hold:
 	//   replaced - it was changed (its check was cleared when it was written)
 	//   outcome  - it was reached and left alone, and says why (its check was cleared then too)
-	//   checked  - still selected, so the run never reached it: a chapter that would not open, or
-	//              a cancel. Those rows carry no reason, on purpose.
+	//   checked  - still selected, so the run never reached it: a chapter that would not open. Those
+	//              rows carry no reason, on purpose. (A cancel never gets here - the run's cancel exit
+	//              rolls every row back and leaves the search's results; KBSReplaceEngine.cpp.)
 	//   isLocked - found by the search and never offerable. Kept so the list can account for a
 	//              search that turned up more than the replace was allowed to touch.
 	bool anyAsked = false;
