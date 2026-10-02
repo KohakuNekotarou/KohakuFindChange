@@ -48,7 +48,7 @@
 #include "VCPlugInHeaders.h"
 
 // Project includes:
-#include "KBSPanelAlpha.h"		// kKBSPanelAlphaValue and the chase constants
+#include "KBSPanelAlpha.h"		// this file's own declarations
 #include "KBSFindChangeMinimize.h"	// the minimize box rides the same window-list notification
 #include "KFCUIID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
 
@@ -87,6 +87,38 @@
 #ifdef WINDOWS
 #include <windows.h>
 #endif
+
+// ---- The tuning constants (in KBSPanelAlpha.h until 2026-10-02 - see the note left there) ----
+
+// The alpha the panel is drawn with while the toggle is ON (0 = invisible, 255 = opaque).
+// *77 is about 30% - the user's figure, settled on in KESCM after 128 (50%) read as too solid.
+// Putting the pointer on the panel brings it back to opaque, so the resting state can afford to be
+// faint. There is no slider and no steps: changing how faint it is means changing this one line.
+// **...but not to 0, and not to anything near it (Microsoft's contract, read 2026-08-11): "hit
+//   testing of a layered window is based on the shape and transparency of the window ... the areas
+//   of the window ... whose alpha value is zero will let the mouse messages through". At 0 the panel
+//   would stop receiving the pointer altogether - and this feature relies on the pointer arriving to
+//   put the panel back to opaque, so it would also have no way back. "0 = invisible" above describes
+//   what the parameter means, not a value to put here.
+static const uint8 kKBSPanelAlphaValue = 77;
+
+// How many times, and how far apart, the alpha is written again AFTER the notification that asked
+// for it (measured 2026-07-29 for KESCM).
+//   Writing the alpha when kPaletteVisibilityChangedMessage arrives is not enough: InDesign can
+//   recreate the top-level window immediately afterwards and the value goes with it (the diagnostic
+//   that settled it: the read-back said 128 while an external tool measured 255 - and the window
+//   written to was a different HWND from the one that then existed).
+//   So the window is chased for a short while after the event. *0 disables the chase entirely.
+//   The count and the interval come from a measurement, not a guess: collapsing to an icon settled
+//   within 3ms, but dragging a panel out to float did not settle at all inside that - a drag puts a
+//   far larger gap between the notification and the final window - so about 400ms is covered.
+static const int32  kKBSPanelAlphaReapplyTries       = 8;
+static const uint32 kKBSPanelAlphaReapplyDelayMillis = 50;	// 50ms x 8 = about 400ms of chasing
+
+// (The panel's SHADOW (OWL.ShadowView) is handled by hiding and showing it, not with an alpha: it
+//  is drawn with per-pixel alpha, which Win32 makes exclusive with the uniform kind, so writing an
+//  alpha to it once means it never returns to the shadow it was - confirmed by breaking it on the
+//  real application, 2026-07-29. Hence no constant for how faint the shadow is.)
 
 // The toggles, for this session. *Both OFF by default. They are remembered across restarts only
 // when the user asks - "Save Panel Settings" writes them to KBSPanelState.json (KBSPanelState.cpp).
@@ -525,9 +557,10 @@ static HWND sFcWnd = nullptr;
 //     open" was re-established from scratch on every ask - and the ask comes from the Win32 hook,
 //     which fires on every cursor move (60-100 a second) and on every window event (1477 measured
 //     for one drag). A closed dialog therefore meant walking IWindowList with a QueryInterface per
-//     window, thousands of times a second, FROM INSIDE A WIN32 CALLBACK - which is the one place in
-//     this file that reached into the model at all (the panel side is pure Win32 by design). With a
-//     restored "ON" it started during the application's own startup sequence.
+//     window, thousands of times a second, FROM INSIDE A WIN32 CALLBACK - which was then the one place
+//     in this file that reached into InDesign at all (the panel side was pure Win32 until 2026-08-07;
+//     it now asks the panel manager, but only when its own cache is empty). With a restored "ON" it
+//     started during the application's own startup sequence.
 //   *Cleared by KBSForgetFindChangeWindow, which the window-list observer calls the moment a window
 //     is added or removed - so a dialog that opens is looked up again at once, not left unseen.
 static bool16 sFcLookedUp = kFalse;
@@ -942,7 +975,9 @@ static void KBSInstallWinEventHook()
 	//   KBSScheduleReapply refuses to book another timer: a hook that goes up after
 	//   KBSShutdownPanelAlpha has taken one down leaves the OS holding KBSWinEventProc - a raw
 	//   function pointer into this .pln - as the .pln goes down. (No caller does that today - the
-	//   menu is the only one, and it is gone by then - but the two bookings are guarded alike.)
+	//   two setters are reached from the menu and from the saved settings, which load at startup or
+	//   when the palettes come up, and neither runs after shutdown - but the two bookings are guarded
+	//   alike.)
 	if (sPanelAlphaShutdown)
 		return;
 
@@ -971,8 +1006,9 @@ static void KBSInstallWinEventHook()
 //     unloaded code (the very thing this file guards for ICallbackTimer).
 //   *Keeping the handle costs nothing and leaves the door open: KBSInstallWinEventHook sees a live
 //     handle and does not install a second one, and the next call here tries again.
-//   !All the callers are on the main thread today (the menu item, and Shutdown), which is why this
-//     has never been seen to fail - the point is that failure is now visible rather than swallowed.
+//   !All the callers are on the main thread today (the menu item, the saved settings' load, and
+//     Shutdown), which is why this has never been seen to fail - the point is that failure is now
+//     visible rather than swallowed.
 static void KBSRemoveWinEventHook()
 {
 	if (sWinEventHook != nullptr)
@@ -1192,8 +1228,9 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 	//     **it stays stuck opaque** (leaving the panel BODY is caught by IMouseRollOver's MouseLeave,
 	//     but the chrome is not covered by that at all). Applying once here measures "not on it" and
 	//     it goes faint again.
-	//   *This writes one alpha and touches neither the model nor the UI = safe to run while the
-	//     application is being deactivated.
+	//   *This writes one alpha and changes neither the model nor the UI (at most it reads the panel
+	//     manager, when the cached window is empty) = safe to run while the application is being
+	//     deactivated.
 	//   **It applies to InDesign's OWN Find/Change dialog just as much (2026-08-04): the pointer can
 	//     be left anywhere on it and the window has no MouseLeave of ours at all, so the suspend is
 	//     the only cue there is. See where it is acted on below.

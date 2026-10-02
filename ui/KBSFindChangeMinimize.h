@@ -47,7 +47,7 @@
 //    !MEASURED, not theorised (2026-08-12): opening the dialog from the same script that switched
 //     the toggle on left it unstyled, while doing the two as separate steps applied it in 15ms.
 //  *8 x 50ms = about 400ms, the figure the panel side settled on for the same kind of settling
-//   (kKBSPanelAlphaReapplyTries in KBSPanelAlpha.h). The count bounds it, so it always stops.
+//   (kKBSPanelAlphaReapplyTries in KBSPanelAlpha.cpp). The count bounds it, so it always stops.
 static const int32  kKBSMinimizeRetryTries       = 8;
 static const uint32 kKBSMinimizeRetryDelayMillis = 50;
 

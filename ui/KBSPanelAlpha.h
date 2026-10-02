@@ -24,44 +24,18 @@
 
 #include "BaseType.h"
 
-// The alpha the panel is drawn with while the toggle is ON (0 = invisible, 255 = opaque).
-// *77 is about 30% - the user's figure, settled on in KESCM after 128 (50%) read as too solid.
-// Putting the pointer on the panel brings it back to opaque, so the resting state can afford to be
-// faint. There is no slider and no steps: changing how faint it is means changing this one line.
-// **...but not to 0, and not to anything near it (Microsoft's contract, read 2026-08-11): "hit
-//   testing of a layered window is based on the shape and transparency of the window ... the areas
-//   of the window ... whose alpha value is zero will let the mouse messages through". At 0 the panel
-//   would stop receiving the pointer altogether - and this feature relies on the pointer arriving to
-//   put the panel back to opaque, so it would also have no way back. "0 = invisible" above describes
-//   what the parameter means, not a value to put here.
-static const uint8 kKBSPanelAlphaValue = 77;
-
-// How many times, and how far apart, the alpha is written again AFTER the notification that asked
-// for it (measured 2026-07-29 for KESCM).
-//   Writing the alpha when kPaletteVisibilityChangedMessage arrives is not enough: InDesign can
-//   recreate the top-level window immediately afterwards and the value goes with it (the diagnostic
-//   that settled it: the read-back said 128 while an external tool measured 255 - and the window
-//   written to was a different HWND from the one that then existed).
-//   So the window is chased for a short while after the event. *0 disables the chase entirely.
-//   The count and the interval come from a measurement, not a guess: collapsing to an icon settled
-//   within 3ms, but dragging a panel out to float did not settle at all inside that - a drag puts a
-//   far larger gap between the notification and the final window - so about 400ms is covered.
-// (KESCM keeps these in KESCMConstants.h; KBS has no constants header, so they live here with the
-//  code that reads them.)
-static const int32  kKBSPanelAlphaReapplyTries       = 8;
-static const uint32 kKBSPanelAlphaReapplyDelayMillis = 50;	// 50ms x 8 = about 400ms of chasing
-
-// (The panel's SHADOW (OWL.ShadowView) is handled by hiding and showing it, not with an alpha: it
-//  is drawn with per-pixel alpha, which Win32 makes exclusive with the uniform kind, so writing an
-//  alpha to it once means it never returns to the shadow it was - confirmed by breaking it on the
-//  real application, 2026-07-29. Hence no constant for how faint the shadow is.)
+// (The tuning constants - the alpha (kKBSPanelAlphaValue) and the chase's count and interval - stood
+//  here until 2026-10-02 and are now at the top of KBSPanelAlpha.cpp, the one file that reads them:
+//  the shape KCM gave its own on 2026-08-30 and the product code uses for a file-local tuning value
+//  (linksui/LinksUIUtils.cpp:606-608). Nothing that includes this header needs them.)
 
 // The toggle's current state (*OFF by default).
 bool16	KBSGetPanelTranslucent();
 
-// Set the toggle. *No WINDOW is touched here (the two are kept apart because there is a caller, at
-// startup, with no panel to touch yet) - but this is not a plain setter either: it puts the Win32
-// event hook up, or takes it down when both toggles end up off. Applying is KBSApplyPanelTranslucency.
+// Set the toggle. *No WINDOW is touched here (the two are kept apart because the saved settings set
+// it too - KBSLoadPanelStateIfPresent, at startup or when the palettes come up - when there may be no
+// panel to touch yet) - but this is not a plain setter either: it puts the Win32 event hook up, or
+// takes it down when both toggles end up off. Applying is KBSApplyPanelTranslucency.
 void	KBSSetPanelTranslucent(bool16 on);
 
 // Write the current flag onto the panel's window.
@@ -132,8 +106,9 @@ bool16	KBSApplyFindChangeTranslucency();
 //     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
 //   . nullptr means "not open", and also "open, but the platform window does not exist yet"
 #ifdef WINDOWS
-// *HWND is named here WITHOUT pulling windows.h into this header, which five .cpp files include and
-//  only two of which have any business with Win32. This is the declaration windows.h itself makes
+// *HWND is named here WITHOUT pulling windows.h into this header, which six .cpp files include and
+//  only three of which have any business with Win32 (KBSPanelAlpha.cpp, KBSFindChangeMinimize.cpp,
+//  KBSPanelState.cpp - each includes windows.h itself). This is the declaration windows.h itself makes
 //  (DECLARE_HANDLE expands to exactly this), so the two can appear in either order.
 struct HWND__;
 typedef struct HWND__* HWND;
