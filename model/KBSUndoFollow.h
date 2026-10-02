@@ -85,7 +85,8 @@ namespace KBSUndoFollow
 
 	/** ***** THE WORK OF THE OBSERVER. ***** Every kept write an Undo or a Redo has moved - the newest one
 	    first for an Undo, the oldest first for a Redo, never past a write in the same document that has not
-	    moved - has its rows put back, and the panel is drawn again and says so on its message line.
+	    moved (a Change Checked, which puts every document's rows back, counts as in every document - since
+	    2026-10-02) - has its rows put back, and the panel is drawn again and says so on its message line.
 	    `story` = the story that sent the notification, or kInvalidUID; nothing is done unless a kept write
 	    names it (typing in a story no write touched costs one comparison).
 	    @return true when anything was put back. */

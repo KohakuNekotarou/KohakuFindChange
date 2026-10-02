@@ -161,8 +161,18 @@ void DropOtherResultSets()
 
 // Do the two writes share a document? (InDesign keeps one history per document, so two that do are
 // taken back and done again in order; two that do not, in any order.)
+// ***** A CHANGE CHECKED SHARES WITH EVERY WRITE (2026-10-02, the block 6/6b re-check W-1). ***** What it puts
+// back is the WHOLE result set - every document's rows, the ones it never wrote to as well (ModelSnapshot) - so
+// following its Undo or Redo in one document took back on the panel a Replace or a Reject made since in another:
+// measured, cases uf-alldocs-cc-undo-other-replace-redo and uf-alldocs-replace-cc-reject-undo. Ordered against
+// every write, it waits until the writes after it are undone, and a write made after its Undo throws its Redo
+// away (KeepStep). One InDesign takes back or does again out of that order is not followed: the rows stay as
+// they are, and the doors stand behind them as for any edit KBS did not make (the story's version, the
+// records' times).
 bool ShareDoc(const Step& a, const Step& b)
 {
+	if (a.whole || b.whole)
+		return true;
 	for (size_t x = 0; x < a.stories.size(); ++x)
 		for (size_t y = 0; y < b.stories.size(); ++y)
 			if (a.stories[x].now == b.stories[y].now)
@@ -215,6 +225,12 @@ std::vector<UIDRef> gWatched;
 //  place - with the detach as without it. Waiting 4 s after the Ctrl+Z before the run's next call heard all
 //  of them: a lazy notification comes at idle, and a run that goes straight on (KIDMCP copies the document
 //  around every script) can miss it. A person who presses Ctrl+Z and looks at the panel gives it that idle.
+// !AND WAITING DID NOT COVER IT ALL (2026-10-02, measured): with TWO documents in the list, the Ctrl+Z in the
+//  second one went unheard 12 times in 18 - 4 s of idle after it, and 10 s more, with a script between the
+//  write and its Ctrl+Z and without one, with a Change Checked among the writes and with rows alone; where
+//  the story's version was read, it was back at exactly the one the follow looks for. Every single-document
+//  probe (eight) heard its Ctrl+Z. Not explained yet (docs/ai-notes/kbs-block6-6b-defect-recheck-2026-10-02.md,
+//  S-1).
 void Watch(IDataBase* db, UID story)
 {
 	if (db == nil || story == kInvalidUID)
@@ -253,7 +269,9 @@ void KeepStep(Step& step)
 	DropOtherResultSets();
 	ResolveDocs();
 	// ***** A NEW STEP IN A DOCUMENT THROWS ITS REDO AWAY ***** (InDesign's own rule): an undone write sharing a
-	// document with this one can never be done again.
+	// document with this one can never be done again. (An undone Change Checked shares with every write -
+	// ShareDoc - so any new write lets it go: InDesign may still do it again in its own document, and the panel
+	// then does not follow.)
 	for (size_t i = gSteps.size(); i-- > 0; )
 		if (!gSteps[i].done && ShareDoc(gSteps[i], step))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));

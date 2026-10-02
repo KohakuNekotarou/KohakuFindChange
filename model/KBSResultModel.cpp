@@ -4,9 +4,10 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Result model implementation. See KBSResultModel.h for the contract. All state is a single
-//  file-static vector of chapters; the getters are bounds-checked so a repaint racing a rebuild
-//  (or a stale node id) reads "nothing" rather than crashing.
+//  Result model implementation. See KBSResultModel.h for the contract. All state is file-static, in
+//  the anonymous namespace below - the vector of chapters, the flags recorded beside it, the row
+//  backup, the right-click targets and the result-set / layout ids; the getters are bounds-checked
+//  so a repaint racing a rebuild (or a stale node id) reads "nothing" rather than crashing.
 //
 //========================================================================================
 
@@ -1627,7 +1628,9 @@ int32 KBSResultModel::KeepCheckedRows()
 	// A replace that was asked for nothing must not empty the panel, so check before touching
 	// anything. A row counts as asked about when any of these hold:
 	//   replaced - it was changed (its check was cleared when it was written)
-	//   outcome  - it was reached and left alone, and says why (its check was cleared then too)
+	//   outcome  - it says something about itself: this run reached it and left it alone (its check was
+	//              cleared then too), or something before the run did - Reject Change took it back, a
+	//              jump found it missing - ticked or not
 	//   checked  - still selected, so the run never reached it: a chapter that would not open. Those
 	//              rows carry no reason, on purpose. (A cancel never gets here - the run's cancel exit
 	//              rolls every row back and leaves the search's results; KBSReplaceEngine.cpp.)

@@ -689,8 +689,11 @@ namespace KBSResultModel
 	/** Turn the result set into a REPORT of what the replace did. Keeps every row the replace was
 	    asked about - the ones it changed, and the ones it left alone with the reason on the
 	    locator - plus the locked rows, which account for a search that turned up more than the
-	    replace was allowed to touch. Drops the rows the user had unchecked, and then the chapters
-	    left with nothing.
+	    replace was allowed to touch, and every row that already says something about itself, ticked
+	    or not: an outcome set before this run (a row Reject Change took back, one a jump found
+	    missing) stays on screen, and a row taken back is work again (KBSReplaceEngine.cpp carries
+	    these rows' places through the run). Drops the other rows the user had left unticked, and
+	    then the chapters left with nothing.
 
 	    Does NOTHING when no row was asked about, so a replace that was asked for nothing never
 	    wipes the result set. Sets the aftermath flag (see IsShowingReplaceOutcome), which takes
