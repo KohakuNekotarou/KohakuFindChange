@@ -1677,10 +1677,14 @@ void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bo
 	// KBSRunGuard exists - but whether it is this SetPosition, WasCancelled, or both, nothing has measured:
 	// KBS's notes said this call pumps and WasCancelled only reads a flag, KCM's say WasCancelled pumps
 	// (KCMProgressBar.h), and KIDMCP's working cancel (2026-08-30) makes both calls. The headers say neither
-	// (ProgressBar.h, IProgressBarManager.h). What WAS measured: during a search, with the bar up and moved
-	// from inside the walk, a 100 ms WM_TIMER was not delivered once (2026-08-01,
-	// docs/ai-notes/progress-bar-and-dialog-automation.md) - whatever lets events in, it is not a loop that
-	// delivers everything. "Pumps" elsewhere in KBS means "a call on the bar lets events in".
+	// (ProgressBar.h, IProgressBarManager.h). The nearest thing on record is a miss: a Cancel posted as KCM's
+	// book compare ended was not taken by the one WasCancelled after its loop (2026-08-12,
+	// docs/ai-notes/kescm-book-comparison-stage3-2026-08-12.md section 4-2, under "could not be measured") -
+	// read there as WasCancelled letting events in, an explanation of the miss rather than a measurement of
+	// either call. What WAS measured: during a search, with the bar up and moved from inside the walk, a
+	// 100 ms WM_TIMER was not delivered once (2026-08-01, docs/ai-notes/progress-bar-and-dialog-automation.md)
+	// - whatever lets events in, it is not a loop that delivers everything. "Pumps" elsewhere in KBS means
+	// "a call on the bar lets events in".
 	bar->SetPosition(target);
 	ioReported = target;
 }
