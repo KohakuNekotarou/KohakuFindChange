@@ -503,6 +503,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSTranslucentFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Search the Application Bar's Text with This Panel (Enter): toggle (check mark). Return in the search
+		// field of InDesign's application bar searches with this panel. *Windows only. KBSAppBarSearchEnter.h.
+		kKBSAppBarSearchEnterActionID,
+		kKBSTargetMenuPath
+		kKBSAppBarSearchEnterMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
 		// Find/Change dialog, so it can be sent to the taskbar instead of closed. Directly under
 		// the translucency toggle - the two act on the same window. *Windows only.
@@ -780,6 +787,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSTranslucentFindChangeActionID,
 		kKBSTranslucentFindChangeMenuKey,	// "Translucent Find/Change" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Search the Application Bar's Text with This Panel (Enter). kCustomEnabling for the check mark, like
+		// the toggles beside it. Not greyed out while the field is hidden: the flag is what is being set.
+		kKBSActionComponentBoss,
+		kKBSAppBarSearchEnterActionID,
+		kKBSAppBarSearchEnterMenuKey,	// "Search the Application Bar's Text with This Panel (Enter)" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

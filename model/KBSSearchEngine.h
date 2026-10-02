@@ -210,6 +210,15 @@ namespace KBSSearchEngine
 	    cannot disagree. */
 	bool CanSearchTab(int32 mode);
 
+	/** Put `text` into Edit > Find/Change as a TEXT search: the Text tab made current, and its Find what set
+	    to `text` (2026-10-02, "Search the Application Bar's Text with This Panel (Enter)" - the user's call:
+	    the Text tab, whatever tab was on). Through the dialog's own commands, kFindSearchModeCmdBoss and
+	    kFindStringCmdBoss, in the shape SnpFindAndReplace gives them (ProcessFindChangeCommandInt32 /
+	    ProcessFindChangeCommandString) - so the dialog shows what will be searched, and the search that
+	    follows reads it like any other. The other settings (switches, Find Format, Search:) are the
+	    user's and are left as they are. False = a command failed; nothing should be searched then. */
+	bool SetTextQuery(const PMString& text);
+
 	// (CharacterTypeName, HasFindFormatSet / HasChangeFormatSet, DescribeFormatSetting and
 	// DescribeCurrentChange - the captions the replace prompt and the saved report printed - were
 	// removed with them on 2026-09-27.)

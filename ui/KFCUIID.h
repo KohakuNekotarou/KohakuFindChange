@@ -289,6 +289,10 @@ DECLARE_PMID(kActionIDSpace, kKBSRunAcceptActionID, kKFCUIPrefix + 43)
 // opened from the panel - with no document open too. Shortcut-assignable (the user's call, the same day).
 // The first number past the split: + 44 was never spent at kKBSPrefix either.
 DECLARE_PMID(kActionIDSpace, kKBSOpenFindChangeActionID, kKFCUIPrefix + 44)
+// "Search the Application Bar's Text with This Panel (Enter)" on the flyout (2026-10-02, the user's design): a
+// check-mark toggle. ON = Return in the search field of InDesign's application bar searches with this panel (the
+// field's text as a Text search). OFF by default. See KBSAppBarSearchEnter.h.
+DECLARE_PMID(kActionIDSpace, kKBSAppBarSearchEnterActionID, kKFCUIPrefix + 45)
 
 
 // WidgetIDs:
@@ -384,6 +388,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSMinimizableFindChangeMenuKey	kKBSStringPrefix "kKBSMinimizableFindChangeMenuKey"
 // "Remember Book Panel Placement": InDesign's own Book panel comes back where it was closed.
 #define kKBSRememberBookPanelMenuKey	kKBSStringPrefix "kKBSRememberBookPanelMenuKey"
+// "Search the Application Bar's Text with This Panel (Enter)": Return in the application bar's search field searches here.
+#define kKBSAppBarSearchEnterMenuKey	kKBSStringPrefix "kKBSAppBarSearchEnterMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
 // Replace feature menu item keys.
@@ -489,6 +495,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // InDesign's own Book panel, the other window the plug-in looks after.
 #define kKBSBookScopeMenuItemPosition		2.2
 #define kKBSHidePrevChapterMenuItemPosition	2.4
+#define kKBSAppBarSearchEnterMenuItemPosition	2.5		// 2026-10-02: a search toggle, before the window toggles
 #define kKBSTranslucentFindChangeMenuItemPosition	2.6
 #define kKBSMinimizableFindChangeMenuItemPosition	2.7
 #define kKBSTranslucentPanelMenuItemPosition	2.8

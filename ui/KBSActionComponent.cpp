@@ -42,6 +42,7 @@
 #include "KBSHowTo.h"			// "How to Use..." - the operating reference
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
+#include "KBSAppBarSearchEnter.h"	// "Search the Application Bar's Text with This Panel (Enter)"
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 
@@ -290,6 +291,15 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKBSMinimizableFindChangeActionID:
 			FlipAppearanceToggle(KBSGetFindChangeMinimizable, KBSSetFindChangeMinimizable, KBSApplyFindChangeMinimizable,
 				"Minimizable Find/Change", ": on - applies when the Find/Change dialog is open.");
+			break;
+
+		// "Search the Application Bar's Text with This Panel (Enter)" (2026-10-02, the user's design): Return in
+		// the search field of InDesign's application bar searches with this panel. *Windows only, OFF by default.
+		// Everything - what was measured, the hook, why that field's own menu could not take an item - is in
+		// KBSAppBarSearchEnter.h.
+		case kKBSAppBarSearchEnterActionID:
+			FlipAppearanceToggle(KBSGetAppBarSearchEnter, KBSSetAppBarSearchEnter, KBSApplyAppBarSearchEnter,
+				"Application Bar search (Enter)", ": on - works while the Application Bar's search field is shown.");
 			break;
 
 		// "Remember Book Panel Placement": InDesign's own Book panel is measured as it closes (and
@@ -698,6 +708,14 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// being set is the preference, and it applies the moment the window exists.
 			int16 actionState = kEnabledAction;
 			if (KBSGetFindChangeMinimizable())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSAppBarSearchEnterActionID)
+		{
+			// Selectable whether or not the field is shown, like the toggles above: the flag is what is being set.
+			int16 actionState = kEnabledAction;
+			if (KBSGetAppBarSearchEnter())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}

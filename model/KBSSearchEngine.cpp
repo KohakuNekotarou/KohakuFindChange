@@ -29,6 +29,7 @@
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "ICommand.h"
 #include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CommitSearchMode
+#include "IStringData.h"			// kFindStringCmdBoss's string - SetTextQuery
 #include "IBoolData.h"				// kFindChangeGlyphIDCmdBoss: which side of the glyph search is being set
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
@@ -3229,6 +3230,24 @@ const char* KBSSearchEngine::FindCommandName(bool bookScopeOn)
 		case IWalkerScopeFactoryUtils::kSelectionScope:		return "Find in Selection";
 		default:											return "Find in Document";
 	}
+}
+
+bool KBSSearchEngine::SetTextQuery(const PMString& text)
+{
+	// The tab first, then the string - the snippet's order (Do_FindText states the mode before the find string).
+	if (!CommitFindChangeInt(kFindSearchModeCmdBoss, static_cast<int32>(IFindChangeOptions::kTextSearch),
+		static_cast<int32>(IFindChangeOptions::kTextSearch)))
+		return false;
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindStringCmdBoss));
+	if (cmd == nil)
+		return false;
+	InterfacePtr<IStringData> value(cmd, UseDefaultIID());
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (value == nil || modeData == nil)
+		return false;
+	value->Set(text);
+	modeData->Set(static_cast<int32>(IFindChangeOptions::kTextSearch));
+	return ProcessFindChangeCmd(cmd);
 }
 
 bool KBSSearchEngine::CanSearchTab(int32 mode)

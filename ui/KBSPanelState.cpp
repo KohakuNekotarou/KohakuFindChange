@@ -43,6 +43,7 @@
 #include "KBSResultTree.h"		// ShowStatus - where the result, or the failure, is reported
 #include "KBSPanelAlpha.h"		// the get / set of BOTH translucency toggles (panel and Find/Change)
 #include "KBSFindChangeMinimize.h"	// the get / set of the minimize-box toggle
+#include "KBSAppBarSearchEnter.h"	// the get / set of the Application Bar search toggle
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 
@@ -567,6 +568,7 @@ void KBSSavePanelState()
 	pairs.push_back(KBSJsonPair("translucentPanel",      KBSBoolLiteral(KBSGetPanelTranslucent())));
 	pairs.push_back(KBSJsonPair("translucentFindChange", KBSBoolLiteral(KBSGetFindChangeTranslucent())));
 	pairs.push_back(KBSJsonPair("minimizableFindChange", KBSBoolLiteral(KBSGetFindChangeMinimizable())));
+	pairs.push_back(KBSJsonPair("appBarSearchEnter",     KBSBoolLiteral(KBSGetAppBarSearchEnter())));
 	pairs.push_back(KBSJsonPair("hidePreviousChapter",   KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn())));
 	// "Remember Book Panel Placement" and the placement (2026-09-25). Its keys are named in
 	// KBSBookPanelPlacement.cpp and nowhere else: this only writes out what that file hands over -
@@ -640,6 +642,10 @@ void KBSLoadPanelStateIfPresent()
 	// the dialog is certainly not open at startup, and the window-list observer puts the style on the
 	// moment it is opened (KBSPanelAlpha.cpp).
 	KBSSetFindChangeMinimizable(KBSJsonReadBool(text, "minimizableFindChange", KBSGetFindChangeMinimizable()));
+
+	// Return in the application bar's search field (2026-10-02). Setting it ON is what puts the hook on - read
+	// back here at startup, on the main thread, the thread the hook watches (KBSAppBarSearchEnter.h).
+	KBSSetAppBarSearchEnter(KBSJsonReadBool(text, "appBarSearchEnter", KBSGetAppBarSearchEnter()));
 
 	// Hide Previous Chapter (the user's call, 2026-08-04, after the first cut left it out). Restoring
 	// it is safe in a way the flag alone does not show: the jump asks ShouldHidePreviousChapter,
