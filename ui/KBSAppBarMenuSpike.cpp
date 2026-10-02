@@ -65,6 +65,43 @@ namespace
 		return false;
 	}
 
+	// SPIKE 2 (2026-10-02, "Return in the field runs KBS"): is `w` the application bar's search field? Asked of
+	// keyboard and IME messages only; the last answer each way is kept per handle.
+	HWND gFieldYes = nullptr;
+	HWND gFieldNo = nullptr;
+	bool IsAppBarField(HWND w)
+	{
+		if (w == nullptr)
+			return false;
+		if (w == gFieldYes)
+			return true;
+		if (w == gFieldNo)
+			return false;
+		const bool yes = ClassOf(w) == L"Edit" && HasAncestorOfClass(w, L"OWL.ApplicationBarHostView");
+		if (yes)
+			gFieldYes = w;
+		else
+			gFieldNo = w;
+		return yes;
+	}
+
+	// The switch: Return in the field is stopped while %TEMP%\kbs-appbar-swallow exists (asked per key).
+	bool SwallowOn()
+	{
+		wchar_t path[MAX_PATH] = { 0 };
+		if (::GetTempPathW(MAX_PATH, path) == 0)
+			return false;
+		wcscat_s(path, L"kbs-appbar-swallow");
+		return ::GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
+	}
+
+	std::wstring TextOf(HWND edit)
+	{
+		wchar_t text[512] = { 0 };
+		::SendMessageW(edit, WM_GETTEXT, 512, reinterpret_cast<LPARAM>(text));
+		return text;
+	}
+
 	struct EditSearch { HWND found; };
 
 	BOOL CALLBACK FindAppBarEdit(HWND w, LPARAM lp)
@@ -164,6 +201,12 @@ namespace
 				case WM_EXITMENULOOP:
 					SpikeLog(L"EXITMENULOOP hwnd=%p popup=%u", m->hwnd, static_cast<UINT>(m->wParam));
 					break;
+				case WM_IME_STARTCOMPOSITION:
+				case WM_IME_ENDCOMPOSITION:
+				case WM_IME_COMPOSITION:
+					if (IsAppBarField(m->hwnd))
+						SpikeLog(L"FIELD IME msg=%#x lp=%#llx", m->message, static_cast<unsigned long long>(m->lParam));
+					break;
 				default:
 					break;
 			}
@@ -175,7 +218,18 @@ namespace
 	{
 		if (code == HC_ACTION && wParam == PM_REMOVE)
 		{
-			const MSG* m = reinterpret_cast<const MSG*>(lParam);
+			MSG* m = reinterpret_cast<MSG*>(lParam);
+			if ((m->message == WM_KEYDOWN || m->message == WM_KEYUP || m->message == WM_CHAR || m->message == WM_SYSKEYDOWN)
+				&& IsAppBarField(m->hwnd))
+			{
+				SpikeLog(L"FIELD KEY msg=%#x vk/ch=%#x lp=%#llx", m->message, static_cast<UINT>(m->wParam),
+					static_cast<unsigned long long>(m->lParam));
+				if (m->message == WM_KEYDOWN && m->wParam == VK_RETURN && SwallowOn())
+				{
+					SpikeLog(L"  SWALLOWED Return - field text [%s]", TextOf(m->hwnd).c_str());
+					m->message = WM_NULL;		// what the loop dispatches is nothing; TranslateMessage makes no WM_CHAR
+				}
+			}
 			if (m->message == WM_COMMAND)
 				LogCommand(L"POSTED WM_COMMAND", m->hwnd, m->wParam, m->lParam);
 			else if (m->message == WM_MENUCOMMAND)
