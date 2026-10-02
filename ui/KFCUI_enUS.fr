@@ -76,10 +76,12 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSPanelTitleKey,				kKBSDisplayName,
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
-                // KBSResultTree::RestoreStatusOnPanelShow reads this key whenever the panel is shown
-                // with nothing run this session - since 2026-09-29 the ONLY reader: the message area is
-                // drawn by hand now and its resource carries no initial text (KFCUI.fr). Kept here so
-                // the wording is not spelled out in the code. It names no Find command (the user's call,
+                // Read (KBSResultListWidgetMgr.cpp's InitialMessage) whenever the panel is shown with
+                // nothing run this session (KBSResultTree::RestoreStatusOnPanelShow), and when a row's
+                // "Source Text:" is taken down with nothing run yet (KBSResultTree::DropBefore) - the
+                // resource carries no initial text since 2026-09-29, the message area being drawn by hand
+                // (KFCUI.fr). (This said RestoreStatusOnPanelShow was the ONLY reader until 2026-10-02.)
+                // Kept here so the wording is not spelled out in the code. It names no Find command (the user's call,
                 // 2026-10-02): since 2026-09-29 the command's name follows Find/Change's Search:
                 // (KBSSearchEngine::FindCommandName), so "Find in Document" was wrong as often as not.
                 kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",

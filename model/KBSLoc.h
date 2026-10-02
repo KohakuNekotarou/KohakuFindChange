@@ -14,15 +14,13 @@
 //  asked is the UI LANGUAGE, not the featureset: a Roman-engine install running a Japanese UI
 //  (this machine) gets Japanese, which is what "speak the user's language" means.
 //
-//  ***** THIS FILE IS UTF-8 WITH BOM ***** so the u"..." literals can stay readable Japanese.
+//  ***** THIS FILE IS UTF-8 WITH BOM ***** so the L"..." literals can stay readable Japanese.
 //  (An ASCII file would force \u escapes; a BOM-less one would be read as CP932 by MSVC.)
 //
 //========================================================================================
 
 #ifndef __KBSLoc_h__
 #define __KBSLoc_h__
-
-#include <string>
 
 #include "LocaleSetting.h"
 #include "PMLocaleIds.h"
@@ -38,33 +36,29 @@ namespace KBSLoc
 	}
 
 	/** The Japanese text when the UI is Japanese, the enUS string-table entry otherwise.
-	    Either way the result is FINISHED text, marked untranslatable - parameters (^1) are
-	    still replaced by ::ReplaceStringParameters afterwards, exactly as before. */
-	inline PMString Text(const char* englishKey, const char16_t* japanese)
+	    Either way the result is FINISHED text that will not be translated again - parameters (^1)
+	    are still replaced by ::ReplaceStringParameters afterwards, exactly as before. */
+	inline PMString Text(const char* englishKey, const wchar_t* japanese)
 	{
-		PMString s;
 		if (JapaneseUI())
 		{
-			// PMString's own way in from UTF-16 (PMString.h:164-170). The cast is the one
-			// the SDK itself makes for wide literals (PMString.h:1071-1073). char16_t
-			// rather than wchar_t on purpose: PMString(const wchar_t*) would say outright
-			// that it is not a key - which is what is wanted here - but wchar_t is UTF-32
-			// on the Mac (PMString.h:96-97), and these literals are UTF-16.
-			s.SetXString(reinterpret_cast<const UTF16TextChar*>(japanese),
-				static_cast<int32>(std::char_traits<char16_t>::length(japanese)));
+			// ***** THE HEADER'S OWN CONSTRUCTOR FOR "NOT A KEY" (2026-10-02, the API re-audit). *****
+			// PMString(const wchar_t*) "should be used to set strings that are not keys. Calling
+			// Translate on this string will do nothing" (PMString.h:96-102) - which is exactly what these
+			// are, and is what the header recommends in place of SetTranslatable, which it files under
+			// DISCOURAGED (:698-721). These were char16_t literals put in through SetXString and then
+			// SetTranslatable(kFalse) until then, because wchar_t is UTF-32 on the Mac (:96-97); KBS is
+			// Windows alone (the user's call, 2026-09-28), where wchar_t is UTF-16 and L"" is that.
+			return PMString(japanese);
 		}
-		else
-		{
-			// The official one-liner for "here is a string-table key, give me its
-			// translation" (PMString.h:80-83), written exactly this way by the
-			// localization sample itself - basiclocalization/BscL10NDialogController.cpp:115.
-			s = PMString(englishKey, PMString::kTranslateDuringCall);
-		}
-		// PMString.h files SetTranslatable under DISCOURAGED (:698-721) and points at
-		// WideString, a kNoTranslate constructor or SetCString-with-encoding instead. None of
-		// those three can carry a UTF-16 literal out as a PMString, and this is the very
-		// means the alert's own contract names: CAlert.h:84 says a string is translated
-		// "unless the string has been translated already or isn't translatable".
+		// The official one-liner for "here is a string-table key, give me its translation"
+		// (PMString.h:80-83), written exactly this way by the localization sample itself -
+		// basiclocalization/BscL10NDialogController.cpp:115.
+		PMString s(englishKey, PMString::kTranslateDuringCall);
+		// ...and the translation marked as finished. This one stays: the header's alternatives
+		// (WideString, a kNoTranslate constructor, SetCString with an encoding) cannot take a key to its
+		// translation, and an alert translates what it is given "unless the string has been translated
+		// already or isn't translatable" (CAlert.h:84).
 		s.SetTranslatable(kFalse);
 		return s;
 	}
@@ -81,17 +75,17 @@ namespace KBSJa
 	// begins where the search left it (KBSReplaceEngine::TellResultsWentStale). An opening that
 	// names the chapter where there is one to name, then what it means for the user.
 	// See KBSID.h for how this came to be a statement rather than a question.
-	const char16_t kStaleResultsDoc[]        = u"検索結果に変化を確認しましたので、置換を中止しました。";
-	const char16_t kStaleResultsOne[]        = u"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
+	const wchar_t kStaleResultsDoc[]        = L"検索結果に変化を確認しましたので、置換を中止しました。";
+	const wchar_t kStaleResultsOne[]        = L"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
 	// What Edit > Undo calls a Change Checked run (2026-09-26, the user's call).
-	const char16_t kReplaceStep[]            = u"置換";
+	const wchar_t kReplaceStep[]            = L"置換";
 	// ...and a Reject Change and an Accept All Changes by KohakuFindChange (2026-09-29: English on every
 	// UI until then). InDesign's own Track Changes words, the author named as the Track Changes panel
 	// shows it (the user's call: the name says only KohakuFindChange's changes are accepted).
-	const char16_t kRejectStep[]             = u"変更を却下";
-	const char16_t kAcceptAllStep[]          = u"KohakuFindChange によるすべての変更を承認";
+	const wchar_t kRejectStep[]             = L"変更を却下";
+	const wchar_t kAcceptAllStep[]          = L"KohakuFindChange によるすべての変更を承認";
 	// ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29, Show Changes).
-	const char16_t kAcceptStep[]             = u"変更を承認";
+	const wchar_t kAcceptStep[]             = L"変更を承認";
 	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
 	//  replaced - please search again" and lost its first half that morning for saying what the
 	//  sentence above already said; the user's call the same day took the rest, leaving the alert
