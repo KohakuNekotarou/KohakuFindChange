@@ -21,6 +21,9 @@
 #include "ISession.h"
 #include "ISubject.h"			// the Find/Change settings' subject - where their changes arrive
 #include "TextWalkerServiceProviderID.h"	// IID_IFINDCHANGEOPTIONS - the protocol those changes arrive on
+#include "IDialog.h"			// AppBarField: dialogs are passed over on the window list
+#include "IWindow.h"			// GetSysWindow - the application frame's HWND
+#include "IWindowList.h"		// the application's windows (KBSPanelAlpha.cpp walks the same list)
 
 // The Glyph tab's query shown as a character (GlyphDescription): its font is two attributes on that tab's list.
 #include "AttributeBossList.h"
@@ -82,8 +85,9 @@ static std::wstring ClassOf(HWND w)
 }
 
 // Is `w` the application bar's search field? A Win32 Edit inside an OWL.ApplicationBarHostView (measured: the
-// window tree, docs/ai-notes/indesign-win32-window-tree.md, and both spikes). Asked of a Return only, so it is
-// asked fresh each time: a handle remembered from an earlier field could name another window by now.
+// window tree, docs/ai-notes/indesign-win32-window-tree.md, and both spikes). The hook asks it of every Return's
+// own window; AppBarField asks it again of the handle it remembers before each use, since a handle the field
+// once had could name another window by now.
 static bool IsAppBarSearchField(HWND w)
 {
 	if (ClassOf(w) != L"Edit")
@@ -115,6 +119,8 @@ static std::wstring FieldText(HWND field)
 //  was dropped once the field showed the dialog's own query. What it measured stays in the note:
 //  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
 
+// What the field is given: the UTF-16 of a PMString, which is UTF-16 already. One converter: the Text and GREP
+// tabs' WideString arrives here through PMString's own constructor from it.
 static std::wstring WideOf(const PMString& s)
 {
 	int32 units = 0;
@@ -122,35 +128,20 @@ static std::wstring WideOf(const PMString& s)
 	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
 }
 
-static std::wstring WideOf(const WideString& s)
-{
-	int32 units = 0;
-	const UTF16TextChar* buf = s.GrabUTF16Buffer(&units);
-	return (buf != nil && units > 0) ? std::wstring(reinterpret_cast<const wchar_t*>(buf), units) : std::wstring();
-}
-
-static void AppendCodePoint(std::wstring& out, UTF32TextChar c)
-{
-	const uint32 v = c.GetValue();
-	if (v >= 0x10000)
-	{
-		out += static_cast<wchar_t>(0xD800 + ((v - 0x10000) >> 10));
-		out += static_cast<wchar_t>(0xDC00 + ((v - 0x10000) & 0x3FF));
-	}
-	else
-		out += static_cast<wchar_t>(v);
-}
-
 // The Glyph tab's query as the field can show it: the character the glyph stands for (when the font says),
 // then the glyph id and the font - "<char> (GID 8123, Kozuka Mincho Pr6N R)". The font is the two attributes the
 // dialog keeps on that tab's list, kTextAttrFontUIDBoss (the family) and kTextAttrFontStyleBoss (the style),
-// read the way SnpInsertGlyph.cpp reads them off text.
-static std::wstring GlyphDescription(const IFindChangeOptions* opts)
+// read the way SnpInsertGlyph.cpp reads them off text (and the way KBSSearchEngine's query signature counts
+// them: "the FONT is two attributes in the list"). Built as a PMString, so a character past U+FFFF becomes its
+// surrogate pair in PMString::AppendW rather than by hand (2026-10-03, the [17] re-check).
+static PMString GlyphDescription(const IFindChangeOptions* opts)
 {
+	PMString out;
 	const Text::GlyphID gid = opts->GetFindGlyphID();
 	if (gid == kInvalidGlyphID)
-		return std::wstring();
-	std::wstring character, font;
+		return out;
+	PMString font;
+	UTF32TextChar character(0);
 	IDataBase* const db = opts->GetUIDAttrDB();
 	const AttributeBossList* list = (db != nil) ? opts->GetFindAttributeBossList(db, IFindChangeOptions::kGlyphSearch) : nil;
 	if (list != nil)
@@ -163,24 +154,31 @@ static std::wstring GlyphDescription(const IFindChangeOptions* opts)
 		if (family != nil)
 		{
 			const PMString style = (styleAttr != nil) ? styleAttr->GetFontName() : PMString();
-			font = WideOf(family->GetDisplayFamilyName());
-			if (!style.empty())
-				font += L" " + WideOf(style);
+			font = family->GetDisplayFamilyName();
+			if (!style.IsEmpty())
+			{
+				font.Append(" ");
+				font.Append(style);
+			}
 			InterfacePtr<IPMFont> face(family->QueryFace(style));
 			Utils<IGlyphUtils> glyphUtils;
 			if (face != nil && glyphUtils)
-			{
-				const UTF32TextChar c = glyphUtils->GetUnicodeForGlyphID(face, gid);
-				if (c.GetValue() != 0)
-					AppendCodePoint(character, c);
-			}
+				character = glyphUtils->GetUnicodeForGlyphID(face, gid);
 		}
 	}
-	std::wstring out = character.empty() ? std::wstring() : character + L" ";
-	out += L"(GID " + std::to_wstring(static_cast<int32>(gid));
-	if (!font.empty())
-		out += L", " + font;
-	out += L")";
+	if (character.GetValue() != 0)
+	{
+		out.AppendW(character);
+		out.Append(" ");
+	}
+	out.Append("(GID ");
+	out.AppendNumber(static_cast<int32>(gid));
+	if (!font.IsEmpty())
+	{
+		out.Append(", ");
+		out.Append(font);
+	}
+	out.Append(")");
 	return out;
 }
 
@@ -191,7 +189,7 @@ static std::wstring GlyphDescription(const IFindChangeOptions* opts)
 // e.g. "Half-width Katakana" = jaJP "hankaku katakana", "kWesternArabicDigits" = "Arabic Digits (0, 1, ...)".
 // kTranslateDuringCall looks the key up in the string tables of every loaded plug-in; a key not found stays as
 // it is - English-like words, never an empty field.
-static std::wstring CharacterTypeName(IFindChangeOptions::CharacterType type)
+static PMString CharacterTypeName(IFindChangeOptions::CharacterType type)
 {
 	ConstCString key = nil;
 	switch (type)
@@ -205,23 +203,63 @@ static std::wstring CharacterTypeName(IFindChangeOptions::CharacterType type)
 		case IFindChangeOptions::kWesternArabicDigits:	key = "kWesternArabicDigits"; break;
 		case IFindChangeOptions::kArabicIndicDigits:	key = "kArabicIndicDigits"; break;
 		case IFindChangeOptions::kFarsiDigits:			key = "kFarsiDigits"; break;
-		default:										return std::wstring();
+		default:										return PMString();
 	}
-	return WideOf(PMString(key, PMString::kTranslateDuringCall));
+	return PMString(key, PMString::kTranslateDuringCall);
 }
 
 struct KBSAppBarFieldSearch { HWND found; };
-static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp);
-static BOOL CALLBACK FindMainFrame(HWND w, LPARAM lp);
 
+static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp)
+{
+	if (IsAppBarSearchField(w))
+	{
+		reinterpret_cast<KBSAppBarFieldSearch*>(lp)->found = w;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+// The field, remembered (2026-10-03, the [17] re-check): it is asked for on every keystroke typed into Find what,
+// and finding it walks every child window of the application frame. Re-checked before each use with the test
+// the hook uses - a Win32 Edit inside the application bar - so a handle the system has since given to another
+// window is never written to; it is looked for again.
+static HWND sField = nullptr;
+
+// The application bar's search field, or nullptr. The application frame is reached through the SDK - the window
+// list, the way KBSPanelAlpha.cpp finds the Find/Change dialog - not by its Win32 class name: the windows on it
+// that have a platform window and are not dialogs (measured: the frame alone - palettes and document windows
+// answer nil to GetSysWindow; docs/ai-notes/indesign-win32-window-tree.md). Each such window is searched, so
+// which of them carries the field is not assumed either. *GetNthWindow does not addref; nothing is released.
+// (Until 2026-10-03 the frame was found with EnumWindows and the class name "indesign" - every top-level window
+// on the desktop walked, on every keystroke.)
 static HWND AppBarField()
 {
-	HWND main = nullptr;
-	::EnumWindows(FindMainFrame, reinterpret_cast<LPARAM>(&main));
-	KBSAppBarFieldSearch s = { nullptr };
-	if (main != nullptr)
-		::EnumChildWindows(main, FindAppBarField, reinterpret_cast<LPARAM>(&s));
-	return s.found;
+	if (sField != nullptr && IsAppBarSearchField(sField))
+		return sField;
+	sField = nullptr;
+	ISession* const session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
+	InterfacePtr<IWindowList> windows(app, IID_IWINDOWLIST);
+	if (windows == nil)
+		return nullptr;
+	const int32 count = windows->WindowCount();
+	for (int32 i = 0; i < count && sField == nullptr; ++i)
+	{
+		IWindow* win = windows->GetNthWindow(i);
+		if (win == nil)
+			continue;
+		InterfacePtr<IDialog> dlg(win, IID_IDIALOG);
+		if (dlg != nil)
+			continue;
+		const HWND frame = win->GetSysWindow();
+		if (frame == nullptr)
+			continue;
+		KBSAppBarFieldSearch s = { nullptr };
+		::EnumChildWindows(frame, FindAppBarField, reinterpret_cast<LPARAM>(&s));
+		sField = s.found;
+	}
+	return sField;
 }
 
 // Write the dialog's query into the field. Only what changed is written: an unchanged write would still move
@@ -233,16 +271,17 @@ static void MirrorFindChangeIntoField()
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
 		return;
-	std::wstring text;
+	PMString query;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	switch (mode)
 	{
 		case IFindChangeOptions::kTextSearch:
-		case IFindChangeOptions::kGrepSearch:			text = WideOf(opts->GetFindString(mode)); break;
-		case IFindChangeOptions::kGlyphSearch:			text = GlyphDescription(opts); break;
-		case IFindChangeOptions::kTransliterateSearch:	text = CharacterTypeName(opts->GetFindCharacterType()); break;
+		case IFindChangeOptions::kGrepSearch:			query = PMString(opts->GetFindString(mode)); break;
+		case IFindChangeOptions::kGlyphSearch:			query = GlyphDescription(opts); break;
+		case IFindChangeOptions::kTransliterateSearch:	query = CharacterTypeName(opts->GetFindCharacterType()); break;
 		default:										return;		// Object, Colour: not this panel's
 	}
+	const std::wstring text = WideOf(query);
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
 		return;
@@ -349,28 +388,6 @@ static void UnhookAppBar()
 	}
 }
 
-static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp)
-{
-	if (IsAppBarSearchField(w))
-	{
-		reinterpret_cast<KBSAppBarFieldSearch*>(lp)->found = w;
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static BOOL CALLBACK FindMainFrame(HWND w, LPARAM lp)
-{
-	DWORD pid = 0;
-	::GetWindowThreadProcessId(w, &pid);
-	if (pid == ::GetCurrentProcessId() && ClassOf(w) == L"indesign")
-	{
-		*reinterpret_cast<HWND*>(lp) = w;
-		return FALSE;
-	}
-	return TRUE;
-}
-
 #endif	// WINDOWS
 
 // The observer that keeps the field following the dialog. An AddIn onto kActiveContextBoss under its own IID
@@ -447,13 +464,8 @@ bool16 KBSApplyAppBarSearchEnter()
 #ifdef WINDOWS
 	if (!sAppBarSearchEnter)
 		return kTrue;
-	HWND main = nullptr;
-	::EnumWindows(FindMainFrame, reinterpret_cast<LPARAM>(&main));
-	if (main == nullptr)
-		return kFalse;
-	KBSAppBarFieldSearch s = { nullptr };
-	::EnumChildWindows(main, FindAppBarField, reinterpret_cast<LPARAM>(&s));
-	return (s.found != nullptr && ::IsWindowVisible(s.found)) ? kTrue : kFalse;
+	const HWND field = AppBarField();
+	return (field != nullptr && ::IsWindowVisible(field)) ? kTrue : kFalse;
 #else
 	return kFalse;
 #endif
