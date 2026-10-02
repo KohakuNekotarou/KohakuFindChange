@@ -159,7 +159,12 @@ enum ChapterWalkResult
 	// and then broke off with an error partway through. Its hits are real and are kept; what is
 	// missing is the rest of the chapter, which is why it gets a sentence of its own rather than
 	// being reported as "could not be searched". See CollectHitsInDoc's loop.
-	kChapterWalkFailed
+	kChapterWalkFailed,
+
+	// ...and the user pressed Cancel while the walk was going (2026-10-02, the API re-audit S-3: asked
+	// inside the walk, as InDesign's own Change All asks it - SpellReplaceWalker.cpp:471). The run is
+	// thrown away, so nothing about this ending is said.
+	kChapterCancelled
 };
 
 /** A short reason to put in the status line. Not translatable - it names internals.
@@ -1328,7 +1333,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// Cancel is asked between chapters only, the user's call of 2026-08-05 ("safety first": WasCancelled was
 	// taken to pump events, and UI work was not to run in the middle of the walk; the cost, waiting out one
 	// large chapter, was accepted). Whether moving the bar already lets the same events in, inside the
-	// section, is the part not known. (Earlier on 2026-10-02 this note said SetPosition pumps and WasCancelled
+	// section, is the part not known. (Since 2026-10-02 it is asked inside the walk as well, right after the
+	// bar moves - the API re-audit S-3, on a commit of its own: see the walk below.) (Earlier on 2026-10-02 this note said SetPosition pumps and WasCancelled
 	// only reads a flag, so asking inside would add nothing - neither half was measured.) Do not
 	// "correct" this to the one-command shape without measuring both.
 	// (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
@@ -1434,7 +1440,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 		// Move the bar. A story we have not seen before means the one before it is finished; within a
 		// story, the position is how far into its text this match sits. Done inside the walker's critical
-		// section; WasCancelled is asked between chapters (see the note on the section above).
+		// section; WasCancelled is asked right after (below - and between chapters, see the note on the
+		// section above).
 		if (progressBar != nil)
 		{
 			if (story != progressStory)
@@ -1469,7 +1476,23 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 			// Moving the bar from inside the walk is what keeps the Cancel button answering at all -
 			// see KBSAdvanceProgress.
+			const int32 reportedBefore = ioProgressReported;
 			KBSAdvanceProgress(progressBar, ioProgressReported, position);
+
+			// ***** AND CANCEL IS ASKED HERE, INSIDE THE WALK (2026-10-02, the API re-audit S-3). ***** As
+			// InDesign's own Change All asks it, every step of its walk (spellpanel/SpellReplaceWalker.cpp:471,
+			// :496; textimportfilter every read, TxtImpFilter.cpp:519-548), so a Cancel pressed in a large
+			// document stops the walk there, rather than once the whole document has been walked and the hits
+			// are thrown away. Asked only when the bar has just been moved: a call on the bar is then made
+			// only where the walk has always made one. Whether WasCancelled ITSELF lets events in is not
+			// measured (KBSAdvanceProgress) - if it does, this puts events inside the walk that the user's call
+			// of 2026-08-05 ("safety first", note on the critical section) kept out; this change was taken on
+			// the user's go-ahead for S-3 and stands on a commit of its own. kFalse = no global error state.
+			if (ioProgressReported != reportedBefore && progressBar->WasCancelled(kFalse))
+			{
+				outResult = kChapterCancelled;
+				break;
+			}
 		}
 
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
@@ -2688,7 +2711,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 			PMString walkName(allDocuments ? PMString("All open documents") : targets[0].shortName);
 			walkName.SetTranslatable(kFalse);
-			if (walkResult == kChapterWalkFailed)
+			if (walkResult == kChapterCancelled)
+				cancelled = true;
+			else if (walkResult == kChapterWalkFailed)
 				brokeOff.push_back(walkName);		// its hits are real and are filed below
 			else if (walkResult != kChapterWalked)
 			{
@@ -2830,6 +2855,14 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		if (!KBSBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
+		// Cancel pressed inside the walk (S-3, 2026-10-02): the chapter is handed back above, the run is
+		// thrown away below.
+		if (walkResult == kChapterCancelled)
+		{
+			cancelled = true;
+			break;
+		}
+
 		if (docCapped)
 			collectionTruncated = true;
 		if (walkResult == kChapterWalkFailed)
@@ -2873,7 +2906,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
 	// pass, so a cancel pressed while the LAST chapter was being walked had no next pass to be seen
 	// in, and the search finished as though the button had never been touched. Same fault as the
-	// replace engine's - see the matching comment there.
+	// replace engine's - see the matching comment there. (The walk asks it too since 2026-10-02, right after
+	// each move of its own; a click taken by a move outside the walk - the forced ones that hand the bar on
+	// when a chapter is done - is seen here.)
 	if (!cancelled && progressBar.WasCancelled(kFalse))
 		cancelled = true;
 
