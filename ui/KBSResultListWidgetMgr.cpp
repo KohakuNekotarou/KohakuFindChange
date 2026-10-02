@@ -880,8 +880,10 @@ void WriteStatusWidget(const PMString& label, const PMString& pre, const PMStrin
 
 	textData->SetSegments(label, pre, mid, post, wantCaret);
 
-	// The pieces are not something the view watches, so it is told to repaint - and forced to at once,
-	// the rule the stock StaticText needed as well (it did not repaint on SetString alone).
+	// The pieces are not something the view watches, so it is told to repaint - and, for a report, made
+	// to repaint NOW (ShowStatus says why): an invalidated view waits for the next event loop. (The stock
+	// multi-line text this box replaced did invalidate itself on SetString - memory
+	// statictext-widget-immediate-update - but drawing at once was still this call's job.)
 	// ONE call for each case: ForceRedraw with no region draws the whole view now ("Redraws the invalid
 	// region directly", IControlView.h:281-286), so an Invalidate in front of it asked for nothing more
 	// (2026-10-02, the API re-audit - KCM's position read-out lost the same duplicate).
