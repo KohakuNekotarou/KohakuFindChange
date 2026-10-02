@@ -20,9 +20,12 @@
 //    UpdateToolTipOnMouseMove - which ITip.h:44-50 wraps in ID_DEPRECATED
 //    SetTipText               - which ITip.h:51-53 says is "not implemented in general case"
 //
-//  It lives in DV_WidgetBin.lib. That was once the reason NOT to use it; the plug-in now links that
-//  library in all four configurations anyway, for its own drawn views (KBSColorTextView,
-//  KBSStatusTextView), so the base class costs nothing.
+//  It lives in DV_WidgetBin.lib. That was once the reason NOT to use it; since the model/UI split
+//  (2026-10-01) the UI half links the SDK's own $(UI_PLUGIN_LINKLIST), which carries DV_WidgetBin.lib
+//  and WidgetBin.lib in all four configurations (build/win/prj/*.props) as it does for every UI sample,
+//  so the base class costs nothing. (The model half links $(MODEL_PLUGIN_LINKLIST), which has neither -
+//  nothing of a widget belongs there. Until 2026-10-02 this said the library was added for the
+//  plug-in's own drawn views, KBSColorTextView and KBSStatusTextView.)
 //
 //========================================================================================
 

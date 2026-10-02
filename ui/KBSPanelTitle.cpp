@@ -16,7 +16,7 @@
 #include "IPanelControlData.h"	// FindWidget - reaching the illustration inside the panel
 #include "IPanelMgr.h"			// GetPanelFromWidgetID / GetPaletteRefContainingPanel
 #include "ISession.h"
-#include "IWorkspace.h"			// the session workspace - where the Find/Change settings live
+#include "IFindChangeOptions.h"	// the Find/Change settings - their subject is where their changes arrive
 #include "TextWalkerServiceProviderID.h"	// IID_IFINDCHANGEOPTIONS - the protocol their changes arrive on
 #include "ISubject.h"			// AttachObserver / DetachObserver on the illustration
 #include "ITriStateControlData.h"	// the protocol a button announces its click on
@@ -25,6 +25,7 @@
 #include "CObserver.h"			// the panel-boss observer that writes the tab on show
 #include "PaletteRefUtils.h"	// SetPaletteLabel - the tab's own label
 #include "PMString.h"
+#include "PreferenceUtils.h"	// QuerySessionPreferences - the Find/Change settings, as the engine reads them
 
 // The plug-in's home page is opened through InDesign's own hyperlink plumbing rather than any OS
 // call of ours. GoToURL is PUBLIC_DECL, so no boss and no IID are needed to reach it.
@@ -164,22 +165,25 @@ void KBSPanelTitle::Restore()
 namespace
 {
 
-/** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
-    Silently does nothing when the widget is not there, which is the ordinary state while the panel
-    is being torn down. */
 // ***** THE FIND/CHANGE TAB ON THE PANEL'S NAME (2026-09-27). ***** The dialog's settings are a session
 // preference (IFindChangeOptions on the session workspace), and a preference command notifies the
-// workspace's subject on the preference's own IID - so switching the dialog's tab should arrive here
-// and rename the tab at once. (No worked example of observing these settings exists in the SDK; the
-// title is also rewritten on show, on a scope toggle and on every search, so it is right by the next
-// of those even if a tab switch never arrives.)
+// subject of the boss that holds it on the preference's own IID - so switching the dialog's tab arrives
+// here and renames the tab at once. MEASURED on 2026-09-27: a script's findGrep() arrives, and so does
+// the user clicking the dialog's tab (memory findchange-tab-switch-notification). No worked example
+// observes THESE settings in the SDK; the title is also rewritten on show, on a scope toggle and on
+// every search.
+// ***** REACHED THROUGH THE SETTING ITSELF (2026-10-02, the API re-audit). ***** The subject is asked of
+// the preference interface, as the product's panels reach theirs - spellpanel's
+// AutoCorrectPanelObserver.cpp:72-75 (QuerySessionPreferences -> ISubject -> AttachObserver, and the
+// same in AutoDetach) - and so through the very call the engine reads the settings by. It was asked of
+// IWorkspace until then: the same boss (PreferenceUtils.h: "a preferences interface in the session
+// workspace"), so nothing that arrives has changed.
 void AttachToFindChangeOptions(IObserver* observer, bool attach)
 {
-	ISession* session = GetExecutionContextSession();
-	if (session == nil)
-		return;
-	InterfacePtr<IWorkspace> ws(session->QueryWorkspace());
-	InterfacePtr<ISubject> subject(ws, UseDefaultIID());
+	if (GetExecutionContextSession() == nil)
+		return;		// the guard this always had (SetTabLabel says why a session is not taken for granted)
+	InterfacePtr<IFindChangeOptions> settings(QuerySessionPreferences<IFindChangeOptions>());
+	InterfacePtr<ISubject> subject(settings, UseDefaultIID());
 	if (subject == nil)
 		return;
 	const bool attached = subject->IsAttached(observer, IID_IFINDCHANGEOPTIONS) != kFalse;
@@ -189,6 +193,9 @@ void AttachToFindChangeOptions(IObserver* observer, bool attach)
 		subject->DetachObserver(observer, IID_IFINDCHANGEOPTIONS);
 }
 
+/** Attach to (or detach from) one of the panel's own widgets on the protocol it reports clicks on.
+    Silently does nothing when the widget is not there, which is the ordinary state while the panel
+    is being torn down. */
 void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const WidgetID& widgetID, bool attach)
 {
 	if (panelData == nil)

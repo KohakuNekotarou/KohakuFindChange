@@ -70,7 +70,24 @@ static bool16 KBSPanelStateFile(IDFile& outFile)
 
 //----------------------------------------------------------------------------------------
 // A minimal JSON (written by hand, read leniently)
-//   What is stored is a flat set of booleans and numbers, so this avoids the boost-backed IJsonUtils.
+//
+//   ***** WHY NOT THE SDK'S JSON CLASS. ***** (Settled 2026-10-02, the API re-audit; this said only
+//   "a flat set of booleans and numbers" until then, which is a reason it is easy, not a reason not to.)
+//   The official one is `class PUBLIC_DECL JSON` in public/interfaces/utils/IJsonUtils.h, a wrapper
+//   around boost::property_tree; the product reads with it (linksui's ChromiumImportHelperAEMLinks.cpp,
+//   read_json in a try/catch) and writes with it (publiclib's HTTPAssetLinkResourceStateUpdater.cpp,
+//   addValue -> write_json). The dependency is not the obstacle: KCM measured that it compiles and
+//   links with no build change (its KCMPageCheck.cpp said so until KCM 57b1278). Two things here would
+//   be lost:
+//     1. THE REPAIR OF A BROKEN FILE (the user's call, 2026-09-28 - KBSJsonSalvagePairs). read_json
+//        throws on the whole text when any of it is broken, so a file cut short by a crash would still
+//        need this hand-written reader to keep what stands complete in it - and the format would then
+//        be known in two places.
+//     2. THE VALUES AS THEY ARE WRITTEN. property_tree keeps every value as a string and writes it back
+//        quoted - true comes out as "true" (KIDMCP's KIDMCPMcp.cpp builds its replies by hand for the
+//        same reason: 1 and "1" cannot be told apart on the way out). KBSPanelStateWriteKeys promises
+//        to leave every key it is not writing exactly as the file has it, and an older KBS reads a bare
+//        true; both would break on the first write.
 //----------------------------------------------------------------------------------------
 
 typedef std::vector<std::pair<std::string, std::string> > KBSJsonPairs;	// key, raw value
