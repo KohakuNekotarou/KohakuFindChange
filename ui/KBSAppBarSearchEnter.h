@@ -10,8 +10,9 @@
 //    . the field SHOWS the query of the tab the dialog is on, and follows it as it is typed (Text / GREP: the
 //      find string; Glyph: the glyph; Transliterate: the character type; Object / Colour: left alone);
 //    . Return in the field searches with this panel instead of Adobe Stock / Help - on the Text and GREP tabs
-//      the field's text is put into that tab first when it differs (KBSSearchEngine::SetQuery); on the other
-//      tabs it is ignored and the dialog's query is searched as it stands (the user's call, 2026-10-03).
+//      only, the field's text put into that tab first when it differs (KBSSearchEngine::SetQuery). On the
+//      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
+//      is up (the user's call at the first live check, 2026-10-03 - the WIP searched the dialog's query there).
 //  (The triangle no longer chooses the tab - that was the first design of 2026-10-03, dropped the same day.)
 //  OFF by default; OFF = the field is not touched at all.
 //

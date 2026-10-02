@@ -251,19 +251,32 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	if (sShutdown || !sAppBarSearchEnter || text.empty())
 		return IIdleTask::kEndOfTime;
 
-	// The panel up first, so the rows the search draws are seen (kFalse = the key focus stays where it is).
+	// Return searches on the Text and GREP tabs only - the user's call (2026-10-03, at the first live check; the
+	// WIP searched the dialog's own query on every other tab). On the others the Return is still stopped (no
+	// browser) and nothing runs; the status line says why - only while the panel is up: ShowStatus also keeps
+	// the line for the panel's next show, where it would stand in place of the last search's report. The panel
+	// is not opened for it.
 	InterfacePtr<IPanelMgr> panelMgr(KBSBookPanelLookup::QueryPanelManager());
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	const IFindChangeOptions::SearchMode mode = (opts != nil) ? opts->GetSearchMode() : IFindChangeOptions::kTextSearch;
+	if (mode != IFindChangeOptions::kTextSearch && mode != IFindChangeOptions::kGrepSearch)
+	{
+		if (panelMgr != nil && panelMgr->IsPanelWithWidgetIDShown(kKBSPanelWidgetID))
+		{
+			PMString msg("Application Bar link: Return searches on the Text and GREP tabs only - nothing was searched.");
+			msg.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(msg);
+		}
+		return IIdleTask::kEndOfTime;
+	}
+
+	// The panel up first, so the rows the search draws are seen (kFalse = the key focus stays where it is).
 	if (panelMgr != nil && !panelMgr->IsPanelWithWidgetIDShown(kKBSPanelWidgetID))
 		panelMgr->ShowPanelByWidgetID(kKBSPanelWidgetID, kFalse);
 
-	// The field's text goes into the dialog only on the Text and GREP tabs, and only when it differs from what that
-	// tab already holds (the field shows that, so an untouched field changes nothing). On every other tab the
-	// field's text is ignored and the dialog's own query is searched as it stands - the user's call (2026-10-03).
-	// Object and Colour are refused by the search itself, with its own words on the status line.
-	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	const IFindChangeOptions::SearchMode mode = (opts != nil) ? opts->GetSearchMode() : IFindChangeOptions::kTextSearch;
-	if ((mode == IFindChangeOptions::kTextSearch || mode == IFindChangeOptions::kGrepSearch)
-		&& (opts == nil || WideOf(opts->GetFindString(mode)) != text))
+	// The field's text goes into the dialog only when it differs from what the tab already holds (the field
+	// shows that, so an untouched field changes nothing).
+	if (opts == nil || WideOf(opts->GetFindString(mode)) != text)
 	{
 		PMString query(WideString(text.c_str(), static_cast<int32>(text.size())));
 		query.SetTranslatable(kFalse);
