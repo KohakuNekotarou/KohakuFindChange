@@ -13,8 +13,7 @@
 #include "VCPlugInHeaders.h"
 
 // General includes:
-#include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign - see MarkUpBreaksForDisplay
-#include "Utils.h"
+#include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign and the hidden markers - see MarkUpBreaksForDisplay
 
 #include <algorithm>	// std::lower_bound - where the display cap falls inside one font group
 #include <set>			// the rows already copied aside - see BackUpRow
@@ -886,10 +885,13 @@ static const UTF32TextChar kKBSReturnArrow = 0x21B5;
 // ***** EXCEPT THE TABLE'S ANCHOR SINCE 2026-09-29 - it is shown as kKBSTableSign (the user: "the way KCM
 // does it, a table sign"). ***** Its continuations (one per row after the first) are still dropped: a table
 // is one sign however many rows it has.
+// By TextChar.h's own names (2026-10-02, the API re-audit: five of the seven were bare numbers beside two
+// named ones; 0x18 is also kTextChar_AutoText there - the same code).
 static bool IsHiddenMarker(UTF16TextChar c)
 {
-	return c == 0x04 || c == 0x05 || c == kTextChar_TableContinued || c == 0x18 || c == 0x19
-		|| c == 0xFEFF || c == 0xFFFC;
+	return c == kTextChar_FootnoteMarker || c == kTextChar_EndnoteMarker || c == kTextChar_TableContinued
+		|| c == kTextChar_PageNumber || c == kTextChar_SectionName
+		|| c == kTextChar_ZeroSpaceNoBreak || c == kTextChar_ObjectReplacementCharacter;
 }
 
 // ***** THE SIGN A TABLE LEAVES IN A ROW (2026-09-29, the user: "can it be like KCM - a table mark between
