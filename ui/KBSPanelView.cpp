@@ -27,9 +27,10 @@
 //
 //    * the size the panel OPENS at (KFCUI.fr, 360). 360 - 61 of fixed part = 299, and 299 / 19 is
 //      15.7 rows.
-//    * the moment KBSPanelMetrics::Update moves the tree's top down for a Japanese UI: the tree
-//      loses 24px out of a height that was rounded against the 48px block, so a panel that WAS
-//      whole stops being so (275 / 19 = 14.5 at the opening size).
+//    * the moment KBSPanelMetrics::Update moves the tree's top down for a UI whose palette font draws
+//      a taller line than the .fr's 12px (a Japanese one: 72 - 48 = 24px): the tree loses that out
+//      of a height rounded against the .fr's block, so a panel that WAS whole stops being so
+//      (275 / 19 = 14.5 at the opening size).
 //
 //  One drag puts it right, and that is where this is left. The fix would be to resize the panel
 //  from KBSPanelMetrics::Update - but a docked panel's height belongs to the dock, and a plug-in
@@ -132,8 +133,8 @@ PMPoint KBSPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 	// ! The product implementations ADD UP the fixed parts by name (control strip + indicators +
 	//   sets area). This one SUBTRACTS instead - the panel's current height less the tree's - and
 	//   the difference is deliberate. The fixed part of this panel is the message block, and its
-	//   height DEPENDS ON THE UI LANGUAGE (48px Roman, 72px Japanese; KBSPanelMetrics decides and
-	//   moves the tree to match). Adding it up here would state that fact a second time, in a
+	//   height DEPENDS ON THE UI LANGUAGE (four of the palette font's lines - 72px on a Japanese UI;
+	//   KBSPanelMetrics asks the font and moves the tree to match). Adding it up here would state that fact a second time, in a
 	//   second place, in a way that has to be kept in step by hand. The tree is the only widget
 	//   that stretches, so what is left when it is taken away IS the fixed part, whatever the
 	//   language made it.

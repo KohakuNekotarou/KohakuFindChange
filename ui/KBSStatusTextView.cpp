@@ -38,13 +38,15 @@
 //  not anything measured. KCM's box, which this one came from, carries the same hand-written wrap.
 //
 //  ***** HOW MANY LINES: as many as the box holds, worked out at draw time. ***** KBSPanelMetrics makes
-//  the box 72px on a Japanese UI (18px x 4) and 48px on a Roman one (12px x 4); a hand-drawn box has
-//  no line count of its own to disagree with that, so the height and the font are the whole answer.
+//  the box four of this font's lines tall (MessageBlockHeight - 72px on this machine's Japanese UI);
+//  a hand-drawn box has no line count of its own to disagree with that, so the height and the font
+//  are the whole answer - and since 2026-10-02 both come from the one place, KBSPanelMetrics'
+//  MessageFont / MessageLineMetrics (the API re-audit P-1; the box's height was a 12px / 18px table
+//  by UI language until then).
 //  ! The stock widget drew in kPaletteWindowFontId; this draws in the SYSTEM SCRIPT variant, the one
 //    the hit rows use, because it now shows the document's own text as well as the panel's sentences.
 //    On this machine's Japanese UI the two answer the same 18px line (KCM measured ascent 12.7 +
-//    descent 5.3 for this font; KBSPanelMetrics' 18px was measured off the stock widget). A Roman UI
-//    has not been measured.
+//    descent 5.3 for this font). A Roman UI has not been measured.
 //
 //  ***** WHEN IT DOES NOT FIT, THE CONTEXT GIVES WAY. ***** The replaced text itself is cut only when it
 //  alone overflows the box, and then an ellipsis says so.
@@ -61,7 +63,6 @@
 // Interface includes:
 #include "IGraphicsPort.h"
 #include "IInterfaceColors.h"	// RealAGMColor, InterfaceColor indices
-#include "IInterfaceFonts.h"	// the palette window font
 #include "ITextControlData.h"	// the message as plain text, for a reader that walks the widgets
 
 // General includes:
@@ -70,10 +71,8 @@
 #include "CPMUnknown.h"
 #include "DVControlView.h"
 #include "DrawStringUtils.h"	// StringUtils::PMDrawStringRGB / PMMeasureString
-#include "DVPublicUtilities.h"	// dv_utils::FontInfoGetDVAFontMetrics - the font's own ascent / descent
 #include "ISession.h"			// GetExecutionContextSession
 #include "IWidgetUtils.h"		// GetViewYPosition - only for the fallback when the metrics are refused
-#include "ShuksanID.h"			// kPaletteWindowSystemScriptFontId
 #include "TextChar.h"			// kTextChar_Ellipse - the mark a cut piece carries
 #include "Utils.h"				// Utils<IWidgetUtils>()
 
@@ -81,6 +80,7 @@
 #include "IKBSStatusTextData.h"
 #include "KFCUIID.h"
 #include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the hit rows
+#include "KBSPanelMetrics.h"	// the font and its line - the same answer the box's height is made of
 
 // Std includes:
 #include <vector>
@@ -513,10 +513,12 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// The palette window's SYSTEM SCRIPT font - the hit rows' (KBSColorTextView.cpp says why: it is what
 	// the shipping panels use for text that came out of a document). ! A hand-drawn widget has no font
 	// field to read: its boss is a generic panel, which carries no IUIFontSpec.
-	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
-	if (fonts == nil)
+	// ***** ASKED OF KBSPanelMetrics, THE SAME PLACE THE BOX'S HEIGHT IS (2026-10-02, the API re-audit
+	// ***** P-1). ***** The box is four of the very lines drawn here - one question, one place.
+	const InterfaceFontInfo* const fontPtr = KBSPanelMetrics::MessageFont();
+	if (fontPtr == nil)
 		return;
-	const InterfaceFontInfo& fontInfo = fonts->GetFont(kPaletteWindowSystemScriptFontId);
+	const InterfaceFontInfo& fontInfo = *fontPtr;
 
 	const PMRect frame = this->GetInnerContentFrame();
 	const PMReal availWidth = frame.Width();
@@ -526,22 +528,12 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// ***** ONE LINE'S ADVANCE COMES FROM THE FONT, NOT FROM A MEASURED STRING. ***** KCM measured it
 	// (2026-08-21, a diagnostic build on a Japanese UI): ascent + descent + leading answers 18.0 where
 	// PMMeasureString("Ag").Y() answers 19.0 - and that one pixel costs a whole line in a box sized to
-	// a whole number of 18px lines (72 = 18 x 4, KBSPanelMetrics.cpp). Measuring a string answers "how
+	// a whole number of lines (KBSPanelMetrics::MessageBlockHeight). Measuring a string answers "how
 	// tall is this ink", which is a different question from "how far to the next line".
 	// The fallback is the measured string, so a font whose metrics are refused still draws something.
 	PMReal lineHeight(0.0);
 	PMReal ascent(0.0);
-	bool16 haveMetrics = kFalse;
-	{
-		float fontSize = 0.0f, fontAscent = 0.0f, fontDescent = 0.0f, fontLeading = 0.0f;
-		if (dv_utils::FontInfoGetDVAFontMetrics(fontInfo, &fontSize, &fontAscent, &fontDescent, &fontLeading))
-		{
-			lineHeight = PMReal(fontAscent + fontDescent + fontLeading);
-			ascent = PMReal(fontAscent);
-			haveMetrics = (lineHeight > PMReal(0.0));
-		}
-	}
-	if (!haveMetrics)
+	if (!KBSPanelMetrics::MessageLineMetrics(lineHeight, ascent))
 	{
 		lineHeight = StringUtils::PMMeasureString(&gc, PMString("Ag"), fontInfo, kKBSDontConvertAmpersand).Y();
 		if (lineHeight <= PMReal(0.0))
@@ -550,9 +542,12 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	}
 
 	// ***** A HAIR ADDED BEFORE THE CUT (2026-09-29, the defect re-check). ***** This box is sized to a
-	// WHOLE number of lines (72 = 18 x 4, KBSPanelMetrics.cpp), so the quotient is meant to come out at
-	// exactly 4 - and a line height a rounding step over 18 would make it 3.9999, cut to 3, and the last
-	// line of every long message would go. KCM's box has 2px to spare (74), which is why it never needed this.
+	// WHOLE number of lines, so the quotient is meant to come out at exactly 4 - and a line height a
+	// rounding step over what the box was made of would make it 3.9999, cut to 3, and the last line of
+	// every long message would go. KCM's box has 2px to spare (74), which is why it never needed this.
+	// (Since 2026-10-02 the box is four of THIS line rounded up to a pixel - KBSPanelMetrics::
+	// MessageBlockHeight - so the quotient is 4 or a hair over; the hair stays for a frame that comes in
+	// a rounding step short.)
 	int32 maxLines = static_cast<int32>(ToDouble(frame.Height() / lineHeight) + 0.01);
 	if (maxLines < 1)
 		maxLines = 1;		// a box too short for even one line still shows the beginning of it

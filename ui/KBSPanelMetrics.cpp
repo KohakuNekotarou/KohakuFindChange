@@ -12,12 +12,14 @@
 
 // Interface includes:
 #include "IControlView.h"		// GetFrame / SetFrame - the widgets being re-placed
+#include "IInterfaceFonts.h"	// the palette window's fonts - the one the message block is drawn in
 #include "IPanelControlData.h"	// FindWidget
 
 // General includes:
-#include "LocaleSetting.h"
-#include "PMLocaleIds.h"
+#include "DVPublicUtilities.h"	// dv_utils::FontInfoGetDVAFontMetrics - the font's own line
+#include "ISession.h"			// GetExecutionContextSession
 #include "PMRect.h"
+#include "ShuksanID.h"			// kPaletteWindowSystemScriptFontId
 
 // Project includes:
 #include "KFCUIID.h"
@@ -27,11 +29,12 @@
 namespace
 {
 
-// The message block's height in each UI. Each is a WHOLE NUMBER OF LINES in the language it
-// is used for - that is the rule, and it is why they are two numbers rather than one: a
-// single value cannot divide by both 12 and 18 without being 36, 72, 108...  Because each
-// language reads only its own line, 72 is fine here (18x4) even though it would be six Roman
-// lines - no Roman UI ever gets it.
+// How many lines the message block holds: FOUR, in every UI language. The block is a WHOLE NUMBER
+// of the drawing's lines - a remainder is room for a part-line, drawn as a sliver of chopped-off
+// letters - and since 2026-10-02 the line is asked of the font itself (MessageLineMetrics; the API
+// re-audit P-1). Until then this was a table: 48 = 12x4 on a Roman UI and 72 = 18x4 on a Japanese,
+// Korean or Chinese one, Japanese and English measured off the screen and the rest assumed - while
+// the box's own drawing asked the font all along.
 //
 // ***** FOUR LINES ON A JAPANESE UI SINCE 2026-08-10, AND THE THIRD WAS NOT A ROUNDING ERROR.
 // ***** It was 54 (18x3) from 2026-08-07, sized against the OPENING message - which draws 535px
@@ -51,21 +54,21 @@ namespace
 // messages are the half that matters; this is the headroom that keeps a long one from being
 // silently truncated again.
 //
-// ***** THE ROMAN BLOCK IS LEFT AT FOUR, and that is not an oversight (user's instruction was to
-// ***** raise it too "if the English version also has a problem"). It has not: the SAME box holds
-// four 12px lines there, and a 12px palette font puts appreciably more characters on each of them
-// than an 18px one does - so four Roman lines hold strictly more text than the four Japanese ones
-// this file now budgets for. The messages were cut to fit the Japanese four, which is the tighter
-// of the two. NOT measured on this machine, which runs a Japanese UI and cannot draw the Roman
-// one; if a Roman UI is ever seen to clip, this is the number to raise (to 60 = 12x5) and
-// kMinimumHeightRoman moves with it.
+// ***** FOUR ON A ROMAN UI TOO, and that is not an oversight (user's instruction was to raise it
+// ***** "if the English version also has a problem"). A smaller palette font puts appreciably
+// more characters on each line than the 18px one does, so four Roman lines hold more text than the
+// four Japanese ones the messages are cut to fit. NOT measured on this machine, which runs a
+// Japanese UI and cannot draw the Roman one; if a Roman UI is ever seen to clip, this is the number
+// to raise, and the floor moves with it (MinimumPanelHeight).
 //
 // The block and the floor are a pair: the width decides how many lines a message takes, and this
 // decides how many there is room to draw. Narrow the floor without raising this and the last
 // line is clipped.
-const int32 kMessageHeightRoman = 48;	// 12px x 4 lines
-const int32 kMessageHeightCJK   = 72;	// 18px x 4 lines  (= six Roman lines, which no Roman UI
-										// ever gets - see the note above)
+const int32 kMessageLines = 4;
+
+// The .fr's own block (KFCUI.fr: Frame 6..54, four 12px lines). What stands when the font cannot be
+// asked, and what the floor's height is stated against (kMinimumHeightAtResourceBlock).
+const int32 kMessageHeightResource = 48;
 
 // The gap between the message block and the tree, as the .fr has always had it.
 const int32 kGapUnderMessageBlock = 3;
@@ -106,35 +109,61 @@ const int32 kGapUnderMessageBlock = 3;
 //   opening message is exactly what let a 128-character line be cut off in shipping code.
 //   The floor is how small the panel MAY be made.
 //
-// Same floor in both languages: a Roman UI draws the same message in 12px lines, so it simply
-// has room to spare rather than a layout of its own.
+// Same floor in every language: a smaller palette font draws the same message in shorter lines, so
+// it simply has room to spare rather than a layout of its own.
 //
-// ! It is the WIDTH that decides the line count, and the block above holds four lines in either
-//   language (see kMessageHeightRoman / kMessageHeightCJK - 48px of them Roman, 72px Japanese).
-//   The two numbers are a pair with this one - neither is meaningful without the other.
+// ! It is the WIDTH that decides the line count, and the block above holds kMessageLines of them in
+//   any language. The two numbers are a pair - neither is meaningful without the other.
 //
-// Height: stated against the Roman block so that a taller block simply moves it. The floor is
-// there to keep about five 19px result rows visible, which has nothing to do with language.
-const int32 kMinimumWidth       = 266;	// the width the panel is worked at (measured 2026-08-07)
-const int32 kMinimumHeightRoman = 160;
+// Height: stated against the .fr's own block (kMessageHeightResource) so that a taller block simply
+// moves it. The floor is there to keep about five 19px result rows visible, which has nothing to do
+// with language.
+const int32 kMinimumWidth                 = 266;	// the width the panel is worked at (measured 2026-08-07)
+const int32 kMinimumHeightAtResourceBlock = 160;
 
-/** Does this UI language draw the palette font tall? Measured for Japanese (18px vs 12px).
-    The other three are the same CJK fonts and are included on that reasoning - they are NOT
-    measured, and this machine cannot measure them. If one of them ever turns out to differ,
-    this is the one place that decides. */
-bool IsTallLineUI()
-{
-	const int16 ui = LocaleSetting::GetLocale().GetUserInterfaceId();
-	return ui == k_jaJP || ui == k_koKR || ui == k_zhCN || ui == k_zhTW;
 }
 
+/* MessageFont
+*/
+const InterfaceFontInfo* KBSPanelMetrics::MessageFont()
+{
+	InterfacePtr<IInterfaceFonts> fonts(GetExecutionContextSession(), UseDefaultIID());
+	if (fonts == nil)
+		return nil;
+	return &fonts->GetFont(kPaletteWindowSystemScriptFontId);
+}
+
+/* MessageLineMetrics
+*/
+bool KBSPanelMetrics::MessageLineMetrics(PMReal& outLineAdvance, PMReal& outAscent)
+{
+	const InterfaceFontInfo* const font = MessageFont();
+	if (font == nil)
+		return false;
+	// The product's way of asking a widget's font for its line
+	// (dynamicdocumentsui/TimingPanelTreeDDTarget.cpp:582-585). ! The SIZE is no answer: it stays 12.0 on
+	// a Japanese UI, where the line is 18 (KCM, 2026-08-11) - the line is ascent + descent + leading.
+	float size = 0.0f, ascent = 0.0f, descent = 0.0f, leading = 0.0f;
+	if (!dv_utils::FontInfoGetDVAFontMetrics(*font, &size, &ascent, &descent, &leading))
+		return false;
+	const PMReal advance(ascent + descent + leading);
+	if (advance <= PMReal(0.0))
+		return false;
+	outLineAdvance = advance;
+	outAscent = PMReal(ascent);
+	return true;
 }
 
 /* MessageBlockHeight
 */
 int32 KBSPanelMetrics::MessageBlockHeight()
 {
-	return IsTallLineUI() ? kMessageHeightCJK : kMessageHeightRoman;
+	PMReal lineAdvance(0.0), ascent(0.0);
+	if (!MessageLineMetrics(lineAdvance, ascent))
+		return kMessageHeightResource;	// the .fr's block - the drawing then measures a string instead
+	// Up to a whole pixel: the widgets sit on whole pixels, and less than a pixel over the lines is no
+	// room for a part-line.
+	return ::ToInt32(::Ceiling(lineAdvance * PMReal(kMessageLines)));
 }
 
 /* MinimumPanelWidth
@@ -148,7 +177,7 @@ int32 KBSPanelMetrics::MinimumPanelWidth()
 */
 int32 KBSPanelMetrics::MinimumPanelHeight()
 {
-	return kMinimumHeightRoman + (MessageBlockHeight() - kMessageHeightRoman);
+	return kMinimumHeightAtResourceBlock + (MessageBlockHeight() - kMessageHeightResource);
 }
 
 /* Update

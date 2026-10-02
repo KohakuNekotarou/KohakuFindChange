@@ -1271,9 +1271,11 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// draws 18px lines (measured 2026-08-06 on the running panel: baselines at y=218, 236, 254),
 		// so this 48px box held two and two thirds of them and the last line of every message was
 		// cut off. A resource carries one set of numbers and these are the English set;
-		// KBSPanelMetrics puts the real height on when the panel appears - 72 = 18x4 there, so that
-		// both languages get FOUR lines. If this number changes, change that one too - the two are
-		// stated against each other.
+		// KBSPanelMetrics puts the real height on when the panel appears - four of the palette font's
+		// own lines, asked of the font (72 on a Japanese UI; since 2026-10-02, a 12/18 table by UI
+		// language before that), so every language gets FOUR lines - and falls back to this 48 when the
+		// font cannot be asked. If this number changes, change kMessageHeightResource there too - the
+		// two are stated against each other.
 		//
 		// ***** IT WAS 54 = 18x3 UNTIL 2026-08-10, AND THAT WAS MEASURABLY TOO SHORT. ***** Three
 		// lines were sized against the OPENING message; the line a stopped replace leaves is 128
