@@ -633,14 +633,13 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 // session is set to (the caller's KBSBackwardSearchScope). What the walk writes moves every row after it
 // in the same thread (CarryRowsPast); a written row is put where its new text stands. A row that would
 // write at an endnote's end is left, and said so (MatchEndsAnEndnote). What is still in `pending` at the
-// end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off;
-// outCancelled = the user pressed Cancel during it (2026-10-02, the API re-audit S-3 - the caller aborts the
-// whole run, so what this walk wrote goes back with the rest).
+// end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
+// (Cancel is not asked in here - between stories, by the caller: the user's call, story by story.)
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
 	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
 	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
-	bool& outSignFailed, bool& outCancelled)
+	bool& outSignFailed)
 {
 	IDataBase* const db = storyRef.GetDataBase();
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
@@ -743,20 +742,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				}
 			}
 			++ioDone;
-			const int32 reportedBefore = ioProgressReported;
 			KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
-			// ***** CANCEL, INSIDE THE STORY'S WALK (2026-10-02, the API re-audit S-3). ***** As InDesign's own
-			// Change All asks it, every step of its walk (spellpanel/SpellReplaceWalker.cpp:471, :809) - asked
-			// only when the bar has just been moved, as KBSSearchEngine's walk asks it, and for the same reason
-			// (see there: whether WasCancelled itself lets events in is not measured). It was asked between
-			// stories only until then - the user's call, story by story, from the days a story was one Change
-			// All command - so a story of thousands of ticked rows wrote them all before a Cancel was heard,
-			// and then took them all back. Taken on the user's go-ahead for S-3, on a commit of its own.
-			if (progressBar != nil && ioProgressReported != reportedBefore && progressBar->WasCancelled(kFalse))
-			{
-				outCancelled = true;
-				break;
-			}
 		}
 	}
 	if (walker->IsWalking())
@@ -1027,9 +1013,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	int32 done = 0;		// ticked rows accounted for, for the bar
 	for (std::map<UID, std::set<int32> >::iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
 	{
-		// Between stories is where a cancel is heard (the user's call: story by story) - and, since 2026-10-02,
-		// inside a story's walk as well (WalkStoryReplacing, the API re-audit S-3). Either way the whole run is
-		// aborted and put back; asking inside only makes the button answer sooner.
+		// Between stories is where a cancel is heard (the user's call: story by story). The whole run is then
+		// aborted and put back. (Asking inside a story's walk as well was tried on 2026-10-02 - the API re-audit
+		// S-3 - and the user chose this instead, the same story-by-story step the search now takes too.)
 		if (progressBar != nil && progressBar->WasCancelled(kFalse))
 		{
 			outCancelled = true;
@@ -1039,19 +1025,13 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		// A story an earlier story's replace deleted (an anchored object's): its rows never come up.
 		if (db->IsValidUID(s->first))
 		{
-			bool signFailed = false, storyCancelled = false;
+			bool signFailed = false;
 			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
 				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase, ioProgressReported, done,
-				signFailed, storyCancelled))
+				signFailed))
 			{
 				outFailed = true;
 				outWhyNot = "the text walker could not be started";
-				return true;
-			}
-			// Cancel pressed during the story's walk (S-3): the caller aborts the whole run.
-			if (storyCancelled)
-			{
-				outCancelled = true;
 				return true;
 			}
 			// a replace whose records could not be signed stops the whole run (the caller rolls it back)
@@ -2193,13 +2173,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// note there for why the run cannot carry a single bar across both.
 	//
 	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters, between
-	// the STORIES of a chapter (ReplaceInChapterOneByOne - the user's call, story by story), INSIDE a story's
-	// walk each time the bar moves (WalkStoryReplacing - since 2026-10-02, the API re-audit S-3, on a commit
-	// of its own: InDesign's own Change All asks it every step of its walk), and once more when the loop
-	// ends. Whenever it is heard, the whole sequence is then aborted and every character put back. (The
-	// stories were Change All's from 2026-09-26 to 2026-09-27, one command each -
-	// which is where "between stories" came from: a single command cannot be asked inside; before that, the
-	// one-at-a-time walk ran a chapter at a time and was asked between chapters.)
+	// the STORIES of a chapter (ReplaceInChapterOneByOne - the user's call, story by story), and once more
+	// when the loop ends. A Cancel pressed during a story is heard when that story is done; the whole
+	// sequence is then aborted and every character put back (BeginAbortableCmdSeq / AbortCommandSequence -
+	// nothing is left on the Undo stack either). (The stories were Change All's from 2026-09-26 to
+	// 2026-09-27, one command each - which is where "between stories" came from: a single command cannot be
+	// asked inside; before that, the one-at-a-time walk ran a chapter at a time and was asked between
+	// chapters. On 2026-10-02 asking inside a story's walk as well - InDesign's own Change All asks every
+	// step - was tried (the API re-audit S-3); the user chose story by story, for the search too.)
 	// DisableChildProgressBars keeps anything the replacements raise from putting up bars of their
 	// own (the chapter opens the other bar covers are the same case, and it says so there).
 	//
