@@ -16,8 +16,9 @@
 //  a replacement made that the search never listed is stepped over, and its row is reported missing
 //  rather than written (H-8). A GREP query holding ^ is walked backward (the direction is set before
 //  anything is written, outside the sequence). The pending tracked changes a ticked match sits in or
-//  next to are accepted first; the replaces' own records are LEFT in the document, told apart by their
-//  time stamp: they are what Reject Change, Redo and the jump find a row by.
+//  next to are accepted first - not around a match the walk leaves, one at an endnote's end (2026-10-02);
+//  the replaces' own records are LEFT in the document, told apart by their time stamp: they are what
+//  Reject Change, Redo and the jump find a row by.
 //  (From 2026-09-26 to 2026-09-27 each story got InDesign's Change All instead and the rows NOT ticked
 //  were taken back; that went in the 2026-09-27 cleanup - git history, c876bc7 and before.)
 //
@@ -206,7 +207,10 @@ namespace KBSReplaceEngine
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
 	/** ***** A STORY ROW'S MENU (2026-09-27, the story level). ***** Replace = the story's TICKED rows (the
-	    user's call), no prompt, one undo step, the list stays a work list (as ReplaceHit). Reject Change =
+	    user's call), no prompt, one undo step, the list stays a work list (as ReplaceHit) - and all or none:
+	    one row that cannot be written (an endnote's end, locked, missing) leaves every row as it was, and
+	    outStatus says so and how many (2026-10-02, the user's call - Change Checked writes the rest).
+	    Reject Change =
 	    every replaced row of the story whose tracked change is still there, one undo step. Redo = the
 	    rows taken back, below (RedoStory - a ROW's own Redo went on 2026-09-27: a row taken back is
 	    replaced again with Replace). Each says what it did - or why nothing - in outStatus. */

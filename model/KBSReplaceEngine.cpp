@@ -839,8 +839,9 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 // with Track Changes on for the stories written (TrackingScope) and the direction the caller set.
 // Refuses before anything is written - returns false, outWhyNot says why - only when the document, the
 // Find/Change options or a row cannot be read. The pending tracked changes the ticked matches sit in or
-// next to are accepted before the first write (outAcceptedFirst = how many). outCancelled / outFailed:
-// the caller aborts the whole run.
+// next to are accepted before the first write (outAcceptedFirst = how many) - except around a match at
+// an endnote's end, which the walk leaves (2026-10-02). outCancelled / outFailed: the caller aborts the
+// whole run.
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
@@ -984,6 +985,13 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			const RowNow& row = rowNow[static_cast<size_t>(*p)];
 			TextIndex at = kInvalidTextIndex;
 			if (!RowStartNow(db, row, at))
+				continue;
+			// ***** NOT AROUND A ROW THAT IS NOT WRITTEN (2026-10-02, the final check's J-2). ***** A match at an
+			// endnote's end is left by the walk below (MatchEndsAnEndnote, the same question), so nothing next to it
+			// is accepted either. It was until then, for a replace that never came - and with nothing written in
+			// the chapter, HandBackChaptersWithNothingInThem then put its modified flag back over the accept
+			// (case endnote-end-pending-kept: the user's Z next to the endnote's last match).
+			if (MatchEndsAnEndnote(storyRef, at + row.length))
 				continue;
 			PMString why;
 			why.SetTranslatable(kFalse);
@@ -2602,7 +2610,8 @@ bool KBSReplaceEngine::IsReplacing()
 // to where its text now stands, ready for the next Replace or a Change Checked. One undo step
 // ("Replace"). The same doors as Change Checked, asked for these rows: the query unchanged
 // (RefuseChangedQuery), the verify walk's three questions (ChapterMovedUnderRows), and only the pending
-// changes the rows sit in or next to accepted first.
+// changes the rows sit in or next to accepted first. Several rows (a story's, a document's) go in
+// together or not at all (2026-10-02, the user's call), and a refusal says how many stopped them.
 // ======================================================================================================
 
 // (RenumberWalkOrders stood here from 2026-09-27 to 2026-09-29: after every row menu's Replace and
@@ -2848,18 +2857,59 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	{
 		KBSResultModel::RollBackRows();
 		StartStatus(outStatus, again);
+		// The reason a row was not written, in that row's words, and how many rows it stopped.
+		const char* why = nil;
+		int32 stopping = 0;
+		bool searchAgain = false;
 		if (endnoteLeft > 0)
-			outStatus.Append("the match ends an endnote, and InDesign's replace breaks an endnote there - left as it is.");
+		{
+			stopping = endnoteLeft;
+			why = "the match ends an endnote, and InDesign's replace breaks an endnote there";
+		}
 		else if (locked > 0)
-			outStatus.Append("the match is locked now (a locked layer or story) - left as it is.");
+		{
+			stopping = locked;
+			why = "the match is locked now (a locked layer or story)";
+		}
 		else if (missing > 0)
-			outStatus.Append("the match was not found where the search found it - search again.");
+		{
+			stopping = missing;
+			why = "the match was not found where the search found it";
+			searchAgain = true;
+		}
 		else if (refused > 0)
-			outStatus.Append("InDesign's replace command would not run there - left as it is.");
-		else
+		{
+			stopping = refused;
+			why = "InDesign's replace command would not run there";
+		}
+		if (why == nil)
 		{
 			outStatus.Append(whyNot.IsEmpty() ? PMString("it did not go through") : whyNot);
 			outStatus.Append(" - nothing was changed.");
+		}
+		else if (rowsToReplace.size() == 1)
+		{
+			outStatus.Append(why);
+			outStatus.Append(searchAgain ? " - search again." : " - left as it is.");
+		}
+		else
+		{
+			// ***** SEVERAL ROWS GO IN TOGETHER OR NOT AT ALL, AND THE LINE SAYS SO (2026-10-02, the final check's
+			// J-1 - the user's call: keep it, say it). ***** One row that cannot be written takes the others back
+			// with it (`ok` above, the sequence rolled back whole). The line gave that row's reason alone until
+			// then, which read as if that row alone had been left (case story-replace-endnote-end).
+			outStatus.Append("nothing was replaced - in ");
+			outStatus.AppendNumber(stopping);
+			outStatus.Append(" of these ");
+			outStatus.AppendNumber(static_cast<int32>(rowsToReplace.size()));
+			outStatus.Append(again ? " row(s) " : " checked row(s) ");
+			outStatus.Append(why);
+			if (searchAgain)
+				outStatus.Append(" - search again.");
+			else if (again)
+				outStatus.Append(".");
+			else
+				outStatus.Append(stopping == 1 ? ". Untick it and Replace again." : ". Untick them and Replace again.");
 		}
 		return false;
 	}
