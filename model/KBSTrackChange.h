@@ -114,6 +114,22 @@ namespace KBSTrackChange
 	    A footnote's thread IS its reference boss (KCMTextRead's test). */
 	bool IsInFootnote(const UIDRef& story, TextIndex at);
 
+	/** Is `at` inside text a HIDDEN condition holds (2026-10-02, case reject-hidden-condition)? While its
+	    condition is hidden, conditional text - and the tracked changes in it - stand in a thread of their own
+	    past the main text, and showing the condition puts them back (measured: a row's insertion read at 14
+	    while hidden, at 0 once shown; its deletion stayed in the main text). That thread's owned item is
+	    kHiddenTextBoss (customconditionaltext/CusCondTxtSuiteTextCSB.cpp:205 says so, and
+	    conditionaltextui/ConditionalTextTips.cpp:232 asks it this way) - IsInFootnote's test, with that class. */
+	bool IsInHiddenText(const UIDRef& story, TextIndex at);
+
+	/** Does this replaced row's insertion stand under a hidden condition right now? Then its change cannot be
+	    found where the row is - FindRowChangeForHit refuses it, the deletion having stayed in the main text -
+	    and Reject Change / Accept Change on it are refused until the condition is shown (the user's call A,
+	    2026-10-02: refused and SAID, not taken back while hidden). The one question every refusal asks to give
+	    the right reason. False for a row with no insertion (replaced with nothing), a footnote's, or a closed
+	    document's. */
+	bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx);
+
 	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
 

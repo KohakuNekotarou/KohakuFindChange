@@ -125,6 +125,11 @@ public:
 	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KBSTrackChange::CurrentReplacedGroup. */
 	virtual void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed) = 0;
+	// (2026-10-02, appended at the end: a vtable slot is a promise to every built caller.)
+	/** = KBSTrackChange::RowChangeIsHidden. */
+	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KBSReplaceEngine::StoryChangesHidden. */
+	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) = 0;
 };
 
 #endif // __IKBSRuns_h__

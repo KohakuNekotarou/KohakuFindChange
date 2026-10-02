@@ -3061,6 +3061,35 @@ static bool RowsWithChangeOf(int32 chapterIdx, const std::vector<int32>& rows, s
 	return !out.empty();
 }
 
+// ***** WHY A ROW'S CHANGE CANNOT BE FOUND, WHEN THE REASON IS A HIDDEN CONDITION (2026-10-02, the user's call A).
+// ***** Text put under a condition that is then hidden moves - with its tracked insertion - out of the main text
+// (KBSTrackChange::RowChangeIsHidden), so Reject Change and Accept Change refuse it until the condition is shown.
+// The refusals said "no tracked change is left" (case reject-hidden-condition): the records were there all along.
+// These rows' count under a hidden condition - and the sentence every such refusal ends on, `verb` = "reject" /
+// "accept".
+static int32 RowsUnderHiddenCondition(int32 chapterIdx, const std::vector<int32>& rows)
+{
+	int32 n = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (KBSTrackChange::RowChangeIsHidden(chapterIdx, rows[k]))
+			++n;
+	return n;
+}
+
+static void AppendShowConditionToRetry(PMString& outStatus, const char* verb)
+{
+	outStatus.Append(" - show the condition and ");
+	outStatus.Append(verb);
+	outStatus.Append(" again.");
+}
+
+bool KBSReplaceEngine::StoryChangesHidden(int32 chapterIdx, int32 groupIdx)
+{
+	std::vector<int32> scope;
+	ScopeRows(chapterIdx, groupIdx, scope);
+	return RowsUnderHiddenCondition(chapterIdx, scope) > 0;
+}
+
 static bool RowsToReject(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out, bool firstOnly = false)
 {
 	std::vector<int32> rows;
@@ -3175,7 +3204,13 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 			if (!KBSTrackChange::FindRowChangeForHit(chapterIdx, p.rows[k], p.story, change)
 				|| !KBSResultModel::GetHitChangeTexts(chapterIdx, p.rows[k], originalText, replacedText))
 			{
-				outStatus = "Reject Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
+				if (KBSTrackChange::RowChangeIsHidden(chapterIdx, p.rows[k]))
+				{
+					outStatus = "Reject Change: nothing was changed - a row's replaced text is under a hidden condition";
+					AppendShowConditionToRetry(outStatus, "reject");
+				}
+				else
+					outStatus = "Reject Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
 				return false;
 			}
 			const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, p.rows[k]);
@@ -3398,8 +3433,19 @@ static bool RejectRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 		return false;
 	}
 	std::vector<int32> rows;
+	// Rows whose replaced text is under a hidden condition are not among `rows` (their change is not found
+	// where they are) - said, whichever way this ends, rather than left out in silence.
+	const int32 hidden = RowsUnderHiddenCondition(chapterIdx, scope);
 	if (!RowsWithChangeOf(chapterIdx, scope, rows, false))
 	{
+		if (hidden > 0)
+		{
+			outStatus.Append("Reject Change: nothing was changed - the replaced text in this ");
+			outStatus.Append(unit);
+			outStatus.Append(" is under a hidden condition");
+			AppendShowConditionToRetry(outStatus, "reject");
+			return false;
+		}
 		outStatus.Append("Reject Change: no replaced row with a tracked change in this ");
 		outStatus.Append(unit);
 		outStatus.Append(".");
@@ -3414,6 +3460,13 @@ static bool RejectRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 	outStatus.Append(KBSResultModel::IsFromRecords()
 		? " - back to their original text. To replace again, search again."
 		: " - back to their original text. Tick them and Replace to replace them again.");
+	if (hidden > 0)
+	{
+		outStatus.Append(" ");
+		outStatus.AppendNumber(hidden);
+		outStatus.Append(" left - under a hidden condition");
+		AppendShowConditionToRetry(outStatus, "reject");
+	}
 	return true;
 }
 
@@ -3563,7 +3616,13 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 		if (!KBSTrackChange::FindRowChangeForHit(chapterIdx, rows[k], storyRef, change)
 			|| !KBSResultModel::GetHitChangeTexts(chapterIdx, rows[k], originalText, replacedText))
 		{
-			outStatus = "Accept Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
+			if (KBSTrackChange::RowChangeIsHidden(chapterIdx, rows[k]))
+			{
+				outStatus = "Accept Change: nothing was changed - a row's replaced text is under a hidden condition";
+				AppendShowConditionToRetry(outStatus, "accept");
+			}
+			else
+				outStatus = "Accept Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
 			return false;
 		}
 		const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, rows[k]);
@@ -3711,8 +3770,18 @@ static bool AcceptRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 		return false;
 	}
 	std::vector<int32> rows;
+	// RejectRowsOf's rule: rows under a hidden condition are said, not left out in silence.
+	const int32 hidden = RowsUnderHiddenCondition(chapterIdx, scope);
 	if (!RowsWithChangeOf(chapterIdx, scope, rows, false))
 	{
+		if (hidden > 0)
+		{
+			outStatus.Append("Accept Change: nothing was changed - the replaced text in this ");
+			outStatus.Append(unit);
+			outStatus.Append(" is under a hidden condition");
+			AppendShowConditionToRetry(outStatus, "accept");
+			return false;
+		}
 		outStatus.Append("Accept Change: no replaced row with a tracked change in this ");
 		outStatus.Append(unit);
 		outStatus.Append(".");
@@ -3725,6 +3794,13 @@ static bool AcceptRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 	outStatus.Append(" row(s) of this ");
 	outStatus.Append(unit);
 	outStatus.Append(" - their changes by KohakuFindChange are final: they can no longer be rejected.");
+	if (hidden > 0)
+	{
+		outStatus.Append(" ");
+		outStatus.AppendNumber(hidden);
+		outStatus.Append(" left - under a hidden condition");
+		AppendShowConditionToRetry(outStatus, "accept");
+	}
 	return true;
 }
 

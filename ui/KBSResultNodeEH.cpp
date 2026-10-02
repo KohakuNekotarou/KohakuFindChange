@@ -283,8 +283,20 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	// shortcut) cannot act on a story nobody right-clicked this time.
 	if (nodeID->IsFontRow() && KBSResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 	{
-		KBSResults()->SetContextMenuGroup(nodeID->GetChapter(), nodeID->GetFont());
+		const int32 chapter = nodeID->GetChapter();
+		const int32 group = nodeID->GetFont();
+		KBSResults()->SetContextMenuGroup(chapter, group);
 		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
+		// ***** WHY ITS REJECT / ACCEPT ARE GREY, WHEN A HIDDEN CONDITION IS THE REASON (2026-10-02, the user's
+		// ***** call A). ***** The hit row's rule below: with every item grey the popup does not open, so the
+		// status line is the only place to say it - and a story whose replaced text is all under a hidden
+		// condition said nothing at all (case reject-hidden-condition-story).
+		if (!KBSRuns()->CanRejectStory(chapter, group) && KBSRuns()->StoryChangesHidden(chapter, group))
+		{
+			PMString why("Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.");
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowStatus(why);
+		}
 		PopRowMenu(kKBSResultStoryMenuName, e, this);
 		return kTrue;
 	}
@@ -323,13 +335,17 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		{
 			// A closed document is said as such (2026-09-29, the defect re-check F-3): the records may all
 			// be there, and the row reads "no tracked change" only because nothing is open to read them in.
+			// ...and so is a hidden condition (2026-10-02, the user's call A): the records are there too, gone
+			// out of the main text with the text the condition hides (case reject-hidden-condition).
 			UIDRef rowDoc;
 			IDFile rowFile;
 			const bool open = KBSResults()->GetChapterLocation(chapter, rowDoc, rowFile)
 				&& KBSChapters()->FindOpenChapterDoc(rowFile, rowDoc);
-			PMString why(open
-				? "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?)."
-				: "Reject Change: the document of this row is not open - open it to take the replace back.");
+			PMString why(!open
+				? "Reject Change: the document of this row is not open - open it to take the replace back."
+				: KBSRuns()->RowChangeIsHidden(chapter, hit)
+				? "Reject Change: this row's replaced text is under a hidden condition - show the condition and reject again."
+				: "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?).");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowStatus(why);
 		}

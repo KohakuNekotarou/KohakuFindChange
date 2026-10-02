@@ -139,6 +139,8 @@ public:
 	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) { return KBSSearchEngine::RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd); }
 	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) { return KBSTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx); }
 	virtual void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed) { KBSTrackChange::CurrentReplacedGroup(chapterIdx, hitIdx, outRows, outRefreshed); }
+	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) { return KBSTrackChange::RowChangeIsHidden(chapterIdx, hitIdx); }
+	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) { return KBSReplaceEngine::StoryChangesHidden(chapterIdx, groupIdx); }
 };
 
 CREATE_PMINTERFACE(KBSRunsSession, kKBSRunsImpl)

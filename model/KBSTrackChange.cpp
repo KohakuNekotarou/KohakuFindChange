@@ -40,6 +40,7 @@
 #include "ScriptingDefs.h"			// en_UIAmber - the colour asked for by its scripting name
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
+#include "ConditionalTextID.h"		// kHiddenTextBoss - IsInHiddenText
 #include "UIDList.h"
 #include "Utils.h"
 #include "VOSRedline.h"
@@ -153,6 +154,13 @@ bool KBSTrackChange::IsInFootnote(const UIDRef& story, TextIndex at)
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(at, nil, nil) : nil);
 	return thread != nil && ::GetClass(thread) == kFootnoteReferenceBoss;
+}
+
+bool KBSTrackChange::IsInHiddenText(const UIDRef& story, TextIndex at)
+{
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(at, nil, nil) : nil);
+	return thread != nil && ::GetClass(thread) == kHiddenTextBoss;
 }
 
 PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
@@ -632,6 +640,35 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 			outChange = c;
 			return true;
 		}
+	}
+	return false;
+}
+
+bool KBSTrackChange::RowChangeIsHidden(int32 chapterIdx, int32 hitIdx)
+{
+	bool checked = false, replaced = false, locked = false;
+	if (!KBSResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced
+		|| KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx))
+		return false;
+	UIDRef docRef;
+	if (!ChapterDocIfOpen(chapterIdx, docRef))
+		return false;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	const uint64 rowTime = KBSResultModel::GetHitRecordTime(chapterIdx, hitIdx);
+	if (rowTime == 0 || !KBSResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		return false;
+	// The row's records, by its time (FindRowChangeForHit's walk); its first insertion says where its text is.
+	const UIDRef storyRef(docRef.GetDataBase(), story);
+	std::set<uint64> own;
+	own.insert(rowTime);
+	std::vector<Record> recs;
+	CollectRecordsOfTimes(storyRef, own, recs);
+	for (size_t k = 0; k < recs.size(); ++k)
+	{
+		if (!recs[k].isDelete && recs[k].len > 0)
+			return IsInHiddenText(storyRef, recs[k].at);
 	}
 	return false;
 }

@@ -236,6 +236,11 @@ namespace KBSReplaceEngine
 	/** Is there anything for the story row's Replace / Reject Change to do (the menu's greying). */
 	bool CanReplaceStory(int32 chapterIdx, int32 groupIdx);
 	bool CanRejectStory(int32 chapterIdx, int32 groupIdx);
+	/** Is a replaced row of this story under a hidden condition right now (KBSTrackChange::RowChangeIsHidden) -
+	    the reason its Reject / Accept Changes are grey when nothing else is left to take back (2026-10-02,
+	    case reject-hidden-condition-story). The story row's right-click says it: with every item grey the
+	    popup does not open at all. */
+	bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx);
 
 	// (RedoHit - Redo on a row taken back - went on 2026-09-27, the user's call: a row taken back carries a
 	//  box again and is replaced again with Replace or Change Checked.)
