@@ -221,6 +221,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarSearchEnter.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarMirrorSpike.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSIconTip.cpp"/>

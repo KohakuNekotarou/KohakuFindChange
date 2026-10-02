@@ -315,6 +315,9 @@ public:
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 			KBSPanelTitle::Update();
+			// THROWAWAY SPIKE (2026-10-03, spike/2026-10-03-appbar-mirror) - see KBSAppBarMirrorSpike.cpp.
+			extern void KBSAppBarMirrorSpikeOnFindChange(const ClassID& theChange);
+			KBSAppBarMirrorSpikeOnFindChange(theChange);
 			return;
 		}
 
