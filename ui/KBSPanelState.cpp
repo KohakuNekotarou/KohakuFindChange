@@ -7,35 +7,36 @@
 //  Saves and restores the flyout's settings toggles as a JSON file of our own, in the user's
 //  preferences folder (see KBSPanelState.h). Nothing is written into InDesign's own data.
 //
-//  Ported from KESCM's KESCMPanelState.cpp, including its two audit fixes: the write is checked
-//  for a short count AND for fclose failing, so a full disk cannot be reported as "saved".
+//  Ported from KESCM's KESCMPanelState.cpp, including its two audit fixes: a short write and a write
+//  that fails on the way to the disk are both caught, so a full disk cannot be reported as "saved".
 //
-//  ***** WHY stdio AND NOT IPMStream. ***** (Settled 2026-08-10; do not re-open without reading
-//  this.) The SDK's usual way to read or write a file's bytes is
-//  StreamUtil::CreateFileStreamRead / CreateFileStreamWrite -> IPMStream, used in dozens of
-//  samples and in the product's own libs; SnpShareAppResources.cpp, the very snippet this file
-//  cites below for WHERE the file goes, opens it that way (:182, :187). FileUtils::OpenFile is a
-//  public, documented API (FileUtils.h:449-455) but has no user anywhere in the SDK.
-//
-//  Two of the three things guarded here move across cleanly - a short write is XferByte's return
-//  value, and a truncated read is GetStreamState() == kStreamStateFailure, which is what ferror
-//  is doing below. The THIRD DOES NOT: IPMStream::Close() and IPMStream::Flush() both return void
-//  (IPMStream.h:321, 368), so a write that fails while being flushed - the full disk, which is
-//  the case the 2026-07-25 audit added the check for - has no documented way of being noticed.
-//  fclose reports it. Moving to the mainstream API would quietly weaken the one check that keeps
-//  this from saying "saved" when nothing was.
+//  ***** THE FILE IS READ AND WRITTEN THROUGH THE SDK'S FILE STREAM (2026-10-02, the user's call:
+//  ***** "for the panel settings and the like, use the official one"). ***** StreamUtil::
+//  CreateFileStreamRead / CreateFileStreamWrite -> IPMStream, the SDK's way to read or write a file's
+//  bytes - dozens of samples and the product's own libs, and SnpShareAppResources.cpp, the very snippet
+//  this file cites for WHERE the file goes, opens its file that way (:182, :187). From 2026-08-10 until
+//  then this was stdio (FileUtils::OpenFile, fread / fwrite / fclose), kept for one reason:
+//  IPMStream::Close() and Flush() return void (IPMStream.h), so a write that fails while being flushed -
+//  the full disk, which the 2026-07-25 audit added a check for - has no documented way of being
+//  noticed, and fclose reports it. That check is now made another way, which does not need Close to
+//  answer: the side file is READ BACK and must come out exactly as written before it is moved over the
+//  real one (KBSWriteWholeFile). A short write is XferByte's count, and a truncated read is
+//  GetStreamState() == kStreamStateFailure, as before.
 //
 //========================================================================================
 
 #include "VCPlugInHeaders.h"
 
+// Interface includes:
+#include "IPMStream.h"		// XferByte / Flush / GetStreamState / Close - the file's bytes
+
 // General includes:
 #include "PMString.h"
-#include "FileUtils.h"		// GetAppRoamingDataFolder / OpenFile / DoesFileExist / SysFileToPMString
+#include "FileUtils.h"		// GetAppRoamingDataFolder / DoesFileExist / SysFileToPMString
 #include "IDFile.h"
+#include "StreamUtil.h"		// CreateFileStreamRead / CreateFileStreamWrite
 
 #include <string>
-#include <cstdio>			// FILE / fread / fwrite / fclose
 
 // Project includes (the state accessors of every setting saved here):
 #include "KBSPanelState.h"
@@ -402,48 +403,71 @@ static void KBSJsonSalvagePairs(const std::string& text, KBSJsonPairs& out)
 }
 
 // The whole file, or false when it could not be read in full. *A read that stopped part way through
-// must not be used: fread returning 0 is how BOTH the end of the file and an error look, so without
-// ferror a truncated read is indistinguishable from a complete one - and what would then be restored
-// is "the settings that happened to be in the part that arrived", the rest silently left at their
-// defaults. All or nothing instead (KESCM's fix of 2026-08-06).
+// must not be used: what would then be restored is "the settings that happened to be in the part that
+// arrived", the rest silently left at their defaults. All or nothing instead (KESCM's fix of 2026-08-06,
+// made with fread and ferror). Through the SDK's file stream since 2026-10-02 (see the top of this file),
+// the way the SDK's samples read a whole file: the size first - Seek to the end answers where it got to -
+// then exactly that many bytes from the start (textimportfilter/TxtImpFilter.cpp:602-611,
+// pdfvt/PDFVTUtils.cpp:141-147). The read never asks past the end of the file, so a short count, or the
+// stream in kStreamStateFailure, can only be a read that broke off.
 static bool KBSReadWholeFile(const IDFile& file, std::string& out)
 {
 	out.clear();
-	FILE* fp = FileUtils::OpenFile(file, "rb");
-	if (fp == nil)
+	InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamRead(file));
+	if (stream == nil)
 		return false;
-	char buf[1024];
-	size_t n;
-	while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
-		out.append(buf, n);
-	const bool readFailed = (ferror(fp) != 0);
-	fclose(fp);
-	return !readFailed;
+	const int64 size = stream->Seek(0, kSeekFromEnd);
+	stream->Seek(0, kSeekFromStart);
+	bool ok = (size >= 0 && size <= static_cast<int64>(0x7FFFFFFF));	// XferByte counts in int32
+	if (ok && size > 0)
+	{
+		out.resize(static_cast<size_t>(size));
+		const int32 n = stream->XferByte(reinterpret_cast<uchar*>(&out[0]), static_cast<int32>(size));
+		ok = (n == static_cast<int32>(size)) && (stream->GetStreamState() != kStreamStateFailure);
+	}
+	stream->Close();
+	if (!ok)
+		out.clear();
+	return ok;
 }
 
-// Write text as the whole file. The byte count AND fclose are checked: a full disk must not be
-// reported as saved. nil when written, otherwise the reason.
+// Write text as the whole file. A full disk must not be reported as saved. nil when written, otherwise
+// the reason.
 // ***** THROUGH A SIDE FILE, NEVER IN PLACE (2026-09-28, the user's call). ***** Opening the file itself
-// with "wb" empties it first, so InDesign going down between that and the last byte left an empty or
+// for writing empties it first, so InDesign going down between that and the last byte left an empty or
 // half-written file - and the book panel's placement then stopped being written at all (the strict
 // reader below refused the file) without a word. The text goes to KBSPanelState.json.tmp first, and only
 // a side file written in full is moved over the real one: the real file is always the old one whole or
 // the new one whole. A side file left behind by a crash is simply written over by the next write.
+// ***** AND THE SIDE FILE IS READ BACK BEFORE IT IS MOVED (2026-10-02). ***** The write goes through the
+// SDK's file stream (StreamUtil::CreateFileStreamWrite with kOpenOut | kOpenTrunc, as
+// SnpShareAppResources.cpp:187 opens its own preferences file), whose Flush and Close return nothing
+// (IPMStream.h) - so a write that fails as it is flushed, the full disk, says nothing there. What it
+// leaves is a side file shorter than the text, and reading it back finds that: only a side file that
+// reads back as exactly what was written is put in place. (stdio's fclose reported it until then.)
 // The move is Win32's MoveFileEx - KBS is Windows alone (the user's call, 2026-09-28) - told to replace
 // the file that is there and to return only once the move is on the disk. (FileUtils::SwapFiles, the
 // SDK's "moves file1 to file2" (FileUtils.h:132), has no caller in the SDK and does not say whether it
-// replaces a file that is already there.)
+// replaces a file that is already there - not known, rather than not so: it has not been measured.)
 static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text)
 {
 	IDFile side;
 	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKBSPanelStateSideFileName)))
 		return "folder";
-	FILE* fp = FileUtils::OpenFile(side, "wb");
-	if (fp == nil)
-		return "open";
-	const size_t wrote = fwrite(text.data(), 1, text.size(), fp);
-	const int closed = fclose(fp);
-	if (wrote != text.size() || closed != 0)
+	{
+		InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(side, kOpenOut | kOpenTrunc));
+		if (stream == nil)
+			return "open";
+		const int32 size = static_cast<int32>(text.size());
+		const int32 wrote = stream->XferByte(reinterpret_cast<uchar*>(const_cast<char*>(text.data())), size);
+		stream->Flush();
+		const bool failed = (wrote != size) || (stream->GetStreamState() == kStreamStateFailure);
+		stream->Close();
+		if (failed)
+			return "write";
+	}
+	std::string readBack;
+	if (!KBSReadWholeFile(side, readBack) || readBack != text)
 		return "write";
 	IDFile target(file);	// GrabTString is not const
 	if (!::MoveFileEx(side.GrabTString(), target.GrabTString(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
@@ -544,9 +568,10 @@ void KBSSavePanelState()
 	// the book panel as it stands now if one is open, otherwise the placement last known.
 	KBSBookPanelPlacement::AppendSaveKeys(pairs);
 
-	// *Both the byte count and fclose are checked (KESCM's 2026-07-25 audit): a partial write on a
-	// full disk must not be reported as a save, with a path that suggests the settings are safe. And
-	// through the side file since 2026-09-28 - see KBSWriteWholeFile.
+	// *A partial write on a full disk must not be reported as a save, with a path that suggests the
+	// settings are safe (KESCM's 2026-07-25 audit): the byte count is checked, and since 2026-10-02 the
+	// side file is read back before it is put in place (stdio's fclose was asked until then). Through
+	// the side file since 2026-09-28. See KBSWriteWholeFile.
 	const char* failure = KBSWriteWholeFile(file, KBSJsonFlatText(pairs));
 	if (failure != nil)
 	{
