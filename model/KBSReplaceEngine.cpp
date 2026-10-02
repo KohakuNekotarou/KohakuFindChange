@@ -3154,7 +3154,9 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		const Plan& p = plans[r];
 		// ***** THE DELETIONS FIRST, THEN THE INSERTIONS - EACH TIME THE ONE FURTHEST ON (2026-09-26,
 		// measured). ***** Taking back a later replace's insertion drops an earlier one's deletion anchored on
-		// its first character. The records are read again after each one: taking one back moves the rest.
+		// its first character - the header's own rule, found by measuring before it was read: "rejecting a
+		// nested insert will also reject the delete change" (redlineiterator.h:46-50). The records are read
+		// again after each one: taking one back moves the rest.
 		// ***** THE FIRST READING IS THE DOOR'S (2026-09-29, the waste re-check P-3). ***** Nothing this plan's
 		// records stand on has moved since: the runs after it in the story took back text after it only. A record
 		// not found there all the same gets one fresh reading before the reject is called off.

@@ -259,7 +259,7 @@ bool16 KBSLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 			// ***** EXCEPT THE BAR'S ROOM (2026-09-29, the defect re-check). ***** The bar stands in one space
 			// (KBSCaretPlaceholder), and a bar that fell at the head of a wrapped line was thrown away with
 			// "the space the wrap broke at" - the place it marks vanished. (KCMStatusTextView.cpp, where
-			// this came from, has the same rule and the same hole.)
+			// this came from, had the same rule and the same hole - closed the same way on 2026-10-02.)
 			if (justWrapped && !isCaret && rest.GetChar(0).IsSpace())
 			{
 				rest.Remove(0, 1);

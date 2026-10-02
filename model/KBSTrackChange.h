@@ -109,7 +109,11 @@ namespace KBSTrackChange
 	// (CollectRecords - every record in the story, the bound on the accept loops - stood here until
 	//  2026-09-29: see AcceptSignedInDocument and AcceptPendingAround.)
 
-	/** True when the story holds at least one record. */
+	/** True when the story holds at least one record OUTSIDE HIDDEN CONDITIONAL TEXT - the strand's own
+	    flag, which leaves those out (IRedlineDataStrand.h:107-112; "at least one record" until 2026-10-02).
+	    A question for work on VISIBLE text only - the pending changes around a match being replaced
+	    (KBSReplaceEngine). Nothing that looks for a row's records asks it: they are walked wherever they
+	    stand (CollectRecordsOfTimes, CollectSignedRows, CountSignedRecords). */
 	bool StoryHasChanges(const UIDRef& story);
 
 	/** True when any story of the document holds a record signed "KohakuFindChange" - the ones Accept

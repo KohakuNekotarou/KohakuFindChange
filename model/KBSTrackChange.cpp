@@ -109,7 +109,8 @@ PMString ReadDeletedText(ITextModel* model, Utils<ITrackChangeUtils>& utils, Red
 // The story's records signed "KohakuFindChange" - wherever they stand, hidden conditional text included (a
 // hidden condition's text, and its records with it, stand in a thread past the main text: measured,
 // KTRedlineProbe - a record at 9 read at 16 once its condition was hidden). The walk is not gated by
-// StoryHasChanges: what it answers for a story whose records all stand in hidden text is not measured.
+// StoryHasChanges: it answers no for a story whose records all stand in hidden text - its header says so
+// (IRedlineDataStrand.h:107-112), and case accept-all-hidden-condition met it (2026-09-29, A-1).
 // firstOnly = stop at 1. outTimes (optional, 2026-09-29, the waste re-check P-2) = every time those records
 // carry, gathered on the same walk - what Accept All compares before and after.
 int32 CountSignedRecords(const UIDRef& story, bool firstOnly, std::set<uint64>* outTimes = nil)
@@ -360,8 +361,15 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out)
 {
 	out.clear();
+	// ***** NO StoryHasChanges() IN FRONT (2026-10-02, the API re-audit block 9b - CollectSignedRows' rule,
+	// ***** 2026-09-29 A-1). ***** It answers no for a story whose only changes stand in hidden conditional
+	// text (IRedlineDataStrand.h:107-112), and a row's records are looked for wherever they stand: with the
+	// gate, a row whose replaced text the user hid would be told "no tracked change of this replace is
+	// left" while its records were there - and only when nothing else in its story was tracked, since one
+	// visible change anywhere in the story opened the gate and the walk below found the hidden ones too
+	// (read from the code; case reject-hidden-condition is the measurement). Walking is cheap.
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil || times.empty() || !redline->StoryHasChanges())
+	if (redline == nil || times.empty())
 		return;
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	Utils<ITrackChangeUtils> utils;
