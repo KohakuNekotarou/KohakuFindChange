@@ -446,9 +446,14 @@ static bool KBSReadWholeFile(const IDFile& file, std::string& out)
 // leaves is a side file shorter than the text, and reading it back finds that: only a side file that
 // reads back as exactly what was written is put in place. (stdio's fclose reported it until then.)
 // The move is Win32's MoveFileEx - KBS is Windows alone (the user's call, 2026-09-28) - told to replace
-// the file that is there and to return only once the move is on the disk. (FileUtils::SwapFiles, the
-// SDK's "moves file1 to file2" (FileUtils.h:132), has no caller in the SDK and does not say whether it
-// replaces a file that is already there - not known, rather than not so: it has not been measured.)
+// the file that is there and to return only once the move is on the disk.
+// ***** NOT FileUtils::SwapFiles, AND NOW THAT IS MEASURED (2026-10-02). ***** The SDK's "moves file1 to
+// file2" (FileUtils.h:132) does replace a file2 that is there (KT's app.ktProbe "swapfiles": file2 read
+// "old-B" before and "new-B" after) - but in TWO steps: Public.dll's SwapFiles is file2.Exists() ->
+// file2.Delete() -> afl::CoreFileUtils::MoveFile(file1, file2, false) (read off its machine code). A crash
+// between the delete and the move leaves NO settings file, only the side file - the very gap the side
+// file exists to close. MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume (and
+// AFL's MoveFile is itself a wrapper around MoveFileExW).
 static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text)
 {
 	IDFile side;
