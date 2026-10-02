@@ -70,6 +70,17 @@ namespace KBSTrackChange
 	bool SignRecordsNow(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
 	/** Is there a record carrying exactly this time standing in [from, to] (where a replace just wrote)? */
 	bool HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time);
+	/** ***** "KohakuFindChange" IN AMBER (2026-10-02, the user's call). ***** A tracked change is drawn in
+	    its AUTHOR's colour, from the document's list of users (IInCopyDocUserList on kDocBoss: a name -> an
+	    index into the session's UI colours, IInCopyUIColors), and the name KBS signs with stood in no
+	    document's list - its changes were drawn on a white background (measured, KT app.ktProbe
+	    "usercolors"). This gives that name the UI colour Amber in the document db, through
+	    kSetUserColorsCmdBoss with the document as the item list: it adds the name, or changes the colour
+	    of a name already there, and leaves the current user and the application's user name and colour
+	    alone (measured, the same probe - kCreateUserCmdBoss adds only, kSetUserColorCmdBoss takes no name).
+	    Nothing is done when it is Amber already. Runs inside the caller's sequence, so the Undo takes it
+	    back with the replace. false = it did not go in (the replace goes on without it). */
+	bool ColourSignAuthor(IDataBase* db);
 
 	/** Every story in `stories` recording changes for the life of the object; the ones this switched
 	    on are switched back off. A story already recording is left alone both ways. */

@@ -964,6 +964,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		return true;
 
 	// ===== from here on things are WRITTEN. A cancel or a failure below leaves the caller to abort. =====
+	const int32 replacedBefore = outReplaced;
 
 	// ***** THE PENDING CHANGES A TICKED MATCH SITS IN OR NEXT TO ARE ACCEPTED FIRST - ANYBODY'S, AND
 	// ***** NOTHING ELSE (2026-09-27, the user's call: "only that part"). ***** A replace written inside
@@ -1070,6 +1071,11 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		}
 		KBSAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
 	}
+	// ***** THE RECORDS JUST WRITTEN, IN AMBER (2026-10-02, the user's call). ***** Their author, KBS's
+	// name, given the UI colour Amber in this document (KBSTrackChange::ColourSignAuthor) - inside the run's
+	// sequence, so the Undo takes it back with the replace. Nothing stops the replace if it does not go in.
+	if (outReplaced > replacedBefore)
+		(void)KBSTrackChange::ColourSignAuthor(db);
 
 	// ----- every row the report keeps, where its text stands now: its range and its line. Read once the
 	// chapter has stopped changing: a line read as its own match was written would still show the later

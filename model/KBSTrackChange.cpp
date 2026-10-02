@@ -15,11 +15,15 @@
 // Interface includes:
 #include "IBoolData.h"
 #include "ICommand.h"
+#include "IInCopyDocUserList.h"		// ColourSignAuthor - the document's users and their colours
+#include "IInCopyUIColors.h"		// ColourSignAuthor - the session's UI colours (Amber's index)
 #include "IInt64Data.h"			// kKBSSignRecordsCmdBoss's time stamp
 #include "IIntData.h"				// kReplaceDeleteChangeDataCmdBoss's position
 #include "IRangeData.h"			// kKBSSignRecordsCmdBoss's range
 #include "IRedlineChangeData.h"		// kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
+#include "ISession.h"				// ColourSignAuthor - the UI colours are the session's
+#include "ISetUserColorsCmdData.h"	// ColourSignAuthor - kSetUserColorsCmdBoss's name and colour
 #include "IStoryList.h"			// Accept All Changes by KohakuFindChange - every text model
 #include "IStringData.h"			// kAcceptAllRedlineCmdBoss's author
 #include "ITextModel.h"
@@ -33,6 +37,7 @@
 #include "InCopySharedID.h"			// kRedlineStrandBoss, kSetRedlineTrackingCmdBoss, kReplaceDeleteChangeDataCmdBoss,
 									// kAcceptAllRedlineCmdBoss
 #include "PersistUtils.h"			// ::GetClass - IsInFootnote
+#include "ScriptingDefs.h"			// en_UIAmber - the colour asked for by its scripting name
 #include "ITextStoryThread.h"
 #include "TextID.h"					// kFootnoteReferenceBoss
 #include "UIDList.h"
@@ -889,6 +894,34 @@ bool KBSTrackChange::SignRecordsNow(const UIDRef& story, TextIndex from, TextInd
 	for (size_t k = 0; k < left.size(); ++k)
 		delete left[k].record;
 	return left.empty() && (found.empty() || withStamp > 0);
+}
+
+bool KBSTrackChange::ColourSignAuthor(IDataBase* db)
+{
+	if (db == nil)
+		return false;
+	InterfacePtr<IInCopyDocUserList> users(db, db->GetRootUID(), UseDefaultIID());
+	InterfacePtr<IInCopyUIColors> colours(GetExecutionContextSession(), UseDefaultIID());
+	if (users == nil || colours == nil)
+		return false;
+	// Asked by its scripting enumeration - not by its place in the list (Amber was 56 of 65 on 21.0,
+	// measured) nor by its name, which a translation could change.
+	const int32 amber = colours->GetEnumerationIndex(ScriptID(en_UIAmber));
+	if (amber < 0)
+		return false;
+	const PMString author = SignAuthorName();
+	if (users->FindUserByName(author) >= 0 && users->GetUserColorIndex(author) == amber)
+		return true;
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kSetUserColorsCmdBoss));
+	InterfacePtr<ISetUserColorsCmdData> data(cmd, UseDefaultIID());
+	if (cmd == nil || data == nil)
+		return false;
+	data->Set(author, amber);
+	cmd->SetItemList(UIDList(UIDRef(db, db->GetRootUID())));
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	if (err != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);		// not a reason to roll the replace back
+	return err == kSuccess;
 }
 
 bool KBSTrackChange::HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time)
