@@ -27,11 +27,11 @@
 //  Track Changes records, one replace's rows sit under a branch row between the document and its
 //  stories - "<date> <time>  (N)", the branch shape again, one step right of the document row.
 //
-//  The visual indent is drawn by explicit frame offsets in ApplyNodeIDToWidget, applied on top of
+//  The visual indent is drawn by explicit frame offsets in ApplyDataToWidget, applied on top of
 //  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
 //  file also hosts KBSResultTree::Rebuild (the tree lives here). Ported from KESCL's
-//  KESCLResultListWidgetMgr, simplified to two levels - itself
-//  modelled on the paneltreeview sample's PnlTrvTVWidgetMgr.
+//  KESCLResultListWidgetMgr - two levels then (document and hit; the book, story and run levels
+//  came later) - itself modelled on the paneltreeview sample's PnlTrvTVWidgetMgr.
 //
 //========================================================================================
 
@@ -119,7 +119,7 @@ namespace
 
 	// Put 'text' into a row's static-text cell. Row widgets are recycled as the tree scrolls, so
 	// every cell is written on every apply. No manual repaint: the tree draws the row right after.
-	void SetColumnText(const InterfacePtr<IPanelControlData>& rowData, const WidgetID& wid, const PMString& text)
+	void SetColumnText(IPanelControlData* rowData, const WidgetID& wid, const PMString& text)
 	{
 		if (rowData == nil)
 			return;
@@ -213,27 +213,31 @@ public:
 		return this->GetTreeViewWidth();
 	}
 
-	virtual bool16 ApplyNodeIDToWidget(const NodeID& node, IControlView* widget, int32 message = 0) const
+	// ***** THE ROW'S CONTENT GOES IN HERE, NOT IN AN ApplyNodeIDToWidget OVERRIDE (2026-10-02, the API
+	// ***** re-audit). ***** The two-argument constructor above turns on the base class's V2 path, and on
+	// that path the base's ApplyNodeIDToWidget runs, in this order: the selection highlight,
+	// HideExpanderIfNotExpandable, ApplyIndentToWidget - which REWRITES the frame.Left of this row's
+	// children - and then THIS (CTreeViewWidgetMgr.cpp:207-219). So the frames set below land on top of
+	// the framework's indent by the framework's own order: the framework indent is NOT switched off here,
+	// it is overwritten, and nothing in this file has to remember to call anything first.
+	//
+	// Until then this was an ApplyNodeIDToWidget override that called the base FIRST and filled the row
+	// after it, under a note that the call "MUST stay first" - it had been moved last once (2026-07-31,
+	// copied from the layer and links panels) and the hit rows' content went back to the left margin.
+	// Those panels are not a counter-example: they use the one-argument constructor, which the header
+	// marks DEPRECATED and whose base call applies the highlight alone (CTreeViewWidgetMgr.cpp:59-74,
+	// 207-221). And on the V2 path the base's own ApplyDataToWidget ran on every row before ours - the
+	// sample default that numbers a ListIndexNodeID, asserting in a debug build that "you must override
+	// CTreeViewWidgetMgr::ApplyDataToWidget()" (:93-113). This is that override: the shape the shipping
+	// MSO panel (MSOPanelTreeViewWidgetMgr.cpp) and both of KCM's trees have.
+	//
+	// kTrue always, the KESCM answer: kFalse asks the framework to build a new widget and apply again
+	// (CTreeViewWidgetMgr.h:160-162), and a row the model cannot resolve would be missing from that one too.
+	virtual bool16 ApplyDataToWidget(const NodeID& node, IPanelControlData* rowData, int32 /*message*/) const
 	{
-		// The base class FIRST, and it MUST stay first for this panel.
-		//
-		// It is not only the selection highlight. With the V2 option flags set it also runs
-		// ApplyIndentToWidget, which REWRITES the frame.Left of this row's child widgets
-		// (CTreeViewWidgetMgr.cpp:207-221 and :234-252), plus HideExpanderIfNotExpandable and
-		// ApplyDataToWidget. Those all run - the framework indent is NOT switched off here, it is
-		// simply overwritten: this panel positions every row's content itself, so our frames have to
-		// be applied ON TOP of whatever the base class just did.
-		//
-		// The shipping panels (LayerPanelTreeViewWidgetMgr, LinksUIPanelTreeViewWidgetMgr) call it
-		// last, and that was copied here on 2026-07-31 - it silently undid this file's indent and
-		// pulled the hit rows' content back to the left margin (seen on screen the same day, then
-		// reverted). Their order works because they let the framework place the row content; ours
-		// does not. The paneltreeview sample - which this tree is modelled on - calls it first.
-		CTreeViewWidgetMgr::ApplyNodeIDToWidget(node, widget);
-
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
-		InterfacePtr<IPanelControlData> rowData(widget, UseDefaultIID());
-		if (nodeID != nil && rowData != nil)
+		InterfacePtr<IControlView> widget(rowData, UseDefaultIID());	// the row itself (the base queried rowData from it)
+		if (nodeID != nil && widget != nil)
 		{
 			if (nodeID->IsHitRow())
 				this->ApplyHitRow(nodeID, widget, rowData);
@@ -261,8 +265,7 @@ public:
 		// KFCUI.fr). Only a child bound on one side alone is left where it is - the hit row's check
 		// box. What makes the framework indent invisible in this panel is NOT that it is switched
 		// off: it is that the Apply*Row methods run AFTER it and set every one of those frames
-		// themselves. That is the whole reason the base call has to stay FIRST (see
-		// ApplyNodeIDToWidget).
+		// themselves - they are called from ApplyDataToWidget, the base's last step (see there).
 		//
 		// ! These values do NOT add up to what the panel draws, and are not meant to. The book
 		//   level's 8px step is not here at all (a document row answers 0 whether or not it hangs
@@ -308,7 +311,7 @@ private:
 	// The arrow is visible exactly when the row has children. Hiding it alone would leave a click
 	// target behind (the stacked-widget lesson), so a hidden arrow is disabled too.
 	void LayOutBranchRow(const NodeID& node, IControlView* widget,
-		const InterfacePtr<IPanelControlData>& rowData, const PMReal& shift, const PMString& label) const
+		IPanelControlData* rowData, const PMReal& shift, const PMString& label) const
 	{
 		const PMReal xExpander = kRowInset + shift;
 		const PMReal xLabel = kRowInset + kExpanderZone + shift;
@@ -367,7 +370,7 @@ private:
 	}
 
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
-		const InterfacePtr<IPanelControlData>& rowData) const
+		IPanelControlData* rowData) const
 	{
 		// "<book>  (N/M checked)" - how many of this book's hits are ticked, out of all of them
 		// (user's wording, 2026-08-05; it used to read just "(M)"). The row a Check All over the
@@ -418,7 +421,7 @@ private:
 
 	// A document row: its expander and "<name>  (N)" after the zone.
 	void ApplyChapterRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+		IControlView* widget, IPanelControlData* rowData) const
 	{
 		PMString name;
 		int32 fullCount = 0;
@@ -487,7 +490,7 @@ private:
 	// as a document row - an expander and a label - so it shares the branch layout and the chapter row's
 	// resource, one step further right.
 	void ApplyFontRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+		IControlView* widget, IPanelControlData* rowData) const
 	{
 		PMString name;
 		int32 fullCount = 0;
@@ -520,7 +523,7 @@ private:
 	// the branch shape one step right of its document row. No checked count: a list rebuilt from the
 	// records has no boxes.
 	void ApplyRunRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, const InterfacePtr<IPanelControlData>& rowData) const
+		IControlView* widget, IPanelControlData* rowData) const
 	{
 		PMString name;
 		int32 fullCount = 0;
@@ -537,7 +540,7 @@ private:
 	// A hit row: the match's line into the custom colour cell (IKBSRowData's parts), no expander,
 	// indented one zone deeper than its story row.
 	void ApplyHitRow(const TreeNodePtr<KBSResultNodeID>& nodeID, IControlView* widget,
-		const InterfacePtr<IPanelControlData>& rowData) const
+		IPanelControlData* rowData) const
 	{
 		// One question, not four: the strings, the flags, the outcome and the accent word all come
 		// from the same hit, and the row wants all of them.
@@ -639,8 +642,9 @@ private:
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
-			// Hand the row's parts to the colour cell; it invalidates itself as the tree draws the
-			// row right after.
+			// Hand the row's parts to the colour cell, and invalidate it HERE: the cell's data holder
+			// does not ask for a redraw (a stock cell's ITextControlData::SetString does - its invalidate
+			// defaults to kTrue), and a recycled row would keep the picture of the row it used to be.
 			InterfacePtr<IKBSRowData> data(cell, UseDefaultIID());
 			if (data != nil)
 				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText);
@@ -668,7 +672,7 @@ ITreeViewMgr* QueryResultTreeMgr()
 }
 
 //----------------------------------------------------------------------------------------
-// KBSResultTree::Rebuild - reload the panel's tree from the model, expand every chapter
+// KBSResultTree::Rebuild - reload the panel's tree from the model, open what the scope opens
 //----------------------------------------------------------------------------------------
 
 void KBSResultTree::Rebuild()
@@ -878,9 +882,13 @@ void WriteStatusWidget(const PMString& label, const PMString& pre, const PMStrin
 
 	// The pieces are not something the view watches, so it is told to repaint - and forced to at once,
 	// the rule the stock StaticText needed as well (it did not repaint on SetString alone).
-	textView->Invalidate();
+	// ONE call for each case: ForceRedraw with no region draws the whole view now ("Redraws the invalid
+	// region directly", IControlView.h:281-286), so an Invalidate in front of it asked for nothing more
+	// (2026-10-02, the API re-audit - KCM's position read-out lost the same duplicate).
 	if (forceRedraw)
 		textView->ForceRedraw();
+	else
+		textView->Invalidate();
 }
 
 /** An ordinary message: the sentence alone, in the theme's text colour - what the stock widget drew. */

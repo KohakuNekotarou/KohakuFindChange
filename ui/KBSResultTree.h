@@ -7,10 +7,11 @@
 //  Result tree rebuild entry point. Called after KBSResultModel has been filled by a search or by Show
 //  Changes: reloads the panel's tree widget from the model. What it opens depends on the scope - a
 //  BOOK result opens the book row and leaves the chapters closed (a book-wide run can fill the
-//  panel with one chapter's hits and bury the fact that others matched), a single document opens
-//  its one chapter. No priming is needed to get the expander arrows drawn: this panel draws them
-//  itself, from the hierarchy adapter's child count. No-op when the panel is closed. Implemented
-//  in KBSResultListWidgetMgr.cpp (it lives with the tree).
+//  panel with one chapter's hits and bury the fact that others matched), All Documents leaves its
+//  document rows closed for the same reason, a single document opens its one chapter - and the story
+//  and run rows always come up open. No priming is needed to get the expander arrows drawn: this
+//  panel draws them itself, from the hierarchy adapter's child count. No-op when the panel is closed.
+//  Implemented in KBSResultListWidgetMgr.cpp (it lives with the tree).
 //
 //========================================================================================
 
@@ -24,7 +25,8 @@
 namespace KBSResultTree
 {
 	/** (Re)load the panel's result tree from KBSResultModel. A book result comes up with the book
-	    row open and its chapters closed; a document result comes up with its one chapter open. Safe
+	    row open and its chapters closed; an All Documents result with its document rows closed; a
+	    document result with its one chapter open. Story and run rows come up open in every case. Safe
 	    to call when the panel is closed (does nothing then). */
 	void Rebuild();
 

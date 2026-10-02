@@ -8,9 +8,9 @@
 //  IID_IEVENTHANDLER on the result tree's node boss (kKBSResultNodeWidgetBoss). Derives from the
 //  stock TreeNodeEventHandler so ordinary tree behaviour (select, expand/collapse, drag) is kept;
 //  only the button-UP is extended. EVERY row now has somewhere to go - KBSJump::ActivateNode sorts
-//  out which: a hit row jumps, a chapter row shows its document, a FONT row shows the document it
-//  sits in (it names no hit, so it falls to the same arm as its chapter), the book row activates
-//  its book.
+//  out which: a hit row jumps, a chapter row shows its document, a STORY ("font") or RUN row shows
+//  the document it sits in (neither names a hit, so both fall to the same arm as their chapter), the
+//  book row activates its book.
 //  Simplified from KESCL (which split fresh clicks onto a selection observer).
 //
 //  The shape of the hook is the layer panel's (LayerTreeRowPanelEH::LButtonUp): act on the button
@@ -33,7 +33,7 @@
 //  ***** THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. ***** The
 //  jump runs on the first button-up and raises its marker there; a double click then selects, and
 //  the ordinary ClearMarker at the end of a successful SelectHitText takes the marker down. A double
-//  click that is REFUSED (overset, locked, hidden, stale) never reaches that ClearMarker, so its
+//  click that is REFUSED (KBSJump.h lists why it can be) never reaches that ClearMarker, so its
 //  marker stays up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode
 //  jump keeps, and the user asked for it (2026-09-25). From 2026-08-09 until then the first click's
 //  marker was BOOKED for the double-click interval instead, so a double click never flashed one - at
@@ -216,7 +216,7 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 				keyBoard->RelinquishKeyFocus();
 			return result;
 		}
-		// It refused (overset, or the text has moved) and has said why. Fall through: the first
+		// It refused (SelectHitText's tests are the list) and has said why. Fall through: the first
 		// click's jump already happened, and the arrows below still want the tree.
 	}
 	else

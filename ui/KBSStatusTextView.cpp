@@ -22,6 +22,21 @@
 //  messages are sentences that fill the box, and several name files - so it is written out below
 //  rather than lost. The one colour is the part that had to go.
 //
+//  ***** THE STOCK WRAPPING IS PUBLIC, AND IS NOT USED HERE (2026-10-02, the API re-audit). ***** A
+//  multi-line static text breaks its string through IStaticTextLineBreaker (public/interfaces/ui -
+//  CreateLineBreaks / GetNthLine / GetNumLines; the stock implementations are kStaticTextLineBreakerImpl
+//  and kDV_StaticTextLineBreakerImpl), and where the app wants its own rules it writes another one on
+//  that interface (the Preflight panel's info box: kPreflightUIInfoBoxLineBreakerImpl, beside an
+//  IID_IPREFLIGHTUIINFOBOXLINEBREAKDATA - no source in the SDK). It is not used here because what
+//  this box needs is more than where the lines fall: (1) the colours change INSIDE a line, so every
+//  line has to map back to exact character offsets in the pieces, and GetNthLine hands back a string -
+//  the header does not say whether a break drops the space it fell on; (2) the bar's room is that same
+//  one space; (3) CreateLineBreaks takes no ampersand flag, while this box measures and draws with '&'
+//  kept (KBSPanelTextDraw.h - a measure that disagrees with the draw is the drift that file exists to
+//  stop); (4) the overflow rule breaks the text again for every amount of context it tries, so the
+//  breaker could replace only the inner step of that search. (1)-(3) are what the header leaves open,
+//  not anything measured. KCM's box, which this one came from, carries the same hand-written wrap.
+//
 //  ***** HOW MANY LINES: as many as the box holds, worked out at draw time. ***** KBSPanelMetrics makes
 //  the box 72px on a Japanese UI (18px x 4) and 48px on a Roman one (12px x 4); a hand-drawn box has
 //  no line count of its own to disagree with that, so the height and the font are the whole answer.
