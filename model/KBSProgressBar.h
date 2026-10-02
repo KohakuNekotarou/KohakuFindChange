@@ -12,8 +12,8 @@
 //  interface components (vol1-06, "UI component content"); the user's call (IKBSUIServices.h says more).
 //
 //  The calls behave exactly as RangeProgressBar's did, because they ARE its calls: the UI half's object
-//  wraps a real one (KBSUIServices.cpp). So the modal bar still pumps events while it is up - which is
-//  what KBSRunGuard exists for - and WasCancelled still only reads a flag.
+//  wraps a real one (KBSUIServices.cpp). So the modal bar still lets events in while it is up - which is
+//  what KBSRunGuard exists for (which of its calls does it is not measured: KBSAdvanceProgress).
 //
 //========================================================================================
 

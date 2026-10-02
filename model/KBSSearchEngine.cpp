@@ -103,9 +103,10 @@ namespace
 // (kKBSCollectHitLimit, beside the display cap) when the two scans - removed 2026-09-27 - were given
 // the same ceiling. Read the contract there; this file uses it in SearchBook.
 
-// The smallest advance worth reporting to the progress bar. Moving the bar is what makes Cancel
-// work at all, but it is not free: doing it once per hit would repaint and run the message loop
-// thousands of times over a large chapter. Small enough that Cancel still answers promptly.
+// The smallest advance worth reporting to the progress bar. Moving the bar keeps Cancel answering (which
+// call on the bar takes the click is not measured - see KBSAdvanceProgress), but it is not free: doing it
+// once per hit would repaint the bar thousands of times over a large chapter. Small enough that Cancel
+// still answers promptly.
 const int32 kKBSProgressReportStep = 8;
 
 // (Instrumentation removed: the answer came from the user's own observation - "cancelling works in
@@ -1322,13 +1323,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// (AcquireKeyFocus + SelectRange on an edit box). Entering and leaving it per match would run
 	// that dance thousands of times in one search.
 	//
-	// What holding it does NOT keep out: the progress bar's SetPosition pumps the event queue - that is what
-	// lets the Cancel button take a click at all (KBSAdvanceProgress; KIDMCP measured the same on 2026-08-28)
-	// - and the walk below moves the bar every few matches, inside this section, as it always has. (This note
-	// said UI work must not be pumped inside it and that this was why Cancel is asked between chapters only;
-	// the walk has pumped through it from the start. WHEN Cancel is asked is a choice, not a constraint of
-	// this section - 2026-10-02, the API re-audit.) Do not "correct" this to the one-command shape without
-	// measuring both. (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
+	// What holding it may not keep out: the walk below moves the bar every few matches, inside this section,
+	// as it always has, and some call on the bar lets events in - which one is not measured (KBSAdvanceProgress).
+	// Cancel is asked between chapters only, the user's call of 2026-08-05 ("safety first": WasCancelled was
+	// taken to pump events, and UI work was not to run in the middle of the walk; the cost, waiting out one
+	// large chapter, was accepted). Whether moving the bar already lets the same events in, inside the
+	// section, is the part not known. (Earlier on 2026-10-02 this note said SetPosition pumps and WasCancelled
+	// only reads a flag, so asking inside would add nothing - neither half was measured.) Do not
+	// "correct" this to the one-command shape without measuring both.
+	// (docs/ai-notes/kbs-book-and-search-api-audit-2026-07-31.md)
 	//
 	// ***** THE REST OF THIS INTERFACE IS DELIBERATELY LEFT ALONE. ***** It also carries
 	// InitTextWalkerTerminator / TerminateTextWalkerTerminator, which spellpanel DOES call
@@ -1430,9 +1433,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		UIDRef story = cmdData->GetRange(start, end);
 
 		// Move the bar. A story we have not seen before means the one before it is finished; within a
-		// story, the position is how far into its text this match sits. This pumps the event queue, inside
-		// the walker's critical section - which is how a click on Cancel is taken at all; WasCancelled only
-		// reads the flag that click sets, and is asked between chapters (see the note on the section above).
+		// story, the position is how far into its text this match sits. Done inside the walker's critical
+		// section; WasCancelled is asked between chapters (see the note on the section above).
 		if (progressBar != nil)
 		{
 			if (story != progressStory)
@@ -1626,7 +1628,7 @@ void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bo
 	if (delta <= 0)
 		return;
 	if (!force && delta < kKBSProgressReportStep)
-		return;		// too small to be worth pumping the event queue for
+		return;		// too small to be worth a call on the bar for
 
 	// SetPosition, which takes the absolute position - hence no use for delta beyond the guard above.
 	//
@@ -1646,6 +1648,16 @@ void KBSAdvanceProgress(KBSProgressBar* bar, int32& ioReported, int32 target, bo
 	// and cancels from it perfectly well (TxtImpFilter.cpp:519-548: SetPosition every 32 reads,
 	// WasCancelled every read). KBS measures its way through hits and stories, so this is the form
 	// that fits.
+	//
+	// ***** WHICH CALL TAKES THE CLICK ON CANCEL IS NOT MEASURED (2026-10-02, the API re-audit). ***** Some
+	// call on the bar lets events in while it is up - that is how a click on Cancel is taken at all, and why
+	// KBSRunGuard exists - but whether it is this SetPosition, WasCancelled, or both, nothing has measured:
+	// KBS's notes said this call pumps and WasCancelled only reads a flag, KCM's say WasCancelled pumps
+	// (KCMProgressBar.h), and KIDMCP's working cancel (2026-08-30) makes both calls. The headers say neither
+	// (ProgressBar.h, IProgressBarManager.h). What WAS measured: during a search, with the bar up and moved
+	// from inside the walk, a 100 ms WM_TIMER was not delivered once (2026-08-01,
+	// docs/ai-notes/progress-bar-and-dialog-automation.md) - whatever lets events in, it is not a loop that
+	// delivers everything. "Pumps" elsewhere in KBS means "a call on the bar lets events in".
 	bar->SetPosition(target);
 	ioReported = target;
 }
@@ -2734,9 +2746,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		KBSSetChapterTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is asked here, and answered by the bar being moved from inside the walk
-		// (KBSAdvanceProgress). WasCancelled only reads a flag; something has to have given the
-		// button a chance to set it.
+		// Cancel is asked here, after the bar has been moved - from inside the walk and just above
+		// (KBSAdvanceProgress; which call on the bar takes the click is not measured, see there).
 		// kFalse = do NOT raise the global error state: it would outlive the search and fail the
 		// commands that come after it.
 		if (progressBar.WasCancelled(kFalse))

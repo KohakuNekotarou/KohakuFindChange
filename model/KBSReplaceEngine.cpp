@@ -2046,9 +2046,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// would be the step they skip.
 		openBar.SetPosition(static_cast<int32>(pi));
 
-		// Cancel, asked between chapters exactly as the replace loop below asks it, and answered by
-		// the bar having just been moved (WasCancelled only reads a flag - something has to have
-		// given the button a chance to set it).
+		// Cancel, asked between chapters exactly as the replace loop below asks it, right after the bar
+		// has been moved (which call on the bar takes the click is not measured - KBSAdvanceProgress).
 		//
 		// kFalse: do NOT raise the global error state, the same reading the replace loop takes.
 		// Nothing has been written at this point - the sequence does not open until this pass is
@@ -2171,12 +2170,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// note there for why the run cannot carry a single bar across both.
 	//
 	// ***** WHAT "STOPPED" MEANS HERE, EXACTLY. ***** WasCancelled is read between chapters, between
-	// the STORIES of a chapter (ReplaceInChapterOneByOne - not inside a story's walk: a choice, not a
-	// constraint of the walker's critical section, inside which the bar is already moved and so pumped -
-	// KBSSearchEngine's note on that section), and once more when the loop ends. A Cancel pressed
-	// during a story is heard when that story is done; the whole sequence is then aborted and every
-	// character put back. (The stories were Change All's from 2026-09-26 to 2026-09-27, one command
-	// each; before that, the one-at-a-time walk ran a chapter at a time and was asked between chapters.)
+	// the STORIES of a chapter (ReplaceInChapterOneByOne - not inside a story's walk: the user's call, story
+	// by story; the bar is moved inside it, and whether that already lets the same events in is not measured
+	// - KBSSearchEngine's note on the walker's critical section), and once more when the loop ends. A Cancel
+	// pressed during a story is heard when that story is done; the whole sequence is then aborted and every
+	// character put back. (The stories were Change All's from 2026-09-26 to 2026-09-27, one command each -
+	// which is where "between stories" came from: a single command cannot be asked inside; before that, the
+	// one-at-a-time walk ran a chapter at a time and was asked between chapters.)
 	// DisableChildProgressBars keeps anything the replacements raise from putting up bars of their
 	// own (the chapter opens the other bar covers are the same case, and it says so there).
 	//
@@ -2301,9 +2301,8 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		KBSSetChapterTask(progressBar, "Chapter", pi, pending.size(), chapterName);
 		KBSAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
-		// Cancel is asked here, and answered by the bar being moved inside the chapter
-		// (KBSAdvanceProgress). WasCancelled only reads a flag; something has to have given the
-		// button a chance to set it.
+		// Cancel is asked here, after the bar has been moved - inside the chapter and just above
+		// (KBSAdvanceProgress; which call on the bar takes the click is not measured, see there).
 		//
 		// kFALSE: do NOT raise the global error state. It used to be kTrue, because the error state
 		// was the mechanism - a regular sequence rolls back when it ends with an error standing. It
