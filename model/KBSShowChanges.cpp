@@ -239,9 +239,17 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	// ***** EVERY REFUSAL COMES BEFORE THE MODEL IS TOUCHED ***** (SearchBook's rule): a run turned away
 	// leaves the panel as it found it.
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
-	if (fromBook && !KBSBookScope::HasTargetBook())
+	// An EMPTY target book is a refusal like the others, ahead of the commit point (2026-10-03, the block 11
+	// re-read B11-2 - the search's door, the same one answer: KBSBookScope::GetTargetBook).
+	const KBSBookScope::TargetBook targetBook = fromBook ? KBSBookScope::GetTargetBook() : KBSBookScope::kNoTargetBook;
+	if (fromBook && targetBook == KBSBookScope::kNoTargetBook)
 	{
 		outSummary.Append("Book Scope is on, but no book is open.");
+		return 0;
+	}
+	if (fromBook && targetBook == KBSBookScope::kTargetBookEmpty)
+	{
+		outSummary.Append("That book has no chapters.");
 		return 0;
 	}
 	if (!fromBook && KBSBookScope::ActiveDocument() == nil)
@@ -251,6 +259,14 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	}
 
 	// ***** THE COMMIT POINT. ***** The rows go, with the book and the find format that describe them.
+	//
+	// ...and the chapters the old results held go NOW, not on a schedule - the search's commit point, the same
+	// two lines (2026-10-03, the block 11 re-read B11-3; the search has done it since 2026-10-02, the block 8
+	// re-read B8-2). DropResults closes them with kSchedule, and a scheduled close waits until this run is
+	// over: until then the chapter is open and no longer held, so OpenChapterDoc below finds it open and reads
+	// it as somebody else's - harmless while a scheduled close never runs under a modal bar (measured
+	// 2026-08-04), but one rule for both commit points is one fewer thing that has to stay true.
+	KBSBookScope::ReleaseHeldDocs(true /*close now*/);
 	KBSSearchEngine::DropResults();
 
 	std::vector<KBSBookScope::ChapterDoc> targets;
@@ -260,6 +276,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	{
 		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
+			// (Refused at the front door since 2026-10-03, B11-2 - the safety net, as in the search.)
 			outSummary.Append("That book has no chapters.");
 			return 0;
 		}

@@ -16,9 +16,11 @@
 //  opened it and whatever is in it: the user can see it, so it is theirs. What stays held BETWEEN
 //  runs is therefore only what was reopened windowless and never shown - a jump whose window could
 //  not be raised, a replace whose chapter took none - which ReleaseHeldDocs hands back when the
-//  results are let go (ReleaseSearchedBook), the book is closed, or the application quits. Those
+//  results are let go (ReleaseSearchedBook - the next search, of any scope, or Show Changes at its
+//  commit point), when the book is closed (KBSBookWatch), and when a replace is cancelled. Those
 //  closes are UI-suppressed, so a chapter with unsaved work in it is kept as well (see
-//  ReleaseHeldDocs).
+//  ReleaseHeldDocs). At application quit nothing is handed back: ShutdownCleanup only forgets the
+//  list, and the quitting application closes every document itself.
 //
 //  Ported from KESCL's KESCLBookScope (KESCL is left untouched). KBS always searches the book the
 //  panel is showing, so KESCL's "Search book" toggle is dropped here.
@@ -68,32 +70,49 @@ namespace KBSBookScope
 
 	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL
 	    learned this the hard way - closing the held chapters inside the toggle crashed). The held
-	    windowless chapters are released by the next book search or at shutdown, and a jump into a
-	    chapter the user closed since reopens it through ReopenChapterDoc. */
+	    windowless chapters are released by the next search (of either scope) or Show Changes at its
+	    commit point, or when their book is closed, and a jump into a chapter the user closed since
+	    reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
-	/** Is there a book for a book-scope run to TARGET - the book panel's book (what
-	    ListBookChapters will actually search), or failing that the active book (its fallback)? A
-	    cheap look: nothing is opened, listed or held.
+	/** The book a book-scope run would TARGET - the book panel's book (what ListBookChapters will
+	    actually search), or failing that the active book (its fallback) - and whether it has a chapter
+	    to run on. A cheap look: nothing is opened, listed or held (the chapters are COUNTED, through
+	    IBookContentMgr::GetContentCount - the list ListBookChapters walks).
 
-	    The one answer to "would a book run have a book", asked by the menu gate (HasScopeTarget)
-	    and by the front doors of the search and Show Changes - through the run's own resolver
-	    (ResolveTargetBook in the .cpp), not a copy of it. Until 2026-08-09 those doors asked only
-	    whether a book was ACTIVE, while the run resolved the PANEL's book - the same question
+	    The one answer to "would a book run have something to run on", asked by the menu gate
+	    (HasScopeTarget) and by the front doors of the search and Show Changes - through the run's own
+	    resolver (ResolveTargetBook in the .cpp), not a copy of it. Until 2026-08-09 those doors asked
+	    only whether a book was ACTIVE, while the run resolved the PANEL's book - the same question
 	    answered two ways, so a book on show in the panel with no active book behind it was turned
-	    away at every door the run has. */
-	bool HasTargetBook();
+	    away at every door the run has.
 
-	/** Is there anything for the CURRENT scope to run on - a targetable book while Book Scope is
-	    ON (HasTargetBook), an active document while it is OFF? Asked by the menu's enablement
-	    (KBSActionComponent's UpdateActionStates) so the three commands that start a run go grey
-	    when there is nothing to run them against, rather than starting and reporting "No open
-	    document to search."
+	    ***** AN EMPTY BOOK IS AN ANSWER OF ITS OWN (2026-10-03, the block 11 re-read B11-2). ***** This
+	    asked only whether there was a book (HasTargetBook) until then, so a book with no chapters - the
+	    one File > New > Book has just put at the front of the Book panel - passed every door, and the
+	    run said "That book has no chapters." only past its commit point, with the previous results
+	    already thrown away. Each door now refuses it before it touches anything, and the menu greys
+	    over it (the user's call of 2026-08-02: a command that cannot run is grey) - from this one
+	    answer, so the two cannot come to differ. */
+	enum TargetBook
+	{
+		kNoTargetBook,		// no book a run could target: none open, or the one there is still closing
+		kTargetBookEmpty,	// a book with no chapters in it
+		kTargetBookReady	// a book with at least one chapter
+	};
+	TargetBook GetTargetBook();
 
-	    It asks exactly what the engines ask when they resolve their own scope - HasTargetBook() and
+	/** Is there anything for the CURRENT scope to run on - a target book with chapters while Book
+	    Scope is ON (GetTargetBook), an active document while it is OFF? Asked by the menu's
+	    enablement (KBSActionComponent's UpdateActionStates) so the two commands that start a run -
+	    Find and Show Changes (three until 2026-09-27, when the missing-glyph and overset scans went;
+	    Show Changes came on 2026-09-29) - go grey when there is nothing to run them against, rather
+	    than starting and reporting "No open document to search."
+
+	    It asks exactly what the engines ask when they resolve their own scope - GetTargetBook() and
 	    ActiveDocument() - so the grey state and the run cannot disagree. Cheap enough for a menu
 	    hook: nothing here opens, lists or holds anything (the panel-book half reads a palette's file
-	    field and one IBookManager lookup).
+	    field, one IBookManager lookup and one chapter count).
 
 	    NOT a substitute for the engines' own checks. This answers for the menu; a script reaching
 	    an action directly still meets the engine's guard. */
@@ -101,8 +120,8 @@ namespace KBSBookScope
 
 	/** The document a document-scope run searches: the ACTIVE document - the one the user is working
 	    in, and the one Edit > Find/Change searches - through IActiveContext::GetContextDocument.
-	    Non-owning; nil when there is none. The one place both the menu's grey state (HasScopeTarget)
-	    and the search (KBSSearchEngine::SearchBook) ask.
+	    Non-owning; nil when there is none. The one place the menu's grey state (HasScopeTarget), the
+	    search (KBSSearchEngine::SearchBook) and Show Changes (KBSShowChanges::Run) ask.
 
 	    ***** NOT ILayoutUIUtils::GetFrontDocument, which it replaced on 2026-09-28. ***** That one
 	    answers "the document of the frontmost LAYOUT presentation" (ILayoutUIUtils.h:95-98) - a UI

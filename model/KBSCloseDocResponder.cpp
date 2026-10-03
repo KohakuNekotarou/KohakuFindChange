@@ -36,12 +36,15 @@
 //  emptied itself while its document stayed open would read as work lost at random.
 //
 //  No "was it us who closed it?" guard is needed at document scope. KBS calls IDocFileHandler::Close
-//  in KBSBookScope only, and none of its closes can close the searched document (named, not counted):
+//  in KBSBookScope only, and none of its closes can close a searched document (named, not counted):
 //    * ReleaseHeldDoc (which ReleaseHeldDocs goes through) closes only chapters a BOOK run opened
 //      windowless, and document scope holds none (nothing goes on the held list without a chapter
-//      file to open by);
-//    * the Hide Previous Chapter sweep (CloseDisplayedDocsIfClean) passes the jumped-to document as
-//      its exception.
+//      file to open by) - nor does All Documents list one (KBSSearchEngine leaves held chapters out);
+//    * the Hide Previous Chapter sweep (CloseDisplayedDocsIfClean) never runs over document-scope
+//      results at all: a jump asks for it only while the results came from a BOOK
+//      (KBSJump's ShouldHidePreviousChapter). (This said the sweep was safe because it spares the
+//      jumped-to document until 2026-10-03 - true of one document, and no reason at all once All
+//      Documents put several on the list, 2026-09-29. The block 11 re-read K-2.)
 //
 //========================================================================================
 
@@ -133,10 +136,14 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	KBSUndoFollow::DocumentClosing(closingDocRef);
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
-	// that model chapter by chapter - and closes the runs schedule themselves (the held-chapter
-	// release, the Hide Previous Chapter sweep) can land here from inside one. The run puts its own
-	// results up when it finishes, so nothing stale survives being skipped here. Same rule as the
-	// book-close watcher's, asked the same way (KBSRunGuard).
+	// that model chapter by chapter - and the closes a run makes ON THE SPOT land here from inside it:
+	// each chapter it hands back as it goes (KBSBookScope::HandBackHeldDocNow) and the held chapters the
+	// search and Show Changes close at their commit point (ReleaseHeldDocs(true)). (A SCHEDULED close lands
+	// only once the current tick has unwound - ReleaseHeldDocs from DropResults after the run, and the Hide
+	// Previous Chapter sweep, which is a jump's and never inside a run at all; this named those two as the
+	// ones landing inside a run until 2026-10-03, the block 11 re-read K-3.) The run
+	// puts its own results up when it finishes, so nothing stale survives being skipped here. Same rule as
+	// the book-close watcher's, asked the same way (KBSRunGuard).
 	if (KBSRunGuard::IsAnyRunning())
 	{
 		KBS_DIAG_LOG("CLOSE - a run of ours is up: the results are left to it");

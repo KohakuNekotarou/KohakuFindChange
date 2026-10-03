@@ -115,6 +115,7 @@
 #include "KBSID.h"
 #include "KBSBookScope.h"
 #include "KBSBookWatch.h"
+#include "KBSDiag.h"			// KBS_DIAG_LOG - every change this observer hears, in a test build (compiled out of a shipping one)
 #include "KBSResultModel.h"
 #include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under ANY run of ours
@@ -133,7 +134,10 @@ const uint32 kKBSBookRetireDelayMs = 300;
 ICallbackTimer* gRetireTimer = nil;
 
 /** Retire the results if the book they were searched in is no longer open. Does nothing - and
-    says nothing - when the book is still there, because this runs on every book context change. */
+    says nothing - when the book is still there, because this runs on every book CLOSE in the session
+    (kCloseBookCmdBoss names no book - see the file header), most of them about some other book.
+    (It said "every book context change" until 2026-10-03: the cue this file header records as the one
+    that did not work, 2026-07-28.) */
 void RetireBookResultsIfGone()
 {
 	// NEVER while ANY run of ours is going. This clears the result model and hands the held chapters
@@ -291,8 +295,15 @@ public:
 CREATE_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 
 void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
-	const PMIID& /*protocol*/, void* /*changedBy*/)
+	const PMIID& protocol, void* changedBy)
 {
+	// Test builds only: EVERY change heard here, ahead of the filter below (2026-10-03, the block 11 re-read
+	// B11-1). What a Book panel command broadcasts on the session - Save Book As above all, which may leave
+	// the searched book's path (KBSBookScope's gSearchedBookPath) naming a file no open book has - was read
+	// off a DEBUG build's Spy until then (the file header); a release build has no Spy.
+	KBS_DIAG_LOG("BOOKWATCH change=0x%x protocol=0x%x changedBy=%p", (unsigned int)theChange.Get(),
+		(unsigned int)protocol.Get(), changedBy);
+
 	// One cue, one question - see the file header.
 	if (theChange != kCloseBookCmdBoss)
 		return;

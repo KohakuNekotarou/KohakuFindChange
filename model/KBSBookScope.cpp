@@ -246,7 +246,7 @@ namespace
 
 	    ***** ONE DEFINITION, because two callers have to give the SAME answer. ***** The run resolves
 	    its book here (ListBookChapters) and the menu's grey state asks whether there would be one
-	    (HasTargetBook); if those two ever disagree, either a command greys out over a book the run
+	    (GetTargetBook); if those two ever disagree, either a command greys out over a book the run
 	    could have searched or it starts a run that reports "no book" - which is the shape this
 	    plug-in keeps being bitten by.
 
@@ -294,8 +294,9 @@ void KBSBookScope::SetBookScopeOn(bool on)
 {
 	// Just the flag. Nothing is closed and nothing is cleared here: KESCL's first shape closed the
 	// held chapters right inside the toggle and crashed (see KESCLBookScope::SetBookSearchOn). The
-	// held chapters are released by the next book search or at shutdown, and a jump into a chapter
-	// the user closed meanwhile goes through ReopenChapterDoc anyway.
+	// held chapters are released by the next search (either scope) or Show Changes at its commit
+	// point, or when their book closes - not at shutdown, which only forgets them (ShutdownCleanup) -
+	// and a jump into a chapter the user closed meanwhile goes through ReopenChapterDoc anyway.
 	gBookScopeOn = on;
 }
 
@@ -891,7 +892,7 @@ void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 	}
 }
 
-bool KBSBookScope::HasTargetBook()
+KBSBookScope::TargetBook KBSBookScope::GetTargetBook()
 {
 	// ***** THE BOOK THE RUN WOULD RESOLVE, asked through the very function the run resolves it
 	// with. ***** ListBookChapters calls ResolveTargetBook too, so the menu's grey state and the
@@ -899,16 +900,24 @@ bool KBSBookScope::HasTargetBook()
 	// here opens, lists or holds anything: it reads a palette's file field and asks IBookManager.
 	// (KBSBookScope::HasActiveBook stood beside this until 2026-08-10: every door wants the book a run
 	// would TARGET, which is not "is a book active".)
-	return ResolveTargetBook() != nil;
+	IBook* const book = ResolveTargetBook();		// non-owning - no release
+	if (book == nil)
+		return kNoTargetBook;
+
+	// ...and whether it has a chapter (2026-10-03, B11-2 - see the header): COUNTED, the list
+	// ListBookChapters walks, without building a single entry. A book whose content manager will not
+	// come is empty to the run as well - ListBookChapters returns false for it - so it is answered the same.
+	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
+	return (contentMgr != nil && contentMgr->GetContentCount() > 0) ? kTargetBookReady : kTargetBookEmpty;
 }
 
 bool KBSBookScope::HasScopeTarget()
 {
 	// The same two questions the search asks when it resolves its scope (KBSSearchEngine.cpp, SearchBook),
 	// asked here so the menu can go grey BEFORE a run that would only report that there was nothing to
-	// run on.
+	// run on - an empty book included (B11-2).
 	if (IsBookScopeOn())
-		return HasTargetBook();
+		return GetTargetBook() == kTargetBookReady;
 
 	// The active document, not "is any document open": a book search opens its chapters WINDOWLESS and
 	// this is the document-scope branch, where the active document is exactly what gets searched.
@@ -1060,7 +1069,7 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// reached, which keeps the old behaviour rather than failing outright.
 	//
 	// Both steps - and the closing-book door on each of them - live in ResolveTargetBook, which the
-	// menu's grey state asks as well (HasTargetBook). Non-owning pointer, whichever step answered:
+	// menu's grey state asks as well (GetTargetBook). Non-owning pointer, whichever step answered:
 	// nothing here is released.
 	IBook* book = ResolveTargetBook();
 	if (book == nil)
@@ -1142,6 +1151,11 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// Cleared rather than restored to what it was: the callers all clear it through
 	// ReleaseSearchedBook immediately before calling this, so there is no earlier value to go back
 	// to, and "no results, no book" is the honest state either way.
+	//
+	// ***** A SAFETY NET SINCE 2026-10-03 (B11-2). ***** The callers ask GetTargetBook at their front
+	// door, before their commit point, and an empty book is refused THERE with the previous results
+	// still standing. What can still reach this is a book that counted chapters none of which could be
+	// read (an entry that is not there, or not a chapter) - and that run's results are already gone.
 	if (outDocs.empty())
 	{
 		gSearchedBookPath.Clear();

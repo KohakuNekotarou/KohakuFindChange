@@ -605,9 +605,10 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		return;
 	}
 
-	// Is there anything for the current scope to run on at all - the target book while Book Scope is
-	// ON, the active document (IActiveContext) while it is OFF? The three commands that START a run share the answer, so
-	// it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
+	// Is there anything for the current scope to run on at all - the target book, with a chapter in it
+	// (2026-10-03, B11-2), while Book Scope is ON, the active document (IActiveContext) while it is OFF? The
+	// two commands that START a run - Find and Show Changes (three until the scans went, 2026-09-27) - share
+	// the answer, so it is taken once here. See KBSBookScope::HasScopeTarget: it asks what the engines themselves
 	// ask, so a command that is offered can always run and one that cannot is visibly grey rather
 	// than reporting "No open document to search." after the fact (user's call 2026-08-02).
 	//

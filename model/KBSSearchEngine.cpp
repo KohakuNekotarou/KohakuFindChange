@@ -2404,9 +2404,19 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
 	}
 
-	if (fromBook && !KBSBookScope::HasTargetBook())
+	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
+	// other refusal (2026-10-03, the block 11 re-read B11-2). It was refused only past it until then, by
+	// ListBookChapters below, with the previous results already gone: the book File > New > Book has just
+	// put at the front of the Book panel, searched by habit, threw away a whole book's results.
+	const KBSBookScope::TargetBook targetBook = fromBook ? KBSBookScope::GetTargetBook() : KBSBookScope::kNoTargetBook;
+	if (fromBook && targetBook == KBSBookScope::kNoTargetBook)
 	{
 		outSummary.Append("Book Scope is on, but no book is open.");
+		return 0;
+	}
+	if (fromBook && targetBook == KBSBookScope::kTargetBookEmpty)
+	{
+		outSummary.Append("That book has no chapters.");
 		return 0;
 	}
 	if (!fromBook && KBSBookScope::ActiveDocument() == nil)
@@ -2447,7 +2457,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// longer held, so the All Documents list below took it for a document of the user's: it was walked,
 	// listed, and its rows went a moment after the search when the close went through. Closed here, before
 	// anything is listed, in the context the book loop below closes its own chapters in. A chapter with
-	// unsaved work, or one with a window, is not closed - ReleaseHeldDoc's verdicts, unchanged.
+	// unsaved work, or one with a window, is not closed - ReleaseHeldDoc's verdicts, unchanged. (Show
+	// Changes' commit point has the same two lines since 2026-10-03 - KBSShowChanges::Run.)
 	KBSBookScope::ReleaseHeldDocs(true /*close now*/);
 	KBSSearchEngine::DropResults();
 
@@ -2468,6 +2479,8 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 			// "That book", not "the active book": since 2026-08-09 a run is against the book the BOOK
 			// PANEL is showing, and only falls back to the active one when no panel can be reached
 			// (KBSBookScope::ResolveTargetBook).
+			// (An empty book is refused at the front door since 2026-10-03, B11-2. This is the safety net
+			// - see the note at the end of ListBookChapters - and the same sentence.)
 			outSummary.Append("That book has no chapters.");
 			return 0;
 		}
