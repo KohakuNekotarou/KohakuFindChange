@@ -76,6 +76,25 @@ static std::wstring    sPendingText;		// the field's text at the Return, until t
 //   plug-in is going down (sMinimizeShutdown's rule, KBSFindChangeMinimize.cpp).
 static bool            sShutdown = false;
 
+// ***** INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN (2026-10-03, O-1 - the user's call: "fix O-1 too"). *****
+// InDesign puts its own "Adobe Stock" into the field when it builds the field - measured: about 24 s into a launch
+// the field is made anew, already holding it - and when a menu is used (the user's observation). Find/Change does
+// not change then, so the field went on saying "Adobe Stock" until its next change, and a Return there searched
+// for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the field being created (WM_CREATE) or written
+// (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook never sees - and books the query to be
+// written back one idle later. Typing is not a WM_SETTEXT (WM_CHAR, the IME and a paste edit the text from inside
+// the Edit), so what the person types is never written over. Two guards:
+//   . the field has the keyboard focus -> nothing is written: that is the person's editing (InDesign may clear its
+//     own text as the field takes the focus);
+//   . InDesign writes again within kKBSAppBarRewriteGuardMs of a write of ours -> it is answering us, so the field
+//     is left to it until Find/Change next changes: a back-and-forth must not run for ever (none was measured).
+static HHOOK           sCallWndRetHook = nullptr;
+static ICallbackTimer* sRemirrorTimer  = nil;
+static bool            sOwnWrite       = false;		// our own WM_SETTEXT is going through the field right now
+static DWORD           sOwnWriteTick   = 0;			// when we last wrote (GetTickCount); 0 = not yet
+static bool            sRemirrorHeld   = false;		// InDesign answered a write of ours: hands off until the dialog changes
+static const DWORD     kKBSAppBarRewriteGuardMs = 500;
+
 static std::wstring ClassOf(HWND w)
 {
 	wchar_t name[128] = { 0 };
@@ -285,7 +304,51 @@ static void MirrorFindChangeIntoField()
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
 		return;
+	// Marked as ours while it goes through, so the WH_CALLWNDPROCRET hook does not take it for InDesign's.
+	sOwnWrite = true;
 	::SendMessageW(field, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
+	sOwnWrite = false;
+	sOwnWriteTick = ::GetTickCount();
+}
+
+// The query written back over InDesign's own text (O-1, see the statics) - one idle after InDesign wrote, so it has
+// finished whatever it was doing with the field. Never while the person is in the field.
+static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
+{
+	if (sShutdown || !sAppBarSearchEnter || sRemirrorHeld)
+		return IIdleTask::kEndOfTime;
+	const HWND field = AppBarField();
+	if (field != nullptr && ::GetFocus() == field)
+		return IIdleTask::kEndOfTime;
+	MirrorFindChangeIntoField();
+	return IIdleTask::kEndOfTime;
+}
+
+// The second hook (O-1): after a SENT message has been handled on the main thread. Only two messages to one window
+// are looked at - the application bar's search field being created or written - and only to book the write-back.
+// *A field made anew is remembered at once (sField): during the rebuild measured at startup the old field can
+// still exist, and writing to it would leave the new one saying "Adobe Stock".
+static LRESULT CALLBACK AppBarCallWndRetProc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION && sAppBarSearchEnter && !sShutdown && !sOwnWrite && !sRemirrorHeld)
+	{
+		const CWPRETSTRUCT* const m = reinterpret_cast<const CWPRETSTRUCT*>(lParam);
+		if ((m->message == WM_SETTEXT || m->message == WM_CREATE) && IsAppBarSearchField(m->hwnd))
+		{
+			if (m->message == WM_CREATE)
+				sField = m->hwnd;
+			if (sOwnWriteTick != 0 && ::GetTickCount() - sOwnWriteTick < kKBSAppBarRewriteGuardMs)
+				sRemirrorHeld = true;	// InDesign answered a write of ours: stop here (see the statics)
+			else
+			{
+				if (sRemirrorTimer == nil)
+					sRemirrorTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
+				if (sRemirrorTimer != nil)
+					sRemirrorTimer->StartTimer(RemirrorAfterInDesign, 1, nil);
+			}
+		}
+	}
+	return ::CallNextHookEx(sCallWndRetHook, code, wParam, lParam);
 }
 
 // The search, on the main thread at the next idle - once the Return has gone through the message loop. Not in
@@ -379,12 +442,18 @@ static LRESULT CALLBACK AppBarGetMsgProc(int code, WPARAM wParam, LPARAM lParam)
 	return ::CallNextHookEx(sGetMsgHook, code, wParam, lParam);
 }
 
+// Both hooks off. (The two always go on and off together: KBSSetAppBarSearchEnter, KBSShutdownAppBarSearchEnter.)
 static void UnhookAppBar()
 {
 	if (sGetMsgHook != nullptr)
 	{
 		::UnhookWindowsHookEx(sGetMsgHook);
 		sGetMsgHook = nullptr;
+	}
+	if (sCallWndRetHook != nullptr)
+	{
+		::UnhookWindowsHookEx(sCallWndRetHook);
+		sCallWndRetHook = nullptr;
 	}
 }
 
@@ -403,7 +472,10 @@ public:
 	{
 #ifdef WINDOWS
 		if (protocol == IID_IFINDCHANGEOPTIONS)
+		{
+			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again (O-1)
 			MirrorFindChangeIntoField();
+		}
 #else
 		(void)protocol;
 #endif
@@ -442,14 +514,23 @@ void KBSSetAppBarSearchEnter(bool16 on)
 {
 	sAppBarSearchEnter = on;
 #ifdef WINDOWS
-	if (on && sGetMsgHook == nullptr && !sShutdown)
-		sGetMsgHook = ::SetWindowsHookExW(WH_GETMESSAGE, AppBarGetMsgProc, nullptr, ::GetCurrentThreadId());
+	if (on && !sShutdown)
+	{
+		// Both on the main thread, the thread that sets them (the flyout, and the settings read back at startup).
+		if (sGetMsgHook == nullptr)
+			sGetMsgHook = ::SetWindowsHookExW(WH_GETMESSAGE, AppBarGetMsgProc, nullptr, ::GetCurrentThreadId());
+		if (sCallWndRetHook == nullptr)
+			sCallWndRetHook = ::SetWindowsHookExW(WH_CALLWNDPROCRET, AppBarCallWndRetProc, nullptr, ::GetCurrentThreadId());
+		sRemirrorHeld = false;
+	}
 	else if (!on)
 	{
 		UnhookAppBar();
 		sPendingText.clear();
 		if (sRunTimer != nil)
 			sRunTimer->StopTimer();
+		if (sRemirrorTimer != nil)
+			sRemirrorTimer->StopTimer();
 	}
 	// The field follows the dialog while ON - and shows its query at once, not only at the next change.
 	if (!sShutdown)
@@ -474,7 +555,7 @@ bool16 KBSApplyAppBarSearchEnter()
 void KBSShutdownAppBarSearchEnter()
 {
 #ifdef WINDOWS
-	// Order: nothing new from now on, then the observer and the hook off, then the booking stopped and the timer
+	// Order: nothing new from now on, then the observer and both hooks off, then the bookings stopped and the timers
 	// let go.
 	sShutdown = true;
 	AttachMirrorObserver(false);
@@ -485,6 +566,12 @@ void KBSShutdownAppBarSearchEnter()
 		sRunTimer->StopTimer();
 		sRunTimer->Release();
 		sRunTimer = nil;
+	}
+	if (sRemirrorTimer != nil)
+	{
+		sRemirrorTimer->StopTimer();
+		sRemirrorTimer->Release();
+		sRemirrorTimer = nil;
 	}
 #endif
 	sAppBarSearchEnter = kFalse;
