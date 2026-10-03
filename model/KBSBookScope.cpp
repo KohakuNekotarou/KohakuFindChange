@@ -12,6 +12,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "IApplication.h"		// QueryDocumentList - the open documents (ISession's own is "for internal use only")
 #include "IBook.h"
 #include "IBookContent.h"
 #include "IBookContentMgr.h"
@@ -298,17 +299,24 @@ void KBSBookScope::SetBookScopeOn(bool on)
 	gBookScopeOn = on;
 }
 
+IDocumentList* KBSBookScope::QueryOpenDocumentList()
+{
+	ISession* const session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
+	return (app != nil) ? app->QueryDocumentList() : nil;
+}
+
 bool KBSBookScope::IsDocStillOpen(const UIDRef& docRef)
 {
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
 		return false;
 
-	InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+	InterfacePtr<IDocumentList> docList(KBSBookScope::QueryOpenDocumentList());
 	if (docList == nil)
 		return false;
 
-	// The session's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
+	// The document list's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
 	// plug-in asks this (the UI half's KBSHitMarkerView.cpp) and how KCM asks it everywhere. It replaced a
 	// walk of GetDocCount/GetNthDoc comparing UIDRefs (block 11 API audit, 2026-08-08).
 	//
@@ -420,7 +428,7 @@ bool KBSBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// QueryDocFileHandler and then to CanSave. A UIDRef is only (IDataBase*, UID), so for a chapter
 	// that has been closed since it was held that pointer is dangling, and handing it to anything at
 	// all is undefined behaviour. IsDocStillOpen is the one question that does not: it compares the
-	// pair against the session's open-document list without following it. ReleaseHeldDocs hands over
+	// pair against the application's open-document list without following it. ReleaseHeldDocs hands over
 	// chapters the user may have closed since, and the header promises that a chapter which "is no
 	// longer open" may be passed in.
 	//
@@ -591,7 +599,7 @@ bool KBSBookScope::ChapterHasFile(const IDFile& file)
 // are walked for.
 static UIDRef KBSOpenDocOfChapterFile(const IDFile& file)
 {
-	InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+	InterfacePtr<IDocumentList> docList(KBSBookScope::QueryOpenDocumentList());
 	if (docList == nil)
 		return UIDRef::gNull;
 	IDocument* openDoc = docList->FindDoc(file);
@@ -806,7 +814,7 @@ void KBSBookScope::ForgetHeldDoc(const UIDRef& docRef)
 
 void KBSBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 {
-	InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+	InterfacePtr<IDocumentList> docList(KBSBookScope::QueryOpenDocumentList());
 	if (docList == nil)
 		return;
 

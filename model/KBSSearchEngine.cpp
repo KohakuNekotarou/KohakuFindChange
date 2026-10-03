@@ -1223,7 +1223,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		dirtyGuards.emplace_back(new IDataBase::SaveRestoreModifiedState(chapterDB));
 	else
 	{
-		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		InterfacePtr<IDocumentList> docList(KBSBookScope::QueryOpenDocumentList());
 		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
 		for (int32 d = 0; d < docCount; ++d)
 		{
@@ -2483,7 +2483,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		// (the walk below; the dialog's own All Documents scope was walked once instead from the morning of
 		// 2026-10-02 to the evening, and started at the caret - B8-3), and this list is what the matches are
 		// filed under, and the T of "M of T document(s)".
-		InterfacePtr<IDocumentList> docList(GetExecutionContextSession()->QueryDocumentList());
+		InterfacePtr<IDocumentList> docList(KBSBookScope::QueryOpenDocumentList());
 		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
 		for (int32 d = 0; d < docCount; ++d)
 		{

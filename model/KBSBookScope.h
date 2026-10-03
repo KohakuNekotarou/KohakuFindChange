@@ -34,6 +34,8 @@
 
 #include <vector>
 
+class IDocumentList;
+
 namespace KBSBookScope
 {
 	/** One searchable document: a book chapter (shortName = its file name for the read-out;
@@ -172,7 +174,15 @@ namespace KBSBookScope
 	void AppendChapterNote(PMString& outSummary, const char* what, const std::vector<PMString>& names,
 		const char* tail);
 
-	/** Is this document still in the session's open-document list? Compares list entries
+	/** The list of open documents, AddRef'd - or nil (the application can be gone during shutdown).
+	    ***** IApplication's, NOT ISession's (2026-10-03, the user's call). ***** ISession::QueryDocumentList
+	    sits in that header's "For internal use only" group (ISession.h:162-196); IApplication's
+	    (IApplication.h:113) is public, and it is the one the SDK's snippets and InDesign's own open source
+	    ask (SnpExportDocAsPDF.cpp, GoToAnchorPanelObserver.cpp, PrivateSpellingUtils.cpp - none asks the
+	    session). Every list of open documents in the model half comes from here. */
+	IDocumentList* QueryOpenDocumentList();
+
+	/** Is this document still in the application's open-document list? Compares list entries
 	    against the UIDRef without dereferencing its (possibly dead) database. */
 	bool IsDocStillOpen(const UIDRef& docRef);
 
