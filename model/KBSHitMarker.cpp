@@ -37,6 +37,7 @@
 // Project includes:
 #include "KBSID.h"
 #include "KBSHitMarker.h"
+#include "KBSDiag.h"		// KBS_DIAG_LOG - test builds only
 
 namespace
 {
@@ -215,7 +216,8 @@ public:
 	{
 		if (!gHasMark)
 			return kFalse;
-		// Never on paper or in an export. kPreviewMode is deliberately NOT refused - see the header.
+		// Never on paper or in an export. kPreviewMode is NOT refused here - the screen's preview modes
+		// draw with it - and Draw refuses it only where there is no view (see the header).
 		return ((iShapeFlags & IShape::kPrinting) != 0) ? kFalse : kTrue;
 	}
 
@@ -252,11 +254,20 @@ public:
 		// ***** EVERY SCREEN MODE, OVERPRINT PREVIEW INCLUDED (user's call, 2026-09-26). ***** The
 		// Draw Event marker hid itself under Overprint Preview (kSepPrvOPPEnabledVPAttr) on the reading
 		// that the preview simulates print; the user asked for the marker after a jump to show in
-		// whatever mode the window is in. Only paper and exports (kPrinting, above) go without it.
+		// whatever mode the window is in. Only paper and exports (kPrinting, above) go without it...
+		// ***** ...AND A PAGE DRAWN AS A PICTURE: kPreviewMode WITH NO VIEW (2026-10-03, M-1). ***** The
+		// screen's preview modes draw with kPreviewMode too, so the flag alone cannot tell them apart; the
+		// view can (the Pages panel's thumbnail test KCM and KIDMCP use). See the header.
+		if ((iShapeFlags & IShape::kPreviewMode) != 0 && gd->GetView() == nil)
+		{
+			KBS_DIAG_LOG("MARKER refused flags=0x%x view=0", (unsigned)iShapeFlags);
+			return;
+		}
 
 		PMRect box;
 		if (!KBSHitMarkerBox(waxRun, renderData, waxGlyphs, box))
 			return;
+		KBS_DIAG_LOG("MARKER draw flags=0x%x view=%d", (unsigned)iShapeFlags, gd->GetView() != nil ? 1 : 0);
 
 		IGraphicsPort* gPort = gd->GetGraphicsPort();
 		if (gPort == nil)

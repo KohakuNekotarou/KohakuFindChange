@@ -32,6 +32,8 @@
 //    fcmin-decoy (UI half, 2026-10-03) the file holds a window handle in hex; ui/KBSFindChangeMinimize.cpp
 //                points its record at that window before putting the dialog's style back - a handle the
 //                OS has since given to another window (work\kbs-fcmin\decoy.ps1 makes one)
+//    jump-no-front (UI half, 2026-10-03) ui/KBSJump.cpp's EnsureDocFrontmost reports that the hit's window
+//                could not be brought forward (work\kbs-jump\j2-select-unfronted.ps1)
 //
 //========================================================================================
 
