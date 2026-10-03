@@ -72,7 +72,11 @@ const wchar_t* const kHowToEN =
 	L"- Show Changes by KohakuFindChange on the menu lists those changes again. Book Scope decides whether it reads the front document or every chapter of the book.\n"
 	L"\n"
 	L"[The Book panel (Remember Book Panel Placement)]\n"
-	L"- ON: InDesign's own Book panel opens where it was and at the size it was (collapsed to icons, if it was) when it was last closed. This is recorded when a book is closed and when InDesign quits.";
+	L"- ON: InDesign's own Book panel opens where it was and at the size it was (collapsed to icons, if it was) when it was last closed. This is recorded when a book is closed and when InDesign quits.\n"
+	L"\n"
+	L"[The application bar's search field (Link the Application Bar's Search Field to This Panel)]\n"
+	L"- ON: the search field on InDesign's application bar (the Adobe Stock / Adobe Help one) shows what the tab Find/Change is on holds: the find string on Text and GREP, the glyph (character, GID, font) on Glyph, the character type on Transliterate. On the Object and Colour tabs the field is left as it is.\n"
+	L"- Return in the field searches with KFC instead of opening a browser (Adobe Stock / Adobe Help). On the Text and GREP tabs the field's text is put into Find/Change first; on the other tabs nothing is searched.";
 
 const wchar_t* const kHowToJA =
 	L"【免責】 どのような問題が起こっても責任を取れません。ご利用は自己責任でお願いします。\n"
@@ -104,7 +108,11 @@ const wchar_t* const kHowToJA =
 	L"・メニューの Show Changes by KohakuFindChange を実行すると、その変更を一覧に戻します。前面のドキュメントか、ブックの全章かは Book Scope で決まります。\n"
 	L"\n"
 	L"【ブックパネル（Remember Book Panel Placement）】\n"
-	L"・ON にすると、InDesign 本体のブックパネルが、前回閉じたときの位置と大きさ（アイコン化していたらアイコンのまま）で開きます。これは、ブックを閉じたときと InDesign を終了したときに記録します。";
+	L"・ON にすると、InDesign 本体のブックパネルが、前回閉じたときの位置と大きさ（アイコン化していたらアイコンのまま）で開きます。これは、ブックを閉じたときと InDesign を終了したときに記録します。\n"
+	L"\n"
+	L"【アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）】\n"
+	L"・ON にすると、InDesign 本体のアプリケーションバーの検索欄（Adobe Stock／Adobe Help の検索欄）に、「検索と置換」でいま選んでいるタブの内容を表示します。テキスト／正規表現は検索文字列、字形は字形（文字・GID・フォント）、文字種変換は文字種です。オブジェクト／カラーのタブでは欄は変わりません。\n"
+	L"・検索欄で Enter を押すと、ブラウザ（Adobe Stock／Adobe Help）を開かずに、KFCで検索します。テキスト／正規表現のタブでは、欄の文字を「検索と置換」に入れてから検索します。それ以外のタブでは検索しません。";
 
 //========================================================================================
 // Helpers
