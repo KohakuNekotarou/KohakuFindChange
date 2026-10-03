@@ -313,7 +313,7 @@ static bool KBSJsonParseFlat(const std::string& text, KBSJsonPairs& out)
 	return p == text.size();
 }
 
-// true, false, or a whole number of at most nine digits (KBSJsonReadInt's limit) - the only bare
+// true, false, or a whole number of at most nine digits (KBSPanelStateReadInt's limit) - the only bare
 // values this plug-in ever writes.
 static bool KBSJsonIsBareScalar(const std::string& v)
 {

@@ -10,11 +10,16 @@
 //  Why the floor exists. Every widget on this panel is bound to the edges, so the panel narrows
 //  happily past the point where it says anything: at about half its width the message wraps to five
 //  lines in a box that holds four, and the tree's rows are ellipsized down to nothing. The message
-//  box no longer shows a half-drawn line (KFCUI.fr sizes it to a whole number of lines), but the text
-//  that no longer fits is text the user cannot read at all.
+//  box no longer shows a half-drawn line (KBSPanelMetrics sizes it to a whole number of the palette
+//  font's lines whenever the panel is shown), but the text that no longer fits is text the user
+//  cannot read at all.
 //
 //  KESCL measures the filter row it places at runtime, over a fixed floor; KCM's is a constant with
-//  a maximum height too; this one is a constant, because every widget sits where the .fr put it.
+//  a maximum height too. Here the WIDTH is a constant, and the HEIGHT moves with the message block:
+//  KBSPanelMetrics sizes that block from the palette font and re-places it, the tree and the pictures
+//  every time the panel is shown, so the floor is asked of it rather than written here. (This said
+//  "a constant, because every widget sits where the .fr put it" until 2026-10-03 - true until
+//  KBSPanelMetrics arrived on 2026-08-06.)
 //
 //  Why the rounding exists. The floor stops the panel getting too small; it says nothing about
 //  where it stops in between. Dragged to any height the framework likes, the tree ends on a part

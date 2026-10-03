@@ -22,8 +22,8 @@
 #include "ITriStateControlData.h"	// the protocol a button announces its click on
 
 // General includes:
-#include "CObserver.h"			// the panel-boss observer that writes the tab on show
-#include "PaletteRefUtils.h"	// SetPaletteLabel - the tab's own label
+#include "SelectionObserver.h"	// ActiveSelectionObserver - the panel-boss observer, which follows the selection too
+#include "PaletteRefUtils.h"	// GetPaletteLabel / SetPaletteLabel - the tab's own label
 #include "PMString.h"
 #include "PreferenceUtils.h"	// QuerySessionPreferences - the Find/Change settings, as the engine reads them
 
@@ -106,8 +106,9 @@ void SetTabLabel(const PMString& label)
 	// IsPanelWithWidgetIDShown), and a minimized palette is exactly a strip of tab names. The
 	// scope can be toggled from the flyout with the palette in that state, so a visible-only door
 	// would refuse the case this function exists for.
-	// *Sibling: KESCL picks between the two per call site for the same kind of reason
-	//  (KESCLReportPanelObserver.cpp:968-969, 1069-1071).
+	// *Sibling: KESCL picks between the two per call site for the same kind of reason, and says why at
+	//  each (KESCLReportPanel::RefreshIfShowing takes the visible-only door, ::SelectFirstHitRow the
+	//  other - named, not numbered: a line number in our own code is wrong after the next edit).
 	IControlView* panelView = panelMgr->GetPanelFromWidgetID(kKBSPanelWidgetID);
 	if (panelView == nil)
 		return;
@@ -117,6 +118,15 @@ void SetTabLabel(const PMString& label)
 	// documented as valid only for one of those.
 	const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
 	if (!container.IsValid())
+		return;
+
+	// ***** NOT WRITTEN AGAIN WHEN IT IS ALREADY THERE (2026-10-03). ***** Since the observer follows the
+	// selection (KBSPanelObserver below), this runs on every caret step, and the label it would write is
+	// nearly always the one on the tab. The TAB is asked rather than a copy kept here: a panel moved to
+	// another palette, or shown again, sits in a container with a label of its own, and a remembered
+	// "last written" would skip exactly that write. A palette never yet laid out answers empty
+	// (PaletteRefUtils.h), which is simply written.
+	if (PaletteRefUtils::GetPaletteLabel(container, PaletteRefUtils::kTitle_PanelLabel).IsEqual(label))
 		return;
 
 	PaletteRefUtils::SetPaletteLabel(container, label, PaletteRefUtils::kTitle_PanelLabel);
@@ -170,8 +180,8 @@ namespace
 // subject of the boss that holds it on the preference's own IID - so switching the dialog's tab arrives
 // here and renames the tab at once. MEASURED on 2026-09-27: a script's findGrep() arrives, and so does
 // the user clicking the dialog's tab (memory findchange-tab-switch-notification). No worked example
-// observes THESE settings in the SDK; the title is also rewritten on show, on a scope toggle and on
-// every search.
+// observes THESE settings in the SDK; the title is also rewritten on show, on a scope toggle, on
+// every search and (2026-10-03) on a selection change.
 // ***** REACHED THROUGH THE SETTING ITSELF (2026-10-02, the API re-audit). ***** The subject is asked of
 // the preference interface, as the product's panels reach theirs - spellpanel's
 // AutoCorrectPanelObserver.cpp:72-75 (QuerySessionPreferences -> ISubject -> AttachObserver, and the
@@ -217,37 +227,56 @@ void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const Wid
 
 }
 
-/** Observer on kKBSPanelWidgetBoss. Three jobs, all tied to the panel being shown:
+/** Observer on kKBSPanelWidgetBoss. Everything tied to the panel being shown:
 
-      * The TAB's name. The panel's widgets are built fresh every time it is shown, and a palette is
-        only laid out while it is visible - so opening the panel is the moment the scope has to be
-        written onto the tab. Without this the tab reads the plain name until the user happens to
-        toggle the scope or run a search.
+      * WRITTEN ON AT EVERY SHOW, because the panel's widgets are built fresh each time (and a palette
+        is only laid out while it is visible): the TAB's name, the LAYOUT for the UI language
+        (KBSPanelMetrics), which PICTURE is showing (KBSPanelIcon), and the STATUS LINE - whose string
+        is persisted in the workspace, so left alone it would come back reading whatever the last
+        session put there (KBSResultTree::RestoreStatusOnPanelShow). Also the translucency's safety
+        net and the palette-visibility subscription's retry.
 
-      * The STATUS LINE. Every read-out on a panel has to be written here, because a widget's string
-        is persisted in the workspace: left alone, the line comes back reading whatever the last
-        session put there. See KBSResultTree::RestoreStatusOnPanelShow.
+      * FOLLOWED WHILE THE PANEL IS UP: what the tab's name is made of - the Find/Change settings
+        (their subject) and the SELECTION (this is an ActiveSelectionObserver; see below).
 
       * The ILLUSTRATION's click. The picture beside the message opens the plug-in's home page (the
         URL its tooltip shows). A button announces a click to whoever is listening on
         ITriStateControlData, and this observer - already on the panel boss, already living exactly
-        as long as the widgets do - is who listens. */
-class KBSPanelObserver : public CObserver
+        as long as the widgets do - is who listens.
+
+    ***** AN ActiveSelectionObserver SINCE 2026-10-03 (the block 4 recheck, T-1). ***** The tab names
+    Search: as the selection makes it, and a selection changed with the Find/Change dialog CLOSED changes
+    no setting - so nothing arrived, and the tab went on naming a scope the next search would not use
+    (while the flyout, asked when it opens, already said the other). It was a CObserver until then.
+    The shape is the SDK's own for a panel observer that also hears its widgets:
+    strokeweightmutator/StrMutSelectionObserver.cpp - the base attached FIRST in AutoAttach and
+    detached LAST in AutoDetach, and the widgets' (and here the settings') messages taken in
+    HandleSelectionUpdate after the base has seen them; Update itself is the base's
+    (SelectionObserver.h: "Do NOT override Update w/o a very good reason"). */
+class KBSPanelObserver : public ActiveSelectionObserver
 {
 public:
-	KBSPanelObserver(IPMUnknown* boss) : CObserver(boss) {}
+	KBSPanelObserver(IPMUnknown* boss) : ActiveSelectionObserver(boss) {}
 	virtual ~KBSPanelObserver() {}
 
 	virtual void AutoAttach()
 	{
+		// The selection first - SelectionObserver.h asks for the inherited method before a subclass
+		// attaches to anything of its own.
+		ActiveSelectionObserver::AutoAttach();
+
 		KBSPanelTitle::Update();
 
-		// ***** THIS OBSERVER IS ON THE PANEL. ***** It is aggregated onto kKBSPanelWidgetBoss, so
-		// the panel everything below works on is simply itself - no need to ask the panel manager
-		// for what we are standing on, and no way for two of these jobs to end up holding different
-		// answers to "which panel". This is the product's own shape:
-		// ConditionalTextUIPanelDetailController.cpp:162 and LayerPanelView.cpp:63 both reach their
-		// own widgets with exactly this line.
+		// ***** THIS OBSERVER IS ON THE PANEL. ***** It is aggregated onto kKBSPanelWidgetBoss, so it
+		// can hand the panel it stands on to what fills the panel in - no need to ask the panel
+		// manager for it. This is the product's own shape: ConditionalTextUIPanelDetailController.cpp:162
+		// and LayerPanelView.cpp:63 both reach their own widgets with exactly this line. The layout,
+		// the picture and the widget subscriptions below are handed it.
+		// !NOT EVERYTHING BELOW IS (this said "the panel everything below works on is simply itself"
+		//  until 2026-10-03). KBSResultTree::RestoreStatusOnPanelShow still finds the panel itself,
+		//  through IPalettePanelUtils::QueryPanelByWidgetID - visible panels only - and the translucency
+		//  goes through the panel manager. Whether the visible-only door answers at the moment the
+		//  panel is rebuilt by the startup restore has not been measured (the block 4 recheck, S-1).
 		// *nil is not expected here (the boss carries IPanelControlData), but each callee checks:
 		//  AutoAttach also runs while the panel is being built, and none of this is worth a crash.
 		InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
@@ -306,12 +335,37 @@ public:
 			AttachToWidget(panelData, this, KBSPanelIcon::NthWidgetID(i), false);
 
 		AttachToFindChangeOptions(this, false);
+
+		// The selection last - the mirror of AutoAttach (SelectionObserver.h).
+		ActiveSelectionObserver::AutoDetach();
 	}
 
-	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* /*changedBy*/)
+protected:
+	// ***** THE SELECTION (2026-10-03). ***** A new selection, or different items in it (a frame picked
+	// on the layout, the text tool's selection replacing it), and every caret step (the "frequent"
+	// change, SelectionObserver.h). Which of the two a caret turning into a selected run of text arrives
+	// as is NOT measured, so both are taken. Each can move what Search: comes to (KBSPanelTitle.h), so
+	// each asks for the name again; the name is only WRITTEN when it differs from the tab's
+	// (SetTabLabel), and with Book Scope on it never does.
+	virtual void HandleSelectionChanged(const ISelectionMessage* /*message*/)
 	{
-		// A Find/Change setting changed - the tab, among others. Renaming costs one label write, so
-		// every change on this protocol is taken rather than trying to tell the tab from the rest.
+		KBSPanelTitle::Update();
+	}
+
+	virtual void HandleFrequentSelectionChanged()
+	{
+		KBSPanelTitle::Update();
+	}
+
+	// What is not the selection's: the Find/Change settings and the pictures' clicks. The base first -
+	// it routes the selection's own messages to the two above (SelectionObserver.h).
+	virtual void HandleSelectionUpdate(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy)
+	{
+		ActiveSelectionObserver::HandleSelectionUpdate(theChange, theSubject, protocol, changedBy);
+
+		// A Find/Change setting changed - the tab, among others. Renaming costs a read of the label (and
+		// a write only when it differs - SetTabLabel), so every change on this protocol is taken rather
+		// than trying to tell the tab from the rest.
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 			KBSPanelTitle::Update();

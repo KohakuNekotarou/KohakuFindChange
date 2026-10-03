@@ -141,15 +141,19 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 */
 			IID_IPANELMENUDATA, kCPanelMenuDataImpl,
 			/*
-			 * Observer whose only job is the tab's name: the panel is rebuilt every time it is
-			 * shown, and the palette that draws the tab is only laid out while it is visible, so
-			 * the scope has to be (re)written the moment the panel appears. See KBSPanelTitle.cpp.
+			 * The panel's observer (KBSPanelTitle.cpp): what has to be written on each time the panel
+			 * is shown, because the panel is rebuilt every time - the tab's name, the layout for the
+			 * UI language, the picture, the message - and, while it is up, the picture's click and
+			 * what the tab's name follows (the Find/Change settings and, since 2026-10-03, the
+			 * selection: it is an ActiveSelectionObserver). This said "whose only job is the tab's
+			 * name" until 2026-10-03.
 			 */
 			IID_IOBSERVER, kKBSPanelObserverImpl,
 			/*
 			 * The panel's view replaced (2026-08-04): PalettePanelView plus a floor under how small
-			 * the panel can be dragged, through ConstrainDimensions. See KBSPanelView.cpp - the same
-			 * shape KESCL has used since 2026-07-17, which took it from customconditionaltextui.
+			 * the panel can be dragged, and (2026-08-09) a height rounded down to whole result rows,
+			 * both through ConstrainDimensions. See KBSPanelView.cpp - the same shape KESCL has used
+			 * since 2026-07-17, which took it from customconditionaltextui.
 			 */
 			IID_ICONTROLVIEW, kKBSPanelViewImpl,
 			/*
