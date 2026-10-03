@@ -86,12 +86,16 @@ static bool            sShutdown = false;
 // the Edit), so what the person types is never written over. Two guards:
 //   . the field has the keyboard focus -> nothing is written: that is the person's editing (InDesign may clear its
 //     own text as the field takes the focus);
-//   . InDesign writes again within kKBSAppBarRewriteGuardMs of a write of ours -> it is answering us, so the field
-//     is left to it until Find/Change next changes: a back-and-forth must not run for ever (none was measured).
+//   . InDesign writes again within kKBSAppBarRewriteGuardMs of a WRITE-BACK of ours -> it is answering us, so the
+//     field is left to it until Find/Change next changes: a back-and-forth must not run for ever (none was measured).
+//     *Only a write-back counts (2026-10-03, found by KIDMCP's win32_controls the same day): the first version timed
+//      it from ANY write of ours, so a write by InDesign within half a second of an ordinary change of the query -
+//      a menu used right after typing in Find what - was taken for an answer, and the field was left saying
+//      "Adobe Stock" (a Return there then searched for it). A back-and-forth can only start from a write-back.
 static HHOOK           sCallWndRetHook = nullptr;
 static ICallbackTimer* sRemirrorTimer  = nil;
 static bool            sOwnWrite       = false;		// our own WM_SETTEXT is going through the field right now
-static DWORD           sOwnWriteTick   = 0;			// when we last wrote (GetTickCount); 0 = not yet
+static DWORD           sWriteBackTick  = 0;			// when we last wrote BACK over InDesign's text (GetTickCount); 0 = not yet
 static bool            sRemirrorHeld   = false;		// InDesign answered a write of ours: hands off until the dialog changes
 static const DWORD     kKBSAppBarRewriteGuardMs = 500;
 
@@ -282,14 +286,14 @@ static HWND AppBarField()
 }
 
 // Write the dialog's query into the field. Only what changed is written: an unchanged write would still move
-// the caret of a field the user is in.
-static void MirrorFindChangeIntoField()
+// the caret of a field the user is in. True = it wrote.
+static bool MirrorFindChangeIntoField()
 {
 	if (sShutdown || !sAppBarSearchEnter)
-		return;
+		return false;
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil)
-		return;
+		return false;
 	PMString query;
 	const IFindChangeOptions::SearchMode mode = opts->GetSearchMode();
 	switch (mode)
@@ -298,17 +302,17 @@ static void MirrorFindChangeIntoField()
 		case IFindChangeOptions::kGrepSearch:			query = PMString(opts->GetFindString(mode)); break;
 		case IFindChangeOptions::kGlyphSearch:			query = GlyphDescription(opts); break;
 		case IFindChangeOptions::kTransliterateSearch:	query = CharacterTypeName(opts->GetFindCharacterType()); break;
-		default:										return;		// Object, Colour: not this panel's
+		default:										return false;	// Object, Colour: not this panel's
 	}
 	const std::wstring text = WideOf(query);
 	const HWND field = AppBarField();
 	if (field == nullptr || FieldText(field) == text)
-		return;
+		return false;
 	// Marked as ours while it goes through, so the WH_CALLWNDPROCRET hook does not take it for InDesign's.
 	sOwnWrite = true;
 	::SendMessageW(field, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
 	sOwnWrite = false;
-	sOwnWriteTick = ::GetTickCount();
+	return true;
 }
 
 // The query written back over InDesign's own text (O-1, see the statics) - one idle after InDesign wrote, so it has
@@ -320,7 +324,8 @@ static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
 	const HWND field = AppBarField();
 	if (field != nullptr && ::GetFocus() == field)
 		return IIdleTask::kEndOfTime;
-	MirrorFindChangeIntoField();
+	if (MirrorFindChangeIntoField())
+		sWriteBackTick = ::GetTickCount();		// the one kind of write InDesign could be answering (see the statics)
 	return IIdleTask::kEndOfTime;
 }
 
@@ -337,8 +342,8 @@ static LRESULT CALLBACK AppBarCallWndRetProc(int code, WPARAM wParam, LPARAM lPa
 		{
 			if (m->message == WM_CREATE)
 				sField = m->hwnd;
-			if (sOwnWriteTick != 0 && ::GetTickCount() - sOwnWriteTick < kKBSAppBarRewriteGuardMs)
-				sRemirrorHeld = true;	// InDesign answered a write of ours: stop here (see the statics)
+			if (sWriteBackTick != 0 && ::GetTickCount() - sWriteBackTick < kKBSAppBarRewriteGuardMs)
+				sRemirrorHeld = true;	// InDesign answered a write-back of ours: stop here (see the statics)
 			else
 			{
 				if (sRemirrorTimer == nil)
