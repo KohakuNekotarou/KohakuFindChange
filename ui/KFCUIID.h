@@ -80,6 +80,10 @@ DECLARE_PMID(kClassIDSpace, kKBSUIStartupShutdownBoss, kKFCUIPrefix + 20)
 // own Edit > Find/Change, so the menu and Ctrl+F worked with no document open. The user's call the same
 // day: KBS leaves InDesign's menu alone - the panel's Open Find/Change... opens the dialog instead.
 //DECLARE_PMID(kClassIDSpace, kKBSFindChangeAnywhereBoss, kKFCUIPrefix + 21)
+// "Shorten Main Menu Names" (2026-10-03, KBSMenuShorten.h): the menu filter that records the six menu-bar
+// columns as InDesign registers its menus, keeps them short while the toggle is ON, and keeps the toggle's
+// own item out of a non-Japanese UI. (+ 22: + 21 is the retired action filter's, still spent.)
+DECLARE_PMID(kClassIDSpace, kKBSMenuShortenFilterBoss, kKFCUIPrefix + 22)
 
 
 // InterfaceIDs:
@@ -163,6 +167,8 @@ DECLARE_PMID(kImplementationIDSpace, kKBSStatusTextDataImpl, kKFCUIPrefix + 37)
 // The application bar's search field following Find/Change (2026-10-03, KBSAppBarSearchEnter.cpp). (+ 40: the
 // next number after the retired + 39.)
 DECLARE_PMID(kImplementationIDSpace, kKBSAppBarMirrorObserverImpl, kKFCUIPrefix + 40)
+// The menu filter of "Shorten Main Menu Names" (2026-10-03, KBSMenuShorten.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKBSMenuShortenFilterImpl, kKFCUIPrefix + 41)
 
 
 // ActionIDs:
@@ -300,6 +306,9 @@ DECLARE_PMID(kActionIDSpace, kKBSOpenFindChangeActionID, kKFCUIPrefix + 44)
 // check-mark toggle. ON = the search field of InDesign's application bar shows Find/Change's query, and Return in
 // it searches with this panel (2026-10-03). OFF by default. See KBSAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKBSAppBarSearchEnterActionID, kKFCUIPrefix + 45)
+// "Shorten Main Menu Names" (2026-10-03, the user's design): a toggle shown only in a Japanese UI that gives
+// six columns of InDesign's menu bar short Japanese titles. OFF by default. See KBSMenuShorten.h.
+DECLARE_PMID(kActionIDSpace, kKBSShortenMainMenuActionID, kKFCUIPrefix + 46)
 
 
 // WidgetIDs:

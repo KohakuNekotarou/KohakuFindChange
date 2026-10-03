@@ -102,4 +102,16 @@ bool	KBSPanelStateFilePath(PMString& outPath);
 bool	KBSPanelStateReadInt(const std::string& text, const char* key, int32& out);
 bool	KBSPanelStateReadBool(const std::string& text, const char* key, bool defVal);
 
+// The whole settings file as text, for a module that names its own keys and is read before the lazy
+// start-up (KBSMenuShorten's menu filter). false when there is no file or it could not be read in full.
+// Implemented in KBSPanelState.cpp.
+bool	KBSPanelStateReadText(std::string& out);
+
+// A file of its own beside KBSPanelState.json (KBSMenuShorten's KFCMenuColumns.tsv), read whole or not at
+// all, and written through a side file of its own that is moved into place in one step - the settings
+// file's own route. Write: nil when written, otherwise the reason ("folder", "open", "write", "replace").
+// Implemented in KBSPanelState.cpp.
+bool		KBSPanelStateReadSiblingFile(const char* fileName, std::string& out);
+const char*	KBSPanelStateWriteSiblingFile(const char* fileName, const char* sideFileName, const std::string& text);
+
 #endif // __KBSPanelState_h__

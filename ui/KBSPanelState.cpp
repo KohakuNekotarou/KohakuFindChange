@@ -455,10 +455,11 @@ static bool KBSReadWholeFile(const IDFile& file, std::string& out)
 // between the delete and the move leaves NO settings file, only the side file - the very gap the side
 // file exists to close. MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume (and
 // AFL's MoveFile is itself a wrapper around MoveFileExW).
-static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text)
+static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text,
+	const char* sideFileName = kKBSPanelStateSideFileName)
 {
 	IDFile side;
-	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKBSPanelStateSideFileName)))
+	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(sideFileName)))
 		return "folder";
 	{
 		InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(side, kOpenOut | kOpenTrunc));
@@ -479,6 +480,38 @@ static const char* KBSWriteWholeFile(const IDFile& file, const std::string& text
 	if (!::MoveFileEx(side.GrabTString(), target.GrabTString(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 		return "replace";
 	return nil;
+}
+
+// The whole settings file as text - for a module that names its own keys and has to read them before the
+// lazy start-up reads the file (KBSMenuShorten's menu filter). false when there is no file or it could
+// not be read in full (all or nothing, as KBSReadWholeFile).
+bool KBSPanelStateReadText(std::string& out)
+{
+	out.clear();
+	IDFile file;
+	if (!KBSPanelStateFile(file) || !FileUtils::DoesFileExist(file))
+		return false;
+	return KBSReadWholeFile(file, out) && !out.empty();
+}
+
+// A file of its own beside KBSPanelState.json, read the way the settings file is read: whole, or not at all.
+bool KBSPanelStateReadSiblingFile(const char* fileName, std::string& out)
+{
+	out.clear();
+	IDFile file;
+	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)) || !FileUtils::DoesFileExist(file))
+		return false;
+	return KBSReadWholeFile(file, out);
+}
+
+// ...and written the way it is written: through a side file of its own, read back, and moved into place in
+// one step (MoveFileEx - see KBSWriteWholeFile for why not FileUtils::SwapFiles). nil when written.
+const char* KBSPanelStateWriteSiblingFile(const char* fileName, const char* sideFileName, const std::string& text)
+{
+	IDFile file;
+	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)))
+		return "folder";
+	return KBSWriteWholeFile(file, text, sideFileName);
 }
 
 const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues, bool* outRepaired)

@@ -300,6 +300,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * "Shorten Main Menu Names" (2026-10-03, KBSMenuShorten.h): the menu filter. The three lines
+	 * IMenuFilter.h gives (kMenuFilterProviderImpl is API-provided, ActionID.h - included above).
+	 */
+	Class
+	{
+		kKBSMenuShortenFilterBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kMenuFilterProviderImpl,
+			IID_IMENUFILTER, kKBSMenuShortenFilterImpl,
+			IID_IPMPERSIST, kPMPersistImpl,
+		}
+	},
+
+	/*
 	 * The UI half's ear on the model half (2026-10-01, the model/UI split): the observer that draws what
 	 * KBSModelNotify.h sends on the session's subject. Attached by the startup (KBSModelObserver.cpp); this
 	 * line only puts our IID, and so the implementation, onto the session.

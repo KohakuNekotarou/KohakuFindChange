@@ -221,6 +221,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarSearchEnter.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSMenuShorten.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSIconTip.cpp"/>
@@ -261,6 +262,8 @@
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarSearchEnter.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSMenuShorten.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSMenuShortenNames.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSJump.h"/>

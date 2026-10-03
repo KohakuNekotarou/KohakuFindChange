@@ -66,3 +66,5 @@ REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)
 REGISTER_PMINTERFACE(KBSModelObserver, kKBSModelObserverImpl)
 // ...and the UI services the model half asks for (the bar, the windows, the Book panel, the alert).
 REGISTER_PMINTERFACE(KBSUIServices, kKBSUIServicesImpl)
+// "Shorten Main Menu Names" (2026-10-03): the menu filter (KBSMenuShorten.cpp).
+REGISTER_PMINTERFACE(KBSMenuShortenFilter, kKBSMenuShortenFilterImpl)

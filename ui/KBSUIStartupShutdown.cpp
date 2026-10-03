@@ -31,6 +31,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
 #include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel": its hooks off at the end
+#include "KBSMenuShorten.h"		// "Shorten Main Menu Names": the record, then the columns as the settings ask
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSResultTree.h"		// the status line's static PMString
@@ -55,6 +56,10 @@ public:
 		//  does the read (it is guarded to run once). The order above holds either way - the read
 		//  still comes before the subscription below.
 		KBSLoadPanelStateIfPresent();
+		// "Shorten Main Menu Names" (2026-10-03): the menus exist by now (this service is a lazy one), so
+		// the record this start-up's registration took is written, and the six columns are put the way
+		// the settings ask (KBSMenuShorten.h).
+		KBSMenuShorten::Startup();
 		KBSAttachPanelVisibilityObserver();
 		// The UI half's ear on the model half's notifications (2026-10-01, the model/UI split).
 		KBSModelObserverAttach();
