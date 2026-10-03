@@ -2406,8 +2406,9 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 
 	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
 	// other refusal (2026-10-03, the block 11 re-read B11-2). It was refused only past it until then, by
-	// ListBookChapters below, with the previous results already gone: the book File > New > Book has just
-	// put at the front of the Book panel, searched by habit, threw away a whole book's results.
+	// ListBookChapters below, with the previous results already gone - a whole book's results, for a book
+	// with nothing in it (KBSBookScope::GetTargetBook says which case was in mind, and that it is not yet
+	// measured).
 	const KBSBookScope::TargetBook targetBook = fromBook ? KBSBookScope::GetTargetBook() : KBSBookScope::kNoTargetBook;
 	if (fromBook && targetBook == KBSBookScope::kNoTargetBook)
 	{

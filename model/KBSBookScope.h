@@ -88,10 +88,12 @@ namespace KBSBookScope
 	    away at every door the run has.
 
 	    ***** AN EMPTY BOOK IS AN ANSWER OF ITS OWN (2026-10-03, the block 11 re-read B11-2). ***** This
-	    asked only whether there was a book (HasTargetBook) until then, so a book with no chapters - the
-	    one File > New > Book has just put at the front of the Book panel - passed every door, and the
-	    run said "That book has no chapters." only past its commit point, with the previous results
-	    already thrown away. Each door now refuses it before it touches anything, and the menu greys
+	    asked only whether there was a book (HasTargetBook) until then, so a book with no chapters passed
+	    every door, and the run said "That book has no chapters." only past its commit point, with the
+	    previous results already thrown away. (The case in mind: a book just made with File > New > Book,
+	    whose tab is EXPECTED to come to the front of the Book panel and so become the target - read off
+	    the code on 2026-10-03, not yet measured; the regression case book-empty-keeps-results is what
+	    measures it.) Each door now refuses it before it touches anything, and the menu greys
 	    over it (the user's call of 2026-08-02: a command that cannot run is grey) - from this one
 	    answer, so the two cannot come to differ. */
 	enum TargetBook
@@ -293,7 +295,8 @@ namespace KBSBookScope
 	    command sequence, with no walk standing). The search asks for it at its commit point (2026-10-02,
 	    the block 8 re-read B8-2): a SCHEDULED close leaves the chapter open, and no longer held, until the
 	    run is over - so an All Documents walk met it, listed it as a document of the user's, and lost its
-	    rows when the close went through after the search. */
+	    rows when the close went through after the search. Show Changes asks for it at its own commit point
+	    as well (2026-10-03, the block 11 re-read B11-3 - one rule for both). */
 	void ReleaseHeldDocs(bool closeNow = false);
 
 	/** Close THIS chapter, if KBS is the one who opened it AND it has nothing unsaved in it. A
