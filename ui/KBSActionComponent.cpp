@@ -194,6 +194,10 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// opens exactly as Edit > Find/Change opens it, and nothing of InDesign's own menu is changed.
 			// (From 2026-10-01 until this item, an IActionFilter took the "needs a document" bit off the
 			// Edit menu's action instead; the user preferred KBS to leave InDesign's menu alone.)
+			// *A MINIMISED DIALOG IS BROUGHT BACK, NOT CLOSED (2026-10-03, the user's call - the block 15
+			//  recheck F-2): that action is a toggle, and on a minimised dialog it closes it (measured).
+			if (KBSRestoreMinimizedFindChange())
+				break;
 			InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 			InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
 			if (actionMgr != nil)

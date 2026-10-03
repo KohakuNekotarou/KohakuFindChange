@@ -208,6 +208,8 @@ bool16 KBSApplyFindChangeMinimizable()
 	}
 
 	HWND h = KBSQueryFindChangeWindow();
+	KBS_DIAG_LOG("FCMIN apply: dialog window 0x%llx%s", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)),
+		(h != nullptr && h == sMinWnd) ? " (already ours)" : "");
 	if (h == nullptr)
 		return kFalse;		// not open (or not built yet); the chase below is what answers that
 
@@ -274,7 +276,10 @@ static uint32 KBSMinimizeRetryProc(void* /*refPtr*/)
 		return IIdleTask::kEndOfTime;
 	}
 	if (sRetriesLeft <= 0)
+	{
+		KBS_DIAG_LOG("FCMIN chase: gave up - no dialog window after %d tries", kKBSMinimizeRetryTries);
 		return IIdleTask::kEndOfTime;	// bounded: the dialog is simply not open
+	}
 
 	// Ask again after another interval - by the RETURN VALUE, as KBSPanelAlpha's re-apply chain does.
 	// ***** THAT IS AN INFERENCE, NOT A PROMISE, AND IT HAS NOT BEEN MEASURED (2026-10-02, the API
@@ -306,6 +311,8 @@ void KBSApplyFindChangeMinimizableWithRetry()
 	sRetriesLeft = kKBSMinimizeRetryTries;
 	if (sRetriesLeft <= 0)
 		return;		// the constant is 0 = the chase is turned off
+	KBS_DIAG_LOG("FCMIN chase: no dialog window - %d tries %ums apart booked", kKBSMinimizeRetryTries,
+		kKBSMinimizeRetryDelayMillis);
 
 	if (sRetryTimer == nil)
 		sRetryTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
@@ -313,6 +320,25 @@ void KBSApplyFindChangeMinimizableWithRetry()
 		return;
 
 	sRetryTimer->StartTimer(KBSMinimizeRetryProc, kKBSMinimizeRetryDelayMillis, nil);
+#endif
+}
+
+bool16 KBSRestoreMinimizedFindChange()
+{
+#ifdef WINDOWS
+	// Asked afresh - the window list has not changed since the dialog was minimised, so the cache would
+	// do, but a menu press is rare and the walk is cheap.
+	KBSForgetFindChangeWindow();
+	HWND h = KBSQueryFindChangeWindow();
+	if (h == nullptr || !::IsIconic(h))
+		return kFalse;
+	// What the taskbar button does: restore, and with it bring the window forward.
+	::ShowWindow(h, SW_RESTORE);
+	KBS_DIAG_LOG("FCMIN open: 0x%llx was minimized - restored instead of closed",
+		static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
+	return kTrue;
+#else
+	return kFalse;
 #endif
 }
 

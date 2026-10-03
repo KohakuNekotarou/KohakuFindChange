@@ -69,8 +69,17 @@ void	KBSSetFindChangeMinimizable(bool16 on);
 bool16	KBSApplyFindChangeMinimizable();
 
 // Apply, and if there is no window yet, keep trying for a short while (see the constants above).
-// *This is what the window-list observer calls, not KBSApplyFindChangeMinimizable directly.
+// *This is what the window-list observer calls when the window just added may be the dialog
+//  (KBSWindowMayBeFindChange, 2026-10-03); for every other window-list message it calls the plain
+//  KBSApplyFindChangeMinimizable once.
 void	KBSApplyFindChangeMinimizableWithRetry();
+
+// If the Find/Change dialog is open and MINIMISED, restore it and return kTrue; otherwise kFalse and
+// nothing is touched. For the panel's Open Find/Change... (2026-10-03, the user's call - the block 15
+// recheck F-2): InDesign's own Edit > Find/Change is a TOGGLE that closes an open dialog, a minimised
+// one included (measured), and from KFC's menu item that read as the dialog being thrown away. Not tied
+// to the toggle: a minimised dialog is brought back whoever minimised it. Windows only; kFalse on Mac.
+bool16	KBSRestoreMinimizedFindChange();
 
 // Put the dialog back as it was, stop the chase and release the timer. Called from the plug-in's
 // shutdown.

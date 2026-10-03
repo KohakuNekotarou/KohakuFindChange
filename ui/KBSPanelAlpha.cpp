@@ -51,6 +51,7 @@
 #include "KBSPanelAlpha.h"		// this file's own declarations
 #include "KBSFindChangeMinimize.h"	// the minimize box rides the same window-list notification
 #include "KFCUIID.h"				// kKBSPanelWidgetID (the panel to aim at) + our IIDs / ImplIDs
+#include "KBSDiag.h"				// KBS_DIAG_LOG (test builds only)
 
 // For the observer that follows the panel being shown, hidden, docked or floated:
 #include "CObserver.h"
@@ -605,6 +606,35 @@ void KBSForgetFindChangeWindow()
 	sFcLookedUp = kFalse;
 }
 
+// See the declaration in the header - what was measured, and why changedBy is matched by value first.
+// *GetNthWindow hands back pointers that are NOT addref'd (as in KBSQueryFindChangeIWindow above).
+bool16 KBSWindowMayBeFindChange(void* changedBy)
+{
+	ISession* session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
+	InterfacePtr<IWindowList> windows(app, IID_IWINDOWLIST);
+	if (windows == nil)
+		return kTrue;		// nothing to tell it by - chase, as before
+
+	const int32 count = windows->WindowCount();
+	for (int32 i = 0; i < count; ++i)
+	{
+		IWindow* win = windows->GetNthWindow(i);
+		if (win == nil || static_cast<void*>(win) != changedBy)
+			continue;
+		InterfacePtr<IDialog> dlg(win, IID_IDIALOG);
+		IControlView* panel = (dlg != nil) ? dlg->GetDialogPanel() : nil;
+		KBS_DIAG_LOG("WINDOWLIST added window %d of %d: dialog=%d panel=0x%x", i, count, dlg != nil ? 1 : 0,
+			panel != nil ? panel->GetWidgetID().Get() : 0);
+		if (dlg == nil)
+			return kFalse;		// a document window, or some other window that is no dialog
+		return (panel == nil || panel->GetWidgetID() == kFindChangeParentWidgetID) ? kTrue : kFalse;
+	}
+	KBS_DIAG_LOG("WINDOWLIST added 0x%llx, not one of the %d windows in the list",
+		static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(changedBy)), count);
+	return kTrue;
+}
+
 // *The window WE put WS_EX_LAYERED on. Turning the toggle off removes the style only from this one:
 //  a window that already carried it (a future build might) must keep it, or its own drawing breaks -
 //  which is exactly the mistake the panel side is written to avoid.
@@ -1048,6 +1078,7 @@ void KBSShutdownPanelAlpha()
 
 static void KBSScheduleReapply() {}
 void        KBSForgetFindChangeWindow() {}		// *not static - see the declaration in the header
+bool16      KBSWindowMayBeFindChange(void*) { return kFalse; }
 static void KBSForgetPaletteWindow() {}
 void        KBSShutdownPanelAlpha() {}
 
@@ -1205,7 +1236,7 @@ public:
 
 CREATE_PMINTERFACE(KBSPanelVisibilityObserver, kKBSPanelVisibilityObserverImpl)
 
-void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*theSubject*/, const PMIID& protocol, void* /*changedBy*/)
+void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*theSubject*/, const PMIID& protocol, void* changedBy)
 {
 	// **Two subjects are subscribed to (both established on a debug build's Spy, 2026-07-29):
 	//   (1) kPaletteVisibilityChangedMessage @ kPanelManagerBoss / IID_IPANELMGR
@@ -1245,6 +1276,7 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 	//   might be it - and the alpha is put on the (new) dialog when the toggle is ON.
 	if (protocol == IID_IWINDOWLIST && (theChange == kWindowAddedMessage || theChange == kRemoveWindowMessage))
 	{
+		KBS_DIAG_LOG("WINDOWLIST %s", theChange == kWindowAddedMessage ? "added" : "removed");
 		KBSForgetFindChangeWindow();
 		if (KBSGetFindChangeTranslucent())
 			KBSApplyFindChangeTranslucency();
@@ -1256,8 +1288,17 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 		// **WithRetry, not the plain Apply: the dialog can be open at this moment with no platform
 		//   window built yet, and unlike the translucency above there is no mouse hook asking again
 		//   a moment later. Measured - see the chase note in KBSFindChangeMinimize.h.
+		// *****BUT ONLY FOR A WINDOW THAT MAY BE THE DIALOG (2026-10-03, the block 15 recheck F-3).***** Every
+		//   other message - a document window opening, any other dialog, a window closing - is asked once
+		//   with the plain Apply: measured, a new document set the whole chase going (8 walks of the window
+		//   list over about a second) while the dialog was not open at all. See KBSWindowMayBeFindChange.
 		if (KBSGetFindChangeMinimizable())
-			KBSApplyFindChangeMinimizableWithRetry();
+		{
+			if (theChange == kWindowAddedMessage && KBSWindowMayBeFindChange(changedBy))
+				KBSApplyFindChangeMinimizableWithRetry();
+			else
+				KBSApplyFindChangeMinimizable();
+		}
 		return;		// nothing here concerns the panel
 	}
 
