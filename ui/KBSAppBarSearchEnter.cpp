@@ -83,7 +83,8 @@ static bool            sShutdown = false;
 // for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the field being created (WM_CREATE) or written
 // (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook never sees - and books the query to be
 // written back one idle later. Typing is not a WM_SETTEXT (WM_CHAR, the IME and a paste edit the text from inside
-// the Edit), so what the person types is never written over. Two guards:
+// the Edit - how a Win32 Edit works; NOT YET MEASURED with a person typing into the field, which is hidden on the
+// machine these were measured on), so what the person types is not written over. Two guards:
 //   . the field has the keyboard focus -> nothing is written: that is the person's editing (InDesign may clear its
 //     own text as the field takes the focus);
 //   . InDesign writes again within kKBSAppBarRewriteGuardMs of a WRITE-BACK of ours -> it is answering us, so the
@@ -96,7 +97,7 @@ static HHOOK           sCallWndRetHook = nullptr;
 static ICallbackTimer* sRemirrorTimer  = nil;
 static bool            sOwnWrite       = false;		// our own WM_SETTEXT is going through the field right now
 static DWORD           sWriteBackTick  = 0;			// when we last wrote BACK over InDesign's text (GetTickCount); 0 = not yet
-static bool            sRemirrorHeld   = false;		// InDesign answered a write of ours: hands off until the dialog changes
+static bool            sRemirrorHeld   = false;		// InDesign answered a write-back of ours: hands off until the dialog changes
 static const DWORD     kKBSAppBarRewriteGuardMs = 500;
 
 static std::wstring ClassOf(HWND w)
@@ -137,7 +138,8 @@ static std::wstring FieldText(HWND field)
 // spike/2026-10-03-appbar-mirror): a settings change arrives on IID_IFINDCHANGEOPTIONS for every keystroke in
 // Find what, not only at Done; the field's usual "Adobe Stock" is real text in the Edit (so a cue banner shows
 // only while the field is focused and empty), and WM_SETTEXT shows at once; InDesign puts its own text back when
-// a menu is used, which the user accepted - the next change writes ours again.
+// a menu is used - accepted by the user at first, and since O-1 (the same day) written over again at once (see
+// the second hook, above).
 // (The day's first design took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - and
 //  was dropped once the field showed the dialog's own query. What it measured stays in the note:
 //  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
@@ -526,7 +528,10 @@ void KBSSetAppBarSearchEnter(bool16 on)
 			sGetMsgHook = ::SetWindowsHookExW(WH_GETMESSAGE, AppBarGetMsgProc, nullptr, ::GetCurrentThreadId());
 		if (sCallWndRetHook == nullptr)
 			sCallWndRetHook = ::SetWindowsHookExW(WH_CALLWNDPROCRET, AppBarCallWndRetProc, nullptr, ::GetCurrentThreadId());
+		// A fresh start for the guard (the [17] re-check, 2nd pass): a write-back made before an OFF must not make an
+		// InDesign write just after this ON look like an answer.
 		sRemirrorHeld = false;
+		sWriteBackTick = 0;
 	}
 	else if (!on)
 	{

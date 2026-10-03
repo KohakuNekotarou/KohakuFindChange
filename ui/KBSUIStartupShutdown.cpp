@@ -30,7 +30,7 @@
 #include "KBSPanelTitle.h"
 #include "KBSPanelAlpha.h"		// "Translucent Panel": start following the panel, and stop cleanly
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change": put the dialog's style back at the end
-#include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel": its hook off at the end
+#include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel": its hooks off at the end
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSResultTree.h"		// the status line's static PMString
@@ -90,8 +90,8 @@ public:
 		// must not outlive us. *It also restores a MINIMISED dialog before undoing anything - see
 		//  KBSRestoreFindChangeStyle for why that order is not optional.
 		KBSShutdownFindChangeMinimize();
-		// The Application Bar search's hook and its pending search (2026-10-02): the hook procedure and the
-		// timer's callback are raw pointers into this .pln - KBSShutdownAppBarSearchEnter.
+		// The Application Bar link's two hooks, its observer and its pending search and write-back (2026-10-02/03):
+		// the hook procedures and the timers' callbacks are raw pointers into this .pln - KBSShutdownAppBarSearchEnter.
 		KBSShutdownAppBarSearchEnter();
 		// The marker's countdown. (The marker's own state is the model half's, emptied by its own
 		// shutdown - KBSHitMarker::ShutdownCleanup refuses every call after it, so a countdown that fires

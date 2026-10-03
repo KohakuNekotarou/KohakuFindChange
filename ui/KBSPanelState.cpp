@@ -643,8 +643,9 @@ void KBSLoadPanelStateIfPresent()
 	// moment it is opened (KBSPanelAlpha.cpp).
 	KBSSetFindChangeMinimizable(KBSJsonReadBool(text, "minimizableFindChange", KBSGetFindChangeMinimizable()));
 
-	// Return in the application bar's search field (2026-10-02). Setting it ON is what puts the hook on - read
-	// back here at startup, on the main thread, the thread the hook watches (KBSAppBarSearchEnter.h).
+	// "Link the Application Bar's Search Field to This Panel" (2026-10-02). Setting it ON is what puts its two hooks
+	// and its observer on - read back here at startup, on the main thread, the thread the hooks watch
+	// (KBSAppBarSearchEnter.h).
 	KBSSetAppBarSearchEnter(KBSJsonReadBool(text, "appBarSearchEnter", KBSGetAppBarSearchEnter()));
 
 	// Hide Previous Chapter (the user's call, 2026-08-04, after the first cut left it out). Restoring

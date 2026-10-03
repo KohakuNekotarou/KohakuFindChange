@@ -45,20 +45,22 @@
 // The toggle's current state (*OFF by default).
 bool16	KBSGetAppBarSearchEnter();
 
-// Set the toggle - and with it the hook: ON puts it on the main thread, OFF takes it off. Unlike the
-// window-appearance toggles there is no window to wait for: the hook watches the message loop, and the
-// field is recognised when a key reaches it. *Called on the main thread (the flyout, and the settings
-// file read back at startup) - a thread hook watches the thread that sets it.
+// Set the toggle - and with it the two hooks (WH_GETMESSAGE for Return, WH_CALLWNDPROCRET for InDesign's own writes
+// into the field - O-1) and the observer on Find/Change: ON puts them on the main thread, OFF takes them off. Unlike
+// the window-appearance toggles there is no window to wait for: the hooks watch the thread, and the field is
+// recognised when a message reaches it. *Called on the main thread (the flyout, and the settings file read back at
+// startup) - a thread hook watches the thread that sets it.
 void	KBSSetAppBarSearchEnter(bool16 on);
 
 // For the flyout's status line: kTrue when the field is on screen now (or the toggle is OFF); kFalse when
 // it is ON and the field cannot be seen - the application bar hides it when its menus need a second row
-// (measured 2026-10-02), and Return can only be caught in a field that is there.
+// (measured 2026-10-02), and a person can only type into a field that is shown. (The hooks themselves work on the
+// hidden field too - a Return posted to it was caught, measured 2026-10-03 with KIDMCP's win32_controls.)
 bool16	KBSApplyAppBarSearchEnter();
 
-// Take the hook off, stop a search not yet started and release the timer. Called from the UI half's
-// shutdown. *A hook's procedure and ICallbackTimer's callback are raw pointers into this .pln - neither
-// may outlive it.
+// Take the observer and both hooks off, stop a search and a write-back not yet started, and release both timers.
+// Called from the UI half's shutdown. *A hook's procedure and ICallbackTimer's callback are raw pointers into this
+// .pln - neither may outlive it.
 void	KBSShutdownAppBarSearchEnter();
 
 #endif // __KBSAppBarSearchEnter_h__
