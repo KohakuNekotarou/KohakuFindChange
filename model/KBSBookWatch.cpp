@@ -209,11 +209,10 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// A run of ours is walking the very chapters this would hand back - wait it out by returning a
 	// POSITIVE value, which re-arms without calling StartTimer from inside the callback.
 	//
-	// ***** THAT RE-ARM IS AN INFERENCE, NOT A PROMISE - AND IT HAS NOT BEEN MEASURED. ***** (It said
-	// "an observed behaviour" until 2026-10-02: what was observed is the OLD way failing - StartTimer from
-	// inside, then kEndOfTime, 8 runs became 2 - and whether the return-value chain runs is listed as
-	// unmeasured in docs/ai-notes/kescm-selfreview-2026-07-29.md. KT's app.ktProbe "callbacktimer"
-	// measures it.) IIdleTask::RunTask documents its
+	// ***** THAT RE-ARM IS AN OBSERVATION, NOT A PROMISE. ***** It is measured since 2026-10-03: the same
+	// return-value chain in the UI half (KBSFindChangeMinimize.cpp) traced one booking and then all 8 runs
+	// on a test build. (Until then the only measurement was the OLD way failing - StartTimer from inside,
+	// then kEndOfTime, 8 runs became 2.) IIdleTask::RunTask documents its
 	// return as "the number of milliseconds to sleep before running again" (IIdleTask.h:195) and
 	// ICallbackTimer derives from IIdleTask, but the timer's OWN header describes what it registers as
 	// "a one time only callback" (ICallbackTimer.h:42) and says nothing about what the callback's

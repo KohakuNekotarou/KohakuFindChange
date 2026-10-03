@@ -282,14 +282,14 @@ static uint32 KBSMinimizeRetryProc(void* /*refPtr*/)
 	}
 
 	// Ask again after another interval - by the RETURN VALUE, as KBSPanelAlpha's re-apply chain does.
-	// ***** THAT IS AN INFERENCE, NOT A PROMISE, AND IT HAS NOT BEEN MEASURED (2026-10-02, the API
-	// ***** re-audit). ***** IIdleTask.h:195 reads the return as the delay before running again, but
-	// ICallbackTimer.h:42 calls what it registers "a one time only callback", and its one SDK caller
-	// re-arms from OUTSIDE the callback (KBSBookWatch.cpp has the whole account). The only measurement
-	// on record is the OLD way failing - StartTimer from inside, then kEndOfTime: 8 runs became 2 - and
-	// "does the chain really run 8 times" is listed as unmeasured (docs/ai-notes/
-	// kescm-selfreview-2026-07-29.md). KT's app.ktProbe "callbacktimer" measures it. WHAT CATCHES IT if
-	// the re-arm does not happen:
+	// ***** NOT A PROMISE, BUT MEASURED (2026-10-03, the block 15 recheck F-3). ***** IIdleTask.h:195 reads
+	// the return as the delay before running again, while ICallbackTimer.h:42 calls what it registers "a
+	// one time only callback", and its one SDK caller re-arms from OUTSIDE the callback (KBSBookWatch.cpp
+	// has the whole account). A test build's trace of this chase showed ONE booking and then all 8 runs
+	// - the first about 0.48s after the booking, the rest about 50ms apart - so on InDesign 21.0 the
+	// return value does re-arm. (Until then the only measurement was the OLD way failing: StartTimer from
+	// inside, then kEndOfTime, 8 runs became 2.) It stays an observation of this version, not a
+	// contract; WHAT CATCHES IT if a later one stops re-arming:
 	// the chase is then the one try 50ms after the cue, and a dialog still without a window by then gets
 	// no button this time - the next cue does it: opening the dialog again (the window-list observer
 	// calls the chase afresh, KBSPanelAlpha.cpp) or switching the toggle off and on.
