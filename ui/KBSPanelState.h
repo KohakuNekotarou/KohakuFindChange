@@ -27,6 +27,12 @@
 //      on the line above: the dialog is not open at startup, and the same window-list observer puts
 //      the style on the moment it is. Added 2026-08-12 with the feature - and added HERE at the same
 //      time, because the line above records what it costs to leave this list behind.)
+//    - Link the Application Bar's Search Field to This Panel (key "appBarSearchEnter", 2026-10-02;
+//      *Windows only). Restoring ON is more than the flag: it puts up the toggle's two message hooks
+//      and its observer on the Find/Change settings - on the main thread, where both callers of
+//      KBSLoadPanelStateIfPresent run (KBSAppBarSearchEnter.h). **Missing from this list until
+//      2026-10-03 while the code saved and restored it all along - the THIRD time this list fell
+//      behind the code. A setting added to KBSSavePanelState gets its line here in the same change.)
 //    - Hide Previous Chapter (the user's call, 2026-08-04). It closes chapter windows as a jump
 //      lands, which is why it was left out at first - but a restored ON cannot act on its own:
 //      the jump asks ShouldHidePreviousChapter, which ALSO requires the results to have come from

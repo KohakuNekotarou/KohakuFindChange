@@ -121,8 +121,10 @@ DECLARE_PMID(kImplementationIDSpace, kKBSMarkerExpiryIdleTaskImpl, kKFCUIPrefix 
 DECLARE_PMID(kImplementationIDSpace, kKBSResultNodeEHImpl, kKFCUIPrefix + 8)
 // Replace feature: the hit row check box's observer (click -> flip that hit's checked flag).
 DECLARE_PMID(kImplementationIDSpace, kKBSResultCheckObserverImpl, kKFCUIPrefix + 10)
-// The panel tab's name: an observer on the panel boss whose only job is to write the current
-// scope onto the tab the moment the panel appears (see KBSPanelTitle.cpp).
+// The panel's observer (KBSPanelTitle.cpp): on the panel boss, it writes the tab's name, the layout,
+// the picture and the message the moment the panel appears, hears the picture's click, and keeps the
+// tab's name following the Find/Change settings and the selection (an ActiveSelectionObserver since
+// 2026-10-03). "Whose only job is to write the current scope onto the tab" until then.
 DECLARE_PMID(kImplementationIDSpace, kKBSPanelObserverImpl, kKFCUIPrefix + 13)
 // The result tree's OWN event handler (the list, not a row): up / down arrows that OPEN the row
 // they land on, so a book search's closed chapters do not hide their hits from the keyboard.
