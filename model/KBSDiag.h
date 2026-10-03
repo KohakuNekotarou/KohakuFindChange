@@ -29,6 +29,9 @@
 //  every use sits inside #ifdef KBS_DIAG all the same, so no name of a switch reaches a shipping .pln.
 //    keep-held   KBSBookScope::HandBackHeldDocNow keeps a held chapter instead of closing it
 //                (work\kbs-regress\cases\fault-keep-held-on.jsx / -off.jsx)
+//    fcmin-decoy (UI half, 2026-10-03) the file holds a window handle in hex; ui/KBSFindChangeMinimize.cpp
+//                points its record at that window before putting the dialog's style back - a handle the
+//                OS has since given to another window (work\kbs-fcmin\decoy.ps1 makes one)
 //
 //========================================================================================
 

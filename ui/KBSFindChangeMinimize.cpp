@@ -15,6 +15,7 @@
 #include "KBSFindChangeMinimize.h"
 #include "KBSPanelAlpha.h"		// KBSQueryFindChangeWindow - the shared lookup of the dialog's window;
 								// KBSCommitWindowStyle
+#include "KBSDiag.h"			// KBS_DIAG_LOG / the "fcmin-decoy" fault switch (test builds only)
 
 // The dialog's window can be absent at the moment we are told about it, so the style is written
 // again once the events have gone round:
@@ -65,12 +66,78 @@ static bool            sMinimizeShutdown = false;
 
 static uint32 KBSMinimizeRetryProc(void* refPtr);
 
+#ifdef KBS_DIAG
+// Fault switch "fcmin-decoy" (test builds only, 2026-10-03): %TEMP%\kbs-diag-fault-fcmin-decoy holds a
+// window handle in hex, and the record is pointed at it just before it is put back - what a handle the
+// OS has since given to somebody else's window looks like. A test makes a window of its own for it.
+static HWND KBSDiagDecoyWindow()
+{
+	char* temp = nullptr;
+	size_t len = 0;
+	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+		return nullptr;
+	char path[600] = { 0 };
+	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-fcmin-decoy", temp);
+	free(temp);
+	FILE* f = nullptr;
+	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
+		return nullptr;
+	unsigned long long value = 0;
+	const int read = fscanf_s(f, "%llx", &value);
+	fclose(f);
+	return (read == 1) ? reinterpret_cast<HWND>(static_cast<uintptr_t>(value)) : nullptr;
+}
+#endif
+
+// Is the window on record still the Find/Change dialog WE styled?
+// *****A HANDLE IS ONLY A NUMBER, AND THE RECORD OUTLIVES ITS WINDOW (2026-10-03, measured).***** The
+//   dialog's window is destroyed on every close (KBSPanelAlpha.cpp's window-list observer has the
+//   measurement), but the record is kept until the toggle goes off, the next dialog is styled or the
+//   plug-in shuts down - and by then the OS may have given that number to another window, of this
+//   process or of any other. IsWindow alone said yes to such a window; a test build pointed the record
+//   at a window of ANOTHER PROCESS (the "fcmin-decoy" switch) and switching the toggle off took that
+//   window's minimize box away and made it a tool window, off the taskbar.
+//   So, Win32 only (shutdown is a caller), the same tests the translucency side makes before it takes
+//   its WS_EX_LAYERED off (KBSRestoreOurFindChangeStyle in KBSPanelAlpha.cpp), plus the process:
+//     . it belongs to THIS process
+//     . its class is still "DroverLord - Window Class" and it is still a top-level window
+//     . OUR marks are still on it - what we changed still reads the way we left it
+static bool KBSStillOurFindChangeWindow(HWND h)
+{
+	if (!::IsWindow(h))
+		return false;
+	DWORD pid = 0;
+	::GetWindowThreadProcessId(h, &pid);
+	if (pid != ::GetCurrentProcessId())
+		return false;
+	if (::GetAncestor(h, GA_ROOT) != h)
+		return false;
+	wchar_t cls[64] = { 0 };
+	if (::GetClassNameW(h, cls, 64) == 0 || ::wcscmp(cls, L"DroverLord - Window Class") != 0)
+		return false;
+	const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
+	if (!sHadAppWin && (ex & WS_EX_APPWINDOW) == 0)
+		return false;		// we put it on, and it is not there
+	if (sHadToolWin && (ex & WS_EX_TOOLWINDOW) != 0)
+		return false;		// we took it off, and it is back
+	return true;
+}
+
 // Put the window we changed back as it was, and forget it. One place for it, because there are
 // three callers: the toggle going OFF, a different dialog window turning up, and shutdown.
 static void KBSRestoreFindChangeStyle()
 {
 	if (sMinWnd == nullptr)
 		return;
+#ifdef KBS_DIAG
+	if (HWND decoy = KBSDiagDecoyWindow())
+	{
+		KBS_DIAG_LOG("FCMIN restore: the record (0x%llx) pointed at the decoy 0x%llx",
+			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(sMinWnd)),
+			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(decoy)));
+		sMinWnd = decoy;
+	}
+#endif
 
 	HWND h = sMinWnd;
 	// *Forgotten first, and whether or not anything below succeeds. A handle the OS has recycled must
@@ -78,8 +145,12 @@ static void KBSRestoreFindChangeStyle()
 	//  (memory/panel-hwnd-from-paletteref.md records the same hazard on the panel side).
 	sMinWnd = nullptr;
 
-	if (!::IsWindow(h))
+	if (!KBSStillOurFindChangeWindow(h))
+	{
+		KBS_DIAG_LOG("FCMIN restore: 0x%llx is no longer the dialog we styled - left alone",
+			static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
 		return;
+	}
 
 	// *****RESTORE IT FIRST IF IT IS MINIMISED.***** Putting WS_EX_TOOLWINDOW back while the window
 	//   is iconic takes it off the taskbar - and the taskbar is the only way back to it. The user
@@ -103,6 +174,7 @@ static void KBSRestoreFindChangeStyle()
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ex);
 
 	KBSCommitWindowStyle(h);	// the frame put back, without pulling the dialog forward
+	KBS_DIAG_LOG("FCMIN restore: the styles were put back on 0x%llx", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
 }
 
 #endif	// WINDOWS
