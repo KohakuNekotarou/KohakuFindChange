@@ -32,8 +32,8 @@
 //
 //  ***** THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. ***** The
 //  jump runs on the first button-up and raises its marker there; a double click then selects, and
-//  the ordinary ClearMarker at the end of a successful SelectHitText takes the marker down. A double
-//  click that is REFUSED (KBSJump.h lists why it can be) never reaches that ClearMarker, so its
+//  the ordinary KBSHitMarkerView::Hide at the end of a successful SelectHitText takes the marker down. A
+//  double click that is REFUSED (KBSJump.h lists why it can be) never reaches that Hide, so its
 //  marker stays up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode
 //  jump keeps, and the user asked for it (2026-09-25). From 2026-08-09 until then the first click's
 //  marker was BOOKED for the double-click interval instead, so a double click never flashed one - at

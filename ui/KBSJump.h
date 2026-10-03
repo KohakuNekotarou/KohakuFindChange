@@ -52,10 +52,12 @@ namespace KBSJump
 	    click still only POINTS at the match (KBSJump's whole design; see the note at the head of this
 	    header), and this is the extra step that says "and put me in it".
 
-	    Assumes the jump has already run for this row, which is what the double-click sequence
-	    guarantees: it does NOT scroll (Selection::kDontScrollSelection), because the jump's own
-	    centring is better than what scroll-into-view would do, and it does not front the window
-	    again. On success it TAKES THE JUMP'S MARKER BACK DOWN - the inverted rectangle and the
+	    Assumes the jump has already run for this row - the double-click sequence TRIES it on the first
+	    click, and this refuses, without a word, when the hit's layout window is not the one in front
+	    (the jump could not bring it forward, or was dropped while an earlier landing was still opening
+	    a chapter - 2026-10-03, J-2). It does NOT scroll (Selection::kDontScrollSelection), because the
+	    jump's own centring is better than what scroll-into-view would do, and it does not front the
+	    window again. On success it TAKES THE JUMP'S MARKER BACK DOWN - the inverted rectangle and the
 	    selection say the same thing, and together they make the text unreadable.
 
 	    Refuses when there is nothing honest to select - a row with no place left ("deleted"), a LOCKED
