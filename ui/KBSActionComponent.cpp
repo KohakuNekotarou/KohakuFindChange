@@ -43,6 +43,7 @@
 #include "KBSPanelAlpha.h"		// "Translucent Panel" - get / set / apply the panel's alpha
 #include "KBSFindChangeMinimize.h"	// "Minimizable Find/Change" - the minimize box on InDesign's dialog
 #include "KBSAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel"
+#include "KBSMenuShorten.h"			// "Shorten Main Menu Names"
 #include "KBSPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 
@@ -307,6 +308,17 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			FlipAppearanceToggle(KBSGetAppBarSearchEnter, KBSSetAppBarSearchEnter, KBSApplyAppBarSearchEnter,
 				"Application Bar link", ": on - works while the Application Bar's search field is shown.");
 			break;
+
+		// "Shorten Main Menu Names" (2026-10-03, the user's design): six columns of InDesign's menu bar get
+		// short Japanese titles, rebuilt at once; the setting is written at once too (KBSMenuShorten.h).
+		case kKBSShortenMainMenuActionID:
+		{
+			PMString msg;
+			KBSMenuShorten::ToggleAndSave(msg);
+			if (!msg.IsEmpty())
+				KBSResultTree::ShowStatus(msg);
+			break;
+		}
 
 		// "Remember Book Panel Placement": InDesign's own Book panel is measured as it closes (and
 		// when InDesign quits) and put back where it was when it next appears. OFF by default.
@@ -722,6 +734,16 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// Selectable whether or not the field is shown, like the toggles above: the flag is what is being set.
 			int16 actionState = kEnabledAction;
 			if (KBSGetAppBarSearchEnter())
+				actionState |= kSelectedAction;		// show the check mark when ON
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKBSShortenMainMenuActionID)
+		{
+			// Drawn under its Japanese name (the item exists in a Japanese UI only - KBSMenuShorten.h), grey
+			// while there is no record of the columns to rebuild from, and checked while ON.
+			listToUpdate->SetNthActionName(i, KBSMenuShorten::MenuItemName());
+			int16 actionState = KBSMenuShorten::HasRecord() ? kEnabledAction : kDisabled_Unselected;
+			if (KBSMenuShorten::IsOn())
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}

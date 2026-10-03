@@ -406,6 +406,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSRememberBookPanelMenuKey	kKBSStringPrefix "kKBSRememberBookPanelMenuKey"
 // "Link the Application Bar's Search Field to This Panel": Return in the application bar's search field searches here.
 #define kKBSAppBarSearchEnterMenuKey	kKBSStringPrefix "kKBSAppBarSearchEnterMenuKey"
+#define kKBSShortenMainMenuMenuKey	kKBSStringPrefix "kKBSShortenMainMenuMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKBSSavePanelSettingsMenuKey	kKBSStringPrefix "kKBSSavePanelSettingsMenuKey"
 // Replace feature menu item keys.
@@ -516,6 +517,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSMinimizableFindChangeMenuItemPosition	2.7
 #define kKBSTranslucentPanelMenuItemPosition	2.8
 #define kKBSRememberBookPanelMenuItemPosition	2.9
+#define kKBSShortenMainMenuMenuItemPosition	2.95	// 2026-10-03: last of the toggles, before the rule at 3.0
 #define kKBSSeparator4MenuItemPosition		3.0
 
 // Block 4 - the command that writes a file of our own and touches no document: the toggles above

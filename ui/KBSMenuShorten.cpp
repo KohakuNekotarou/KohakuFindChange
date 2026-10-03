@@ -33,6 +33,7 @@
 #include "KBSMenuShorten.h"
 #include "KBSMenuShortenNames.h"
 #include "KBSPanelState.h"
+#include "KBSDiag.h"			// KBS_DIAG_LOG - a test build's trace of every item the filter is handed
 
 namespace
 {
@@ -239,6 +240,8 @@ std::vector<Item> ItemsToRebuild()
 bool Rebuild(bool toShort)
 {
 	const std::vector<Item> items = ItemsToRebuild();
+	KBS_DIAG_LOG("MENUSHORTEN REBUILD toShort=%d items=%u registered=%d", toShort ? 1 : 0,
+		static_cast<unsigned>(items.size()), gRegistered ? 1 : 0);
 	if (items.empty())
 		return false;
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
@@ -276,6 +279,24 @@ bool Rebuild(bool toShort)
 	return true;
 }
 
+// ***** A RE-ADD TAKES THE OLD COPY OFF THE SHORT COLUMN FIRST (2026-10-03, measured). ***** A dynamic menu
+// (IDynamicMenu::RebuildMenu, run each time its menu is read or opened) removes its old items by the OFFICIAL
+// path - RemoveMenuItem("Main:&Window:...", id), the SDK's own dynamicmenu sample's way
+// (DynMnuDynamicMenu.cpp) - and the filter never hears of a removal. Under a short title that removal misses,
+// so every re-add came on top of the last: Window > Workspace grew to 12,897 items. Removing the item from
+// `path` (the short path it is about to be added under) before the add puts it back once.
+void RemoveShortCopy(const PMString& path, ActionID id)
+{
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
+	InterfacePtr<IMenuManager> menus(actionMgr, UseDefaultIID());
+	if (menus == nil)
+		return;
+	gRebuilding = true;
+	menus->RemoveMenuItem(path, id);
+	gRebuilding = false;
+}
+
 const char* WriteKeys()
 {
 	std::vector<std::pair<std::string, std::string> > keys;
@@ -305,6 +326,9 @@ void KBSMenuShortenFilter::FilterMenuItem(ActionID* actionID, PMString* menuPath
 {
 	if (gRebuilding || actionID == nil || menuPath == nil)
 		return;
+	KBS_DIAG_LOG("MENUFILTER id=%u pos=%.3f dyn=%d own=%d path=%s", actionID->Get(),
+		(menuPos != nil) ? ToDouble(*menuPos) : 0.0, isDynamic ? 1 : 0, isOwnerDraw ? 1 : 0,
+		menuPath->GetUTF8String().c_str());
 	// The panel menu's own item, only in a Japanese UI (the user's call). Registration and its saved data
 	// are kept per UI language, so an English InDesign never gets it ("" = not added: IMenuFilter.h).
 	if (*actionID == kKBSShortenMainMenuActionID)
@@ -338,6 +362,8 @@ void KBSMenuShortenFilter::FilterMenuItem(ActionID* actionID, PMString* menuPath
 		PMString shortHead;
 		shortHead.SetUTF8String("Main:" + ShortUtf8(c));
 		menuPath->Insert(shortHead, 0);
+		if (it.id != 0)		// not a sub-menu's own entry: removing one would leave its items behind (IMenuManager.h)
+			RemoveShortCopy(*menuPath, *actionID);
 	}
 }
 
@@ -350,6 +376,8 @@ void KBSMenuShorten::Startup()
 	if (!KBSLoc::JapaneseUI())
 		return;
 	ReadSettingsOnce();
+	KBS_DIAG_LOG("MENUSHORTEN STARTUP registered=%d seen=%u on=%d applied=%d", gRegistered ? 1 : 0,
+		static_cast<unsigned>(gSeen.size()), gOn ? 1 : 0, gApplied ? 1 : 0);
 	if (gRegistered && KBSPanelStateWriteSiblingFile(kRecordFileName, kRecordSideFileName, Serialize(gSeen)) == nil)
 		gRecordState = 1;
 	bool rebuilt = false;

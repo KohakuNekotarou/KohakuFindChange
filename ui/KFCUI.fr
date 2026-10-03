@@ -563,6 +563,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Shorten Main Menu Names: toggle (check mark). Six columns of InDesign's menu bar get short Japanese
+		// titles. Offered only in a Japanese UI - the menu filter keeps it out of any other (KBSMenuShorten.h).
+		kKBSShortenMainMenuActionID,
+		kKBSTargetMenuPath
+		kKBSShortenMainMenuMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Separator between the toggles and the command that writes a file.
 		kKBSSeparator4ActionID,
 		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
@@ -828,6 +835,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKBSActionComponentBoss,
 		kKBSAppBarSearchEnterActionID,
 		kKBSAppBarSearchEnterMenuKey,	// "Link the Application Bar's Search Field to This Panel" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Shorten Main Menu Names. kCustomEnabling for the check mark and for the Japanese name it is drawn
+		// under (UpdateActionStates). Not in the shortcut editor: the item exists in a Japanese UI only.
+		kKBSActionComponentBoss,
+		kKBSShortenMainMenuActionID,
+		kKBSShortenMainMenuMenuKey,	// "Shorten Main Menu Names" (toggle, check mark; drawn in Japanese)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

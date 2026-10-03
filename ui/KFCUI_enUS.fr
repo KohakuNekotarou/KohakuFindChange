@@ -47,6 +47,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSMinimizableFindChangeMenuKey,	"Minimizable Find/Change",
                 kKBSRememberBookPanelMenuKey,	"Remember Book Panel Placement",
                 kKBSAppBarSearchEnterMenuKey,	"Link the Application Bar's Search Field to This Panel",
+                kKBSShortenMainMenuMenuKey,	"Shorten Main Menu Names",
                 kKBSSavePanelSettingsMenuKey,	"Save Panel Settings",
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
