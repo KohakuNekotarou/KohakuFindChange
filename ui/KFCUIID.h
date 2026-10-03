@@ -387,7 +387,7 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSBookScopeMenuKey			kKBSStringPrefix "kKBSBookScopeMenuKey"
 #define kKBSHidePrevChapterMenuKey		kKBSStringPrefix "kKBSHidePrevChapterMenuKey"
 // "Translucent Panel" toggle: ON = the panel is drawn faint while it floats, and comes back to solid
-// while the pointer is on it. English in both string tables, like the rest of the flyout.
+// while the pointer is on it. English in every UI language, like the rest of the flyout.
 #define kKBSTranslucentPanelMenuKey		kKBSStringPrefix "kKBSTranslucentPanelMenuKey"
 // "Translucent Find/Change": the same, for InDesign's own Find/Change dialog.
 #define kKBSTranslucentFindChangeMenuKey	kKBSStringPrefix "kKBSTranslucentFindChangeMenuKey"
@@ -419,10 +419,11 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // "Show Changes by KohakuFindChange" (2026-09-29).
 #define kKBSShowChangesMenuKey			kKBSStringPrefix "kKBSShowChangesMenuKey"
 #define kKBSRedoMenuKey					kKBSStringPrefix "kKBSRedoMenuKey"	// the story and document rows' Redo (2026-09-27) - "Replace Again (Current Find/Change Settings)" since 2026-09-29
-// "How to Use...": the operating reference. English in both string tables, like the rest of the
-// flyout - only the replace's own alerts are translated (see kKBSStaleResultsDocKey). The BODY of the
-// reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single string at
-// about 3.1KB and this text is several times that.
+// "How to Use...": the operating reference. English in every UI language, like the rest of the
+// flyout - there is one string table, and what KBSLoc.h switches to Japanese at run time is the model
+// half's alert and Undo names (kKBSStaleResultsDocKey and friends, KBSID.h) and this page's body.
+// The BODY of the reference is not here at all: it lives in KBSHowTo.cpp, because odfrc caps a single
+// string at about 3.1KB and this text is several times that.
 #define kKBSHowToMenuKey				kKBSStringPrefix "kKBSHowToMenuKey"
 // "Open Find/Change..." (2026-10-01).
 #define kKBSOpenFindChangeMenuKey		kKBSStringPrefix "kKBSOpenFindChangeMenuKey"

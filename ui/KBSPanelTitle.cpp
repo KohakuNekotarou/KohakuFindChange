@@ -59,9 +59,9 @@ namespace
 // available.
 //
 // It is kKBSDisplayName rather than a literal of its own: that macro is the ONE definition of the
-// display name - both string tables put it under kKBSPanelTitleKey and the .rc builds its
-// FileDescription from it - so this cannot drift out of step with the name the panel came up with,
-// which three separate literals could.
+// display name - the UI half's string table (KFCUI_enUS.fr) puts it under kKBSPanelTitleKey and the
+// model half's .rc builds its FileDescription from it - so this cannot drift out of step with the name
+// the panel came up with, which three separate literals could.
 const char* const kKBSPlainPanelName = kKBSDisplayName;
 
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */

@@ -66,7 +66,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // what it writes with - Find/Change as it stands now, not the replace it takes back.
                 kKBSRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
-                // The operating reference. English in both tables, like the rest of the flyout.
+                // The operating reference. English in every UI language, like the rest of the flyout.
                 kKBSHowToMenuKey,				"How to Use...",
                 kKBSOpenFindChangeMenuKey,		"Open Find/Change...",
                 // The Keyboard Shortcuts editor's area (kKBSPanelMenuActionArea): files the
