@@ -38,7 +38,9 @@
 //      palette would move the book panel the user already has open;
 //    * a book panel InDesign itself put in a dock: that is InDesign's own memory at work;
 //    * a floating placement whose title band would land off every screen (a monitor that has gone),
-//      and a docked one whose neighbours are all gone;
+//      and a docked one whose neighbours are all gone AND whose dock cannot be found again (a file
+//      written before 2026-09-27 does not say which dock; since then a column of its own is made in
+//      the same dock at the same place);
 //    * a floating neighbour whose palette is closed: the Book panel is not put into a palette that
 //      cannot be seen - it gets its own place and size instead.
 //

@@ -74,10 +74,10 @@
 //    group at tab 0 and at tab 1, above the next group, below the previous one - each came back where
 //    it had been, and the floating palette it was taken out of went away with it. A new column
 //    (NewTabPaneInDock) was measured 2026-09-27 alone in the dock and beside the toolbox (which it
-//    does not take as "before" - RestoreDocked); beside another column it is still NOT measured.
-//    ! Seen once and not again (the user, same day): the Book panel's icon drawn as KBS's own. KBS
-//      writes no palette icon anywhere, so the suspicion is OWL's icon strip after a reparent - not
-//      confirmed.
+//    does not take as "before" - RestoreDocked), and beside another column by the user the same night.
+//    ! Seen twice, both on 2026-09-25 (the user): the Book panel's icon drawn as KBS's own. KBS writes
+//      no palette icon anywhere, so the suspicion is OWL's icon strip after a reparent - not confirmed,
+//      and left there with the user's agreement (it is only how the icon looks).
 //
 //========================================================================================
 
@@ -102,6 +102,7 @@
 // General includes:
 #include "AppUIID.h"			// kPaletteVisibilityChangedMessage (:325)
 #include "BookID.h"				// kCloseBookCmdBoss - the command every book close goes through
+#include "DocumentID.h"			// kOpenDocCmdBoss, kNewDocCmdBoss - a document opening ends the launch
 #include "CObserver.h"
 #include "CPMUnknown.h"
 #include "CreateObject.h"		// ::CreateObject / ::CreateObject2
@@ -115,12 +116,15 @@
 #include "ShuksanID.h"			// kCallbackTimerBoss, IID_ICALLBACKTIMER
 #include "WorkspaceID.h"		// kPaletteMgrService, IID_IPALETTEMGRSERVICE
 
+#include <chrono>				// steady_clock - the Home screen is looked at only around launch
+
 // Project includes:
 #include "KFCUIID.h"
 #include "KBSBookPanelPlacement.h"
 #include "KBSBookPanelLookup.h"	// IsBookPanel - the one place that decides what a book panel is (KBSBookScope's until 2026-10-01)
 #include "KBSPanelState.h"		// KBSPanelStateWriteKeys and the readers - the settings file, key by key
 #include "KBSResultTree.h"		// ShowStatus - a write that failed is said, not swallowed
+#include "KBSDiag.h"			// KBS_DIAG_LOG - a test build's trace of what was measured and put back (2026-10-03)
 
 namespace
 {
@@ -216,12 +220,23 @@ int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMa
     up); the opening of a book does. So when the placement is docked and the Home screen stands over
     an open book, KBS closes the books and opens them again, as the user would - once a session, and
     only with no document open and no book modified. (User's call, 2026-09-27: "the docks visible,
-    as when the book is opened from InDesign, is best".) */
+    as when the book is opened from InDesign, is best".)
+    ***** ONLY AROUND LAUNCH (2026-10-03, measured). ***** The Home screen also comes back in the middle
+    of a session: with a book open, closing the last document puts it up again. And the checks left over
+    from an opening (one opening used 2 of the 6) did not stay unused - the Home screen's own switch
+    raised visibility messages that recounted the book panels "none, then one" and armed fresh ones - so
+    KBS closed the user's book and opened it again, and its panel came back floating at InDesign's
+    default place (a test build's trace). The case this was written for is a book opened WITH InDesign,
+    so it is looked at only within kKBSHomeWindowMs of PaletteMgrStarted, and not at all once a document
+    has been seen open (the session is past its launch then). */
 ICallbackTimer* gHomeTimer = nil;
 const uint32 kKBSHomeCheckDelayMs = 1500;
 const int32 kKBSMaxHomeChecks = 6;	// per opening - the visibility messages come in bursts
 int32 gHomeChecks = 0;
 bool gLeftHomeScreen = false;	// once a session
+const std::chrono::milliseconds kKBSHomeWindowMs(60000);	// from PaletteMgrStarted (Start)
+std::chrono::steady_clock::time_point gStartedAt;
+bool gHomeWindowOver = false;	// past launch: the window has run out, or a document has been seen open
 
 /** How much of the title band has to be on a screen for a remembered placement to be used: enough
     to take hold of it and drag it back. */
@@ -346,6 +361,40 @@ PaletteRef ChildAtOrEnd(const PaletteRef& parent, int32 index)
 	if (!parent.IsValid() || index < 0 || index >= PaletteRefUtils::GetChildCountOfPalette(parent))
 		return PaletteRef();
 	return PaletteRefUtils::GetNthChildOfPalette(parent, static_cast<uint16>(index));
+}
+
+/** Does this palette already stand under this parent, just before this sibling (an invalid one = at
+    the end) - or is the sibling it is to go before the palette itself? */
+bool StandsThere(const PaletteRef& which, const PaletteRef& parent, const PaletteRef& before)
+{
+	if (!which.IsValid() || ParentOf(which) != parent)
+		return false;
+	const int32 at = IndexOfChild(parent, which);
+	if (before == which)
+		return true;
+	if (!before.IsValid())
+		return at + 1 == PaletteRefUtils::GetChildCountOfPalette(parent);
+	return IndexOfChild(parent, before) == at + 1;
+}
+
+/** ReparentPalette - unless the palette already stands exactly there.
+    ***** A BOOK PANEL CAN BE "PUT BACK" WHERE IT ALREADY IS (2026-10-03, measured). ***** The count of
+    book panels is put to zero BEFORE kCloseBookCmdBoss runs (OnBookAboutToClose), and the close can still
+    be cancelled after that: a modified book's "save before closing?" comes up INSIDE the command - the
+    settings file had been written while the prompt stood open. Cancelled, the panel stays, and the next
+    visibility message reads "none, then one" and puts it back. Tabbed into a floating palette with a
+    neighbour, that asked ReparentPalette to put the panel into its own group BEFORE ITSELF (the trace of a
+    test build: beforeIsSelf=1). Nothing visible came of it on 21.0.2, but PaletteRefUtils.h:203-210 promises
+    nothing for that call ("an invalid parent/child combination will trigger an assert in the debug
+    build"), so it is not made: a panel already where it is to go is left alone. */
+void ReparentUnlessThere(const PaletteRef& which, const PaletteRef& parent, const PaletteRef& before)
+{
+	if (StandsThere(which, parent, before))
+	{
+		KBS_DIAG_LOG("BOOKPANEL JOIN already there - left alone");
+		return;
+	}
+	PaletteRefUtils::ReparentPalette(which, parent, before);
 }
 
 /** The WidgetID of the first panel in this tab group that is not a book panel, or 0. A book panel's
@@ -497,25 +546,43 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 	if (!PaletteRefUtils::IsPaletteFloating(container))
 	{
 		if (!MeasureDocked(panelMgr, container, measured))
+		{
+			KBS_DIAG_LOG("BOOKPANEL MEASURE docked: not a dock's shape - kept the last");
 			return false;
+		}
+		KBS_DIAG_LOG("BOOKPANEL MEASURE docked side=%d column=%d mate=%d tab=%d next=%d prev=%d nextCol=%d prevCol=%d iconic=%d",
+			measured.dockSide, measured.columnIndex, measured.mate, measured.tabIndex, measured.nextGroup,
+			measured.prevGroup, measured.nextColumn, measured.prevColumn, measured.iconic ? 1 : 0);
 		out = measured;
 		return true;
 	}
 
 	// Floating. Minimised to its title bar, its frame is not the size to come back to.
 	if (PaletteRefUtils::IsPaletteMinimized(container))
+	{
+		KBS_DIAG_LOG("BOOKPANEL MEASURE floating: minimised - kept the last");
 		return false;
+	}
 
 	const PaletteRef dock = FindFloatingDock(container);
 	if (!dock.IsValid())
+	{
+		KBS_DIAG_LOG("BOOKPANEL MEASURE floating: no floating dock above it - kept the last");
 		return false;
+	}
+	KBS_DIAG_LOG("BOOKPANEL MEASURE floating dock: visible=%d dockMode=%d location=%d",
+		PaletteRefUtils::IsPaletteVisible(dock) ? 1 : 0, static_cast<int32>(PaletteRefUtils::GetDockMode(dock)),
+		static_cast<int32>(PaletteRefUtils::GetDockLocation(dock)));
 
 	// A floating palette that is not on show is not a place to come back to: it is where InDesign leaves
 	// the book panel when it throws it out of the dock (2026-09-27, see kKBSBookPanelReRestoreDelayMs) -
 	// recorded, it read "floating at 0,0" and the next opening put the panel there. The last good
 	// placement is kept. (A floating dock holding only hidden panels answers false - measured 09-25.)
 	if (!PaletteRefUtils::IsPaletteVisible(dock))
+	{
+		KBS_DIAG_LOG("BOOKPANEL MEASURE floating: the floating dock is not on show - kept the last");
 		return false;
+	}
 
 	const SysPoint pos = PaletteRefUtils::GetPalettePosition(dock);
 	const PMRect frame = bookPanel->GetFrame();
@@ -538,9 +605,13 @@ bool Measure(IPanelMgr* panelMgr, IControlView* bookPanel, Placement& out)
 	}
 	else if (!(measured.iconic && measured.haveFloat))
 	{
+		KBS_DIAG_LOG("BOOKPANEL MEASURE floating: an empty frame and no size from before - kept the last");
 		return false;
 	}
 
+	KBS_DIAG_LOG("BOOKPANEL MEASURE floating at %d,%d %dx%d iconic=%d floatMate=%d tab=%d next=%d prev=%d",
+		measured.left, measured.top, measured.width, measured.height, measured.iconic ? 1 : 0, measured.floatMate,
+		measured.floatTabIndex, measured.floatNextGroup, measured.floatPrevGroup);
 	out = measured;
 	return true;
 }
@@ -810,7 +881,10 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 		const PaletteRef mateGroup = ParentOf(ContainerOfPanel(panelMgr, mate));
 		if (Is(mateGroup, &PaletteRefUtils::IsTabGroup))
 		{
-			PaletteRefUtils::ReparentPalette(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex));
+			KBS_DIAG_LOG("BOOKPANEL JOIN mate=%d tab=%d ownGroup=%d beforeIsSelf=%d standsThere=%d", mate, tabIndex,
+				mateGroup == ownGroup ? 1 : 0, ChildAtOrEnd(mateGroup, tabIndex) == container ? 1 : 0,
+				StandsThere(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex)) ? 1 : 0);
+			ReparentUnlessThere(container, mateGroup, ChildAtOrEnd(mateGroup, tabIndex));
 			return true;
 		}
 	}
@@ -822,7 +896,9 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 		const PaletteRef column = Is(nextGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(nextGroup) : PaletteRef();
 		if (Is(column, &PaletteRefUtils::IsTabPane))
 		{
-			PaletteRefUtils::ReparentPalette(ownGroup, column, nextGroup);
+			KBS_DIAG_LOG("BOOKPANEL JOIN nextGroup=%d standsThere=%d", nextGroupPanel,
+				StandsThere(ownGroup, column, nextGroup) ? 1 : 0);
+			ReparentUnlessThere(ownGroup, column, nextGroup);
 			return true;
 		}
 	}
@@ -834,7 +910,10 @@ bool JoinNeighbours(IPanelMgr* panelMgr, const PaletteRef& container, int32 mate
 		const PaletteRef column = Is(prevGroup, &PaletteRefUtils::IsTabGroup) ? ParentOf(prevGroup) : PaletteRef();
 		if (Is(column, &PaletteRefUtils::IsTabPane))
 		{
-			PaletteRefUtils::ReparentPalette(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1));
+			KBS_DIAG_LOG("BOOKPANEL JOIN prevGroup=%d beforeIsSelf=%d standsThere=%d", prevGroupPanel,
+				ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1) == ownGroup ? 1 : 0,
+				StandsThere(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1)) ? 1 : 0);
+			ReparentUnlessThere(ownGroup, column, ChildAtOrEnd(column, IndexOfChild(column, prevGroup) + 1));
 			return true;
 		}
 	}
@@ -856,8 +935,8 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 
 	// 4. It had a column to itself, so there is no column left to go back into: a new one, beside
 	//    the column that was after it (or before it), in the same icon state and width.
-	//    ***** NOT MEASURED YET: beside a second COLUMN (2026-09-25: no test had one). Beside the
-	//    toolbox, and alone in the dock, it is (2026-09-27 - see below and step 5). *****
+	//    (Measured beside another column by the user, 2026-09-27; beside the toolbox, and alone in the
+	//    dock, by a run of mine the same day - see below and step 5.)
 	PaletteRef dock;
 	PaletteRef before;
 	const PaletteRef nextCol = FindAncestor(ContainerOfPanel(panelMgr, p.nextColumn), &PaletteRefUtils::IsTabPane);
@@ -884,10 +963,17 @@ void RestoreDocked(IPanelMgr* panelMgr, const PaletteRef& container, const Place
 			before = ChildAtOrEnd(dock, p.columnIndex);
 	}
 	if (!Is(dock, &PaletteRefUtils::IsDock))
+	{
+		KBS_DIAG_LOG("BOOKPANEL RESTORE docked: no neighbour and no dock found - left where InDesign put it");
 		return;		// no neighbour left to find the place by - it stays where InDesign put it
+	}
 
 	const PaletteRef newColumn = PaletteRefUtils::NewTabPaneInDock(dock,
 		p.iconic ? PaletteRefUtils::kIcon_TabPaneMode : PaletteRefUtils::kExpanded_TabPaneMode, before);
+	KBS_DIAG_LOG("BOOKPANEL RESTORE docked: a new column in the dock (side=%d visible=%d floatingDock=%d), before a %s, made=%d",
+		static_cast<int32>(PaletteRefUtils::GetDockLocation(dock)), PaletteRefUtils::IsPaletteVisible(dock) ? 1 : 0,
+		PaletteRefUtils::IsFloatingTabbedPaletteDock(dock) ? 1 : 0, before.IsValid() ? "sibling" : "nothing (the end)",
+		Is(newColumn, &PaletteRefUtils::IsTabPane) ? 1 : 0);
 	if (!Is(newColumn, &PaletteRefUtils::IsTabPane))
 		return;
 	// ***** NewTabPaneInDock DOES NOT TAKE THE TOOLBOX AS "BEFORE" (2026-09-27, measured). ***** A
@@ -922,13 +1008,18 @@ void RestoreNow()
 
 	// InDesign put it in a dock itself: that is InDesign's own memory at work - leave it.
 	if (!PaletteRefUtils::IsPaletteFloating(container))
+	{
+		KBS_DIAG_LOG("BOOKPANEL RESTORE skipped: already docked");
 		return;
+	}
 
 	// Put back from a hidden palette = InDesign threw it out of the dock again: counted, so it is only
 	// done a few times per opening (MaybeRestoreAgain).
 	const PaletteRef ownDock = FindFloatingDock(container);
 	if (ownDock.IsValid() && !PaletteRefUtils::IsPaletteVisible(ownDock))
 		++gReRestores;
+	KBS_DIAG_LOG("BOOKPANEL RESTORE remembered docked=%d floatMate=%d reRestores=%d",
+		gRemembered.docked ? 1 : 0, gRemembered.floatMate, gReRestores);
 
 	if (gRemembered.docked)
 		RestoreDocked(panelMgr, container, gRemembered);
@@ -938,6 +1029,13 @@ void RestoreNow()
 		// its own place and size otherwise. Joined, the place and size are the palette's - nothing
 		// more is put on it.
 		RestoreFloating(bookPanel, container, gRemembered);
+
+#ifdef KBS_DIAG
+	const PaletteRef after = panelMgr->GetPaletteRefContainingPanel(bookPanel);
+	const PaletteRef afterFloatingDock = FindFloatingDock(after);
+	KBS_DIAG_LOG("BOOKPANEL RESTORE done: floating=%d floatingDockVisible=%d", (after.IsValid() && PaletteRefUtils::IsPaletteFloating(after)) ? 1 : 0,
+		(afterFloatingDock.IsValid() && PaletteRefUtils::IsPaletteVisible(afterFloatingDock)) ? 1 : 0);
+#endif
 }
 
 /** Timer callback. A raw function pointer, so it must never outlive this plug-in (see
@@ -971,7 +1069,8 @@ void ArmRestoreTimer(uint32 delayMs = kKBSBookPanelRestoreDelayMs)
 /** How many documents are open. */
 int32 OpenDocumentCount()
 {
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	ISession* session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
 	InterfacePtr<IDocumentList> docs(app != nil ? app->QueryDocumentList() : nil);
 	return (docs != nil) ? docs->GetDocCount() : 0;
 }
@@ -1007,6 +1106,7 @@ void LeaveHomeScreen()
 		" for (var k = 0; k < files.length; k++) app.open(files[k]);"
 		"})();"));
 	const ErrorCode ran = utils->RunScriptInEngine(engine, text, kFalse /*showErrorAlert*/, kFalse /*invokeDebugger*/);
+	KBS_DIAG_LOG("BOOKPANEL HOME script %s (check %d)", ran == kSuccess ? "REOPENED THE BOOKS" : "declined", gHomeChecks);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	if (ran == kSuccess)
 		gLeftHomeScreen = true;		// the reopening itself puts the book panel back (0 -> 1)
@@ -1019,18 +1119,41 @@ uint32 HomeTimerCallback(void* /*refPtr*/)
 	return IIdleTask::kEndOfTime;
 }
 
-/** A visibility message with a book panel up, no document open and the placement docked: look at
-    the Home screen once the messages stop. Its own timer, so the restore's short wait is untouched. */
+/** The session is past its launch: the Home screen is not looked at again (see gHomeTimer). */
+void EndHomeWindow(const char* why)
+{
+	gHomeWindowOver = true;
+	KBS_DIAG_LOG("BOOKPANEL HOME window over: %s", why);
+	(void)why;
+}
+
+/** A visibility message with a book panel up, no document open and the placement docked, around launch:
+    look at the Home screen once the messages stop. Its own timer, so the restore's short wait is
+    untouched. */
 void MaybeCheckHomeScreen()
 {
-	if (gLeftHomeScreen || !gRemembered.IsUsable() || !gRemembered.docked || gBookPanelCount == 0
-		|| gHomeChecks >= kKBSMaxHomeChecks || OpenDocumentCount() > 0)
+	if (gLeftHomeScreen || gHomeWindowOver)
+		return;
+	// Past launch, for good (see gHomeTimer): the window has run out, or a document is open now (the
+	// interceptor ends it as one opens - this is the backstop for a toggle switched on with one open).
+	if (std::chrono::steady_clock::now() - gStartedAt > kKBSHomeWindowMs)
+	{
+		EndHomeWindow("the time since launch ran out");
+		return;
+	}
+	if (OpenDocumentCount() > 0)
+	{
+		EndHomeWindow("a document is open");
+		return;
+	}
+	if (!gRemembered.IsUsable() || !gRemembered.docked || gBookPanelCount == 0 || gHomeChecks >= kKBSMaxHomeChecks)
 		return;
 	if (gHomeTimer == nil)
 		gHomeTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	if (gHomeTimer == nil)
 		return;
 	++gHomeChecks;
+	KBS_DIAG_LOG("BOOKPANEL HOME check %d armed", gHomeChecks);
 	gHomeTimer->StopTimer();
 	gHomeTimer->StartTimer(HomeTimerCallback, kKBSHomeCheckDelayMs, nil);
 }
@@ -1054,6 +1177,7 @@ void MaybeRestoreAgain()
 	const PaletteRef dock = FindFloatingDock(container);
 	if (!dock.IsValid() || PaletteRefUtils::IsPaletteVisible(dock))
 		return;		// floating and on show: the user's, or the first restore still to come
+	KBS_DIAG_LOG("BOOKPANEL RESTORE-AGAIN armed: remembered docked, the panel in a hidden floating dock (done %d)", gReRestores);
 	ArmRestoreTimer(kKBSBookPanelReRestoreDelayMs);
 }
 
@@ -1067,6 +1191,7 @@ void RecountAndMaybeRestore()
 
 	if (previous == 0 && gBookPanelCount > 0 && gRemembered.IsUsable())
 	{
+		KBS_DIAG_LOG("BOOKPANEL RECOUNT 0->%d: restore armed", gBookPanelCount);
 		gReRestores = 0;
 		gHomeChecks = 0;
 		ArmRestoreTimer();
@@ -1180,7 +1305,13 @@ void UninstallCmdWatch()
     book to open would not look like "none, then one" and would never be put back.
     *With several books open their panels are normally tabs of ONE palette, so the first book panel
     found stands for all of them. A book panel dragged out into a palette of its own is not told
-    apart - the first one found is what is measured. */
+    apart - the first one found is what is measured.
+    *A CLOSE CAN STILL BE CANCELLED after this (2026-10-03, measured): a modified book asks whether to
+    save from inside the command, after this has run. Cancelled, the panel stays with the count at zero,
+    and the next visibility message puts it back where it already is - the place and size just measured,
+    or its own tab group (ReparentUnlessThere leaves that alone). The count is not repaired here: a
+    script can close and reopen a book within one call (LeaveHomeScreen), and only a zero count lets that
+    reopening be put back. */
 void OnBookAboutToClose()
 {
 	if (!gOn)
@@ -1194,6 +1325,7 @@ void OnBookAboutToClose()
 	InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
 	if (bookMgr == nil || bookMgr->GetBookCount() <= 1)
 		gBookPanelCount = 0;
+	KBS_DIAG_LOG("BOOKPANEL CLOSE books=%d count now %d", bookMgr != nil ? bookMgr->GetBookCount() : -1, gBookPanelCount);
 }
 
 }	// anonymous namespace
@@ -1326,6 +1458,11 @@ void KBSBookPanelPlacement::Start()
 	// has laid out. Reading here as well costs nothing: the read is guarded to happen once.
 	KBSLoadPanelStateIfPresent();
 
+	// The Home screen is looked at only for a while from here (see gHomeTimer).
+	gStartedAt = std::chrono::steady_clock::now();
+	gHomeWindowOver = false;
+	KBS_DIAG_LOG("BOOKPANEL START on=%d remembered docked=%d", gOn ? 1 : 0, gRemembered.docked ? 1 : 0);
+
 	AttachObserver(true);
 	// Only while ON (see InstallCmdWatch) - ToggleAndSave puts it in when the box is ticked later.
 	if (gOn)
@@ -1409,8 +1546,9 @@ void KBSBookPanelObserver::Update(const ClassID& theChange, ISubject* /*theSubje
     ***** kCmdNotHandled ON EVERY PATH. ***** This class is allowed to cancel any command in InDesign
     and never does: kCmdNotHandled is "pass it on", which is what an interceptor that is not there
     would produce. Everything is inside try/catch - an exception leaving here lands in the middle of
-    InDesign's command processing. And the test that runs for every command is one flag and one class
-    comparison. At file scope, not in the anonymous namespace, for the reason the other
+    InDesign's command processing. And the test that runs for every command is a class comparison -
+    three more, and only until the session is past its launch, for the Home screen's window (2026-10-03,
+    see gHomeTimer). At file scope, not in the anonymous namespace, for the reason the other
     implementations here are.
 
     ***** WHY NOT THE OBSERVER KBS ALREADY HAS (API audit 2026-09-25, A-2 - measured). ***** KBSBookWatch
@@ -1438,8 +1576,20 @@ public:
 	{
 		try
 		{
-			if (gOn && cmd != nil && ::GetClass(cmd) == kCloseBookCmdBoss && IDThreading::IsMainThreadDomain())
-				OnBookAboutToClose();
+			const ClassID cls = (cmd != nil) ? ::GetClass(cmd) : kInvalidClass;
+			if (cls == kCloseBookCmdBoss)
+			{
+				if (gOn && IDThreading::IsMainThreadDomain())
+					OnBookAboutToClose();
+			}
+			// A document opened or made: the session is past its launch, and the Home screen is looked at
+			// no more (see gHomeTimer - measured 2026-10-03, no visibility message comes while a document
+			// is open, so this is the place that sees one). Two more comparisons, and only until then.
+			else if (!gHomeWindowOver && (cls == kOpenDocCmdBoss || cls == kNewDocCmdBoss || cls == kOpenDocFromBookCmdBoss)
+				&& IDThreading::IsMainThreadDomain())
+			{
+				EndHomeWindow("a document was opened");
+			}
 		}
 		catch (...)
 		{

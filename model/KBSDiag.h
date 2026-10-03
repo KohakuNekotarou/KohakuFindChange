@@ -11,6 +11,8 @@
 //      msbuild build\win\prj\KohakuFindChange.vcxproj /p:Configuration=Release /p:Platform=x64
 //              /p:KBSExtraDefines=KBS_DIAG
 //  (the project passes $(KBSExtraDefines) to the compiler; work\kbs-regress\cycle-build.ps1 -Diag does it).
+//  *The UI half too, since 2026-10-03: KohakuFindChangeUI.vcxproj passes the same property, and
+//   ui/KBSBookPanelPlacement.cpp traces what it measured and put back (the block 16 recheck).
 //  In a build without it every KBS_DIAG_LOG compiles to nothing - its arguments are not evaluated either -
 //  so the shipping .pln holds no call, no format string and no file name. Anything a trace needs that the
 //  product does not (a helper that walks state to print it) goes inside #ifdef KBS_DIAG with it.
