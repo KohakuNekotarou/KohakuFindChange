@@ -115,6 +115,17 @@ typedef struct HWND__* HWND;
 
 HWND	KBSQueryFindChangeWindow();
 
+// Could 'h' still be the Find/Change dialog's window - a live, top-level "DroverLord - Window Class"
+// window of THIS process? Win32 only, so shutdown can ask it. (2026-10-03, the block 13/14 recheck S-1.)
+// *The ONE place that answers it. Three did, each its own way: the minimize side's
+//  KBSStillOurFindChangeWindow (process, top level, class - the block 15 F-1 fix), the translucency
+//  side's KBSRestoreOurFindChangeStyle (top level, class; no process) and the cached handle in
+//  KBSQueryFindChangeWindow (IsWindow alone - and the cache is filled again with the CLOSING dialog,
+//  which is still in the window list when kRemoveWindowMessage arrives). A handle is a number the OS
+//  hands on, so each of them could name another window by the time it was used.
+// *It says nothing about whether the window carries OUR marks: each caller asks that of its own bits.
+bool	KBSIsFindChangeShapedWindow(HWND h);
+
 // Make a SetWindowLongPtr style change on 'h' take effect without pulling the window forward:
 // SetWindowPos with the combination Microsoft's SetWindowPos Remarks prescribe (SWP_NOMOVE |
 // SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) plus SWP_NOACTIVATE, then a full redraw. Shared by
@@ -131,11 +142,13 @@ void	KBSCommitWindowStyle(HWND h);
 //    "no" and never saw the window that had appeared in the meantime.
 // *The translucency toggle has always done this from its own setter, for the stated reason that "a
 //  toggle press is exactly when 'not open', established at some earlier moment, must not be allowed
-//  to answer". The minimize toggle needs it in both places: its setter, and every turn of its chase.
+//  to answer". The minimize toggle does it from its setter too, and so does every turn of the chase
+//  both toggles share (KBSChaseFindChangeWindow in KBSFindChangeMinimize.h).
 void	KBSForgetFindChangeWindow();
 
 // Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? (2026-10-03, the
-// block 15 recheck F-3.) The minimize chase waits for that dialog's window, and until this it was set
+// block 15 recheck F-3.) The chase waits for that dialog's window (KBSChaseFindChangeWindow - the
+// minimize box's alone until the block 13/14 recheck T-1, both toggles' since), and until this it was set
 // going by EVERY window that opened - !MEASURED with the dialog closed: a new document's window started
 // it, and it walked the window list 8 times over about a second before giving up.
 // What the message carries, measured the same day on a test build: changedBy IS the added IWindow (the
@@ -143,7 +156,9 @@ void	KBSForgetFindChangeWindow();
 //   . a document window is no dialog (IDialog absent)                 -> kFalse
 //   . the Find/Change dialog opened for the FIRST time in a session is a dialog whose panel is NOT SET
 //     YET (GetDialogPanel nil) - which is why the window-list lookup cannot see it at that moment, and
-//     why the chase exists                                             -> kTrue
+//     why the chase exists (not on every first opening: on 2026-10-03 one session's first dialog was
+//     styled at the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
+//     without a panel")                                                -> kTrue
 //     (another dialog opened for the first time looks the same, and is chased the same - the chase is
 //      bounded, and a dialog's first opening is rare next to documents opening)
 //   . opened again later, it carries kFindChangeParentWidgetID at once -> kTrue
@@ -175,13 +190,15 @@ void	KBSDetachPanelVisibilityObserver();
 // (KBSUIStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not
 // reference counted, so leaving a booking live while this .pln goes down is a crash. Implemented in
 // KBSPanelAlpha.cpp (empty on Mac). In order:
-//   . the one-shot timer, and the flag that stops another timer or hook being made afterwards
+//   . the flag that stops another timer or hook being made afterwards
 //   . the Win32 event hook
 //   . ***InDesign's own Find/Change dialog, put back as it was*** - the WS_EX_LAYERED on it is OURS,
 //     and a style plus an alpha left on a window nobody maintains any more would outlive this
 //     plug-in. This one is easy to overlook, being the only thing here that touches somebody else's
 //     window.
 //   . the remembered window handles
+//   . the one-shot timer, stopped and released (until 2026-10-03 this list put it first, beside the
+//     flag; the flag is what has to come first, and no idle task runs inside this call)
 void	KBSShutdownPanelAlpha();
 
 #endif // __KBSPanelAlpha_h__

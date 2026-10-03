@@ -28,7 +28,8 @@
 //  left of the screen - the old owned-popup behaviour, measured at L=0 T=700 R=160 B=728.
 //
 //  The window is found by KBSQueryFindChangeWindow (KBSPanelAlpha.h) - the SAME lookup the
-//  translucency toggle uses, deliberately not a second copy of that judgement.
+//  translucency toggle uses, deliberately not a second copy of that judgement. And the chase that asks
+//  again for a dialog not yet tellable (KBSChaseFindChangeWindow, here) serves both toggles alike.
 //
 //========================================================================================
 
@@ -37,19 +38,27 @@
 
 #include "BaseType.h"
 
-// How many times, and how far apart, the style is written again after a cue that found NO WINDOW.
-//  *****WHY A CHASE IS NEEDED AT ALL.***** The only cue this feature gets is the application's
-//    window list saying a window was added - and the dialog can be "open" at that moment while its
-//    platform window does not exist yet. KBSQueryFindChangeWindow is written for exactly that state
-//    (it does not record the walk as done, so the next ask looks again) - but SOMEBODY HAS TO ASK
-//    AGAIN. The translucency side is asked again constantly by its Win32 mouse hook; this side has
-//    no such traffic, so without a chase the button simply never appears.
-//    !MEASURED, not theorised (2026-08-12): opening the dialog from the same script that switched
-//     the toggle on left it unstyled, while doing the two as separate steps applied it in 15ms.
+// How many times, and how far apart, the dialog's window is asked for again after a cue that could
+// not tell it yet - THE CHASE, which serves BOTH toggles on that window (this one and Translucent
+// Find/Change) since 2026-10-03.
+//  *****WHY A CHASE IS NEEDED AT ALL.***** The only cue either feature gets is the application's
+//    window list saying a window was added - and the Find/Change dialog opened for the FIRST time in a
+//    session can be in the list at that moment with NO PANEL SET YET (GetDialogPanel nil - measured
+//    2026-10-03, the block 15 recheck; not every first opening, the block 13/14 recheck saw both), so
+//    the lookup, which knows the dialog by its panel, cannot tell it. It records "not open" - its
+//    negative cache - and answers that until the window list next changes. So SOMEBODY HAS TO FORGET
+//    AND ASK AGAIN once the panel is on.
+//    !MEASURED twice, not theorised: 2026-08-12, opening the dialog from the same script that switched
+//     this toggle on left it unstyled; 2026-10-03 (the block 13/14 recheck T-1), Translucent
+//     Find/Change ON alone left the session's first dialog OPAQUE - its Win32 mouse hook does ask
+//     again on every move, but what it asks is the lookup, and the lookup answered from that negative
+//     cache. Until then this note said the translucency side needed no chase for that very reason.
 //  *8 x 50ms = about 400ms, the figure the panel side settled on for the same kind of settling
 //   (kKBSPanelAlphaReapplyTries in KBSPanelAlpha.cpp). The count bounds it, so it always stops.
-static const int32  kKBSMinimizeRetryTries       = 8;
-static const uint32 kKBSMinimizeRetryDelayMillis = 50;
+//   (The first run comes 0.5 to 1 second after the booking - see KBSFindChangeChaseProc - and found the
+//    first-time dialog on that run in both traces: block 15, and the block 13/14 recheck's GREEN.)
+static const int32  kKBSFindChangeChaseTries       = 8;
+static const uint32 kKBSFindChangeChaseDelayMillis = 50;
 
 // The toggle's current state (*OFF by default).
 bool16	KBSGetFindChangeMinimizable();
@@ -68,11 +77,14 @@ void	KBSSetFindChangeMinimizable(bool16 on);
 //    on, which need not be a window that is open now, and may be no window at all.
 bool16	KBSApplyFindChangeMinimizable();
 
-// Apply, and if there is no window yet, keep trying for a short while (see the constants above).
+// Put BOTH toggles that act on InDesign's Find/Change dialog - this one and Translucent Find/Change
+// (KBSApplyFindChangeTranslucency) - on its window, each only if ON; and if the window cannot be told
+// yet, keep asking for a short while (see the constants above). Does nothing when both are OFF.
 // *This is what the window-list observer calls when the window just added may be the dialog
-//  (KBSWindowMayBeFindChange, 2026-10-03); for every other window-list message it calls the plain
-//  KBSApplyFindChangeMinimizable once.
-void	KBSApplyFindChangeMinimizableWithRetry();
+//  (KBSWindowMayBeFindChange, 2026-10-03); for every other window-list message it calls the two plain
+//  Apply functions once. It was KBSApplyFindChangeMinimizableWithRetry, for this toggle alone, until
+//  the block 13/14 recheck T-1 (2026-10-03) found the translucency side needing the same chase.
+void	KBSChaseFindChangeWindow();
 
 // If the Find/Change dialog is open and MINIMISED, restore it and return kTrue; otherwise kFalse and
 // nothing is touched. For the panel's Open Find/Change... (2026-10-03, the user's call - the block 15

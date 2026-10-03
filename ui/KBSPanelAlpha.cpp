@@ -5,7 +5,8 @@
 //  KohakuFindChange (KBS)
 //
 //  The "Translucent Panel" toggle, and "Translucent Find/Change" beside it. Win32 is reached from
-//  here, KBSFindChangeMinimize.cpp and KBSPanelState.cpp (a grep for windows.h recounts them).
+//  here, KBSFindChangeMinimize.cpp, KBSPanelState.cpp and KBSAppBarSearchEnter.cpp (a grep for
+//  windows.h recounts them).
 //
 //  Ported from KESCM's KESCMPanelAlpha.cpp (2026-08-04). Everything below is what that file
 //  established on the real application on 2026-07-29 - see docs/ai-notes/win32-window-transparency.md
@@ -26,17 +27,22 @@
 //
 //  *The OWL.Dock HWND CHANGES when the panel is DOCKED and then floated again: the old window is
 //    DESTROYED and a new one is made. Closing and re-opening the panel is different - the same Dock
-//    survives, alpha and all. The OWL.Palette HWND does not change in either case. So no window
-//    handle is held across calls - it is looked up again.
-//    **That pair of facts is also why turning the toggle OFF can never leave a faint window behind,
-//    which is the one thing this file's "do nothing while docked" rule looks like it should
+//    survives, alpha and all. The OWL.Palette HWND does not change in either case. So the window the
+//    panel is on is looked up again on every call.
+//    **For a panel floating ALONE that pair of facts is why turning the toggle OFF cannot leave a faint
+//    window behind, which this file's "do nothing while docked" rule looks like it should
 //    (measured 2026-08-04 on Release 21.0.2.2, one step at a time, reading the alpha from another
 //    process - see docs/ai-notes/win32-window-transparency.md):
 //      . OFF while the panel is merely CLOSED reaches the Dock and writes 255 - it is still there
 //      . OFF while DOCKED reaches nothing, but there is nothing left to reach: the Dock that
 //        carried the 77 was destroyed by the docking, and floating again builds a fresh one at 255
-//    *Nor can one panel's alpha reach another's: a Dock belongs to ONE panel (55-56 of them exist
-//    from startup, waiting invisible, each naming its own panel), so nothing is ever handed round.
+//    *****BUT NOT FOR A PANEL IN A FLOATING GROUP (2026-10-03, the block 13/14 recheck T-3).***** A group
+//    shares one Dock, so the alpha lands on the whole group, and when this panel leaves it (pulled out,
+//    or docked) the Dock lives on with the others in it - measured left at 77, OFF unable to reach it.
+//    (This said, until then, that "a Dock belongs to ONE panel ... so nothing is ever handed round":
+//    true of the 55-56 Docks waiting invisible from startup, each naming its own panel, and not of a
+//    group.) Hence the faint window IS remembered - sFaintWnd - and given back its 255 once the panel
+//    is no longer on it.
 //  *InDesign itself puts WS_EX_LAYERED on OWL.Dock (EXSTYLE = 0x08080000). The style is neither
 //    added nor removed here. *Removing it breaks the application's own drawing - to undo, write
 //    alpha = 255 and nothing else.
@@ -258,6 +264,7 @@ void KBSSetPanelTranslucent(bool16 on)
 	sPanelTranslucent = on;
 
 #ifdef WINDOWS
+	KBS_DIAG_LOG("PANELALPHA toggle set %d", on ? 1 : 0);
 	KBSUpdateWinEventHook();
 #endif
 }
@@ -292,6 +299,20 @@ static bool KBSClassIs(HWND h, const wchar_t* wanted)
 	if (::GetClassNameW(h, cls, 64) == 0)
 		return false;
 	return ::wcscmp(cls, wanted) == 0;
+}
+
+// See the declaration in KBSPanelAlpha.h.
+bool KBSIsFindChangeShapedWindow(HWND h)
+{
+	if (h == nullptr || !::IsWindow(h))
+		return false;
+	DWORD pid = 0;
+	::GetWindowThreadProcessId(h, &pid);
+	if (pid != ::GetCurrentProcessId())
+		return false;
+	if (::GetAncestor(h, GA_ROOT) != h)
+		return false;		// a document window's canvas shares the class but is a child
+	return KBSClassIs(h, L"DroverLord - Window Class");
 }
 
 // ***THIS PANEL'S OWL.Palette WINDOW, ASKED OF THE SDK.*** KESCM's route, brought over 2026-08-07.
@@ -423,6 +444,53 @@ static HWND KBSQueryTranslucentTarget(HWND palette)
 	return nullptr;		// "indesign" = the main frame = docked and expanded
 }
 
+// ***** THE FLOATING WINDOW WE LAST LEFT FAINT (2026-10-03, the block 13/14 recheck T-3). *****
+//   A floating GROUP of panels shares one OWL.Dock, so while this panel is in a group the alpha written
+//   to "the window the panel is on" lands on the whole group. When the panel then LEAVES that window -
+//   its tab pulled out to float alone, or docked - the window stays where it is with the other panels in
+//   it, and nothing here looked at it again: the hook and every apply ask only for the window the panel
+//   is on NOW.
+//   !MEASURED: the Pages panel tabbed into this panel's floating window (KIDMCP panel tab) - both faint,
+//    as a group is; this panel floated out on its own (panel float) -> the window left holding the
+//    Pages panel kept alpha 77, and switching the toggle OFF did not reach it either (255 went on this
+//    panel's new window only). Only a restart would have put it right.
+//   So the window last written faint is remembered, and given 255 the moment the panel is found on any
+//   other window or on none (docked).
+//   *Only the alpha. Its shadow, hidden while ON, came back by itself in that measurement - InDesign draws
+//    a group's shadow again when the group is laid out again - and showing one ourselves at the wrong
+//    moment is the 2026-07-29 defect (a shadow left behind at the old place).
+//   *Checked before it is touched, with Win32 alone, as this file's other remembered handles are: a live
+//    window of this process that is still a floating container. Anything else is forgotten untouched -
+//    a window destroyed meanwhile (docking a panel that floated alone destroys its window) had nothing
+//    left to restore.
+//   *A panel of another plug-in in that group whose OWN translucency is on (KCM's) loses its 77 here as
+//    well; its hook reads that window's alpha at its next event and writes it back when it differs (the
+//    same check as this file's hook - KCMPanelAlpha.cpp, "is the alpha what is wanted?").
+static HWND sFaintWnd = nullptr;
+
+// Give the remembered faint window back its 255 unless the panel is still on it ('current' = the window
+// the panel is on now, nullptr while docked).
+static void KBSReleaseFormerFaintWindow(HWND current)
+{
+	if (sFaintWnd == nullptr || sFaintWnd == current)
+		return;
+
+	HWND h = sFaintWnd;
+	sFaintWnd = nullptr;		// forgotten either way
+
+	if (!::IsWindow(h))
+		return;
+	DWORD pid = 0;
+	::GetWindowThreadProcessId(h, &pid);
+	if (pid != ::GetCurrentProcessId())
+		return;
+	if (!KBSClassIs(h, L"OWL.Dock") && !KBSClassIs(h, L"OWL.FrameDrawer"))
+		return;
+
+	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
+	KBS_DIAG_LOG("PANELALPHA the window the panel left (0x%llx) back to 255", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
+}
+
 #endif // WINDOWS
 
 bool16 KBSApplyPanelTranslucency()
@@ -430,15 +498,25 @@ bool16 KBSApplyPanelTranslucency()
 #ifdef WINDOWS
 	HWND palette = KBSQueryPaletteWindow();
 	HWND target  = KBSQueryTranslucentTarget(palette);
+	// A window the panel has left keeps nothing of ours (see sFaintWnd). Only when the panel was found -
+	// "no panel" says nothing about where it is.
+	if (palette != nullptr)
+		KBSReleaseFormerFaintWindow(target);
 	if (target == nullptr)
+	{
+		KBS_DIAG_LOG("PANELALPHA apply: no floating window (palette 0x%llx)", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(palette)));
 		return kFalse;		// no panel / docked and expanded -> nothing to do
+	}
 
 	// *Opaque again while the pointer is on it (KBSEffectiveAlpha measures where it is). That counts
 	//   the tab band and the title band too, because the target window contains them.
 	const BYTE alpha = KBSEffectiveAlpha(target);
+	KBS_DIAG_LOG("PANELALPHA apply: %d on 0x%llx", static_cast<int>(alpha), static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(target)));
 
 	// *WS_EX_LAYERED is InDesign's own doing here, so it is left alone.
 	const BOOL ok = ::SetLayeredWindowAttributes(target, 0, alpha, LWA_ALPHA);
+	if (ok)
+		sFaintWnd = (alpha < 255) ? target : nullptr;	// remembered while faint (see sFaintWnd)
 
 	// *The SHADOW (OWL.ShadowView) is dealt with as well. It is a separate top-level window - the
 	//   Dock's owner - so making only the Dock faint leaves the shadow solid, and that band alone
@@ -529,6 +607,7 @@ static IWindow* KBSQueryFindChangeIWindow()
 		return nil;
 
 	const int32 count = windows->WindowCount();
+	int32 panelless = 0;	// (test builds: dialogs whose panel is not set yet)
 	for (int32 i = 0; i < count; ++i)
 	{
 		IWindow* win = windows->GetNthWindow(i);
@@ -541,16 +620,23 @@ static IWindow* KBSQueryFindChangeIWindow()
 			continue;
 
 		IControlView* panel = dlg->GetDialogPanel();
+		if (panel == nil)
+			++panelless;
 		if (panel != nil && panel->GetWidgetID() == kFindChangeParentWidgetID)
+		{
+			KBS_DIAG_LOG("FCLOOKUP walked: Find/Change is window %d of %d", i, count);
 			return win;
+		}
 	}
+	KBS_DIAG_LOG("FCLOOKUP walked: no Find/Change in %d windows (%d dialog(s) without a panel)", count, panelless);
 	return nil;
 }
 
 // The HWND, cached. *The cache matters: the Win32 hook below asks on every mouse move (60-100 a
 // second), and walking the window list with a QueryInterface per window each time would be waste.
 // It is dropped whenever a window is added or removed - the observer at the foot of this file does
-// that - so a handle the OS has recycled cannot be used against a different window.
+// that - and checked on every use (KBSIsFindChangeShapedWindow), because the observer's own Apply fills
+// it again with the closing dialog, which a kRemoveWindowMessage still finds in the list.
 static HWND sFcWnd = nullptr;
 
 // **Has the window list already been walked since it last changed? (2026-08-04 audit.)
@@ -563,14 +649,27 @@ static HWND sFcWnd = nullptr;
 //     it now asks the panel manager, but only when its own cache is empty). With a restored "ON" it
 //     started during the application's own startup sequence.
 //   *Cleared by KBSForgetFindChangeWindow, which the window-list observer calls the moment a window
-//     is added or removed - so a dialog that opens is looked up again at once, not left unseen.
+//     is added or removed - so a dialog that opens is looked up again at once.
+//   ***** BUT "LOOKED AT ONCE" IS NOT "SEEN" (2026-10-03, the block 13/14 recheck T-1). ***** The
+//     dialog opened for the first time in a session can be in the list at that moment with no panel
+//     set yet, so the walk cannot tell it and this records "not open" - and from then on the hook,
+//     however often it asks, is answered from here. MEASURED: Translucent Find/Change ON alone, the
+//     session's first dialog stayed opaque (trace "no Find/Change in 75 windows (1 dialog(s) without a
+//     panel)", then nothing). What sees it is the chase both toggles share (KBSChaseFindChangeWindow,
+//     KBSFindChangeMinimize.h), which forgets this and asks again for a short while.
+//     *Not "do not record while a dialog without a panel is listed": one sat there for 30 seconds of
+//      the application's own startup in the same trace, and the hook would have walked the list on
+//      every event all that time - the very cost this flag was made to remove.
 static bool16 sFcLookedUp = kFalse;
 
 // nullptr when the dialog is not open, or when the SDK has no platform window for it (a document
 // window answers nil to GetSysWindow, so this is not merely theoretical).
 HWND KBSQueryFindChangeWindow()
 {
-	if (sFcWnd != nullptr && ::IsWindow(sFcWnd))
+	// *The cached handle is checked to still be a window of the dialog's kind, not merely alive
+	//  (KBSIsFindChangeShapedWindow - the block 13/14 recheck S-1): it is filled again with the CLOSING
+	//  dialog when kRemoveWindowMessage arrives, so it can outlive the window it names.
+	if (sFcWnd != nullptr && KBSIsFindChangeShapedWindow(sFcWnd))
 		return sFcWnd;
 
 	sFcWnd = nullptr;
@@ -584,13 +683,17 @@ HWND KBSQueryFindChangeWindow()
 		return nullptr;
 	}
 
-	// **The dialog is open but has no platform window YET - which can be the state at the very
-	//   moment kWindowAddedMessage arrives. The walk is deliberately NOT recorded as done here: the
-	//   next ask has to look again, or the dialog would sit opaque until something else happened to
-	//   change the window list. This is the case the negative cache above must not swallow.
+	// **The dialog is told but has no platform window YET. The walk is deliberately NOT recorded as
+	//   done here: the next ask has to look again, or the dialog would sit opaque until something else
+	//   happened to change the window list. (Written 2026-08-04 for the moment kWindowAddedMessage
+	//   arrives. What was measured at that moment on 2026-10-03 was the other state - no PANEL yet,
+	//   which the walk above cannot tell from "not open"; this one has not been seen in a trace.)
 	HWND h = win->GetSysWindow();
 	if (h == nullptr || !::IsWindow(h))
+	{
+		KBS_DIAG_LOG("FCLOOKUP the dialog has no platform window yet - not recorded");
 		return nullptr;
+	}
 
 	sFcLookedUp = kTrue;
 	sFcWnd = h;
@@ -653,12 +756,13 @@ static HWND sFcStyledWnd = nullptr;
 //
 // *The handle is therefore verified before it is touched - and verified with WIN32 ONLY, no
 //   IWindowList and no IApplication, because shutdown is one of the callers and the model is the
-//   last thing that should be reached into there. What the three tests rest on:
+//   last thing that should be reached into there. What the tests rest on:
+//     . it is still a window of the dialog's kind - this process, top level, "DroverLord - Window
+//       Class" (KBSIsFindChangeShapedWindow, shared with the minimize side since 2026-10-03; THIS
+//       PROCESS was not asked here until then - the block 13/14 recheck S-1)
 //     . WS_EX_LAYERED is still set = OUR OWN mark is still on it. A recycled handle belongs to a
 //       window created since, whose EXSTYLE starts clean (this is the test that really carries it -
 //       we only ever record a window that did NOT have the style, so its presence is our doing).
-//     . the class is still "DroverLord - Window Class" (what a Find/Change dialog answers)
-//     . it is still a top-level window (a document window's canvas shares that class but is a child)
 static void KBSRestoreOurFindChangeStyle()
 {
 	if (sFcStyledWnd == nullptr)
@@ -667,15 +771,26 @@ static void KBSRestoreOurFindChangeStyle()
 	HWND h = sFcStyledWnd;
 	sFcStyledWnd = nullptr;		// forgotten either way: a window that fails the tests is not ours
 
-	if (!::IsWindow(h))
+	if (!KBSIsFindChangeShapedWindow(h))
 		return;
 	if ((::GetWindowLongPtr(h, GWL_EXSTYLE) & WS_EX_LAYERED) == 0)
-		return;
-	if (!KBSClassIs(h, L"DroverLord - Window Class") || ::GetAncestor(h, GA_ROOT) != h)
 		return;
 
 	::SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
 	::SetWindowLongPtr(h, GWL_EXSTYLE, ::GetWindowLongPtr(h, GWL_EXSTYLE) & ~WS_EX_LAYERED);
+	// *****NOT COMMITTED WHILE IT IS MINIMISED (2026-10-03, the block 13/14 recheck T-2).***** The
+	//   minimize side will not rebuild an iconic window's frame with SWP_FRAMECHANGED - doing so was
+	//   followed once by the window being destroyed outright (KBSFindChangeMinimize.cpp, 2026-08-12) - and
+	//   this side did it with no such test, on switching Translucent Find/Change OFF with the dialog
+	//   minimised. The style bit is off already; the whole window is drawn afresh when it is restored, and
+	//   Microsoft's own way to make a layered window opaque is only "remove the bit, then have the window
+	//   repaint". MEASURED with the guard: OFF while minimised took WS_EX_LAYERED off (0x000C0100 ->
+	//   0x00040100), the window stayed, and restoring it drew the dialog whole.
+	//   (Quitting with both toggles on and the dialog minimised was the other path in view - this runs
+	//    before the minimize side's own restore. Measured, it never reaches a live dialog: InDesign closes
+	//    the dialog's window before the shutdown services run, and the record is then left alone.)
+	if (::IsIconic(h))
+		return;
 	// Committed, so removing the style cannot pull the dialog forward. (The ADDING side deliberately
 	// does not commit - see the note there.)
 	KBSCommitWindowStyle(h);
@@ -748,6 +863,7 @@ bool16 KBSApplyFindChangeTranslucency()
 	// Solid again while the pointer is on it - the same rule as the panel, asked in the one place
 	// that holds it (KBSEffectiveFindChangeAlpha).
 	const BYTE alpha = KBSEffectiveFindChangeAlpha(h);
+	KBS_DIAG_LOG("FCALPHA %d on 0x%llx", static_cast<int>(alpha), static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
 	return ::SetLayeredWindowAttributes(h, 0, alpha, LWA_ALPHA) ? kTrue : kFalse;
 #else
 	return kFalse;		// Mac: no way to do this
@@ -951,6 +1067,9 @@ static void CALLBACK KBSWinEventProc(HWINEVENTHOOK /*hook*/, DWORD /*event*/, HW
 	//     GetAncestor and an attribute read, and it returns at once when nothing is out of place, so
 	//     the volume does no harm.
 	HWND target = KBSQueryTranslucentTarget(sPaletteWnd);
+	// The window the panel was on before, if it has left it - above all when it has just been DOCKED out
+	// of a floating group, which raises no SDK notification and returns just below (see sFaintWnd).
+	KBSReleaseFormerFaintWindow(target);
 	if (target == nullptr)
 		return;					// docked and expanded = not ours to touch
 
@@ -1063,6 +1182,7 @@ void KBSShutdownPanelAlpha()
 	sFcWnd = nullptr;
 	sFcLookedUp = kFalse;
 	sPaletteWnd = nullptr;
+	sFaintWnd = nullptr;
 
 	if (sReapplyTimer != nil)
 	{
@@ -1272,30 +1392,42 @@ void KBSPanelVisibilityObserver::Update(const ClassID& theChange, ISubject* /*th
 	//   kWindowAddedMessage, closing it broadcasts kRemoveWindowMessage (both read off a Spy trace on
 	//   a debug build, 2026-08-04).
 	//   The cached HWND is dropped either way - the dialog's window is gone, or a new one exists that
-	//   might be it - and the alpha is put on the (new) dialog when the toggle is ON.
+	//   might be it - and both toggles that act on the dialog (the alpha here, the minimize box of
+	//   KBSFindChangeMinimize.cpp) are put on the (new) dialog when ON.
+	//   *The dialog's window is BUILT AFRESH every time it is opened - the handle changes with it
+	//    (measured: 0x1F06EC one time, 0x1D0AF4 the next) - so what was written once does not survive a
+	//    close and reopen. Two features, one notification; the order does not matter, they touch
+	//    different bits of the same window (2026-08-12).
 	if (protocol == IID_IWINDOWLIST && (theChange == kWindowAddedMessage || theChange == kRemoveWindowMessage))
 	{
 		KBS_DIAG_LOG("WINDOWLIST %s", theChange == kWindowAddedMessage ? "added" : "removed");
 		KBSForgetFindChangeWindow();
-		if (KBSGetFindChangeTranslucent())
-			KBSApplyFindChangeTranslucency();
-		// *The minimize box goes on the same window, on the same cue, for the same reason: the
-		//  dialog's window is BUILT AFRESH every time it is opened - the handle changes with it
-		//  (measured: 0x1F06EC one time, 0x1D0AF4 the next) - so a style written once does not
-		//  survive a close and reopen. Two features, one notification; the order does not matter,
-		//  they touch different bits of the same window (2026-08-12).
-		// **WithRetry, not the plain Apply: the dialog can be open at this moment with no platform
-		//   window built yet, and unlike the translucency above there is no mouse hook asking again
-		//   a moment later. Measured - see the chase note in KBSFindChangeMinimize.h.
-		// *****BUT ONLY FOR A WINDOW THAT MAY BE THE DIALOG (2026-10-03, the block 15 recheck F-3).***** Every
-		//   other message - a document window opening, any other dialog, a window closing - is asked once
-		//   with the plain Apply: measured, a new document set the whole chase going (8 walks of the window
-		//   list over about a second) while the dialog was not open at all. See KBSWindowMayBeFindChange.
-		if (KBSGetFindChangeMinimizable())
+		const bool16 translucent = KBSGetFindChangeTranslucent();
+		const bool16 minimizable = KBSGetFindChangeMinimizable();
+		if (!translucent && !minimizable)
+			return;
+		// *****THE CHASE, FOR A WINDOW THAT MAY BE THE DIALOG - AND FOR BOTH TOGGLES (2026-10-03).*****
+		//   The Find/Change dialog opened for the first time in a session can be in the list at this
+		//   moment with no panel set yet (not every time - measured both ways), so the lookup cannot tell
+		//   it, records "not open", and keeps answering that (its negative cache) until the list next
+		//   changes. The chase forgets and asks again for a short while - see KBSFindChangeMinimize.h.
+		//   !MEASURED for the alpha too (the block 13/14 recheck T-1): until this the chase served the
+		//    minimize box alone, on the reasoning that the Win32 mouse hook asks again constantly. It does
+		//    ask - the LOOKUP, which answers from that cache - and Translucent Find/Change on its own left
+		//    the session's first dialog opaque (EXSTYLE 0x180, the trace "no Find/Change in 75 windows (1
+		//    dialog(s) without a panel)", then nothing however the pointer moved).
+		//   Every other message - a document window opening, any other dialog, a window closing - is asked
+		//   once with the plain Apply functions (the block 15 recheck F-3: a new document set the whole chase
+		//   going while the dialog was not open at all). See KBSWindowMayBeFindChange.
+		if (theChange == kWindowAddedMessage && KBSWindowMayBeFindChange(changedBy))
 		{
-			if (theChange == kWindowAddedMessage && KBSWindowMayBeFindChange(changedBy))
-				KBSApplyFindChangeMinimizableWithRetry();
-			else
+			KBSChaseFindChangeWindow();
+		}
+		else
+		{
+			if (translucent)
+				KBSApplyFindChangeTranslucency();
+			if (minimizable)
 				KBSApplyFindChangeMinimizable();
 		}
 		return;		// nothing here concerns the panel

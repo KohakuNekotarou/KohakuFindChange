@@ -5,7 +5,8 @@
 //  KohakuFindChange (KBS)
 //
 //  "Minimizable Find/Change" - the implementation. See KBSFindChangeMinimize.h for why the SDK
-//  cannot do this and Win32 can, and for why the chase at the foot of this file has to exist.
+//  cannot do this and Win32 can, and for why the chase at the foot of this file has to exist (it
+//  serves Translucent Find/Change too since 2026-10-03).
 //
 //========================================================================================
 
@@ -14,11 +15,11 @@
 // Project includes:
 #include "KBSFindChangeMinimize.h"
 #include "KBSPanelAlpha.h"		// KBSQueryFindChangeWindow - the shared lookup of the dialog's window;
-								// KBSCommitWindowStyle
+								// KBSCommitWindowStyle; the translucency toggle the chase applies as well
 #include "KBSDiag.h"			// KBS_DIAG_LOG / the "fcmin-decoy" fault switch (test builds only)
 
-// The dialog's window can be absent at the moment we are told about it, so the style is written
-// again once the events have gone round:
+// The dialog cannot always be told at the moment we are told about it (the first opening in a session
+// can have no panel yet), so it is asked for again once the events have gone round:
 #include "ICallbackTimer.h"		// StartTimer / StopTimer (an IIdleTask; kEndOfTime comes with it)
 #include "CreateObject.h"		// ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER)
 
@@ -56,7 +57,7 @@ static bool sHadMinBox  = false;	// did it already have WS_MINIMIZEBOX?
 static bool sHadToolWin = false;	// did it already have WS_EX_TOOLWINDOW? (in practice it does)
 static bool sHadAppWin  = false;	// did it already have WS_EX_APPWINDOW?
 
-// The chase (see the constants in the header).
+// The chase - for both toggles on the dialog's window (see the constants in the header).
 static ICallbackTimer* sRetryTimer   = nil;
 static int32           sRetriesLeft  = 0;
 // **Once the clean-up has run, never build the timer again. The same guard, for the same reason, as
@@ -64,7 +65,7 @@ static int32           sRetriesLeft  = 0;
 //   plug-in is going down, and it must not leave a booking live against code that is being unloaded.
 static bool            sMinimizeShutdown = false;
 
-static uint32 KBSMinimizeRetryProc(void* refPtr);
+static uint32 KBSFindChangeChaseProc(void* refPtr);
 
 #ifdef KBS_DIAG
 // Fault switch "fcmin-decoy" (test builds only, 2026-10-03): %TEMP%\kbs-diag-fault-fcmin-decoy holds a
@@ -97,23 +98,15 @@ static HWND KBSDiagDecoyWindow()
 //   process or of any other. IsWindow alone said yes to such a window; a test build pointed the record
 //   at a window of ANOTHER PROCESS (the "fcmin-decoy" switch) and switching the toggle off took that
 //   window's minimize box away and made it a tool window, off the taskbar.
-//   So, Win32 only (shutdown is a caller), the same tests the translucency side makes before it takes
-//   its WS_EX_LAYERED off (KBSRestoreOurFindChangeStyle in KBSPanelAlpha.cpp), plus the process:
-//     . it belongs to THIS process
-//     . its class is still "DroverLord - Window Class" and it is still a top-level window
+//   So, Win32 only (shutdown is a caller):
+//     . it is still a window of the dialog's kind - THIS process, top level, "DroverLord - Window Class"
+//       (KBSIsFindChangeShapedWindow in KBSPanelAlpha.cpp: asked there for the translucency side's
+//       restore and for the cached handle too, since the block 13/14 recheck S-1 - each had its own
+//       version, one without the process)
 //     . OUR marks are still on it - what we changed still reads the way we left it
 static bool KBSStillOurFindChangeWindow(HWND h)
 {
-	if (!::IsWindow(h))
-		return false;
-	DWORD pid = 0;
-	::GetWindowThreadProcessId(h, &pid);
-	if (pid != ::GetCurrentProcessId())
-		return false;
-	if (::GetAncestor(h, GA_ROOT) != h)
-		return false;
-	wchar_t cls[64] = { 0 };
-	if (::GetClassNameW(h, cls, 64) == 0 || ::wcscmp(cls, L"DroverLord - Window Class") != 0)
+	if (!KBSIsFindChangeShapedWindow(h))
 		return false;
 	const LONG_PTR ex = ::GetWindowLongPtr(h, GWL_EXSTYLE);
 	if (!sHadAppWin && (ex & WS_EX_APPWINDOW) == 0)
@@ -248,20 +241,43 @@ bool16 KBSApplyFindChangeMinimizable()
 
 #ifdef WINDOWS
 
+// Is either toggle that acts on the dialog's window ON?
+static bool KBSAnyFindChangeToggleOn()
+{
+	return sFindChangeMinimizable || KBSGetFindChangeTranslucent();
+}
+
+// Put each toggle that is ON on the dialog's window, if the lookup can tell the window. True when it
+// could (the toggles are then applied - each one's own Apply decides what that means, "already done" and
+// "minimised, not now" included); false when the dialog cannot be told, which is what the chase waits on.
+// ***** ONE LOOKUP FOR BOTH (2026-10-03, the block 13/14 recheck T-1). ***** The two features are set
+//   going by the same cue and wait on the same window, so the question "is the dialog there yet" is
+//   asked once here, not by each feature's own Apply.
+static bool KBSApplyFindChangeToggles()
+{
+	if (KBSQueryFindChangeWindow() == nullptr)
+		return false;
+	if (KBSGetFindChangeTranslucent())
+		KBSApplyFindChangeTranslucency();
+	if (sFindChangeMinimizable)
+		KBSApplyFindChangeMinimizable();
+	return true;
+}
+
 // The chase. **There is deliberately no "already booked, do not stack" gate - the panel side
 //   removed one in its 2026-07-29 self-review because a broken chain left the flag raised and the
 //   feature dead for the rest of the session. ICallbackTimer holds one booking per instance, so
 //   StartTimer over a live booking merely replaces it, and re-arming unconditionally debounces as a
 //   side effect (the count goes back to the full number every time).
-static uint32 KBSMinimizeRetryProc(void* /*refPtr*/)
+static uint32 KBSFindChangeChaseProc(void* /*refPtr*/)
 {
 	--sRetriesLeft;
 
 	// *Do not Release here (releasing itself from inside RunTask is self-destruction). Releasing is
 	//   in KBSShutdownFindChangeMinimize(), and nowhere else.
-	if (!sFindChangeMinimizable)
+	if (!KBSAnyFindChangeToggleOn())
 	{
-		sRetriesLeft = 0;		// turned OFF while we were waiting - stop
+		sRetriesLeft = 0;		// both turned OFF while we were waiting - stop
 		return IIdleTask::kEndOfTime;
 	}
 
@@ -270,14 +286,15 @@ static uint32 KBSMinimizeRetryProc(void* /*refPtr*/)
 	//   See KBSForgetFindChangeWindow in KBSPanelAlpha.h.
 	KBSForgetFindChangeWindow();
 
-	if (KBSApplyFindChangeMinimizable())
+	if (KBSApplyFindChangeToggles())
 	{
-		sRetriesLeft = 0;		// the window was found and styled (or is minimised) - done
+		KBS_DIAG_LOG("FCCHASE found the dialog with %d tries left", sRetriesLeft);
+		sRetriesLeft = 0;		// the window was found and the toggles put on - done
 		return IIdleTask::kEndOfTime;
 	}
 	if (sRetriesLeft <= 0)
 	{
-		KBS_DIAG_LOG("FCMIN chase: gave up - no dialog window after %d tries", kKBSMinimizeRetryTries);
+		KBS_DIAG_LOG("FCCHASE gave up - no dialog window after %d tries", kKBSFindChangeChaseTries);
 		return IIdleTask::kEndOfTime;	// bounded: the dialog is simply not open
 	}
 
@@ -290,36 +307,39 @@ static uint32 KBSMinimizeRetryProc(void* /*refPtr*/)
 	// return value does re-arm. (Until then the only measurement was the OLD way failing: StartTimer from
 	// inside, then kEndOfTime, 8 runs became 2.) It stays an observation of this version, not a
 	// contract; WHAT CATCHES IT if a later one stops re-arming:
-	// the chase is then the one try 50ms after the cue, and a dialog still without a window by then gets
-	// no button this time - the next cue does it: opening the dialog again (the window-list observer
-	// calls the chase afresh, KBSPanelAlpha.cpp) or switching the toggle off and on.
-	return kKBSMinimizeRetryDelayMillis;
+	// the chase is then the one run the booking makes, and a dialog still not tellable by then gets
+	// neither its button nor its alpha this time - the next cue does it: opening the dialog again (the
+	// window-list observer calls the chase afresh, KBSPanelAlpha.cpp) or switching a toggle off and on.
+	return kKBSFindChangeChaseDelayMillis;
 }
 
 #endif	// WINDOWS
 
-void KBSApplyFindChangeMinimizableWithRetry()
+void KBSChaseFindChangeWindow()
 {
 #ifdef WINDOWS
-	if (KBSApplyFindChangeMinimizable())
-		return;		// styled on the spot - the common case, and no timer is created at all
+	if (!KBSAnyFindChangeToggleOn())
+		return;		// nothing to put on the window
 
-	// No window yet. **This is the case the whole chase exists for; see the header.
+	if (KBSApplyFindChangeToggles())
+		return;		// told on the spot - the common case, and no timer is created at all
+
+	// The dialog cannot be told yet. **This is the case the whole chase exists for; see the header.
 	if (sMinimizeShutdown)
 		return;
 
-	sRetriesLeft = kKBSMinimizeRetryTries;
+	sRetriesLeft = kKBSFindChangeChaseTries;
 	if (sRetriesLeft <= 0)
 		return;		// the constant is 0 = the chase is turned off
-	KBS_DIAG_LOG("FCMIN chase: no dialog window - %d tries %ums apart booked", kKBSMinimizeRetryTries,
-		kKBSMinimizeRetryDelayMillis);
+	KBS_DIAG_LOG("FCCHASE no dialog window - %d tries %ums apart booked", kKBSFindChangeChaseTries,
+		kKBSFindChangeChaseDelayMillis);
 
 	if (sRetryTimer == nil)
 		sRetryTimer = ::CreateObject2<ICallbackTimer>(kCallbackTimerBoss, IID_ICALLBACKTIMER);
 	if (sRetryTimer == nil)
 		return;
 
-	sRetryTimer->StartTimer(KBSMinimizeRetryProc, kKBSMinimizeRetryDelayMillis, nil);
+	sRetryTimer->StartTimer(KBSFindChangeChaseProc, kKBSFindChangeChaseDelayMillis, nil);
 #endif
 }
 
