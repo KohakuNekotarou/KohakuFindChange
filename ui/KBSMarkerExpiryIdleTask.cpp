@@ -26,7 +26,7 @@ static const uint32 kKBSMarkerLifetimeMs = 1000;
 
 // ---- Shared state (private to this translation unit) ----
 //
-// ***** THERE IS NO "IS IT RUNNING" FLAG HERE, AND THERE MUST NOT BE. ***** Whether the task is
+// THERE IS NO "IS IT RUNNING" FLAG HERE, AND THERE MUST NOT BE. Whether the task is
 // sitting in the idle queue is the BASE CLASS's business: CIdleTask keeps it in fCurrentlyInstalled
 // (CIdleTask.h:64) and InstallTask / UninstallTask maintain it. A second copy in this file could
 // only ever disagree with it - and disagreeing in one direction is illegal, not merely untidy:
@@ -36,7 +36,6 @@ static const uint32 kKBSMarkerLifetimeMs = 1000;
 // (IIdleTaskMgr.h:95-98) and does nothing else. So every entry point below simply uninstalls first
 // and asks no questions - the shape Adobe's own re-arming code uses
 // (spellpanel/DynSpellCheckEventWatcher.cpp:138,145 on every keystroke, :178 to stop).
-// A flag lived here until the block 12 API audit, 2026-08-08.
 static IIdleTask* sTask     = nil;		// the task object (created once, reused). Released in Shutdown
 static bool16     sShutdown = kFalse;	// set at application shutdown: never create/schedule again
 
@@ -62,7 +61,7 @@ uint32 KBSMarkerExpiryTask::RunTask(uint32 /*flags*/, IdleTimer* /*idleTimer*/)
 	// return kEndOfTime from RunTask, instead you would call UninstallTask and return any value
 	// from RunTask as it will be ignored".
 	//
-	// Hide (KBSHitMarker::ClearMarker until 2026-10-01) calls back into Stop(), which uninstalls
+	// Hide calls back into Stop(), which uninstalls
 	// again. That second call is harmless by the contract quoted at the top of this file (a task that
 	// is not installed, or is currently running, costs a return value and nothing more).
 	this->UninstallTask();

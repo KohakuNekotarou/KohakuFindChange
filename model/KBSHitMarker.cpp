@@ -44,7 +44,7 @@ namespace
 
 // ---- where the marker is -------------------------------------------------------------------
 //
-// ***** WRITTEN ON THE MAIN THREAD, AND THE ADORNMENT MAY BE ASKED ON ANOTHER. ***** A global text
+// WRITTEN ON THE MAIN THREAD, AND THE ADORNMENT MAY BE ASKED ON ANOTHER. A global text
 // adornment is a service, which the registry resolves in every execution context - the
 // asynchronous PDF export's background thread included (KCM measured it, KCM.fr says so). This
 // marker never draws there (kPrinting is refused before anything is read), but GetCouldDraw and
@@ -70,13 +70,12 @@ const double kAscentFraction     = 0.85;
 const double kDescentFraction    = 0.10;
 const double kCaretWidthFraction = 0.25;
 
-// ***** SAME ADDRESS IS NOT SAME DOCUMENT. ***** A closed document's address can be handed to the
-// next document opened, so the address is confirmed by the file (the rule the Draw Event marker kept
-// from 2026-08-04 - memory uidref-reuse-after-close). Neither ever saved: the address stands alone.
-// gDB is compared, never read; drawnDB is a wax run's, being drawn, so it is certainly alive.
-// ***** THE FILES ARE COMPARED, NOT THEIR PATH STRINGS (API re-audit, 2026-10-02). ***** FileUtils::IsEqual,
-// the rule KBSBookScope's KBSDocumentLivesInFile keeps (and KCM's KCMIsSameDoc) - this compared the two
-// paths' strings until then. Caller holds gLock.
+// SAME ADDRESS IS NOT SAME DOCUMENT. A closed document's address can be handed to the next document
+// opened, so the address is confirmed by the file (memory uidref-reuse-after-close). Neither ever
+// saved: the address stands alone. gDB is compared, never read; drawnDB is a wax run's, being drawn,
+// so it is certainly alive.
+// THE FILES ARE COMPARED, NOT THEIR PATH STRINGS. FileUtils::IsEqual, the rule KBSBookScope's
+// KBSDocumentLivesInFile keeps (and KCM's KCMIsSameDoc). Caller holds gLock.
 bool KBSHitMarkerSameDoc(IDataBase* drawnDB)
 {
 	if (drawnDB == nil || drawnDB != gDB)
@@ -88,8 +87,7 @@ bool KBSHitMarkerSameDoc(IDataBase* drawnDB)
 }
 
 // Forget where the marker is - gHasMark first, the flag every unlocked reader tests. The one place
-// ClearMarker, ForgetDoc and ShutdownCleanup empty the state (each wrote the four lines out until
-// 2026-10-01). Caller holds gLock.
+// ClearMarker, ForgetDoc and ShutdownCleanup empty the state. Caller holds gLock.
 void KBSHitMarkerForget()
 {
 	gHasMark = kFalse;
@@ -99,8 +97,8 @@ void KBSHitMarkerForget()
 	gStory = kInvalidUID;
 }
 
-// (KBSHitMarkerRepaint - repaint a document so the marker appears or disappears now - stood here until
-//  2026-10-01. Repainting views is the UI half's: KBSHitMarkerView.cpp, with its notes.)
+// (Repainting a document so the marker appears or disappears now is the UI half's:
+//  KBSHitMarkerView.cpp.)
 
 // The part of this run the marker covers, as character offsets into the run. False when none of it
 // does. Caller holds gLock and has checked gHasMark.
@@ -144,7 +142,7 @@ bool KBSHitMarkerRunPart(const IWaxRun* waxRun, int32& outCharStart, int32& outC
 
 // The rectangle to invert in this run, in the run's own coordinates (what Draw is handed). False when
 // the run cannot be measured - an inline graphic has neither glyphs nor render data.
-// ***** CHARACTERS ARE NOT GLYPHS. ***** The range is mapped with MapCharsToGlyphs before any width
+// CHARACTERS ARE NOT GLYPHS. The range is mapped with MapCharsToGlyphs before any width
 // is added up - the call the product's spelling squiggle makes (DynamicSpellCheckAdornment.cpp), and
 // KCM's GetMarkBoxes after it.
 bool KBSHitMarkerBox(const IWaxRun* waxRun, const IWaxRenderData* renderData,
@@ -251,12 +249,12 @@ public:
 			return;
 		if ((iShapeFlags & IShape::kPrinting) != 0)
 			return;
-		// ***** EVERY SCREEN MODE, OVERPRINT PREVIEW INCLUDED (user's call, 2026-09-26). ***** The
-		// Draw Event marker hid itself under Overprint Preview (kSepPrvOPPEnabledVPAttr) on the reading
-		// that the preview simulates print; the user asked for the marker after a jump to show in
-		// whatever mode the window is in. Only paper and exports (kPrinting, above) go without it...
-		// ***** ...AND A PAGE DRAWN AS A PICTURE: kPreviewMode WITH NO VIEW (2026-10-03, M-1). ***** The
-		// screen's preview modes draw with kPreviewMode too, so the flag alone cannot tell them apart; the
+		// EVERY SCREEN MODE, OVERPRINT PREVIEW INCLUDED (the author's call). Not hidden under Overprint
+		// Preview (kSepPrvOPPEnabledVPAttr) on the reading that the preview simulates print: the marker
+		// after a jump shows in whatever mode the window is in. Only paper and exports (kPrinting, above)
+		// go without it...
+		// ...AND A PAGE DRAWN AS A PICTURE: kPreviewMode WITH NO VIEW. The screen's preview modes draw
+		// with kPreviewMode too, so the flag alone cannot tell them apart; the
 		// view can (the Pages panel's thumbnail test KCM and KIDMCP use). See the header.
 		if ((iShapeFlags & IShape::kPreviewMode) != 0 && gd->GetView() == nil)
 		{
@@ -275,7 +273,7 @@ public:
 
 		// White over Difference = (1 - backdrop): a full inversion, visible on any ground, with the
 		// glyphs inverting along with it so the text stays readable. The blending mode is part of the
-		// graphics state, so AutoGSave puts it back. (Unchanged from the Draw Event marker.)
+		// graphics state, so AutoGSave puts it back.
 		AutoGSave ag(gPort);
 		gPort->setblendingmode(kPMBlendDifference);
 		gPort->setrgbcolor(PMReal(1.0), PMReal(1.0), PMReal(1.0));
@@ -326,7 +324,7 @@ bool KBSHitMarker::ClearMarker(IDataBase*& outDB)
 	outDB = nil;
 	if (gShutdown)
 		return false;
-	// (The countdown is stopped by the caller - KBSHitMarkerView, the UI half - since 2026-10-01.)
+	// (The countdown is stopped by the caller - KBSHitMarkerView, the UI half.)
 
 	IDataBase* db = nil;
 	{

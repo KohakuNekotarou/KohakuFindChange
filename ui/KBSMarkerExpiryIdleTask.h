@@ -5,17 +5,17 @@
 //  KohakuBookSearch (KBS)
 //
 //  One-shot timer that takes the jump marker back off the screen shortly after it appears.
-//  Driven by KBSHitMarkerView (the UI half of KBSHitMarker since 2026-10-01): Show arms it, Hide
-//  disarms it. This is the plug-in's only CIdleTask - the single justified exception to "avoid idle
-//  tasks" (a marker has to expire on wall-clock time).
+//  Driven by KBSHitMarkerView (the UI half of KBSHitMarker): Show arms it, Hide disarms it. This is
+//  the plug-in's only CIdleTask - the single justified exception to "avoid idle tasks" (a marker has
+//  to expire on wall-clock time).
 //
-//  ***** WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. ***** It is a main-thread "call me back in
-//  n ms" too (ICallbackTimer.h:38 - it derives from IIdleTask), and this plug-in uses it elsewhere
-//  (KBSBookWatch, KBSPanelAlpha, KBSBookPanelPlacement and KBSFindChangeMinimize on 2026-10-01 - a
-//  grep for ICallbackTimer recounts them). It is not taken here because its callback is a plain
-//  function pointer that nothing reference-counts - its own header spends six words on "Danger!"
-//  saying the supplying plug-in must not be unloaded while that pointer is in the timer, and the note
-//  on KBSShutdownPanelAlpha (KBSPanelAlpha.h) records the same hazard. A CIdleTask is an interface on
+//  WHY NOT ICallbackTimer, WHICH KBS USES ELSEWHERE. It is a main-thread "call me back in n ms" too
+//  (ICallbackTimer.h:38 - it derives from IIdleTask), and this plug-in uses it elsewhere (a grep for
+//  ICallbackTimer lists them - KBSBookWatch, KBSPanelAlpha and others). It is not taken here
+//  because its callback is a plain function pointer that nothing reference-counts - its own header
+//  spends six words on "Danger!" saying the supplying plug-in must not be unloaded while that
+//  pointer is in the timer, and the note on KBSShutdownPanelAlpha (KBSPanelAlpha.h) records the same
+//  hazard. A CIdleTask is an interface on
 //  a boss: it can be Released at shutdown, and it takes part in KBSUIStartupShutdown's teardown like
 //  everything else.
 //

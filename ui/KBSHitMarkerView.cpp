@@ -4,7 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  See KBSHitMarkerView.h. UI side. The repaint was KBSHitMarker.cpp's until 2026-10-01 (moved unchanged).
+//  See KBSHitMarkerView.h. UI side.
 //
 //========================================================================================
 
@@ -23,7 +23,7 @@
 #include "Utils.h"
 
 // Project includes:
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KBSHitMarkerView.h"
 #include "KBSMarkerExpiryIdleTask.h"
 

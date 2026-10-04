@@ -66,9 +66,9 @@
 
 // Project includes:
 #include "KBSJump.h"
-#include "KBSHitMarkerView.h"		// the marker shown and taken down - the UI half of KBSHitMarker (2026-10-01)
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
-#include "KBSBookPanelLookup.h"		// BringBookTabForward - a book row's tab (2026-10-01)
+#include "KBSHitMarkerView.h"		// the marker shown and taken down - the UI half of KBSHitMarker
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
+#include "KBSBookPanelLookup.h"		// BringBookTabForward - a book row's tab
 #include "KBSResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KBSDiag.h"				// KBS_DIAG_LOG / KBS_DIAG_FAULT - test builds only
 #include <vector>
@@ -82,21 +82,18 @@ namespace
 
 	/** May the "close everything else" sweep run for the results now on the panel?
 
-	    TWO conditions, and the second one used to be missing. The toggle says whether the user wants
-	    it; IsFromBook says whether it means anything - the sweep is about CHAPTERS, and a
-	    document-scope result set has none.
+	    TWO conditions. The toggle says whether the user wants it; IsFromBook says whether it means
+	    anything - the sweep is about CHAPTERS, and a document-scope result set has none.
 
-	    Without the second test a document-scope jump closed every other clean document the user had
-	    open, and there was no way to stop it: the menu item greys itself out in document scope
+	    Without the second test a document-scope jump would close every other clean document the user
+	    had open, with no way to stop it: the menu item greys itself out in document scope
 	    (KBSActionComponent::UpdateActionStates says so in as many words), so the toggle could not
-	    even be reached to be turned off (found 2026-08-03 in the defect audit). The menu and the
-	    behaviour now answer the same question.
+	    even be reached to be turned off. The menu and the behaviour answer the same question.
 
-	    The same lock-out came back through the other door and was closed on 2026-08-09: the menu
-	    asked the LIVE Book Scope toggle alone, so book results with the scope since switched off
-	    had the sweep running on every jump while the menu sat grey. The menu now also asks
-	    IsFromBook - the very question below - so wherever the sweep can run, the toggle can be
-	    reached.
+	    The same lock-out has a second door: a menu asking the LIVE Book Scope toggle alone would sit
+	    grey over book results with the scope since switched off, while the sweep ran on every jump.
+	    So the menu asks IsFromBook too - the very question below - and wherever the sweep can run,
+	    the toggle can be reached.
 
 	    Asked of the RESULTS rather than of the live Book Scope toggle, for the reason the model
 	    records that flag at all: flipping the scope after a search must not change how the results
@@ -112,19 +109,17 @@ namespace
 
 	// Scroll the GIVEN layout view so the given pasteboard point is centred. Does not select.
 	//
-	// ***** THE VIEW IS PASSED IN, NOT LOOKED UP HERE. ***** It used to ask
-	// ILayoutUIUtils::QueryFrontView for itself, while EnsureSpreadInView below asked
-	// QueryFrontLayoutData for its own - and THE TWO ARE NOT THE SAME QUESTION:
+	// THE VIEW IS PASSED IN, NOT LOOKED UP HERE: one view, looked up ONCE by the caller and handed to
+	// both this and EnsureSpreadInView, because the two lookups are NOT THE SAME QUESTION:
 	//
 	//   QueryFrontView / GetFrontDocument -> "the frontmost LAYOUT presentation"  (ILayoutUIUtils.h:89-98)
 	//   QueryFrontLayoutData              -> "the FRONT MOST presentation"'s layout part (:127-133)
 	//
 	// With a Story Editor window in front of its own document's layout window, the second one is nil
-	// while the first still hands back the layout view behind it. The spread was then never changed
-	// and this scroll ran anyway - landing on empty pasteboard for any hit on another spread, which
-	// is the master-page symptom of 2026-08-05 arriving through a second door (measured on the
-	// running application, 2026-08-10: the active spread stayed put while the jump reported nothing
-	// wrong). One view is now looked up ONCE by the caller and handed to both.
+	// while the first still hands back the layout view behind it - so asked separately, the spread
+	// would never be changed and this scroll would run anyway, landing on empty pasteboard for any hit
+	// on another spread (measured on the running application: the active spread stayed put while the
+	// jump reported nothing wrong).
 	//
 	// ScrollContentLocationToFrameCenter, not ScrollViewCenterTo: IPanorama.h:141-145 calls the
 	// latter "an obsolete name" for this one and says new code should call this, "but this function
@@ -147,11 +142,10 @@ namespace
 	/** Bring this story's composition up to date, so that what is read below is the CURRENT
 	    composition rather than the one left over from before the last edit.
 
-	    ***** IT COVERS THE OVERSET TEST AS WELL AS THE GEOMETRY. ***** Both are readings of the
-	    RESULT of composition, and the recompose used to sit inside the geometry helper alone - so
-	    the question "is this position overset" was answered from the old composition and the
-	    rectangle was measured from the new one, in that order, inside one jump. Being overset is
-	    exactly what changes when text is recomposed, so that was the wrong way round.
+	    IT COVERS THE OVERSET TEST AS WELL AS THE GEOMETRY. Both are readings of the RESULT of
+	    composition; a recompose inside the geometry helper alone would answer "is this position
+	    overset" from the old composition and measure the rectangle from the new one, inside one jump -
+	    and being overset is exactly what changes when text is recomposed.
 
 	    The recipe is the SDK's: IFrameList::GetFirstDamagedFrameIndex() != -1 ->
 	    IFrameListComposer::RecomposeThruLastFrame (SnpInspectTextModel.cpp:724-733). Called inside
@@ -244,8 +238,8 @@ namespace
 		// How tall to make the rectangle: proportions of the line height, measured from the baseline
 		// (the wax run's local y origin), which is the space mLeft / mRight map from.
 		//
-		// CAREFUL with IWaxLineShape::GetSelectionLine here. It was tried 2026-07-31 and reverted the
-		// same day. What the header says, both sentences (IWaxLineShape.h:142-148):
+		// CAREFUL with IWaxLineShape::GetSelectionLine here. It was tried and reverted. What the
+		// header says, both sentences (IWaxLineShape.h:142-148):
 		//   1. "Get the selection line (top/bottom) for this line" - so it DOES report a top and a
 		//      bottom;
 		//   2. "This is typically used to determine the constraints on the height of the highlight
@@ -298,19 +292,18 @@ namespace
 
 	/** Put the layout view on the SPREAD the match sits on, before anything is scrolled.
 
-	    ***** SCROLLING TO A POINT ASSUMES THE VIEW IS ALREADY ON THAT POINT'S SPREAD. ***** The scroll
-	    below moves the view to a pasteboard POINT, and a point taken from one spread means something
-	    else - or nothing at all - to a view showing another. A MASTER spread is where this shows up
-	    plainly, because it is not in the ordinary spreads' continuous pasteboard at all: measured
-	    2026-08-05 with Include Master Pages on, the row read "PA master cat one" correctly and
-	    clicking it left the window on EMPTY PASTEBOARD - no page, no text, no marker, nothing said -
-	    while the body row beside it landed correctly in the same test run.
+	    SCROLLING TO A POINT ASSUMES THE VIEW IS ALREADY ON THAT POINT'S SPREAD. The scroll below
+	    moves the view to a pasteboard POINT, and a point taken from one spread means something else -
+	    or nothing at all - to a view showing another. A MASTER spread is where this shows up plainly,
+	    because it is not in the ordinary spreads' continuous pasteboard at all: measured with Include
+	    Master Pages on and the scroll alone, the row read "PA master cat one" correctly and clicking
+	    it left the window on EMPTY PASTEBOARD - no page, no text, no marker, nothing said - while the
+	    body row beside it landed correctly in the same test run.
 
-	    ***** THE TEST IS "IS IT A DIFFERENT SPREAD", NOT "IS IT A MASTER". ***** That is the rule
-	    Adobe's own code follows: SnapTracker.cpp:224 compares ::GetUIDRef(spread) against
+	    THE TEST IS "IS IT A DIFFERENT SPREAD", NOT "IS IT A MASTER". That is the rule Adobe's own code
+	    follows: SnapTracker.cpp:224 compares ::GetUIDRef(spread) against
 	    ILayoutControlData::GetSpreadRef() and issues the command whenever they differ, with no special
-	    case for masters anywhere. This started out master-only, on the reasoning that ordinary
-	    spread-to-spread jumps had worked by scrolling for as long as the panel had existed; that is a
+	    case for masters anywhere. That ordinary spread-to-spread jumps work by scrolling alone is a
 	    reason to TEST the ordinary case, not a reason to keep a second rule of our own beside Adobe's.
 
 	    !! AND THE GEOMETRY MUST BE COMPUTED AFTER THIS RUNS. SnapTracker.cpp:234-235 recalculates its
@@ -324,15 +317,11 @@ namespace
 	    That a layout view can show a master spread at all is stated by
 	    ILayoutUIUtils::GetVisibleMasterSpreadUID (ILayoutUIUtils.h:220).
 
-	    ***** THE VIEW IS THE ONE THAT WILL BE SCROLLED. ***** It is handed in rather than looked up,
-	    because this used to ask ILayoutUIUtils::QueryFrontLayoutData while the scroll asked
-	    QueryFrontView - two different questions (see ScrollViewToPoint above for the contract lines
-	    and for what a Story Editor window did with the difference). Asking the view we are about to
-	    scroll is the only way the two can never disagree.
-
-	    (The spread was resolved by JumpToHit and handed in until 2026-10-01, because the Draw Event
-	    marker needed it too; the marker has been drawn on the characters since 2026-09-26, and this is
-	    the only asker again.)
+	    THE VIEW IS THE ONE THAT WILL BE SCROLLED. It is handed in rather than looked up: looked up
+	    here it would be QueryFrontLayoutData beside the scroll's QueryFrontView - two different
+	    questions (see ScrollViewToPoint above for the contract lines and for what a Story Editor
+	    window does with the difference). Asking the view we are about to scroll is the only way the
+	    two can never disagree.
 
 	    Silent when it cannot do it: the scroll that follows is no worse off than before. */
 	void EnsureSpreadInView(IControlView* view, const UIDRef& storyRef, TextIndex pos)
@@ -358,10 +347,10 @@ namespace
 		if (::GetDataBase(viewDoc) != storyRef.GetDataBase())
 			return;
 
-		// ***** PRESERVE, THEN CLEAR - the caller's error state goes back the way it came. ***** Clearing
-		// the CALLER's error state is not this function's to decide, and every exit below - not only
-		// the last - has to hand back what it found (a bare clear after the command stood here until
-		// 2026-08-10). The pair is Adobe's own (CDialogObserver.cpp:392-394; contract at
+		// PRESERVE, THEN CLEAR - the caller's error state goes back the way it came. Clearing the
+		// CALLER's error state is not this function's to decide, and every exit below - not only the
+		// last - has to hand back what it found (a bare clear after the command would not). The pair
+		// is Adobe's own (CDialogObserver.cpp:392-394; contract at
 		// ErrorUtils.h:115-137). The clear is the other half: a standing error fails whatever is
 		// attempted next, and what is attempted next is this very command.
 		GlobalErrorStatePreserver spreadErrorState;
@@ -382,28 +371,27 @@ namespace
 
 	/** Accepts a presentation that HAS A LAYOUT IN IT, and no other.
 
-	    ***** A DOCUMENT'S WINDOWS ARE NOT ALL LAYOUT WINDOWS. ***** A Story Editor window is a
-	    presentation of the same document (kStoryEditorPresentationBoss, WritingModeUIID2.h:117), and
-	    the predicate that stood here accepted EVERYTHING - so a document being edited in one could
-	    have that window made active by a jump, after which every single thing the jump does next
-	    (scroll, spread, marker) is addressed at a LAYOUT view that was never brought forward.
+	    A DOCUMENT'S WINDOWS ARE NOT ALL LAYOUT WINDOWS. A Story Editor window is a presentation of
+	    the same document (kStoryEditorPresentationBoss, WritingModeUIID2.h:117), and a predicate that
+	    accepts EVERYTHING lets a jump make that window active in a document being edited in one -
+	    after which every single thing the jump does next (scroll, spread, marker) is addressed at a
+	    LAYOUT view that was never brought forward.
 	    Adobe's own worked examples for this search order their candidates with prefer-criteria such
 	    as is_layout (DocumentPresFindCriteria.h:54-58); this asks the same question in the accept
 	    half, where a "no" is the useful answer - no layout presentation means the else branch below
 	    opens one, which is exactly right.
 
-	    ***** THE TEST IS THE SDK'S OWN PREDICATE FOR IT. ***** ILayoutUIUtils::IsLayoutPresentation,
+	    THE TEST IS THE SDK'S OWN PREDICATE FOR IT. ILayoutUIUtils::IsLayoutPresentation,
 	    "Test to see if the given presentation contains ILayoutControlData" (ILayoutUIUtils.h:112-115)
 	    - which is this function's whole question, under that name. (Not a ClassID comparison,
 	    deliberately: naming a boss means naming all of them - kLayoutPresentationBoss,
 	    kWasmLayoutPresentationBoss, whatever comes next.)
 
-	    ***** WHY NOT THE STOCK FindPresCriteria::is_layout (DocumentPresFindCriteria.h:86). ***** It
-	    was out of reach while this file was a model plug-in's - its implementation is in WidgetBin, and
-	    the header (:40-46) tells a model plug-in to write a local one of exactly this shape. This is the
-	    UI half since 2026-10-01, where the stock one links (KIDMCP's UI half passes it), and where this
-	    plug-in's any-presentation question went over to the stock accept_all (KBSUIServices). This one
-	    stays local because what it tests is stated - "contains ILayoutControlData" - and the stock
+	    WHY NOT THE STOCK FindPresCriteria::is_layout (DocumentPresFindCriteria.h:86). Its
+	    implementation is in WidgetBin, and the header (:40-46) tells a model plug-in to write a local
+	    one of exactly this shape. This is the UI half, where the stock one links (KIDMCP's UI half
+	    passes it, and this plug-in's any-presentation question uses the stock accept_all -
+	    KBSUIServices). This one stays local because what it tests is stated - "contains ILayoutControlData" - and the stock
 	    is_layout's test is not: its implementation is not in the SDK, and nothing says what it counts
 	    as a layout. */
 	bool KBSAcceptLayoutPresentation(IDocumentPresentation* p)
@@ -415,19 +403,19 @@ namespace
 
 	/** Is the window in front RIGHT NOW a layout window showing this document?
 
-	    ***** NOT ILayoutUIUtils::GetFrontDocument, WHICH ANSWERS A WEAKER QUESTION. ***** That one
-	    returns "the document associated with the frontmost LAYOUT presentation" (ILayoutUIUtils.h:95-98)
-	    - so with a Story Editor window in front of its own document's layout window it still names
-	    that document, and a jump asking it concluded the document was already frontmost and stopped.
-	    Measured on the running application 2026-08-10: the Story Editor stayed in front, the layout
-	    never changed spread, and the panel reported nothing wrong.
+	    NOT ILayoutUIUtils::GetFrontDocument, WHICH ANSWERS A WEAKER QUESTION. That one returns "the
+	    document associated with the frontmost LAYOUT presentation" (ILayoutUIUtils.h:95-98) - so with
+	    a Story Editor window in front of its own document's layout window it still names that
+	    document, and a jump asking it concludes the document is already frontmost and stops. Measured
+	    on the running application: the Story Editor stayed in front, the layout never changed spread,
+	    and the panel reported nothing wrong.
 
 	    QueryFrontLayoutData is about "the FRONT MOST presentation" (:127-133) and hands back its
 	    layout part, so it is nil exactly when the window in front is not a layout - which is the
 	    question this function is named for.
 
 	    ONE place asks it, and both the entry test and the did-it-take test below call here: they are
-	    the same question and drifted apart the moment they were written out twice. */
+	    the same question, and written out twice they drift apart. */
 	bool LayoutOfDocIsFrontmost(const UIDRef& docRef)
 	{
 		InterfacePtr<ILayoutControlData> frontLayout(Utils<ILayoutUIUtils>()->QueryFrontLayoutData());
@@ -444,7 +432,7 @@ namespace
 		return p != nil && !p->IsMinimized();
 	}
 
-	/** ***** A MINIMISED WINDOW COMES BACK (2026-10-03, the block 12 re-read L-1). ***** A layout window
+	/** A MINIMISED WINDOW COMES BACK. A layout window
 	    that floats can be minimised (IDocumentPresentation.h:88-96), and MakeActive does not bring it
 	    back: measured, a click on a hit row in a document whose only layout window was floating and
 	    minimised moved that window's view (centre y 0 -> -114.5 pt) and left it minimised - the scroll and
@@ -463,7 +451,7 @@ namespace
 	// travels along (zoom first, scroll second). Returns false when no window could be produced or
 	// the activation did not take (the caller then reports without scrolling).
 	//
-	// ***** On success the chapter STOPS BEING HELD (KBSBookScope::ForgetHeldDoc). ***** See the
+	// On success the chapter STOPS BEING HELD (KBSBookScope::ForgetHeldDoc). See the
 	// note beside that call at the foot of this function.
 	bool EnsureDocFrontmost(const UIDRef& docRef)
 	{
@@ -488,16 +476,15 @@ namespace
 
 		if (LayoutOfDocIsFrontmost(docRef))
 		{
-			KBSBringBackIfMinimized(pres);			// in front, but minimised (L-1, above)
+			KBSBringBackIfMinimized(pres);			// in front, but minimised (see above)
 			KBSChapters()->ForgetHeldDoc(docRef);	// already in front and visible - see below
 			return true;
 		}
 
-		// ***** PRESERVE, THEN CLEAR. ***** Same pair, and for the same reason, as EnsureSpreadInView
-		// above (two bare clears on two of this function's exits until 2026-08-10): MakeActive()
-		// reports nothing at all, and a standing error would then fail the zoom command below it and
-		// the spread command after it. The destructor at the closing brace puts the caller's own state
-		// back untouched (ErrorUtils.h:115-137).
+		// PRESERVE, THEN CLEAR. Same pair, and for the same reason, as EnsureSpreadInView above (not a
+		// bare clear on an exit or two): MakeActive() reports nothing at all, and a standing error would
+		// then fail the zoom command below it and the spread command after it. The destructor at the
+		// closing brace puts the caller's own state back untouched (ErrorUtils.h:115-137).
 		GlobalErrorStatePreserver frontErrorState;
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
@@ -564,19 +551,18 @@ namespace
 			}
 		}
 
-		// ***** THE CHAPTER IS THE USER'S FROM HERE ON: STOP HOLDING IT. *****
+		// THE CHAPTER IS THE USER'S FROM HERE ON: STOP HOLDING IT.
 		//
 		// A jump reaches a closed chapter by reopening it WINDOWLESS (EnsureChapterReachable ->
 		// ReopenChapterDoc), which puts it on the held list - the list of chapters a run is entitled
 		// to hand back by closing them, with the UI suppressed. It has a window now and the user is
 		// looking at it, so that entitlement is over: the next run would otherwise close a window
 		// they are working in, and take with it whatever they have typed or replaced into it since
-		// (user, 2026-08-03: "a document the user opened by jumping should not be closed, even if
-		// nothing was replaced in it").
+		// (the user: "a document the user opened by jumping should not be closed, even if nothing was
+		// replaced in it").
 		//
-		// KBSBookScope::ShowChapterWindow has always said this about the window IT opens after a
-		// replace. This is the same statement about the window a JUMP opens - the case that was
-		// missing, and the one that reaches the user first.
+		// KBSBookScope::ShowChapterWindow says this about the window IT opens after a replace. This is
+		// the same statement about the window a JUMP opens - the one that reaches the user first.
 		KBSChapters()->ForgetHeldDoc(docRef);
 		return true;
 	}
@@ -624,7 +610,7 @@ void KBSJump::ToggleHidePreviousChapter()
 
 void KBSJump::SetHidePreviousChapter(bool on)
 {
-	// Added for the saved settings (KBSPanelState.cpp), which has to write a REMEMBERED value rather
+	// For the saved settings (KBSPanelState.cpp), which has to write a REMEMBERED value rather
 	// than flip whatever the flag happens to be. Toggling from a restore would come out inverted
 	// whenever the default is not what was saved.
 	gHidePrevChapterOn = on;
@@ -637,11 +623,10 @@ namespace
 // ActivateNode; the double click's selection is the other entry). A landing opens documents, and
 // opening a document RUNS THE MESSAGE LOOP - so the next click, or the trailing half of a double
 // click, can be dispatched while the previous landing is still inside its own open, and would then
-// select or jump from a state that landing has not finished making. The keyboard walk has guarded
-// itself this way since 2026-08-01 (KBSResultTreeEH's gWalking, which also guards its own selection
-// step and therefore stays); the mouse path had no equivalent until the 2026-08-09 sweep. Kept HERE
-// rather than in each event handler so the doors cannot drift apart and a future caller is covered
-// on arrival.
+// select or jump from a state that landing has not finished making. The keyboard walk guards itself
+// this way as well (KBSResultTreeEH's gWalking, which also guards its own selection step and
+// therefore stays). Kept HERE rather than in each event handler so the doors cannot drift apart and
+// a future caller is covered on arrival.
 bool gActivating = false;
 
 class ActivationGuard
@@ -665,17 +650,12 @@ void SayRowHasNoPlace()
 	KBSResultTree::ShowStatus(message);
 }
 
-// (RelocateStaleRow - a row whose place moved under it, looked for again by walking its story under the
-//  same query - stood here until 2026-10-01. It is model work - a walk, and the rows put right - so it is
-//  KBSSearchEngine::RelocateStaleRow now, reached through IKBSRuns; its notes went with it.)
-
-// ***** A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST (2026-09-26). ***** The record moves with the
-// text, so an edit made since the replace does not put the jump off. Asked only once the chapter is
-// reachable (a closed one has just been reopened); no record of ours (accepted, rejected, a footnote's
-// row) = the stored range and its hash, as before. The row's text is taken again as well (an edit since
-// the replace moves what stands around it), so the rows are repainted, or the panel goes on showing the
-// old line (found 2026-09-27 by reading the panel itself, case jump-after-edit - the model was right,
-// the screen was not). Shared by JumpToHit and SelectHitText.
+// A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST. The record moves with the text, so an edit made
+// since the replace does not put the jump off. Asked only once the chapter is reachable (a closed one has
+// just been reopened); no record of ours (accepted, rejected, a footnote's row) = the stored range and its
+// hash. The row's text is taken again as well (an edit since the replace moves what stands around it), so
+// the rows are repainted, or the panel goes on showing the old line (case jump-after-edit, read off the
+// panel itself - the model was right, the screen was not). Shared by JumpToHit and SelectHitText.
 void TakeRowFromRecords(int32 chapterIdx, int32 hitIdx, UIDRef& docRef, IDFile& file, UID& storyUID,
 	TextIndex& start, TextIndex& end)
 {
@@ -689,9 +669,9 @@ void TakeRowFromRecords(int32 chapterIdx, int32 hitIdx, UIDRef& docRef, IDFile& 
 // again? The stored position is an offset into the story, so ANY edit earlier in that story moves it,
 // and that is exactly the case where marking or selecting there would frame text the user never
 // searched for. Asked of the engine (KBSSearchEngine::RowReadsAsFound): the stored HASH of the match -
-// not the row's drawn text, which is capped for drawing and so only ever compared the first stretch of a
-// long GREP match (2026-08-04) - and, since 2026-09-29 (the defect re-check F-2), the line around it: an
-// Undo can leave a row's place on another occurrence of its own text, which the hash passes. A row that
+// not the row's drawn text, which is capped for drawing and so would compare only the first stretch of a
+// long GREP match - and the line around it: an Undo can leave a row's place on another occurrence of its
+// own text, which the hash passes. A row that
 // fails is looked for again (KBSSearchEngine::RelocateStaleRow - a row left behind by Undo / Redo),
 // which asks the same line of its candidates; when it is found, the rows are repainted.
 // Shared by JumpToHit, which still moves the view when it is not, and SelectHitText, which refuses.
@@ -706,15 +686,15 @@ bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, 
 	return true;
 }
 
-// ***** A PLACE PAST THE END OF ITS STORY IS BROUGHT BACK INSIDE IT (2026-10-03, the block 12 re-read J-1). *****
+// A PLACE PAST THE END OF ITS STORY IS BROUGHT BACK INSIDE IT.
 // A row that is no longer found keeps its stored place, and an edit made since the search can have cut the
-// story short of it. Measured: a row at 40 in a story cut to 8 characters went on as 40 to the overset test,
-// the spread and the wax lookup - InDesign answered "overset" for a place that is not in the story at all,
-// and the double click's selection then refused with the overset reason instead of "not found". Every other
-// door already bounds it: KBSSearchEngine's RowReadsAsFound, the clamp at the foot of SelectHitText, and the
-// SDK's gotolasttextedit ("reset text index if it is out of range", GTTxtEdtUtils.cpp:107-109). The story's
-// last character is the nearest place there is to where the row was, so the view still goes where the hit
-// used to be. A story that has gone (its UID deleted) reads as nil here and below (IDataBase.h:152-156).
+// story short of it. Measured unclamped: a row at 40 in a story cut to 8 characters went on as 40 to the
+// overset test, the spread and the wax lookup - InDesign answered "overset" for a place that is not in the
+// story at all, and the double click's selection then refused with the overset reason instead of "not
+// found". Every other door bounds it too: KBSSearchEngine's RowReadsAsFound, the clamp at the foot of
+// SelectHitText, and the SDK's gotolasttextedit ("reset text index if it is out of range",
+// GTTxtEdtUtils.cpp:107-109). The story's last character is the nearest place there is to where the row
+// was, so the view still goes where the hit used to be. A story that has gone (its UID deleted) reads as nil here and below (IDataBase.h:152-156).
 void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
@@ -756,32 +736,32 @@ bool FrontChapter(const UIDRef& docRef)
     The marker comes up at once, whichever door asked (see the note at the head of KBSJump.h).
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
-    it is in here (it was public until 2026-10-01, with a note asking new callers to go round it).
+    it is in here.
     @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
           still the text the row describes (overset or not). False for every other end: a bad index,
           a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
           text is no longer there (each of which has said why, or has nothing to say). ActivateNode
-          reads it to decide whether the row's "Source Text:" goes up (2026-09-29). */
+          reads it to decide whether the row's "Source Text:" goes up. */
 bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef docRef;
 	IDFile file;
 	UID storyUID = kInvalidUID;
 	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	// ***** A JUMP THAT GOES NOWHERE TAKES THE OLD MARKER WITH IT. ***** Every exit below that does
-	// not move the view clears it, and these two used to be the exceptions - leaving the previous
-	// hit's marker standing over a row that had just refused to go anywhere. It expires by itself
-	// within the second either way; what is being made consistent is what the panel is SAYING.
+	// A JUMP THAT GOES NOWHERE TAKES THE OLD MARKER WITH IT. Every exit below that does not move the
+	// view clears it, these two included - or the previous hit's marker would stand over a row that
+	// had just refused to go anywhere. It expires by itself within the second either way; what is
+	// being made consistent is what the panel is SAYING.
 	if (!KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 	{
 		KBSHitMarkerView::Hide();
 		return false;
 	}
 
-	// ***** A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY (2026-09-27 defect sweep, P-3). ***** A
-	// "deleted" row - its text went with the footnote, table or anchored object another ticked row
-	// deleted (KBSResultModel::SetHitDeleted) - keeps kInvalidTextIndex as its range. Nothing below
-	// asks about that: the overset test, the spread and the wax rectangle would all be handed -1.
+	// A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY. A "deleted" row - its text went with the
+	// footnote, table or anchored object another ticked row deleted (KBSResultModel::SetHitDeleted) -
+	// keeps kInvalidTextIndex as its range. Nothing below asks about that: the overset test, the
+	// spread and the wax rectangle would all be handed -1.
 	if (!RowHasPlace(start, end))
 	{
 		KBSHitMarkerView::Hide();
@@ -815,9 +795,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 
 	// Compose first, then read. The overset test below, the overset locator and the wax rectangle are
-	// all readings of the RESULT of composition. The recompose used to live inside the geometry
-	// helper alone, which put it AFTER the overset test had already been answered - so the two could
-	// be looking at different compositions, and being overset is precisely what recomposing changes.
+	// all readings of the RESULT of composition, and being overset is precisely what recomposing
+	// changes (see RecomposeIfDamaged).
 	RecomposeIfDamaged(storyRef);
 
 	// Is the text at this position still the text this row describes - or can the row be found again?
@@ -826,11 +805,11 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!sameOccurrence)
 		ClampIntoStory(storyRef, start, end);	// a place the story no longer reaches - see ClampIntoStory
 
-	// ***** UNDER A HIDDEN CONDITION: THE PLACE ITS TEXT COMES BACK TO (2026-10-04, the [9b] re-read
-	// ***** D9b-1). ***** Such a row - only a list Show Changes rebuilt can hold one - stands in a thread no
-	// frame holds, so the overset test below said yes and the view went to the frame's "+" (measured). The
-	// view goes to the place the condition puts the text back (KBSTrackChange::HiddenTextAnchor) and the
-	// marker stands there with no width. Why nothing is there to see is the row's own word, " hidden
+	// UNDER A HIDDEN CONDITION: THE PLACE ITS TEXT COMES BACK TO. Such a row - only a list Show Changes
+	// rebuilt can hold one - stands in a thread no frame holds, so asked as it stands the overset test
+	// below says yes and the view goes to the frame's "+" (measured). The view goes to the place the
+	// condition puts the text back (KBSTrackChange::HiddenTextAnchor) and the marker stands there with
+	// no width. Why nothing is there to see is the row's own word, " hidden
 	// condition" - as " hidden" says it for a switched-off layer, whose jump lands the same way.
 	const TextIndex hiddenAnchor = KBSRuns()->HiddenTextAnchor(storyRef, start);
 	const bool underHiddenCondition = (hiddenAnchor != kInvalidTextIndex);
@@ -839,8 +818,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
-	// used; this file wrote that walk out by hand until 2026-08-08, and its copy answered "not
-	// overset" to the failures the original folds into "no frame of its own").
+	// used; a copy of that walk here would have to fold the same failures into "no frame of its own").
 #ifdef KBS_DIAG
 	{
 		InterfacePtr<ITextModel> diagModel(storyRef, UseDefaultIID());
@@ -861,15 +839,15 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// ***** ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW. ***** The spread change and the
-	// scroll used to find their own view through two different calls that do not mean the same
-	// thing (ILayoutUIUtils.h:89-98 vs :127-133 - see ScrollViewToPoint). Taken here, after the
-	// document has been fronted and before any geometry is read.
+	// ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW - not one per user through two different
+	// calls that do not mean the same thing (ILayoutUIUtils.h:89-98 vs :127-133 - see
+	// ScrollViewToPoint). Taken here, after the document has been fronted and before any geometry is
+	// read.
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
 
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
 	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
-	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
+	// EnsureSpreadInView, and the empty pasteboard a master-page row lands on without it.
 	EnsureSpreadInView(frontView, storyRef, placeStart);
 
 	// A visible match scrolls to its first wax line AND gets the marker on its characters. An overset
@@ -877,10 +855,10 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// which also climbs out of a pushed-out table to the main frame's "+") but is NOT marked - there
 	// are no drawn characters to put it on. If no geometry can be produced, just clear.
 	//
-	// ***** THE RECTANGLE BELOW IS FOR SCROLLING ONLY since 2026-09-26. ***** It was the marker as
-	// well - the first line of the match, in pasteboard coordinates - which is why a match running
-	// over several lines was only ever marked on its first. The marker is a global text adornment
-	// now (KBSHitMarker), handed the story and the whole range, and drawn on every line of it.
+	// THE RECTANGLE BELOW IS FOR SCROLLING ONLY. It covers the first line of the match, in
+	// pasteboard coordinates - as a marker it would mark a match running over several lines on its
+	// first alone. The marker is a global text adornment (KBSHitMarker), handed the story and the
+	// whole range, and drawn on every line of it.
 	if (overset)
 	{
 		const KBSOversetLoc loc = KBSRuns()->FindOversetLocator(storyRef, placeStart);
@@ -896,17 +874,17 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			ScrollViewToPoint(frontView, PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
 				(pbRect.Top() + pbRect.Bottom()) / PMReal(2.0)));
-			// The marker goes up either way, and in the same colour (user call, 2026-07-28). On a row
+			// The marker goes up either way, and in the same colour (the author's call). On a row
 			// whose text is missing it frames whatever stands at that position now rather than the
 			// match - which is the useful thing: it shows WHERE the hit used to be. That it is not
 			// there any more is said by the status line and by the word on the row itself.
 			//
 			// AT ONCE, from the mouse as from the keyboard - the beat KCM's Story-mode jump flash
-			// keeps (user's request, 2026-09-25). From 2026-08-09 the mouse's marker was booked for
-			// the double-click interval, so that a double click that selects never flashed one; it
-			// came up about half a second after the view had moved, which is what was asked to go. A
-			// double click now shows the marker for that moment and SelectHitText's KBSHitMarkerView::Hide
-			// takes it down when the selection is made - exactly what KCM does ("THE MARK COMES DOWN").
+			// keeps (the user's request). Not booked for the double-click interval so that a double
+			// click never flashes one: that brings it up about half a second after the view has
+			// moved. A double click shows the marker for that moment and SelectHitText's
+			// KBSHitMarkerView::Hide takes it down when the selection is made - exactly what KCM does
+			// ("THE MARK COMES DOWN").
 			KBSHitMarkerView::Show(db, storyUID, placeStart, placeEnd);
 		}
 		else
@@ -949,8 +927,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 /** Show chapter 'chapterIdx': bring its document to the front, reopening it windowless first if the
     user closed it since the search. Does NOT scroll and raises no marker - a chapter row names a
     document, not a place inside one. Honours "Hide Previous Chapter". No-op on a bad index; an
-    unreachable chapter reports through the status line. Reached through ActivateNode (2026-10-01:
-    public until then, like JumpToHit). */
+    unreachable chapter reports through the status line. Reached through ActivateNode, like
+    JumpToHit. */
 void ShowChapter(int32 chapterIdx)
 {
 	UIDRef docRef;
@@ -962,18 +940,17 @@ void ShowChapter(int32 chapterIdx)
 		return;
 
 	// The guard the file's header promises for everything after the database is in hand - opening a
-	// window, zooming, making it active - and that JumpToHit and SelectHitText both keep. This entry
-	// alone went without it until 2026-09-27 (the open/close re-check, S-1): a chapter a search had
-	// closed and this row reopened could come out wanting to be saved for having been LOOKED at, and
-	// then "Hide Previous Chapter" would not close it. It restores the flag the document came in
-	// with, so it changes nothing when nothing was dirtied.
+	// window, zooming, making it active - and that JumpToHit and SelectHitText both keep. Without it
+	// a chapter a search had closed and this row reopened could come out wanting to be saved for
+	// having been LOOKED at, and then "Hide Previous Chapter" would not close it. It restores the flag
+	// the document came in with, so it changes nothing when nothing was dirtied.
 	IDataBase::SaveRestoreModifiedState dirtyGuard(docRef.GetDataBase());
 
 	// Showing a chapter is NOT jumping to a match: the view is left exactly where the user had it
 	// and no marker is raised. The row says "this document", so the answer is that document, not a
 	// place inside it. (KESCL's document rows behave the same way.)
 	//
-	// ***** AND THE STANDING MARKER IS NOT TAKEN DOWN, unlike every exit of JumpToHit. ***** The
+	// AND THE STANDING MARKER IS NOT TAKEN DOWN, unlike every exit of JumpToHit. The
 	// asymmetry is real and it is harmless, which is worth saying so that nobody "fixes" it: a
 	// marker belongs to one database (KBSHitMarker's adornment draws in that one only), so bringing a
 	// DIFFERENT chapter forward stops it being painted without anything being cleared, and bringing
@@ -990,8 +967,7 @@ void ShowChapter(int32 chapterIdx)
 /** Activate the book the results came from: make it IBookManager's current active book AND bring its
     tab to the front in the book panel - two separate things that do not follow each other. A book that
     has been closed since the search is NOT reopened; the status line says so. No-op for a
-    document-scope result, which has no book row. Reached through ActivateNode (2026-10-01: public
-    until then, like JumpToHit). */
+    document-scope result, which has no book row. Reached through ActivateNode, like JumpToHit. */
 void ShowBook()
 {
 	// Which book the results came from. The SEARCHED PATH, not the model's display name: that name
@@ -1010,8 +986,7 @@ void ShowBook()
 		return;
 	}
 	// ...and its tab to the front of the book panel: the active book and the front tab are separate states,
-	// and the user who clicks a book row asks for both (KBSBookScope::ActivateBook did the two until
-	// 2026-10-01 - the tab is user interface, the UI half's).
+	// and the user who clicks a book row asks for both (the tab is user interface, the UI half's).
 	KBSBookPanelLookup::BringBookTabForward(bookPath);
 }
 
@@ -1034,7 +1009,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (!KBSResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 		return false;
 
-	// A "deleted" row has no range at all (P-3, see JumpToHit) - said before the zero-width test below,
+	// A "deleted" row has no range at all (see JumpToHit) - said before the zero-width test below,
 	// which would otherwise answer it with the wrong reason.
 	if (!RowHasPlace(start, end))
 	{
@@ -1042,8 +1017,8 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// ***** OUT OF THE USER'S REACH: move there and mark it, but do not select. *****
-	// (user's call, 2026-08-09.) A LOCKED match is on a locked layer or in a locked story - InDesign
+	// OUT OF THE USER'S REACH: move there and mark it, but do not select (the author's call).
+	// A LOCKED match is on a locked layer or in a locked story - InDesign
 	// can search locked content but offers no way to change it, so a selection would be an offer it
 	// cannot keep. A HIDDEN match is on a switched-off layer: it is composed and can be jumped to,
 	// but it draws nothing, so a selection over it would be invisible.
@@ -1051,7 +1026,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// Asked FIRST because it costs nothing - no database, no composition - and because there is no
 	// point doing any of that work for a row that is going to be refused.
 	//
-	// ***** THE MARKER STAYS UP. ***** It is taken down only when a selection replaces it (see the
+	// THE MARKER STAYS UP. It is taken down only when a selection replaces it (see the
 	// foot of this function). Here nothing replaces it, so it remains what it always was: the answer
 	// to "where is it?" - which is the whole of what a double click on these rows can give.
 	bool hitLocked = false, hitHidden = false;
@@ -1066,9 +1041,9 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// ***** A ZERO-WIDTH MATCH HAS NOTHING TO SELECT. ***** GREP's ^, $ and the lookarounds match at
-	// a POSITION rather than over characters, so such a row names a place, not text (measured
-	// 2026-08-09: ^ returns one hit per paragraph). The clamp further down refuses the empty range
+	// A ZERO-WIDTH MATCH HAS NOTHING TO SELECT. GREP's ^, $ and the lookarounds match at a POSITION
+	// rather than over characters, so such a row names a place, not text (measured: ^ returns one hit
+	// per paragraph). The clamp further down refuses the empty range
 	// anyway - but silently, and a double click that appears to do nothing is the one refusal this
 	// function must not make when every other one says why. Asked up here with the other tests that
 	// cost nothing, before any database work is done for a row that is going to be turned away.
@@ -1086,11 +1061,11 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (!EnsureChapterReachable(chapterIdx, docRef, file))
 		return false;
 
-	// ***** ...AND ITS WINDOW HAS TO BE THE ONE IN FRONT (2026-10-03, the block 12 re-read J-2). ***** The
-	// selection below goes through the ACTIVE selection - the window in front - and the double click only
-	// promises that the jump was TRIED: it can have failed to bring the window forward (it has said why),
-	// or have been dropped while an earlier landing was still opening a chapter. Measured with the test
-	// build's fault switch jump-no-front: the front document's own selection was cleared, and the hit's
+	// ...AND ITS WINDOW HAS TO BE THE ONE IN FRONT. The selection below goes through the ACTIVE
+	// selection - the window in front - and the double click only promises that the jump was TRIED: it
+	// can have failed to bring the window forward (it has said why), or have been dropped while an
+	// earlier landing was still opening a chapter. Measured without this test, with the test build's
+	// fault switch jump-no-front: the front document's own selection was cleared, and the hit's
 	// text - in the document behind - was not selected. Refused without a word, as a click dropped by
 	// gActivating is: the jump has already said why, or a later click will land.
 	KBS_DIAG_LOG("SELECT row %d/%d: the hit's document is in front=%d", chapterIdx, hitIdx,
@@ -1122,17 +1097,17 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// be typed over. So this one refuses. The jump has already put its own message up in this case;
 	// this adds nothing and would only overwrite it.
 	//
-	// ***** ASKED BEFORE THE OVERSET TEST, IN THE ORDER JumpToHit ASKS THEM (2026-10-03, J-3). ***** The
-	// other way round, a stale place was handed to the overset test first: measured, a row at 40 in a story
-	// cut to 8 characters read as "overset", and the status line said "An overset match has no text on the
-	// page to select." over the jump's "Not found". And a row found again here (moved) was tested for being
-	// overset at the place it had left.
+	// ASKED BEFORE THE OVERSET TEST, IN THE ORDER JumpToHit ASKS THEM. The other way round, a stale
+	// place is handed to the overset test first: measured, a row at 40 in a story cut to 8 characters
+	// read as "overset", and the status line said "An overset match has no text on the page to select."
+	// over the jump's "Not found". And a row found again here (moved) would be tested for being overset
+	// at the place it had left.
 	if (!RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, storyUID, start, end))
 		return false;
 
-	// ***** UNDER A HIDDEN CONDITION: NOTHING ON THE PAGE TO SELECT (2026-10-04, the [9b] re-read D9b-1). *****
-	// Asked before the overset test, which says yes for it - its text stands in a thread no frame holds - and
-	// so gave the overset reason. The jump went to the place the text comes back to.
+	// UNDER A HIDDEN CONDITION: NOTHING ON THE PAGE TO SELECT. Asked before the overset test, which says
+	// yes for it - its text stands in a thread no frame holds - and so would give the overset reason. The
+	// jump goes to the place the text comes back to.
 	if (KBSRuns()->HiddenTextAnchor(storyRef, start) != kInvalidTextIndex)
 	{
 		PMString message("That match is under a hidden condition - show the condition to select it.");
@@ -1141,8 +1116,8 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// ***** OVERSET: move there, but do not select. ***** (Same rule as locked and hidden above -
-	// user's call, 2026-08-09.) There is no on-page text to highlight. The jump has the same split and
+	// OVERSET: move there, but do not select. (Same rule as locked and hidden above - the author's
+	// call.) There is no on-page text to highlight. The jump has the same split and
 	// scrolls to the "+" indicator instead.
 	//
 	// The marker is left exactly as the jump left it - which for an overset row means there is none
@@ -1196,17 +1171,17 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
 		selectionManager->DeselectAll(nil);
 
-	// ***** The Type tool, because this is an invitation to EDIT. ***** A text selection made while
+	// The Type tool, because this is an invitation to EDIT. A text selection made while
 	// the Selection tool is active is not somewhere the user can start typing, which is the whole
 	// point of the double-click. ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is
 	// written down in How to Use for that reason.
 	//
-	// ***** IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ***** ITool.h:178-183 says IsTextTool
-	// "could be more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and
-	// Hand tools return kTrue from it as well - then names this call as the one to use "for
-	// traditional 'text' tools that select text". Measured on the running application 2026-08-10:
-	// with the Hand, Zoom or Gradient tool active, a double click left that tool in place and made
-	// the selection anyway - text highlighted in a window the user cannot type into, which is the
+	// IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
+	// more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
+	// return kTrue from it as well - then names this call as the one to use "for traditional 'text'
+	// tools that select text". Measured on the running application with IsTextTool: with the Hand,
+	// Zoom or Gradient tool active, a double click left that tool in place and made the selection
+	// anyway - text highlighted in a window the user cannot type into, which is the
 	// one outcome the paragraph above says must not happen. (The Selection tool was the control
 	// group and switched correctly, before and after.)
 	// ! Every SDK sample uses IsTextTool here, gotolasttextedit included; the header is what they
@@ -1238,7 +1213,7 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// ***** TAKE THE JUMP'S MARKER BACK DOWN. ***** (user's call, 2026-08-09)
+	// TAKE THE JUMP'S MARKER BACK DOWN (the author's call).
 	//
 	// The first click of this double click raised the marker, which INVERTS the pixels under the
 	// match (KBSHitMarker.h) - a pointer saying "it is here". The selection now says the same thing,
@@ -1263,8 +1238,8 @@ void KBSJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
-	// ***** THE MESSAGE AREA FOLLOWS THE ROW (2026-09-29, the user's request - "show the text as it was
-	// before, the way KCM does, when a row is selected"). ***** Settled here, the one door, so a click and a
+	// THE MESSAGE AREA FOLLOWS THE ROW (the user's request - "show the text as it was before, the way
+	// KCM does, when a row is selected"). Settled here, the one door, so a click and a
 	// keyboard walk cannot disagree about it:
 	//   * a hit row the jump LANDED on shows its "Source Text:" when it holds a replace (a replaced row, an
 	//     accepted one, a footnote's) - with the rows written side by side with it, as the RECORDS have

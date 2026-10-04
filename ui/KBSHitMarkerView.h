@@ -4,7 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The jump marker as the UI half shows it (2026-10-01, the model/UI split). The marker itself - where it
+//  The jump marker as the UI half shows it (the model/UI split). The marker itself - where it
 //  is, and the text adornment that draws it - is the model half's (KBSHitMarker.h): an adornment is drawn
 //  by the text engine wherever text is drawn, which is what a mark meant for print and PDF will need. What
 //  is left here is the user interface around it: repainting the views so it appears and disappears at
