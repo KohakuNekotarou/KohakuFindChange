@@ -67,7 +67,7 @@
 #include "KBSModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
 #include "KBSSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together
-#include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go
+#include "KBSUndoFollow.h"		// ForgetDocument / ForgetBookChapter - All Documents and a book let one document go
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -129,9 +129,17 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// State only - the document is on its way out, so nothing is repainted (KBSHitMarker::ForgetDoc).
 	KBSHitMarker::ForgetDoc(closingDocRef.GetDataBase());
 
-	// ...and the Undo follow takes its observers off the closing document's stories, for every close and
-	// ahead of every exit (KBSUndoFollow::DocumentClosing): what was attached is detached.
+	// ...and the Undo follow takes its observer off the closing document, for every close and ahead of every
+	// exit (KBSUndoFollow::DocumentClosing): what was attached is detached.
 	KBSUndoFollow::DocumentClosing(closingDocRef);
+
+	// ...and a chapter of a book's list leaves the kept writes, so that a Change Checked that wrote it is still followed
+	// in the chapters left open, the closed one keeping the rows it has (KBSUndoFollow::ForgetBookChapter - All
+	// Documents' ForgetDocument below empties the chapter instead, its rows leaving the list). Ahead of the run guard
+	// below: a Change Checked hands back the chapters it left nothing in, closing them inside its own run, and a
+	// write kept from before it may have written one of them (saved since, so it closes).
+	if (KBSResultModel::IsFromBook())
+		KBSUndoFollow::ForgetBookChapter(closingDocRef);
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
 	// that model chapter by chapter - and the closes a run makes ON THE SPOT land here from inside it:
@@ -147,7 +155,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	}
 
-	// Book results survive a chapter closing - see the file header.
+	// Book results survive a chapter closing - see the file header (the kept writes let it go above).
 	if (KBSResultModel::IsFromBook())
 	{
 		KBS_DIAG_LOG("CLOSE - book results: they stay");

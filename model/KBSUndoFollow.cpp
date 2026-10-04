@@ -23,6 +23,9 @@
 #include "ErrorUtils.h"
 #include "IDFile.h"
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in LazyUpdate
+#include "FileUtils.h"				// IsEqual - a frozen chapter found again by its file
+#include "ITextModel.h"				// StoryTextHash - the story's text, read whole
+#include "textiterator.h"			// StoryTextHash
 #include "UIDList.h"
 
 #include <algorithm>		// std::find - the documents watched
@@ -50,8 +53,10 @@ struct StoryMoved
 	UID			story;
 	uint32		before;
 	uint32		after;
+	uint64		afterText;	// its text right after the write, as one number (StoryTextHash) - what tells a Redo from
+							// the same count of edits made after an Undo (the head of KBSUndoFollow.h)
 	IDataBase*	now;		// the document as it was last found (ResolveDocs); nil = not open
-	StoryMoved() : story(kInvalidUID), before(0), after(0), now(nil) {}
+	StoryMoved() : story(kInvalidUID), before(0), after(0), afterText(0), now(nil) {}
 };
 
 // One kept write.
@@ -67,6 +72,9 @@ struct Step
 	KBSResultModel::RowStep			rows;			// a write of rows: the rows before and after
 	KBSResultModel::ModelSnapshot	before;			// a write of the whole result set: the set before...
 	KBSResultModel::ModelSnapshot	after;			// ...and after
+	std::vector<size_t>				frozenBefore;	// a whole set's book chapters closed since, as indexes into before's
+	std::vector<size_t>				frozenAfter;	// and after's chapters: kept as the panel has them when that set is
+													// put back (KBSUndoFollow::ForgetBookChapter)
 	Step() : kind(KBSUndoFollow::kStepReplace), done(true), resultSet(0), whole(false), layoutBefore(0), layoutAfter(0) {}
 };
 
@@ -185,7 +193,36 @@ bool ShareDoc(const Step& a, const Step& b)
 	return false;
 }
 
+// A story's whole text - every thread, the deleted text Track Changes keeps included - as one number: FNV-1a, 64-bit,
+// over each character's value. 0 = it could not be read. What a Redo is asked besides the version (AllAt).
+uint64 StoryTextHash(IDataBase* db, UID story)
+{
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
+		return 0;
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	if (model == nil)
+		return 0;
+	uint64 hash = 14695981039346656037ULL;
+	const int32 total = model->TotalLength();
+	TextIterator it(model, 0);
+	for (int32 i = 0; i < total && !it.IsNull(); ++i, ++it)
+	{
+		const uint32 ch = static_cast<uint32>((*it).GetValue());
+		for (int32 b = 0; b < 4; ++b)
+		{
+			hash ^= static_cast<uint64>((ch >> (b * 8)) & 0xFF);
+			hash *= 1099511628211ULL;
+		}
+	}
+	hash ^= static_cast<uint64>(total);		// the length too: a story cut short reads differently
+	return (hash != 0) ? hash : 1;
+}
+
 // Is every story the write moved at its version before it (after = false) or after it (after = true)?
+// A REDO IS ASKED THE TEXT AS WELL: an edit after an Undo goes on from the version the Undo put back, so as many
+// edits as the write moved the story by land on its "after" (measured - the regression case
+// u1-false-redo-undo-other-type4); only a story that also reads as the write left it was redone. (An Undo needs no
+// such question: a version comes back DOWN to "before" only by an Undo.)
 bool AllAt(const Step& step, bool after)
 {
 	for (size_t k = 0; k < step.stories.size(); ++k)
@@ -196,8 +233,35 @@ bool AllAt(const Step& step, bool after)
 			return false;
 		if (version != (after ? s.after : s.before))
 			return false;
+		if (after && StoryTextHash(s.now, s.story) != s.afterText)
+			return false;
 	}
 	return !step.stories.empty();
+}
+
+// A whole result set to put back, its FROZEN chapters (indexes into it) - a book's, closed since
+// (KBSUndoFollow::ForgetBookChapter) - given the rows the panel has for them now, found by the chapter's file
+// (FileUtils::IsEqual, as KBSBookScope compares them): an Undo in another chapter does not reach their file. A
+// chapter the panel no longer holds rows for is emptied in place (KBSResultModel::EmptyChapter - its place is kept).
+void KeepFrozenAsTheyAre(KBSResultModel::ModelSnapshot& set, const std::vector<size_t>& frozen)
+{
+	if (frozen.empty())
+		return;
+	KBSResultModel::ModelSnapshot now;
+	KBSResultModel::TakeModelSnapshot(now);
+	for (size_t f = 0; f < frozen.size(); ++f)
+	{
+		if (frozen[f] >= set.chapters.size())
+			continue;
+		KBSResultModel::Chapter& chapter = set.chapters[frozen[f]];
+		size_t n = 0;
+		while (n < now.chapters.size() && FileUtils::IsEqual(now.chapters[n].file, chapter.file) == kFalse)
+			++n;
+		if (n < now.chapters.size())
+			chapter = now.chapters[n];
+		else
+			KBSResultModel::EmptyChapter(chapter);
+	}
 }
 
 // A write standing in a document a LATER standing write shares: the later one is undone first.
@@ -474,6 +538,7 @@ void KBSUndoFollow::StepRecorder::Keep(StepKind kind)
 		if (s.now == nil || !KBSSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
 			continue;
 		s.after = version;
+		s.afterText = StoryTextHash(s.now, s.story);
 		step.stories.push_back(s);
 	}
 	if (step.whole)
@@ -555,7 +620,16 @@ bool KBSUndoFollow::Follow()
 		}
 		if (step.whole)
 		{
-			KBSResultModel::RestoreModelSnapshot(undo ? step.before : step.after);
+			const std::vector<size_t>& frozen = undo ? step.frozenBefore : step.frozenAfter;
+			if (frozen.empty())
+				KBSResultModel::RestoreModelSnapshot(undo ? step.before : step.after);
+			else
+			{
+				// a book chapter closed since keeps what the panel has for it (KeepFrozenAsTheyAre)
+				KBSResultModel::ModelSnapshot set(undo ? step.before : step.after);
+				KeepFrozenAsTheyAre(set, frozen);
+				KBSResultModel::RestoreModelSnapshot(set);
+			}
 			reshaped = true;
 		}
 		else
@@ -647,6 +721,66 @@ void KBSUndoFollow::ForgetDocument(const UIDRef& docRef)
 		if (stories.empty())
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 	}
+}
+
+void KBSUndoFollow::ForgetBookChapter(const UIDRef& docRef)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return;
+	// THE KEPT WRITES AS THEY STAND FIRST - the order Follow and KeepStep take: the writes of another result set
+	// go, and every write's documents are found again (ResolveDocs drops one with a document closed since; the one
+	// closing now is still open at this signal). Each story's `now` was otherwise the document as the LAST follow
+	// found it, which can be one closed since: the test build's trace below read a story's version through such a
+	// pointer and brought InDesign down (2026-10-04, the regression case book-empty-keeps-results - a script
+	// closing a document). Nothing below reads `now`; the trace does.
+	DropOtherResultSets();
+	ResolveDocs();
+	// Its stories in each kept write - found as every follow finds them (DocOf, by the chapter's file): the document
+	// is still open at this signal.
+	auto inChapter = [&](const StoryMoved& story) { return story.doc == docRef || DocOf(story) == db; };
+	std::vector<bool> wroteIt(gSteps.size(), false);
+	for (size_t i = 0; i < gSteps.size(); ++i)
+		for (size_t k = 0; k < gSteps[i].stories.size() && !wroteIt[i]; ++k)
+			wroteIt[i] = inChapter(gSteps[i].stories[k]);
+	// FROZEN in a whole result set only where that write, or one after it, wrote the chapter: the set's rows for it
+	// then describe text its file may no longer hold (a write after it that goes now - its history goes with the
+	// chapter - no longer even stands in the way of its Undo). A chapter nothing since wrote reads in the set as it
+	// reads in its file, so it is put back with the set: frozen, it was EMPTIED whenever the list on screen had no
+	// rows for it - a chapter with nothing ticked, which a Change Checked's report drops - and its rows were lost on
+	// the Undo (found re-checking this fix - the regression case cb-book-close-unwritten-undo).
+	// Found in the set by its file the same way: a set's docRef can be one the chapter had before it was closed and
+	// opened again.
+	bool laterWrote = false;
+	for (size_t i = gSteps.size(); i-- > 0; )
+	{
+		laterWrote = laterWrote || wroteIt[i];
+		Step& step = gSteps[i];
+		if (!step.whole || !laterWrote)
+			continue;
+		const KBSResultModel::ModelSnapshot* const sets[2] = { &step.before, &step.after };
+		std::vector<size_t>* const frozen[2] = { &step.frozenBefore, &step.frozenAfter };
+		for (size_t s = 0; s < 2; ++s)
+			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
+			{
+				const KBSResultModel::Chapter& chapter = sets[s]->chapters[c];
+				UIDRef found = chapter.docRef;
+				if (KBSBookScope::FindOpenChapterDoc(chapter.file, found) && found.GetDataBase() == db
+					&& std::find(frozen[s]->begin(), frozen[s]->end(), c) == frozen[s]->end())
+					frozen[s]->push_back(c);
+			}
+	}
+	// ...then its stories come off every write; a write of rows is one document's, so one of this chapter goes whole.
+	for (size_t i = gSteps.size(); i-- > 0; )
+	{
+		std::vector<StoryMoved>& stories = gSteps[i].stories;
+		for (size_t k = stories.size(); k-- > 0; )
+			if (inChapter(stories[k]))
+				stories.erase(stories.begin() + static_cast<std::ptrdiff_t>(k));
+		if (stories.empty())
+			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
+	}
+	KBS_DIAG_STEPS("chapter closing");
 }
 
 void KBSUndoFollow::ShutdownCleanup()

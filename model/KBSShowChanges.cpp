@@ -159,7 +159,8 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			// Its texts, as the replace writes them (KBSResultModel::SetHitChangeTexts): what its insertion
 			// reads now, and what its deletion took. A touching group written front to back leaves ONE
 			// deletion, on its LAST row - the others carry no original text, which is exactly what
-			// RejectRowsNow's check (the group's originals joined = the deletion) wants (spec section 2).
+			// RejectRowsNow's and AcceptRowsNow's check wants: the group's text with its records taken back
+			// (KBSTrackChange::OriginalFromRecords) reads as its rows' originals joined (spec section 2).
 			hit.originalText = row.deletedText;
 			hit.originalText.SetTranslatable(kFalse);
 			// The pieces' own text, not the range's (re-check R-2): a row somebody typed inside reads their
