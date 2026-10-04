@@ -4,16 +4,15 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  kKBSSignRecordsCmdBoss (2026-09-28): the tracked changes one replace made, signed "KohakuFindChange"
-//  at the row's time - KBSTrackChange::SignRecordsNow does the work; this wraps it in a command so the
-//  change to the model goes through a command, inside the run's sequence (one Ctrl+Z takes the replace
-//  and its signature back together, and a Redo brings both - measured on the spike, 2026-09-28).
+//  kKBSSignRecordsCmdBoss: the tracked changes one replace made, signed "KohakuFindChange" at the row's
+//  time - KBSTrackChange::SignRecordsNow does the work; this wraps it in a command so the change to the
+//  model goes through a command, inside the run's sequence (one Ctrl+Z takes the replace and its
+//  signature back together, and a Redo brings both - measured).
 //  KBSInt64Data: IInt64Data (IID_IINT64DATA, CommandID.h) ships with only a PERSISTENT implementation,
 //  kPersistInt64DataImpl (ShuksanID.h:1145), which no boss of the product's carries (the 20.5 boss dump has
 //  no IID_IINT64DATA at all). A command's data lives outside the database, and for 32 bits the SDK gives
 //  commands a plain one beside the persistent one - kIntDataImpl (CommandID.h:164) / kPersistIntDataImpl
-//  (ShuksanID.h:828) - so this is that plain one, for 64. (Until 2026-10-02 this said the SDK had "no
-//  stock implementation" - it has the persistent one.)
+//  (ShuksanID.h:828) - so this is that plain one, for 64.
 //
 //========================================================================================
 
