@@ -19,16 +19,16 @@
 //  BOOK closes, by KBSBookWatch (an observer: a book close has no signal to respond to).
 //
 //  One piece of bookkeeping DOES run for every close, whatever the scope: the closing document
-//  comes off the held-chapter list (ForgetHeldDoc, 2026-08-09) - see the comment in Respond.
+//  comes off the held-chapter list (ForgetHeldDoc) - see the comment in Respond.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
 //  available in the "before" signal (see [[signal-responder-catalog]]).
 //
-//  ***** AND "BEFORE" DOES NOT MEAN "BEFORE THE USER HAS DECIDED". ***** The standing warning about
-//  this family of signals is that a "before close" is not a close, because the save prompt can still
-//  be cancelled - which would leave this having thrown away the results of a document that is still
-//  open. Measured 2026-08-08 (block 11 API audit, work/kbs-selftest/run-close-cancel-test.ps1): a
+//  AND "BEFORE" DOES NOT MEAN "BEFORE THE USER HAS DECIDED". The standing warning about this family
+//  of signals is that a "before close" is not a close, because the save prompt can still be
+//  cancelled - which would leave this having thrown away the results of a document that is still
+//  open. Measured (work/kbs-selftest/run-close-cancel-test.ps1): a
 //  dirty document searched at document scope, closed with the UI on, put its save prompt up, and
 //  pressing CANCEL left the document open with all of its rows still on the panel. So the signal
 //  arrives once the close is going through, not while it can still be called off, and the warning
@@ -42,9 +42,8 @@
 //      file to open by) - nor does All Documents list one (KBSSearchEngine leaves held chapters out);
 //    * the Hide Previous Chapter sweep (CloseDisplayedDocsIfClean) never runs over document-scope
 //      results at all: a jump asks for it only while the results came from a BOOK
-//      (KBSJump's ShouldHidePreviousChapter). (This said the sweep was safe because it spares the
-//      jumped-to document until 2026-10-03 - true of one document, and no reason at all once All
-//      Documents put several on the list, 2026-09-29. The block 11 re-read K-2.)
+//      (KBSJump's ShouldHidePreviousChapter). (That the sweep spares the jumped-to document is no
+//      reason: true of one document, and none at all once All Documents puts several on the list.)
 //
 //========================================================================================
 
@@ -65,10 +64,10 @@
 #include "KBSHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KBSID.h"
 #include "KBSResultModel.h"
-#include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
+#include "KBSModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under a run of ours
 #include "KBSSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together
-#include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go (2026-09-29)
+#include "KBSUndoFollow.h"		// ForgetDocument - All Documents lets one document go
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -93,7 +92,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (signalMgr == nil)
 		return;
 
-	// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6). A model plug-in's
+	// The main thread only (kModelPlugIn - the split's design, section 6). A model plug-in's
 	// responder is also called on a background task's thread, where the document "closing" is the task's
 	// own copy (an export's clone) - and the results are about the user's document, which stays open.
 	if (!IDThreading::IsMainThreadDomain())
@@ -101,11 +100,11 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 
 	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,
 	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL - not an unsaved
-	// document either: measured 2026-08-08, a never-saved document closed unsaved arrived here with a
-	// valid UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
+	// document either: measured, a never-saved document closed unsaved arrived here with a valid
+	// UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
 	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md). Were it otherwise, its document-scope results
 	// would outlive their document, and the replace would ask IsDocStillOpen of a dead UIDRef (the
-	// 2026-08-04 address-reuse fault).
+	// address-reuse fault, [[uidref-reuse-after-close]]).
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)
 		return;
@@ -114,12 +113,11 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	KBS_DIAG_LOG("CLOSE doc=%p uid=%u", (void*)closingDocRef.GetDataBase(), closingDocRef.GetUID().Get());
 
-	// ***** THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. ***** Until
-	// 2026-08-09 nothing took a held chapter off gHeldDocs when someone ELSE closed it (the user,
-	// after the book panel windowed it; a script), so its (IDataBase*, UID) stayed on the list
-	// dangling - and a reused address can make IsDocStillOpen answer YES about a DIFFERENT
-	// windowless document, which a later ReleaseHeldDocs would then close (the same address-reuse
-	// fault [[uidref-reuse-after-close]] records, aimed at somebody else's document). Forgetting it
+	// THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. A held chapter someone ELSE
+	// closes (the user, after the book panel windowed it; a script) would otherwise stay on gHeldDocs,
+	// its (IDataBase*, UID) dangling - and a reused address can make IsDocStillOpen answer YES about a
+	// DIFFERENT windowless document, which a later ReleaseHeldDocs would then close (the same
+	// address-reuse fault [[uidref-reuse-after-close]] records, aimed at somebody else's document). Forgetting it
 	// here removes the stale entry at its source. Safe on every path: ForgetHeldDoc does nothing
 	// when the document is not held, and the closes KBS schedules itself come off the list BEFORE
 	// their Close call, so this is a no-op for them - which is why it may run even while a run of
@@ -132,7 +130,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	KBSHitMarker::ForgetDoc(closingDocRef.GetDataBase());
 
 	// ...and the Undo follow takes its observers off the closing document's stories, for every close and
-	// ahead of every exit (2026-09-29, KBSUndoFollow::DocumentClosing): what was attached is detached.
+	// ahead of every exit (KBSUndoFollow::DocumentClosing): what was attached is detached.
 	KBSUndoFollow::DocumentClosing(closingDocRef);
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
@@ -140,8 +138,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// each chapter it hands back as it goes (KBSBookScope::HandBackHeldDocNow) and the held chapters the
 	// search and Show Changes close at their commit point (ReleaseHeldDocs(true)). (A SCHEDULED close lands
 	// only once the current tick has unwound - ReleaseHeldDocs from DropResults after the run, and the Hide
-	// Previous Chapter sweep, which is a jump's and never inside a run at all; this named those two as the
-	// ones landing inside a run until 2026-10-03, the block 11 re-read K-3.) The run
+	// Previous Chapter sweep, which is a jump's and never inside a run at all.) The run
 	// puts its own results up when it finishes, so nothing stale survives being skipped here. Same rule as
 	// the book-close watcher's, asked the same way (KBSRunGuard).
 	if (KBSRunGuard::IsAnyRunning())
@@ -164,7 +161,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 
 	// A Document / Story / Selection result set is one chapter - the searched document - and an All
-	// Documents one is a chapter per open document (2026-09-29), so every chapter is compared.
+	// Documents one is a chapter per open document, so every chapter is compared.
 	int32 closingChapter = -1;
 	for (int32 ci = 0; ci < chapterCount; ++ci)
 	{
@@ -184,7 +181,7 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	}
 
-	// ***** ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (2026-09-29, the user's call). ***** The list is the
+	// ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (the author's call). The list is the
 	// open documents', and the others are still open - their rows, their ticks, their Undo stay. The chapter
 	// keeps its place in the model (KBSResultModel::CloseChapter says why) and the kept writes let the
 	// document go too (KBSUndoFollow::ForgetDocument). When it was the last document with rows, the list
@@ -198,7 +195,8 @@ void KBSCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KBS_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KBSUndoFollow::ForgetDocument(closingDocRef);
 		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
-		// draws; under it, only that row goes and the others stay as they are (open or closed).
+		// draws; under it, only that row goes and the others stay as they are (open or closed). (No list
+		// is collected past the cap - kKBSCollectHitLimit IS the cap - so the first is a guard.)
 		const bool overCap = KBSResultModel::GetTotalHitCount() > KBSResultModel::kKBSDisplayHitLimit;
 		if (!overCap)
 			KBSNotifyChapterRowGoes(closingChapter);

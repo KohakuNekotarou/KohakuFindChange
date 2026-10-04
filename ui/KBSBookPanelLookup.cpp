@@ -4,8 +4,7 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  See KBSBookPanelLookup.h. UI side. Carried out of KBSBookScope.cpp on 2026-10-01 (the model/UI
-//  split) as it stood - the notes below are that file's, and "this module" in them was KBSBookScope.
+//  See KBSBookPanelLookup.h. UI side.
 //
 //========================================================================================
 
@@ -36,20 +35,17 @@ namespace
 	/** The ClassID of InDesign's book panel as THIS build numbers it, learned from a live one - or
 	    kInvalidClass while none could be asked yet.
 
-	    ***** Why it is learned rather than written down (2026-09-25). ***** kBookPanelBoss lives in
-	    BOOK PANEL.APLN and is declared in no public header, so until this date the file compared
-	    against 0x10101 - a number read off a 20.5 DEBUG build's object-model dump (2026-07-28,
-	    docs/ai-notes/book-panel-active-tab.md) - backed up by matching the panel's NAME against the
-	    open books' titles. Neither held:
-	      * the number is one build's numbering, and nothing promised the release build of another
-	        version kept it;
-	      * the name half could pick the WRONG PANEL: it accepted any panel whose name merely STARTED
-	        with a book's title, so a book called "Book" made the Bookmarks panel a book panel, and a
-	        book called "Info" the Info panel (the user asked "how do you tell them apart - can it not
-	        get it wrong?", and it could).
-	    A wrong answer was cheap while the only callers read a book FILE off the panel; since Remember
-	    Book Panel Placement it would move and resize somebody else's palette. Both are gone - the
-	    number too, at the user's word: no hard-coded fallback.
+	    Why it is learned rather than written down. kBookPanelBoss lives in BOOK PANEL.APLN and is
+	    declared in no public header, and the two other ways to recognise the panel both fail:
+	      * a number - 0x10101, read off a 20.5 DEBUG build's object-model dump
+	        (docs/ai-notes/book-panel-active-tab.md) - is one build's numbering, and nothing promises
+	        the release build of another version keeps it;
+	      * matching the panel's NAME against the open books' titles can pick the WRONG PANEL: a panel
+	        whose name merely STARTS with a book's title makes a book called "Book" turn the Bookmarks
+	        panel into a book panel, and a book called "Info" the Info panel (the user asked "how do
+	        you tell them apart - can it not get it wrong?", and it could).
+	    A wrong answer would move and resize somebody else's palette (Remember Book Panel Placement).
+	    Neither is used - and no hard-coded number as a fallback either, at the author's word.
 	    IBookUIUtils::QueryActiveBookPanel hands over the active book's own panel (IBookUIUtils.h:83-87),
 	    so its class is the book panel's class by construction, whatever the build numbers it.
 	    Learned once and kept: a class does not change within a session. Nothing is asked while no
@@ -77,7 +73,7 @@ namespace
 
 	/** Is this registered panel one of InDesign's book panels?
 
-	    ***** ONE PLACE. ***** Every walk of the panel list in this plug-in asks it here (ForEachBookPanel,
+	    ONE PLACE. Every walk of the panel list in this plug-in asks it here (ForEachBookPanel,
 	    and KBSBookPanelPlacement through IsBookPanel), so how a book panel is recognised is decided once.
 	    The class learned from a live book panel decides, and nothing else (see LearnedBookPanelClass).
 	    Before one could be asked, the answer is "no": the callers here then fall back to the active
@@ -158,8 +154,8 @@ bool KBSBookPanelLookup::GetPanelBookFile(IDFile& outFile)
 	if (!Utils<IBookUIUtils>().Exists())
 		return false;
 
-	// Walk every registered panel instead of asking for "the" book panel. Two earlier attempts
-	// failed and are not worth repeating (measured 2026-07-27/28):
+	// Walk every registered panel instead of asking for "the" book panel. The two ways of asking
+	// fail and are not worth repeating (measured):
 	//   - GetBookPanelWidget() returns nil for us. It is fed by the book panel's OWN actions
 	//     (SetBookPanelWidget), so a command from another panel's flyout finds nothing stored.
 	//   - GetBookFileFromBookPanel(file, nil) falls through to QueryActiveBookPanel(), i.e. the
@@ -198,19 +194,17 @@ bool KBSBookPanelLookup::IsBookPanel(IControlView* panelView)
 
 void KBSBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 {
-	// (Until 2026-10-01 this was the second half of KBSBookScope::ActivateBook, which made the book the
-	//  active one first - that half is the model's, KBSBookScope::MakeBookActive, and the caller asks it
-	//  before this. The numbering below is ActivateBook's.)
+	// (Step 1, making the book the active one, is the model's half - KBSBookScope::MakeBookActive - and
+	//  the caller asks it before this.)
 	// 2. The tab the user can SEE. One panel per open book, each registered with IPanelMgr, so the
 	//    panel is found by walking the list and asking each candidate which book it belongs to -
 	//    the WidgetID is numbered per book at runtime, which is why no name can be used here.
 	if (!Utils<IBookUIUtils>().Exists())
 		return;	// the active book was still set; the tab is the part we could not do
 
-	// ***** THE BOOKS ARE COMPARED AS FILES, NOT AS PATH STRINGS (API re-audit, 2026-10-02). *****
+	// THE BOOKS ARE COMPARED AS FILES, NOT AS PATH STRINGS.
 	// FileUtils::IsEqual - the rule KBSBookScope's KBSDocumentLivesInFile keeps, and the model half's
-	// MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile. The panel's path string
-	// was compared with == until then.
+	// MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile.
 	const IDFile wanted(SDKFileHelper(bookPath).GetIDFile());
 
 	InterfacePtr<IPanelMgr> panelMgr(QueryPanelManager());

@@ -5,9 +5,8 @@
 //  KohakuBookSearch (KBS)
 //
 //  "Is this plug-in in the middle of a long run?" - ONE definition, because three different things
-//  can be running - a search, a replace and Show Changes by KohakuFindChange (four until 2026-09-27,
-//  when the missing-glyph and overset scans were removed; two until Show Changes came, 2026-09-29) -
-//  and every guard has to know about all of them.
+//  can be running - a search, a replace and Show Changes by KohakuFindChange - and every guard has to
+//  know about all of them.
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -37,8 +36,6 @@
 //    * the document-close responder (KBSCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
 //    * the Undo follow (KBSUndoFollow::Follow), which would otherwise put rows back under a run.
-//    (the report writer - KBSReportSave - and the script provider - app.kfcStatus / app.kfcResults -
-//     asked too, until they were removed on 2026-09-27.)
 //
 //  A run added later is one line in KBSRunGuard.cpp rather than a fault nobody notices in the callers.
 //
@@ -49,7 +46,7 @@
 
 namespace KBSRunGuard
 {
-	/** Is a search, a replace or a Show Changes by KohakuFindChange (2026-09-29) running right now? */
+	/** Is a search, a replace or a Show Changes by KohakuFindChange running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not

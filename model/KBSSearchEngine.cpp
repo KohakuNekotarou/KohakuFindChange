@@ -2342,7 +2342,7 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
 	// other refusal: refused past it (by ListBookChapters below), the previous results would already be
 	// gone - a whole book's results, for a book with nothing in it (KBSBookScope::GetTargetBook says which
-	// case was in mind, and that it is not yet measured).
+	// case was in mind; the regression case book-empty-keeps-results measures it).
 	const KBSBookScope::TargetBook targetBook = fromBook ? KBSBookScope::GetTargetBook() : KBSBookScope::kNoTargetBook;
 	if (fromBook && targetBook == KBSBookScope::kNoTargetBook)
 	{

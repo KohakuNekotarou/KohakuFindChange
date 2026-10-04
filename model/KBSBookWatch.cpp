@@ -15,10 +15,6 @@
 //  locked (a .idlk beside the file) for the rest of the session, so nobody else can open it. Emptying
 //  the panel only makes sense while the panel is showing THAT book's results.
 //
-//  (This started as a temporary instrumentation build - a session observer that just reported what
-//  a book close broadcasts. It answered the question and then became the feature; the notes below
-//  are the measurements it was built to take.)
-//
 //  A book close cannot be caught with a responder: the Programming Guide states responders may
 //  only register for "a set of events the application predefines", and not one of the SDK's 105
 //  signal ServiceIDs comes from BookID.h. So it has to be an observer, and what to listen to was
@@ -38,13 +34,12 @@
 //  disappears by any route at all is caught by the next cue.
 //
 //  It is asked about the SEARCHED BOOK (KBSBookScope::GetSearchedBookPath), NOT about the result
-//  set. Asking it about the result set - which is what this did until 2026-07-30 - let two cases
-//  through, and in both of them chapters stayed open with their files locked for the rest of the
-//  session:
-//    * a book search that found NOTHING - no result set, so an "are there results?" gate returned
-//      early while the chapters it opened to look were still held;
+//  set. Asked about the result set, two cases get through, and in both of them chapters stay open
+//  with their files locked for the rest of the session:
+//    * a book search that found NOTHING - no result set, so an "are there results?" gate returns
+//      early while the chapters it opened to look are still held;
 //    * a book search followed by a DOCUMENT-scope search - IsFromBook() is false by then, so that
-//      gate returned early as well.
+//      gate returns early as well.
 //  The searched-book path survives both. It is set whenever a run resolves a book, whatever that
 //  run goes on to find, and the only way to let it go is ReleaseSearchedBook - which hands the held
 //  chapters back in the same breath. So when this gate is false, what is left open is only what
@@ -54,11 +49,10 @@
 //  (KBSSearchEngine::DropResults) and tries them again, and a chapter kept for unsaved work is one a
 //  replace has already reported to the user.
 //
-//  (Until 2026-08-02 the gate asked about the HELD CHAPTERS. That was honest while a book run kept
-//  every chapter it opened; now a run closes each chapter as soon as it has walked it, so the held
-//  list is empty almost always and a gate on it would never have armed the timer at all.)
+//  (Not about the HELD CHAPTERS either: a run closes each chapter as soon as it has walked it, so the
+//  held list is empty almost always and a gate on it would never arm the timer at all.)
 //
-//  THE ONE THAT DID NOT WORK - kept here so it is not tried again (2026-07-28)
+//  THE ONE THAT DID NOT WORK - kept here so it is not tried again
 //
 //  This first listened to IID_IDX_ACTIVE_BOOKCONTEXT_CHANGED_MSG @ kSessionBoss
 //  (IID_IACTIVETOPICLISTCONTEXT) instead, on the belief that it is "broadcast when a book closes
@@ -67,8 +61,8 @@
 //  active (that cue DOES arrive, the diagnostic line appears), then close both books. Neither close
 //  moved the active book, so no cue ever arrived and the result set was never retired.
 //
-//  kCloseBookCmdBoss had been written off on 2026-07-27 as "useless on its own" for two reasons,
-//  and neither survives contact with the design above: it does not identify the book (irrelevant -
+//  kCloseBookCmdBoss can look "useless on its own" for two reasons, and neither survives contact
+//  with the design above: it does not identify the book (irrelevant -
 //  one question, asked about OUR book) and at broadcast time the closing book still reports
 //  IsOpen() (handled - the question is deferred, see below). Measured on a debug build to fire once
 //  per close, for the last remaining book as much as for any other, and confirmed on the release
@@ -77,8 +71,8 @@
 //
 //  WHY THE ANSWER IS NOT ASKED IMMEDIATELY
 //
-//  Because at cue time nothing about the book has changed yet. Measured on the release build
-//  (2026-07-27), immediately inside this notification the closing book still reports:
+//  Because at cue time nothing about the book has changed yet. Measured on the release build,
+//  immediately inside this notification the closing book still reports:
 //
 //      books=1, ours listed, IsOpen=1, db=1
 //
@@ -117,7 +111,7 @@
 #include "KBSBookWatch.h"
 #include "KBSDiag.h"			// KBS_DIAG_LOG - every change this observer hears, in a test build (compiled out of a shipping one)
 #include "KBSResultModel.h"
-#include "KBSModelNotify.h"		// the panel is told, never called (2026-10-01, the model/UI split)
+#include "KBSModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KBSRunGuard.h"		// never retire results out from under ANY run of ours
 #include "KBSSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
 
@@ -135,9 +129,7 @@ ICallbackTimer* gRetireTimer = nil;
 
 /** Retire the results if the book they were searched in is no longer open. Does nothing - and
     says nothing - when the book is still there, because this runs on every book CLOSE in the session
-    (kCloseBookCmdBoss names no book - see the file header), most of them about some other book.
-    (It said "every book context change" until 2026-10-03: the cue this file header records as the one
-    that did not work, 2026-07-28.) */
+    (kCloseBookCmdBoss names no book - see the file header), most of them about some other book. */
 void RetireBookResultsIfGone()
 {
 	// NEVER while ANY run of ours is going. This clears the result model and hands the held chapters
@@ -146,9 +138,8 @@ void RetireBookResultsIfGone()
 	// a book, then start a run inside the wait below.) The caller re-arms, so the cue is deferred
 	// rather than dropped, and the book will still be gone when it is finally asked.
 	//
-	// This asked only about the SEARCH until 2026-08-02, which left the replace unguarded - and the
-	// replace is the worst run to interrupt, since it holds an open command sequence over the documents
-	// this would close. See KBSRunGuard.
+	// ANY run - not the search alone: the replace is the worst run to interrupt, since it holds an open
+	// command sequence over the documents this would close. See KBSRunGuard.
 	if (KBSRunGuard::IsAnyRunning())
 		return;
 
@@ -171,7 +162,7 @@ void RetireBookResultsIfGone()
 	// IsFromBook() ALONE - deliberately not "and it has at least one chapter". A book search that
 	// found NOTHING still leaves a row on the tree: the hierarchy adapter gives the root one child
 	// whenever the results came from a book, so the panel shows "book.indb  (0)". That row names a
-	// book, so once the book is gone it has to go too. (Measured 2026-07-30 by the user: with a
+	// book, so once the book is gone it has to go too. (Measured by the user: with a
 	// chapter-count test in here, closing the book after a 0-hit search released the chapters but
 	// left that row sitting there and the panel said nothing at all - which also made it impossible
 	// to tell from the screen whether the close had even been noticed.)
@@ -206,23 +197,22 @@ void RetireBookResultsIfGone()
     releasing it from inside drops the last reference to the very object whose RunTask is still on
     the stack - it would then read this function's return value out of a destroyed object. And
     nil-ing the global first throws away the only handle a teardown StopTimer could use to stop a
-    callback that has gone wrong. KESCM hit exactly this and settled the rule the same way
-    (KESCMTracker.cpp, KESCMHudTimerProc): the timer is released in ONE place, and it is not here. */
+    callback that has gone wrong. So the timer is released in ONE place, and it is not here (KCM's
+    timer keeps the same rule: KCMPanelAlpha.cpp releases it in KCMShutdownPanelAlpha only). */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
 	// A run of ours is walking the very chapters this would hand back - wait it out by returning a
 	// POSITIVE value, which re-arms without calling StartTimer from inside the callback.
 	//
-	// ***** THAT RE-ARM IS AN OBSERVATION, NOT A PROMISE. ***** It is measured since 2026-10-03: the same
-	// return-value chain in the UI half (KBSFindChangeMinimize.cpp) traced one booking and then all 8 runs
-	// on a test build. (Until then the only measurement was the OLD way failing - StartTimer from inside,
-	// then kEndOfTime, 8 runs became 2.) IIdleTask::RunTask documents its
+	// THAT RE-ARM IS AN OBSERVATION, NOT A PROMISE. Measured: the same return-value chain in the UI half
+	// (KBSFindChangeMinimize.cpp) traced one booking and then all 8 runs on a test build (the other way -
+	// StartTimer from inside, then kEndOfTime - made 8 runs into 2). IIdleTask::RunTask documents its
 	// return as "the number of milliseconds to sleep before running again" (IIdleTask.h:195) and
 	// ICallbackTimer derives from IIdleTask, but the timer's OWN header describes what it registers as
 	// "a one time only callback" (ICallbackTimer.h:42) and says nothing about what the callback's
 	// return value does with it.
 	//
-	// ***** AND THE SDK'S ONE WORKED EXAMPLE NEVER TAKES THIS PATH. ***** ICallbackTimer has exactly
+	// AND THE SDK'S ONE WORKED EXAMPLE NEVER TAKES THIS PATH. ICallbackTimer has exactly
 	// one caller in the whole SDK - publiclib/links/HTTPAssetLinkResourceHandler.cpp - and its
 	// callback returns ~(uint32)0, which IS kEndOfTime, on every exit (:621). When Adobe wants that
 	// timer to fire again they do it from OUTSIDE the callback: StopTimer, Release, build another and
@@ -231,7 +221,7 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.
 	// KBSPanelAlpha's re-apply chain rests on the same inference.)
 	//
-	// ***** WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. ***** The cue is dropped and this book's
+	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's
 	// chapters are not handed back HERE - but the next search or Show Changes calls ReleaseSearchedBook
 	// on its way in and hands them back then (KBSSearchEngine::DropResults, at its commit point). A
 	// REPLACE does not: it keeps the searched book on purpose, its results being still on the panel. So
@@ -297,10 +287,10 @@ CREATE_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
 void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	const PMIID& protocol, void* changedBy)
 {
-	// Test builds only: EVERY change heard here, ahead of the filter below (2026-10-03, the block 11 re-read
-	// B11-1). What a Book panel command broadcasts on the session - Save Book As above all, which may leave
-	// the searched book's path (KBSBookScope's gSearchedBookPath) naming a file no open book has - was read
-	// off a DEBUG build's Spy until then (the file header); a release build has no Spy.
+	// Test builds only: EVERY change heard here, ahead of the filter below. What a Book panel command
+	// broadcasts on the session - Save Book As above all, which may leave the searched book's path
+	// (KBSBookScope's gSearchedBookPath) naming a file no open book has - can otherwise be read only off a
+	// DEBUG build's Spy (the file header); a release build has no Spy.
 	// ! What this hears is the session's IID_IBOOKCONTENT protocol and nothing else (KBSBookWatchAttach), so
 	//   a command with no line here may still have broadcast - elsewhere. No line is not "nothing was sent".
 	KBS_DIAG_LOG("BOOKWATCH change=0x%x protocol=0x%x changedBy=%p", (unsigned int)theChange.Get(),
@@ -310,7 +300,7 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	if (theChange != kCloseBookCmdBoss)
 		return;
 
-	// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6): the results and the
+	// The main thread only (kModelPlugIn - the split's design, section 6): the results and the
 	// timer below are the session's, and a background task's thread has no business with either.
 	if (!IDThreading::IsMainThreadDomain())
 		return;
@@ -318,7 +308,7 @@ void KBSBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	// No searched book? Then no book closing is any of our business - nothing of ours is open and
 	// nothing on the panel names a book. This is the same gate the deferred question uses, kept here
 	// so a cue that will do nothing does not even arm the timer. (See the file header for why the
-	// question is not "are there results?" and no longer "do we hold chapters?".)
+	// question is not "are there results?" nor "do we hold chapters?".)
 	PMString searchedBookPath;
 	if (!KBSBookScope::GetSearchedBookPath(searchedBookPath))
 		return;

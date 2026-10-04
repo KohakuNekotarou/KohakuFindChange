@@ -4,9 +4,9 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  InDesign's Book panel, OBSERVED - the UI half's part of "which book" (2026-10-01, the model/UI split).
+//  InDesign's Book panel, OBSERVED - the UI half's part of "which book" (the model/UI split).
 //  Reading the panels needs IBookUIUtils, IPanelMgr and PaletteRefUtils (WidgetBin), which a model plug-in
-//  may not reach, so the walks that used to stand in KBSBookScope live here. The DECISION stays with the
+//  may not reach, so the walks live here and not in KBSBookScope. The DECISION stays with the
 //  model: KBSBookScope asks for the front tab's book (through IKBSUIServices::GetPanelBookFile) and falls
 //  back to the active book when there is none - KCM's KCMBookPanelLookup is the same split.
 //
@@ -29,8 +29,8 @@ namespace KBSBookPanelLookup
 	    the session can already be gone. */
 	IPanelMgr* QueryPanelManager();
 
-	/** ***** THE ONE WALK OF THE BOOK PANELS (2026-10-01: GetPanelBookFile, BringBookTabForward and
-	    ***** KBSBookPanelPlacement each wrote the loop out until then). ***** Every panel registered with
+	/** THE ONE WALK OF THE BOOK PANELS - GetPanelBookFile, BringBookTabForward and KBSBookPanelPlacement
+	    all go through it rather than writing the loop out. Every panel registered with
 	    panelMgr that is one of InDesign's book panels (IsBookPanel), in the manager's order, is handed to
 	    `visit` with its WidgetID, until `visit` answers true. InDesign makes one book panel per open book
 	    and registers each with IPanelMgr, and the WidgetID is numbered per book at run time - so walking
@@ -41,7 +41,7 @@ namespace KBSBookPanelLookup
 
 	/** The file of the book whose tab is FRONTMOST in the book panel, which is NOT necessarily
 	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not make
-	    that book active - only touching a chapter inside it does (measured 2026-07-27).
+	    that book active - only touching a chapter inside it does (measured).
 	    Found by walking IPanelMgr: InDesign creates one book panel per open book, and the front tab is
 	    the one whose containing palette is visible (docs/ai-notes/book-panel-active-tab.md).
 	    @return false when no book panel is frontmost - the panel is iconised, its palette is closed, or
