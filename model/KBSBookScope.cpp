@@ -606,6 +606,7 @@ static UIDRef KBSOpenDocOfChapterFile(const IDFile& file)
 	IDocument* openDoc = docList->FindDoc(file);
 	if (KBSDocumentLivesInFile(openDoc, file))
 		return ::GetUIDRef(openDoc);
+	UIDRef walked = UIDRef::gNull;
 	const int32 openCount = docList->GetDocCount();
 	for (int32 i = 0; i < openCount; ++i)
 	{
@@ -613,9 +614,26 @@ static UIDRef KBSOpenDocOfChapterFile(const IDFile& file)
 		if (candidate == nil || candidate == openDoc || !candidate->IsConverted())
 			continue;
 		if (KBSDocumentLivesInFile(candidate, file))
-			return ::GetUIDRef(candidate);
+		{
+			walked = ::GetUIDRef(candidate);
+			break;
+		}
 	}
-	return UIDRef::gNull;
+#ifdef KBS_DIAG
+	// Test builds only (2026-10-04, the block 11 re-read A-1): what the document list's own lookup for an
+	// older version's document answers where the walk above has to be used - FindDocFromPreviousVersion,
+	// "document could be previous version" (IDocumentList.h:78-82), called by nothing in the SDK. The walk
+	// decides; this only records whether that call names the same document, so the walk can be replaced
+	// by it on a measurement rather than on its header.
+	{
+		IDocument* const previous = docList->FindDocFromPreviousVersion(file);
+		KBS_DIAG_LOG("PREVVERSION file=%s findDoc=%p walk=%p previous=%p previousLivesInFile=%d same=%d",
+			SDKFileHelper(file).GetPath().GetUTF8String().c_str(), (void*)openDoc, (void*)walked.GetDataBase(),
+			(void*)(previous != nil ? ::GetDataBase(previous) : nil), KBSDocumentLivesInFile(previous, file) ? 1 : 0,
+			(previous != nil && ::GetUIDRef(previous) == walked) ? 1 : 0);
+	}
+#endif
+	return walked;
 }
 
 bool KBSBookScope::FindOpenChapterDoc(const IDFile& file, UIDRef& ioDocRef)
