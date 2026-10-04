@@ -8,11 +8,31 @@
 
 ## 1. フライアウトの並び
 
-- **SET-01** パネルのフライアウトは上から ――
-  `Open Find/Change...`／`Find in …`／`Change Checked`／（区切り）／`Show Changes by KohakuFindChange`／（区切り）／
-  `Book Scope`／`Hide Previous Chapter`／`Link the Application Bar's Search Field to This Panel`／`Translucent Find/Change`／
-  `Minimizable Find/Change`／`Translucent Panel`／`Remember Book Panel Placement`／（区切り）／
-  `Save Panel Settings`／（区切り）／`How to Use...`／`About This Plug-in...`。
+- **SET-01** パネルのフライアウトは、上からこう並ぶ（`──` は区切り線）。
+
+  ```
+  Open Find/Change...
+  Find in Document
+  Change Checked
+  ──────────
+  Show Changes by KohakuFindChange
+  ──────────
+  Book Scope
+  Hide Previous Chapter
+  Link the Application Bar's Search Field to This Panel
+  Translucent Find/Change
+  Minimizable Find/Change
+  Translucent Panel
+  Remember Book Panel Placement
+  ──────────
+  Save Panel Settings
+  ──────────
+  How to Use...
+  About This Plug-in...
+  ```
+
+  2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
+  `Book Scope` から `Remember Book Panel Placement` までの7つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
   - 訂正:
 
 - **SET-02** ★`Find in …` と `Change Checked` の間に区切り線は無い（2026-09-27 の決定）。`Show Changes` は `Change Checked` の下で、区切り線の後（2026-09-29・作者が決めた場所）。
