@@ -4,10 +4,10 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Tree row event handler (Task 3): a click on a HIT row jumps to that occurrence. Replaces
+//  Tree row event handler: a click on a HIT row jumps to that occurrence. Replaces
 //  IID_IEVENTHANDLER on the result tree's node boss (kKBSResultNodeWidgetBoss). Derives from the
 //  stock TreeNodeEventHandler so ordinary tree behaviour (select, expand/collapse, drag) is kept;
-//  only the button-UP is extended. EVERY row now has somewhere to go - KBSJump::ActivateNode sorts
+//  only the button-UP is extended. EVERY row has somewhere to go - KBSJump::ActivateNode sorts
 //  out which: a hit row jumps, a chapter row shows its document, a STORY ("font") or RUN row shows
 //  the document it sits in (neither names a hit, so both fall to the same arm as their chapter), the
 //  book row activates its book.
@@ -24,26 +24,25 @@
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
-//  DOUBLE-click on a hit row (2026-08-09) adds the other half: after the jump has pointed at the
+//  DOUBLE-click on a hit row adds the other half: after the jump has pointed at the
 //  match, it SELECTS it - Type tool, match highlighted - so the user can edit or copy without
-//  hunting for it with the mouse. Single click still only points; that was and remains the design
+//  hunting for it with the mouse. Single click still only points; that is the design
 //  (KBSJump.h). Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
 //  note explains why it cannot simply be done inside ButtonDblClk.
 //
-//  ***** THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. ***** The
-//  jump runs on the first button-up and raises its marker there; a double click then selects, and
-//  the ordinary KBSHitMarkerView::Hide at the end of a successful SelectHitText takes the marker down. A
-//  double click that is REFUSED (KBSJump.h lists why it can be) never reaches that Hide, so its
-//  marker stays up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode
-//  jump keeps, and the user asked for it (2026-09-25). From 2026-08-09 until then the first click's
-//  marker was BOOKED for the double-click interval instead, so a double click never flashed one - at
-//  the price of every single click's marker arriving about half a second after the view had moved.
+//  THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. The jump runs on
+//  the first button-up and raises its marker there; a double click then selects, and the ordinary
+//  KBSHitMarkerView::Hide at the end of a successful SelectHitText takes the marker down. A double
+//  click that is REFUSED (KBSJump.h lists why it can be) never reaches that Hide, so its marker stays
+//  up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode jump keeps, and
+//  the user asked for it. (Booked for the double-click interval instead, so that a double click never
+//  flashes one, every single click's marker arrives about half a second after the view has moved.)
 //
 //  The row's "replace me" check box is a real widget of its own (kKBSResultCheckWidgetBoss) that
 //  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
 //  KBSResultCheckObserver.
 //
-//  RIGHT-click (2026-08-01) pops the row's own context menu - the book / document rows', a story row's,
+//  RIGHT-click pops the row's own context menu - the book / document rows', a story row's,
 //  a run row's or a hit row's. See RButtonDn at the foot of this file.
 //
 //========================================================================================
@@ -69,13 +68,13 @@
 #include "KFCUIID.h"
 #include "KBSResultNodeID.h"
 #include "KBSJump.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KBSResultTree.h"		// ShowRowMenuReason / DropRowMenuReason - why a row's menu has nothing to offer
 
 namespace
 {
 
-// ***** THE DOUBLE-CLICK'S ONE BIT OF STATE, AND WHY IT IS NEEDED. *****
+// THE DOUBLE-CLICK'S ONE BIT OF STATE, AND WHY IT IS NEEDED.
 //
 // A double click arrives as FOUR events, in this order:
 //
@@ -108,11 +107,10 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 
 // Why a story row's Reject / Accept are grey, in the hit row's words (RButtonDn below) - asked once
 // CanRejectStory has said no. "" = the story has no replaced row, so there is nothing to take back and nothing
-// to say. The hit row's order: a footnote, a replace that changed no character (2026-10-04), a closed
-// document, a hidden condition, then no change left.
-// (2026-10-04, R-1: once a story's Check All stopped being offered over rows with no box - D-1 - such a story's
-// menu can be grey from top to bottom, and then it does not open at all; the hidden condition was the only reason
-// said until then.)
+// to say. The hit row's order: a footnote, a replace that changed no character, a closed document, a hidden
+// condition, then no change left.
+// (Every reason is said, not only the hidden condition: with Check All not offered over rows with no box, a
+// story's menu can be grey from top to bottom, and then it does not open at all.)
 const char* StoryRejectGreyReason(int32 chapter, int32 group)
 {
 	PMString name;
@@ -130,7 +128,7 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 		if (KBSResults()->GetHitInFootnote(chapter, hit))
 			++inFootnote;
 		else if (KBSResults()->GetHitTextUnchanged(chapter, hit))
-			++formatOnly;		// a replace that changed no character (2026-10-04, scenario cross-check 5)
+			++formatOnly;		// a replace that changed no character
 	}
 	if (replaced == 0)
 		return "";
@@ -146,11 +144,10 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 		return "Reject / Accept Changes in This Story: its document is not open - open it to take the replace back.";
 	if (KBSRuns()->StoryChangesHidden(chapter, group))
 		return "Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.";
-	// The guess names every cause measured (2026-10-04, scenario cross-check 1): a Ctrl+Z of the replace that the
-	// list does not follow (a list Show Changes rebuilt - KBSUndoFollow.h), and a deletion with Track Changes on,
-	// which InDesign folds into the deleter's own record (the [9b] re-read O9b-1). "Accepted or rejected" only, until then.
-	// "Split around other text" since 2026-10-04 (scenario cross-check 5): typing inside a replace, or - on a list
-	// Show Changes rebuilt - a GREP <$0>, whose two records stand around the match it kept.
+	// The guess names every cause measured: a Ctrl+Z of the replace that the list does not follow (a list Show
+	// Changes rebuilt - KBSUndoFollow.h); a deletion with Track Changes on, which InDesign folds into the deleter's
+	// own record; and "split around other text" - typing inside a replace, or, on a list Show Changes rebuilt, a
+	// GREP <$0>, whose two records stand around the match it kept.
 	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (undone, accepted, rejected, deleted, or split around other text?).";
 }
 
@@ -226,7 +223,7 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	if (treeController == nil || !treeController->IsSelected(node))
 		return result;
 
-	// ***** The second click of a double click SELECTS instead of jumping again. *****
+	// The second click of a double click SELECTS instead of jumping again.
 	// The first click already did the jump (fronted the document, centred the match, raised the
 	// marker), so repeating it would only re-do all of that. What is added is putting the user IN
 	// the match - Type tool, match highlighted.
@@ -234,7 +231,7 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	{
 		if (KBSJump::SelectHitText(nodeID->GetChapter(), nodeID->GetHit()))
 		{
-			// ***** AND GIVE THE KEYBOARD BACK. ***** The FIRST click of this double click ended in
+			// AND GIVE THE KEYBOARD BACK. The FIRST click of this double click ended in
 			// the AcquireKeyFocus at the foot of this function, so the TREE is holding the keyboard
 			// at this moment. Left that way, the caret would sit in the text while the arrow keys
 			// walked the panel and typing went nowhere - which is the one thing a user who asked
@@ -271,8 +268,8 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	{
 		// The jump, and its marker, now - even though this click may yet turn out to be the first half
 		// of a double click. Then the second click selects and SelectHitText takes the marker down,
-		// the beat KCM's Story-mode jump keeps (2026-09-25; the marker used to be booked for the
-		// double-click interval - see KBSJump.h).
+		// the beat KCM's Story-mode jump keeps (not booked for the double-click interval - see
+		// KBSJump.h).
 		KBSJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 	}
 
@@ -282,7 +279,7 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 	//   * The QUERY brings the list's IID_IEVENTHANDLER into existence. Interface implementations
 	//     are created on first use, and nothing else in this plug-in ever asks the tree for its
 	//     event handler - so without this line KBSResultTreeEH is never constructed at all and the
-	//     arrows keep the stock behaviour (visible rows only). Measured 2026-08-01: with the panel
+	//     arrows keep the stock behaviour (visible rows only). Measured: with the panel
 	//     open and a book searched, a trace in that class's constructor never fired.
 	//   * AcquireKeyFocus makes it the key target. ActivateNode above brings a document window -
 	//     or, on a book row, the Book panel - forward, and that takes the focus with it.
@@ -307,9 +304,8 @@ bool16 KBSResultNodeEH::LButtonUp(IEvent* e)
 // learns what the menu was about.
 //
 // What the book / document rows' commands reach is exactly the row this was popped over: the BOOK row
-// means every chapter (what the flyout used to do), a document row means that chapter alone. That
-// question is the whole reason Check All / Uncheck All moved here (2026-08-01) - a flyout has no row to
-// ask about.
+// means every chapter, a document row means that chapter alone. That question is the whole reason
+// Check All / Uncheck All live here and not on the flyout - a flyout has no row to ask about.
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -326,7 +322,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 
 	// Every menu below consumes the click - no stock handling, so the row is not selected and nothing jumps.
 	//
-	// ***** A STORY ROW (2026-09-27, the story level): its own menu, over that story's rows. *****
+	// A STORY ROW: its own menu, over that story's rows.
 	// Every other right-click clears the story it named, so a story menu item fired later (a script, a
 	// shortcut) cannot act on a story nobody right-clicked this time.
 	if (nodeID->IsFontRow() && KBSResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
@@ -334,15 +330,14 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		const int32 chapter = nodeID->GetChapter();
 		const int32 group = nodeID->GetFont();
 		KBSResults()->SetContextMenuGroup(chapter, group);
-		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
-		// ***** WHY ITS REJECT / ACCEPT ARE GREY (2026-10-02 a hidden condition, the user's call A; 2026-10-04 a
-		// ***** footnote, a closed document and no change left as well, R-1). ***** The hit row's rule below: with
-		// every item grey the popup does not open, so the status line is the only place to say it - and a story
-		// whose replaced text is all under a hidden condition said nothing at all (case
-		// reject-hidden-condition-story). StoryRejectGreyReason, above, says which.
-		// ***** OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (2026-10-04,
-		// ***** O-3, the user's call). ***** Through ShowStatus until then: it became the last message and stayed,
-		// reading as if it were about whatever row was right-clicked next (KBSResultTree::ShowRowMenuReason).
+		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's: cleared like this one
+		// WHY ITS REJECT / ACCEPT ARE GREY (the user's call). The hit row's rule below: with every item grey the
+		// popup does not open, so the status line is the only place to say it - otherwise a story whose replaced
+		// text is all under a hidden condition says nothing at all (case reject-hidden-condition-story).
+		// StoryRejectGreyReason, above, says which reason.
+		// OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (the user's call).
+		// Not through ShowStatus: it would become the last message and stay, reading as if it were about
+		// whatever row was right-clicked next (KBSResultTree::ShowRowMenuReason).
 		PMString why;
 		if (!KBSRuns()->CanRejectStory(chapter, group))
 			why = StoryRejectGreyReason(chapter, group);
@@ -358,23 +353,22 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	}
 	KBSResults()->SetContextMenuGroup(-1, -1);
 
-	// ***** A RUN ROW (2026-09-29, Show Changes by KohakuFindChange): its own menu, over that run's rows in
-	// ***** this document. ***** Cleared by every other right-click, like the story row's.
+	// A RUN ROW (Show Changes by KohakuFindChange): its own menu, over that run's rows in this document.
+	// Cleared by every other right-click, like the story row's.
 	if (nodeID->IsRunRow())
 	{
 		KBSResults()->SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
-		KBSResultTree::DropRowMenuReason();		// nothing to say over a run row (O-3)
+		KBSResultTree::DropRowMenuReason();		// nothing to say over a run row
 		PopRowMenu(kKBSResultRunMenuName, e, this);
 		return kTrue;
 	}
 	KBSResults()->SetContextMenuRun(-1, -1);
 
-	// Hit rows carry their own menu since 2026-09-26 - Replace, Reject Change and Accept Change, about THIS
-	// row (the user's call; until then a hit row had no menu, its check box being all a row needed).
+	// Hit rows carry their own menu - Replace, Reject Change and Accept Change, about THIS row (the user's
+	// call).
 	//
-	// ***** WHY REJECT CHANGE IS GREY IS SAID HERE, BEFORE THE MENU. ***** When every item is disabled the
-	// popup does not open at all (measured 2026-08-01 with Check All), so the status line is the only
-	// place left to say it.
+	// WHY REJECT CHANGE IS GREY IS SAID HERE, BEFORE THE MENU. When every item is disabled the popup does
+	// not open at all (measured with Check All), so the status line is the only place left to say it.
 	if (nodeID->IsHitRow())
 	{
 		const int32 chapter = nodeID->GetChapter();
@@ -382,16 +376,16 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		KBSResults()->SetContextMenuHit(chapter, hit);
 		bool checked = false, replaced = false, locked = false;
 		KBSResults()->GetHitFlags(chapter, hit, checked, replaced, locked);
-		// (Over the last message since 2026-10-04 - the story row's note above, O-3.)
+		// (Over the last message - the story row's note above.)
 		if (KBSResults()->GetHitInFootnote(chapter, hit))
 		{
 			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowRowMenuReason(why);
 		}
-		// ...and a replace that changed no character (2026-10-04, scenario cross-check 5): Change Format with an empty
-		// Change To. It was told "no tracked change ... is left (undone, accepted or rejected ..., or deleted?)" until
-		// then - none was ever made (case xs5-b2-format-only-cc).
+		// ...and a replace that changed no character: Change Format with an empty Change To. Not "no tracked change
+		// ... is left (undone, accepted or rejected ..., or deleted?)" - none was ever made (case
+		// xs5-b2-format-only-cc).
 		else if (KBSResults()->GetHitTextUnchanged(chapter, hit))
 		{
 			PMString why("Reject Change: this replace changed no character (formatting only) - Track Changes records nothing for it (Edit > Undo takes it back).");
@@ -400,9 +394,9 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		}
 		else if (replaced && !KBSRuns()->RefreshRowFromRecords(chapter, hit))
 		{
-			// A closed document is said as such (2026-09-29, the defect re-check F-3): the records may all
-			// be there, and the row reads "no tracked change" only because nothing is open to read them in.
-			// ...and so is a hidden condition (2026-10-02, the user's call A): the records are there too, gone
+			// A closed document is said as such: the records may all be there, and the row would read "no
+			// tracked change" only because nothing is open to read them in.
+			// ...and so is a hidden condition (the user's call): the records are there too, gone
 			// out of the main text with the text the condition hides (case reject-hidden-condition).
 			UIDRef rowDoc;
 			IDFile rowFile;
@@ -426,7 +420,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		? static_cast<int32>(KBSResultModel::kContextMenuBookRow)
 		: nodeID->GetChapter();
 	KBSResults()->SetContextMenuChapter(target);
-	KBSResultTree::DropRowMenuReason();		// nothing to say over a book or document row (O-3)
+	KBSResultTree::DropRowMenuReason();		// nothing to say over a book or document row
 	PopRowMenu(kKBSResultRowMenuName, e, this);
 	return kTrue;
 }
