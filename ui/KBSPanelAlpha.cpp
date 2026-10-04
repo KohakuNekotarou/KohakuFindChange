@@ -644,11 +644,12 @@ static HWND sFcWnd = nullptr;
 //   *Cleared by KBSForgetFindChangeWindow, which the window-list observer calls the moment a window
 //     is added or removed - so a dialog that opens is looked up again at once.
 //   BUT "LOOKED AT ONCE" IS NOT "SEEN". The dialog opened for the first time in a session can be in
-//     the list at that moment with no panel set yet, so the walk cannot tell it and this records "not open" - and from then on the hook,
-//     however often it asks, is answered from here. MEASURED: Translucent Find/Change ON alone, the
-//     session's first dialog stayed opaque (trace "no Find/Change in 75 windows (1 dialog(s) without a
-//     panel)", then nothing). What sees it is the chase both toggles share (KBSChaseFindChangeWindow,
-//     KBSFindChangeMinimize.h), which forgets this and asks again for a short while.
+//     the list at that moment with no panel set yet, so the walk cannot tell it and this records "not open"
+//     - and from then on the hook, however often it asks, is answered from here. MEASURED: Translucent
+//     Find/Change ON alone, the session's first dialog stayed opaque (trace "no Find/Change in 75 windows
+//     (1 dialog(s) without a panel)", then nothing). What sees it is the chase both toggles share
+//     (KBSChaseFindChangeWindow, KBSFindChangeMinimize.h), which forgets this and asks again for a short
+//     while.
 //     *Not "do not record while a dialog without a panel is listed": one sat there for 30 seconds of
 //      the application's own startup in the same trace, and the hook would have walked the list on
 //      every event all that time - the very cost this flag was made to remove.
@@ -772,10 +773,11 @@ static void KBSRestoreOurFindChangeStyle()
 	// NOT COMMITTED WHILE IT IS MINIMISED. The minimize side will not rebuild an iconic window's frame
 	//   with SWP_FRAMECHANGED - doing so was followed once by the window being destroyed outright
 	//   (KBSFindChangeMinimize.cpp) - and switching Translucent Find/Change OFF with the dialog minimised
-	//   would do just that here without this test. The style bit is off already; the whole window is
-	//   drawn afresh when it is restored, and Microsoft's own way to make a layered window opaque is only "remove the bit, then have the window
-	//   repaint". MEASURED with the guard: OFF while minimised took WS_EX_LAYERED off (0x000C0100 ->
-	//   0x00040100), the window stayed, and restoring it drew the dialog whole.
+	//   would do just that here without this test. The style bit is off already; the whole window is drawn
+	//   afresh when it is restored, and Microsoft's own way to make a layered window opaque is only "remove
+	//   the bit, then have the window repaint". MEASURED with the guard: OFF while minimised took
+	//   WS_EX_LAYERED off (0x000C0100 -> 0x00040100), the window stayed, and restoring it drew the dialog
+	//   whole.
 	//   (Quitting with both toggles on and the dialog minimised was the other path in view - this runs
 	//    before the minimize side's own restore. Measured, it never reaches a live dialog: InDesign closes
 	//    the dialog's window before the shutdown services run, and the record is then left alone.)
