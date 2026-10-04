@@ -4,25 +4,24 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The panel's MESSAGE AREA, drawn by hand so that it can show more than one colour (2026-09-29): when
-//  a replaced row is selected, this box shows the text as it was BEFORE the replace, with the
-//  characters the replace took at the theme's text colour and the words around them faded - the
-//  treatment a hit row already has (user's request: "show it in the panel's top part, the way KCM
-//  does").
+//  The panel's MESSAGE AREA, drawn by hand so that it can show more than one colour: when a replaced
+//  row is selected, this box shows the text as it was BEFORE the replace, with the characters the
+//  replace took at the theme's text colour and the words around them faded - the treatment a hit row
+//  already has (the author's request: "show it in the panel's top part, the way KCM does").
 //
-//  ***** BROUGHT OVER FROM KCM's KCMStatusTextView.cpp, which replaced the same stock widget for the
-//  same reason on 2026-08-20. ***** What came across: the wrapping, the line count taken from the box's
+//  BROUGHT OVER FROM KCM's KCMStatusTextView.cpp, which replaced the same stock widget for the same
+//  reason. What came across: the wrapping, the line count taken from the box's
 //  height and the font, the rule that the CONTEXT gives way before the change does, the heading on a
 //  line of its own, and the bar for a change with no characters. What did not: the reading over the
 //  characters (ruby), the emphasis marks (kenten), the warichu / tate-chu-yoko layers and the warning
 //  colour - KCM shows attribute changes, and KBS replaces text.
 //
-//  ***** WHAT A STOCK MULTI-LINE STATIC TEXT GAVE US, AND WHAT IT COST. ***** It held one string,
-//  wrapped it, and drew the lot in ONE colour. The wrapping is the part worth keeping - the panel's
-//  messages are sentences that fill the box, and several name files - so it is written out below
-//  rather than lost. The one colour is the part that had to go.
+//  WHAT A STOCK MULTI-LINE STATIC TEXT GIVES, AND WHAT IT COSTS. It holds one string,
+//  wraps it, and draws the lot in ONE colour. The wrapping is the part worth keeping - the panel's
+//  messages are sentences that fill the box, and several name files - so it is written out below.
+//  The one colour is the part that had to go.
 //
-//  ***** THE STOCK WRAPPING IS PUBLIC, AND IS NOT USED HERE (2026-10-02, the API re-audit). ***** A
+//  THE STOCK WRAPPING IS PUBLIC, AND IS NOT USED HERE. A
 //  multi-line static text breaks its string through IStaticTextLineBreaker (public/interfaces/ui -
 //  CreateLineBreaks / GetNthLine / GetNumLines; the stock implementations are kStaticTextLineBreakerImpl
 //  and kDV_StaticTextLineBreakerImpl), and where the app wants its own rules it writes another one on
@@ -37,18 +36,16 @@
 //  breaker could replace only the inner step of that search. (1)-(3) are what the header leaves open,
 //  not anything measured. KCM's box, which this one came from, carries the same hand-written wrap.
 //
-//  ***** HOW MANY LINES: as many as the box holds, worked out at draw time. ***** KBSPanelMetrics makes
-//  the box four of this font's lines tall (MessageBlockHeight - 72px on this machine's Japanese UI);
-//  a hand-drawn box has no line count of its own to disagree with that, so the height and the font
-//  are the whole answer - and since 2026-10-02 both come from the one place, KBSPanelMetrics'
-//  MessageFont / MessageLineMetrics (the API re-audit P-1; the box's height was a 12px / 18px table
-//  by UI language until then).
+//  HOW MANY LINES: as many as the box holds, worked out at draw time. KBSPanelMetrics makes the box
+//  four of this font's lines tall (MessageBlockHeight - 72px on a Japanese UI); a hand-drawn box has
+//  no line count of its own to disagree with that, so the height and the font are the whole answer -
+//  and both come from the one place, KBSPanelMetrics' MessageFont / MessageLineMetrics.
 //  ! The stock widget drew in kPaletteWindowFontId; this draws in the SYSTEM SCRIPT variant, the one
-//    the hit rows use, because it now shows the document's own text as well as the panel's sentences.
-//    On this machine's Japanese UI the two answer the same 18px line (KCM measured ascent 12.7 +
-//    descent 5.3 for this font). A Roman UI has not been measured.
+//    the hit rows use, because it shows the document's own text as well as the panel's sentences.
+//    On a Japanese UI the two answer the same 18px line (KCM measured ascent 12.7 + descent 5.3 for
+//    this font). A Roman UI has not been measured.
 //
-//  ***** WHEN IT DOES NOT FIT, THE CONTEXT GIVES WAY. ***** The replaced text itself is cut only when it
+//  WHEN IT DOES NOT FIT, THE CONTEXT GIVES WAY. The replaced text itself is cut only when it
 //  alone overflows the box, and then an ellipsis says so.
 //  ! An ordinary message has no context, so a long one ends in an ellipsis. That is a CHANGE from the
 //    stock widget, which cut silently at the last line it had room for. Truncation that shows is
@@ -256,10 +253,9 @@ bool16 KBSLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 			}
 
 			// (3) The space a wrap broke at does not start the next line.
-			// ***** EXCEPT THE BAR'S ROOM (2026-09-29, the defect re-check). ***** The bar stands in one space
-			// (KBSCaretPlaceholder), and a bar that fell at the head of a wrapped line was thrown away with
-			// "the space the wrap broke at" - the place it marks vanished. (KCMStatusTextView.cpp, where
-			// this came from, had the same rule and the same hole - closed the same way on 2026-10-02.)
+			// EXCEPT THE BAR'S ROOM. The bar stands in one space (KBSCaretPlaceholder); thrown away as "the
+			// space the wrap broke at", a bar at the head of a wrapped line would vanish with the place it
+			// marks. (KCMStatusTextView.cpp, where this came from, keeps the same exception.)
 			if (justWrapped && !isCaret && rest.GetChar(0).IsSpace())
 			{
 				rest.Remove(0, 1);
@@ -351,7 +347,7 @@ std::vector<KBSRun> KBSMakeRuns(const PMString& label, const PMString& pre,
 		PMString heading(label);
 		heading.Append("\n");		// the heading owns its break: nothing may share its line
 		// NOT faded: faded means context, and the heading is not context - it says what the words
-		// below are (KCM's user made the same call there, 2026-08-21).
+		// below are (KCM's author made the same call there).
 		runs.push_back(KBSRun(heading, kFalse));
 	}
 	if (!pre.IsEmpty())
@@ -419,10 +415,9 @@ public:
 		// that walks the widgets looks for a label (KIDMCP's inspect_ui; the regression suite's
 		// PSTATUS). Written here, the one place every message arrives, so the two cannot drift.
 		//
-		// ***** THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER. ***** It
-		// is persistent; a non-persistent one of our own on the hit row's cell crashed InDesign the first
-		// time a row was built (KBSColorTextView.cpp, 2026-09-27). Nothing draws it: this box paints
-		// itself.
+		// THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER. It is
+		// persistent; a non-persistent one of our own on the hit row's cell crashed InDesign the first
+		// time a row was built (KBSColorTextView.cpp). Nothing draws it: this box paints itself.
 		// ! Not doubled for '&' any more: the stock widget took a lone '&' as an accelerator, so the
 		//   message was written "A&&B.indd" and a reader saw that. This box draws with
 		//   convertAmpersand kFalse, so the text is the text.
@@ -513,8 +508,8 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// The palette window's SYSTEM SCRIPT font - the hit rows' (KBSColorTextView.cpp says why: it is what
 	// the shipping panels use for text that came out of a document). ! A hand-drawn widget has no font
 	// field to read: its boss is a generic panel, which carries no IUIFontSpec.
-	// ***** ASKED OF KBSPanelMetrics, THE SAME PLACE THE BOX'S HEIGHT IS (2026-10-02, the API re-audit
-	// ***** P-1). ***** The box is four of the very lines drawn here - one question, one place.
+	// ASKED OF KBSPanelMetrics, THE SAME PLACE THE BOX'S HEIGHT IS. The box is four of the very lines
+	// drawn here - one question, one place.
 	const InterfaceFontInfo* const fontPtr = KBSPanelMetrics::MessageFont();
 	if (fontPtr == nil)
 		return;
@@ -525,8 +520,8 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (availWidth <= PMReal(0.0))
 		return;
 
-	// ***** ONE LINE'S ADVANCE COMES FROM THE FONT, NOT FROM A MEASURED STRING. ***** KCM measured it
-	// (2026-08-21, a diagnostic build on a Japanese UI): ascent + descent + leading answers 18.0 where
+	// ONE LINE'S ADVANCE COMES FROM THE FONT, NOT FROM A MEASURED STRING. KCM measured it (a diagnostic
+	// build on a Japanese UI): ascent + descent + leading answers 18.0 where
 	// PMMeasureString("Ag").Y() answers 19.0 - and that one pixel costs a whole line in a box sized to
 	// a whole number of lines (KBSPanelMetrics::MessageBlockHeight). Measuring a string answers "how
 	// tall is this ink", which is a different question from "how far to the next line".
@@ -541,13 +536,12 @@ void KBSStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		ascent = Utils<IWidgetUtils>()->GetViewYPosition(&gc, fontInfo, lineHeight);
 	}
 
-	// ***** A HAIR ADDED BEFORE THE CUT (2026-09-29, the defect re-check). ***** This box is sized to a
-	// WHOLE number of lines, so the quotient is meant to come out at exactly 4 - and a line height a
-	// rounding step over what the box was made of would make it 3.9999, cut to 3, and the last line of
-	// every long message would go. KCM's box has 2px to spare (74), which is why it never needed this.
-	// (Since 2026-10-02 the box is four of THIS line rounded up to a pixel - KBSPanelMetrics::
-	// MessageBlockHeight - so the quotient is 4 or a hair over; the hair stays for a frame that comes in
-	// a rounding step short.)
+	// A HAIR ADDED BEFORE THE CUT. This box is sized to a WHOLE number of lines, so the quotient is meant
+	// to come out at exactly 4 - and a line height a rounding step over what the box was made of would
+	// make it 3.9999, cut to 3, and the last line of every long message would go. KCM's box has 2px to
+	// spare (74), which is why it never needed this. (The box is four of THIS line rounded up to a pixel
+	// - KBSPanelMetrics::MessageBlockHeight - so the quotient is 4 or a hair over; the hair stays for a
+	// frame that comes in a rounding step short.)
 	int32 maxLines = static_cast<int32>(ToDouble(frame.Height() / lineHeight) + 0.01);
 	if (maxLines < 1)
 		maxLines = 1;		// a box too short for even one line still shows the beginning of it

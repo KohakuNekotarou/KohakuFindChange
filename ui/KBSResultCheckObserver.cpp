@@ -34,7 +34,7 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KBSResultNodeID.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 #include "KBSResultTree.h"
 
 /** Watches one hit row's check box and mirrors the click into KBSResultModel. */
@@ -87,20 +87,18 @@ void KBSResultCheckObserver::Update(const ClassID& theChange, ISubject* /*theSub
 	if (nodeID == nil || !nodeID->IsHitRow())
 		return;
 
-	// One row, one box (2026-09-27): touching matches no longer go on and off together, and a footnote's
-	// row can be taken off like any other - the replace writes only the ticked matches again. (From
-	// 2026-09-26 the model moved a whole touching group and refused to take a footnote's row off, and
-	// this said so on the status line.)
+	// One row, one box: touching matches do not go on and off together, and a footnote's row can be
+	// taken off like any other - the replace writes only the ticked matches.
 	KBSResults()->SetHitChecked(nodeID->GetChapter(), nodeID->GetHit(), nowChecked);
 
-	// The book row and this chapter's row read out "(N/M checked)" (2026-08-05), so one box going
+	// The book row and this chapter's row read out "(N/M checked)", so one box going
 	// on or off changes what they say. Nothing else on the panel does - see RefreshCheckedCounts.
 	KBSResultTree::RefreshCheckedCounts(nodeID->GetChapter());
 
 	// ...and say WHICH row it was, by the locator the row leads with: "P1(2)  checked".
 	//
-	// The COUNT is deliberately not repeated here - that is what the two rows above now read out
-	// (user's call, 2026-08-05, which is also why the old "<checked> / <total> checked." line went).
+	// The COUNT is deliberately not repeated here - that is what the two rows above read out (the
+	// author's call).
 	// What the line adds is the identity of the row that just changed, which is worth having when
 	// the list is long enough that the row is nowhere near the pointer.
 	PMString locator, pre, match, post;

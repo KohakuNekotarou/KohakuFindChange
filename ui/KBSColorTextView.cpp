@@ -50,7 +50,7 @@
 #include "KFCUIID.h"
 #include "KBSColorTextView.h"
 #include "KBSPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the message area
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 
 // How far up the widget chain to look for the hilite (see KBSViewOrParentIsHilited). One step is
 // all this panel needs (cell -> row); the extra steps only keep it working if the row ever gains
@@ -77,9 +77,9 @@ static bool16 KBSViewOrParentIsHilited(IControlView* view, int32 stepsLeft)
 	return KBSViewOrParentIsHilited(parentView, stepsLeft - 1);
 }
 
-// (The blend that fades the context toward the background stood here as a static until 2026-09-29. It
-//  is KBSBlendColor in KBSPanelTextDraw.h now, with the 0.65 it is used at: the panel's message area
-//  fades its context the same way, and two copies would be two things to keep in step.)
+// (The blend that fades the context toward the background is KBSBlendColor in KBSPanelTextDraw.h, with
+//  the 0.65 it is used at: the panel's message area fades its context the same way, and two copies would
+//  be two things to keep in step.)
 
 // (The break characters are turned into marks by KBSResultModel::MarkUpBreaksForDisplay - one rule for
 //  this cell, the story rows, the message area and the label a reader walks.)
@@ -111,10 +111,10 @@ public:
 		// locator, flag, then the line with its breaks marked - and the match in [ ] where the cell
 		// uses colour. Written here, the one place every row's parts arrive, so the two cannot drift.
 		//
-		// ***** THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER. *****
+		// THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER.
 		// It is persistent and reads the resource's "Panel name" field; nothing draws it, since this
-		// cell paints itself. An implementation of our own replacing it (non-persistent, 2026-09-27)
-		// crashed InDesign the first time a row was built: DVPanelControlData::ReadWrite called the
+		// cell paints itself. A non-persistent implementation of our own replacing it crashed InDesign
+		// the first time a row was built: DVPanelControlData::ReadWrite called the
 		// ReadWrite it did not have (RIP 0, under KBSResultListWidgetMgr::CreateWidgetForNode).
 		InterfacePtr<ITextControlData> label(this, UseDefaultIID());
 		if (label != nil)
@@ -203,8 +203,8 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// draws in: the branch row resource's label widget (kKBSResultChapterLabelWidgetID, in KFCUI.fr's
 	// KBSResultNodeWidget for kKBSResultChapterNodeWidgetRsrcID) declares
 	// kPaletteWindowSystemScriptFontId for both its normal and its hilite font, and the branch rows
-	// are stock static texts that take it from there. This cell asked for kPaletteWindowFontId until
-	// 2026-08-07, which left one row of one tree wanting a different font from the rows above it.
+	// are stock static texts that take it from there. (Not kPaletteWindowFontId: that left this one
+	// row of the tree wanting a different font from the rows above it.)
 	//
 	// It is also what the shipping panels reach for whenever a widget has to show text that came
 	// out of a DOCUMENT, or that a user typed: the layer panel stamps it on the layer-name cell
@@ -277,13 +277,10 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// The page locator ("P1(2)") is drawn at the full theme text colour, then the line text follows
 	// straight after it.
 	//
-	// There used to be a tab stop here - a fixed column from the cell's left edge - so the line
-	// text would form a column of its own. It cannot: the locator's width varies by several
-	// characters now that it carries "overset", "hidden" and "locked", so a short locator was flung
-	// out to the tab while a long one sat right against its text. The same list showed both gaps at
-	// once and the wide one read as a mistake (user's call 2026-07-28, from the running panel).
-	// The words grew again on 2026-08-04 ("ov" -> "overset", "lock" -> "locked"), which only makes
-	// the fixed column less workable - one gap remains the right answer.
+	// NO TAB STOP - a fixed column from the cell's left edge - for the line text. The locator's width
+	// varies by several characters ("overset", "hidden", "locked"), so a short locator was flung out
+	// to the tab while a long one sat right against its text; the same list showed both gaps at once
+	// and the wide one read as a mistake (the author's call, from the running panel).
 	//
 	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
 	// keeps that fixed for every row (see KBSResultListWidgetMgr - the check box sits in the margin
@@ -329,17 +326,16 @@ void KBSColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		x += StringUtils::PMMeasureString(&gc, s, fontInfo, kDontConvertAmpersand).X();
 	};
 
-	// ***** AN EMPTY MATCH IS A PLACE, AND IT IS DRAWN AS A BAR (2026-09-29, the user's request: "the
-	// bar KCM draws"). ***** A row replaced with nothing, and a zero-width match (^, $, a lookaround),
-	// have no characters at the match, so the line closed up around it and did not say WHERE. The bar
-	// stands in the room of one space (KBSPanelTextDraw.h) and everything below treats it as a match of
-	// that width - so the context gives way around it exactly as it gives way around characters.
-	// ***** EVERY EMPTY MATCH, EVEN WITH NOTHING EITHER SIDE (2026-09-29, the user: "no bar when it was
-	// ***** deleted at the very end"). ***** It was held back when the line had no other text as well, on the
-	// thought that such a row was a position that could not be read. But that is exactly what the LAST
-	// paragraph of a story looks like once its only word is replaced with nothing: a paragraph in the middle
-	// keeps its pilcrow in the trailing context, the last one has none - so the bar went missing there
-	// alone. (A "deleted" row keeps the match it was found with. A match whose story had no text model to
+	// AN EMPTY MATCH IS A PLACE, AND IT IS DRAWN AS A BAR (the author's request: "the bar KCM draws").
+	// A row replaced with nothing, and a zero-width match (^, $, a lookaround), have no characters at the
+	// match, so without it the line closes up around it and does not say WHERE. The bar stands in the
+	// room of one space (KBSPanelTextDraw.h) and everything below treats it as a match of that width - so
+	// the context gives way around it exactly as it gives way around characters.
+	// EVERY EMPTY MATCH, EVEN WITH NOTHING EITHER SIDE (the author: "no bar when it was deleted at the
+	// very end"). Do not hold it back when the line has no other text: that is exactly what the LAST
+	// paragraph of a story looks like once its only word is replaced with nothing - a paragraph in the
+	// middle keeps its pilcrow in the trailing context, the last one has none - so the bar would go
+	// missing there alone. (A "deleted" row keeps the match it was found with. A match whose story had no text model to
 	// read comes with three empty segments and now draws the bar alone - a place with nothing to show,
 	// which is what the bar says.)
 	// ! The label a reader walks still says "[]" (KBSRowData::SetSegments): the bar is drawn, never

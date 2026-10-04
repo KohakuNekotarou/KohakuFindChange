@@ -52,21 +52,20 @@ namespace KBSResultTree
 	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
 	void RefreshCheckedCounts(int32 chapterIdx);
 
-	/** ***** ONE DOCUMENT ROW IS ABOUT TO GO (2026-09-29, All Documents: a document was closed). ***** Tells
+	/** ONE DOCUMENT ROW IS ABOUT TO GO (All Documents: a document was closed). Tells
 	    the tree BEFORE the model empties the chapter (KBSResultModel::CloseChapter) - ITreeViewMgr's
 	    BeforeNodeDeleted, the way the conditional text panel takes a row out - so only that row and its
 	    children leave, and every other row keeps its place and whether it is open (a Rebuild would close
 	    them all again). Safe when the panel is closed. */
 	void BeforeChapterRowGoes(int32 chapterIdx);
 
-	/** Write a message to the panel's message area (drawn by hand since 2026-09-29 - KBSStatusTextView;
-	    a wrapping StaticText before that). Takes the place of a standing "Source Text:" (ShowRowsBefore). Safe
+	/** Write a message to the panel's message area (drawn by hand - KBSStatusTextView). Takes the place of a standing "Source Text:" (ShowRowsBefore). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
-	/** ***** A REPLACED ROW, ONCE SELECTED, SHOWS ITS TEXT AS IT WAS BEFORE THE REPLACE (2026-09-29, the
-	    user's request - "the way KCM does"). ***** The message area reads
+	/** A REPLACED ROW, ONCE SELECTED, SHOWS ITS TEXT AS IT WAS BEFORE THE REPLACE (the author's request -
+	    "the way KCM does"). The message area reads
 
 	        Source Text:
 	        <the row's words before>  <the text the replace took>  <the row's words after>
@@ -87,7 +86,7 @@ namespace KBSResultTree
 	    run this session). Nothing happens when none is standing. */
 	void DropBefore();
 
-	/** ***** WHY A ROW'S RIGHT-CLICK MENU IS GREY (2026-10-04, O-3 - the user's call). ***** Put up OVER what
+	/** WHY A ROW'S RIGHT-CLICK MENU IS GREY (the author's call). Put up OVER what
 	    the box shows - the last message, or a standing "Source Text:" - without replacing it, the way
 	    ShowRowsBefore stands over the last message: the reason is about the row the menu was popped over, so
 	    the next right-click that has nothing to say takes it down again (DropRowMenuReason) instead of
@@ -98,7 +97,8 @@ namespace KBSResultTree
 
 	/** Take a standing reason down and put back what was under it: the "Source Text:" when one stands, the
 	    last message otherwise (or the opening one, with nothing run this session). Nothing happens when no
-	    reason is standing. Every right-click that says nothing calls it. */
+	    reason is standing. Every right-click that says nothing calls it, and so does selecting a row with
+	    no "Source Text:" to show (DropBefore). */
 	void DropRowMenuReason();
 
 	/** Put the status read-out back to what THIS session last had on it - a standing "Source Text:" first
@@ -115,9 +115,6 @@ namespace KBSResultTree
 	    to call when the panel is closed (does nothing then). */
 	void RestoreStatusOnPanelShow();
 
-	// (GetLastStatus - the kept line, for the app.kfcStatus script property - went with that
-	//  property on 2026-09-27.)
-
 	/** Release this module's static storage during the controlled shutdown (the UI half's,
 	    KBSUIStartupShutdown), so no static destructor at DLL unload finds work left to do: the kept
 	    status line and a standing "Source Text:"'s pieces - PMStrings, exactly the kind of static the
@@ -129,15 +126,14 @@ namespace KBSResultTree
 	        ch1.indd  all checked
 	        selftest.indb  all unchecked
 
-	    ***** Check All / Uncheck All only. ***** Those two reach every hit of a book or of a
+	    Check All / Uncheck All only. Those two reach every hit of a book or of a
 	    document, most of them scrolled out of sight, so what they did has to be said somewhere the
 	    user is looking - and WHICH row they were asked over is the whole question, since the same
 	    two commands mean "this chapter" or "the whole book" depending on it.
 
 	    Ticking a single box does not come through HERE - it has a line of its own, one row narrower:
-	    ShowHitCheckStatus below. What went on 2026-08-05 was the COUNT ("<checked> / <total>
-	    checked."), because the book and document rows read that out themselves now; what a single
-	    tick still says is WHICH row it was ("P1(2)  checked").
+	    ShowHitCheckStatus below. It says WHICH row it was ("P1(2)  checked") and no count: the book
+	    and document rows read the "(n/m checked)" out themselves.
 
 	    @param targetName the row the menu was popped over - a chapter's name, or the book's.
 	    @param nowChecked true = Check All, false = Uncheck All. */
@@ -154,8 +150,6 @@ namespace KBSResultTree
 	    @param locator the hit row's page locator (KBSResultModel::GetHitDisplay's first field).
 	    @param nowChecked the state the box was just put into. */
 	void ShowHitCheckStatus(const PMString& locator, bool nowChecked);
-
-	// (SaveResultsAsText - "Save Results..." - was removed on 2026-09-27, the user's call.)
 }
 
 #endif // __KBSResultTree_h__

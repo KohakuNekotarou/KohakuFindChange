@@ -17,14 +17,13 @@
 //       row shows the document it sits in (neither names a hit, so both take the chapter's arm),
 //       the book row activates its book.
 //
-//  WHERE THE ROW ARITHMETIC WENT (2026-08-01)
+//  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
-//  An earlier version worked out the next / previous row itself (a full tree-order walk over the
-//  model). It was replaced by "let the stock handler move, then open what it landed on", which
-//  behaves the same and cannot go wrong the same way: the stock handler only ever selects rows the
-//  tree actually has, while the hand-rolled walk counted chapters with GetChapterCount() where the
-//  tree is built from GetDisplayChapterCount() - so a result set over the display cap sent it after
-//  a node that does not exist.
+//  "Let the stock handler move, then open what it landed on" - not a tree-order walk over the model
+//  working out the next / previous row itself. The stock handler only ever selects rows the tree
+//  actually has; a hand-rolled walk once counted chapters with GetChapterCount() where the tree is
+//  built from GetDisplayChapterCount(), so a result set over the display cap sent it after a node
+//  that does not exist.
 //
 //  TreeViewEventHandler is the stock base (source/open/includes/widgets; on the CPP.rsp path) and
 //  HandleUpDownKey is virtual precisely for this. Home / End / PageUp / PageDown and the left /
@@ -122,9 +121,8 @@ bool16 KBSResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	if (!node->IsHitRow())
 		treeMgr->ExpandNode(selected[0], kFalse /*expandAllDescendants*/);
 
-	// The row's action - the same one a click on it would run, marker and all (the click's marker
-	// used to wait out the double-click interval and this one did not; both come up at once since
-	// 2026-09-25 - see KBSJump.h).
+	// The row's action - the same one a click on it would run, marker and all (the two come up at
+	// once - see KBSJump.h).
 	KBSJump::ActivateNode(node->GetChapter(), node->GetHit());
 
 	// That action activated a document window - or, on a book row, the Book panel - which took the

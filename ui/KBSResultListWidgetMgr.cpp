@@ -12,18 +12,16 @@
 //      needed a resource of its own.
 //      The expander is hidden on a row with no children, which DOES happen: a book search that
 //      finds nothing still draws its book row (the adapter gives the root one child whenever the
-//      results came from a book), and that row has no chapters under it. Measured by the user on
-//      2026-07-30 and written down in KBSBookWatch, which is where this file's own "never happens"
-//      was finally read against a fact - it had stood since 2026-07-23, when there was no book row
-//      to make it false. The guard also mirrors KESCL's.
+//      results came from a book), and that row has no chapters under it - measured by the user
+//      (KBSBookWatch has the account). The guard also mirrors KESCL's.
 //    * HIT rows (from kKBSResultHitNodeWidgetRsrcID): one match's line, drawn by the custom
 //      colour cell (KBSColorTextView) with the matched part highlighted. No expander (a leaf);
 //      indented past its branch row.
 //
-//  The STORY rows (2026-09-27) group each chapter's hits by story. (The level held the FONT rows of
-//  Find Missing Glyphs from 2026-08-02 until that scan was removed on 2026-09-27.)
+//  The STORY rows group each chapter's hits by story. (The code calls them FONT rows: the level once
+//  held the fonts of the Find Missing Glyphs scan, since removed.)
 //
-//  A fifth kind, the RUN row (2026-09-29, Show Changes by KohakuFindChange): on a list rebuilt from the
+//  A fifth kind, the RUN row (Show Changes by KohakuFindChange): on a list rebuilt from the
 //  Track Changes records, one replace's rows sit under a branch row between the document and its
 //  stories - "<date> <time>  (N)", the branch shape again, one step right of the document row.
 //
@@ -64,10 +62,10 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KBSResultNodeID.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 #include "KBSResultTree.h"
 #include "KBSColorTextView.h"	// IKBSRowData (the hit cell)
-#include "IKBSStatusTextData.h"	// the message area's pieces (2026-09-29)
+#include "IKBSStatusTextData.h"	// the message area's pieces
 #include "KBSPanelIcon.h"		// the illustration follows the status line
 
 namespace
@@ -79,10 +77,10 @@ namespace
 	const PMReal kExpanderZone = 16.0;
 	// How much further right than its chapter row a hit row's content starts. ZERO: the check box
 	// begins exactly where the chapter row's expander arrow ends, so the two line up down the left
-	// edge (user's call 2026-07-28, from a screen shot - "put the check where the arrow is").
+	// edge (the author's call, from a screen shot - "put the check where the arrow is").
 	//
-	// It was a full expander zone, then half of one, and both left a gap in front of the check box
-	// that bought nothing. The hierarchy is still legible without it: the chapter row's LABEL and
+	// A full expander zone, or half of one, only leaves a gap in front of the check box that buys
+	// nothing. The hierarchy is still legible without it: the chapter row's LABEL and
 	// the hit row's LOCATOR are what the eye compares, and the check box's width keeps those apart.
 	const PMReal kHitExtraIndent = 0.0;
 	// The hit row's check box occupies this much at the start of the row's content, and the
@@ -91,9 +89,9 @@ namespace
 	// What that same column shrinks to when NO row of the list carries a check box: a replace's report,
 	// or a list rebuilt from the records - see everyRowLostBox in ApplyHitRow, which is the one place
 	// that decides. Half a check zone, so the hit rows land 8px right of the row above them: the step
-	// the book and story levels already use, which makes the whole tree one even staircase (user's
-	// call 2026-08-02 - "make it a nice staircase, shifted left by the check"). (The name is from the
-	// scans, whose lists had no boxes either - removed 2026-09-27.)
+	// the book and story levels already use, which makes the whole tree one even staircase (the
+	// author's call - "make it a nice staircase, shifted left by the check"). (The name is from the
+	// scans, since removed, whose lists had no boxes either.)
 	// Half rather than all of it: giving back the full 16px would line the hit rows up with their
 	// story row's LABEL, leaving no step at all between a branch and the rows under it. The full
 	// zone is still kept for a WORK LIST, where some rows have a box and some do not and the
@@ -213,25 +211,24 @@ public:
 		return this->GetTreeViewWidth();
 	}
 
-	// ***** THE ROW'S CONTENT GOES IN HERE, NOT IN AN ApplyNodeIDToWidget OVERRIDE (2026-10-02, the API
-	// ***** re-audit). ***** The two-argument constructor above turns on the base class's V2 path, and on
+	// THE ROW'S CONTENT GOES IN HERE, NOT IN AN ApplyNodeIDToWidget OVERRIDE. The two-argument
+	// constructor above turns on the base class's V2 path, and on
 	// that path the base's ApplyNodeIDToWidget runs, in this order: the selection highlight,
 	// HideExpanderIfNotExpandable, ApplyIndentToWidget - which REWRITES the frame.Left of this row's
 	// children - and then THIS (CTreeViewWidgetMgr.cpp:207-219). So the frames set below land on top of
 	// the framework's indent by the framework's own order: the framework indent is NOT switched off here,
 	// it is overwritten, and nothing in this file has to remember to call anything first.
 	//
-	// Until then this was an ApplyNodeIDToWidget override that called the base FIRST and filled the row
-	// after it, under a note that the call "MUST stay first" - it had been moved last once (2026-07-31,
-	// copied from the layer and links panels) and the hit rows' content went back to the left margin.
-	// Those panels are not a counter-example: they use the one-argument constructor, which the header
+	// !Do not go back to an ApplyNodeIDToWidget override: there the base has to be called FIRST, and
+	// moving the call last (as the layer and links panels have it) sends the hit rows' content back to
+	// the left margin. Those panels are not a counter-example: they use the one-argument constructor, which the header
 	// marks DEPRECATED and whose base call applies the highlight alone (CTreeViewWidgetMgr.cpp:59-74,
 	// 207-221). And on the V2 path the base's own ApplyDataToWidget ran on every row before ours - the
 	// sample default that numbers a ListIndexNodeID, asserting in a debug build that "you must override
 	// CTreeViewWidgetMgr::ApplyDataToWidget()" (:93-113). This is that override: the shape the shipping
 	// MSO panel (MSOPanelTreeViewWidgetMgr.cpp) and both of KCM's trees have.
 	//
-	// kTrue always, the KESCM answer: kFalse asks the framework to build a new widget and apply again
+	// kTrue always, KCM's answer: kFalse asks the framework to build a new widget and apply again
 	// (CTreeViewWidgetMgr.h:160-162), and a row the model cannot resolve would be missing from that one too.
 	virtual bool16 ApplyDataToWidget(const NodeID& node, IPanelControlData* rowData, int32 /*message*/) const
 	{
@@ -272,7 +269,7 @@ public:
 		//   under a book row), because the Apply*Row methods carry it themselves in LevelShift().
 		//   The two can only pull a row in different directions if one of those methods ever stops
 		//   setting a frame - which is the invariant to keep, rather than "keep these numbers in
-		//   step", which is what this note claimed until 2026-08-11.
+		//   step".
 		TreeNodePtr<KBSResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
@@ -290,15 +287,14 @@ private:
 	}
 
 	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story
-	// row every hit sits under (since 2026-09-27 - "when the chapter has font rows" until 2026-10-01, from
-	// the days a Find/Change chapter had none), and the run step where there is one.
+	// row every hit sits under, and the run step where there is one.
 	PMReal FontShift(int32 chapterIdx) const
 	{
 		return kFontLevelIndent + this->RunShift(chapterIdx);
 	}
 
-	// One more step for the story and hit rows of a chapter that has RUN rows above them (2026-09-29,
-	// Show Changes) - asked from the adapter's own count, like FontShift.
+	// One more step for the story and hit rows of a chapter that has RUN rows above them (Show Changes)
+	// - asked from the adapter's own count, like FontShift.
 	PMReal RunShift(int32 chapterIdx) const
 	{
 		return (KBSResults()->GetDisplayRunCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
@@ -355,11 +351,10 @@ private:
 	// is the root's single child - so it is the panel's standing answer to which book is the target,
 	// which a status line cannot be (one line, truncated, overwritten by the next message).
 	// "  - first N shown" when the tree is drawing fewer hit rows than it holds (kKBSDisplayHitLimit),
-	// on the OUTERMOST row only - the book row, or a document's row when there is no book. The counts
-	// in the rows stay uncapped (they are about the work: Check All and a replace reach every stored
-	// hit); this says, once, that the rows under them are not all drawn. Until 2026-09-28 the only word
-	// of it was a sentence on the status line, which the next click replaced (the notice had left the
-	// rows on 2026-08-05 - docs/ai-notes/kbs-checked-readout-audit-2026-08-05.md).
+	// on the OUTERMOST row only - the book row, or a document's row when there is no book - and once,
+	// because a sentence on the status line is replaced by the next click. !A GUARD NOW: the search stops
+	// collecting at the same number (kKBSCollectHitLimit, the spec map's GEN-34), so the model holds no
+	// row the tree does not draw and this does not fire; it stays for the day the two limits part.
 	static void AppendDisplayCapNote(PMString& label)
 	{
 		if (KBSResults()->GetTotalHitCount() <= KBSResultModel::kKBSDisplayHitLimit)
@@ -373,27 +368,23 @@ private:
 		IPanelControlData* rowData) const
 	{
 		// "<book>  (N/M checked)" - how many of this book's hits are ticked, out of all of them
-		// (user's wording, 2026-08-05; it used to read just "(M)"). The row a Check All over the
-		// book acts on is this row, so what it did is answered in the same place it was asked.
+		// (the author's wording). The row a Check All over the book acts on is this row, so what it
+		// did is answered in the same place it was asked.
 		//
-		// Both numbers are UNCAPPED - every stored hit, not the rows on screen. That is what Check
-		// All ticks and what a replace would rewrite.
+		// Both numbers count every stored hit - what Check All ticks and what a replace would rewrite.
 		//
-		// ***** ONLY ON A LIST THAT HAS BOXES, AND ONLY ON A LIST THAT HAS ROWS. ***** A replace's report
-		// and a list rebuilt from the records have no boxes at all, so "checked" is a word about nothing
-		// there and the count is 0 by definition (this row read "(0/120 checked)" over a scan's report
-		// from 2026-08-05 until NoRowHasCheckBox was given a home in the model). Those lists go back to
-		// the plain total, which is what this row has always said when there was no work to offer.
+		// ONLY ON A LIST THAT HAS BOXES, AND ONLY ON A LIST THAT HAS ROWS. A replace's report and a list
+		// rebuilt from the records have no boxes at all, so "checked" is a word about nothing there and
+		// the count is 0 by definition ("(0/120 checked)"). Those lists go back to the plain total, which
+		// is what this row says when there is no work to offer.
 		//
-		// ***** AND A BOOK SEARCH THAT FOUND NOTHING IS THE SAME SENTENCE ABOUT NOTHING. ***** This
-		// row is drawn even when the search found no hits at all - the hierarchy adapter gives the
-		// root one child whenever the results came from a book, which is deliberate: it is how the
-		// panel goes on naming the book it just searched. With no hits and a Find/Change kind
-		// NoRowHasCheckBox is false, so the row read "book.indb  (0/0 checked)" from 2026-08-05 to
-		// 2026-08-11 - the "(0/120 checked)" fault over again, in the one case its fix did not
-		// count. Found by reading KBSBookWatch, which describes this row as saying "book.indb  (0)"
-		// and had the user's own measurement of it (2026-07-30) to say so; the wording changed
-		// underneath that note and nothing brought the two back together. Back to "(0)".
+		// AND A BOOK SEARCH THAT FOUND NOTHING IS THE SAME SENTENCE ABOUT NOTHING. This row is drawn
+		// even when the search found no hits at all - the hierarchy adapter gives the root one child
+		// whenever the results came from a book, which is deliberate: it is how the panel goes on
+		// naming the book it just searched. With no hits and a Find/Change kind NoRowHasCheckBox is
+		// false, so without the hit-count test the row would read "book.indb  (0/0 checked)". It reads
+		// "(0)" - which is also how KBSBookWatch describes it (the user's own measurement); keep the
+		// two together.
 		//
 		// M counts LOCKED hits too, though Check All cannot tick them (RowHasCheckBox turns them
 		// away) - so a fully checked chapter of locked-and-free hits reads short of its own total on
@@ -429,15 +420,12 @@ private:
 			return;
 
 		// "<name>  (N/M checked)" - the same read-out the book row carries, for this chapter alone
-		// (user's wording, 2026-08-05). A Check All over a DOCUMENT row means that chapter, so this
-		// is where its answer belongs.
+		// (the author's wording). A Check All over a DOCUMENT row means that chapter, so this is
+		// where its answer belongs.
 		//
-		// Both numbers are UNCAPPED. The label used to read "(shown / total)" on the one boundary
-		// chapter the display cap falls inside, which was the panel talking about ITSELF rather than
-		// about the work: the hits past the cap are still stored, still ticked by Check All and
-		// still rewritten by a replace. Saying how many are drawn was dropped with the matching
-		// "(N shown)" on the status line - and came back on 2026-09-28 as one note on the OUTERMOST
-		// row, outside the brackets (AppendDisplayCapNote).
+		// Both numbers are about the work, not the drawing - never "(shown / total)", which is the
+		// panel talking about ITSELF. How many rows are drawn is one note on the OUTERMOST row,
+		// outside the brackets (AppendDisplayCapNote).
 		//
 		// And, exactly as on the book row, only where there are boxes to count: a list with none falls
 		// back to the plain total. See ApplyBookRow for the whole of it.
@@ -448,7 +436,7 @@ private:
 		// that happens.
 		PMString label(name);
 		label.SetTranslatable(kFalse);
-		// ***** A DOCUMENT WITH NO WINDOW (2026-09-29). ***** Search: = All Documents searches those too, as
+		// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
 		// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
 		// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
 		// takes the note away at the next repaint.
@@ -477,16 +465,12 @@ private:
 		if (!KBSResults()->IsFromBook())
 			AppendDisplayCapNote(label);
 
-		// A chapter a cancelled replace never reached used to say "cancelled" here (2026-08-03). Only
-		// the chapter-at-a-time path could leave one: it saved as it went, so a cancel stopped the run
-		// with some chapters done and the rest untouched. That path went with "save after replace" on
-		// 2026-08-05, and a cancel now puts the WHOLE run back - there is no such chapter any more.
+		// (No "cancelled" note: a cancel puts the WHOLE run back, so no chapter is left half-reached.)
 
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
 
-	// A STORY row (2026-09-27; the code calls the level FONT - it held the fonts of Find Missing Glyphs until
-	// that scan went the same day): the story's first words and how many rows sit under it. The same shape
+	// A STORY row (the code calls the level FONT - see the head of the file): the story's first words and how many rows sit under it. The same shape
 	// as a document row - an expander and a label - so it shares the branch layout and the chapter row's
 	// resource, one step further right.
 	void ApplyFontRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
@@ -497,9 +481,9 @@ private:
 		if (!KBSResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
-		// "P3  first words...  (N/M checked)", the way a document row reads out its count - UNCAPPED, like
-		// the rows above it: what the row holds, not what the panel drew of it. (A group that answered
-		// GetFontDisplay is in range: an IsStoryGroup test stood here too until 2026-10-01.)
+		// "P3  first words...  (N/M checked)", the way a document row reads out its count, like the rows
+		// above it: what the row holds, not what the panel drew of it. (A group that answered
+		// GetFontDisplay is in range - no further test needed.)
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
@@ -519,7 +503,7 @@ private:
 			this->LevelShift() + kFontLevelIndent + this->RunShift(nodeID->GetChapter()), label);
 	}
 
-	// A RUN row (2026-09-29, Show Changes by KohakuFindChange): one replace's rows, "<date> <time>  (N)" -
+	// A RUN row (Show Changes by KohakuFindChange): one replace's rows, "<date> <time>  (N)" -
 	// the branch shape one step right of its document row. No checked count: a list rebuilt from the
 	// records has no boxes.
 	void ApplyRunRow(const TreeNodePtr<KBSResultNodeID>& nodeID, const NodeID& node,
@@ -611,8 +595,7 @@ private:
 			// Rows are recycled as the tree scrolls, so a row that once showed a replaced or locked
 			// hit has to get its box back.
 			checkView->ShowView(kTrue);
-			// (A footnote's row was ticked and greyed from 2026-09-26 to 2026-09-27, while the replace was
-			// Change All. It is ticked by hand like any other now - only its Reject Change and Accept Change
+			// (A footnote's row is ticked by hand like any other - only its Reject Change and Accept Change
 			// stay off, since Track Changes records nothing in a footnote.)
 			checkView->Enable();
 		}
@@ -628,9 +611,9 @@ private:
 			//         P1(2) lock
 			//         P1(3) lock
 			//
-			// The rows without a box used to reclaim those 16px, which read as a ragged left edge
-			// once a search turned up a lot of locked hits (user's call 2026-07-28, from a screen
-			// shot). A column that does not move is worth more than the width.
+			// Rows without a box reclaiming those 16px read as a ragged left edge once a search turns
+			// up a lot of locked hits (the author's call, from a screen shot). A column that does not
+			// move is worth more than the width.
 			//
 			// A list where NO row has a box is the case where the column can move, because it moves
 			// for every row at once and nothing is left ragged: a replace's report (every row lost its
@@ -712,17 +695,16 @@ void KBSResultTree::Rebuild()
 		for (int32 n = 0; n < chapters; ++n)
 			treeMgr->ExpandNode(KBSResultNodeID::Create(KBSResults()->GetShownChapter(n)), kFalse);
 	}
-	// (All Documents - 2026-09-29, the user's call - leaves its document rows CLOSED, for the book's reason
-	//  above: one document's hits would bury the fact that the others matched at all.)
+	// (All Documents - the author's call - leaves its document rows CLOSED, for the book's reason above:
+	//  one document's hits would bury the fact that the others matched at all.)
 	//
-	// ***** THE STORY ROWS COME UP OPEN (2026-09-27, the story level). ***** The level is a grouping, not
-	// a place to hide rows: a story row closed would put every hit one click further away than it was
-	// before the level existed. Opened in a closed chapter too (a book's), so the chapter's arrow shows
+	// THE STORY ROWS COME UP OPEN. The level is a grouping, not a place to hide rows: a story row closed
+	// would put every hit one click further away. Opened in a closed chapter too (a book's), so the chapter's arrow shows
 	// its hits at once.
 	for (int32 n = 0; n < chapters; ++n)
 	{
 		const int32 c = KBSResults()->GetShownChapter(n);
-		// ...and the RUN rows above them the same (2026-09-29, Show Changes): a grouping, not a hiding place.
+		// ...and the RUN rows above them the same (Show Changes): a grouping, not a hiding place.
 		const int32 runs = KBSResults()->GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
 			treeMgr->ExpandNode(KBSResultNodeID::CreateRun(c, r), kFalse);
@@ -748,9 +730,9 @@ void KBSResultTree::RefreshRows()
 	// up when they scroll into view. The row heights do not change here, which is what NodeChanged
 	// requires.
 	//
-	// ***** The BOOK row first, and it has to be asked for by name. ***** childrenChangedAlso
-	// refreshes a node's children, so refreshing the chapters does NOT reach the row above them.
-	// It carries "(N/M checked)" now (2026-08-05), so it goes stale the moment anything is ticked -
+	// The BOOK row first, and it has to be asked for by name. childrenChangedAlso refreshes a node's
+	// children, so refreshing the chapters does NOT reach the row above them. It carries
+	// "(N/M checked)", so it goes stale the moment anything is ticked -
 	// which is exactly what this function is called for. Only drawn on a book search; NodeChanged
 	// on a node the tree does not hold is harmless.
 	if (KBSResults()->IsFromBook())
@@ -764,7 +746,7 @@ void KBSResultTree::RefreshRows()
 	{
 		const int32 c = KBSResults()->GetShownChapter(n);	// (chapter n, but for an emptied one before it)
 		treeMgr->NodeChanged(KBSResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
-		// the run rows (2026-09-29): the story rows' parents there, so the chapter's call stops at them
+		// the run rows: the story rows' parents there, so the chapter's call stops at them
 		const int32 runs = KBSResults()->GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateRun(c, r), kTrue /*childrenChangedAlso*/);
@@ -793,7 +775,7 @@ void KBSResultTree::RefreshCheckedCounts(int32 chapterIdx)
 	if (chapterIdx >= 0)
 	{
 		treeMgr->NodeChanged(KBSResultNodeID::Create(chapterIdx), kFalse);
-		// ...and its STORY rows, which read out a checked count too (2026-09-27)
+		// ...and its STORY rows, which read out a checked count too
 		const int32 groups = KBSResults()->GetDisplayFontCount(chapterIdx);
 		for (int32 g = 0; g < groups; ++g)
 			treeMgr->NodeChanged(KBSResultNodeID::CreateFont(chapterIdx, g), kFalse);
@@ -821,11 +803,10 @@ void KBSResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 
 // The last thing ShowStatus was given. Kept in the module rather than read back off the widget: the
 // widget is gone whenever the panel is closed, and the line is written back when the panel is shown
-// again (RestoreStatusOnPanelShow). (GetLastStatus, which handed it to app.kfcStatus, went with that
-// property on 2026-09-27.)
+// again (RestoreStatusOnPanelShow).
 static PMString gLastStatus;
 
-// ***** THE "Source Text:" A SELECTED REPLACED ROW PUT UP (2026-09-29, ShowRowsBefore). ***** Its pieces, and
+// THE "Source Text:" A SELECTED REPLACED ROW PUT UP (ShowRowsBefore). Its pieces, and
 // whether it is standing - kept beside gLastStatus for the same reason: the panel can be closed and
 // shown again while it stands. It stands OVER the last message rather than replacing it, so that
 // selecting a row that has no "before" puts that message back (DropBefore); gLastStatus is not touched.
@@ -834,7 +815,7 @@ static PMString gBeforePre;
 static PMString gBeforeOriginal;
 static PMString gBeforePost;
 
-// ***** WHY A ROW'S RIGHT-CLICK MENU IS GREY (2026-10-04, O-3, ShowRowMenuReason). ***** One more layer, over
+// WHY A ROW'S RIGHT-CLICK MENU IS GREY (ShowRowMenuReason). One more layer, over
 // the "Source Text:" or the last message: neither of those is touched while it stands, so the next right-click
 // that has nothing to say - or a selection (DropBefore) - puts back exactly what it covered.
 static bool gShowingReason = false;
@@ -862,12 +843,11 @@ namespace
     when the panel is closed, which is an ordinary state. Shared by every writer below, so they all
     reach the box the same way; they decide only WHAT it says.
 
-    ***** NO '&' DOUBLING SINCE 2026-09-29. ***** The line names files the user chose, and the stock
-    StaticText this box used to be took a lone '&' as a keyboard accelerator ("A&B.indd" drew as "AB.indd"
-    with the B underlined - reported 2026-07-31), so every message went through InsertAmpersandForDisplay
-    on its way in. The box is drawn by hand now, with convertAmpersand kFalse (KBSStatusTextView.cpp), so
-    the text is the text - and a reader of the widget (KIDMCP's inspect_ui) reads "A&B.indd" rather than
-    the doubled "A&&B.indd" it used to get.
+    NO '&' DOUBLING. The line names files the user chose; a stock StaticText takes a lone '&' as a
+    keyboard accelerator ("A&B.indd" draws as "AB.indd" with the B underlined) and needs every message
+    put through InsertAmpersandForDisplay. This box is drawn by hand, with convertAmpersand kFalse
+    (KBSStatusTextView.cpp), so the text is the text - and a reader of the widget (KIDMCP's inspect_ui)
+    reads "A&B.indd", not a doubled "A&&B.indd". !Do not double it again.
 
     @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
                        there is nothing on screen to force yet, and this runs mid-construction. */
@@ -889,12 +869,10 @@ void WriteStatusWidget(const PMString& label, const PMString& pre, const PMStrin
 	textData->SetSegments(label, pre, mid, post, wantCaret);
 
 	// The pieces are not something the view watches, so it is told to repaint - and, for a report, made
-	// to repaint NOW (ShowStatus says why): an invalidated view waits for the next event loop. (The stock
-	// multi-line text this box replaced did invalidate itself on SetString - memory
-	// statictext-widget-immediate-update - but drawing at once was still this call's job.)
+	// to repaint NOW (ShowStatus says why): an invalidated view waits for the next event loop (memory
+	// statictext-widget-immediate-update).
 	// ONE call for each case: ForceRedraw with no region draws the whole view now ("Redraws the invalid
-	// region directly", IControlView.h:281-286), so an Invalidate in front of it asked for nothing more
-	// (2026-10-02, the API re-audit - KCM's position read-out lost the same duplicate).
+	// region directly", IControlView.h:281-286), so an Invalidate in front of it asks for nothing more.
 	if (forceRedraw)
 		textView->ForceRedraw();
 	else
@@ -912,7 +890,7 @@ void WriteMessage(const PMString& message, bool16 forceRedraw)
     replace took in the middle - or the bar, when it took nothing (an insertion). */
 void WriteBefore(bool16 forceRedraw)
 {
-	// ***** "Source Text:", KCM's word (the user's call, 2026-09-29 - "Before:" until then). ***** KCM's
+	// "Source Text:", KCM's word (the author's call). KCM's
 	// message area says the same thing in the same place: the row shows the newer side, the box the older
 	// one. Here the older side is what Track Changes holds as the deletion - what Reject brings back.
 	PMString label("Source Text:");
@@ -937,10 +915,9 @@ void KBSResultTree::RestoreStatusOnPanelShow()
 	// Widget strings are PERSISTED IN THE WORKSPACE. A panel that is rebuilt - on every show, and
 	// once more when InDesign is launched - comes back carrying whatever this line last said,
 	// including a message from a session that ended days ago, while the results it described are
-	// long gone (reported 2026-08-02: "the previous message is still there after a restart"). The
-	// .fr's initial text was only ever used the very first time the panel was built. (Since 2026-09-29
-	// the box is drawn by hand from pieces nothing persists, and its resource carries no text at all -
-	// so this is the only writer a newly built panel meets.)
+	// long gone ("the previous message is still there after a restart"). The box is drawn by hand from
+	// pieces nothing persists, and its resource carries no text at all - so this is the only writer a
+	// newly built panel meets.
 	//
 	// So the panel's show is where the line has to be written, exactly as the tab's name and the
 	// illustration already are: whatever is written here outranks the persisted value.
@@ -959,7 +936,7 @@ void KBSResultTree::RestoreStatusOnPanelShow()
 	if (!gLastStatus.IsEmpty())
 	{
 		// Something ran in THIS session: put its message back. This also restores the line when the
-		// panel is closed and reopened mid-session, which used to lose it.
+		// panel is closed and reopened mid-session.
 		WriteMessage(gLastStatus, kFalse /*still being built*/);
 		return;
 	}
@@ -975,9 +952,9 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	gLastStatus = message;
 	gLastStatus.SetTranslatable(kFalse);
 
-	// A new message takes the place of a standing "Source Text:" (2026-09-29): it reports something that has
-	// happened since, and a jump that fails says why through here - never under an old row's text. And of a
-	// standing right-click reason (2026-10-04), for the same reason.
+	// A new message takes the place of a standing "Source Text:": it reports something that has happened
+	// since, and a jump that fails says why through here - never under an old row's text. And of a standing
+	// right-click reason, for the same reason.
 	gShowingBefore = false;
 	gShowingReason = false;
 	gReason.Clear();
@@ -1009,7 +986,7 @@ void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 		return;
 	}
 
-	// ***** CUT LONG BEFORE THE BOX HAS TO MEASURE IT. ***** The original text is the WHOLE match (a GREP
+	// CUT LONG BEFORE THE BOX HAS TO MEASURE IT. The original text is the WHOLE match (a GREP
 	// across paragraphs, a format-only search: a story's worth), where a row's own is capped at 50
 	// characters for drawing (KBSSearchEngine's kKBSMaxLineChars) - and the box lays its text out by
 	// measuring prefixes, again for every width it tries (KBSStatusTextView.cpp), on every repaint. It
@@ -1050,7 +1027,7 @@ void KBSResultTree::DropBefore()
 	if (!gShowingBefore)
 	{
 		// Nothing standing - but a right-click reason over the last message is about a row the user has
-		// now moved away from by selecting another one (2026-10-04, O-3): it goes too.
+		// now moved away from by selecting another one: it goes too.
 		DropRowMenuReason();
 		return;
 	}
@@ -1067,7 +1044,7 @@ void KBSResultTree::DropBefore()
 }
 
 //----------------------------------------------------------------------------------------
-// KBSResultTree::ShowRowMenuReason / DropRowMenuReason - why a row's right-click menu is grey (2026-10-04)
+// KBSResultTree::ShowRowMenuReason / DropRowMenuReason - why a row's right-click menu is grey
 //----------------------------------------------------------------------------------------
 
 void KBSResultTree::ShowRowMenuReason(const PMString& reason)
@@ -1104,14 +1081,10 @@ void KBSResultTree::ShowCheckAllStatus(const PMString& targetName, bool nowCheck
 	// "<name>  all checked" - the row's own name first, spaced the way the tree spaces its label
 	// from its count, so the line reads as an echo of the row that was clicked.
 	//
-	// The NAME is what matters here and the counts are deliberately left out: the row itself now
-	// reads "(N/M checked)", and this line exists to answer "which one did I just do that to?" -
-	// the same two commands mean one chapter or the whole book depending on where the menu was
-	// popped, and that is the part the panel cannot show afterwards.
-	//
-	// (Until 2026-08-05 this was ShowCheckedStatus, which put "<checked> / <total> checked." here
-	// after ANY change of any box. The count moved onto the rows; what was left worth saying is
-	// this.)
+	// The NAME is what matters here and the counts are deliberately left out: the row itself reads
+	// "(N/M checked)", and this line exists to answer "which one did I just do that to?" - the same
+	// two commands mean one chapter or the whole book depending on where the menu was popped, and
+	// that is the part the panel cannot show afterwards.
 	PMString msg(targetName);
 	msg.SetTranslatable(kFalse);
 	msg.Append(nowChecked ? "  all checked" : "  all unchecked");

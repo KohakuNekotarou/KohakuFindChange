@@ -4,19 +4,19 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  What every hand-drawn text widget in this panel has to agree about (2026-09-29): how far the
-//  CONTEXT around a match is faded toward the background, how that faded colour is worked out, the
-//  two flags every draw and every measure passes, and the BAR that stands where a change has a place
-//  and no characters.
+//  What every hand-drawn text widget in this panel has to agree about: how far the CONTEXT around a
+//  match is faded toward the background, how that faded colour is worked out, the two flags every
+//  draw and every measure passes, and the BAR that stands where a change has a place and no
+//  characters.
 //
-//  ***** WHY THIS FILE EXISTS. ***** Two widgets draw "the words that matter at full strength, the
-//  words around them faded": a hit row's cell (KBSColorTextView.cpp) and, since 2026-09-29, the
-//  panel's MESSAGE AREA (KBSStatusTextView.cpp), which shows a replaced row's text as it was BEFORE
-//  the replace. If each kept its own 0.65 and its own blend, the two would answer the same question in
-//  two places and drift apart the first time one of them was tuned.
+//  WHY THIS FILE EXISTS. Two widgets draw "the words that matter at full strength, the words around
+//  them faded": a hit row's cell (KBSColorTextView.cpp) and the panel's MESSAGE AREA
+//  (KBSStatusTextView.cpp), which shows a replaced row's text as it was BEFORE the replace. If each
+//  kept its own 0.65 and its own blend, the two would answer the same question in two places and drift
+//  apart the first time one of them was tuned.
 //
-//  ***** THE SAME SHAPE AS KCM's KCMPanelTextDraw.h, which the message area was brought over from
-//  (the user: "the way KCM does it"). ***** Header-only for the reason KCM gives: one constant, a
+//  THE SAME SHAPE AS KCM's KCMPanelTextDraw.h, which the message area was brought over from (the
+//  author: "the way KCM does it"). Header-only for the reason KCM gives: one constant, a
 //  pure function of three numbers and a few lines of drawing - no state, no SDK object to hold.
 //  ! What is NOT shared is the colour LOOKUP: the row cell asks whether its row is selected and
 //    switches both colours to the selection pair, while the message area is never selected. Each
@@ -36,9 +36,9 @@
 #include "PMString.h"			// the bar's placeholder
 
 /** The two flags every draw and every measure passes, spelled out rather than left to a default.
-    ***** THE DEFAULTS IN DrawStringUtils.h DISAGREE WITH EACH OTHER: the draw calls default to kFalse,
-    the measure and ellipsize calls to kTrue - so taking them would measure a string differently from
-    how it is drawn. ***** '&' has to survive verbatim in any case: the rows draw document text and the
+    THE DEFAULTS IN DrawStringUtils.h DISAGREE WITH EACH OTHER: the draw calls default to kFalse, the
+    measure and ellipsize calls to kTrue - so taking them would measure a string differently from how
+    it is drawn. '&' has to survive verbatim in any case: the rows draw document text and the
     message area draws file names the user chose ("A&B.indd"). The app's own drawing names them the
     same way (CRenderingObjectDrawer::DrawRenderObjectUIName). */
 const bool16 kKBSDontConvertAmpersand = kFalse;
@@ -47,13 +47,13 @@ const bool16 kKBSNoUnderline = kFalse;
 /** How much of the theme's text colour the CONTEXT keeps: 0 = the background itself (invisible),
     1 = the full text colour (no fade at all).
 
-    0.65 rather than the 0.50 it shipped with (user's call 2026-08-02, "blend it into the background a
-    little less"): half and half made the surrounding line harder to read than it needed to be, and
-    the match still stands out at this weight. (KCM took the same 0.65 from here.) */
+    0.65, not 0.50 (the author's call, "blend it into the background a little less"): half and half
+    made the surrounding line harder to read than it needed to be, and the match still stands out at
+    this weight. (KCM took the same 0.65 from here.) */
 const double kKBSContextTextWeight = 0.65;
 
 /** Linear blend of two RGB colours (t = 0 -> bg, t = 1 -> fg) - how the context is faded toward
-    whatever stands behind it (the KESCM scrollbar-map trick). RealAGMColor's components are PMReal,
+    whatever stands behind it (KCM's scrollbar-map trick). RealAGMColor's components are PMReal,
     hence the ToDouble on the way back into its constructor. */
 inline RealAGMColor KBSBlendColor(const RealAGMColor& bg, const RealAGMColor& fg, const PMReal& t)
 {
@@ -64,8 +64,8 @@ inline RealAGMColor KBSBlendColor(const RealAGMColor& bg, const RealAGMColor& fg
 		ToDouble(bg.blue  * u + fg.blue  * t));
 }
 
-/** ***** THE PLACE WORDS LEFT, OR WHERE THEY WENT IN (2026-09-29, the user's request - "the bar KCM
-    draws; bring it to KBS"). *****
+/** THE PLACE WORDS LEFT, OR WHERE THEY WENT IN (the author's request - "the bar KCM draws; bring it
+    to KBS").
 
     A row whose match was replaced with NOTHING shows the line with the words simply gone: the
     context closes up and nothing says WHERE. A zero-width match (GREP ^ / $ / a lookaround) is the
@@ -74,13 +74,13 @@ inline RealAGMColor KBSBlendColor(const RealAGMColor& bg, const RealAGMColor& fg
     had nothing there before. All three are "a place, and nothing to show", and KCM draws that as a
     thin bar the full height of the line.
 
-    ***** NOTHING IS ADDED TO ANY STRING. ***** The bar is DRAWN; the placeholder below only reserves
-    the room, so nothing a reader walks (KIDMCP's inspect_ui reads the rows' "[]") gains a character.
+    NOTHING IS ADDED TO ANY STRING. The bar is DRAWN; the placeholder below only reserves the room, so
+    nothing a reader walks (KIDMCP's inspect_ui reads the rows' "[]") gains a character.
 
-    ***** 1.0 WIDE, and on WHOLE PIXELS - both KCM's findings, taken as they stand. ***** KCM showed
-    2.0 first and was asked for thinner (2026-09-08); and a centred 1px fill landed on x.5 as often as
-    on a whole number, which the renderer smooths into two paler pixels - the same bar read as a thin
-    dark line in one row and a wide grey one in the next (2026-09-16). Rounding the left edge makes
+    1.0 WIDE, and on WHOLE PIXELS - both KCM's findings, taken as they stand. KCM showed 2.0 first and
+    was asked for thinner; and a centred 1px fill landed on x.5 as often as on a whole number, which the
+    renderer smooths into two paler pixels - the same bar read as a thin dark line in one row and a
+    wide grey one in the next. Rounding the left edge makes
     every bar the same pixel. ! At a UI scale above 100% a view unit is more than one pixel, so this
     promises only that every bar is drawn the same way. */
 const PMReal kKBSCaretWidth(1.0);

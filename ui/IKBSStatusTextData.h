@@ -4,26 +4,26 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  What the panel's MESSAGE AREA draws (2026-09-29): an optional heading line, and a body split into
-//  the three pieces where its colour changes.
+//  What the panel's MESSAGE AREA draws: an optional heading line, and a body split into the three
+//  pieces where its colour changes.
 //
-//  ***** WHY PIECES AND NOT ONE STRING. ***** Every message the panel raises used to be one string in a
-//  stock multi-line static text, which draws its whole string in ONE colour. When a replaced row is
+//  WHY PIECES AND NOT ONE STRING. A stock multi-line static text draws its whole string in ONE colour.
+//  When a replaced row is
 //  selected, this box shows the text as it was BEFORE the replace (KBSJump::ActivateNode), and the
 //  reader's question there is "which characters were the ones replaced" - a question one colour
 //  cannot answer. So the box is drawn by hand (KBSStatusTextView.cpp), and a hand-drawn box has to be
 //  told where the colour changes: label / pre / mid / post is that channel. The same shape as KCM's
-//  IKCMStatusTextData, which is where it was brought over from (the user: "the way KCM does it").
+//  IKCMStatusTextData, which is where it was brought over from (the author: "the way KCM does it").
 //
-//  ***** AN ORDINARY MESSAGE IS THE SAME SHAPE, NOT A SPECIAL CASE: ***** the other pieces are empty
-//  and mid carries the whole sentence, which comes out as one run at the theme's text colour - what
-//  the stock widget drew. That is why no caller of KBSResultTree::ShowStatus had to change.
+//  AN ORDINARY MESSAGE IS THE SAME SHAPE, NOT A SPECIAL CASE: the other pieces are empty and mid
+//  carries the whole sentence, which comes out as one run at the theme's text colour - what the stock
+//  widget drew - so a caller of KBSResultTree::ShowStatus still passes one string.
 //
-//  ***** THE HEADING IS ITS OWN FIELD RATHER THAN THE HEAD OF pre, ***** for the overflow rule: when the
-//  text does not fit, the CONTEXT gives way from its outer ends - so a heading at the head of pre
-//  would be the first thing cut away. It is the one piece that must survive.
+//  THE HEADING IS ITS OWN FIELD RATHER THAN THE HEAD OF pre, for the overflow rule: when the text does
+//  not fit, the CONTEXT gives way from its outer ends - so a heading at the head of pre would be the
+//  first thing cut away. It is the one piece that must survive.
 //
-//  ***** NOT PERSISTENT. ***** This is the message raised last in this session; what outlives the panel
+//  NOT PERSISTENT. This is the message raised last in this session; what outlives the panel
 //  is kept on the tree's side (KBSResultListWidgetMgr.cpp) and written back when the panel is shown.
 //
 //========================================================================================
@@ -46,7 +46,7 @@ class IKBSStatusTextData : public IPMUnknown
 public:
 	enum { kDefaultIID = IID_IKBSSTATUSTEXTDATA };
 
-	/** Replace every piece. ***** ALL OF THEM, ALWAYS. ***** There is one message area and one message
+	/** Replace every piece. ALL OF THEM, ALWAYS. There is one message area and one message
 	    in it; writing only the pieces a caller happens to have would leave the rest of the previous
 	    message standing beside it.
 

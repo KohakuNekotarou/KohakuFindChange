@@ -9,27 +9,25 @@
 //    (-2, -1, -1, -1)        the hidden root
 //    (-1, -1, -1, -1)        the BOOK row       -> present only while the results came from a book search
 //    (chap, -1, -1, -1)      a document row     -> index into KBSResultModel's chapters
-//    (chap, run, -1, -1)     a RUN row          -> 'run' indexes the chapter's runs (2026-09-29: only a
-//                                                  list rebuilt from the records has them - Show Changes)
+//    (chap, run, -1, -1)     a RUN row          -> 'run' indexes the chapter's runs (only a list rebuilt
+//                                                  from the records has them - Show Changes)
 //    (chap, run, font, -1)   a STORY row        -> 'font' indexes the chapter's fontGroups (one per story;
 //                                                  per run and story under a run)
 //    (chap, run, font, hit)  a hit row          -> hit indexes that CHAPTER's hits
 //
-//  run is -1 everywhere on every other list, so those nodes are the triples they were until 2026-09-29.
-//  Like the font group, the run of a story or hit row is DERIVED from the model, never passed in (see
-//  Create(chapter, hit)).
+//  run is -1 on every other list. Like the font group, the run of a story or hit row is DERIVED from
+//  the model, never passed in (see Create(chapter, hit)).
 //
 //  The book row is what tells the user WHICH book was searched, permanently and in the panel
 //  itself rather than in a status line that the next message overwrites. A document-scope search
 //  has no book row, so its tree is one level shallower.
 //
-//  The middle level held FONTS for Find Missing Glyphs from 2026-08-02 (the font was the unit a fix
-//  applied to). Since 2026-09-27 it holds STORIES - a Find/Change result is grouped by story, the way
-//  KCM's Story mode lists them - and that scan has been removed. The names "font" / FontGroup are
-//  kept from then. A story row has its own menu (Replace / Reject Change / Accept Change / Replace
-//  Again / Check All / Uncheck All - KBSResultNodeEH::RButtonDn).
+//  The level under a document holds STORIES - a Find/Change result is grouped by story, the way KCM's
+//  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find
+//  Missing Glyphs scan, since removed); the names were kept. A story row has its own menu (Replace /
+//  Reject Change / Accept Change / Replace Again / Check All / Uncheck All - KBSResultNodeEH::RButtonDn).
 //
-//  ***** hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
+//  hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
 //  way, and this level is a way of DISPLAYING those hits, not a renumbering of them.
 //
@@ -51,7 +49,7 @@
 #include "IPMStream.h"
 #include "PMString.h"
 #include "KFCUIID.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 
 /** One node of the result tree: (chapter index, run, font group, hit index). See the file comment for
     the six shapes a node can take. */
@@ -72,7 +70,7 @@ public:
 	/** A document row ('chapter' = 0-based chapter index). */
 	static NodeID_rv Create(int32 chapter) { return new KBSResultNodeID(chapter, -1, -1, -1); }
 
-	/** A RUN row under chapter 'chapter' ('run' indexes that chapter's runs - 2026-09-29, Show Changes). */
+	/** A RUN row under chapter 'chapter' ('run' indexes that chapter's runs - Show Changes). */
 	static NodeID_rv CreateRun(int32 chapter, int32 run) { return new KBSResultNodeID(chapter, run, -1, -1); }
 
 	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). Its run is the
@@ -149,7 +147,7 @@ public:
 	/** The chapter's 0-based index into KBSResultModel (negative = root or book row). */
 	int32 GetChapter() const { return fChapter; }
 
-	/** The run this row belongs to (2026-09-29), or -1 on a list with no run level. */
+	/** The run this row belongs to, or -1 on a list with no run level. */
 	int32 GetRun() const { return fRun; }
 
 	/** The font (story) group this row belongs to, or -1 on a row above the story level (and on a hit
@@ -162,10 +160,10 @@ public:
 	/** Is this a hit row (a leaf)? */
 	bool16 IsHitRow() const { return fHit >= 0; }
 
-	/** Is this a FONT row - the STORY row since 2026-09-27 (the level once named the font with no glyph)? */
+	/** Is this a FONT row - the STORY row (the level's old name - see the file comment)? */
 	bool16 IsFontRow() const { return fChapter >= 0 && fFont >= 0 && fHit < 0; }
 
-	/** Is this a RUN row - one replace's rows on a list rebuilt from the records (2026-09-29)? */
+	/** Is this a RUN row - one replace's rows on a list rebuilt from the records? */
 	bool16 IsRunRow() const { return fChapter >= 0 && fRun >= 0 && fFont < 0 && fHit < 0; }
 
 	/** Is this the book row - the one that names the book the results came from? */

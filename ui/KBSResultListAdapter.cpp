@@ -10,12 +10,12 @@
 //  per chapter that holds matches (in book order). A document-scope search has no book row, so its
 //  chapters hang off the root directly, which is the two-level tree KBS started with.
 //
-//  Under a document, a STORY node per group (2026-09-27), each holding that story's hits - the code calls
-//  the level FONT, the name it had when it held the fonts of Find Missing Glyphs (removed the same day).
+//  Under a document, a STORY node per group, each holding that story's hits - the code calls the level
+//  FONT, the name it had when it held the fonts of the Find Missing Glyphs scan (since removed).
 //  Every chapter's hits are grouped; the branches below that hang hits off the document directly are the
 //  safe answer for a node that names no group, not a shape any list has now.
 //
-//  ***** A RUN LEVEL between the document and its stories (2026-09-29, Show Changes by KohakuFindChange). *****
+//  A RUN LEVEL between the document and its stories (Show Changes by KohakuFindChange).
 //  A list rebuilt from the Track Changes records groups a document's rows by the replace that wrote them
 //  first: document -> run -> story -> row. Decided per chapter again, from its own runs (none on every
 //  other list).
@@ -37,7 +37,7 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KBSResultNodeID.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 
 /** The hierarchy over KBSResultModel: hidden root -> the BOOK row when the results came from a book
     -> one document node per chapter with hits -> (a RUN node per replace, on a list rebuilt from the
@@ -62,7 +62,7 @@ public:
 		if (nodeID->IsHitRow())
 		{
 			// A hit hangs off its story ("font") row - and off the document row only when it names no
-			// group, which no list has since 2026-09-27.
+			// group, which no list has now.
 			const int32 font = nodeID->GetFont();
 			if (font >= 0)
 				return KBSResultNodeID::CreateFont(nodeID->GetChapter(), font);
@@ -98,7 +98,7 @@ public:
 		if (nodeID->IsRunRow())
 			return KBSResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
 
-		// A document row: its RUN rows when the list has runs (2026-09-29); else its story ("font") rows
+		// A document row: its RUN rows when the list has runs; else its story ("font") rows
 		// (its hits directly only for a chapter with no groups - see the head of the file).
 		const int32 runs = KBSResults()->GetDisplayRunCount(nodeID->GetChapter());
 		if (runs > 0)
@@ -121,7 +121,7 @@ public:
 			if (KBSResults()->IsFromBook())
 				return (nth == 0) ? KBSResultNodeID::CreateBook() : kInvalidNodeID;
 			// The nth SHOWN chapter, which is chapter nth unless a closed document's chapter was emptied in
-			// place before it (2026-09-29, All Documents - KBSResultModel::CloseChapter).
+			// place before it (All Documents - KBSResultModel::CloseChapter).
 			const int32 chapter = KBSResults()->GetShownChapter(nth);
 			return (chapter >= 0) ? KBSResultNodeID::Create(chapter) : kInvalidNodeID;
 		}
