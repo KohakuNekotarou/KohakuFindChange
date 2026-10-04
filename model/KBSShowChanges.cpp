@@ -22,7 +22,7 @@
 // General includes:
 #include "IDTime.h"					// a run's start as a local date and time
 #include "IDataBase.h"				// SaveRestoreModifiedState
-#include "KBSProgressBar.h"		// the read's progress + cancel - the bar is the UI half's since 2026-10-01
+#include "KBSProgressBar.h"		// the read's progress + cancel - the bar is the UI half's
 #include "WideString.h"				// IDTime::DateToString
 
 #include <algorithm>				// std::sort - the runs, newest first
@@ -71,12 +71,11 @@ void AppendTwoDigits(PMString& s, int32 n)
 
 // The run row's text: the run's start as a local date and time, seconds included. The records hold UTC
 // (100 ns since 1601 - an ATime, which IDTime takes as it is).
-// ***** IDTime, THE SDK'S OWN LOCAL TIME (2026-09-29, the official-terms audit B-1). ***** Its header says
-// "local" of both calls used here (IDTime.h:207-227) - GlobalTime's does not say either way. The date is the
-// system's short form; the time is put together from the local hour, minute and second, because every SDK
-// time string stops at the minute ("10:40", measured with GlobalTime::TimeToString) - and two runs made in
-// one minute then drew as the same row twice (case show-two-runs). (Win32 GetTimeFormatEx carried the
-// seconds for one build the same day; the SDK's own call is the one to lean on.)
+// IDTime, THE SDK'S OWN LOCAL TIME. Its header says "local" of both calls used here (IDTime.h:207-227) -
+// GlobalTime's does not say either way. The date is the system's short form; the time is put together from
+// the local hour, minute and second, because every SDK time string stops at the minute ("10:40", measured
+// with GlobalTime::TimeToString) - and two runs made in one minute would then draw as the same row twice
+// (case show-two-runs). (Not Win32 GetTimeFormatEx: the SDK's own call is the one to lean on.)
 PMString RunLabel(uint64 t0)
 {
 	const IDTime when(t0);
@@ -134,7 +133,7 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 		if (rows.empty())
 			continue;
 
-		// The story's version as it is read (the defect re-check F-2): Reject / Accept write to it only
+		// The story's version as it is read: Reject / Accept write to it only
 		// while it still stands there.
 		uint32 version = 0;
 		if (KBSSearchEngine::ReadStoryVersion(db, story.GetUID(), version))
@@ -149,7 +148,7 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			}
 			const KBSTrackChange::SignedRow& row = rows[k];
 			KBSResultModel::Hit hit;
-			// (the pieces' span, not their sum - 2026-10-04: a GREP <$0>'s two pieces stand around the match)
+			// (the pieces' span, not their sum: a GREP <$0>'s two pieces stand around the match)
 			if (!builder.Build(docRef, story, row.at, row.at + row.spanLen, hit))
 				return false;		// out of memory - nothing to show honestly
 			// A replaced row, tied to its records by its time exactly - what Reject Change and Accept
@@ -160,10 +159,11 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			// reads now, and what its deletion took. A touching group written front to back leaves ONE
 			// deletion, on its LAST row - the others carry no original text, which is exactly what
 			// RejectRowsNow's and AcceptRowsNow's check wants: the group's text with its records taken back
-			// (KBSTrackChange::OriginalFromRecords) reads as its rows' originals joined (spec section 2).
+			// (KBSTrackChange::OriginalFromRecords) reads as its rows' originals joined (section 2 of the spec
+			// named in KBSShowChanges.h).
 			hit.originalText = row.deletedText;
 			hit.originalText.SetTranslatable(kFalse);
-			// The pieces' own text, not the range's (re-check R-2): a row somebody typed inside reads their
+			// The pieces' own text, not the range's: a row somebody typed inside reads their
 			// characters in the range, and FindRowChangeForHit refuses it by that difference - the search's
 			// rows are refused the same way (case signed-user-typed-then-reject).
 			hit.replacedText = row.insertedText;
@@ -238,11 +238,11 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	}
 	const ShowingFlagGuard showingGuard;
 
-	// ***** EVERY REFUSAL COMES BEFORE THE MODEL IS TOUCHED ***** (SearchBook's rule): a run turned away
+	// EVERY REFUSAL COMES BEFORE THE MODEL IS TOUCHED (SearchBook's rule): a run turned away
 	// leaves the panel as it found it.
 	const bool fromBook = KBSBookScope::IsBookScopeOn();
-	// An EMPTY target book is a refusal like the others, ahead of the commit point (2026-10-03, the block 11
-	// re-read B11-2 - the search's door, the same one answer: KBSBookScope::GetTargetBook).
+	// An EMPTY target book is a refusal like the others, ahead of the commit point (the search's door, the
+	// same one answer: KBSBookScope::GetTargetBook).
 	const KBSBookScope::TargetBook targetBook = fromBook ? KBSBookScope::GetTargetBook() : KBSBookScope::kNoTargetBook;
 	if (fromBook && targetBook == KBSBookScope::kNoTargetBook)
 	{
@@ -260,14 +260,13 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 		return 0;
 	}
 
-	// ***** THE COMMIT POINT. ***** The rows go, with the book and the find format that describe them.
+	// THE COMMIT POINT. The rows go, with the book and the find format that describe them.
 	//
 	// ...and the chapters the old results held go NOW, not on a schedule - the search's commit point, the same
-	// two lines (2026-10-03, the block 11 re-read B11-3; the search has done it since 2026-10-02, the block 8
-	// re-read B8-2). DropResults closes them with kSchedule, and a scheduled close waits until this run is
-	// over: until then the chapter is open and no longer held, so OpenChapterDoc below finds it open and reads
-	// it as somebody else's - harmless while a scheduled close never runs under a modal bar (measured
-	// 2026-08-04), but one rule for both commit points is one fewer thing that has to stay true.
+	// two lines. DropResults closes them with kSchedule, and a scheduled close waits until this run is over:
+	// until then the chapter is open and no longer held, so OpenChapterDoc below finds it open and reads it as
+	// somebody else's - harmless while a scheduled close never runs under a modal bar (measured), but one rule
+	// for both commit points is one fewer thing that has to stay true.
 	KBSBookScope::ReleaseHeldDocs(true /*close now*/);
 	KBSSearchEngine::DropResults();
 
@@ -278,7 +277,7 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	{
 		if (!KBSBookScope::ListBookChapters(targets, bookName) || targets.empty())
 		{
-			// (Refused at the front door since 2026-10-03, B11-2 - the safety net, as in the search.)
+			// (Refused at the front door - this is the safety net, as in the search.)
 			outSummary.Append("That book has no chapters.");
 			return 0;
 		}
@@ -413,9 +412,8 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	outSummary.Append(" change(s) by KohakuFindChange in ");
 	outSummary.AppendNumber(runCount);
 	outSummary.Append(" run(s) - right-click a row to reject or accept them. To replace again, search again.");
-	// One cap since 2026-10-04 (the spec map's GEN-34): the ceiling is the panel's display cap, so a list that
-	// stops there has every row it holds on the panel. (A "Showing first 5000 in the panel" for 5,001 to
-	// 10,000 rows stood here until then.)
+	// One cap: the ceiling is the panel's display cap (kKBSCollectHitLimit), so a list that stops there has
+	// every row it holds on the panel - no second "showing the first N" note.
 	if (capped)
 	{
 		outSummary.Append(" Stopped at the ");
