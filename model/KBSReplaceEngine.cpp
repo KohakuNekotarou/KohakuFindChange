@@ -3250,7 +3250,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 					AppendShowConditionToRetry(outStatus, "reject");
 				}
 				else
-					outStatus = "Reject Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
+					outStatus = "Reject Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote, where nothing is recorded) - nothing was changed.";
 				return false;
 			}
 			const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, p.rows[k]);
@@ -3665,7 +3665,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 				AppendShowConditionToRetry(outStatus, "accept");
 			}
 			else
-				outStatus = "Accept Change: no tracked change of this replace is left for a row (accepted or rejected in the Track Changes panel, or in a footnote, where nothing is recorded) - nothing was changed.";
+				outStatus = "Accept Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote, where nothing is recorded) - nothing was changed.";
 			return false;
 		}
 		const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, rows[k]);

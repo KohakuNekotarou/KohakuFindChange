@@ -139,7 +139,10 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 		return "Reject / Accept Changes in This Story: its document is not open - open it to take the replace back.";
 	if (KBSRuns()->StoryChangesHidden(chapter, group))
 		return "Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.";
-	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (accepted or rejected?).";
+	// The guess names every cause measured (2026-10-04, scenario cross-check 1): a Ctrl+Z of the replace that the
+	// list does not follow (a list Show Changes rebuilt - KBSUndoFollow.h), and a deletion with Track Changes on,
+	// which InDesign folds into the deleter's own record (the [9b] re-read O9b-1). "Accepted or rejected" only, until then.
+	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (undone, accepted, rejected or deleted?).";
 }
 
 }
@@ -391,7 +394,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 				? "Reject Change: the document of this row is not open - open it to take the replace back."
 				: KBSRuns()->RowChangeIsHidden(chapter, hit)
 				? "Reject Change: this row's replaced text is under a hidden condition - show the condition and reject again."
-				: "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?).");
+				: "Reject Change: no tracked change of this replace is left for this row (undone, accepted or rejected in the Track Changes panel, or deleted?).");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowRowMenuReason(why);
 		}
