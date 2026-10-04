@@ -8,24 +8,23 @@
 //  clicking the picture opens, so the icon is not a button whose destination is a mystery - the
 //  same job KCM's KCMIconTip does for its panel.
 //
-//  ***** WHY IT DERIVES FROM AbstractTip *****
+//  WHY IT DERIVES FROM AbstractTip
 //
 //  AbstractTip (source/public/libs/widgetbin/includes/AbstractTip.h) is what every tooltip in the
 //  product code derives from - linksui, layerpanel, buttonui, dynamicdocumentsui, conditionaltextui
 //  - and customconditionaltextui/CusCondTxtUIIconTip.cpp:42 shows an external plug-in doing the
-//  same. Nothing in the SDK implements ITip on CPMUnknown directly.
+//  same. Nothing in Adobe's code implements ITip on CPMUnknown directly (KESCL's two tips do - they
+//  are ours, not a precedent).
 //
 //  It supplies the two members this class has no opinion about, so only GetTipText is left to
 //  write:
 //    UpdateToolTipOnMouseMove - which ITip.h:44-50 wraps in ID_DEPRECATED
 //    SetTipText               - which ITip.h:51-53 says is "not implemented in general case"
 //
-//  It lives in DV_WidgetBin.lib. That was once the reason NOT to use it; since the model/UI split
-//  (2026-10-01) the UI half links the SDK's own $(UI_PLUGIN_LINKLIST), which carries DV_WidgetBin.lib
-//  and WidgetBin.lib in all four configurations (build/win/prj/*.props) as it does for every UI sample,
-//  so the base class costs nothing. (The model half links $(MODEL_PLUGIN_LINKLIST), which has neither -
-//  nothing of a widget belongs there. Until 2026-10-02 this said the library was added for the
-//  plug-in's own drawn views, KBSColorTextView and KBSStatusTextView.)
+//  It lives in DV_WidgetBin.lib, which the UI half links anyway: the SDK's own $(UI_PLUGIN_LINKLIST)
+//  carries DV_WidgetBin.lib and WidgetBin.lib in all four configurations (build/win/prj/*.props) as it
+//  does for every UI sample, so the base class costs nothing. (The model half links
+//  $(MODEL_PLUGIN_LINKLIST), which has neither - nothing of a widget belongs there.)
 //
 //========================================================================================
 

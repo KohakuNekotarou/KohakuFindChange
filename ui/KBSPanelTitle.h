@@ -21,9 +21,9 @@ namespace KBSPanelTitle
 	    AS THE SELECTION MAKES IT (Story, To End of Story and Selection need a selection that offers
 	    them; without one the dialog shows Document, and so does this). Every input is followed while
 	    the panel is up: Book Scope by the flyout that toggles it, the Find/Change settings through
-	    their subject, and the selection through the panel's observer - an ActiveSelectionObserver
-	    since 2026-10-03, when it was found that a selection changed with the dialog closed (which
-	    leaves the settings untouched) left the tab naming a scope the next search would not use.
+	    their subject, and the selection through the panel's observer - an ActiveSelectionObserver,
+	    because a selection changed with the dialog closed leaves the settings untouched, and the tab
+	    would go on naming a scope the next search would not use.
 	    Whether a book or a document is actually open is deliberately NOT shown: that changes outside
 	    KBS (a document closes, a book panel tab is brought forward) with nothing to tell us, so a tab
 	    drawn from it would go stale without being wrong-looking.

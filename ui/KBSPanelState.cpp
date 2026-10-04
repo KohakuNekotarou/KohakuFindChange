@@ -7,21 +7,19 @@
 //  Saves and restores the flyout's settings toggles as a JSON file of our own, in the user's
 //  preferences folder (see KBSPanelState.h). Nothing is written into InDesign's own data.
 //
-//  Ported from KESCM's KESCMPanelState.cpp, including its two audit fixes: a short write and a write
-//  that fails on the way to the disk are both caught, so a full disk cannot be reported as "saved".
+//  Ported from KCM's KCMPanelState.cpp, including its two fixes: a short write and a write that fails on
+//  the way to the disk are both caught, so a full disk cannot be reported as "saved".
 //
-//  ***** THE FILE IS READ AND WRITTEN THROUGH THE SDK'S FILE STREAM (2026-10-02, the user's call:
-//  ***** "for the panel settings and the like, use the official one"). ***** StreamUtil::
-//  CreateFileStreamRead / CreateFileStreamWrite -> IPMStream, the SDK's way to read or write a file's
-//  bytes - dozens of samples and the product's own libs, and SnpShareAppResources.cpp, the very snippet
-//  this file cites for WHERE the file goes, opens its file that way (:182, :187). From 2026-08-10 until
-//  then this was stdio (FileUtils::OpenFile, fread / fwrite / fclose), kept for one reason:
-//  IPMStream::Close() and Flush() return void (IPMStream.h), so a write that fails while being flushed -
-//  the full disk, which the 2026-07-25 audit added a check for - has no documented way of being
-//  noticed, and fclose reports it. That check is now made another way, which does not need Close to
-//  answer: the side file is READ BACK and must come out exactly as written before it is moved over the
-//  real one (KBSWriteWholeFile). A short write is XferByte's count, and a truncated read is
-//  GetStreamState() == kStreamStateFailure, as before.
+//  THE FILE IS READ AND WRITTEN THROUGH THE SDK'S FILE STREAM (the author's call: "for the panel
+//  settings and the like, use the official one"). StreamUtil::CreateFileStreamRead /
+//  CreateFileStreamWrite -> IPMStream, the SDK's way to read or write a file's bytes - dozens of samples
+//  and the product's own libs, and SnpShareAppResources.cpp, the very snippet this file cites for WHERE
+//  the file goes, opens its file that way (:182, :187).
+//  !IPMStream::Close() and Flush() return void (IPMStream.h), so a write that fails while being flushed -
+//  the full disk - has no documented way of being noticed there. The check is made another way, which
+//  does not need Close to answer: the side file is READ BACK and must come out exactly as written before
+//  it is moved over the real one (KBSWriteWholeFile). A short write is XferByte's count, and a truncated
+//  read is GetStreamState() == kStreamStateFailure.
 //
 //========================================================================================
 
@@ -47,7 +45,7 @@
 #include "KBSJump.h"			// IsHidePreviousChapterOn / SetHidePreviousChapter
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement" and the placement it keeps
 
-// MoveFileEx - the side file put in place (KBSWriteWholeFile). KBS is Windows alone (2026-09-28). After
+// MoveFileEx - the side file put in place (KBSWriteWholeFile). KBS is Windows alone. After
 // the SDK headers, so its macros cannot collide with SDK names (as KBSPanelAlpha.cpp).
 #include <windows.h>
 
@@ -73,15 +71,13 @@ static bool16 KBSPanelStateFile(IDFile& outFile)
 //----------------------------------------------------------------------------------------
 // A minimal JSON (written by hand, read leniently)
 //
-//   ***** WHY NOT THE SDK'S JSON CLASS. ***** (Settled 2026-10-02, the API re-audit; this said only
-//   "a flat set of booleans and numbers" until then, which is a reason it is easy, not a reason not to.)
-//   The official one is `class PUBLIC_DECL JSON` in public/interfaces/utils/IJsonUtils.h, a wrapper
-//   around boost::property_tree; the product reads with it (linksui's ChromiumImportHelperAEMLinks.cpp,
-//   read_json in a try/catch) and writes with it (publiclib's HTTPAssetLinkResourceStateUpdater.cpp,
-//   addValue -> write_json). The dependency is not the obstacle: KCM measured that it compiles and
-//   links with no build change (its KCMPageCheck.cpp said so until KCM 57b1278). Two things here would
+//   WHY NOT THE SDK'S JSON CLASS. The official one is `class PUBLIC_DECL JSON` in
+//   public/interfaces/utils/IJsonUtils.h, a wrapper around boost::property_tree; the product reads with
+//   it (linksui's ChromiumImportHelperAEMLinks.cpp, read_json in a try/catch) and writes with it
+//   (publiclib's HTTPAssetLinkResourceStateUpdater.cpp, addValue -> write_json). The dependency is not
+//   the obstacle: KCM measured that it compiles and links with no build change. Two things here would
 //   be lost:
-//     1. THE REPAIR OF A BROKEN FILE (the user's call, 2026-09-28 - KBSJsonSalvagePairs). read_json
+//     1. THE REPAIR OF A BROKEN FILE (the author's call - KBSJsonSalvagePairs). read_json
 //        throws on the whole text when any of it is broken, so a file cut short by a crash would still
 //        need this hand-written reader to keep what stands complete in it - and the format would then
 //        be known in two places.
@@ -202,14 +198,14 @@ static std::string KBSJsonFlatText(const KBSJsonPairs& pairs)
 //----------------------------------------------------------------------------------------
 // Rewriting some keys and keeping the rest (KBSPanelStateWriteKeys)
 //
-//   The book panel's placement and its toggle are written WITHOUT "Save Panel Settings" (the user's
-//   rules, 2026-09-25 - see KBSPanelState.h), and writing them must not also write the other
+//   The book panel's placement and its toggle are written WITHOUT "Save Panel Settings" (the author's
+//   rules - see KBSPanelState.h), and writing them must not also write the other
 //   settings as they happen to stand on the flyout right now: those are saved when the user asks,
 //   and a half-way change they have not saved must not be saved behind their back.
 //   So the file is READ, the named keys are replaced (or added), and it is written back. The reader
 //   is a strict one for the only shape this plug-in writes - one flat object of "key": value pairs.
 //   A file it refuses is not guessed at: only the pairs that stand complete in it are kept
-//   (KBSJsonSalvagePairs, 2026-09-28 - until then such a file was left alone and not written at all).
+//   (KBSJsonSalvagePairs).
 //----------------------------------------------------------------------------------------
 
 // A quoted string starting at text[p] (which is the opening quote): the text between the quotes goes
@@ -329,11 +325,10 @@ static bool KBSJsonIsBareScalar(const std::string& v)
 	return true;
 }
 
-// ***** A FILE THAT DOES NOT READ AS THE FLAT OBJECT IS REPAIRED, NOT LEFT (2026-09-28, the user's
-// call: "if it is set to remember, fix what is broken and remember"). ***** Until then such a file was
-// never written again, so a file cut short by a crash stopped the book panel's placement from being
-// kept at all - with no word unless the toggle was flipped. Now every "key": value pair that stands
-// COMPLETE is kept, and the rest is dropped:
+// A FILE THAT DOES NOT READ AS THE FLAT OBJECT IS REPAIRED, NOT LEFT (the author's call: "if it is set
+// to remember, fix what is broken and remember"). Left alone, a file cut short by a crash would never be
+// written again, and the book panel's placement would stop being kept - with no word unless the toggle
+// was flipped. Every "key": value pair that stands COMPLETE is kept, and the rest is dropped:
 //   - the key's quotes are closed and a ':' follows it;
 //   - the value is true, false, a whole number, or a closed string;
 //   - a ',', a '}' or a line end follows the value (spaces between allowed). This plug-in ends every
@@ -405,9 +400,8 @@ static void KBSJsonSalvagePairs(const std::string& text, KBSJsonPairs& out)
 
 // The whole file, or false when it could not be read in full. *A read that stopped part way through
 // must not be used: what would then be restored is "the settings that happened to be in the part that
-// arrived", the rest silently left at their defaults. All or nothing instead (KESCM's fix of 2026-08-06,
-// made with fread and ferror). Through the SDK's file stream since 2026-10-02 (see the top of this file),
-// the way the SDK's samples read a whole file: the size first - Seek to the end answers where it got to -
+// arrived", the rest silently left at their defaults. All or nothing instead (KCM's fix). Through the
+// SDK's file stream (see the top of this file), the way the SDK's samples read a whole file: the size first - Seek to the end answers where it got to -
 // then exactly that many bytes from the start (textimportfilter/TxtImpFilter.cpp:602-611,
 // pdfvt/PDFVTUtils.cpp:141-147). The read never asks past the end of the file, so a short count, or the
 // stream in kStreamStateFailure, can only be a read that broke off.
@@ -434,21 +428,20 @@ static bool KBSReadWholeFile(const IDFile& file, std::string& out)
 
 // Write text as the whole file. A full disk must not be reported as saved. nil when written, otherwise
 // the reason.
-// ***** THROUGH A SIDE FILE, NEVER IN PLACE (2026-09-28, the user's call). ***** Opening the file itself
-// for writing empties it first, so InDesign going down between that and the last byte left an empty or
-// half-written file - and the book panel's placement then stopped being written at all (the strict
-// reader below refused the file) without a word. The text goes to KBSPanelState.json.tmp first, and only
-// a side file written in full is moved over the real one: the real file is always the old one whole or
-// the new one whole. A side file left behind by a crash is simply written over by the next write.
-// ***** AND THE SIDE FILE IS READ BACK BEFORE IT IS MOVED (2026-10-02). ***** The write goes through the
-// SDK's file stream (StreamUtil::CreateFileStreamWrite with kOpenOut | kOpenTrunc, as
-// SnpShareAppResources.cpp:187 opens its own preferences file), whose Flush and Close return nothing
-// (IPMStream.h) - so a write that fails as it is flushed, the full disk, says nothing there. What it
-// leaves is a side file shorter than the text, and reading it back finds that: only a side file that
-// reads back as exactly what was written is put in place. (stdio's fclose reported it until then.)
-// The move is Win32's MoveFileEx - KBS is Windows alone (the user's call, 2026-09-28) - told to replace
-// the file that is there and to return only once the move is on the disk.
-// ***** NOT FileUtils::SwapFiles, AND NOW THAT IS MEASURED (2026-10-02). ***** The SDK's "moves file1 to
+// THROUGH A SIDE FILE, NEVER IN PLACE (the author's call). Opening the file itself for writing empties
+// it first, so InDesign going down between that and the last byte would leave an empty or half-written
+// file. The text goes to KBSPanelState.json.tmp first, and only a side file written in full is moved
+// over the real one: the real file is always the old one whole or the new one whole. A side file left
+// behind by a crash is simply written over by the next write.
+// AND THE SIDE FILE IS READ BACK BEFORE IT IS MOVED. The write goes through the SDK's file stream
+// (StreamUtil::CreateFileStreamWrite with kOpenOut | kOpenTrunc, as SnpShareAppResources.cpp:187 opens
+// its own preferences file), whose Flush and Close return nothing (IPMStream.h) - so a write that fails
+// as it is flushed, the full disk, says nothing there. What it leaves is a side file shorter than the
+// text, and reading it back finds that: only a side file that reads back as exactly what was written is
+// put in place.
+// The move is Win32's MoveFileEx - KBS is Windows alone (the author's call) - told to replace the file
+// that is there and to return only once the move is on the disk.
+// NOT FileUtils::SwapFiles (measured). The SDK's "moves file1 to
 // file2" (FileUtils.h:132) does replace a file2 that is there (KT's app.ktProbe "swapfiles": file2 read
 // "old-B" before and "new-B" after) - but in TWO steps: Public.dll's SwapFiles is file2.Exists() ->
 // file2.Delete() -> afl::CoreFileUtils::MoveFile(file1, file2, false) (read off its machine code). A crash
@@ -497,8 +490,7 @@ const char* KBSPanelStateWriteKeys(const KBSJsonPairs& keyValues, bool* outRepai
 			return "read";
 		if (!KBSJsonParseFlat(text, pairs))
 		{
-			// A broken file is repaired with what can be read of it (KBSJsonSalvagePairs) - it was left
-			// alone, and the write refused, until 2026-09-28.
+			// A broken file is repaired with what can be read of it (KBSJsonSalvagePairs).
 			KBSJsonSalvagePairs(text, pairs);
 			if (outRepaired != nil)
 				*outRepaired = true;
@@ -570,15 +562,14 @@ void KBSSavePanelState()
 	pairs.push_back(KBSJsonPair("minimizableFindChange", KBSBoolLiteral(KBSGetFindChangeMinimizable())));
 	pairs.push_back(KBSJsonPair("appBarSearchEnter",     KBSBoolLiteral(KBSGetAppBarSearchEnter())));
 	pairs.push_back(KBSJsonPair("hidePreviousChapter",   KBSBoolLiteral(KBSJump::IsHidePreviousChapterOn())));
-	// "Remember Book Panel Placement" and the placement (2026-09-25). Its keys are named in
+	// "Remember Book Panel Placement" and the placement. Its keys are named in
 	// KBSBookPanelPlacement.cpp and nowhere else: this only writes out what that file hands over -
 	// the book panel as it stands now if one is open, otherwise the placement last known.
 	KBSBookPanelPlacement::AppendSaveKeys(pairs);
 
 	// *A partial write on a full disk must not be reported as a save, with a path that suggests the
-	// settings are safe (KESCM's 2026-07-25 audit): the byte count is checked, and since 2026-10-02 the
-	// side file is read back before it is put in place (stdio's fclose was asked until then). Through
-	// the side file since 2026-09-28. See KBSWriteWholeFile.
+	// settings are safe: the byte count is checked, and the side file is read back before it is put in
+	// place. See KBSWriteWholeFile.
 	const char* failure = KBSWriteWholeFile(file, KBSJsonFlatText(pairs));
 	if (failure != nil)
 	{
@@ -589,11 +580,10 @@ void KBSSavePanelState()
 		return;
 	}
 
-	// The full path and nothing else, so the file can be found, backed up or deleted (user's call
-	// 2026-08-08). It said "Settings saved: " in front until then; the line is the answer to "where
-	// did it go", and a path is long enough to be worth the whole width of the panel. KESCM says the
-	// same thing the same way, though it arrived there for a different reason - its status line is
-	// narrow enough that a label in front would have pushed the end of the path out of sight.
+	// The full path and nothing else, so the file can be found, backed up or deleted (the author's
+	// call): the line is the answer to "where did it go", and a path is long enough to be worth the
+	// whole width of the panel - a label in front would push the end of the path out of sight. KCM
+	// says the same thing the same way.
 	PMString msg;
 	msg.SetTranslatable(kFalse);
 	msg.Append(FileUtils::SysFileToPMString(file));
@@ -626,11 +616,10 @@ void KBSLoadPanelStateIfPresent()
 	//  palette-visibility observer (KBSPanelAlpha.cpp).
 	//  *It is not merely "restore a flag", though: restoring ON makes KBSSetPanelTranslucent put up
 	//   the Win32 event hook. With no panel yet the callback returns immediately.
-	//  !This said "none could be: this runs at startup, before there is a panel" until 2026-09-25.
-	//   That was never measured - the startup service is a LAZY one - and since that day this can
-	//   also run from the palette manager's PaletteMgrStarted, after the palettes are laid out. If
-	//   the panel is already up when the flag is restored, the alpha goes on at the next event the
-	//   hook or the visibility observer sees, not here.
+	//  !Do not assume there is no panel yet: the startup service is a LAZY one, and this can also
+	//   run from the palette manager's PaletteMgrStarted, after the palettes are laid out. If the
+	//   panel is already up when the flag is restored, the alpha goes on at the next event the hook
+	//   or the visibility observer sees, not here.
 	KBSSetPanelTranslucent(KBSJsonReadBool(text, "translucentPanel", KBSGetPanelTranslucent()));
 
 	// The same for InDesign's own Find/Change dialog. Nothing is applied here either - the dialog is
@@ -643,19 +632,19 @@ void KBSLoadPanelStateIfPresent()
 	// moment it is opened (KBSPanelAlpha.cpp).
 	KBSSetFindChangeMinimizable(KBSJsonReadBool(text, "minimizableFindChange", KBSGetFindChangeMinimizable()));
 
-	// "Link the Application Bar's Search Field to This Panel" (2026-10-02). Setting it ON is what puts its two hooks
-	// and its observer on - read back here at startup, on the main thread, the thread the hooks watch
+	// "Link the Application Bar's Search Field to This Panel". Setting it ON is what puts its two hooks
+	// and its observer on - read back here, on the main thread, the thread the hooks watch
 	// (KBSAppBarSearchEnter.h).
 	KBSSetAppBarSearchEnter(KBSJsonReadBool(text, "appBarSearchEnter", KBSGetAppBarSearchEnter()));
 
-	// Hide Previous Chapter (the user's call, 2026-08-04, after the first cut left it out). Restoring
+	// Hide Previous Chapter (the author's call). Restoring
 	// it is safe in a way the flag alone does not show: the jump asks ShouldHidePreviousChapter,
 	// which also requires the results to have come from a BOOK, so a restored ON cannot start
 	// closing documents in document scope. The menu greys the toggle out there for the same reason.
 	// (KBSJump speaks bool, so the bool reader.)
 	KBSJump::SetHidePreviousChapter(KBSPanelStateReadBool(text, "hidePreviousChapter", KBSJump::IsHidePreviousChapterOn()));
 
-	// "Remember Book Panel Placement" (2026-09-25): the toggle and the placement. Read by
+	// "Remember Book Panel Placement": the toggle and the placement. Read by
 	// KBSBookPanelPlacement, which owns the keys; nothing is moved here - what puts the placement on
 	// a book panel is that file, when one appears.
 	KBSBookPanelPlacement::LoadFromSettings(text);

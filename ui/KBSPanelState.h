@@ -5,45 +5,40 @@
 //  KohakuFindChange (KBS)
 //
 //  Saves and restores the flyout's SETTINGS toggles as a small JSON file of our own, in the
-//  user's roaming preferences folder. Ported from KESCM's KESCMPanelState (2026-08-04), which
-//  has carried this since 2026-07-12.
+//  user's roaming preferences folder. Ported from KCM's KCMPanelState.
 //  *Nothing is written into InDesign's own data (workspace SavedData, documents).
 //
 //  Where: FileUtils::GetAppRoamingDataFolder(.., "KBSPanelState.json"), in that folder itself
 //    (Windows) %APPDATA%\Adobe\InDesign\Version XX.0\<locale>\KBSPanelState.json
-//  *No sub-folder is created (the user's rule, set for KESCM on 2026-07-12). The folder is one
-//   InDesign already makes for its preferences, but the file is ours alone and unrelated to
-//   anything InDesign keeps there.
+//  *No sub-folder is created (the author's rule, as for KCM). The folder is one InDesign already
+//   makes for its preferences, but the file is ours alone and unrelated to anything InDesign keeps
+//   there.
 //
-//  What is saved (SETTINGS only, not work state):
+//  What is saved (SETTINGS only, not work state). !A setting added to KBSSavePanelState gets its line
+//  here in the same change - this list has fallen behind the code more than once.
 //    - Translucent Panel (*Windows only. Only the FLAG is restored; putting the alpha on the
-//      window is done by the panel's AutoAttach and the palette-visibility observer, because at
-//      startup there is no panel yet.)
+//      window is done by the panel's AutoAttach and the palette-visibility observer.)
 //    - Translucent Find/Change (*Windows only, and the same again: the flag alone. InDesign's own
 //      Find/Change dialog is certainly not open at startup, and the window-list observer puts the
-//      alpha on the moment it is. **This line was missing from the list until 2026-08-04, when it
-//      was already being saved and restored - the code was right and the note was not.)
+//      alpha on the moment it is.)
 //    - Minimizable Find/Change (*Windows only, and the flag alone once more, for the reason given
 //      on the line above: the dialog is not open at startup, and the same window-list observer puts
-//      the style on the moment it is. Added 2026-08-12 with the feature - and added HERE at the same
-//      time, because the line above records what it costs to leave this list behind.)
-//    - Link the Application Bar's Search Field to This Panel (key "appBarSearchEnter", 2026-10-02;
-//      *Windows only). Restoring ON is more than the flag: it puts up the toggle's two message hooks
-//      and its observer on the Find/Change settings - on the main thread, where both callers of
-//      KBSLoadPanelStateIfPresent run (KBSAppBarSearchEnter.h). **Missing from this list until
-//      2026-10-03 while the code saved and restored it all along - the THIRD time this list fell
-//      behind the code. A setting added to KBSSavePanelState gets its line here in the same change.)
-//    - Hide Previous Chapter (the user's call, 2026-08-04). It closes chapter windows as a jump
-//      lands, which is why it was left out at first - but a restored ON cannot act on its own:
-//      the jump asks ShouldHidePreviousChapter, which ALSO requires the results to have come from
-//      a book. In document scope the toggle is greyed out and the sweep never runs.
-//    - Remember Book Panel Placement (2026-09-25), and the placement itself - where InDesign's OWN
+//      the style on the moment it is.)
+//    - Link the Application Bar's Search Field to This Panel (key "appBarSearchEnter"; *Windows
+//      only). Restoring ON is more than the flag: it puts up the toggle's two message hooks and its
+//      observer on the Find/Change settings - on the main thread, where both callers of
+//      KBSLoadPanelStateIfPresent run (KBSAppBarSearchEnter.h).
+//    - Hide Previous Chapter (the author's call). It closes chapter windows as a jump lands - but a
+//      restored ON cannot act on its own: the jump asks ShouldHidePreviousChapter, which ALSO
+//      requires the results to have come from a book. In document scope the toggle is greyed out
+//      and the sweep never runs.
+//    - Remember Book Panel Placement, and the placement itself - where InDesign's OWN
 //      Book panel was when it was last closed (floating: place, size, icon state and width; docked:
 //      its neighbours). The keys are named in KBSBookPanelPlacement.cpp and ONLY there - this file
 //      writes what that one hands over (AppendSaveKeys) and hands it the text to read
 //      (LoadFromSettings), so a key added there needs nothing here.
-//      *****THESE ARE THE ONLY KEYS WRITTEN WITHOUT "Save Panel Settings".***** The user's rules
-//      (2026-09-25): flipping the toggle writes the toggle's key, and while it is ticked, a book
+//      THESE ARE THE ONLY KEYS WRITTEN WITHOUT "Save Panel Settings". The author's rules:
+//      flipping the toggle writes the toggle's key, and while it is ticked, a book
 //      closing - InDesign quitting included - writes the placement keys. Nothing else in the
 //      file is touched by either: KBSPanelStateWriteKeys below rewrites the named keys and leaves
 //      every other key as the FILE has it, not as the flyout currently has it. See
@@ -82,13 +77,12 @@ void	KBSLoadPanelStateIfPresent();
 // it - its value, and the key itself when this version does not know it. A key not yet in the file is
 // added at the end. With no file yet, one is made holding "version" and these keys alone.
 // *Values are written RAW (already JSON: "true", "-12"), so a string value would need its quotes.
-// *A file that cannot be read as the flat object "Save Panel Settings" writes is REPAIRED (2026-09-28,
-//  the user's call): every "key": value pair that stands complete in it is kept, the rest dropped, and
-//  the file is written again with these keys. (Until then it was left as it was and the write refused -
-//  which, for a file cut short by a crash, stopped the book panel's placement being kept at all.)
-//  outRepaired (when not nil) says it happened.
+// *A file that cannot be read as the flat object "Save Panel Settings" writes is REPAIRED (the author's
+//  call): every "key": value pair that stands complete in it is kept, the rest dropped, and the file is
+//  written again with these keys. (Refusing the write instead would stop the book panel's placement being
+//  kept at all once a crash had cut the file short.) outRepaired (when not nil) says it happened.
 // *Every write goes through a side file (KBSPanelState.json.tmp) that is moved over the real one only
-//  when written in full, so a crash part way leaves the old file whole (2026-09-28).
+//  when written in full, so a crash part way leaves the old file whole.
 // @return nil when the file was written; otherwise a short reason for the status line - "folder",
 //         "read", "open", "write", "replace".
 // Implemented in KBSPanelState.cpp.
@@ -96,8 +90,8 @@ const char*	KBSPanelStateWriteKeys(const std::vector<std::pair<std::string, std:
 	bool* outRepaired = nil);
 
 // The settings file's full path, as "Save Panel Settings" shows it on the status line. false when the
-// folder cannot be had. The toggle that writes its own key shows the same path (the user's call,
-// 2026-09-25: "show where it was saved, the way Save Panel Settings does").
+// folder cannot be had. The toggle that writes its own key shows the same path (the author's call:
+// "show where it was saved, the way Save Panel Settings does").
 // Implemented in KBSPanelState.cpp.
 bool	KBSPanelStateFilePath(PMString& outPath);
 

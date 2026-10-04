@@ -21,16 +21,16 @@
 // Project includes:
 #include "KFCUIID.h"
 #include "KBSPanelIcon.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 
 namespace
 {
 
-/** The pictures, in the order Choose() tests them. A new one is a row here plus its id and PNG
-    resource; nothing else changes.
+/** The pictures. A new one is a row here plus its ids, its widget and its PNG lines (KBSPanelIcon.h
+    lists them) and its test in Choose().
 
     Choose() asks the more specific state first (a replace has also been "run"); the order here is
-    the order the pictures were added. */
+    the order the pictures were added, not the order Choose() tests them. */
 const WidgetID kIcons[] =
 {
 	kKBSIconWidgetID,		// nothing has been run yet
@@ -42,7 +42,7 @@ const int32 kIconCount = static_cast<int32>(sizeof(kIcons) / sizeof(kIcons[0]));
 /** Which picture belongs on screen right now. */
 WidgetID Choose()
 {
-	// ***** The more specific state is asked FIRST. ***** A replace has also been RUN, so testing
+	// The more specific state is asked FIRST. A replace has also been RUN, so testing
 	// HasRun ahead of this would answer the searching cat every time and the changing one would
 	// never reach the screen - which is what the ordering note over kIcons is about.
 	//
@@ -91,10 +91,10 @@ void KBSPanelIcon::Update(IPanelControlData* panelData)
 		const bool16 on = (kIcons[i] == wanted) ? kTrue : kFalse;
 		view->ShowView(on);
 
-		// ***** Enable as well as show. ***** A hidden widget still takes clicks - ShowView stops
-		// the drawing, not the hit test - so with the pictures stacked at one frame a single click
-		// would reach every one of them and open a browser tab for each. Measured in KESCM
-		// (2026-07-03) and hit again when the same panel shape was carried into KESCL (2026-07-15).
+		// Enable as well as show. A hidden widget still takes clicks - ShowView stops the drawing,
+		// not the hit test - so with the pictures stacked at one frame a single click would reach
+		// every one of them and open a browser tab for each. Measured in KCM, and hit again when the
+		// same panel shape was carried into KESCL.
 		if (on)
 			view->Enable();
 		else

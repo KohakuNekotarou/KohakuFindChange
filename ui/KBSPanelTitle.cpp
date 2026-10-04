@@ -42,7 +42,7 @@ namespace GoToURLUtils
 
 // Project includes:
 #include "KFCUIID.h"
-#include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
+#include "KBSModelAccess.h"		// the model half, through its session interfaces
 #include "KBSPanelIcon.h"		// which illustration is showing, and which widgets are illustrations
 #include "KBSPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
 #include "KBSPanelMetrics.h"	// how tall the message block has to be in this UI language
@@ -67,17 +67,14 @@ const char* const kKBSPlainPanelName = kKBSDisplayName;
 /** Put a label on the panel's tab. Does nothing unless the panel exists and sits in a palette. */
 void SetTabLabel(const PMString& label)
 {
-	// ***** THE SESSION CAN BE GONE DURING SHUTDOWN. ***** (2026-08-11.)
-	//   This used to write GetExecutionContextSession()->QueryApplication() straight out, which
-	//   dereferences whatever that call returns. KBSPanelAlpha.cpp says of the same function
-	//   "can be nil during shutdown" and takes the pointer into a variable before using it.
+	// THE SESSION CAN BE GONE DURING SHUTDOWN - KBSPanelAlpha.cpp says of the same function "can be
+	//   nil during shutdown" - so it is taken into a variable and checked, not dereferenced on the spot.
 	//   *Why this one matters and the dozen others do not: KBSPanelTitle::Restore is called from
 	//    the UI half's shutdown (KBSUIStartupShutdown) - it is the only entry here that runs during teardown.
 	//    The rest of this plug-in reaches the session from inside UI events (a click, a key, a
 	//    draw), where it is certainly alive.
-	//   !No failure has been seen: the tab is restored FIRST in Shutdown, "while the UI is still
-	//    standing", and the teardown test passes. This is the Shutdown path being made to look
-	//    like the other Shutdown path rather than a fix for an observed crash.
+	//   (No failure has been seen: the tab is restored FIRST in Shutdown, "while the UI is still
+	//    standing". This makes the Shutdown path look like the other Shutdown path.)
 	ISession* session = GetExecutionContextSession();
 	if (session == nil)
 		return;
@@ -93,7 +90,7 @@ void SetTabLabel(const PMString& label)
 	// Non-owning - a Get, not a Query. nil until the panel has been opened once, which is the
 	// ordinary state at startup and the reason every caller may fire blindly.
 	//
-	// ***** WHY THIS DOOR AND NOT THE VISIBLE-ONLY ONES. ***** The rest of the plug-in reaches the
+	// WHY THIS DOOR AND NOT THE VISIBLE-ONLY ONES. The rest of the plug-in reaches the
 	// panel through Utils<IPalettePanelUtils>()->QueryPanelByWidgetID (KBSPanelIcon.cpp), which
 	// hands back nil for a panel that is not on screen, and IPanelMgr has GetVisiblePanel
 	// (:115-123) for the same reason - the manager purges panels that are not shown and will not
@@ -120,8 +117,8 @@ void SetTabLabel(const PMString& label)
 	if (!container.IsValid())
 		return;
 
-	// ***** NOT WRITTEN AGAIN WHEN IT IS ALREADY THERE (2026-10-03). ***** Since the observer follows the
-	// selection (KBSPanelObserver below), this runs on every caret step, and the label it would write is
+	// NOT WRITTEN AGAIN WHEN IT IS ALREADY THERE. The observer follows the selection (KBSPanelObserver
+	// below), so this runs on every caret step, and the label it would write is
 	// nearly always the one on the tab. The TAB is asked rather than a copy kept here: a panel moved to
 	// another palette, or shown again, sits in a container with a label of its own, and a remembered
 	// "last written" would skip exactly that write. A palette never yet laid out answers empty
@@ -137,10 +134,10 @@ void SetTabLabel(const PMString& label)
 void KBSPanelTitle::Update()
 {
 	// A plain ASCII hyphen, not an em dash: on a tab this size the long dash reads as a gap
-	// (user's call 2026-07-28). Staying inside ASCII also keeps this file free of the CP932
+	// (the author's call). Staying inside ASCII also keeps this file free of the CP932
 	// mangling a non-ASCII literal in a BOM-less .cpp would bring.
 	PMString title(kKBSPlainPanelName);
-	// ***** THE FIND/CHANGE TAB, THEN THE SCOPE (2026-09-27, the user's call) *****:
+	// THE FIND/CHANGE TAB, THEN THE SCOPE (the author's call):
 	// "Kohaku Find/Change - Text - Book", "... - GREP - Document". The tab is the one the dialog is on NOW,
 	// which is what the next Find in ... will search with. Left out when the settings cannot be read.
 	const char* const tab = KBSRuns()->TabName(KBSRuns()->CurrentSearchMode());
@@ -150,10 +147,9 @@ void KBSPanelTitle::Update()
 		title.Append(tab);
 	}
 	title.Append(" - ");
-	// The whole word, not "Doc" (user's call 2026-08-01, and again on 2026-09-27 after a few hours of
-	// "Doc" beside the tab name).
-	// With Book Scope off, the Search: KBS follows since 2026-09-29 ("... - Text - Story") as the selection
-	// makes it (Document when the selection does not offer it, as the dialog shows); Document for one it refuses.
+	// The whole word, not "Doc" (the author's call, made twice).
+	// With Book Scope off, the Search: KBS follows ("... - Text - Story") as the selection makes it
+	// (Document when the selection does not offer it, as the dialog shows); Document for one it refuses.
 	const char* const searchWord = KBSRuns()->SearchScopeName(
 		KBSRuns()->SearchScopeForSelection(KBSRuns()->CurrentSearchScope()));
 	title.Append(KBSChapters()->IsBookScopeOn() ? "Book" : (searchWord[0] != '\0' ? searchWord : "Document"));
@@ -175,19 +171,18 @@ void KBSPanelTitle::Restore()
 namespace
 {
 
-// ***** THE FIND/CHANGE TAB ON THE PANEL'S NAME (2026-09-27). ***** The dialog's settings are a session
-// preference (IFindChangeOptions on the session workspace), and a preference command notifies the
-// subject of the boss that holds it on the preference's own IID - so switching the dialog's tab arrives
-// here and renames the tab at once. MEASURED on 2026-09-27: a script's findGrep() arrives, and so does
-// the user clicking the dialog's tab (memory findchange-tab-switch-notification). No worked example
-// observes THESE settings in the SDK; the title is also rewritten on show, on a scope toggle, on
-// every search and (2026-10-03) on a selection change.
-// ***** REACHED THROUGH THE SETTING ITSELF (2026-10-02, the API re-audit). ***** The subject is asked of
-// the preference interface, as the product's panels reach theirs - spellpanel's
-// AutoCorrectPanelObserver.cpp:72-75 (QuerySessionPreferences -> ISubject -> AttachObserver, and the
-// same in AutoDetach) - and so through the very call the engine reads the settings by. It was asked of
-// IWorkspace until then: the same boss (PreferenceUtils.h: "a preferences interface in the session
-// workspace"), so nothing that arrives has changed.
+// THE FIND/CHANGE TAB ON THE PANEL'S NAME. The dialog's settings are a session preference
+// (IFindChangeOptions on the session workspace), and a preference command notifies the subject of the
+// boss that holds it on the preference's own IID - so switching the dialog's tab arrives here and
+// renames the tab at once. MEASURED: a script's findGrep() arrives, and so does the user clicking the
+// dialog's tab (memory findchange-tab-switch-notification). No worked example observes THESE settings
+// in the SDK; the title is also rewritten on show, on a scope toggle, on every search and on a
+// selection change.
+// REACHED THROUGH THE SETTING ITSELF. The subject is asked of the preference interface, as the
+// product's panels reach theirs - spellpanel's AutoCorrectPanelObserver.cpp:72-75
+// (QuerySessionPreferences -> ISubject -> AttachObserver, and the same in AutoDetach) - and so through
+// the very call the engine reads the settings by. (It is the same boss as the session's IWorkspace -
+// PreferenceUtils.h: "a preferences interface in the session workspace".)
 void AttachToFindChangeOptions(IObserver* observer, bool attach)
 {
 	if (GetExecutionContextSession() == nil)
@@ -244,11 +239,10 @@ void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const Wid
         ITriStateControlData, and this observer - already on the panel boss, already living exactly
         as long as the widgets do - is who listens.
 
-    ***** AN ActiveSelectionObserver SINCE 2026-10-03 (the block 4 recheck, T-1). ***** The tab names
-    Search: as the selection makes it, and a selection changed with the Find/Change dialog CLOSED changes
-    no setting - so nothing arrived, and the tab went on naming a scope the next search would not use
-    (while the flyout, asked when it opens, already said the other). It was a CObserver until then.
-    The shape is the SDK's own for a panel observer that also hears its widgets:
+    AN ActiveSelectionObserver, NOT A PLAIN CObserver. The tab names Search: as the selection makes it,
+    and a selection changed with the Find/Change dialog CLOSED changes no setting - so an observer of the
+    settings alone hears nothing, and the tab goes on naming a scope the next search would not use (while
+    the flyout, asked when it opens, already says the other). The shape is the SDK's own for a panel observer that also hears its widgets:
     strokeweightmutator/StrMutSelectionObserver.cpp - the base attached FIRST in AutoAttach and
     detached LAST in AutoDetach, and the widgets' (and here the settings') messages taken in
     HandleSelectionUpdate after the base has seen them; Update itself is the base's
@@ -267,16 +261,16 @@ public:
 
 		KBSPanelTitle::Update();
 
-		// ***** THIS OBSERVER IS ON THE PANEL. ***** It is aggregated onto kKBSPanelWidgetBoss, so it
-		// can hand the panel it stands on to what fills the panel in - no need to ask the panel
-		// manager for it. This is the product's own shape: ConditionalTextUIPanelDetailController.cpp:162
-		// and LayerPanelView.cpp:63 both reach their own widgets with exactly this line. The layout,
-		// the picture and the widget subscriptions below are handed it.
-		// !NOT EVERYTHING BELOW IS (this said "the panel everything below works on is simply itself"
-		//  until 2026-10-03). KBSResultTree::RestoreStatusOnPanelShow still finds the panel itself,
+		// THIS OBSERVER IS ON THE PANEL. It is aggregated onto kKBSPanelWidgetBoss, so it can hand the
+		// panel it stands on to what fills the panel in - no need to ask the panel manager for it. This
+		// is the product's own shape: ConditionalTextUIPanelDetailController.cpp:162 and
+		// LayerPanelView.cpp:63 both reach their own widgets with exactly this line. The layout, the
+		// picture and the widget subscriptions below are handed it.
+		// !NOT EVERYTHING BELOW IS. KBSResultTree::RestoreStatusOnPanelShow finds the panel itself,
 		//  through IPalettePanelUtils::QueryPanelByWidgetID - visible panels only - and the translucency
 		//  goes through the panel manager. Whether the visible-only door answers at the moment the
-		//  panel is rebuilt by the startup restore has not been measured (the block 4 recheck, S-1).
+		//  panel is rebuilt by the startup restore is measured for a FLOATING panel (it does - the
+		//  message came back right); a docked one is not measured.
 		// *nil is not expected here (the boss carries IPanelControlData), but each callee checks:
 		//  AutoAttach also runs while the panel is being built, and none of this is worth a crash.
 		InterfacePtr<IPanelControlData> panelData(this, UseDefaultIID());
@@ -284,7 +278,7 @@ public:
 		// The LAYOUT first, because the two calls below fill in what these frames hold. The .fr
 		// carries the English measurements and a Japanese UI draws the palette font half again as
 		// tall, so on that UI the message box has to be taller or the last line of every message is
-		// cut off mid-glyph (reported 2026-08-06). See KBSPanelMetrics.h.
+		// cut off mid-glyph. See KBSPanelMetrics.h.
 		KBSPanelMetrics::Update(panelData);
 
 		// The widgets are built fresh every time the panel is shown, so the picture that belongs on
@@ -294,7 +288,7 @@ public:
 		// ...and for the same reason, so does the message. The .fr's initial text is used the first
 		// time the panel is ever built and never again: after that the widget carries whatever the
 		// workspace remembers, which after a restart is a message about results that no longer
-		// exist (reported 2026-08-02).
+		// exist.
 		KBSResultTree::RestoreStatusOnPanelShow();
 
 		for (int32 i = 0; i < KBSPanelIcon::Count(); ++i)
@@ -314,13 +308,12 @@ public:
 		//   (kPaletteVisibilityChangedMessage).
 		//   *Note: AutoAttach runs every time the widgets are rebuilt, so it is no place to write a
 		//   fixed default - it only reflects whatever KBSGetPanelTranslucent currently says.
-		// **The OFF test is HERE and not inside (corrected 2026-08-11). This said "safe to call
-		//   unconditionally - OFF, docked and Mac are all rejected inside", and OFF is NOT rejected
-		//   inside: KBSApplyPanelTranslucency writes alpha 255 and shows the shadow when the toggle is
-		//   off, which is how the OFF menu item does its restoring. Calling it from here regardless
-		//   meant every rebuild of the widgets wrote 255 to this panel's top-level window - and a
-		//   floating GROUP shares one OWL.Dock, so that lands on any grouped panel whose own
-		//   translucency is ON. See the note at KBSPanelRollOver::MouseEnter for the whole account.
+		// **The OFF test is HERE and not inside: KBSApplyPanelTranslucency does NOT reject OFF - it
+		//   writes alpha 255 and shows the shadow when the toggle is off, which is how the OFF menu
+		//   item does its restoring. Calling it from here regardless would write 255 to this panel's
+		//   top-level window on every rebuild of the widgets - and a floating GROUP shares one
+		//   OWL.Dock, so that lands on any grouped panel whose own translucency is ON. See the note
+		//   at KBSPanelRollOver::MouseEnter for the whole account.
 		if (KBSGetPanelTranslucent())
 			KBSApplyPanelTranslucency();
 	}
@@ -341,7 +334,7 @@ public:
 	}
 
 protected:
-	// ***** THE SELECTION (2026-10-03). ***** A new selection, or different items in it (a frame picked
+	// THE SELECTION. A new selection, or different items in it (a frame picked
 	// on the layout, the text tool's selection replacing it), and every caret step (the "frequent"
 	// change, SelectionObserver.h). Which of the two a caret turning into a selected run of text arrives
 	// as is NOT measured, so both are taken. Each can move what Search: comes to (KBSPanelTitle.h), so

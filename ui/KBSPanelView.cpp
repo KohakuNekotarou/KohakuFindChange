@@ -4,8 +4,8 @@
 //
 //  Kohaku Find/Change (KBS)
 //
-//  The panel's IControlView (2026-08-04): stock palette behaviour, plus a FLOOR under how small
-//  the user can drag the panel, and (2026-08-09) a HEIGHT THAT LANDS ON A WHOLE NUMBER OF ROWS.
+//  The panel's IControlView: stock palette behaviour, plus a FLOOR under how small the user can
+//  drag the panel, and a HEIGHT THAT LANDS ON A WHOLE NUMBER OF ROWS.
 //
 //  Why the floor exists. Every widget on this panel is bound to the edges, so the panel narrows
 //  happily past the point where it says anything: at about half its width the message wraps to five
@@ -17,9 +17,7 @@
 //  KESCL measures the filter row it places at runtime, over a fixed floor; KCM's is a constant with
 //  a maximum height too. Here the WIDTH is a constant, and the HEIGHT moves with the message block:
 //  KBSPanelMetrics sizes that block from the palette font and re-places it, the tree and the pictures
-//  every time the panel is shown, so the floor is asked of it rather than written here. (This said
-//  "a constant, because every widget sits where the .fr put it" until 2026-10-03 - true until
-//  KBSPanelMetrics arrived on 2026-08-06.)
+//  every time the panel is shown, so the floor is asked of it rather than written here.
 //
 //  Why the rounding exists. The floor stops the panel getting too small; it says nothing about
 //  where it stops in between. Dragged to any height the framework likes, the tree ends on a part
@@ -27,7 +25,7 @@
 //  hiding. Rounding the panel's own height down to a multiple of the row height means the last row
 //  drawn is a whole one.
 //
-//  ***** WHAT THAT DOES NOT COVER: ANY HEIGHT THE USER DID NOT DRAG TO. ***** The framework asks
+//  WHAT THAT DOES NOT COVER: ANY HEIGHT THE USER DID NOT DRAG TO. The framework asks
 //  this only when it is about to resize, so a height that arrives another way is never rounded:
 //
 //    * the size the panel OPENS at (KFCUI.fr, 360). 360 - 61 of fixed part = 299, and 299 / 19 is
@@ -83,7 +81,7 @@ public:
 	*/
 	virtual PMPoint ConstrainDimensions(const PMPoint& dimensions) const;
 
-	// ***** THE TWO NUMBERS ARE NOT HERE. ***** They are KBSPanelMetrics', because the height one
+	// THE TWO NUMBERS ARE NOT HERE. They are KBSPanelMetrics', because the height one
 	// has to move with the message block, and how tall THAT is depends on the UI language. What they
 	// mean and where they came from are written there.
 };
@@ -105,7 +103,7 @@ PMPoint KBSPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 	if (constrainedDim.Y() < minHeight)
 		constrainedDim.Y(minHeight);
 
-	// ***** Round the height down to a whole number of result rows. *****
+	// Round the height down to a whole number of result rows.
 	//
 	// The shape is ConditionalTextUIPanelView::ConstrainDimensions (:61-99): work out how much of
 	// the panel is NOT the list, ask the tree how tall one row is, floor the rest to a multiple of

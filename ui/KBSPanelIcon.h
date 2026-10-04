@@ -8,10 +8,10 @@
 //  KFCUI.fr, and exactly one of them is visible and enabled at a time.
 //
 //  There are three: before anything has been run, once something HAS been run, and once a replace
-//  has written something. Adding a fourth is three lines - an id and a resource in KFCUIID.h, a
-//  widget in KFCUI.fr, and a row in this file's table - plus the test that picks it, which goes in
-//  Choose() with the more specific state FIRST. Nothing else in the plug-in names the pictures:
-//  the panel's observer asks IsIconWidget rather than testing an id of its own.
+//  has written something. Adding a fourth: a widget id and a PNG resource id in KFCUIID.h, the widget
+//  and its PNGA / PNGR lines in KFCUI.fr, and a row in kIcons (KBSPanelIcon.cpp) - plus the test that
+//  picks it, which goes in Choose() with the more specific state FIRST. Nothing else in the plug-in
+//  names the pictures: the panel's observer asks IsIconWidget rather than testing an id of its own.
 //
 //========================================================================================
 

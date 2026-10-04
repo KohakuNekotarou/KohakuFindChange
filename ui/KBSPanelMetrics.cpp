@@ -31,35 +31,28 @@ namespace
 
 // How many lines the message block holds: FOUR, in every UI language. The block is a WHOLE NUMBER
 // of the drawing's lines - a remainder is room for a part-line, drawn as a sliver of chopped-off
-// letters - and since 2026-10-02 the line is asked of the font itself (MessageLineMetrics; the API
-// re-audit P-1). Until then this was a table: 48 = 12x4 on a Roman UI and 72 = 18x4 on a Japanese,
-// Korean or Chinese one, Japanese and English measured off the screen and the rest assumed - while
-// the box's own drawing asked the font all along.
+// letters - and the line is asked of the font itself (MessageLineMetrics).
 //
-// ***** FOUR LINES ON A JAPANESE UI SINCE 2026-08-10, AND THE THIRD WAS NOT A ROUNDING ERROR.
-// ***** It was 54 (18x3) from 2026-08-07, sized against the OPENING message - which draws 535px
-// wide on a Japanese UI and therefore takes 2.8 lines in the 217px box the floor gives it. The
-// note that stood here said so, and the .fr's said the same thing with the warning attached:
-// "that is one message, though, not a promise about every message - a longer one takes a fourth
-// line and the fourth is clipped."
+// FOUR, NOT THREE - AND THE THIRD WAS NOT A ROUNDING ERROR. Three lines (54 = 18x3 on a Japanese UI)
+// were sized against the OPENING message, which draws 535px wide on a Japanese UI and so takes 2.8
+// lines in the 217px box the floor gives it. A longer message takes a fourth line, and the fourth was
+// clipped: MEASURED on the running panel (PrintWindow over the status widget), the line a stopped
+// replace leaves - "Replace cancelled - nothing was changed. The results have been cleared - the
+// document has changed since the search. Search again." - drew three lines and STOPPED AT "the
+// document has". What the user lost was the end of the sentence, which is the part that says what to
+// do about it. 128 characters against a box that holds about 88.
 //
-// It was clipped. MEASURED on the running panel (2026-08-10, PrintWindow over the status widget):
-// the line a stopped replace leaves - "Replace cancelled - nothing was changed. The results have
-// been cleared - the document has changed since the search. Search again." - drew three lines and
-// STOPPED AT "the document has". What the user lost was the end of the sentence, which is the
-// part that says what to do about it. 128 characters against a box that holds about 88.
-//
-// So both halves were fixed together (user's call): this block grew a line, and every refusal
-// that has to be read whole was cut to fit four - about 117 characters at the floor. The
+// So both halves were fixed together (the author's call): this block holds four lines, and every
+// refusal that has to be read whole is cut to fit four - about 117 characters at the floor. The
 // messages are the half that matters; this is the headroom that keeps a long one from being
 // silently truncated again.
 //
-// ***** FOUR ON A ROMAN UI TOO, and that is not an oversight (user's instruction was to raise it
-// ***** "if the English version also has a problem"). A smaller palette font puts appreciably
-// more characters on each line than the 18px one does, so four Roman lines hold more text than the
-// four Japanese ones the messages are cut to fit. NOT measured on this machine, which runs a
-// Japanese UI and cannot draw the Roman one; if a Roman UI is ever seen to clip, this is the number
-// to raise, and the floor moves with it (MinimumPanelHeight).
+// FOUR ON A ROMAN UI TOO, and that is not an oversight (the author's instruction was to raise it "if
+// the English version also has a problem"). A smaller palette font puts appreciably more characters
+// on each line than the 18px one does, so four Roman lines hold more text than the four Japanese ones
+// the messages are cut to fit. NOT measured: the development machine runs a Japanese UI and cannot
+// draw the Roman one; if a Roman UI is ever seen to clip, this is the number to raise, and the floor
+// moves with it (MinimumPanelHeight).
 //
 // The block and the floor are a pair: the width decides how many lines a message takes, and this
 // decides how many there is room to draw. Narrow the floor without raising this and the last
@@ -73,36 +66,29 @@ const int32 kMessageHeightResource = 48;
 // The gap between the message block and the tree, as the .fr has always had it.
 const int32 kGapUnderMessageBlock = 3;
 
-// ***** THE FLOOR. ***** Width, measured on the running panel rather than reasoned about:
-// the opening message DRAWS 535px wide on a Japanese UI (its two lines came out 266px and
-// 265px in a 301px box, 2026-08-06), and the box is the panel less 49px of margins and
-// illustration (5 + box + 4 + 32 + 8). So
+// THE FLOOR. Width, measured on the running panel rather than reasoned about: the opening message
+// DRAWS 535px wide on a Japanese UI (its two lines came out 266px and 265px in a 301px box), and the
+// box is the panel less 49px of margins and illustration (5 + box + 4 + 32 + 8). So
 //
 //     box 301 (panel 350) -> 2 lines      <- pointlessly wide
 //     box 251 (panel 300) -> 3 lines      <- what the panel opens at
-//     box 217 (panel 266) -> 3 lines      <- ***** the floor *****, and MEASURED there: the
-//                                            opening message drew three 18px lines with nothing
-//                                            clipped (2026-08-07, Japanese UI). ***** THAT IS THE
-//                                            OPENING MESSAGE AND ONLY IT ***** - a stopped
-//                                            replace's line needs five at this width, which is
-//                                            what the block being 3 lines tall cost (2026-08-10)
+//     box 217 (panel 266) -> 3 lines      <- the floor, and MEASURED there: the opening message
+//                                            drew three 18px lines with nothing clipped (Japanese
+//                                            UI). THAT IS THE OPENING MESSAGE AND ONLY IT - a
+//                                            stopped replace's 128-character line needs five at
+//                                            this width, which is why the block holds four and
+//                                            the messages are cut to fit them
 //     box 216 (panel 265) -> 4 lines      <- where the clipping was reported back when the
 //                                            Japanese block was 48px (2 2/3 lines)
 //
-// ***** THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT. ***** The whole history is
-// 250 -> 224 -> 242 -> 266, and only the last two came from that instruction:
+// THE FLOOR IS THE WIDTH THE PANEL IS ACTUALLY WORKED AT (the author's instruction, given twice:
+// "make the minimum width the size it is now" - read off the running panel). Lining up with KCM's
+// panel when the two are docked together (224, KCM's width then) is GIVEN UP, deliberately: a floor
+// is there to stop the panel being dragged down to where it cannot be read, and the width it is read
+// at is this one. Lining up with a sibling was a second job asked of the same number, and the two
+// wanted different answers.
 //
-//     250  2026-08-04  the first floor, in KBSPanelView itself, measured BY EYE (b307ee1)
-//     224  2026-08-06  KESCM's fixed width, to line the two panels up when docked (ee0f870)
-//     242  2026-08-07  "make the minimum width the size it is now" - off the running panel
-//     266  2026-08-07  the same instruction again (aaf1ba2). This is the number here.
-//
-// 224 was KESCM's fixed width, put here so the two would line up when docked
-// together. That is GIVEN UP, deliberately: a floor is there to stop the panel being dragged down
-// to where it cannot be read, and the width it is read at is this one. Lining up with a sibling
-// was a second job asked of the same number, and the two wanted different answers.
-//
-// ! The floor and the block are measured AT THE SAME WIDTH, and the block is now sized against the
+// ! The floor and the block are measured AT THE SAME WIDTH, and the block is sized against the
 //   LONGEST message rather than the opening one: four 18px lines in a 72px block at box 217, which
 //   is about 117 characters. Every refusal that has to be read whole is kept under that (see
 //   KBSReplaceEngine::RefuseChangedQuery and the search's own refusals). Sizing it against the
@@ -118,7 +104,7 @@ const int32 kGapUnderMessageBlock = 3;
 // Height: stated against the .fr's own block (kMessageHeightResource) so that a taller block simply
 // moves it. The floor is there to keep about five 19px result rows visible, which has nothing to do
 // with language.
-const int32 kMinimumWidth                 = 266;	// the width the panel is worked at (measured 2026-08-07)
+const int32 kMinimumWidth                 = 266;	// the width the panel is worked at (measured)
 const int32 kMinimumHeightAtResourceBlock = 160;
 
 }
@@ -142,7 +128,7 @@ bool KBSPanelMetrics::MessageLineMetrics(PMReal& outLineAdvance, PMReal& outAsce
 		return false;
 	// The product's way of asking a widget's font for its line
 	// (dynamicdocumentsui/TimingPanelTreeDDTarget.cpp:582-585). ! The SIZE is no answer: it stays 12.0 on
-	// a Japanese UI, where the line is 18 (KCM, 2026-08-11) - the line is ascent + descent + leading.
+	// a Japanese UI, where the line is 18 (measured in KCM) - the line is ascent + descent + leading.
 	float size = 0.0f, ascent = 0.0f, descent = 0.0f, leading = 0.0f;
 	if (!dv_utils::FontInfoGetDVAFontMetrics(*font, &size, &ascent, &descent, &leading))
 		return false;
