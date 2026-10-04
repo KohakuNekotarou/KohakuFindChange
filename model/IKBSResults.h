@@ -17,8 +17,8 @@
 //  half reaches it with KBSResults() (KBSModelAccess.h).
 //  ***** EDITED BY HAND SINCE 2026-10-02. ***** Generated on 2026-10-01 with its two siblings and their
 //  implementation (KBSModelServices.cpp) from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py).
-//  Methods have been added to IKBSRuns by hand since, which the table does not know: the generator is a
-//  record now and refuses to write. A new method goes at the END of its interface - a vtable slot is a
+//  Methods have been added by hand since - to IKBSRuns, and to this one (2026-10-04) - which the table does
+//  not know: the generator is a record now and refuses to write. A new method goes at the END of its interface - a vtable slot is a
 //  promise to every built caller.
 //
 //========================================================================================

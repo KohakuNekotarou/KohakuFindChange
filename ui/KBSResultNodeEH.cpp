@@ -106,6 +106,42 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, widget);
 }
 
+// Why a story row's Reject / Accept are grey, in the hit row's words (RButtonDn below) - asked once
+// CanRejectStory has said no. "" = the story has no replaced row, so there is nothing to take back and nothing
+// to say. The hit row's order: a footnote, a closed document, a hidden condition, then no change left.
+// (2026-10-04, R-1: once a story's Check All stopped being offered over rows with no box - D-1 - such a story's
+// menu can be grey from top to bottom, and then it does not open at all; the hidden condition was the only reason
+// said until then.)
+const char* StoryRejectGreyReason(int32 chapter, int32 group)
+{
+	PMString name;
+	int32 rows = 0;
+	if (!KBSResults()->GetFontDisplay(chapter, group, name, rows))
+		return "";
+	int32 replaced = 0, inFootnote = 0;
+	for (int32 n = 0; n < rows; ++n)
+	{
+		const int32 hit = KBSResults()->GetFontGroupHit(chapter, group, n);
+		bool checked = false, wasReplaced = false, locked = false;
+		if (hit < 0 || !KBSResults()->GetHitFlags(chapter, hit, checked, wasReplaced, locked) || !wasReplaced)
+			continue;
+		++replaced;
+		if (KBSResults()->GetHitInFootnote(chapter, hit))
+			++inFootnote;
+	}
+	if (replaced == 0)
+		return "";
+	if (inFootnote == replaced)
+		return "Reject / Accept Changes in This Story: not for matches inside a footnote - Track Changes records nothing there.";
+	UIDRef storyDoc;
+	IDFile storyFile;
+	if (!(KBSResults()->GetChapterLocation(chapter, storyDoc, storyFile) && KBSChapters()->FindOpenChapterDoc(storyFile, storyDoc)))
+		return "Reject / Accept Changes in This Story: its document is not open - open it to take the replace back.";
+	if (KBSRuns()->StoryChangesHidden(chapter, group))
+		return "Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.";
+	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (accepted or rejected?).";
+}
+
 }
 
 class KBSResultNodeEH : public TreeNodeEventHandler
@@ -287,15 +323,19 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		const int32 group = nodeID->GetFont();
 		KBSResults()->SetContextMenuGroup(chapter, group);
 		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's (2026-09-29): cleared like this one
-		// ***** WHY ITS REJECT / ACCEPT ARE GREY, WHEN A HIDDEN CONDITION IS THE REASON (2026-10-02, the user's
-		// ***** call A). ***** The hit row's rule below: with every item grey the popup does not open, so the
-		// status line is the only place to say it - and a story whose replaced text is all under a hidden
-		// condition said nothing at all (case reject-hidden-condition-story).
-		if (!KBSRuns()->CanRejectStory(chapter, group) && KBSRuns()->StoryChangesHidden(chapter, group))
+		// ***** WHY ITS REJECT / ACCEPT ARE GREY (2026-10-02 a hidden condition, the user's call A; 2026-10-04 a
+		// ***** footnote, a closed document and no change left as well, R-1). ***** The hit row's rule below: with
+		// every item grey the popup does not open, so the status line is the only place to say it - and a story
+		// whose replaced text is all under a hidden condition said nothing at all (case
+		// reject-hidden-condition-story). StoryRejectGreyReason, above, says which.
+		if (!KBSRuns()->CanRejectStory(chapter, group))
 		{
-			PMString why("Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.");
-			why.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(why);
+			PMString why(StoryRejectGreyReason(chapter, group));
+			if (!why.IsEmpty())
+			{
+				why.SetTranslatable(kFalse);
+				KBSResultTree::ShowStatus(why);
+			}
 		}
 		PopRowMenu(kKBSResultStoryMenuName, e, this);
 		return kTrue;
