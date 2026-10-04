@@ -91,10 +91,17 @@
   **Reject Change by KohakuFindChange** とその仲間（`… in This Story`／`Reject All Changes by KohakuFindChange in This Document`／`… in This Run`）／
   **Accept Change by KohakuFindChange** とその仲間（`… in This Story`／`… in This Run`／`Accept All Changes by KohakuFindChange in This Document`）。
   **どれも1回が「編集 > 取り消し」の1段**になる。
+  ⚠行のメニューの書き込みが「全部か無し」で**巻き戻ったとき、本文は元に戻るが「変更あり」の印が残る**（保存済みの文書が、何も変わっていないのに未保存になる）。
+  Change Checked のキャンセルは印も戻すが、行のメニューの側には無い（2026-10-04 に別の検査で実測・直すかは判断待ち＝R9-1 → 第6章）。
   - 訂正:
 
-- **GEN-17** ★**何も保存しない。** 置換が入った章は「変更あり・未保存」のまま窓を開いて残し、上書きするかどうかは利用者が決める。
+- **GEN-17** ★**何も保存しない。** 置換が入った文書は「変更あり・未保存」のまま残し、上書きするかどうかは利用者が決める。
   （置換の後に保存するオプションは 2026-08-05 に撤去した。）
+  Change Checked は、**KFC が窓なしで開いた章に置換が入ったら、窓を開く**（見えないと保存も閉じるもできないため）。
+  開けなかったら ` N chapter(s) were changed but could not be shown - open them from the book panel to save them.` と書く。
+  ★**利用者が窓なしで持っている文書（All Documents）は、窓を開かずにそのまま残し**、` N document(s) without a window were changed - still hidden.` と書く
+  （2026-09-29 の決定＝重いので隠しているのかもしれない）。
+  ⚠**行のメニューの Replace は今、その隠した文書にも窓を開く**（2026-10-04 に別の検査で実測・直すかは判断待ち＝D9-1 → 第6章）。
   - 訂正:
 
 - **GEN-18** 置換を書くとき、その文書のユーザー一覧に **`KohakuFindChange` を UI カラー Amber（琥珀色）で**登録する（すでに Amber なら何もしない）。
