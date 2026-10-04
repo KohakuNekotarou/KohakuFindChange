@@ -1,6 +1,6 @@
 # 08. Show Changes by KohakuFindChange
 
-> コード地図での位置: ブロック **9b**（`model/KBSShowChanges.*`）。行の作り方は検索の `HitBuilder`（ブロック8）を借り、記録の読み方は `KBSTrackChange`。
+> コード地図での位置: ブロック **9b**（`model/KFCShowChanges.*`）。行の作り方は検索の `HitBuilder`（ブロック8）を借り、記録の読み方は `KFCTrackChange`。
 > 範囲は第3章 SCOPE-25、記録の形と却下・承認は第7章、行の見た目は第4章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

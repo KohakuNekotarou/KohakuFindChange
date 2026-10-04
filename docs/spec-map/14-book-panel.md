@@ -1,6 +1,6 @@
 # 14. ブックパネルの位置を覚える（Remember Book Panel Placement）
 
-> コード地図での位置: ブロック **16**（`ui/KBSBookPanelPlacement.*`・`ui/KBSBookPanelLookup.*`）。
+> コード地図での位置: ブロック **16**（`ui/KFCBookPanelPlacement.*`・`ui/KFCBookPanelLookup.*`）。
 > トグルを押したときの保存とメッセージ欄の文は第12章（SET-20・SET-21）。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

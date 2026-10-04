@@ -34,5 +34,5 @@
 /I "..\..\..\external\dva\third_party\adobe_source_libraries"
 /I "..\..\..\external\asl\intel_tbb_libraries\include"
 /I "..\..\..\external\icu\include"
-/I "..\..\..\source\sdksamples\KBS\model"
+/I "..\..\..\source\sdksamples\KFC\model"
 

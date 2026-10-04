@@ -1,6 +1,6 @@
 # 04. 結果の一覧
 
-> コード地図での位置: ブロック **6**（結果のモデル `model/KBSResultModel.*`）と **7**（結果の木とメッセージ欄 `ui/KBSResultListWidgetMgr.cpp`・`KBSColorTextView`・`KBSStatusTextView`・`KBSResultNodeEH` ほか）。
+> コード地図での位置: ブロック **6**（結果のモデル `model/KFCResultModel.*`）と **7**（結果の木とメッセージ欄 `ui/KFCResultListWidgetMgr.cpp`・`KFCColorTextView`・`KFCStatusTextView`・`KFCResultNodeEH` ほか）。
 > 行をクリックしたときの動き（ジャンプ・印）は第5章、行のメニューの置換・却下・承認は第6・7章、run の行は第8章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

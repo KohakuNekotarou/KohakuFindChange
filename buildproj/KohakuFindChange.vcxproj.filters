@@ -15,64 +15,64 @@
       </Filter>
    </ItemGroup>
    <ItemGroup>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCBookScope.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCBookWatch.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSCloseDocResponder.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCCloseDocResponder.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarker.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCHitMarker.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSID.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCID.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCModelNotify.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSModelServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCModelServices.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSNoStrip.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCNoStrip.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCOversetLocator.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCProgressBar.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCReplaceEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCResultModel.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCShowChanges.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSSignRecordsCmd.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSignRecordsCmd.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSStartupShutdown.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCStartupShutdown.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTrackChange.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\model\TriggerResourceDeps.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\TriggerResourceDeps.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp">
@@ -89,83 +89,83 @@
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSChapters.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSResults.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCResults.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSRuns.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCRuns.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\IKBSUIServices.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCUIServices.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookScope.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCBookScope.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBookWatch.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCBookWatch.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSBoundaryID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCBoundaryID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSFactoryList.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCFactoryList.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSHitMarker.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCHitMarker.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSLoc.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCLoc.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelNotify.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCModelNotify.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSModelTypes.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCModelTypes.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSOversetLocator.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCOversetLocator.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSProgressBar.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCProgressBar.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSReplaceEngine.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCReplaceEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSResultModel.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCResultModel.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSRunGuard.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSSearchEngine.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSShowChanges.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCShowChanges.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSTrackChange.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTrackChange.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\model\KBSUndoFollow.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>
    <ItemGroup>
-      <CustomBuild Include="..\..\..\source\sdksamples\KBS\model\KBS.fr">
+      <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">
          <Filter>Resource Files</Filter>
       </CustomBuild>
-      <None Include="..\..\..\source\sdksamples\KBS\model\KBS_enUS.fr">
+      <None Include="..\..\..\source\sdksamples\KFC\model\KFC_enUS.fr">
          <Filter>Resource Files</Filter>
       </None>
    </ItemGroup>
    <ItemGroup>
-      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\model\KBS.rc">
+      <ResourceCompile Include="..\..\..\source\sdksamples\KFC\model\KFC.rc">
          <Filter>Resource Files</Filter>
       </ResourceCompile>
    </ItemGroup>

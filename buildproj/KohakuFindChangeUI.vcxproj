@@ -89,7 +89,7 @@
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangeUIcpp.rsp"</AdditionalOptions>
          <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChangeUI.pch</PrecompiledHeaderOutputFile>
-         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KFCExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
          <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -121,7 +121,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangeUIcpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KFCExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;DEBUG;STRICT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
          <PrecompiledHeaderOutputFile>$(IntDir)KohakuFindChangeUI.pch</PrecompiledHeaderOutputFile>
@@ -154,7 +154,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangeUIcpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KFCExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
@@ -189,7 +189,7 @@
       </Midl>
       <ClCompile>
          <AdditionalOptions>/vmg @"KohakuFindChangeUIcpp.rsp"</AdditionalOptions>
-         <PreprocessorDefinitions>$(KBSExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+         <PreprocessorDefinitions>$(KFCExtraDefines);_CRT_SECURE_NO_DEPRECATE;BOOST_SYSTEM_NO_DEPRECATED;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <StringPooling>true</StringPooling>
          <PrecompiledHeader>Use</PrecompiledHeader>
          <PrecompiledHeaderFile>VCPlugInHeaders.h</PrecompiledHeaderFile>
@@ -215,35 +215,35 @@
       </PostBuildEvent>
    </ItemDefinitionGroup>
    <ItemGroup>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSActionComponent.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelLookup.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelPlacement.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarSearchEnter.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSIconTip.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSJump.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSMarkerExpiryIdleTask.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSModelObserver.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelAlpha.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelIcon.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelMetrics.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelState.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTitle.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultCheckObserver.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultListAdapter.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultListWidgetMgr.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultNodeEH.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultTreeEH.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSStatusTextView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSUIServices.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSUIStartupShutdown.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUIID.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUINoStrip.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\TriggerResourceDeps.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCActionComponent.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelLookup.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelAlpha.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelIcon.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelMetrics.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelState.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTitle.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultCheckObserver.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListAdapter.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeEH.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCStatusTextView.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIServices.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIStartupShutdown.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUINoStrip.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\TriggerResourceDeps.cpp"/>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKPlugInEntrypoint.cpp"/>
       <ClCompile Include="$(ID_SDK_DIR)\source\sdksamples\common\SDKFileHelper.cpp"/>
@@ -255,71 +255,71 @@
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\IKBSStatusTextData.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelLookup.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelPlacement.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSAppBarSearchEnter.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSJump.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSMarkerExpiryIdleTask.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSModelAccess.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSModelObserver.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelAlpha.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelIcon.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelMetrics.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelState.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTextDraw.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTitle.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSResultNodeID.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSResultTree.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h"/>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KFCUIID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\IKFCStatusTextData.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelLookup.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCAppBarSearchEnter.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCModelAccess.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelAlpha.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelIcon.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelMetrics.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelState.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTextDraw.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTitle.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeID.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.h"/>
    </ItemGroup>
    <ItemGroup>
-      <CustomBuild Include="..\..\..\source\sdksamples\KBS\ui\KFCUI.fr">
+      <CustomBuild Include="..\..\..\source\sdksamples\KFC\ui\KFCUI.fr">
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\ui" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeUIodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KFC\ui" -i "..\..\..\source\sdksamples\KFC\model" @"KohakuFindChangeUIodfrc.rsp"
       </Command>
-         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
+         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KBS\ui" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeUIodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -d DEBUG  -i "..\..\..\source\sdksamples\KFC\ui" -i "..\..\..\source\sdksamples\KFC\model" @"KohakuFindChangeUIodfrc.rsp"
       </Command>
-         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
+         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\ui" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeUIodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KFC\ui" -i "..\..\..\source\sdksamples\KFC\model" @"KohakuFindChangeUIodfrc.rsp"
       </Command>
-         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
+         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
          <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KBS\ui" -i "..\..\..\source\sdksamples\KBS\model" @"KohakuFindChangeUIodfrc.rsp"
+        odfrc $(ODFRC_ADDITIONAL_FLAGS) "%(FullPath)" -o "$(IntDir)%(Filename).fres" -i "..\..\..\source\sdksamples\KFC\ui" -i "..\..\..\source\sdksamples\KFC\model" @"KohakuFindChangeUIodfrc.rsp"
       </Command>
-         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
+         <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)TriggerResourceDeps.obj;..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h;%(AdditionalInputs)</AdditionalInputs>
          <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)%(Filename).fres;%(Outputs)</Outputs>
       </CustomBuild>
-      <None Include="..\..\..\source\sdksamples\KBS\ui\KFCUI_enUS.fr" />
+      <None Include="..\..\..\source\sdksamples\KFC\ui\KFCUI_enUS.fr" />
    </ItemGroup>
    <ItemGroup>
-      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUI.rc">
+      <ResourceCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUI.rc">
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\source\sdksamples\KBS\ui;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\source\sdksamples\KFC\ui;..\..\..\source\sdksamples\KFC\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..\..\source\sdksamples\KBS\ui;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..\..\source\sdksamples\KFC\ui;..\..\..\source\sdksamples\KFC\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\source\sdksamples\KBS\ui;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\..\source\sdksamples\KFC\ui;..\..\..\source\sdksamples\KFC\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
          <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
          <Culture Condition="'$(Configuration)|$(Platform)'=='Release|x64'">0x0809</Culture>
-         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..\..\source\sdksamples\KBS\ui;..\..\..\source\sdksamples\KBS\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
+         <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..\..\source\sdksamples\KFC\ui;..\..\..\source\sdksamples\KFC\model;$(ID_SDK_DIR)\source\precomp\msvc;$(ID_SDK_DIR)\source\public\includes;$(ID_SDK_DIR)\source\sdksamples\common;%(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       </ResourceCompile>
    </ItemGroup>

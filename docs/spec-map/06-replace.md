@@ -1,6 +1,6 @@
 # 06. 置換 ― Change Checked と行のメニューの Replace
 
-> コード地図での位置: ブロック **9**（`model/KBSReplaceEngine.*`）。
+> コード地図での位置: ブロック **9**（`model/KFCReplaceEngine.*`）。
 > 変更履歴の署名・色・却下と承認は第7章、取り消し・やり直しへの追従は第9章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
@@ -151,9 +151,9 @@
 
 - **REP-27** 行のメニューの Replace も、Change Checked と**同じ確かめ**をする（条件が変わった＝結果を消して断る・版・行の文字）。
   違いは、文書が変わっていたとき**アラートを出さず、メッセージ欄で断る**こと ――
-  `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KBS) - search again.`／
+  `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again.`／
   `Replace: the text of this row has changed since the search (edited, or undone) - search again.`
-  ⚠利用者に見える文に旧名 `KBS` が残っている（改名の手順書に入っている）。
+  ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
   - 訂正:
 
 - **REP-28** 結果の文 ―― 1行＝`Replaced with Track Changes on - Reject Change on the row's right-click menu takes it back.`

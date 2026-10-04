@@ -23,4 +23,4 @@
 
 #include "VCPlugInHeaders.h"
 
-#include "KBS.fr"
+#include "KFC.fr"

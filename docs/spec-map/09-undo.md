@@ -1,6 +1,6 @@
 # 09. Undo/Redo への追従
 
-> コード地図での位置: ブロック **6b**（`model/KBSUndoFollow.*`）。
+> コード地図での位置: ブロック **6b**（`model/KFCUndoFollow.*`）。
 > KFC の書き込みが取り消しの1段であることは第6・7章、行の見た目は第4章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

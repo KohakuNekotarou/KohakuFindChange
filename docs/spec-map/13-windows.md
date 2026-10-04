@@ -1,6 +1,6 @@
 # 13. 窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change
 
-> コード地図での位置: ブロック **14**（`ui/KBSPanelAlpha.*`）・**15**（`ui/KBSFindChangeMinimize.*`）。
+> コード地図での位置: ブロック **14**（`ui/KFCPanelAlpha.*`）・**15**（`ui/KFCFindChangeMinimize.*`）。
 > メニューの並びと押したときのメッセージ欄の文は第12章（SET-07・SET-09）、保存は SET-16。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

@@ -1,0 +1,24 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuFindChange (KFC)
+//
+//  The UI half's ear on the model half (the model/UI split): the observer that receives what
+//  KFCModelNotify.h sends on the session's subject and turns it into drawing - the tree rebuilt, the rows
+//  repainted, a chapter row taken out, the message line written. An observer that keeps the user
+//  interface up to date is a UI component (guide vol1-06, "UI component content"), so it lives here and
+//  the model only speaks.
+//
+//  Attached by the UI's startup and detached by its shutdown (the session holds a pointer into this .pln
+//  while attached).
+//
+//========================================================================================
+
+#ifndef __KFCModelObserver_h__
+#define __KFCModelObserver_h__
+
+void KFCModelObserverAttach();
+void KFCModelObserverDetach();
+
+#endif // __KFCModelObserver_h__

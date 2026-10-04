@@ -15,88 +15,88 @@
       </Filter>
    </ItemGroup>
    <ItemGroup>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSActionComponent.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCActionComponent.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelLookup.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelLookup.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelPlacement.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSIconTip.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSJump.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSMarkerExpiryIdleTask.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSModelObserver.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelAlpha.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelAlpha.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelIcon.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelIcon.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelMetrics.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelMetrics.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelState.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelState.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTitle.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTitle.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultCheckObserver.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultCheckObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultListAdapter.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListAdapter.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultListWidgetMgr.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultNodeEH.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSResultTreeEH.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSStatusTextView.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCStatusTextView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSUIServices.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIServices.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KBSUIStartupShutdown.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIStartupShutdown.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUIID.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUINoStrip.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUINoStrip.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KBS\ui\TriggerResourceDeps.cpp">
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\TriggerResourceDeps.cpp">
          <Filter>Source Files\Plugin</Filter>
       </ClCompile>
       <ClCompile Include="$(id_sdk_dir)\source\public\libs\publiclib\statics\PlugInStatics.cpp">
@@ -113,80 +113,80 @@
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\IKBSStatusTextData.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\IKFCStatusTextData.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelLookup.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelLookup.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSBookPanelPlacement.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSColorTextView.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCColorTextView.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSFindChangeMinimize.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCFindChangeMinimize.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHitMarkerView.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCHitMarkerView.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSHowTo.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCHowTo.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSJump.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSMarkerExpiryIdleTask.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSModelAccess.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCModelAccess.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSModelObserver.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelAlpha.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelAlpha.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelIcon.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelIcon.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelMetrics.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelMetrics.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelState.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelState.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTextDraw.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTextDraw.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSPanelTitle.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTitle.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSResultNodeID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KBSResultTree.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KFCUIFactoryList.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIFactoryList.h">
          <Filter>Header Files</Filter>
       </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KBS\ui\KFCUIID.h">
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCUIID.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>
    <ItemGroup>
-      <CustomBuild Include="..\..\..\source\sdksamples\KBS\ui\KFCUI.fr">
+      <CustomBuild Include="..\..\..\source\sdksamples\KFC\ui\KFCUI.fr">
          <Filter>Resource Files</Filter>
       </CustomBuild>
-      <None Include="..\..\..\source\sdksamples\KBS\ui\KFCUI_enUS.fr">
+      <None Include="..\..\..\source\sdksamples\KFC\ui\KFCUI_enUS.fr">
          <Filter>Resource Files</Filter>
       </None>
    </ItemGroup>
    <ItemGroup>
-      <ResourceCompile Include="..\..\..\source\sdksamples\KBS\ui\KFCUI.rc">
+      <ResourceCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCUI.rc">
          <Filter>Resource Files</Filter>
       </ResourceCompile>
    </ItemGroup>

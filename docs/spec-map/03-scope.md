@@ -1,6 +1,6 @@
 # 03. 範囲 ― 文書とブック
 
-> コード地図での位置: ブロック **11**（`model/KBSBookScope.*`・UI 側の `ui/KBSBookPanelLookup.*`）と **8**（検索エンジンの範囲の分岐）。
+> コード地図での位置: ブロック **11**（`model/KFCBookScope.*`・UI 側の `ui/KFCBookPanelLookup.*`）と **8**（検索エンジンの範囲の分岐）。
 > 「検索:」の値ごとの歩き方は第2章 §5、ブックや文書を閉じたときの結果の扱いは第10章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

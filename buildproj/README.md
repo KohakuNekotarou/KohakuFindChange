@@ -21,16 +21,16 @@ declares a `PluginDependency` on the model half, never the other way round.
 - `KohakuFindChangeCPP.rsp` / `KohakuFindChangeODFRC.rsp` — its compiler / ODFRC response files.
 - `KohakuFindChangeUI.vcxproj` / `.vcxproj.filters` — the UI half's MSVC project.
 - `KohakuFindChangeUICPP.rsp` / `KohakuFindChangeUIODFRC.rsp` — its response files. The C++ one adds
-  `/I ..\..\..\source\sdksamples\KBS\model`: the UI includes the headers the halves share
-  (`KBSBoundaryID.h`, `KBSModelTypes.h`, `KBSLoc.h`, `IKBS*.h`), which live in `model/` and nowhere else.
-- The four `.sdk.props` per project (`KBS*.sdk.props`, `KFCUI*.sdk.props`) are NOT kept: they are the
+  `/I ..\..\..\source\sdksamples\KFC\model`: the UI includes the headers the halves share
+  (`KFCBoundaryID.h`, `KFCModelTypes.h`, `KFCLoc.h`, `IKFC*.h`), which live in `model/` and nowhere else.
+- The four `.sdk.props` per project (`KFC*.sdk.props`, `KFCUI*.sdk.props`) are NOT kept: they are the
   DollyXs boilerplate, identical between projects.
 
 ## Restore into a clean SDK checkout
 1. Copy the eight files above into `build/win/prj/`, and make `KFCUI<Debug|Release><Win32|X64>.sdk.props`
-   as copies of the `KBS…` ones.
-2. Copy this repo's `model/` and `ui/` folders into `source/sdksamples/KBS/`. The SDK folder keeps the short
-   name `KBS` - it is not renamed along with the project. The sources moved a level down into `source/` on
+   as copies of the `KFC…` ones.
+2. Copy this repo's `model/` and `ui/` folders into `source/sdksamples/KFC/`. The SDK folder keeps the short
+   name `KFC` - it is not renamed along with the project. The sources moved a level down into `source/` on
    2026-08-10 and were split into `model/` and `ui/` on 2026-10-01; everything a folder includes resolves
    against that folder (and the UI's against `model/` as well), so each has to stay together.
 3. Register both projects in `build/win/prj/SDKSamples.sln`:

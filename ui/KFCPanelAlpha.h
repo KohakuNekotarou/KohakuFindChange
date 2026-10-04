@@ -1,0 +1,203 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuFindChange (KFC)
+//
+//  The "Translucent Panel" flyout toggle. Ported from KCM's panel translucency (KCMPanelAlpha, shipped
+//  in its 1.2.0) - the mechanism is not specific to which panel it is pointed at.
+//
+//  *Windows only. The alpha is put on the panel's window with Win32's
+//    SetLayeredWindowAttributes; on Mac the three calls below still exist but
+//    KFCApplyPanelTranslucency does nothing.
+//  *It only takes effect while the panel is FLOATING (or pulled out of an icon as a drawer).
+//    A docked panel is a child of the main frame and cannot be made translucent on its own -
+//    the flag is still set, and the moment the panel floats again it applies.
+//
+//  The measurements this rests on = memory/win32-window-alpha-transparency.md
+//                                   docs/ai-notes/win32-window-transparency.md
+//
+//========================================================================================
+
+#ifndef __KFCPanelAlpha_h__
+#define __KFCPanelAlpha_h__
+
+#include "BaseType.h"
+
+// (The tuning constants - the alpha (kKFCPanelAlphaValue) and the chase's count and interval - are at
+//  the top of KFCPanelAlpha.cpp, the one file that reads them: the shape KCM gives its own and the
+//  product code uses for a file-local tuning value (linksui/LinksUIUtils.cpp:606-608). Nothing that
+//  includes this header needs them.)
+
+// The toggle's current state (*OFF by default).
+bool16	KFCGetPanelTranslucent();
+
+// Set the toggle. *No WINDOW is touched here (the two are kept apart because the saved settings set
+// it too - KFCLoadPanelStateIfPresent, at startup or when the palettes come up - when there may be no
+// panel to touch yet) - but this is not a plain setter either: it puts the Win32 event hook up, or
+// takes it down when both toggles end up off. Applying is KFCApplyPanelTranslucency.
+void	KFCSetPanelTranslucent(bool16 on);
+
+// Write the current flag onto the panel's window.
+//  IT DOES NOT CHECK THE TOGGLE - THE CALLER MUST. While OFF this writes alpha 255 and shows
+//    the shadow again, because that IS the restoring the OFF menu item does. Anything that calls it
+//    on some other cue (the pointer arriving, the widgets being rebuilt) has to ask
+//    KFCGetPanelTranslucent first, or it will cancel the translucency of ANY OTHER panel grouped
+//    with this one - a floating group shares one OWL.Dock - and force out a shadow nobody asked for.
+//    See the note over KFCPanelRollOver::MouseEnter in the .cpp.
+//  - Does nothing (and does NOT report an error) when the panel is absent or docked
+//  - Callers, by name: the menu item (KFCActionComponent.cpp), the panel's AutoAttach
+//    (KFCPanelTitle.cpp), and five in KFCPanelAlpha.cpp itself - the palette-visibility observer,
+//    the chase timer, the Win32 event hook, and KFCPanelRollOver's MouseEnter and MouseLeave.
+//  - Returns kTrue when an alpha actually reached a window; kFalse when there is no panel, when it
+//    is docked, or on Mac. The menu uses that to say "it is on" or "it is on but the panel is
+//    docked", rather than leaving a click with no visible result unexplained.
+bool16	KFCApplyPanelTranslucency();
+
+//----------------------------------------------------------------------------------------
+// The same treatment for InDesign's OWN Find/Change dialog (the user's request).
+//
+//   Measured on the real application before it was built (work/findchange-window-probe.ps1):
+//     class   = "DroverLord - Window Class"   top-level, owner = the main frame ("indesign")
+//     EXSTYLE = 0x00000180  = *WS_EX_LAYERED is NOT set, unlike a floating panel's OWL.Dock
+//   So the style has to be added by us - and taken off again when the toggle goes OFF, which is
+//   the opposite of the panel side, where InDesign's own style must never be touched.
+//   Adding it turned out to have no side effects at all: text, frame and every control stayed
+//   correct and usable (the user's check).
+//
+//   *"DroverLord - Window Class" is a GENERIC class - a document window's canvas is one too, and
+//    so is every other dialog - so the class alone cannot identify it. That is why this window is
+//    NOT looked for from Win32 at all: the lookup walks the SDK's IWindowList and takes the dialog
+//    whose panel answers kFindChangeParentWidgetID - a NUMBER, so no UI language can change it.
+//    See the block comment over KFCQueryFindChangeIWindow in KFCPanelAlpha.cpp for the full route.
+//    (Not by its title either: the title is translated.)
+//----------------------------------------------------------------------------------------
+
+// The toggle's current state (*OFF by default).
+bool16	KFCGetFindChangeTranslucent();
+
+// Set the toggle. The window is left to KFCApplyFindChangeTranslucency below; what this does do
+// besides the flag is drop whatever was cached about where the dialog is (a toggle press is exactly
+// when "not open", established at some earlier moment, must not be allowed to answer), and put the
+// Win32 event hook up or take it down.
+void	KFCSetFindChangeTranslucent(bool16 on);
+
+// Write the current flag onto the Find/Change window.
+//  - While ON: returns kFalse when the dialog is not open (so the menu can say so rather than
+//    leaving a click with no visible result unexplained), and on Mac
+//  - While OFF: always kTrue on Windows. Two separate things happen - the dialog open NOW goes back
+//    to opaque, and the WS_EX_LAYERED we added comes off the window WE ADDED IT TO, which need not
+//    be the one open now and may be no open window at all. A window that already carried the style
+//    is left with it.
+//    *They are NOT both hung off "is a dialog open": then switching OFF with the dialog closed would
+//     run no clean-up at all and leave the record standing against a handle the OS can recycle.
+bool16	KFCApplyFindChangeTranslucency();
+
+// InDesign's OWN Find/Change dialog's platform window, or nullptr when it is not open.
+// *Shared with KFCFindChangeMinimize.cpp so that "which window is the Find/Change
+//  dialog" is decided in ONE place. It is not a trivial question - the window class is generic and
+//  the title is translated - and the answer walks the SDK's window list for the dialog whose panel
+//  answers kFindChangeParentWidgetID, a NUMBER. See the block comment over KFCQueryFindChangeIWindow
+//  in the .cpp. (KFCQueryFindChangeIWindow itself stays private: nothing outside needs the IWindow.)
+// The contract:
+//   . the result is CACHED, and the cache is dropped by the window-list observer whenever a window
+//     is added or removed - so ask again rather than keeping the handle
+//   . do not hold the returned HWND across events. The OS recycles handles, and a stale one
+//     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
+//   . nullptr means "not open", and also "open, but the platform window does not exist yet"
+#ifdef WINDOWS
+// *HWND is named here WITHOUT pulling windows.h into this header, which six .cpp files include and
+//  only three of which have any business with Win32 (KFCPanelAlpha.cpp, KFCFindChangeMinimize.cpp,
+//  KFCPanelState.cpp - each includes windows.h itself). This is the declaration windows.h itself makes
+//  (DECLARE_HANDLE expands to exactly this), so the two can appear in either order.
+struct HWND__;
+typedef struct HWND__* HWND;
+
+HWND	KFCQueryFindChangeWindow();
+
+// Could 'h' still be the Find/Change dialog's window - a live, top-level "DroverLord - Window Class"
+// window of THIS process? Win32 only, so shutdown can ask it.
+// *The ONE place that answers it, for the minimize side (KFCStillOurFindChangeWindow), the
+//  translucency side (KFCRestoreOurFindChangeStyle) and the cached handle in
+//  KFCQueryFindChangeWindow - not three tests each its own way (IsWindow alone is not enough: the
+//  cache is filled again with the CLOSING dialog, which is still in the window list when
+//  kRemoveWindowMessage arrives). A handle is a number the OS hands on, so a weaker test could name
+//  another window by the time it is used.
+// *It says nothing about whether the window carries OUR marks: each caller asks that of its own bits.
+bool	KFCIsFindChangeShapedWindow(HWND h);
+
+// Make a SetWindowLongPtr style change on 'h' take effect without pulling the window forward:
+// SetWindowPos with the combination Microsoft's SetWindowPos Remarks prescribe (SWP_NOMOVE |
+// SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) plus SWP_NOACTIVATE, then a full redraw. Shared by
+// the two features that change the Find/Change dialog's style.
+void	KFCCommitWindowStyle(HWND h);
+#endif
+
+// Throw away what is cached about where the dialog is, so the NEXT ask walks the window list again.
+// THIS IS NOT OPTIONAL FOR ANYONE WAITING FOR THE DIALOG TO APPEAR. The lookup above records
+//   "looked, found nothing" and then answers nullptr WITHOUT LOOKING AGAIN - which is right for its
+//   ordinary caller (it stops a walk of every window on every mouse move) and useless for a caller
+//   whose whole purpose is to ask the same question until the answer changes.
+//   !MEASURED: a retry loop that did not call this ran its full count against the cached "no" and
+//    never saw the window that had appeared in the meantime.
+// *The translucency toggle does this from its own setter, for the stated reason that "a
+//  toggle press is exactly when 'not open', established at some earlier moment, must not be allowed
+//  to answer". The minimize toggle does it from its setter too, and so does every turn of the chase
+//  both toggles share (KFCChaseFindChangeWindow in KFCFindChangeMinimize.h).
+void	KFCForgetFindChangeWindow();
+
+// Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? The chase waits
+// for that dialog's window (KFCChaseFindChangeWindow - both toggles'), and without this test it is set
+// going by EVERY window that opens - !MEASURED with the dialog closed: a new document's window started
+// it, and it walked the window list 8 times over about a second before giving up.
+// What the message carries, measured on a test build: changedBy IS the added IWindow (the
+// same pointer as the newest entry of the window list), and
+//   . a document window is no dialog (IDialog absent)                 -> kFalse
+//   . the Find/Change dialog opened for the FIRST time in a session is a dialog whose panel is NOT SET
+//     YET (GetDialogPanel nil) - which is why the window-list lookup cannot see it at that moment, and
+//     why the chase exists (not on every first opening: one session's first dialog was styled at
+//     the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
+//     without a panel")                                                -> kTrue
+//     (another dialog opened for the first time looks the same, and is chased the same - the chase is
+//      bounded, and a dialog's first opening is rare next to documents opening)
+//   . opened again later, it carries kFindChangeParentWidgetID at once -> kTrue
+//   . any other dialog, its panel set                                  -> kFalse
+// *changedBy is matched against the list's own pointers BY VALUE before anything is asked of it, so a
+//  pointer of some other kind is never dereferenced; one that matches nothing answers kTrue - the chase
+//  runs, rather than a dialog being left without its button. Always kFalse on Mac.
+bool16	KFCWindowMayBeFindChange(void* changedBy);
+
+// Start listening for the panel being shown, hidden, docked or floated.
+// *Called from TWO places, and safe to call again: KFCUIStartupShutdown::Startup, and the panel's
+//   own AutoAttach (KFCPanelTitle.cpp). !The second one is not belt and braces - the panel manager
+//   comes up partway through the application's startup sequence, so at Startup it can still be nil,
+//   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
+//   IsAttached first, so repeating the call attaches nothing twice.
+// *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
+//   (identified on a debug build's Spy). Two further subjects hang off kAppBoss - see
+//   the function itself.
+void	KFCAttachPanelVisibilityObserver();
+
+// Undo every attachment the above makes. Called from the plug-in's shutdown, BEFORE
+// KFCShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
+// *Why it exists: while attached, the session holds a pointer into this .pln, and a
+//   notification arriving during teardown would run the observer in code that is going away - the
+//   same reasoning, and the same shape, as KFCBookWatchDetach.
+void	KFCDetachPanelVisibilityObserver();
+
+// Tear down everything this file has put anywhere. Called from the plug-in's shutdown
+// (KFCUIStartupShutdown::Shutdown). *ICallbackTimer's callback is a raw function pointer that is not
+// reference counted, so leaving a booking live while this .pln goes down is a crash. Implemented in
+// KFCPanelAlpha.cpp (empty on Mac). In order:
+//   . the flag that stops another timer or hook being made afterwards
+//   . the Win32 event hook
+//   . InDesign's own Find/Change dialog, put back as it was - the WS_EX_LAYERED on it is OURS,
+//     and a style plus an alpha left on a window nobody maintains any more would outlive this
+//     plug-in. This one is easy to overlook, being the only thing here that touches somebody else's
+//     window.
+//   . the remembered window handles
+//   . the one-shot timer, stopped and released (the flag is what has to come first, and no idle task
+//     runs inside this call)
+void	KFCShutdownPanelAlpha();
+
+#endif // __KFCPanelAlpha_h__

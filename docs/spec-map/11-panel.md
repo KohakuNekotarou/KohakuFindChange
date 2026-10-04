@@ -1,6 +1,6 @@
 # 11. パネルの見た目
 
-> コード地図での位置: ブロック **4**（`ui/KBSPanelTitle.*`・`KBSPanelIcon.*`・`KBSIconTip.cpp`・`KBSPanelMetrics.*`・`KBSPanelView.cpp`）・**7**（メッセージ欄）・**13**（How to Use）。
+> コード地図での位置: ブロック **4**（`ui/KFCPanelTitle.*`・`KFCPanelIcon.*`・`KFCIconTip.cpp`・`KFCPanelMetrics.*`・`KFCPanelView.cpp`）・**7**（メッセージ欄）・**13**（How to Use）。
 > 一覧の中身は第4章、フライアウトの項目と設定の保存は第12章、半透明は第13章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

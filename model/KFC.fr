@@ -1,0 +1,289 @@
+//========================================================================================
+//  
+//  $File: $
+//  
+//  Owner: 
+//  
+//  $Author: $
+//  
+//  $DateTime: $
+//  
+//  $Revision: $
+//  
+//  $Change: $
+//  
+//  Copyright 1997-2012 Adobe Systems Incorporated. All rights reserved.
+//  
+//  NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance 
+//  with the terms of the Adobe license agreement accompanying it.  If you have received
+//  this file from a source other than Adobe, then your use, modification, or 
+//  distribution of it requires the prior written permission of Adobe.
+//  
+//========================================================================================
+
+
+#include "VCPlugInHeaders.h"
+
+// THE MODEL HALF'S RESOURCES.
+// The search and replace engines, the results, the tracked-change signature, the jump marker's
+// adornment and the observers that keep the results true are declared here; everything the panel
+// needs - its bosses, menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's
+// resource. The strings this half writes itself (the replace's own alert and what Edit > Undo
+// calls a KFC write) stay in KFC_enUS.fr.
+
+// General includes:
+#include "LocaleIndex.h"
+#include "PMLocaleIds.h"
+#include "StringTable.fh"
+#include "ObjectModelTypes.fh"
+#include "ShuksanID.h"
+#include "CommandID.h"
+#include "BuildNumber.h"
+#include "PlugInModel_UIAttributes.h"
+#include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
+#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
+
+// Project includes:
+#include "KFCID.h"
+
+// (The UI half's includes - the menu, action, panel, widget, tree and icon definitions - are in
+//  ui/KFCUI.fr with the resources that need them.)
+
+
+#ifdef __ODFRC__
+
+/*
+ * Plugin version definition.
+ */
+resource PluginVersion (kSDKDefPluginVersionResourceID)
+{
+	kTargetVersion,
+	kKFCPluginID,
+	kSDKDefPlugInMajorVersionNumber, kSDKDefPlugInMinorVersionNumber,
+	kSDKDefHostMajorVersionNumber, kSDKDefHostMinorVersionNumber,
+	kKFCCurrentMajorFormatNumber, kKFCCurrentMinorFormatNumber,
+	{ kInDesignProduct },
+	{ kWildFS },
+	kModelPlugIn,		// no UI boss, no UI library, safe on a background thread
+	kKFCVersion
+};
+
+/*
+ * The ExtraPluginInfo resource adds extra information to the Missing Plug-in dialog
+ * that is popped when a document containing this plug-in's data is opened when
+ * this plug-in is not present. These strings are not translatable strings
+ * since they must be available when the plug-in isn't around. They get stored
+ * in any document that this plug-in contributes data to.
+ */
+resource ExtraPluginInfo(1)
+{
+	kKFCCompanyValue,			// Company name
+	kKFCMissingPluginURLValue,	// URL
+	kKFCMissingPluginAlertValue,	// Missing plug-in alert text
+};
+
+/*
+ * Boss class definitions.
+ */
+resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
+{{{
+
+
+	/*
+	 * The jump marker: a global text adornment. Two interfaces, only one of them ours:
+	 * the API ships the provider for kGlobalTextAdornmentService (kGlobalTextAdornmentServiceImpl,
+	 * TextID.h) - the same pair as the product's dynamic spelling squiggle (SpellPanelClass.fr) and
+	 * KCM's Story-mode marker (KCM.fr, kKCMStoryMarkerBoss). It replaced kKFCDrawEventServiceBoss,
+	 * the Draw Event rectangle (KFCHitMarker.h says why).
+	 */
+	Class
+	{
+		kKFCHitMarkerBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER,   kGlobalTextAdornmentServiceImpl,
+			IID_IGLOBALTEXTADORNMENT, kKFCHitMarkerAdornmentImpl,
+		}
+	},
+
+	/** Signs the tracked changes one replace made: the insertion's pieces and the deletion
+		in the range become "KohakuFindChange" at the row's time. KFCSignRecordsCmd.cpp.
+		ItemList: the story. */
+	Class
+	{
+		kKFCSignRecordsCmdBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMAND,		kKFCSignRecordsCmdImpl,
+			IID_IRANGEDATA,		kRangeDataImpl,			// the range the replace wrote [start, end]
+			IID_IINT64DATA,		kKFCInt64DataImpl,		// the row's time stamp (100 ns units since 1601)
+		}
+	},
+
+	/*
+	 * Startup/shutdown service boss - the MODEL half's: starts the book-close watcher and clears the
+	 * model's state during controlled shutdown.
+	 * kCMainThreadStartupShutdownProviderImpl (API-provided) registers it, NOT the lazy provider: a model
+	 * plug-in's startup/shutdown service is otherwise ALSO called as each background
+	 * thread starts and stops (guide vol1-07), and this Shutdown throws the session's results away. The
+	 * shape Adobe uses for a model plug-in that wants the main thread only, with that very reason written
+	 * beside it: private/toolkit/diagnosticlog/DiagLogClass.fr; KCM's model half does the same.
+	 */
+	Class
+	{
+		kKFCStartupShutdownBoss,
+		kInvalidClass,
+		{
+			IID_ISTARTUPSHUTDOWN, kKFCStartupShutdownImpl,
+			IID_IK2SERVICEPROVIDER, kCMainThreadStartupShutdownProviderImpl,
+		}
+	},
+
+	/*
+	 * Book-close watcher: retires a BOOK-scope result set when the book it was searched in is
+	 * closed - the book half of what KFCCloseDocResponder does for a single document. Books have
+	 * no signal to responder-register for (not one of the SDK's signal ServiceIDs comes from
+	 * BookID.h), so this has to be an observer.
+	 *
+	 * The AddIn goes on kSessionBoss because that is the subject the cue is broadcast from:
+	 * kCloseBookCmdBoss @ kSessionBoss, protocol IID_IBOOKCONTENT - read off a debug build's
+	 * Test > Spy. The attach itself is in KFCBookWatch.cpp; this line only puts our IID, and so
+	 * the observer implementation, onto the session.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKFCBOOKWATCH, kKFCBookWatchImpl,
+		}
+	},
+
+	/*
+	 * The three doors the UI half reaches the model half through (IKFCResults.h / IKFCRuns.h /
+	 * IKFCChapters.h, forwarding in KFCModelServices.cpp). On the session
+	 * because what is behind them is session state; the model's own implementations, so they are this
+	 * half's.
+	 */
+	AddIn
+	{
+		kSessionBoss,
+		kInvalidClass,
+		{
+			IID_IKFCRESULTS, kKFCResultsImpl,
+			IID_IKFCRUNS, kKFCRunsImpl,
+			IID_IKFCCHAPTERS, kKFCChaptersImpl,
+		}
+	},
+
+	/*
+	 * The panel follows an Undo and a Redo of KFC's own writes (the author: "after an Undo the row cannot
+	 * be rejected again - the panel should come back with it, the way KCM's does").
+	 * ON THE DOCUMENT, NOT THE STORY. Every write leaves a mark in its undo step (kKFCUndoMarkCmdBoss,
+	 * below): a ModelChange on its document's subject, under IID_IKFCUNDOMARK. This LAZY observer hears it
+	 * on the Do, the Undo and the Redo alike - lazy because that is the only notification an Undo and a
+	 * Redo broadcast (ISubject.h:78-82). KCM's ticks and paws ride the same road (KCM.fr,
+	 * IID_IKCMMARKSOBSERVER). An observer on each story a write moved (kTextStoryBoss) is lost: a story
+	 * InDesign purges from memory - it does, switching documents - comes back without it (the second
+	 * document's Ctrl+Z went unheard 12 times in 18). A document is not purged while it is open.
+	 * Our own IID: kDocBoss carries other people's IID_IOBSERVER. Attached at run time in KFCUndoFollow.cpp
+	 * (this line only puts our IID, and so the implementation, onto the boss), never written into the
+	 * document. The MODEL half's: it keeps the results true and tells the panel only through
+	 * KFCModelNotify, and answers on the main thread only - a background task has neither an Undo nor a panel.
+	 */
+	AddIn
+	{
+		kDocBoss,
+		kInvalidClass,
+		{
+			IID_IKFCDOCUNDOOBSERVER, kKFCDocUndoObserverImpl,
+		}
+	},
+
+	/** The mark (KFCUndoFollow.cpp): processed inside every write of KFC's own, it changes nothing
+		and raises a ModelChange on its document's subject from DoNotify. ItemList: the document's root. */
+	Class
+	{
+		kKFCUndoMarkCmdBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMAND,		kKFCUndoMarkCmdImpl,
+		}
+	},
+
+	/*
+	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
+	 * is closed - a row naming a closed document would still jump, and Change Checked would still
+	 * reopen it to replace in it. Book results are left to the book-side responder.
+	 *
+	 * A boss that answers ONE signal does not need a ServiceProvider of its own: naming the API's
+	 * kBeforeCloseDocSignalRespServiceImpl (DocumentID.h) registers this responder for that signal.
+	 * CServiceProvider + HasMultipleIDs is only for a boss that answers several, as in
+	 * linksui/ClosingDocumentsResponder.cpp. IID_IRESPONDER comes from ShuksanID.h, included above.
+	 */
+	Class
+	{
+		kKFCCloseDocResponderBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kBeforeCloseDocSignalRespServiceImpl,
+			IID_IRESPONDER,         kKFCCloseDocResponderImpl,
+		}
+	},
+
+}}};
+
+/*  
+ * Implementation definition.
+ */
+resource FactoryList (kSDKDefFactoryListResourceID)
+{
+	kImplementationIDSpace,
+	{
+		#include "KFCFactoryList.h"
+	}
+};
+
+/*  
+ * Locale Indicies.
+ * The LocaleIndex should have indicies that point at your
+ * localizations for each language system that you are localized for.
+ */
+
+/*  
+ * String LocaleIndex.
+ */
+resource LocaleIndex ( kSDKDefStringsResourceID)
+{
+	kStringTableRsrcType,
+	{
+		// ONE wild row. This is the shape the SDK samples use when a plug-in ships a single
+		// string table: candlechart/CdlChart.fr:340, basictextadornment/BscTA.fr:345,
+		// customdatalinkui/CusDtLnkUI.fr:437, customdatalink/CusDtLnk.fr:562,
+		// basicshape/BscShp.fr:270 - they all close with this exact line. The other official
+		// shape, a row per locale (basiclocalization/BscL10N.fr:196-219), is for a plug-in that
+		// really carries several translated tables. KFC carries one, so there is nothing for
+		// a per-locale row to select.
+		//
+		// !Do NOT turn it into a list of named locales that all point at this same table. That
+		// is NOT equivalent: the lookup is a match, not a default (LocaleIndex.h:124-134, "Does
+		// wildcard matching"), so a locale absent from the list matches no row at all and draws
+		// every menu, panel and prompt as its RAW KEY (measured on a Japanese UI - memory
+		// plugin-ui-localization-fr-encoding).
+		//
+		// The Japanese KFC speaks is not in a table (the author's call): it is switched in at RUN
+		// TIME by UI language - see KFCLoc.h. The official jaJP shape (kInDesignJapaneseFS + a
+		// jaJP table) matched NO row on a Roman-engine install running a Japanese UI. kWildFS is
+		// what covers both, because the featureset and the UI language are separate axes and this
+		// table is meant for every combination of them.
+		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
+	}
+};
+
+
+
+#endif // __ODFRC__
+
+#include "KFC_enUS.fr"
+// (No KFC_jaJP.fr: the Japanese lives in KFCLoc.h and is switched at run time by UI language. See the
+//  LocaleIndex note above.)

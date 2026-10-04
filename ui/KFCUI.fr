@@ -7,7 +7,7 @@
 //  THE UI HALF'S RESOURCES.
 //  The panel and everything it needs: its bosses and the observers and services that serve it, the
 //  menus and actions, the views, the pictures and the strings. The model half's resources are in
-//  model/KBS.fr.
+//  model/KFC.fr.
 //
 //========================================================================================
 
@@ -59,7 +59,7 @@ resource PluginVersion (kSDKDefPluginVersionResourceID)
 	{ kInDesignProduct },
 	{ kWildFS },
 	kUIPlugIn,
-	kKBSVersion			// one version for both halves (KBSBoundaryID.h)
+	kKFCVersion			// one version for both halves (KFCBoundaryID.h)
 };
 
 /*
@@ -67,14 +67,14 @@ resource PluginVersion (kSDKDefPluginVersionResourceID)
  */
 resource ExtraPluginInfo(1)
 {
-	kKBSCompanyValue,			// Company name (KBSBoundaryID.h - the same publisher for both halves)
+	kKFCCompanyValue,			// Company name (KFCBoundaryID.h - the same publisher for both halves)
 	kKFCUIMissingPluginURLValue,	// URL
 	kKFCUIMissingPluginAlertValue,	// Missing plug-in alert text
 };
 
 /*
  * This half does not stand on its own: the panel's rows, its commands and its status all come from
- * the model half through the three session interfaces (IKBSResults / IKBSRuns / IKBSChapters). Guide
+ * the model half through the three session interfaces (IKFCResults / IKFCRuns / IKFCChapters). Guide
  * gs-03 - a UI plug-in makes no sense without its model half - so say so and let InDesign enforce the
  * load order and report the missing half. The SDK's shape (transparencyeffectui/TranFxUI.fr), and KCM's.
  * The dependency is ONE-WAY: the model half declares none, and has to keep working on its own.
@@ -83,8 +83,8 @@ resource PluginDependency(kSDKDefPluginDependencyResourceID)
 {
 	kWildFS
 	{
-		kKBSPluginID,			// the model half's PluginID (KBSBoundaryID.h)
-		kKBSPluginName,			// "KohakuBookSearch" (KBSBoundaryID.h)
+		kKFCPluginID,			// the model half's PluginID (KFCBoundaryID.h)
+		kKFCPluginName,			// "KohakuBookSearch" (KFCBoundaryID.h)
 		kSDKDefPlugInMajorVersionNumber,
 		kSDKDefPlugInMinorVersionNumber,
 	}
@@ -114,11 +114,11 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSActionComponentBoss,
+		kKFCActionComponentBoss,
 		kBaseActionComponentBoss,
 		{
 			// Handle the actions from the menu. The rest comes from the parent boss above.
-			IID_IACTIONCOMPONENT, kKBSActionComponentImpl,
+			IID_IACTIONCOMPONENT, kKFCActionComponentImpl,
 		}
 	},
 
@@ -132,7 +132,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSPanelWidgetBoss,
+		kKFCPanelWidgetBoss,
 		kPalettePanelWidgetBoss,
 		{
 			/*
@@ -141,98 +141,98 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			 */
 			IID_IPANELMENUDATA, kCPanelMenuDataImpl,
 			/*
-			 * The panel's observer (KBSPanelTitle.cpp): what has to be written on each time the panel
+			 * The panel's observer (KFCPanelTitle.cpp): what has to be written on each time the panel
 			 * is shown, because the panel is rebuilt every time - the tab's name, the layout for the
 			 * UI language, the picture, the message - and, while it is up, the picture's click and
 			 * what the tab's name follows (the Find/Change settings and the selection: it is an
 			 * ActiveSelectionObserver).
 			 */
-			IID_IOBSERVER, kKBSPanelObserverImpl,
+			IID_IOBSERVER, kKFCPanelObserverImpl,
 			/*
 			 * The panel's view replaced: PalettePanelView plus a floor under how small the panel can
 			 * be dragged, and a height rounded down to whole result rows, both through
-			 * ConstrainDimensions. See KBSPanelView.cpp - the same shape KESCL uses, which took it
+			 * ConstrainDimensions. See KFCPanelView.cpp - the same shape KESCL uses, which took it
 			 * from customconditionaltextui.
 			 */
-			IID_ICONTROLVIEW, kKBSPanelViewImpl,
+			IID_ICONTROLVIEW, kKFCPanelViewImpl,
 			/*
 			 * Roll-over (ported from KCM): while the "Translucent Panel" toggle is ON, the panel goes
 			 * back to solid with the pointer on it. Verified over the whole panel area in KCM.
 			 * Note that IMouseRollOver has no usage example anywhere in the SDK; besides this AddIn
 			 * it needs CREATE_PMINTERFACE *and* an entry in KFCUIFactoryList.h - a missing factory
-			 * entry fails completely silently. Implementation: KBSPanelAlpha.cpp.
+			 * entry fails completely silently. Implementation: KFCPanelAlpha.cpp.
 			 */
-			IID_IMOUSEROLLOVER, kKBSPanelRollOverImpl,
+			IID_IMOUSEROLLOVER, kKFCPanelRollOverImpl,
 		}
 	},
 
 	/*
 	 * The panel's illustration: the system rollover icon button plus a tooltip of our own, so
 	 * hovering the picture says where clicking it goes. Nothing else is added - the click itself is
-	 * heard by the panel's observer (KBSPanelTitle.cpp), which is already there.
+	 * heard by the panel's observer (KFCPanelTitle.cpp), which is already there.
 	 *
 	 * Same shape as kLinksUIButtonBoss in open/components/linksui, and as KCM's
 	 * kKCMIconWidgetBoss - which is where this panel's layout comes from.
 	 */
 	Class
 	{
-		kKBSIconWidgetBoss,
+		kKFCIconWidgetBoss,
 		kRollOverIconButtonBoss,
 		{
-			IID_ITIP, kKBSIconTipImpl,
+			IID_ITIP, kKFCIconTipImpl,
 		}
 	},
 
 	/*
 	 * Result tree list: the tree-view widget carrying our hierarchy adapter and row
 	 * widget manager. The framework provides the tree controller and default event handling
-	 * (selection, expand/collapse); the row-click jump handler is the row's (kKBSResultNodeWidgetBoss, below).
+	 * (selection, expand/collapse); the row-click jump handler is the row's (kKFCResultNodeWidgetBoss, below).
 	 */
 	Class
 	{
-		kKBSResultListWidgetBoss,
+		kKFCResultListWidgetBoss,
 		kTreeViewWidgetBoss,
 		{
-			IID_ITREEVIEWHIERARCHYADAPTER, kKBSResultListAdapterImpl,
-			IID_ITREEVIEWWIDGETMGR, kKBSResultListWidgetMgrImpl,
+			IID_ITREEVIEWHIERARCHYADAPTER, kKFCResultListAdapterImpl,
+			IID_ITREEVIEWWIDGETMGR, kKFCResultListWidgetMgrImpl,
 			/* Extends the stock handler so the up / down arrows OPEN the row they land on and run
-			   that row's action - see KBSResultTreeEH.cpp. A book search comes up with every
+			   that row's action - see KFCResultTreeEH.cpp. A book search comes up with every
 			   chapter closed, and the stock keys walk visible rows only.
 			   NOTE: this line alone does not create the handler. Implementations are made on first
-			   QueryInterface, and the one that asks is KBSResultNodeEH's key-focus hand-off. */
-			IID_IEVENTHANDLER, kKBSResultTreeEHImpl,
+			   QueryInterface, and the one that asks is KFCResultNodeEH's key-focus hand-off. */
+			IID_IEVENTHANDLER, kKFCResultTreeEHImpl,
 		}
 	},
 
 	/*
 	 * The hit line's multi-colour text cell: a generic panel widget whose IControlView
-	 * is our self-drawing view (KBSColorTextView), plus the per-row draw data it paints.
+	 * is our self-drawing view (KFCColorTextView), plus the per-row draw data it paints.
 	 */
 	Class
 	{
-		kKBSColorTextWidgetBoss,
+		kKFCColorTextWidgetBoss,
 		kGenericPanelWidgetBoss,
 		{
-			IID_ICONTROLVIEW, kKBSColorTextViewImpl,
-			IID_IKBSROWDATA, kKBSRowDataImpl,
+			IID_ICONTROLVIEW, kKFCColorTextViewImpl,
+			IID_IKFCROWDATA, kKFCRowDataImpl,
 		}
 	},
 
 	/*
 	 * The panel's MESSAGE AREA, built the same way as the cell above and for the same
 	 * reason: a replaced row, once selected, shows its text as it was BEFORE the replace here, and
-	 * "which characters were replaced" is a question one colour cannot answer (KBSStatusTextView.cpp).
+	 * "which characters were replaced" is a question one colour cannot answer (KFCStatusTextView.cpp).
 	 * Brought over from KCM, whose kKCMStatusTextWidgetBoss replaced the same stock widget.
 	 * ! No ITextControlData of our own: the one kGenericPanelWidgetBoss carries is persistent, and the
 	 *   data implementation writes the message into it for a reader that walks the widgets.
 	 */
 	Class
 	{
-		kKBSStatusTextWidgetBoss,
+		kKFCStatusTextWidgetBoss,
 		kGenericPanelWidgetBoss,
 		{
-			IID_ICONTROLVIEW, kKBSStatusTextViewImpl,
-			IID_IKBSSTATUSTEXTDATA, kKBSStatusTextDataImpl,
+			IID_ICONTROLVIEW, kKFCStatusTextViewImpl,
+			IID_IKFCSTATUSTEXTDATA, kKFCStatusTextDataImpl,
 		}
 	},
 
@@ -243,10 +243,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSResultNodeWidgetBoss,
+		kKFCResultNodeWidgetBoss,
 		kTreeNodeWidgetBoss,
 		{
-			IID_IEVENTHANDLER, kKBSResultNodeEHImpl,
+			IID_IEVENTHANDLER, kKFCResultNodeEHImpl,
 		}
 	},
 
@@ -258,10 +258,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSResultCheckWidgetBoss,
+		kKFCResultCheckWidgetBoss,
 		kCheckBoxWidgetBoss,
 		{
-			IID_IOBSERVER, kKBSResultCheckObserverImpl,
+			IID_IOBSERVER, kKFCResultCheckObserverImpl,
 		}
 	},
 
@@ -271,31 +271,31 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSMarkerExpiryIdleTaskBoss,
+		kKFCMarkerExpiryIdleTaskBoss,
 		kInvalidClass,
 		{
-			IID_IIDLETASK, kKBSMarkerExpiryIdleTaskImpl,
+			IID_IIDLETASK, kKFCMarkerExpiryIdleTaskImpl,
 		}
 	},
 
 	/*
-	 * The UI half's startup/shutdown service boss (KBSUIStartupShutdown.cpp): the saved settings, the
+	 * The UI half's startup/shutdown service boss (KFCUIStartupShutdown.cpp): the saved settings, the
 	 * windows the panel follows, the marker's countdown and the ear on the model half. A boss of its own
 	 * because a startup/shutdown service is declared per boss. UI code, so this half's; lazy here.
 	 */
 	Class
 	{
-		kKBSUIStartupShutdownBoss,
+		kKFCUIStartupShutdownBoss,
 		kInvalidClass,
 		{
-			IID_ISTARTUPSHUTDOWN, kKBSUIStartupShutdownImpl,
+			IID_ISTARTUPSHUTDOWN, kKFCUIStartupShutdownImpl,
 			IID_IK2SERVICEPROVIDER, kLazyStartupShutdownProviderImpl,
 		}
 	},
 
 	/*
-	 * The UI half's ear on the model half: the observer that draws what KBSModelNotify.h sends on the
-	 * session's subject. Attached by the startup (KBSModelObserver.cpp); this line only puts our IID, and
+	 * The UI half's ear on the model half: the observer that draws what KFCModelNotify.h sends on the
+	 * session's subject. Attached by the startup (KFCModelObserver.cpp); this line only puts our IID, and
 	 * so the implementation, onto the session. An AddIn that points at UI code, in this half's resource.
 	 */
 	AddIn
@@ -303,12 +303,12 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kSessionBoss,
 		kInvalidClass,
 		{
-			IID_IKBSMODELOBSERVER, kKBSModelObserverImpl,
+			IID_IKFCMODELOBSERVER, kKFCModelObserverImpl,
 		}
 	},
 
 	/*
-	 * What the model half asks the UI half for (IKBSUIServices.h): the progress bar, the windows, the
+	 * What the model half asks the UI half for (IKFCUIServices.h): the progress bar, the windows, the
 	 * Book panel's front tab and the alert. A UI implementation on a model boss, which the guide allows
 	 * only through an AddIn in the UI plug-in's resource (vol1-07, Object-Model Rule 2) - and which a
 	 * background thread does not see, where the model does without.
@@ -318,7 +318,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kSessionBoss,
 		kInvalidClass,
 		{
-			IID_IKBSUISERVICES, kKBSUIServicesImpl,
+			IID_IKFCUISERVICES, kKFCUIServicesImpl,
 		}
 	},
 
@@ -328,7 +328,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * is opened, closed, restored from an icon or drawer-expanded. The "Translucent Panel" toggle
 	 * puts its alpha on the panel's CURRENT top-level window (an OWL.Dock), and that window is thrown
 	 * away and recreated by those very actions - so without this the translucency would be silently
-	 * lost. The attach itself is in KBSPanelAlpha.cpp; this line only puts our IID, and so the
+	 * lost. The attach itself is in KFCPanelAlpha.cpp; this line only puts our IID, and so the
 	 * observer implementation, onto the boss.
 	 *
 	 * It goes on kActiveContextBoss rather than the kSessionBoss above because that is the proven
@@ -340,7 +340,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kActiveContextBoss,
 		kInvalidClass,
 		{
-			IID_IKBSPANELVISIBILITYOBSERVER, kKBSPanelVisibilityObserverImpl,
+			IID_IKFCPANELVISIBILITYOBSERVER, kKFCPanelVisibilityObserverImpl,
 		}
 	},
 
@@ -348,14 +348,14 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * "Link the Application Bar's Search Field to This Panel": the observer that makes the
 	 * application bar's search field show what Edit > Find/Change holds. On kActiveContextBoss for the same
 	 * reason as the one above; attached to the Find/Change settings while the toggle is ON
-	 * (KBSAppBarSearchEnter.cpp). An AddIn that points at UI code, in this half's resource.
+	 * (KFCAppBarSearchEnter.cpp). An AddIn that points at UI code, in this half's resource.
 	 */
 	AddIn
 	{
 		kActiveContextBoss,
 		kInvalidClass,
 		{
-			IID_IKBSAPPBARMIRROROBSERVER, kKBSAppBarMirrorObserverImpl,
+			IID_IKFCAPPBARMIRROROBSERVER, kKFCAppBarMirrorObserverImpl,
 		}
 	},
 
@@ -365,7 +365,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * subject - the subject the observer above listens to). Measuring it as it closes is the command
 	 * interceptor's job further down: a closing book says nothing on this subject (measured).
 	 * On kActiveContextBoss for the same reason as the one above. The attach
-	 * itself is in KBSBookPanelPlacement.cpp; this line only puts our IID onto the boss.
+	 * itself is in KFCBookPanelPlacement.cpp; this line only puts our IID onto the boss.
 	 * An AddIn that points at UI code, in this half's resource.
 	 */
 	AddIn
@@ -373,7 +373,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kActiveContextBoss,
 		kInvalidClass,
 		{
-			IID_IKBSBOOKPANELOBSERVER, kKBSBookPanelObserverImpl,
+			IID_IKFCBOOKPANELOBSERVER, kKFCBookPanelObserverImpl,
 		}
 	},
 
@@ -385,11 +385,11 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSBookPanelServiceBoss,
+		kKFCBookPanelServiceBoss,
 		kInvalidClass,
 		{
-			IID_IK2SERVICEPROVIDER, kKBSBookPanelServiceProviderImpl,
-			IID_IPALETTEMGRSERVICE, kKBSBookPanelPaletteMgrServiceImpl,
+			IID_IK2SERVICEPROVIDER, kKFCBookPanelServiceProviderImpl,
+			IID_IPALETTEMGRSERVICE, kKFCBookPanelPaletteMgrServiceImpl,
 		}
 	},
 
@@ -403,10 +403,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 */
 	Class
 	{
-		kKBSBookPanelCmdWatchBoss,
+		kKFCBookPanelCmdWatchBoss,
 		kInvalidClass,
 		{
-			IID_ICOMMANDINTERCEPTOR, kKBSBookPanelCmdWatchImpl,
+			IID_ICOMMANDINTERCEPTOR, kKFCBookPanelCmdWatchImpl,
 		}
 	},
 
@@ -430,8 +430,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 {
 	{
 		// The About sub-menu item for this plug-in.
-		kKBSAboutActionID,			// ActionID (kInvalidActionID for positional entries)
-		kKBSAboutMenuPath,			// Menu Path.
+		kKFCAboutActionID,			// ActionID (kInvalidActionID for positional entries)
+		kKFCAboutMenuPath,			// Menu Path.
 		kSDKDefAlphabeticPosition,											// Menu Position.
 		kSDKDefIsNotDynamicMenuFlag,										// kSDKDefIsNotDynamicMenuFlag or kSDKDefIsDynamicMenuFlag
 
@@ -445,243 +445,243 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// Open Find/Change... (the author's call): InDesign's own Find/Change dialog, opened from here -
 		// with no document open as well, where the Edit menu greys it out. Open, type the query, then search.
-		kKBSOpenFindChangeActionID,
-		kKBSTargetMenuPath
-		kKBSOpenFindChangeMenuItemPosition,
+		kKFCOpenFindChangeActionID,
+		kKFCTargetMenuPath
+		kKFCOpenFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Find in <scope>: run the search over the current scope using the settings in InDesign's own
 		// Find/Change dialog. Drawn under the name the scope calls for (see the action definition below).
-		kKBSSearchBookActionID,
-		kKBSTargetMenuPath
-		kKBSSearchBookMenuItemPosition,
+		kKFCSearchBookActionID,
+		kKFCTargetMenuPath
+		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// (No rule between the search and Change Checked - the author's call.)
 
 		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
-		kKBSReplaceCheckedActionID,
-		kKBSTargetMenuPath
-		kKBSReplaceCheckedMenuItemPosition,
+		kKFCReplaceCheckedActionID,
+		kKFCTargetMenuPath
+		kKFCReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Show Changes by KohakuFindChange (the author's place): the list rebuilt from the Track
-		// Changes records KBS signed - under Change Checked, a rule between them.
-		kKBSSeparator6ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator6MenuItemPosition,
+		// Changes records KFC signed - under Change Checked, a rule between them.
+		kKFCSeparator6ActionID,
+		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKFCSeparator6MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSShowChangesActionID,
-		kKBSTargetMenuPath
-		kKBSShowChangesMenuItemPosition,
+		kKFCShowChangesActionID,
+		kKFCTargetMenuPath
+		kKFCShowChangesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// (Block 2 - Find Missing Glyphs and Find Overset - is gone: the Book panel's preflight reports both.)
 
 		// Separator between Show Changes and the toggles.
-		kKBSSeparator3ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator3MenuItemPosition,
+		kKFCSeparator3ActionID,
+		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKFCSeparator3MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// --- Block 3: the check-mark toggles (their positions are in KFCUIID.h) ---
 
 		// Book Scope: toggle (check mark). ON = the whole book, OFF = what Edit > Find/Change's Search:
 		// names. Leads the block because it is what the commands in block 1 run on.
-		kKBSScopeBookActionID,
-		kKBSTargetMenuPath
-		kKBSBookScopeMenuItemPosition,
+		kKFCScopeBookActionID,
+		kKFCTargetMenuPath
+		kKFCBookScopeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Hide Previous Chapter: toggle (check mark). Closes the previous chapter window on jump.
-		kKBSHidePrevChapterActionID,
-		kKBSTargetMenuPath
-		kKBSHidePrevChapterMenuItemPosition,
+		kKFCHidePrevChapterActionID,
+		kKFCTargetMenuPath
+		kKFCHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
-		// field of InDesign's application bar searches with this panel. *Windows only. KBSAppBarSearchEnter.h.
+		// field of InDesign's application bar searches with this panel. *Windows only. KFCAppBarSearchEnter.h.
 		// A search toggle, so it comes before the window ones below.
-		kKBSAppBarSearchEnterActionID,
-		kKBSTargetMenuPath
-		kKBSAppBarSearchEnterMenuItemPosition,
+		kKFCAppBarSearchEnterActionID,
+		kKFCTargetMenuPath
+		kKFCAppBarSearchEnterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Translucent Find/Change: toggle (check mark) for InDesign's OWN Find/Change dialog.
 		// *Windows only.
-		kKBSTranslucentFindChangeActionID,
-		kKBSTargetMenuPath
-		kKBSTranslucentFindChangeMenuItemPosition,
+		kKFCTranslucentFindChangeActionID,
+		kKFCTargetMenuPath
+		kKFCTranslucentFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
 		// Find/Change dialog, so it can be sent to the taskbar instead of closed. Directly under
 		// the translucency toggle - the two act on the same window. *Windows only.
-		kKBSMinimizableFindChangeActionID,
-		kKBSTargetMenuPath
-		kKBSMinimizableFindChangeMenuItemPosition,
+		kKFCMinimizableFindChangeActionID,
+		kKFCTargetMenuPath
+		kKFCMinimizableFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Translucent Panel: Translucent Find/Change's idea applied to this panel - drawn faint while it
 		// floats, and back to solid while the pointer is on it. Under the two that act on InDesign's
 		// dialog. *Windows only.
-		kKBSTranslucentPanelActionID,
-		kKBSTargetMenuPath
-		kKBSTranslucentPanelMenuItemPosition,
+		kKFCTranslucentPanelActionID,
+		kKFCTargetMenuPath
+		kKFCTranslucentPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Remember Book Panel Placement: toggle (check mark). InDesign's own Book panel comes back
 		// where it was closed. Last in the block - it is about a window, like the three above.
-		kKBSRememberBookPanelActionID,
-		kKBSTargetMenuPath
-		kKBSRememberBookPanelMenuItemPosition,
+		kKFCRememberBookPanelActionID,
+		kKFCTargetMenuPath
+		kKFCRememberBookPanelMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between the toggles and the command that writes a file.
-		kKBSSeparator4ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator4MenuItemPosition,
+		kKFCSeparator4ActionID,
+		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKFCSeparator4MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// --- Block 4: the command that writes a file of our own ---
 
 		// Save Panel Settings: write the toggles above to a JSON file of our own in the user's
 		// preferences folder, read back at startup. A plain command, not a toggle.
-		kKBSSavePanelSettingsActionID,
-		kKBSTargetMenuPath
-		kKBSSavePanelSettingsMenuItemPosition,
+		kKFCSavePanelSettingsActionID,
+		kKFCTargetMenuPath
+		kKFCSavePanelSettingsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Separator between those and the two reference items that close the menu.
-		kKBSSeparator1ActionID,
-		kKBSInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKBSSeparator1MenuItemPosition,
+		kKFCSeparator1ActionID,
+		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
+		kKFCSeparator1MenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// --- Block 5: the two reference items ---
 
-		// "How to Use...": the plug-in's operating reference, in a scrollable dialog (KBSHowTo.cpp).
+		// "How to Use...": the plug-in's operating reference, in a scrollable dialog (KFCHowTo.cpp).
 		// Between the separator and About.
-		kKBSHowToActionID,
-		kKBSTargetMenuPath
-		kKBSHowToMenuItemPosition,
+		kKFCHowToActionID,
+		kKFCTargetMenuPath
+		kKFCHowToMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// About this plug-in sub-menu for the popup menu on the panel
-		kKBSPopupAboutThisActionID,
-		kKBSTargetMenuPath
-		kKBSAboutThisMenuItemPosition,
+		kKFCPopupAboutThisActionID,
+		kKFCTargetMenuPath
+		kKFCAboutThisMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- The book and document rows' right-click context menu -----
 		// A menu of its own, not part of the flyout above - which is why it is written last here,
 		// after that menu has been laid out from top to bottom. Popped at the cursor by the row event
-		// handler (KBSResultNodeEH::RButtonDn, through IMenuManager::HandlePopupMenu with this
+		// handler (KFCResultNodeEH::RButtonDn, through IMenuManager::HandlePopupMenu with this
 		// subtree's name). Check All / Uncheck All live here, not on the flyout, where they could only
 		// ever mean "every hit everywhere". Here they mean the row the menu was popped over - the BOOK
 		// row for all of it, a document row for that chapter alone.
 		// Replace: the ticked rows of the document the menu was popped over, no prompt.
-		kKBSChapterReplaceActionID,
-		kKBSResultRowMenuName
-		kKBSChapterReplaceMenuItemPosition,
+		kKFCChapterReplaceActionID,
+		kKFCResultRowMenuName
+		kKFCChapterReplaceMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Reject Change: every replaced row of that document with a tracked change left.
-		kKBSChapterRejectActionID,
-		kKBSResultRowMenuName
-		kKBSChapterRejectMenuItemPosition,
+		kKFCChapterRejectActionID,
+		kKFCResultRowMenuName
+		kKFCChapterRejectMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Replace Again (Current Find/Change Settings) - the code's "Redo": that document's rows taken
 		// back, replaced again with what Find/Change holds now.
-		kKBSChapterRedoActionID,
-		kKBSResultRowMenuName
-		kKBSChapterRedoMenuItemPosition,
+		kKFCChapterRedoActionID,
+		kKFCResultRowMenuName
+		kKFCChapterRedoMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSCheckAllActionID,
-		kKBSResultRowMenuName
-		kKBSCheckAllMenuItemPosition,
+		kKFCCheckAllActionID,
+		kKFCResultRowMenuName
+		kKFCCheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSUncheckAllActionID,
-		kKBSResultRowMenuName
-		kKBSUncheckAllMenuItemPosition,
+		kKFCUncheckAllActionID,
+		kKFCResultRowMenuName
+		kKFCUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Accept All Changes by KohakuFindChange in This Document: the changes signed "KohakuFindChange"
 		// in the document of the row the menu was popped over, and no one else's.
-		kKBSAcceptAllChangesActionID,
-		kKBSResultRowMenuName
-		kKBSAcceptAllChangesMenuItemPosition,
+		kKFCAcceptAllChangesActionID,
+		kKFCResultRowMenuName
+		kKFCAcceptAllChangesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- A hit row's right-click menu -----
-		// Popped by KBSResultNodeEH::RButtonDn over a hit row: Replace replaces that row alone with no
+		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row alone with no
 		// prompt, Reject Change takes that row's replace back through its tracked change. (No Redo here:
 		// a row taken back is replaced again with Replace.)
-		kKBSReplaceHitActionID,
-		kKBSResultHitMenuName
-		kKBSReplaceHitMenuItemPosition,
+		kKFCReplaceHitActionID,
+		kKFCResultHitMenuName
+		kKFCReplaceHitMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSRejectChangeActionID,
-		kKBSResultHitMenuName
-		kKBSRejectChangeMenuItemPosition,
+		kKFCRejectChangeActionID,
+		kKFCResultHitMenuName
+		kKFCRejectChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Accept Change by KohakuFindChange: the row's tracked change accepted.
-		kKBSAcceptChangeActionID,
-		kKBSResultHitMenuName
-		kKBSAcceptChangeMenuItemPosition,
+		kKFCAcceptChangeActionID,
+		kKFCResultHitMenuName
+		kKFCAcceptChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 
 		// ----- A STORY row's right-click menu -----
-		// Popped by KBSResultNodeEH::RButtonDn over a story row: each command over that story's rows.
-		kKBSStoryReplaceActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryReplaceMenuItemPosition,
+		// Popped by KFCResultNodeEH::RButtonDn over a story row: each command over that story's rows.
+		kKFCStoryReplaceActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryReplaceMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSStoryRejectActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryRejectMenuItemPosition,
+		kKFCStoryRejectActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryRejectMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSStoryAcceptActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryAcceptMenuItemPosition,
+		kKFCStoryAcceptActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryAcceptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSStoryRedoActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryRedoMenuItemPosition,
+		kKFCStoryRedoActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryRedoMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 
-		kKBSStoryCheckAllActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryCheckAllMenuItemPosition,
+		kKFCStoryCheckAllActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryCheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSStoryUncheckAllActionID,
-		kKBSResultStoryMenuName
-		kKBSStoryUncheckAllMenuItemPosition,
+		kKFCStoryUncheckAllActionID,
+		kKFCResultStoryMenuName
+		kKFCStoryUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- A RUN row's right-click menu (Show Changes by KohakuFindChange) -----
-		// Popped by KBSResultNodeEH::RButtonDn over a run row: the run's rows in that document, taken back
+		// Popped by KFCResultNodeEH::RButtonDn over a run row: the run's rows in that document, taken back
 		// or accepted.
-		kKBSRunRejectActionID,
-		kKBSResultRunMenuName
-		kKBSRunRejectMenuItemPosition,
+		kKFCRunRejectActionID,
+		kKFCResultRunMenuName
+		kKFCRunRejectMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		kKBSRunAcceptActionID,
-		kKBSResultRunMenuName
-		kKBSRunAcceptMenuItemPosition,
+		kKFCRunAcceptActionID,
+		kKFCResultRunMenuName
+		kKFCRunAcceptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 	}
@@ -693,9 +693,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 resource ActionDef (kSDKDefActionResourceID)
 {
 	{
-		kKBSActionComponentBoss, 		// ClassID of boss class that implements the ActionID.
-		kKBSAboutActionID,	// ActionID.
-		kKBSAboutMenuKey,	// Sub-menu string.
+		kKFCActionComponentBoss, 		// ClassID of boss class that implements the ActionID.
+		kKFCAboutActionID,	// ActionID.
+		kKFCAboutMenuKey,	// Sub-menu string.
 		// The Help > About Plug-ins entry belongs to the help menu's area, which is what the samples
 		// (basicpanel/BscPnl.fr:200) give it. The area only ever
 		// matters to the keyboard shortcut editor, and every action here is invisible in it, but
@@ -707,8 +707,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,			// Selection InterfaceID this action cares about or kInvalidInterfaceID.
 		kSDKDefInvisibleInKBSCEditorFlag, // kSDKDefVisibleInKBSCEditorFlag or kSDKDefInvisibleInKBSCEditorFlag.
 
-		kKBSActionComponentBoss,
-		kKBSPopupAboutThisActionID,
+		kKFCActionComponentBoss,
+		kKFCPopupAboutThisActionID,
 		kSDKDefAboutThisPlugInMenuKey,	// Key to the name of this action
 		kOtherActionArea,
 		kNormalAction,
@@ -719,50 +719,50 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Open Find/Change.... NOT kDisableIfNoFrontDocument - opening the dialog with no document is the
 		// point of it. In the Keyboard Shortcuts editor under Palette Menus (the author's call), like the
 		// search below.
-		kKBSActionComponentBoss,
-		kKBSOpenFindChangeActionID,
-		kKBSOpenFindChangeMenuKey,		// "Open Find/Change..."
-		kKBSPanelMenuActionArea,
+		kKFCActionComponentBoss,
+		kKFCOpenFindChangeActionID,
+		kKFCOpenFindChangeMenuKey,		// "Open Find/Change..."
+		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
 		// The search command. kCustomEnabling is what lets UpdateActionStates rename it for the scope it
-		// would search (KBSSearchEngine::FindCommandName - "Find in Book", "Find in Document", ...);
+		// would search (KFCSearchEngine::FindCommandName - "Find in Book", "Find in Document", ...);
 		// without it that hook is never called for this action.
 		// NOT kDisableIfNoFrontDocument: a book search runs off the Book panel's book (or the active
-		// book as a fallback - KBSBookScope::ResolveTargetBook) and opens
+		// book as a fallback - KFCBookScope::ResolveTargetBook) and opens
 		// its chapters windowless, so "a book is open but no document window is" is a normal, working
 		// state here. That flag would grey this out - and skip UpdateActionStates, losing the name -
 		// exactly when the panel is most useful. The Layers panel can afford it; this one cannot.
 		// "There is nothing to run on" IS answered, but in UpdateActionStates, where the question can
-		// be put to the CURRENT scope (KBSBookScope::HasScopeTarget).
+		// be put to the CURRENT scope (KFCBookScope::HasScopeTarget).
 		// IN THE KEYBOARD SHORTCUTS EDITOR (the author's call), under Palette Menus
-		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
+		// as "Kohaku Find/Change: <name>" - KCM's shape (kKFCPanelMenuActionArea). The enabling is
 		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
-		kKBSActionComponentBoss,
-		kKBSSearchBookActionID,
-		kKBSSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
-		kKBSPanelMenuActionArea,
+		kKFCActionComponentBoss,
+		kKFCSearchBookActionID,
+		kKFCSearchBookMenuKey,			// "Search" (renamed at run time to carry the scope)
+		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
 
-		kKBSActionComponentBoss,
-		kKBSScopeBookActionID,
-		kKBSBookScopeMenuKey,			// "Book Scope" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCScopeBookActionID,
+		kKFCBookScopeMenuKey,			// "Book Scope" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSHidePrevChapterActionID,
-		kKBSHidePrevChapterMenuKey,		// "Hide Previous Chapter" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCHidePrevChapterActionID,
+		kKFCHidePrevChapterMenuKey,		// "Hide Previous Chapter" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -774,9 +774,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// visible effect (the author's call, as in KCM). Pressing it there sets the flag,
 		// which applies the moment the panel floats again, and the status line says so rather than
 		// leaving a click with no result unexplained.
-		kKBSActionComponentBoss,
-		kKBSTranslucentPanelActionID,
-		kKBSTranslucentPanelMenuKey,	// "Translucent Panel" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCTranslucentPanelActionID,
+		kKFCTranslucentPanelMenuKey,	// "Translucent Panel" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -787,9 +787,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// greyed out while the dialog is closed, for the same reason the panel one is not greyed out
 		// while docked: the flag is what the user is setting, and it applies the moment the dialog
 		// opens. The status line says which of the two happened.
-		kKBSActionComponentBoss,
-		kKBSTranslucentFindChangeActionID,
-		kKBSTranslucentFindChangeMenuKey,	// "Translucent Find/Change" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCTranslucentFindChangeActionID,
+		kKFCTranslucentFindChangeMenuKey,	// "Translucent Find/Change" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -798,9 +798,9 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		// Link the Application Bar's Search Field to This Panel. kCustomEnabling for the check mark, like
 		// the toggles beside it. Not greyed out while the field is hidden: the flag is what is being set.
-		kKBSActionComponentBoss,
-		kKBSAppBarSearchEnterActionID,
-		kKBSAppBarSearchEnterMenuKey,	// "Link the Application Bar's Search Field to This Panel" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCAppBarSearchEnterActionID,
+		kKFCAppBarSearchEnterMenuKey,	// "Link the Application Bar's Search Field to This Panel" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -810,9 +810,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Minimizable Find/Change. kCustomEnabling for the check mark, like the toggle above it.
 		// Not greyed out while the dialog is closed, for the same reason: the flag is what the user
 		// is setting, and it applies the moment the dialog opens.
-		kKBSActionComponentBoss,
-		kKBSMinimizableFindChangeActionID,
-		kKBSMinimizableFindChangeMenuKey,	// "Minimizable Find/Change" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCMinimizableFindChangeActionID,
+		kKFCMinimizableFindChangeMenuKey,	// "Minimizable Find/Change" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -822,9 +822,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Remember Book Panel Placement. kCustomEnabling for the check mark, like the toggles above -
 		// without it the check mark never appears (ActionDefs.h:40). Not greyed out with no book open:
 		// the flag is what is being set, and it acts the next time a book panel closes or opens.
-		kKBSActionComponentBoss,
-		kKBSRememberBookPanelActionID,
-		kKBSRememberBookPanelMenuKey,	// "Remember Book Panel Placement" (toggle, check mark)
+		kKFCActionComponentBoss,
+		kKFCRememberBookPanelActionID,
+		kKFCRememberBookPanelMenuKey,	// "Remember Book Panel Placement" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -838,9 +838,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// for actions that ask for it (ActionDefs.h:40). It changes nothing in practice: a run's
 		// progress bar is modal, so the flyout cannot be opened while one is going (measured on the
 		// running panel).
-		kKBSActionComponentBoss,
-		kKBSSavePanelSettingsActionID,
-		kKBSSavePanelSettingsMenuKey,	// "Save Panel Settings"
+		kKFCActionComponentBoss,
+		kKFCSavePanelSettingsActionID,
+		kKFCSavePanelSettingsMenuKey,	// "Save Panel Settings"
 		kOtherActionArea,
 		kNormalAction,
 		kDisableIfLowMem,
@@ -853,17 +853,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		// open at all, so that flag would grey out the very run this panel exists for.
 		// !Nothing here and nothing in UpdateActionStates asks whether a hit's document is still
 		//  OPEN, and nothing should. A closed chapter is REOPENED by the replace itself
-		//  (KBSReplaceEngine -> KBSBookScope::ReopenChapterDoc), and a document-scope result set is
-		//  retired the moment its document closes (KBSCloseDocResponder) - both cases are answered
+		//  (KFCReplaceEngine -> KFCBookScope::ReopenChapterDoc), and a document-scope result set is
+		//  retired the moment its document closes (KFCCloseDocResponder) - both cases are answered
 		//  before this command can be reached. A per-hit door there is exactly the one that would grey
 		//  out a book-wide replace.
 		// IN THE KEYBOARD SHORTCUTS EDITOR (the author's call), under Palette Menus
-		// as "Kohaku Find/Change: <name>" - KCM's shape (kKBSPanelMenuActionArea). The enabling is
+		// as "Kohaku Find/Change: <name>" - KCM's shape (kKFCPanelMenuActionArea). The enabling is
 		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
-		kKBSActionComponentBoss,
-		kKBSReplaceCheckedActionID,
-		kKBSReplaceCheckedMenuKey,		// "Change Checked"
-		kKBSPanelMenuActionArea,
+		kKFCActionComponentBoss,
+		kKFCReplaceCheckedActionID,
+		kKFCReplaceCheckedMenuKey,		// "Change Checked"
+		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
@@ -872,18 +872,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Check All / Uncheck All - the book and document rows' right-click menu (the MenuDef above). kCustomEnabling so UpdateActionStates can grey them out when the row the menu was
 		// popped over has nothing left to check; it is also what lets that hook see them at all, and
 		// the hook is where the right-click target is read.
-		kKBSActionComponentBoss,
-		kKBSCheckAllActionID,
-		kKBSCheckAllMenuKey,			// "Check All"
+		kKFCActionComponentBoss,
+		kKFCCheckAllActionID,
+		kKFCCheckAllMenuKey,			// "Check All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSUncheckAllActionID,
-		kKBSUncheckAllMenuKey,			// "Uncheck All"
+		kKFCActionComponentBoss,
+		kKFCUncheckAllActionID,
+		kKFCUncheckAllMenuKey,			// "Uncheck All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -893,18 +893,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		// Replace / Reject Change - a hit row's right-click menu.
 		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys them by the row the
 		// menu is over.
-		kKBSActionComponentBoss,
-		kKBSReplaceHitActionID,
-		kKBSReplaceHitMenuKey,			// "Replace"
+		kKFCActionComponentBoss,
+		kKFCReplaceHitActionID,
+		kKFCReplaceHitMenuKey,			// "Replace"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSRejectChangeActionID,
-		kKBSRejectChangeMenuKey,		// "Reject Change by KohakuFindChange"
+		kKFCActionComponentBoss,
+		kKFCRejectChangeActionID,
+		kKFCRejectChangeMenuKey,		// "Reject Change by KohakuFindChange"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -912,9 +912,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Accept Change by KohakuFindChange - a hit row's, greyed like Reject Change by the row.
-		kKBSActionComponentBoss,
-		kKBSAcceptChangeActionID,
-		kKBSAcceptChangeMenuKey,		// "Accept Change by KohakuFindChange"
+		kKFCActionComponentBoss,
+		kKFCAcceptChangeActionID,
+		kKFCAcceptChangeMenuKey,		// "Accept Change by KohakuFindChange"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -923,27 +923,27 @@ resource ActionDef (kSDKDefActionResourceID)
 
 
 		// A story row's right-click menu - the same names as the rows' own commands.
-		kKBSActionComponentBoss,
-		kKBSStoryReplaceActionID,
-		kKBSReplaceHitMenuKey,			// "Replace"
+		kKFCActionComponentBoss,
+		kKFCStoryReplaceActionID,
+		kKFCReplaceHitMenuKey,			// "Replace"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSStoryRejectActionID,
-		kKBSStoryRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Story"
+		kKFCActionComponentBoss,
+		kKFCStoryRejectActionID,
+		kKFCStoryRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Story"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSStoryAcceptActionID,
-		kKBSStoryAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Story"
+		kKFCActionComponentBoss,
+		kKFCStoryAcceptActionID,
+		kKFCStoryAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Story"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -951,27 +951,27 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 
-		kKBSActionComponentBoss,
-		kKBSStoryRedoActionID,
-		kKBSRedoMenuKey,				// "Replace Again (Current Find/Change Settings)" - the story row's
+		kKFCActionComponentBoss,
+		kKFCStoryRedoActionID,
+		kKFCRedoMenuKey,				// "Replace Again (Current Find/Change Settings)" - the story row's
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSStoryCheckAllActionID,
-		kKBSCheckAllMenuKey,			// "Check All"
+		kKFCActionComponentBoss,
+		kKFCStoryCheckAllActionID,
+		kKFCCheckAllMenuKey,			// "Check All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSStoryUncheckAllActionID,
-		kKBSUncheckAllMenuKey,			// "Uncheck All"
+		kKFCActionComponentBoss,
+		kKFCStoryUncheckAllActionID,
+		kKFCUncheckAllMenuKey,			// "Uncheck All"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -979,9 +979,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Replace - a document row's right-click menu: that document's ticked rows.
-		kKBSActionComponentBoss,
-		kKBSChapterReplaceActionID,
-		kKBSReplaceHitMenuKey,			// "Replace"
+		kKFCActionComponentBoss,
+		kKFCChapterReplaceActionID,
+		kKFCReplaceHitMenuKey,			// "Replace"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -989,9 +989,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Reject Change - a document row's right-click menu.
-		kKBSActionComponentBoss,
-		kKBSChapterRejectActionID,
-		kKBSChapterRejectMenuKey,		// "Reject All Changes by KohakuFindChange in This Document"
+		kKFCActionComponentBoss,
+		kKFCChapterRejectActionID,
+		kKFCChapterRejectMenuKey,		// "Reject All Changes by KohakuFindChange in This Document"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -999,9 +999,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Replace Again (Current Find/Change Settings) - a document row's right-click menu.
-		kKBSActionComponentBoss,
-		kKBSChapterRedoActionID,
-		kKBSRedoMenuKey,				// "Replace Again (Current Find/Change Settings)"
+		kKFCActionComponentBoss,
+		kKFCChapterRedoActionID,
+		kKFCRedoMenuKey,				// "Replace Again (Current Find/Change Settings)"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1009,9 +1009,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Accept All Changes by KohakuFindChange in This Document - a document row's right-click menu.
-		kKBSActionComponentBoss,
-		kKBSAcceptAllChangesActionID,
-		kKBSAcceptAllChangesMenuKey,	// "Accept All Changes by KohakuFindChange in This Document"
+		kKFCActionComponentBoss,
+		kKFCAcceptAllChangesActionID,
+		kKFCAcceptAllChangesMenuKey,	// "Accept All Changes by KohakuFindChange in This Document"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1019,18 +1019,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// A run row's right-click menu (Show Changes by KohakuFindChange).
-		kKBSActionComponentBoss,
-		kKBSRunRejectActionID,
-		kKBSRunRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Run"
+		kKFCActionComponentBoss,
+		kKFCRunRejectActionID,
+		kKFCRunRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Run"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKBSActionComponentBoss,
-		kKBSRunAcceptActionID,
-		kKBSRunAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Run"
+		kKFCActionComponentBoss,
+		kKFCRunAcceptActionID,
+		kKFCRunAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Run"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -1038,12 +1038,12 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Show Changes by KohakuFindChange: the flyout's, in the Keyboard Shortcuts editor like
-		// the search and Change Checked (kKBSPanelMenuActionArea). kCustomEnabling so UpdateActionStates greys
-		// it with nothing to read (KBSBookScope::HasScopeTarget) or while a run is up.
-		kKBSActionComponentBoss,
-		kKBSShowChangesActionID,
-		kKBSShowChangesMenuKey,			// "Show Changes by KohakuFindChange"
-		kKBSPanelMenuActionArea,
+		// the search and Change Checked (kKFCPanelMenuActionArea). kCustomEnabling so UpdateActionStates greys
+		// it with nothing to read (KFCBookScope::HasScopeTarget) or while a run is up.
+		kKFCActionComponentBoss,
+		kKFCShowChangesActionID,
+		kKFCShowChangesMenuKey,			// "Show Changes by KohakuFindChange"
+		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
@@ -1053,9 +1053,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		// text - no document, no result set, no selection - so it stays live with nothing loaded, which
 		// is exactly when a first-time user reaches for it. (Not caught by the blanket disable at the top
 		// of UpdateActionStates either - see Save Panel Settings above.)
-		kKBSActionComponentBoss,
-		kKBSHowToActionID,
-		kKBSHowToMenuKey,				// "How to Use..."
+		kKFCActionComponentBoss,
+		kKFCHowToActionID,
+		kKFCHowToMenuKey,				// "How to Use..."
 		kOtherActionArea,
 		kNormalAction,
 		kDisableIfLowMem,
@@ -1079,9 +1079,9 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 {
 	kStringTableRsrcType,
 	{
-		// ONE wild row, the same as the model half's: model/KBS.fr's LocaleIndex says why (a single
+		// ONE wild row, the same as the model half's: model/KFC.fr's LocaleIndex says why (a single
 		// table, matched by every locale; a named-locale list strands every locale it leaves out on raw
-		// keys; the Japanese is switched in at run time - KBSLoc.h).
+		// keys; the Japanese is switched in at run time - KFCLoc.h).
 		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
 	}
 };
@@ -1100,7 +1100,7 @@ resource StringTable (kSDKDefStringsNoTransResourceID + index_enUS)
 	k_enUS,									// Locale Id
 	kEuropeanMacToWinEncodingConverter,		// Character encoding converter
 	{
-		kKBSInternalPopupMenuNameKey,	kKBSInternalPopupMenuNameKey,		// No need to translate, internal menu name.
+		kKFCInternalPopupMenuNameKey,	kKFCInternalPopupMenuNameKey,		// No need to translate, internal menu name.
 	
 	}
 };
@@ -1117,70 +1117,70 @@ resource LocaleIndex (kSDKDefPanelResourceID)
 };
 
 /*
- * LocaleIndex wrappers for the result tree's row resources. KBSResultListWidgetMgr
+ * LocaleIndex wrappers for the result tree's row resources. KFCResultListWidgetMgr
  * creates these at runtime via RsrcSpec(..., kViewRsrcType, <base RsrcID>); these map that base
  * ID to the +index_enUS body. The rows carry no localized strings (text is stamped at runtime),
  * so one wild locale suffices.
  */
-resource LocaleIndex (kKBSResultChapterNodeWidgetRsrcID)
+resource LocaleIndex (kKFCResultChapterNodeWidgetRsrcID)
 {
 	kViewRsrcType,
 	{
-		kWildFS, k_Wild, 	kKBSResultChapterNodeWidgetRsrcID + index_enUS
+		kWildFS, k_Wild, 	kKFCResultChapterNodeWidgetRsrcID + index_enUS
 	}
 };
 
-resource LocaleIndex (kKBSResultHitNodeWidgetRsrcID)
+resource LocaleIndex (kKFCResultHitNodeWidgetRsrcID)
 {
 	kViewRsrcType,
 	{
-		kWildFS, k_Wild, 	kKBSResultHitNodeWidgetRsrcID + index_enUS
+		kWildFS, k_Wild, 	kKFCResultHitNodeWidgetRsrcID + index_enUS
 	}
 };
 
 /*  
  * Type definition.
  */
-type KBSPanelWidget(kViewRsrcType) : PalettePanelWidget(ClassID = kKBSPanelWidgetBoss)
+type KFCPanelWidget(kViewRsrcType) : PalettePanelWidget(ClassID = kKFCPanelWidgetBoss)
 {
 	CPanelMenuData;
 };
 
 /*
  * Result tree types. The list on our tree boss; the row on our tree node boss (it carries
- * the row-click handler, KBSResultNodeEH), shared by the branch and hit row resources; the hit
+ * the row-click handler, KFCResultNodeEH), shared by the branch and hit row resources; the hit
  * line's colour cell on our generic-panel boss.
  */
-type KBSResultListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKBSResultListWidgetBoss)
+type KFCResultListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCResultListWidgetBoss)
 {
 };
 
-type KBSResultNodeWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKBSResultNodeWidgetBoss)
+type KFCResultNodeWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCResultNodeWidgetBoss)
 {
 };
 
-type KBSColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSColorTextWidgetBoss)
+type KFCColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCColorTextWidgetBoss)
 {
 };
 
-// The panel's message area: drawn by hand for the same reason (see kKBSStatusTextWidgetBoss).
+// The panel's message area: drawn by hand for the same reason (see kKFCStatusTextWidgetBoss).
 // ! The field list is GenericPanelWidget's, NOT StaticMultiLineTextWidget's - the line that uses it
 // carries no alignment, ellipsize style, ampersand flag, font, LINE COUNT or initial string. The drawing
-// code decides all of them, and the line count is the box's own height (KBSStatusTextView.cpp). KCM's
+// code decides all of them, and the line count is the box's own height (KFCStatusTextView.cpp). KCM's
 // KCMStatusTextWidget is the same type.
-type KBSStatusTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKBSStatusTextWidgetBoss)
+type KFCStatusTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCStatusTextWidgetBoss)
 {
 };
 
-type KBSResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKBSResultCheckWidgetBoss)
+type KFCResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKFCResultCheckWidgetBoss)
 {
 };
 
 /*
- * The panel's illustration. KBSIconWidget rather than the plain RollOverIconButtonWidget so that it
- * comes up on kKBSIconWidgetBoss and therefore carries IID_ITIP (the tooltip naming the URL).
+ * The panel's illustration. KFCIconWidget rather than the plain RollOverIconButtonWidget so that it
+ * comes up on kKFCIconWidgetBoss and therefore carries IID_ITIP (the tooltip naming the URL).
  */
-type KBSIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKBSIconWidgetBoss)
+type KFCIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKFCIconWidgetBoss)
 {
 };
 
@@ -1200,20 +1200,20 @@ type KBSIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKBSIconW
  * loads it - if it is ever wanted on screen, it needs a resource line of its own here, and a
  * properly sized version to point that line at.
  */
-resource PNGA(kKBSIconResID) "Kohakuneko_OFF32.png"
-resource PNGR(kKBSIconResID) "Kohakuneko_OFF32.png"
-resource PNGA(kKBSIconFoundResID) "KohakuFind32.png"
-resource PNGR(kKBSIconFoundResID) "KohakuFind32.png"
-resource PNGA(kKBSIconChangedResID) "KohakuChange32.png"
-resource PNGR(kKBSIconChangedResID) "KohakuChange32.png"
+resource PNGA(kKFCIconResID) "Kohakuneko_OFF32.png"
+resource PNGR(kKFCIconResID) "Kohakuneko_OFF32.png"
+resource PNGA(kKFCIconFoundResID) "KohakuFind32.png"
+resource PNGR(kKFCIconFoundResID) "KohakuFind32.png"
+resource PNGA(kKFCIconChangedResID) "KohakuChange32.png"
+resource PNGR(kKFCIconChangedResID) "KohakuChange32.png"
 
 /*
  * The small dock-tab icon, shown in place of the tab's name once the panel is collapsed to its
- * narrowest. Named by the PanelList entry above (kKBSPaletteIconResID, kKFCUIPluginID), which is
+ * narrowest. Named by the PanelList entry above (kKFCPaletteIconResID, kKFCUIPluginID), which is
  * where a palette is told which picture is its own - it is NOT a widget, so there is no Frame and
  * no rollover state to give it.
  */
-resource PNGA(kKBSPaletteIconResID) "KohakuFindChangeTab.png"
+resource PNGA(kKFCPaletteIconResID) "KohakuFindChangeTab.png"
 
 /*  
  * PanelList definition.
@@ -1225,15 +1225,15 @@ resource PanelList (kSDKDefPanelResourceID)
 		kSDKDefPanelResourceID,		// Resource ID for this panel (use SDK default rsrc ID)
 		kKFCUIPluginID,			// ID of plug-in that owns this panel
 		kIsResizable,
-		kKBSPanelWidgetActionID,	// Action ID to show/hide the panel
-		kKBSPanelWindowMenuName,	// Window > Kohaku Plug-Ins > Kohaku Find/Change (the author's call:
+		kKFCPanelWidgetActionID,	// Action ID to show/hide the panel
+		kKFCPanelWindowMenuName,	// Window > Kohaku Plug-Ins > Kohaku Find/Change (the author's call:
 									// "like KCM"). *The colon inside this key is what buys the
 									// sub-menu level (PanelList.fh on this field).
 		"",							// *NO ALTERNATE MENU PATH: the panel lives on the Window menu alone,
 									// where InDesign's own panels live. (An empty panelName would mean NO
 									// Window entry at all.)
 		0.0,						// Alternate menu position - meaningless without a path.
-		kKBSPaletteIconResID, kKFCUIPluginID,	// PNG icon for the collapsed dock tab
+		kKFCPaletteIconResID, kKFCUIPluginID,	// PNG icon for the collapsed dock tab
 		c_Panel
 	}
 };
@@ -1245,27 +1245,27 @@ resource PanelList (kSDKDefPanelResourceID)
  * However, if you wish to localise it, it is recommended to locate it in one of
  * the localised framework resource files (i.e. KFCUI_enUS.fr etc.).
  */
-resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
+resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 {
 	__FILE__, __LINE__,					// Localization macro
-	kKBSPanelWidgetID,					// WidgetID
+	kKFCPanelWidgetID,					// WidgetID
 	kPMRsrcID_None,						// RsrcID
 	kBindNone,							// Binding (0=none)
 	Frame(0, 0, 300, 360),				// Default size. Resizable (kIsResizable in PanelList), down
 										// to a floor of 266 - the width the panel is actually worked
 										// at, measured off the running panel. *Lining up with KCM's
 										// width when docked together is deliberately GIVEN UP - see
-										// KBSPanelMetrics.cpp. This 300 is the size the panel OPENS
+										// KFCPanelMetrics.cpp. This 300 is the size the panel OPENS
 										// at, where the opening message takes three lines on a
 										// Japanese UI - and FOUR is what the block is sized to hold,
 										// at this width and at the floor alike, because the longest
 										// message the panel can put up needs them. Both numbers, and
-										// the measurements behind them, are in KBSPanelMetrics.cpp.
+										// the measurements behind them, are in KFCPanelMetrics.cpp.
 	kTrue, kTrue,						// Visible, Enabled
 	kTrue,								// Erase background (the result tree needs it)
 	kInterfacePaletteFill,				// Erase to color
 	kFalse,								// Draw dropshadow
-	kKBSPanelTitleKey,					// Panel name
+	kKFCPanelTitleKey,					// Panel name
 	{
 		// Status read-out at the top: the search summary (total hits / chapters). WRAPPING over
 		// several lines, not one line ellipsized (the author's call): a book search can append the
@@ -1281,31 +1281,31 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// AND THE LINE IS NOT 12px IN EVERY LANGUAGE. On a JAPANESE UI the palette font draws 18px
 		// lines (measured on the running panel: baselines at y=218, 236, 254), so a 48px box holds two
 		// and two thirds of them. A resource carries one set of numbers and these are the English set;
-		// KBSPanelMetrics puts the real height on when the panel appears - four of the palette font's
+		// KFCPanelMetrics puts the real height on when the panel appears - four of the palette font's
 		// own lines, asked of the font (72 on a Japanese UI), so every language gets FOUR lines - and
 		// falls back to this 48 when the font cannot be asked. If this number changes, change
 		// kMessageHeightResource there too - the two are stated against each other.
 		//
 		// FOUR LINES, NOT THREE: the line a stopped replace leaves is 128 characters, and three lines
 		// drew it only as far as "the document has", losing the sentence that says what to do (see
-		// KBSPanelMetrics.cpp, which carries the measurement). If the palette font ever changes size,
+		// KFCPanelMetrics.cpp, which carries the measurement). If the palette font ever changes size,
 		// measure again - the rule is the remainder, not the number 48.
 		//
-		// DRAWN BY HAND (KBSStatusTextView.cpp), not a StaticMultiLineTextWidget: the stock widget
+		// DRAWN BY HAND (KFCStatusTextView.cpp), not a StaticMultiLineTextWidget: the stock widget
 		// cannot draw two colours in one box, and this box shows a replaced row's text as it was BEFORE
 		// the replace, where the question is "which characters were replaced". The same move KCM made
 		// with its own message area (kKCMStatusTextWidgetBoss). The WidgetID, the Frame, the binding and
-		// the way messages arrive (KBSResultTree::ShowStatus) are the stock widget's, so KBSPanelMetrics'
+		// the way messages arrive (KFCResultTree::ShowStatus) are the stock widget's, so KFCPanelMetrics'
 		// 72px and the illustrations sitting on the block's bottom edge did not move.
 		// ! The stock fields are gone: the alignment (always left), the ellipsize style (a wrapping box
 		//   has no "one line"; the view ends a message that does not fit with an ellipsis), the
 		//   ampersand flag (kFalse in the drawing - no more doubling), the font (the rows' system-script
 		//   palette font) and the LINE COUNT (as many whole lines as the height holds - 4 in both
 		//   languages at the heights above). The initial text is written when the panel is shown
-		//   (KBSResultTree::RestoreStatusOnPanelShow), as it always was in effect.
-		KBSStatusTextWidget
+		//   (KFCResultTree::RestoreStatusOnPanelShow), as it always was in effect.
+		KFCStatusTextWidget
 		(
-			kKBSStaticTextWidgetID,			 // WidgetId
+			kKFCStaticTextWidgetID,			 // WidgetId
 			kPMRsrcID_None,					 // RsrcId
 			kBindLeft | kBindRight | kBindTop, // Frame binding
 			Frame(5, 6, 256, 54),			 // Frame: left, top, right, bottom (48px = four 12px lines)
@@ -1316,7 +1316,7 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		),
 
 		/* The panel's illustration, to the right of the message: hover it for the plug-in's home
-		 * page, click it to go there (KBSIconTip supplies the tip text, the panel's own observer
+		 * page, click it to go there (KFCIconTip supplies the tip text, the panel's own observer
 		 * hears the click). Bound RIGHT so it keeps its place beside the message as the panel is
 		 * resized (KCM's resizable panel binds its own right for the same reason).
 		 *
@@ -1326,33 +1326,33 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 *
 		 * THREE of them, STACKED at one frame: the plain cat until something has been run, the
 		 * searching cat once it has, and the changing cat once a replace has written something.
-		 * KBSPanelIcon owns which - it is the only place that names them, so a fourth picture is a
-		 * widget here and a row there. All but the first come up HIDDEN; KBSPanelIcon writes the real
+		 * KFCPanelIcon owns which - it is the only place that names them, so a fourth picture is a
+		 * widget here and a row there. All but the first come up HIDDEN; KFCPanelIcon writes the real
 		 * answer when the panel appears, because these widgets are rebuilt on every show and a
 		 * default written here would otherwise outrank the actual state.
 		 */
-		KBSIconWidget
+		KFCIconWidget
 		(
-			kKBSIconWidgetID,
-			kKBSIconResID, kKFCUIPluginID,
+			kKFCIconWidgetID,
+			kKFCIconResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
 			Frame(260, 22, 292, 54),		// 4px clear of the text, 8px in from the panel's edge
 			kTrue, kTrue,
 			kADBEIconSuiteButtonType,
 		),
-		KBSIconWidget
+		KFCIconWidget
 		(
-			kKBSIconFoundWidgetID,
-			kKBSIconFoundResID, kKFCUIPluginID,
+			kKFCIconFoundWidgetID,
+			kKFCIconFoundResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
 			Frame(260, 22, 292, 54),		// SAME frame as the one above - they are alternatives
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),
-		KBSIconWidget
+		KFCIconWidget
 		(
-			kKBSIconChangedWidgetID,
-			kKBSIconChangedResID, kKFCUIPluginID,
+			kKFCIconChangedWidgetID,
+			kKFCIconChangedResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
 			Frame(260, 22, 292, 54),		// SAME frame again
 			kFalse, kTrue,
@@ -1362,9 +1362,9 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// Result tree: the result rows, filling the rest of the panel and bound to all four
 		// edges so it grows with the window. Root hidden, single selection, vertical scroll bar
 		// only; scroll increments = one 19px row.
-		KBSResultListWidget
+		KFCResultListWidget
 		(
-			kKBSResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kKFCResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindAll,						// Frame binding: grow with the panel
 			Frame(4, 57, 296, 356),			// Frame (below the message block to the panel's edges)
 											// 3px under the message block's bottom edge (54).
@@ -1375,10 +1375,10 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kHideRootNode,					// Options: the root is not a row
 			kFalse,							// Use H scroll bar
 			kTrue,							// Use V scroll bar
-			kKBSResultRowHeight,			// fVScrollButtonIncrement (one row)
-			kKBSResultRowHeight,			// fVThumbScrollIncrement
-			kKBSResultRowHeight,			// fHScrollButtonIncrement (unused, no H bar)
-			kKBSResultRowHeight,			// fHThumbScrollIncrement
+			kKFCResultRowHeight,			// fVScrollButtonIncrement (one row)
+			kKFCResultRowHeight,			// fVThumbScrollIncrement
+			kKFCResultRowHeight,			// fHScrollButtonIncrement (unused, no H bar)
+			kKFCResultRowHeight,			// fHThumbScrollIncrement
 			1,								// Items selectable: 1 = single selection
 			kFalse,							// Allow children from multiple parents to be selected
 			kFalse,							// Allow discontiguous selection
@@ -1387,21 +1387,21 @@ resource KBSPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		),
 	}
 
-	kKBSInternalPopupMenuNameKey		// Popup menu name (internal)
+	kKFCInternalPopupMenuNameKey		// Popup menu name (internal)
 };
 
 /*
  * One BRANCH row of the result tree - book, document, run and story alike - created at runtime by
- * KBSResultListWidgetMgr for every node that is not a hit: a stock expander arrow (hidden by the
+ * KFCResultListWidgetMgr for every node that is not a hit: a stock expander arrow (hidden by the
  * widget manager on a childless row) and the "<name>  (N)" label after the expander's zone. The widget manager
  * owns the runtime layout; these frames are only the default state.
  */
-resource KBSResultNodeWidget(kKBSResultChapterNodeWidgetRsrcID + index_enUS)
+resource KFCResultNodeWidget(kKFCResultChapterNodeWidgetRsrcID + index_enUS)
 {
 	__FILE__, __LINE__,
-	kKBSResultChapterNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+	kKFCResultChapterNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 	kBindLeft | kBindRight,				// Frame binding: follow the list's width
-	Frame(0, 0, 296, kKBSResultRowHeight),	// Frame (left, top, right, bottom)
+	Frame(0, 0, 296, kKFCResultRowHeight),	// Frame (left, top, right, bottom)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
@@ -1426,7 +1426,7 @@ resource KBSResultNodeWidget(kKBSResultChapterNodeWidgetRsrcID + index_enUS)
 
 		InfoStaticTextWidget
 		(
-			kKBSResultChapterLabelWidgetID,	// WidgetId
+			kKFCResultChapterLabelWidgetID,	// WidgetId
 			kPMRsrcID_None,					// RsrcId
 			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
 			Frame(18, 1, 292, 17),			// Frame
@@ -1442,25 +1442,25 @@ resource KBSResultNodeWidget(kKBSResultChapterNodeWidgetRsrcID + index_enUS)
 
 /*
  * One HIT row of the result tree: the match's line in the custom multi-colour text cell
- * (KBSColorTextView highlights the matched part). No expander (a leaf); the widget manager
+ * (KFCColorTextView highlights the matched part). No expander (a leaf); the widget manager
  * indents the cell one expander zone deeper than the chapter row's text at apply time, so this
  * frame is only the default state.
  */
-resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
+resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 {
 	__FILE__, __LINE__,
-	kKBSResultHitNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+	kKFCResultHitNodeWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 	kBindLeft | kBindRight,				// Frame binding: follow the list's width
-	Frame(0, 0, 296, kKBSResultRowHeight),	// Frame (left, top, right, bottom)
+	Frame(0, 0, 296, kKFCResultRowHeight),	// Frame (left, top, right, bottom)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
 		// The "replace me" check box. A stock check box drawn by the system (kSysCheckBoxPMRsrcId),
 		// so it matches the UI theme with no icon art of ours. The widget manager re-places it and
 		// pushes its state in on every apply; its observer flips the model when it is clicked.
-		KBSResultCheckWidget
+		KFCResultCheckWidget
 		(
-			kKBSResultCheckWidgetID, kSysCheckBoxPMRsrcId,	// WidgetId, RsrcId
+			kKFCResultCheckWidgetID, kSysCheckBoxPMRsrcId,	// WidgetId, RsrcId
 			kBindLeft | kBindTop | kBindBottom,	// Frame binding: stay at the row's left
 			Frame(34, 1, 50, 17),			// Frame (the widget manager re-places it)
 			kTrue, kTrue,					// Visible, Enabled
@@ -1468,9 +1468,9 @@ resource KBSResultNodeWidget(kKBSResultHitNodeWidgetRsrcID + index_enUS)
 			"",								// No label: the box alone
 		),
 
-		KBSColorTextWidget
+		KFCColorTextWidget
 		(
-			kKBSResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindLeft | kBindRight,			// Frame binding: take the rest of the row
 			Frame(50, 1, 292, 17),			// Frame (indented; the widget manager re-places it)
 			kTrue, kTrue,					// Visible, Enabled

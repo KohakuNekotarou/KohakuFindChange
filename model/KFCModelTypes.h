@@ -1,0 +1,124 @@
+//========================================================================================
+//
+//  Owner: KohakuNekotarou
+//
+//  KohakuFindChange (KFC)
+//
+//  The model half's PLAIN TYPES that the UI half reads as well (the model/UI split).
+//  Structs, enums and constants only: no function is declared here, so a UI file that includes this
+//  cannot reach into the model plug-in's code by accident - every call goes through the session
+//  interfaces (IKFCResults / IKFCRuns / IKFCChapters). The namespaces are the ones these types always
+//  had, so KFCResultModel::RowDisplay is still spelled KFCResultModel::RowDisplay.
+//  Only what crosses stands here: a type the UI half does not read lives in KFCResultModel.h /
+//  KFCSearchEngine.h (Hit, Chapter, the groups, the Undo copies, HitDetail).
+//
+//========================================================================================
+
+#ifndef __KFCModelTypes_h__
+#define __KFCModelTypes_h__
+
+#include "BaseType.h"
+#include "PMPoint.h"		// PBPMPoint - KFCOversetLoc
+#include "PMString.h"
+#include "UIDRef.h"
+
+namespace KFCResultModel
+{
+	/** The panel shows at most this many hit rows (book order), to keep a huge result set from flooding
+	    the panel. The search also stops COLLECTING here (kKFCCollectHitLimit is made from this - the spec
+	    map's GEN-34), so the model holds no row the panel does not draw; the cap's own
+	    machinery (the adapter's counts, the "first N shown" note) stays as the panel's guard. */
+	const int32 kKFCDisplayHitLimit = 5000;
+
+	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
+	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */
+	enum ChangeOutcome
+	{
+		kOutcomeNone = 0,	// replaced, or never reached
+		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
+		kOutcomeLocked,		// it became locked between the search and the replace
+		kOutcomeRefused,	// InDesign's own replace command would not run there
+		kOutcomeRejected,	// replaced, then taken back with Reject Change: the row shows the
+							// original text again and can be replaced once more (Redo)
+		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
+							// ticked row deleted - counted as done; no place to jump to
+		kOutcomeEndnoteLeft,// ticked, left alone: the match ends an endnote, and InDesign's replace
+							// breaks an endnote at its end (MatchEndsAnEndnote). Only this row is
+							// left - the replace goes one match at a time
+		kOutcomeAccepted	// replaced, then its tracked change ACCEPTED with Accept Change by
+							// KohakuFindChange: the replace is final, nothing is left to take back
+							// or accept - the locator says "accepted"
+	};
+
+	enum SearchScopeKind
+	{
+		kScopeDocument = 0,
+		kScopeBook,
+		kScopeAllDocuments,
+		kScopeStory,
+		kScopeToEndOfStory,
+		kScopeSelection
+	};
+
+	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
+	struct RowDisplay
+	{
+		PMString		locator;	// "P1(2) overset hidden locked" - drawn at the full text colour
+		PMString		accentFlag;	// "missing" / "refused" / "not replaced", or empty - drawn in the accent
+									// colour (BuildHitLocator's tests are the list of both strings)
+		PMString		preText;	// the line, split around the match
+		PMString		matchText;
+		PMString		postText;
+		bool			checked;
+		bool			replaced;
+		bool			locked;
+		ChangeOutcome	outcome;
+		bool			hasCheckBox;	// does THIS row carry a check box? RowHasCheckBox's own answer,
+										// so the panel does not have to re-derive it from the four
+										// fields above - see GetHitRow.
+		// (A footnote's row is told apart by GetHitInFootnote, not by a field here.)
+
+		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
+					   hasCheckBox(false) {}
+	};
+
+	enum
+	{
+		kContextMenuBookRow		= -1,	// the BOOK row: the commands reach every chapter
+		kNoContextMenuChapter	= -2	// nothing has been right-clicked: they do nothing at all
+	};
+}
+
+/** Where the overset "+" locator for a text position is. 'found' is false when nothing in the
+    thread (or any enclosing thread) is placed, so there is no on-page location to point at. */
+struct KFCOversetLoc
+{
+	bool		found;		// true if an outport location was resolved
+	UID			frameUID;	// the frame carrying the "+" (for naming its page)
+	PBPMPoint	outportPb;	// the "+" point in pasteboard coordinates (for scrolling)
+
+	KFCOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
+};
+
+/** What one notification from the model half to the UI half carries (the model/UI split; sent by
+    KFCModelNotify.h, received by KFCModelObserver.cpp). The model never calls the panel: it
+    says what happened on the session's subject, and the panel - when there is one listening - does the
+    drawing. Handed over as ISubject::Change's changedBy and read during delivery only, so `text` may
+    point at the sender's own string. */
+struct KFCNotifyPayload
+{
+	enum Kind
+	{
+		kRebuild = 0,		// the result set changed shape: build the tree again (KFCResultTree::Rebuild)
+		kRefreshRows,		// only what the rows draw changed (KFCResultTree::RefreshRows)
+		kChapterRowGoes,	// chapterIdx's row is about to go (KFCResultTree::BeforeChapterRowGoes)
+		kStatus				// say *text on the message line (KFCResultTree::ShowStatus)
+	};
+	Kind				kind;
+	int32				chapterIdx;
+	const PMString*		text;
+
+	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
+};
+
+#endif // __KFCModelTypes_h__

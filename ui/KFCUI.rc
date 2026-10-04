@@ -61,7 +61,7 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Kohaku Plug-Ins\0"
             VALUE "FileDescription", kKFCUIDisplayName " - Adobe InDesign SDK Plug-in\0"
-            VALUE "FileVersion", kKBSVersion, "\0"
+            VALUE "FileVersion", kKFCVersion, "\0"
             VALUE "InternalName", kKFCUIPluginName, "\0"
             VALUE "LegalCopyright", kShortCopyRightStr, "\0"
 

@@ -1,6 +1,6 @@
 # 07. 変更履歴 ― 署名・色・却下と承認
 
-> コード地図での位置: ブロック **9b**（`model/KBSTrackChange.*`・`model/KBSSignRecordsCmd.cpp`）と **9**（`model/KBSReplaceEngine.cpp` の Reject／Accept）。
+> コード地図での位置: ブロック **9b**（`model/KFCTrackChange.*`・`model/KFCSignRecordsCmd.cpp`）と **9**（`model/KFCReplaceEngine.cpp` の Reject／Accept）。
 > 置換そのものは第6章、Show Changes（記録から一覧を作り直す）は第8章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

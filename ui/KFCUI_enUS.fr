@@ -31,68 +31,68 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
         	 // ----- Menu strings
-                kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKBSCompanyValue)
-                kKBSAboutMenuKey,					kKBSDisplayName "...",
+                kKFCCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKFCCompanyValue)
+                kKFCAboutMenuKey,					kKFCDisplayName "...",
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
                 // ----- Command strings
-                kKBSSearchBookMenuKey,			"Search",
-                kKBSBookScopeMenuKey,			"Book Scope",
-                kKBSHidePrevChapterMenuKey,		"Hide Previous Chapter",
-                kKBSTranslucentPanelMenuKey,	"Translucent Panel",
-                kKBSTranslucentFindChangeMenuKey,	"Translucent Find/Change",
-                kKBSMinimizableFindChangeMenuKey,	"Minimizable Find/Change",
-                kKBSRememberBookPanelMenuKey,	"Remember Book Panel Placement",
-                kKBSAppBarSearchEnterMenuKey,	"Link the Application Bar's Search Field to This Panel",
-                kKBSSavePanelSettingsMenuKey,	"Save Panel Settings",
-                kKBSReplaceCheckedMenuKey,		"Change Checked",
-                kKBSCheckAllMenuKey,			"Check All",
-                kKBSReplaceHitMenuKey,			"Replace",
+                kKFCSearchBookMenuKey,			"Search",
+                kKFCBookScopeMenuKey,			"Book Scope",
+                kKFCHidePrevChapterMenuKey,		"Hide Previous Chapter",
+                kKFCTranslucentPanelMenuKey,	"Translucent Panel",
+                kKFCTranslucentFindChangeMenuKey,	"Translucent Find/Change",
+                kKFCMinimizableFindChangeMenuKey,	"Minimizable Find/Change",
+                kKFCRememberBookPanelMenuKey,	"Remember Book Panel Placement",
+                kKFCAppBarSearchEnterMenuKey,	"Link the Application Bar's Search Field to This Panel",
+                kKFCSavePanelSettingsMenuKey,	"Save Panel Settings",
+                kKFCReplaceCheckedMenuKey,		"Change Checked",
+                kKFCCheckAllMenuKey,			"Check All",
+                kKFCReplaceHitMenuKey,			"Replace",
                 // The Reject / Accept items name KohakuFindChange as the changes' author - they act on its
                 // own changes only (the plug-in author's call) - one name per level.
-                kKBSRejectChangeMenuKey,		"Reject Change by KohakuFindChange",
-                kKBSStoryRejectMenuKey,			"Reject Changes by KohakuFindChange in This Story",
-                kKBSChapterRejectMenuKey,		"Reject All Changes by KohakuFindChange in This Document",
-                kKBSRunRejectMenuKey,			"Reject Changes by KohakuFindChange in This Run",
-                kKBSAcceptChangeMenuKey,		"Accept Change by KohakuFindChange",
-                kKBSStoryAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Story",
-                kKBSRunAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Run",
-                kKBSAcceptAllChangesMenuKey,	"Accept All Changes by KohakuFindChange in This Document",
-                kKBSShowChangesMenuKey,			"Show Changes by KohakuFindChange",
+                kKFCRejectChangeMenuKey,		"Reject Change by KohakuFindChange",
+                kKFCStoryRejectMenuKey,			"Reject Changes by KohakuFindChange in This Story",
+                kKFCChapterRejectMenuKey,		"Reject All Changes by KohakuFindChange in This Document",
+                kKFCRunRejectMenuKey,			"Reject Changes by KohakuFindChange in This Run",
+                kKFCAcceptChangeMenuKey,		"Accept Change by KohakuFindChange",
+                kKFCStoryAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Story",
+                kKFCRunAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Run",
+                kKFCAcceptAllChangesMenuKey,	"Accept All Changes by KohakuFindChange in This Document",
+                kKFCShowChangesMenuKey,			"Show Changes by KohakuFindChange",
                 // The story and document rows' second replace (the code's "Redo"). The name says what it
                 // writes with - Find/Change as it stands now, not the replace it takes back (the plug-in
                 // author's call).
-                kKBSRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
-                kKBSUncheckAllMenuKey,			"Uncheck All",
+                kKFCRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
+                kKFCUncheckAllMenuKey,			"Uncheck All",
                 // The operating reference. English in every UI language, like the rest of the flyout.
-                kKBSHowToMenuKey,				"How to Use...",
-                kKBSOpenFindChangeMenuKey,		"Open Find/Change...",
-                // The Keyboard Shortcuts editor's area (kKBSPanelMenuActionArea): files the
+                kKFCHowToMenuKey,				"How to Use...",
+                kKFCOpenFindChangeMenuKey,		"Open Find/Change...",
+                // The Keyboard Shortcuts editor's area (kKFCPanelMenuActionArea): files the
                 // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
-                kKBSPanelMenuActionArea,		kKBSPanelMenuActionAreaValue,
+                kKFCPanelMenuActionArea,		kKFCPanelMenuActionAreaValue,
 
                 // ----- Panel/dialog strings
-                kKBSPanelTitleKey,				kKBSDisplayName,
+                kKFCPanelTitleKey,				kKFCDisplayName,
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
-                // Read through InitialMessage (KBSResultListWidgetMgr.cpp) whenever the message line falls
+                // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls
                 // back to what a panel with nothing run says; the resource itself carries no initial text,
                 // the message area being drawn by hand (KFCUI.fr). Kept here so the wording is not spelled
                 // out in the code. It names no Find command (the plug-in author's call): the command's name
-                // follows Find/Change's Search: (KBSSearchEngine::FindCommandName), so any one name would
+                // follows Find/Change's Search: (KFCSearchEngine::FindCommandName), so any one name would
                 // be wrong as often as not.
-                kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",
+                kKFCStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",
 
                 // (The model half's strings - the replace's own alert and what Edit > Undo calls a
-                //  KBS write - are in model/KBS_enUS.fr.)
+                //  KFC write - are in model/KFC_enUS.fr.)
 
 
 		// ----- Misc strings
                 // The About box is the plug-in's NAME AND VERSION, nothing else, and it reads the
                 // same in every UI language (the plug-in author's call) - no description, credit, URL
                 // or Japanese wording. Same shape as KCM's (KCMUI_enUS.fr, kKCMAboutBoxStringKey).
-                kKBSAboutBoxStringKey,			kKBSDisplayName " version " kKBSVersion,
+                kKFCAboutBoxStringKey,			kKFCDisplayName " version " kKFCVersion,
 
 
         }

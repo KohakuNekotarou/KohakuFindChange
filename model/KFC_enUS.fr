@@ -1,0 +1,50 @@
+//========================================================================================
+//
+//  $File: $
+//
+//  Owner:
+//
+//  $Author: $
+//
+//  $DateTime: $
+//
+//  $Revision: $
+//
+//  $Change: $
+//
+//  Copyright 1997-2012 Adobe Systems Incorporated. All rights reserved.
+//
+//  NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance
+//  with the terms of the Adobe license agreement accompanying it.  If you have received
+//  this file from a source other than Adobe, then your use, modification, or
+//  distribution of it requires the prior written permission of Adobe.
+//
+//========================================================================================
+
+#ifdef __ODFRC__
+
+// English string table is defined here
+
+resource StringTable (kSDKDefStringsResourceID + index_enUS)
+{
+        k_enUS,									// Locale Id
+        kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
+        {
+                // The model half's strings: what the model writes itself. Every other string is the UI
+                // half's (ui/KFCUI_enUS.fr). The Japanese for these is KFCLoc.h's.
+                // The replace's own alert, shown INSTEAD of running: the verify walk found a ticked
+                // match that no longer begins where the search left it, and nothing was written.
+                kKFCStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
+                kKFCStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
+                // What Edit > Undo calls a Change Checked run.
+                kKFCReplaceStepKey,				"Replace",
+                // ...and a Reject Change and an Accept All Changes by KohakuFindChange.
+                kKFCRejectStepKey,				"Reject Change",
+                kKFCAcceptAllStepKey,			"Accept All Changes by KohakuFindChange",
+                // ...and an Accept Change by KohakuFindChange on a row, a story or a run.
+                kKFCAcceptStepKey,				"Accept Change",
+        }
+
+};
+
+#endif // __ODFRC__

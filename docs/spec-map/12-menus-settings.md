@@ -1,6 +1,6 @@
 # 12. フライアウトと設定の保存
 
-> コード地図での位置: ブロック **5**（`ui/KBSActionComponent.cpp`）・**3**（`ui/KFCUI.fr` の MenuDef／ActionDef）・**4**（`ui/KBSPanelState.*`）。
+> コード地図での位置: ブロック **5**（`ui/KFCActionComponent.cpp`）・**3**（`ui/KFCUI.fr` の MenuDef／ActionDef）・**4**（`ui/KFCPanelState.*`）。
 > 各項目の働きはそれぞれの章（検索＝第2章、置換＝第6章、窓の工夫＝第13章、ブックパネル＝第14章、アプリケーションバー＝第15章）。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

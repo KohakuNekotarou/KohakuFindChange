@@ -1,6 +1,6 @@
 # 15. アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）
 
-> コード地図での位置: ブロック **17**（`ui/KBSAppBarSearchEnter.*`）。
+> コード地図での位置: ブロック **17**（`ui/KFCAppBarSearchEnter.*`）。
 > トグルを押したときのメッセージ欄の文は第12章（SET-09）、保存は SET-16。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

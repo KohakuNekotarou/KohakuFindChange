@@ -1,6 +1,6 @@
 # 10. 文書・ブックを閉じたとき
 
-> コード地図での位置: ブロック **11**（`model/KBSCloseDocResponder.cpp`・`model/KBSBookWatch.*`・`model/KBSBookScope.*`）と **13**（起動と終了＝`model/KBSStartupShutdown.cpp`・`ui/KBSUIStartupShutdown.cpp`）。
+> コード地図での位置: ブロック **11**（`model/KFCCloseDocResponder.cpp`・`model/KFCBookWatch.*`・`model/KFCBookScope.*`）と **13**（起動と終了＝`model/KFCStartupShutdown.cpp`・`ui/KFCUIStartupShutdown.cpp`）。
 > KFC が開いた章の閉じ方・残し方は第3章 §5、取り消しの追従を捨てるときは第9章 UNDO-11。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

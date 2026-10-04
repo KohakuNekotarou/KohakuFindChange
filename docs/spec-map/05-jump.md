@@ -1,6 +1,6 @@
 # 05. ジャンプと印
 
-> コード地図での位置: ブロック **12**（`ui/KBSJump.*`・`model/KBSHitMarker.*`・`ui/KBSHitMarkerView.*`・`ui/KBSMarkerExpiryIdleTask.*`）と、行のクリックを受ける `ui/KBSResultNodeEH.cpp`・矢印キーの `ui/KBSResultTreeEH.cpp`。
+> コード地図での位置: ブロック **12**（`ui/KFCJump.*`・`model/KFCHitMarker.*`・`ui/KFCHitMarkerView.*`・`ui/KFCMarkerExpiryIdleTask.*`）と、行のクリックを受ける `ui/KFCResultNodeEH.cpp`・矢印キーの `ui/KFCResultTreeEH.cpp`。
 > メッセージ欄の Source Text は第4章 ROW-28、行の右クリックメニューは第6・7章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
