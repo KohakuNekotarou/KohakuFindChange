@@ -411,17 +411,14 @@ int32 KBSShowChanges::Run(PMString& outSummary)
 	outSummary.Append(" change(s) by KohakuFindChange in ");
 	outSummary.AppendNumber(runCount);
 	outSummary.Append(" run(s) - right-click a row to reject or accept them. To replace again, search again.");
+	// One cap since 2026-10-04 (the spec map's GEN-34): the ceiling is the panel's display cap, so a list that
+	// stops there has every row it holds on the panel. (A "Showing first 5000 in the panel" for 5,001 to
+	// 10,000 rows stood here until then.)
 	if (capped)
 	{
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KBSResultModel::kKBSCollectHitLimit);
 		outSummary.Append(" safety limit.");
-	}
-	else if (total > KBSResultModel::kKBSDisplayHitLimit)
-	{
-		outSummary.Append(" Showing first ");
-		outSummary.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
-		outSummary.Append(" in the panel.");
 	}
 	outSummary.Append(chapterNotes);
 	return total;
