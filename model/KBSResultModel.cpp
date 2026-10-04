@@ -31,10 +31,10 @@ namespace
 	// Were these results produced by a book search? Decides whether the tree opens its chapters.
 	bool gFromBook = false;
 
-	// The Search: they were searched with (2026-09-29). See KBSResultModel::SetSearchScope.
+	// The Search: they were searched with. See KBSResultModel::SetSearchScope.
 	KBSResultModel::SearchScopeKind gSearchScope = KBSResultModel::kScopeDocument;
 
-	// Were these rows rebuilt from the Track Changes records (2026-09-29)? See KBSResultModel::SetFromRecords.
+	// Were these rows rebuilt from the Track Changes records? See KBSResultModel::SetFromRecords.
 	bool gFromRecords = false;
 
 	// The book those results came from (file name only). Drawn on the tree's book row.
@@ -56,18 +56,14 @@ namespace
 	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
 	bool gHasRun = false;
 
-	// (gStoppedShort - did the search stop short of its scope - stood here until 2026-09-28. Nothing had
-	// read it since the replace became one match at a time on 2026-09-27; see KBSResultModel.h.)
-
 	// The rows copied aside before a write of ours changed them - see KBSResultModel::BeginRowBackup.
-	// (Its own struct, BackedUpRow, until 2026-09-29: the same three fields as RowCopy, which the panel's
-	// following of Undo hands out.)
+	// RowCopy, the same struct the panel's following of Undo hands out.
 	//
 	// Only true while a write of ours is running; empty at every other moment.
 	bool gBackingUpRows = false;
 	std::vector<KBSResultModel::RowCopy> gRowBackup;
 	std::set<std::pair<int32, int32> > gRowsBackedUp;	// (chapter, hit) already in gRowBackup
-	// ...and the story versions it recorded (SetStoryVersion), the same way (2026-09-29): an Undo of the
+	// ...and the story versions it recorded (SetStoryVersion), the same way: an Undo of the
 	// write puts the story back at the version before it, and the record has to follow or the next
 	// write refuses the story as "changed since the search".
 	std::vector<KBSResultModel::VersionCopy> gVersionBackup;
@@ -80,10 +76,9 @@ namespace
 	uint32 gLayoutGeneration = 0;
 
 	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
-	// taken first is the row as the run found it, and it is the one a rollback has to put back. (Every
-	// change was kept until 2026-09-28, a replaced row four or five times over - MarkHitReplaced,
-	// SetHitRecordTime (SetHitRecord since 2026-10-04), SetHitChangeTexts, SetHitRange, SetHitSegments - and RollBackRows walked the
-	// copies backwards so the oldest won; every later copy was overwritten unread.)
+	// taken first is the row as the run found it, and it is the one a rollback has to put back. (A
+	// replaced row is written four or five times over - MarkHitReplaced, SetHitRecord, SetHitChangeTexts,
+	// SetHitRange, SetHitSegments - and a copy per change would only be overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KBSResultModel::Hit& row)
 	{
 		if (!gBackingUpRows || !gRowsBackedUp.insert(std::make_pair(chapterIdx, hitIdx)).second)
@@ -100,12 +95,12 @@ namespace
 	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
 	// negative values it can hold.
 	int32 gContextMenuChapter = KBSResultModel::kNoContextMenuChapter;
-	// ...and which HIT row, for the hit row's own menu (2026-09-26: Replace, Reject Change, Accept Change). -1 = none.
+	// ...and which HIT row, for the hit row's own menu (Replace, Reject Change, Accept Change). -1 = none.
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
-	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked (2026-09-27)
+	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked
 	int32 gContextMenuGroup = -1;
-	int32 gContextMenuRunChapter = -1;		// the run row right-clicked (2026-09-29)
+	int32 gContextMenuRunChapter = -1;		// the run row right-clicked
 	int32 gContextMenuRun = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
@@ -121,7 +116,7 @@ namespace
 		gContextMenuRun = -1;
 	}
 
-	// ***** THE INDEXES, ASKED IN ONE PLACE. ***** A chapter, a row, a story group - or nil when an index
+	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
 	// is out of range, which is how a repaint racing a rebuild (or a stale node id) reads "nothing" rather
 	// than crashing. Every getter and setter below starts here; RunAt, further down, is the run level's.
 	KBSResultModel::Chapter* ChapterAt(int32 chapterIdx)
@@ -135,8 +130,8 @@ namespace
 		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
 	}
 
-	// A replaced row whose replace changed no character, so nothing was recorded for it - the one rule
-	// (2026-10-04, scenario cross-check 5). See KBSResultModel::GetHitTextUnchanged. A row taken back, accepted
+	// A replaced row whose replace changed no character, so nothing was recorded for it - the one rule.
+	// See KBSResultModel::GetHitTextUnchanged. A row taken back, accepted
 	// or gone with its object has an outcome, and a footnote's row is said as such.
 	bool TextUnchanged(const KBSResultModel::Hit& h)
 	{
@@ -181,22 +176,22 @@ namespace
 	}
 
 	// Does this row carry a check box? THE one definition of the question, so the commands that set
-	// the boxes and the counts that decide whether to offer those commands can no longer drift apart:
+	// the boxes and the counts that decide whether to offer those commands cannot drift apart:
 	// a row the model quietly checked but the panel drew no box for would be replaced without ever
 	// having been asked for. Replaced = the text it matched is gone; locked = InDesign offers no way
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
-		// A list rebuilt from the records offers no replace at all (2026-09-29, the user's call B).
+		// A list rebuilt from the records offers no replace at all (the user's call).
 		if (gFromRecords)
 			return false;
 
-		// A replace's report offers work only on the rows Reject Change put back (2026-09-27, B). This is
-		// the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
+		// A replace's report offers work only on the rows Reject Change put back (the user's call). This
+		// is the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
 		// taken back and still open is exactly what makes that question answer no, and every other row
-		// is refused here. (NoRowHasCheckBox was asked first as well until 2026-09-29 - an answer that
-		// could not change this one, and a walk of every row per row: squared in the rows over a report.
-		// The callers that loop still ask it once, as their early exit.)
+		// is refused here. (NoRowHasCheckBox is not asked here as well - an answer that cannot change this
+		// one, and a walk of every row per row: squared in the rows over a report. The callers that loop
+		// ask it once, as their early exit.)
 		if (KBSResultModel::IsShowingReplaceOutcome() && hit.outcome != KBSResultModel::kOutcomeRejected)
 			return false;
 
@@ -204,9 +199,8 @@ namespace
 	}
 
 	// Change Checked's work - see KBSResultModel::IsHitCheckedWork. Ticked and carrying a box: the box's own
-	// question (RowHasCheckBox) since 2026-09-29 (the defect re-check F-4) - it was "not replaced, and a work
-	// outcome" until then, which said yes over a report to the ticked rows of a chapter the run could not
-	// open, rows that have no box there.
+	// question (RowHasCheckBox) - not "not replaced, and a work outcome", which says yes over a report to
+	// the ticked rows of a chapter the run could not open, rows that have no box there.
 	bool IsCheckedWork(const KBSResultModel::Hit& hit)
 	{
 		return hit.checked && RowHasCheckBox(hit);
@@ -242,18 +236,18 @@ namespace
 		return count;
 	}
 
-	// ***** GROUP A CHAPTER'S HITS BY STORY (2026-09-27, the user's call) - the tree's middle level. *****
+	// GROUP A CHAPTER'S HITS BY STORY (the user's call) - the tree's middle level.
 	// One group per story in first-appearance (page) order - so the stories read in the order their
 	// first matches stand - and every hit given its group. The row reads "P<page of the story's first
-	// match>  <the story's first words>". (The level held FONTS for Find Missing Glyphs from 2026-08-02;
-	// that scan was removed on 2026-09-27, and the level is the story's alone.)
+	// match>  <the story's first words>". (The "font" in the names is the level's old name: it held the
+	// fonts of Find Missing Glyphs, since removed; the level is the story's alone.)
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
 	// the hit held before - a search's new hits and the hits KeepCheckedRows carries over alike.
 	//
-	// ***** KEYED BY (RUN, STORY) SINCE 2026-09-29 (Show Changes by KohakuFindChange). ***** On a list rebuilt
-	// from the records a story two runs changed stands under each run, so a group is one story of one run;
-	// every other list has run -1 throughout, where the key is the story alone, as before. Each run's own
+	// KEYED BY (RUN, STORY) (Show Changes by KohakuFindChange). On a list rebuilt from the records a
+	// story two runs changed stands under each run, so a group is one story of one run; every other
+	// list has run -1 throughout, where the key is the story alone. Each run's own
 	// list of groups is rebuilt at the end, from the groups (the runs themselves - start and label - are
 	// the builder's and stay).
 	void BuildFontGroups(KBSResultModel::Chapter& chapter)
@@ -280,7 +274,7 @@ namespace
 				if (!hit.pageString.IsEmpty())
 					group.fontName.Append(hit.pageString);
 				group.fontName.Append("  ");
-				// The story's first words keep their breaks (2026-09-29, KBSSearchEngine's StoryLeadText):
+				// The story's first words keep their breaks (KBSSearchEngine's StoryLeadText):
 				// drawn as the marks a hit row draws, by the same function.
 				PMString lead(hit.storyLead);
 				KBSResultModel::MarkUpBreaksForDisplay(lead);
@@ -321,20 +315,16 @@ namespace
 
 void KBSResultModel::AppendChapter(Chapter&& chapter)
 {
-	// ***** THE HITS ARE TAKEN, NOT COPIED. ***** A chapter of a large search holds thousands of
-	// Hits and each Hit holds its texts as PMStrings, so copying the vector in here doubled the cost of
-	// filling the model for nothing: every caller builds a Chapter, hands it over and drops it.
-	// Copied until 2026-08-08 - and the search had used swap() to keep the same hits from being
-	// copied into that Chapter one line earlier, which this then undid.
+	// THE HITS ARE TAKEN, NOT COPIED. A chapter of a large search holds thousands of Hits and each Hit
+	// holds its texts as PMStrings, so copying the vector in here would double the cost of filling the
+	// model for nothing: every caller builds a Chapter, hands it over and drops it.
 	gChapters.push_back(std::move(chapter));
 	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
 
-	// ***** EVERY ROW STARTS UNTICKED (2026-09-27, the user's call). ***** From 2026-09-26 to 2026-09-27
-	// every row came in ticked, because the replace was Change All over whole stories and the rows left
-	// out had to be taken back; the replace writes one match at a time again, so the user ticks what is
-	// to be replaced. (Hit::checked is false as a Hit is built - nothing to do here.)
+	// EVERY ROW STARTS UNTICKED (the user's call). The replace writes one match at a time, so the user
+	// ticks what is to be replaced. (Hit::checked is false as a Hit is built - nothing to do here.)
 }
 
 void KBSResultModel::Clear()
@@ -347,15 +337,14 @@ void KBSResultModel::Clear()
 	gBookName.Clear();
 	gSearchMode = -1;
 	gWalkSignature.Clear();
-	// (KBSEditStamp::Forget was called from here, and the file is gone: the replace checks the
-	//  stored positions against a fresh walk rather than fingerprinting each chapter, so nothing
-	//  outside this model describes these rows any more.)
+	// (Nothing outside this model describes these rows to forget here: the replace checks the stored
+	//  positions against a fresh walk rather than fingerprinting each chapter.)
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next search's Check All reach a chapter the user never right-clicked.
 	ForgetContextMenus();
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
-	// A new result set, in its first layout (2026-09-29): what KBSUndoFollow kept for the old one names
+	// A new result set, in its first layout: what KBSUndoFollow kept for the old one names
 	// rows that are gone.
 	gResultSetId = ++gIdCounter;
 	gLayoutGeneration = ++gIdCounter;
@@ -485,13 +474,12 @@ bool KBSResultModel::IsFromRecords()
 
 bool KBSResultModel::NoRowHasCheckBox()
 {
-	// A list rebuilt from the records has no box anywhere (2026-09-29) - RowHasCheckBox's first answer.
+	// A list rebuilt from the records has no box anywhere - RowHasCheckBox's first answer.
 	if (gFromRecords)
 		return true;
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
-	// ***** EXCEPT A REPORT HOLDING A ROW TAKEN BACK (2026-09-27, B): that row carries a box. *****
-	// (A scan's report-only kind was the other half until the two scans were removed, 2026-09-27.)
+	// EXCEPT A REPORT HOLDING A ROW TAKEN BACK (the user's call): that row carries a box.
 	return gShowingOutcome && !KBSResultModel::AnyRejectedRowOpen();
 }
 
@@ -563,10 +551,9 @@ void KBSResultModel::ShutdownCleanup()
 	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
 	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
 	//
-	// ALL of them. gChangeText was added on 2026-08-04 and did not get a line here, so the one string
-	// that is only ever filled by a replace was the one left holding storage at unload. When a static
-	// is added above, it is added here too - that is what this list is. (gQueryText, gChangeText and
-	// gRunSummary went with Save Results... on 2026-09-27.)
+	// ALL of them. A static string added above without a line here is left holding storage at unload
+	// (it has happened once). When a static is added above, it is added here too - that is what this
+	// list is.
 	gBookName.Clear();
 	gWalkSignature.Clear();
 
@@ -605,7 +592,7 @@ int32 KBSResultModel::GetDisplayChapterCount()
 		if (before >= kKBSDisplayHitLimit)
 			break;
 		if (gChapters[i].hits.empty())
-			continue;	// a chapter CloseChapter emptied (2026-09-29) - kept in place, not shown
+			continue;	// a chapter CloseChapter emptied - kept in place, not shown
 		++shown;
 		before += static_cast<int32>(gChapters[i].hits.size());
 	}
@@ -666,8 +653,7 @@ int32 KBSResultModel::GetDisplayFontCount(int32 chapterIdx)
 
 bool KBSResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
 {
-	// Every group is a story group since the font level went (2026-09-27; a FontGroup::isStory said so
-	// until 2026-10-01, written true by the one place that makes a group) - so this is the index's range.
+	// Every group is a story group - so this is the index's range.
 	return GroupAt(chapterIdx, groupIdx) != nil;
 }
 
@@ -707,7 +693,7 @@ void KBSResultModel::SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool chec
 
 int32 KBSResultModel::GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx)
 {
-	// The rows SetGroupChecked above would set, counted the same way (2026-10-04, D-1).
+	// The rows SetGroupChecked above would set, counted the same way.
 	if (NoRowHasCheckBox())
 		return 0;
 	std::vector<int32> rows;
@@ -736,7 +722,7 @@ bool KBSResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupId
 	return true;
 }
 
-// ---- The run level (2026-09-29, Show Changes by KohakuFindChange) - see the header. ----
+// ---- The run level (Show Changes by KohakuFindChange) - see the header. ----
 
 namespace
 {
@@ -891,29 +877,25 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	// The same call SetHitChecked makes before it accepts a tick, so the panel cannot draw a box the
 	// model would refuse. The flags above are handed over as well - the row still says WHY it was
 	// left alone ("locked" in the locator, "missing" / "refused" in the accent word) - but nothing
-	// outside this file has to add them up into this answer any more.
+	// outside this file has to add them up into this answer.
 	out.hasCheckBox = RowHasCheckBox(h);
 	return true;
 }
-
-// (DescribeAllRows and its three helpers - the app.kfcResults block - went with that property on
-//  2026-09-27.)
 
 // U+21B5 DOWNWARDS ARROW WITH CORNER LEFTWARDS - the mark for a forced line break. TextChar.h names
 // the pilcrow (kTextChar_PilchrowSign, :122) but carries no constant for this one, so it is named
 // here rather than left as a bare number in the loop below.
 static const UTF32TextChar kKBSReturnArrow = 0x21B5;
 
-// ***** THE CHARACTERS AN OBJECT STANDS ON ARE NOT SHOWN (2026-09-26, the user's call). ***** They have
+// THE CHARACTERS AN OBJECT STANDS ON ARE NOT SHOWN (the user's call). They have
 // no glyph in the panel's font and drew as a box: a footnote / endnote reference (0x04 / 0x05), the
 // marks around an endnote's text and other anchors (U+FEFF), a table's anchor and continuation
 // (0x16 / 0x17), the page number and section markers (0x18 / 0x19), an anchored object (U+FFFC).
 // Display only, like the break marks: the model keeps them as they are.
-// ***** EXCEPT THE TABLE'S ANCHOR SINCE 2026-09-29 - it is shown as kKBSTableSign (the user: "the way KCM
-// does it, a table sign"). ***** Its continuations (one per row after the first) are still dropped: a table
-// is one sign however many rows it has.
-// By TextChar.h's own names (2026-10-02, the API re-audit: five of the seven were bare numbers beside two
-// named ones; 0x18 is also kTextChar_AutoText there - the same code).
+// EXCEPT THE TABLE'S ANCHOR - it is shown as kKBSTableSign (the user: "the way KCM does it, a table
+// sign"). Its continuations (one per row after the first) are still dropped: a table is one sign however
+// many rows it has.
+// By TextChar.h's own names (0x18 is also kTextChar_AutoText there - the same code).
 static bool IsHiddenMarker(UTF16TextChar c)
 {
 	return c == kTextChar_FootnoteMarker || c == kTextChar_EndnoteMarker || c == kTextChar_TableContinued
@@ -921,8 +903,8 @@ static bool IsHiddenMarker(UTF16TextChar c)
 		|| c == kTextChar_ZeroSpaceNoBreak || c == kTextChar_ObjectReplacementCharacter;
 }
 
-// ***** THE SIGN A TABLE LEAVES IN A ROW (2026-09-29, the user: "can it be like KCM - a table mark between
-// ***** the two characters either side of the table"). ***** U+25A6 SQUARE WITH ORTHOGONAL CROSSHATCH FILL,
+// THE SIGN A TABLE LEAVES IN A ROW (the user: "can it be like KCM - a table mark between the two
+// characters either side of the table"). U+25A6 SQUARE WITH ORTHOGONAL CROSSHATCH FILL,
 // KCM's kKCMTableSign (KCMStoryList.cpp), and for KCM's reasons: NOT the kanji U+7530 the user remembered -
 // KCM's user turned it down there ("that is Japanese": the sign has to read the same to an English
 // reader) - and not U+229E, which in the palette font reads like InDesign's overset box. It stands where
@@ -1025,7 +1007,7 @@ void KBSResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
 		return;
-	// Copied aside like a row (2026-09-29), once, as the write found it.
+	// Copied aside like a row, once, as the write found it.
 	if (gBackingUpRows && gVersionsBackedUp.insert(std::make_pair(chapterIdx, story)).second)
 		gVersionBackup.push_back(VersionNow(chapterIdx, story));
 	c->storyVersions[story] = version;
@@ -1080,11 +1062,9 @@ void KBSResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 	// a checked hit that no row offered - a replace's report above all, where only the rows taken back
 	// carry a box.
 	//
-	// ***** ONE ROW AT A TIME AGAIN (2026-09-27). ***** Touching matches went on and off together, and a
-	// footnote's row could not go off, while the replace was Change All (2026-09-26 to 2026-09-27): a row
-	// left out had to be taken back, and neither a deletion shared by touching matches nor anything in a
-	// footnote can be. The replace writes only the ticked matches now, so every box is the row's own.
-	// (Reject Change still takes a touching group together - GetTouchingGroup.)
+	// ONE ROW AT A TIME. The replace writes only the ticked matches, so every box is the row's own:
+	// touching matches do not go on and off together, and a footnote's row can be left out. (Reject
+	// Change still takes a touching group together - GetTouchingGroup.)
 	if (RowHasCheckBox(*h))
 		h->checked = checked;
 }
@@ -1258,7 +1238,7 @@ bool KBSResultModel::GetRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 		if (rows[k] < 0 || rows[k] >= static_cast<int32>(hits.size()) || !hits[rows[k]].replaced)
 			return false;
 
-	// ***** THE ROWS AS ONE (2026-09-29). ***** Matches written side by side are one run of new text in the
+	// THE ROWS AS ONE. Matches written side by side are one run of new text in the
 	// document, and on a list rebuilt from the records their ONE deletion stands on the last row
 	// (KBSShowChanges.cpp) - so a row alone may have no original text to show at all. Their originals
 	// joined in text order are what the group took, whichever list this is: a search's rows each carry
@@ -1363,9 +1343,6 @@ bool KBSResultModel::GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& ou
 	return true;
 }
 
-// (GetHitAnchor and GetHitStoryStamp were defined here until 2026-08-03 - see the note where they
-// were declared in KBSResultModel.h.)
-
 void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStoryUID,
 	TextIndex newStart, TextIndex newEnd)
 {
@@ -1390,13 +1367,13 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textEnd = newEnd;
 	h.replaced = true;
 	h.checked = false;
-	// a row taken back and replaced again (2026-09-27, A/B) is an ordinary replaced row once more
+	// a row taken back and replaced again is an ordinary replaced row once more
 	// The locator follows at once where the replace changes what it says: a row taken back reads as an
-	// ordinary replaced one again, and a footnote's row says "no track" (2026-09-29) - a row's Replace leaves a
-	// work list, which no pass numbers again afterwards (only a Change Checked's report is - KeepCheckedRows).
-	// So does a row whose replace changed no character (2026-10-04, TextUnchanged - the replace sets the row's
-	// record and texts before this, for it). Every other row's locator reads the same before and after, so it
-	// is not built again for nothing.
+	// ordinary replaced one again, and a footnote's row says "no track" - a row's Replace leaves a work
+	// list, which no pass numbers again afterwards (only a Change Checked's report is - KeepCheckedRows).
+	// So does a row whose replace changed no character (TextUnchanged - the replace sets the row's record
+	// and texts before this, for it). Every other row's locator reads the same before and after, so it is
+	// not built again for nothing.
 	const bool takenBack = (h.outcome == kOutcomeRejected);
 	if (takenBack)
 		h.outcome = kOutcomeNone;
@@ -1404,10 +1381,9 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 		BuildHitLocator(h);
 }
 
-// (GetHitReplacedRange stood here until 2026-09-25: the replace pass read a replaced row's range
-//  back from the model to fetch its line. The range the model holds is where the text was WRITTEN,
-//  and a later replacement in the same story can move it, so the pass now keeps the range itself,
-//  carries it forward and hands the final one over - SetHitRange, below.)
+// (No getter hands a replaced row's range back to the replace pass: the range the model holds is
+//  where the text was WRITTEN, and a later replacement in the same story can move it, so the pass
+//  keeps the range itself, carries it forward and hands the final one over - SetHitRange, below.)
 
 void KBSResultModel::SetHitRange(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start,
 	TextIndex end)
@@ -1438,7 +1414,7 @@ void KBSResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMStri
 	h.matchText = newMatch;		h.matchText.SetTranslatable(kFalse);
 	h.postText = newPost;		h.postText.SetTranslatable(kFalse);
 
-	// ***** AND the hash, in the same call. ***** See the header for why the two cannot be set
+	// AND the hash, in the same call. See the header for why the two cannot be set
 	// apart from one another.
 	h.matchHash = newMatchHash;
 }
@@ -1469,8 +1445,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		if (hit.isOverset)
 			hit.locator.Append(" overset");
 	}
-	// Under a hidden condition (2026-10-04, the [9b] re-read D9b-1): nothing of it is on the page named,
-	// which is the page the text comes back to - "P1(2) hidden condition" (it read "P1(2) overset").
+	// Under a hidden condition: nothing of it is on the page named, which is the page the text comes back
+	// to - "P1(2) hidden condition" (not "P1(2) overset", which it is not).
 	if (hit.inHiddenText)
 		hit.locator.Append(" hidden condition");
 
@@ -1489,7 +1465,7 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
-	// overset". EVERY word is spelled out in full (user's call, 2026-08-04): these are what explain
+	// overset". EVERY word is spelled out in full (the user's call): these are what explain
 	// a row the user cannot act on, so they are worth the characters. Clipped forms were tried and
 	// dropped - "hid" / "lck" are hard to read, "loc" reads as "location" in English, and "ov" left
 	// the one word a reader most needs to recognise as the least legible of the set.
@@ -1499,8 +1475,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" locked");
 
 	// NOT chained onto the test above. A locked row can be jumped to and found changed, and then it
-	// has both things to say - "P4(1) locked missing" - where an else left it saying only that it
-	// was locked, which is not why the jump landed on different text. Missing and refused do exclude
+	// has both things to say - "P4(1) locked missing" - where an else would leave it saying only that
+	// it was locked, which is not why the jump landed on different text. Missing and refused do exclude
 	// each other: outcome holds one value.
 	//
 	// These two go into their own string rather than onto the locator because the cell draws them
@@ -1512,25 +1488,25 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeEndnoteLeft)
 		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
-	// A rejected row says nothing (the user, 2026-09-27: "no 'rejected' when I take one back") - it
-	// reads its original text again, which is what the user asked for; the state is still there for
-	// the story and document rows' Replace Again (Redo in the code); a reader of the panel sees the
-	// row's check box come back.
-	// ***** EXCEPT ON A LIST REBUILT FROM THE RECORDS (2026-09-29, the design's section 4). ***** No row
-	// there carries a box, so nothing else would tell a row taken back from one still replaced.
+	// A rejected row says nothing (the user: "no 'rejected' when I take one back") - it reads its
+	// original text again, which is what the user asked for; the state is still there for the story
+	// and document rows' Replace Again (Redo in the code); a reader of the panel sees the row's check
+	// box come back.
+	// EXCEPT ON A LIST REBUILT FROM THE RECORDS. No row there carries a box, so nothing else would
+	// tell a row taken back from one still replaced.
 	else if (hit.outcome == kOutcomeRejected && gFromRecords)
 		hit.locator.Append(" rejected");
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 	else if (hit.outcome == kOutcomeAccepted)
-		hit.locator.Append(" accepted");	// its change accepted (2026-09-29): final, nothing left to act on
+		hit.locator.Append(" accepted");	// its change accepted: final, nothing left to act on
 
-	// ***** "no track" - REPLACED INSIDE A FOOTNOTE (2026-09-29, the user's request). ***** Track Changes
-	// records nothing in a footnote (measured 2026-09-26), so the replace there left no change to take back
-	// or accept, and nothing on the row said so until now (the status line did, once, when it was replaced).
+	// "no track" - REPLACED INSIDE A FOOTNOTE (the user's request). Track Changes records nothing in a
+	// footnote (measured), so the replace there left no change to take back or accept, and only the
+	// row can keep saying so (the status line says it once, when it is replaced).
 	// Normal colour, like "locked": a fact about the row, not a failure.
-	// ...and a replace that changed no character (2026-10-04, scenario cross-check 5 - TextUnchanged): formatting
-	// only, if anything, which Track Changes does not record either.
+	// ...and a replace that changed no character (TextUnchanged): formatting only, if anything, which
+	// Track Changes does not record either.
 	if ((hit.replaced && hit.inFootnote && hit.outcome == kOutcomeNone) || TextUnchanged(hit))
 		hit.locator.Append(" no track");
 }
@@ -1587,15 +1563,14 @@ void KBSResultModel::RollBackRows()
 {
 	gBackingUpRows = false;
 
-	// One copy per row (BackUpRow), so the order decides nothing now. (Backwards since the copies were
-	// several per row, when the one taken FIRST had to be applied last.)
+	// One copy per row (BackUpRow), so the direction of this loop decides nothing.
 	for (size_t i = gRowBackup.size(); i > 0; --i)
 	{
 		const RowCopy& saved = gRowBackup[i - 1];
 		if (Hit* h = HitAt(saved.chapter, saved.hit))	// nil: the result set changed underneath
 			*h = saved.row;
 	}
-	// The recorded versions too (2026-09-29) - every caller records them only once its write has gone
+	// The recorded versions too - every caller records them only once its write has gone
 	// through, so there is normally nothing here.
 	for (size_t i = 0; i < gVersionBackup.size(); ++i)
 		PutVersionBack(gVersionBackup[i]);
@@ -1670,9 +1645,6 @@ void KBSResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	ForgetRowBackup();
 }
 
-// (DropChapter - erase one chapter and leave the others - was defined here until 2026-08-07. See
-// the note where it was declared in KBSResultModel.h.)
-
 int32 KBSResultModel::KeepCheckedRows()
 {
 	// A replace that was asked for nothing must not empty the panel, so check before touching
@@ -1715,37 +1687,32 @@ int32 KBSResultModel::KeepCheckedRows()
 				&& hits[hi].outcome == kOutcomeNone)
 				continue;
 			// The source vector is thrown away at the swap below, so the hit is moved out rather
-			// than copied - a Hit carries its texts as PMStrings.
-			// (Its fontGroup / fontGroupPos were put back to -1 here until 2026-09-29, for a regroup
-			// that left an ungrouped chapter's pair as it came. BuildFontGroups below writes every
-			// hit's pair since every chapter is grouped by story, 2026-09-27.)
+			// than copied - a Hit carries its texts as PMStrings. (Its fontGroup / fontGroupPos are
+			// left as they were: BuildFontGroups below writes every hit's pair.)
 			keep.push_back(std::move(hits[hi]));
 		}
 		hits.swap(keep);
 
 		// RENUMBER the within-page ordinals over what is left, so the rows read "the first
-		// replacement on this page, the second, the third" (2026-08-03, user's call).
+		// replacement on this page, the second, the third" (the user's call: the count follows the
+		// REPLACEMENTS rather than the matches they came from).
 		//
-		// The ordinal was CLEARED here until then, on the reasoning that thinning the list leaves the
-		// search's numbers full of gaps - which left every row on a page reading a bare "P1", saying
-		// nothing at all about which of them it was. Keeping the search's numbers was tried in
-		// between; the user asked for the count to follow the REPLACEMENTS rather than the matches
-		// they came from, which is this.
+		// Neither of the other two: clearing the ordinal leaves every row on a page reading a bare
+		// "P1", saying nothing about which of them it is; keeping the search's numbers leaves them
+		// full of gaps. Both were tried.
 		//
 		// The search's own numbering, over what is left: thinning preserves the page order the search
 		// sorted into. The locators are rebuilt here rather than as each row was kept - the flags may
 		// have changed too, and this is the one pass that has the final ordinal to bake in.
 		NumberHitsWithinPages(hits);
 
-		// ***** AND THE FONT GROUPS, because the thinning renumbered the hits they point AT. *****
+		// AND THE STORY GROUPS, because the thinning renumbered the hits they point AT.
 		// A group holds POSITIONS in the chapter's hits vector (FontGroup::hitIndices), and every
 		// hit holds the group it is in and its place inside it - all three of which were true of
 		// the vector this pass has just replaced. Left alone, GetFontGroupHit would hand the tree
 		// positions that name a different row or none at all, and KBSResultNodeID::Create(chapter,
 		// hit) would stamp a stale group onto the node: two nodes naming one hit while carrying
-		// different fonts, which is the one thing that header says must never happen.
-		//
-		// Reached on every Find/Change chapter since the story groups came in (2026-09-27).
+		// different groups, which is the one thing that header says must never happen.
 		BuildFontGroups(gChapters[ci]);
 	}
 
@@ -1762,9 +1729,10 @@ int32 KBSResultModel::KeepCheckedRows()
 	}
 	gChapters.swap(remaining);
 
-	// From here the panel is a report, not a work list: no row offers a check box.
+	// From here the panel is a report, not a work list: no row offers a check box but one taken back
+	// (RowHasCheckBox).
 	gShowingOutcome = true;
-	// ...with its rows numbered again: an index taken before this names another row now (2026-09-29).
+	// ...with its rows numbered again: an index taken before this names another row now.
 	gLayoutGeneration = ++gIdCounter;
 	return kept;
 }
