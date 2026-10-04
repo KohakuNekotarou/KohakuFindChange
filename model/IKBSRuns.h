@@ -137,6 +137,9 @@ public:
 	/** = KBSSearchEngine::SetQuery (2026-10-02, appended at the end like the two above; given its mode on
 	    2026-10-03, before any build of it had shipped). */
 	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
+	/** = KBSTrackChange::HiddenTextAnchor (2026-10-04, appended at the end like the ones above - the jump asks
+	    where a row under a hidden condition comes back to). */
+	virtual TextIndex HiddenTextAnchor(const UIDRef& storyRef, TextIndex pos) = 0;
 };
 
 #endif // __IKBSRuns_h__

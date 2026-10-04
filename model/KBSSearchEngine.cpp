@@ -1094,9 +1094,18 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 		lead = cache.storyLeads.insert(std::make_pair(outHit.storyUID, StoryLeadText(storyRef))).first;
 	outHit.storyLead = lead->second;
 
+	// ***** UNDER A HIDDEN CONDITION: ASKED WHERE THE TEXT COMES BACK TO (2026-10-04, the [9b] re-read
+	// ***** D9b-1). ***** Such text stands in a thread no frame holds, and the row read "P1(2) overset" - on
+	// a list Show Changes rebuilt from the records, the only kind that can hold one (a search does not walk
+	// hidden conditional text). Its frame, page and overset test are those of the place the condition puts
+	// the text back (KBSTrackChange::HiddenTextAnchor), and the row says why it shows nothing there.
+	const TextIndex hiddenAnchor = KBSTrackChange::HiddenTextAnchor(storyRef, start);
+	outHit.inHiddenText = (hiddenAnchor != kInvalidTextIndex);
+	const TextIndex placeAt = outHit.inHiddenText ? hiddenAnchor : start;
+
 	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
 	// that follows from the frame comes out of the cache.
-	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
+	const UID matchFrameUID = FrameUIDForPosition(storyRef, placeAt);
 	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, cache.frames);
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
@@ -1110,7 +1119,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	if (!facts->hasPage)
 	{
 		outHit.isOverset = true;
-		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, start);
+		const KBSOversetLoc loc = KBSFindOversetLocator(storyRef, placeAt);
 		if (loc.found)
 		{
 			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, cache.frames);

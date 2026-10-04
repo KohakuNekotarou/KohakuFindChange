@@ -19,6 +19,7 @@
 #include "IInCopyUIColors.h"		// ColourSignAuthor - the session's UI colours (Amber's index)
 #include "IInt64Data.h"			// kKBSSignRecordsCmdBoss's time stamp
 #include "IIntData.h"				// kReplaceDeleteChangeDataCmdBoss's position
+#include "IOwnedItem.h"				// HiddenTextAnchor - where a hidden condition's text is anchored
 #include "IRangeData.h"			// kKBSSignRecordsCmdBoss's range
 #include "IRedlineChangeData.h"		// kReplaceDeleteChangeDataCmdBoss's record
 #include "IRedlineDataStrand.h"
@@ -161,6 +162,29 @@ bool KBSTrackChange::IsInHiddenText(const UIDRef& story, TextIndex at)
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	InterfacePtr<ITextStoryThread> thread(model != nil ? model->QueryStoryThread(at, nil, nil) : nil);
 	return thread != nil && ::GetClass(thread) == kHiddenTextBoss;
+}
+
+TextIndex KBSTrackChange::HiddenTextAnchor(const UIDRef& story, TextIndex at)
+{
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (model == nil)
+		return kInvalidTextIndex;
+	TextIndex anchor = kInvalidTextIndex;
+	TextIndex pos = at;
+	// A condition can stand inside text another hidden condition holds: climbed until the place shows. A
+	// thread cannot hold its own anchor, so the bound is only a guard.
+	for (int32 depth = 0; depth < 8; ++depth)
+	{
+		InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(pos, nil, nil));
+		if (thread == nil || ::GetClass(thread) != kHiddenTextBoss)
+			break;
+		InterfacePtr<IOwnedItem> owned(thread, UseDefaultIID());
+		const TextIndex next = (owned != nil) ? owned->GetTextIndex() : kInvalidTextIndex;
+		if (next == kInvalidTextIndex || next == pos)
+			break;
+		anchor = pos = next;
+	}
+	return anchor;
 }
 
 PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
@@ -321,9 +345,9 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 	for (int32 i = 0; i < count; ++i)
 	{
 		const UIDRef story = storyList->GetNthTextModelUID(i);
+		// The times, not the records, are what is counted (D9b-2, the header): one per replace.
 		std::set<uint64> timesBefore;
-		const int32 before = CountSignedRecords(story, false, (outAcceptedTimes != nil) ? &timesBefore : nil);
-		if (before == 0)
+		if (CountSignedRecords(story, false, &timesBefore) == 0)
 			continue;
 		// ***** InDesign's OWN ACCEPT ALL, TOLD WHOSE (2026-09-29, the official-terms audit A-4 and the user's
 		// ***** call: "only the ones named KohakuFindChange"). ***** kAcceptAllRedlineCmdBoss over the story, as
@@ -352,14 +376,17 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 			return -1;
 		}
 		std::set<uint64> timesAfter;
-		const int32 after = CountSignedRecords(story, false, (outAcceptedTimes != nil) ? &timesAfter : nil);
-		total += before - after;
-		outLeft += after;
+		(void)CountSignedRecords(story, false, &timesAfter);
+		outLeft += static_cast<int32>(timesAfter.size());
 		// the times this accept took away - a row carrying one was accepted (re-check R-4)
-		if (outAcceptedTimes != nil)
-			for (std::set<uint64>::const_iterator t = timesBefore.begin(); t != timesBefore.end(); ++t)
-				if (timesAfter.count(*t) == 0)
-					outAcceptedTimes->insert(*t);
+		for (std::set<uint64>::const_iterator t = timesBefore.begin(); t != timesBefore.end(); ++t)
+		{
+			if (timesAfter.count(*t) != 0)
+				continue;
+			++total;
+			if (outAcceptedTimes != nil)
+				outAcceptedTimes->insert(*t);
+		}
 	}
 	return total;
 }

@@ -3618,7 +3618,8 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	recorder.Keep(KBSUndoFollow::kStepAcceptAll);
 	// ***** OURS ONLY, AND THE HIDDEN ONES SAID (2026-09-29, the user's call). ***** The records signed
 	// "KohakuFindChange" - everybody else's changes stay (until then: every change in the document, as
-	// InDesign's own Accept All). The numbers come first: a status line cut short cuts its end.
+	// InDesign's own Accept All). The numbers come first: a status line cut short cuts its end. They count
+	// REPLACES, one per row as Show Changes counts them - records until 2026-10-04 (the [9b] re-read D9b-2).
 	outStatus = "Accepted ";
 	outStatus.AppendNumber(accepted);
 	if (left > 0)

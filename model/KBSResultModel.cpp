@@ -1445,10 +1445,15 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		if (hit.isOverset)
 			hit.locator.Append(" overset");
 	}
+	// Under a hidden condition (2026-10-04, the [9b] re-read D9b-1): nothing of it is on the page named,
+	// which is the page the text comes back to - "P1(2) hidden condition" (it read "P1(2) overset").
+	if (hit.inHiddenText)
+		hit.locator.Append(" hidden condition");
 
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
-	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
+	//   on the locator, in the row's own colour = facts about the row: hidden condition (above - only on a
+	//     list rebuilt from the records), hidden (on a switched-off layer,
 	//     so the page will look empty on arrival), locked (no check box; the replace will not touch it),
 	//     and what has happened to it since: rejected (on a list rebuilt from the records only),
 	//     deleted, accepted, no track;

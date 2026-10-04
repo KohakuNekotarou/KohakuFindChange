@@ -26,10 +26,11 @@
 //
 //  ***** WHERE THE RECORDS ARE (measured 2026-09-26). ***** A replacement leaves an insertion record
 //  over the new text and a deletion record anchored right after it (redlineiterator.h:42-50);
-//  replacements that touch merge their records. Text in table cells and footnotes is recorded too
-//  (the user checked it in the UI) - the DOM's Story.changes lists only the story's main text, which
-//  is why a probe once said otherwise. NewRedlineIterator walks the whole story's TextIndex space,
-//  cells and footnotes included.
+//  replacements that touch merge their records. Text in table cells is recorded too (the user checked
+//  it in the UI) - the DOM's Story.changes lists only the story's main text, which is why a probe once
+//  said otherwise. Text in a FOOTNOTE is not: measured the same day through IDML (IsInFootnote), and
+//  case show-footnote finds no record of a footnote's replace. NewRedlineIterator walks the whole
+//  story's TextIndex space - cells, footnotes and hidden conditional text included.
 //
 //========================================================================================
 
@@ -122,6 +123,15 @@ namespace KBSTrackChange
 	    conditionaltextui/ConditionalTextTips.cpp:232 asks it this way) - IsInFootnote's test, with that class. */
 	bool IsInHiddenText(const UIDRef& story, TextIndex at);
 
+	/** ***** WHERE HIDDEN TEXT COMES BACK TO (2026-10-04, the [9b] re-read D9b-1). ***** kInvalidTextIndex
+	    unless `at` is inside text a hidden condition holds; then the place that text goes back to when the
+	    condition is shown - the anchor of its kHiddenTextBoss, an owned item (IOwnedItem::GetTextIndex;
+	    kHiddenTextOwnedItemImpl in the 20.5 boss dump), climbed again while that place is hidden too. Such
+	    text sits in a thread no frame holds, so its page and its jump are asked at this place instead: a row
+	    of it - only a list rebuilt from the records has one, the search does not walk hidden conditional
+	    text - read "P1(2) overset" and its jump went to the frame's "+" until then (measured). */
+	TextIndex HiddenTextAnchor(const UIDRef& story, TextIndex at);
+
 	/** Does this replaced row's insertion stand under a hidden condition right now? Then its change cannot be
 	    found where the row is - FindRowChangeForHit refuses it, the deletion having stayed in the main text -
 	    and Reject Change / Accept Change on it are refused until the condition is shown (the user's call A,
@@ -151,13 +161,17 @@ namespace KBSTrackChange
 	    ***** call: "only the ones named KohakuFindChange"). ***** InDesign's own Accept All command
 	    (kAcceptAllRedlineCmdBoss) over each story holding such a record, told the author: everybody
 	    else's changes stay. A change in hidden conditional text is not accepted (the command's default,
-	    measured) - outLeft counts the signed records still there after it, for the caller to say (hidden
-	    conditional text is the one cause measured). (From 2026-09-27 to 2026-09-29 it accepted
-	    every change, whoever made it, one whole record at a time - AcceptAllInDocument.) Runs inside the
-	    caller's command sequence. Returns how many were accepted, or -1 when InDesign would not (outWhy
-	    says so - the caller rolls the sequence back). Leaves the error state clear.
-	    outAcceptedTimes (optional, 2026-09-29) = the times every record of which this took away - a row
-	    carrying one was accepted (re-check R-4). Gathered on the two walks each story is counted by anyway. */
+	    measured). (From 2026-09-27 to 2026-09-29 it accepted every change, whoever made it, one whole
+	    record at a time - AcceptAllInDocument.) Runs inside the caller's command sequence.
+	    ***** COUNTED IN REPLACES, AS SHOW CHANGES COUNTS THEM (2026-10-04, the [9b] re-read D9b-2). *****
+	    Returns how many replaces it accepted - the times every record of which it took away, one per row -
+	    or -1 when InDesign would not (outWhy says so - the caller rolls the sequence back). outLeft = the
+	    replaces with a record still standing after it, for the caller to say (hidden conditional text is
+	    the one cause measured). Until then both counted RECORDS, an insertion and a deletion apiece: a
+	    document Show Changes had just called "Found 2 change(s)" came out "Accepted 4 change(s)". Leaves
+	    the error state clear.
+	    outAcceptedTimes (optional, 2026-09-29) = those accepted times - a row carrying one was accepted
+	    (re-check R-4). Gathered on the two walks each story is counted by anyway. */
 	int32 AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy,
 		std::set<uint64>* outAcceptedTimes = nil);
 

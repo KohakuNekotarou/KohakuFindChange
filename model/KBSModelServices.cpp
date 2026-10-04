@@ -145,6 +145,7 @@ public:
 	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) { return KBSTrackChange::RowChangeIsHidden(chapterIdx, hitIdx); }
 	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) { return KBSReplaceEngine::StoryChangesHidden(chapterIdx, groupIdx); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KBSSearchEngine::SetQuery(text, mode); }
+	virtual TextIndex HiddenTextAnchor(const UIDRef& storyRef, TextIndex pos) { return KBSTrackChange::HiddenTextAnchor(storyRef, pos); }
 };
 
 CREATE_PMINTERFACE(KBSRunsSession, kKBSRunsImpl)

@@ -138,6 +138,11 @@ namespace KBSResultModel
 		// Track Changes records (2026-09-29, Show Changes by KohakuFindChange); -1 on every other list,
 		// which has no run level. Set by whoever builds the hits; the groups follow it (AppendChapter).
 		int32		run;
+		// The match stands in text a HIDDEN CONDITION holds (2026-10-04, the [9b] re-read D9b-1) -> the
+		// locator gets " hidden condition", and its page is the one the text comes back to when the
+		// condition is shown (KBSTrackChange::HiddenTextAnchor). Only a list rebuilt from the records can
+		// hold such a row: a search does not walk hidden conditional text.
+		bool		inHiddenText;
 
 		// checked starts FALSE here and stays so for a search's rows (unticked since 2026-09-27; ticked
 		// from 2026-09-26, unticked from 2026-08-02 - each the user's call).
@@ -145,7 +150,7 @@ namespace KBSResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				recordTime(0), pageOrdinal(0), run(-1) {}
+				recordTime(0), pageOrdinal(0), run(-1), inHiddenText(false) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree (2026-09-27). The struct keeps the name

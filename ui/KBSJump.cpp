@@ -826,6 +826,17 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!sameOccurrence)
 		ClampIntoStory(storyRef, start, end);	// a place the story no longer reaches - see ClampIntoStory
 
+	// ***** UNDER A HIDDEN CONDITION: THE PLACE ITS TEXT COMES BACK TO (2026-10-04, the [9b] re-read
+	// ***** D9b-1). ***** Such a row - only a list Show Changes rebuilt can hold one - stands in a thread no
+	// frame holds, so the overset test below said yes and the view went to the frame's "+" (measured). The
+	// view goes to the place the condition puts the text back (KBSTrackChange::HiddenTextAnchor) and the
+	// marker stands there with no width. Why nothing is there to see is the row's own word, " hidden
+	// condition" - as " hidden" says it for a switched-off layer, whose jump lands the same way.
+	const TextIndex hiddenAnchor = KBSRuns()->HiddenTextAnchor(storyRef, start);
+	const bool underHiddenCondition = (hiddenAnchor != kInvalidTextIndex);
+	const TextIndex placeStart = underHiddenCondition ? hiddenAnchor : start;
+	const TextIndex placeEnd = underHiddenCondition ? hiddenAnchor : end;
+
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KBSSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
 	// used; this file wrote that walk out by hand until 2026-08-08, and its copy answered "not
@@ -839,7 +850,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			(start >= 0 && start < diagTotal) ? "inside" : "OUTSIDE");
 	}
 #endif
-	const bool overset = KBSRuns()->IsPositionOverset(storyRef, start);
+	const bool overset = KBSRuns()->IsPositionOverset(storyRef, placeStart);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, the panel has said so and the view is left where it was. (With "Hide
@@ -859,7 +870,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
 	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
 	// EnsureSpreadInView, and the empty pasteboard a master-page row used to land on.
-	EnsureSpreadInView(frontView, storyRef, start);
+	EnsureSpreadInView(frontView, storyRef, placeStart);
 
 	// A visible match scrolls to its first wax line AND gets the marker on its characters. An overset
 	// match has no wax line, so it scrolls to the red "+" overset locator (KBSFindOversetLocator,
@@ -872,7 +883,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// now (KBSHitMarker), handed the story and the whole range, and drawn on every line of it.
 	if (overset)
 	{
-		const KBSOversetLoc loc = KBSRuns()->FindOversetLocator(storyRef, start);
+		const KBSOversetLoc loc = KBSRuns()->FindOversetLocator(storyRef, placeStart);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KBSHitMarkerView::Hide();
@@ -880,7 +891,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	else
 	{
 		PMRect pbRect;
-		if (GetFirstChunkPasteboardRect(storyRef, start, end, pbRect))
+		if (GetFirstChunkPasteboardRect(storyRef, placeStart, placeEnd, pbRect))
 		{
 			ScrollViewToPoint(frontView, PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
@@ -896,7 +907,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// came up about half a second after the view had moved, which is what was asked to go. A
 			// double click now shows the marker for that moment and SelectHitText's KBSHitMarkerView::Hide
 			// takes it down when the selection is made - exactly what KCM does ("THE MARK COMES DOWN").
-			KBSHitMarkerView::Show(db, storyUID, start, end);
+			KBSHitMarkerView::Show(db, storyUID, placeStart, placeEnd);
 		}
 		else
 		{
@@ -1118,6 +1129,17 @@ bool KBSJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	// overset at the place it had left.
 	if (!RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, storyUID, start, end))
 		return false;
+
+	// ***** UNDER A HIDDEN CONDITION: NOTHING ON THE PAGE TO SELECT (2026-10-04, the [9b] re-read D9b-1). *****
+	// Asked before the overset test, which says yes for it - its text stands in a thread no frame holds - and
+	// so gave the overset reason. The jump went to the place the text comes back to.
+	if (KBSRuns()->HiddenTextAnchor(storyRef, start) != kInvalidTextIndex)
+	{
+		PMString message("That match is under a hidden condition - show the condition to select it.");
+		message.SetTranslatable(kFalse);
+		KBSResultTree::ShowStatus(message);
+		return false;
+	}
 
 	// ***** OVERSET: move there, but do not select. ***** (Same rule as locked and hidden above -
 	// user's call, 2026-08-09.) There is no on-page text to highlight. The jump has the same split and
