@@ -91,7 +91,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 09 | [Undo/Redo への追従](09-undo.md)（追いかける書き込み・追いかけないもの・知り方・順番・やめるとき・メッセージ欄） | `UNDO-` | 6b | ✅ |
 | 10 | [文書・ブックを閉じたとき](10-lifecycle.md)（文書の結果・All Documents・ブックの結果・復帰・ブックの別名保存・保存・起動と終了） | `LIFE-` | 11・13 | ✅ |
 | 11 | [パネルの見た目](11-panel.md)（開き方・タブ名・3枚の絵・メッセージ欄の高さ・大きさの下限と行の丸め・How to Use・About） | `PNL-` | 4・7・13 | ✅ |
-| 12 | フライアウトと設定の保存（項目の並び・灰色の規則・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5 | ⬜ |
+| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー・ショートカット・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5・3 | ✅ |
 | 13 | 窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change | `WIN-` | 14・15 | ⬜ |
 | 14 | ブックパネルの位置を覚える（Remember Book Panel Placement） | `BPP-` | 16 | ⬜ |
 | 15 | アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel） | `BAR-` | 17 | ⬜ |
