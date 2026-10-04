@@ -47,20 +47,21 @@ namespace KBSBookScope
 	    docRef is null until the chapter is opened. A document-scope target (DocAsChapter) comes with
 	    docRef already set and contentUID left invalid - that is what tells the engines apart.
 
-	    hasFile is what IBookContent::GetIDFile ANSWERED, kept rather than discarded: the header
-	    says it "returns kTrue if a file can be obtained ... kFalse otherwise"
-	    (IBookContent.h:121-125), so "this entry names no file" is a state the book API allows and
-	    not one this plug-in may assume away. It is false for a document-scope target, which names
-	    no file either. */
+	    file is EMPTY when there is no file to name: a document-scope target, and a book entry for which
+	    IBookContent::GetIDFile answered kFalse - "returns kTrue if a file can be obtained ... kFalse
+	    otherwise" (IBookContent.h:121-125), a state the book API allows and this plug-in may not assume
+	    away. ListBookChapters empties it on that answer, because the header does not say what the
+	    function leaves in its argument then, and an empty file is what every door here reads as "no
+	    file" (ChapterHasFile). (The answer went into a flag of its own, hasFile, from 2026-08-11 to
+	    2026-10-04 - and nothing ever read it: the block 11 re-read 2026-10-04, R-2.) */
 	struct ChapterDoc
 	{
 		UIDRef		docRef;
 		PMString	shortName;
 		IDFile		file;
 		UID			contentUID;
-		bool		hasFile;
 
-		ChapterDoc() : contentUID(kInvalidUID), hasFile(false) {}
+		ChapterDoc() : contentUID(kInvalidUID) {}
 	};
 
 	/** Is the search scope the whole book (ON), or what Edit > Find/Change's Search: names (OFF -
@@ -401,9 +402,12 @@ namespace KBSBookScope
 	    "returns kTrue if a file can be obtained for the book content, kFalse otherwise"
 	    (IBookContent.h:121-125). What rests on it is not small: the callers below read a false as
 	    "this is a document-scope row", and that is the answer allowed to fall back on a docRef the
-	    search left behind. So the answer is kept where the book gives it (ChapterDoc::hasFile) rather
-	    than assumed here, and the one door that could act on an unchecked document - OpenChapterDoc's
-	    already-open lookup - does not.
+	    search left behind. So the book's answer is not assumed here: ListBookChapters gives an entry the
+	    book says names no file an EMPTY file (see ChapterDoc), this function answers false for it - and
+	    such an entry never gets a docRef to fall back on, because both doors that could give it one
+	    refuse it: OpenChapterDoc's already-open lookup (KBSDocumentLivesInFile matches nothing against an
+	    empty file) and ReopenChapterDoc (nothing to open by). It is reported as a chapter that could not
+	    be opened.
 
 	    ***** That difference is what tells ReopenChapterDoc's two failures apart. ***** It answers
 	    false both when there was nothing to open BY and when the file would not open, and a caller
@@ -422,9 +426,9 @@ namespace KBSBookScope
 	    it; otherwise open it windowless + UI-suppressed and hold it. The (re)opened document is
 	    returned in outDocRef. false = cannot reopen (missing file, locked) - or there was no file to
 	    open by at all, which ChapterHasFile is what tells apart.
-	    Used by every run that walks a book's chapters (through OpenChapterDoc), by the replace's
-	    resolve pass, and by the jump (through ReachChapterDoc) - a chapter is closed as soon as each
-	    walk is done with it, so this is how any of them reaches one again. */
+	    Used by every run that walks a book's chapters (through OpenChapterDoc), and through
+	    ReachChapterDoc by the jump, the replace's resolve pass and a row menu's Replace - a chapter is
+	    closed as soon as each walk is done with it, so this is how any of them reaches one again. */
 	bool ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef);
 
 	/** A result chapter's document, LIVE - the one question the jump (KBSJump
