@@ -50,7 +50,7 @@
 #include "WideString.h"
 
 #include <algorithm>				// CollectSignedRows - position order
-#include <map>						// CollectSignedRows - one row per time
+#include <map>						// CollectSignedRows - one row per time; OriginalFromRecords - the deletions by place
 
 // Project includes:
 #include "KBSBookScope.h"			// IsDocStillOpen - a closed chapter is not read
@@ -493,6 +493,7 @@ void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 			if (row.insLen == 0)
 				row.at = at;
 			row.insLen += len;
+			row.spanLen = at + len - row.at;	// to the end of this piece - the walk runs in position order
 			row.insertedText.Append(ReadText(story, at, len));	// the piece's own text (re-check R-2)
 		}
 	}
@@ -509,6 +510,18 @@ void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 
 namespace
 {
+// Are `part`'s characters those of `whole` with some left out, in their order (2026-10-04)? What a GREP $n's
+// kept characters are of the match they came from (FindRowChangeForHit).
+bool IsInOrderPartOf(const PMString& part, const PMString& whole)
+{
+	const WideString p(part), w(whole);
+	WideString::const_iterator pi = p.begin();
+	for (WideString::const_iterator wi = w.begin(); pi != p.end() && wi != w.end(); ++wi)
+		if (*pi == *wi)
+			++pi;
+	return pi == p.end();
+}
+
 // Take back (accept = false) or accept the ONE record standing at `at` of that kind and of exactly that
 // time - RejectRecord's walk, which AcceptRecord shares since 2026-09-29.
 bool ProcessRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete, bool accept)
@@ -600,51 +613,70 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	std::vector<Record> recs;
 	CollectRecordsOfTimes(outStory, own, recs);
 	Change c;
-	bool haveIns = false;
-	TextIndex delAt = kInvalidTextIndex;
+	// ***** THE ROW'S RECORDS, AND THE TEXT IT WROTE AROUND THEM (2026-10-04, scenario cross-check 5). ***** The
+	// first record of its time - its first insertion piece, or its first deletion when it inserted nothing - stands
+	// Hit::recordLead into the text the row wrote: 0 for a replace that writes the whole match, more for a GREP
+	// Change To holding $n, which keeps the matched characters $n names and records only around them (the head
+	// of KBSTrackChange.h). The row's change is that whole written text. Until then it was the insertion pieces
+	// alone, read as the replaced text, with one deletion right after them - which a $n's row never is ("k" of
+	// "kat"), so it could be neither taken back nor accepted, and was said to have "no tracked change left".
+	TextIndex firstIns = kInvalidTextIndex, firstDel = kInvalidTextIndex;
+	std::vector<Record> insertions;
 	for (size_t k = 0; k < recs.size(); ++k)
 	{
 		if (recs[k].isDelete)
 		{
-			if (!c.hasDelete)
-			{
-				c.hasDelete = true;
-				delAt = recs[k].at;
-			}
-			continue;
+			if (firstDel == kInvalidTextIndex)
+				firstDel = recs[k].at;
+			c.hasDelete = true;
 		}
-		if (!haveIns)
+		else if (recs[k].len > 0)
 		{
-			c.at = recs[k].at;
-			haveIns = true;
+			if (firstIns == kInvalidTextIndex)
+				firstIns = recs[k].at;
+			insertions.push_back(recs[k]);
 		}
-		c.insLen += recs[k].len;
 	}
-	if (haveIns)
+	const TextIndex first = (firstIns != kInvalidTextIndex) ? firstIns : firstDel;
+	if (first != kInvalidTextIndex)
 	{
-		// ***** THE PIECES MUST READ, WHERE THEY STAND, AS WHAT THE ROW WROTE. ***** Somebody else's text
+		// ***** NOT WHILE A HIDDEN CONDITION HOLDS IT (the user's call A, 2026-10-02 - asked here since 2026-10-04). *****
+		// A whole-match replace under a hidden condition was refused by its deletion alone, which stays in the main
+		// text while its insertion goes with the hidden text (RowChangeIsHidden). A GREP $n that only inserted
+		// (cat -> $0s) has no deletion to do that, and its text would read whole in the hidden thread - so it is
+		// asked of the first record itself.
+		if (IsInHiddenText(outStory, first))
+			return false;
+		c.at = first - KBSResultModel::GetHitRecordLead(chapterIdx, hitIdx);
+		c.insLen = WideString(replacedText).CharCount();
+		// ***** THE TEXT MUST READ, WHERE ITS RECORDS PUT IT, AS WHAT THE ROW WROTE. ***** Somebody else's text
 		// typed in between (an insertion of theirs splitting the row's) means the row's change is not its
 		// own any more (case signed-user-typed-then-reject) - and a piece accepted in the Track Changes
 		// panel leaves the rest short.
-		if (ReadText(outStory, c.at, c.insLen) != replacedText)
+		if (c.insLen > 0 && ReadText(outStory, c.at, c.insLen) != replacedText)
 			return false;
-		// ***** AND ITS DELETION STANDS RIGHT AFTER THEM (2026-09-28, case reject-next-to-user-edit). ***** A
-		// replace's deletion is anchored at the end of its insertion. Somebody else's text typed right after
-		// the row - a record of its own now that the row's records are signed - stands between the two, and
-		// taking the row back would put the original text after that typing, not where it was.
-		if (c.hasDelete && delAt != c.at + c.insLen)
+		// ***** EVERY RECORD OF ITS TIME INSIDE IT (2026-09-28, case reject-next-to-user-edit - "its deletion right
+		// ***** after the insertion" until 2026-10-04). ***** A whole-match replace anchors its deletion at the end of
+		// what it wrote. Somebody else's text typed right after the row - a record of its own now that the row's
+		// records are signed - stands between the two, and taking the row back would put the original text after
+		// that typing, not where it was.
+		bool inside = false;
+		(void)OriginalFromRecords(outStory, c.at, c.insLen, recs, inside);
+		if (!inside)
+			return false;
+		// ***** AND WHAT NO INSERTION OF ITS TIME COVERS IS PART OF ITS ORIGINAL TEXT, IN ORDER. ***** For a GREP $n
+		// that is the characters it kept ("at" of "cat" in "kat"); for a whole-match replace it is nothing. Not the
+		// whole original: a touching group written front to back leaves ONE deletion, carrying the LAST row's time,
+		// so a row of it cannot give back its own original alone - the run's door does (KBSReplaceEngine
+		// RejectRowsNow / AcceptRowsNow, through OriginalFromRecords).
+		bool unused = false;
+		if (!IsInOrderPartOf(OriginalFromRecords(outStory, c.at, c.insLen, insertions, unused), originalText))
 			return false;
 		outChange = c;
 		return true;
 	}
 	if (!replacedText.IsEmpty())
 		return false;		// it wrote text, and no record of it is left (accepted, or rejected in the panel)
-	if (c.hasDelete)
-	{
-		c.at = delAt;
-		outChange = c;
-		return true;
-	}
 	// ***** REPLACED WITH NOTHING, AND JOINED TO A NEIGHBOUR (2026-09-28). ***** A deletion written next to
 	// a touching neighbour's is joined to it and carries the neighbour's time: this row is found through a
 	// deletion of a replaced touching neighbour that stands where this row stands and holds its text
@@ -988,23 +1020,93 @@ bool KBSTrackChange::ColourSignAuthor(IDataBase* db)
 	return err == kSuccess;
 }
 
-bool KBSTrackChange::HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time)
+bool KBSTrackChange::FirstRecordOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time,
+	TextIndex& outAt)
 {
+	outAt = kInvalidTextIndex;
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return false;
 	RedlineIterator* it = redline->NewRedlineIterator(from);
 	if (it == nil)
 		return false;
-	bool found = false;
-	for (bool16 more = kTrue; more && !found && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+	// The first insertion piece wins - a row rebuilt from the records starts there too (CollectSignedRows) -
+	// and the first deletion stands in for it only when there is none (a GREP $n that only deleted).
+	TextIndex firstDelete = kInvalidTextIndex;
+	for (bool16 more = kTrue; more && outAt == kInvalidTextIndex && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
 	{
-		const VOSRedlineChange* record = it->GetCurrentChangeRecord();
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
 		if (record == nil)
 			continue;
-		found = (record->GetTimeStamp() == time);
+		if (record->GetTimeStamp() == time)
+		{
+			if (record->GetChangeType() == VOSRedlineChange::kDelete)
+			{
+				if (firstDelete == kInvalidTextIndex)
+					firstDelete = at;
+			}
+			else if (record->GetChangeType() == VOSRedlineChange::kInsert && len > 0)
+				outAt = at;
+		}
 		delete record;		// the caller owns it (redlineiterator.h:137-138)
 	}
 	delete it;
-	return found;
+	if (outAt == kInvalidTextIndex)
+		outAt = firstDelete;
+	return outAt != kInvalidTextIndex;
+}
+
+PMString KBSTrackChange::OriginalFromRecords(const UIDRef& story, TextIndex at, int32 len,
+	const std::vector<Record>& recs, bool& outAllInside)
+{
+	outAllInside = true;
+	PMString original;
+	original.SetTranslatable(kFalse);
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	const TextIndex end = at + len;
+	if (model == nil || at < 0 || len < 0 || end > model->TotalLength())
+	{
+		outAllInside = false;
+		return original;
+	}
+	// Which characters of the range an insertion covers, and which deletions stand at each place - laid out
+	// once, so a long touching run is not walked once per record.
+	std::vector<bool> inserted(static_cast<size_t>(len), false);
+	std::multimap<TextIndex, size_t> deletionsAt;
+	for (size_t k = 0; k < recs.size(); ++k)
+	{
+		const Record& r = recs[k];
+		if (r.isDelete)
+		{
+			if (r.at < at || r.at > end)
+				outAllInside = false;
+			else
+				deletionsAt.insert(std::make_pair(r.at, k));
+			continue;
+		}
+		if (r.at < at || r.at + r.len > end)
+			outAllInside = false;
+		for (TextIndex i = (r.at > at ? r.at : at); i < r.at + r.len && i < end; ++i)
+			inserted[static_cast<size_t>(i - at)] = true;
+	}
+	WideString w;
+	TextIterator it(model, at);
+	for (TextIndex i = at; ; ++i)
+	{
+		// a deletion's text stands in front of the character at its place (in the order the walk met them)
+		typedef std::multimap<TextIndex, size_t>::const_iterator DelIt;
+		const std::pair<DelIt, DelIt> here = deletionsAt.equal_range(i);
+		for (DelIt d = here.first; d != here.second; ++d)
+			w.Append(WideString(recs[d->second].text));
+		if (i >= end)
+			break;
+		if (!inserted[static_cast<size_t>(i - at)])
+			w.Append(*it);
+		++it;
+	}
+	original = PMString(w);
+	original.SetTranslatable(kFalse);
+	return original;
 }

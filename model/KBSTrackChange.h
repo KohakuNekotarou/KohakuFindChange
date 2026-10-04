@@ -26,7 +26,11 @@
 //
 //  ***** WHERE THE RECORDS ARE (measured 2026-09-26). ***** A replacement leaves an insertion record
 //  over the new text and a deletion record anchored right after it (redlineiterator.h:42-50);
-//  replacements that touch merge their records. Text in table cells is recorded too (the user checked
+//  replacements that touch merge their records. ! EXCEPT a GREP Change To holding $n (measured 2026-10-04,
+//  scenario cross-check 5): the one-at-a-time replace KEEPS the matched characters $n names and records only
+//  around them - c(at) -> k$1 on "cat": insertion "k", deletion "c" in front of the kept "at"; cat -> <$0>: two
+//  insertions, "<" and ">", and no deletion; c(at) -> $1: the deletion of "c" alone. (Change All records the
+//  whole match.) A row's change is found with that in mind - Hit::recordLead, OriginalFromRecords. Text in table cells is recorded too (the user checked
 //  it in the UI) - the DOM's Story.changes lists only the story's main text, which is why a probe once
 //  said otherwise. Text in a FOOTNOTE is not: measured the same day through IDML (IsInFootnote), and
 //  case show-footnote finds no record of a footnote's replace. NewRedlineIterator walks the whole
@@ -69,8 +73,11 @@ namespace KBSTrackChange
 	bool SignReplace(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
 	/** The command's work (KBSSignRecordsCmd::Do) - not to be called from anywhere else. */
 	bool SignRecordsNow(const UIDRef& story, TextIndex from, TextIndex to, uint64 stamp);
-	/** Is there a record carrying exactly this time standing in [from, to] (where a replace just wrote)? */
-	bool HasRecordsOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time);
+	/** Where the first record carrying exactly this time stands in [from, to] (where a replace just wrote): the
+	    first insertion piece, or the first deletion when there is no insertion. False = no such record (a
+	    footnote, or a replace that changed no character). A row's Hit::recordLead is that place minus `from`
+	    (2026-10-04, scenario cross-check 5 - HasRecordsOfTimeIn, the yes/no alone, until then). */
+	bool FirstRecordOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time, TextIndex& outAt);
 	/** ***** "KohakuFindChange" IN AMBER (2026-10-02, the user's call). ***** A tracked change is drawn in
 	    its AUTHOR's colour, from the document's list of users (IInCopyDocUserList on kDocBoss: a name -> an
 	    index into the session's UI colours, IInCopyUIColors), and the name KBS signs with stood in no
@@ -199,6 +206,18 @@ namespace KBSTrackChange
 	    (2026-09-28: KBS hands each row a time no other record can carry - the head of this file). */
 	void CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out);
 
+	/** ***** THE TEXT [at, at+len) HAD BEFORE THESE RECORDS (2026-10-04, scenario cross-check 5). ***** What taking
+	    every record of `recs` back would leave there: each deletion's text put back where it is anchored (in
+	    front of the character at its place - measured: c(at) -> k$1 on "x cat y" left the insertion "k"@2 and
+	    the deletion "c"@3, in front of the kept "a"), each insertion piece left out, and every other character
+	    kept. The door Reject Change and Accept Change ask of a run of rows: it must read as their original texts
+	    joined. It replaced "the deletions hold exactly the originals" - true of a replace that writes the whole
+	    match, not of a GREP Change To holding $n, whose kept characters no record holds (Hit::recordLead).
+	    outAllInside = every record of `recs` stands inside the range (an insertion within [at, at+len), a
+	    deletion anchored in [at, at+len]); false as well when the range cannot be read. */
+	PMString OriginalFromRecords(const UIDRef& story, TextIndex at, int32 len, const std::vector<Record>& recs,
+		bool& outAllInside);
+
 	/** ***** ONE ROW OF A LIST REBUILT FROM THE RECORDS (2026-09-29, Show Changes by KohakuFindChange). *****
 	    Every record signed "KohakuFindChange" carrying one time: the insertion's pieces (at = the first,
 	    insLen = their sum - the text the replace wrote) and the deletion of that time, if any (its text is
@@ -213,11 +232,17 @@ namespace KBSTrackChange
 		uint64		time;
 		TextIndex	at;
 		int32		insLen;
+		// From the first piece's start to the last piece's end (2026-10-04, scenario cross-check 5) - the row's
+		// place on the list. insLen when the pieces stand side by side; more when text no record of this time
+		// holds stands between them: a GREP <$0> leaves "<" and ">" around the match it kept, and its row read
+		// "[<c]at>" until then. Such a row is still refused (its pieces do not read as the text between them -
+		// FindRowChangeForHit): a list rebuilt from the records cannot tell kept text from typing.
+		int32		spanLen;
 		PMString	insertedText;
 		bool		hasDelete;
 		TextIndex	delAt;
 		PMString	deletedText;
-		SignedRow() : time(0), at(kInvalidTextIndex), insLen(0), hasDelete(false), delAt(kInvalidTextIndex) {}
+		SignedRow() : time(0), at(kInvalidTextIndex), insLen(0), spanLen(0), hasDelete(false), delAt(kInvalidTextIndex) {}
 	};
 	/** Every row the story's signed records make, one per time, in position order (Show Changes). */
 	void CollectSignedRows(const UIDRef& story, std::vector<SignedRow>& out);
@@ -233,9 +258,11 @@ namespace KBSTrackChange
 	    `at` of that kind and of exactly that time, whole. True = it was. Leaves the global error state clear. */
 	bool AcceptRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
 
-	/** One row's change: its insertion [at, at+insLen) and whether a deletion of its time stands.
-	    (The two texts and the time rode along until 2026-09-29, and no caller read them: the texts are
-	    checked inside FindRowChangeForHit, and the time is the row's own, Hit::recordTime.) */
+	/** One row's change: the text its replace wrote, [at, at+insLen), and whether a deletion of its time stands.
+	    (Its insertion pieces summed until 2026-10-04 - the same thing for a replace that writes the whole
+	    match; for a GREP Change To holding $n the written text also holds the matched characters it kept,
+	    which no record covers. The two texts and the time rode along until 2026-09-29, and no caller read
+	    them: the texts are checked inside FindRowChangeForHit, and the time is the row's own, Hit::recordTime.) */
 	struct Change
 	{
 		TextIndex	at;
@@ -278,10 +305,15 @@ namespace KBSTrackChange
 	bool ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef);
 
 	/** Like RefreshRowFromRecords, and hands the change back too. The row's own change, by its time
-	    (Hit::recordTime): the insertion pieces carrying it (at = the first, insLen = their sum, which must
-	    read as the row's replaced text) and the deletion carrying it, if any. A row replaced with nothing
-	    whose deletion InDesign joined to a touching neighbour's is found through that neighbour's
-	    deletion. False = no record of the row is left. */
+	    (Hit::recordTime): the records carrying it, the first of them Hit::recordLead into the text the row
+	    wrote - so at = that record's place minus the lead, insLen = the replaced text's length - and three
+	    questions (2026-10-04, scenario cross-check 5): that text still reads as the row's replaced text, every
+	    record of its time stands inside it, and what no insertion of its time covers (the characters a GREP $n
+	    kept) is a part of its original text, in order. (Until then: the insertion pieces alone, which had to
+	    read as the replaced text - at = the first, insLen = their sum - and one deletion right after them, so a
+	    GREP $n's row could be neither taken back nor accepted.) A row replaced with nothing whose deletion
+	    InDesign joined to a touching neighbour's is found through that neighbour's deletion. False = no
+	    record of the row is left. */
 	bool FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange);
 
 	/** The touching group of a replaced row: the replaced rows outside a footnote, in text order. A group

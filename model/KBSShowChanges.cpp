@@ -149,7 +149,8 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KBSResul
 			}
 			const KBSTrackChange::SignedRow& row = rows[k];
 			KBSResultModel::Hit hit;
-			if (!builder.Build(docRef, story, row.at, row.at + row.insLen, hit))
+			// (the pieces' span, not their sum - 2026-10-04: a GREP <$0>'s two pieces stand around the match)
+			if (!builder.Build(docRef, story, row.at, row.at + row.spanLen, hit))
 				return false;		// out of memory - nothing to show honestly
 			// A replaced row, tied to its records by its time exactly - what Reject Change and Accept
 			// Change look it up by (KBSTrackChange::FindRowChangeForHit).

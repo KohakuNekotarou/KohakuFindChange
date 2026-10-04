@@ -116,9 +116,10 @@ namespace KBSResultModel
 		// --- Track Changes (2026-09-26) ---
 		// The WHOLE text of the match before the replace and the whole text the replace wrote, taken
 		// as it was written (not capped for drawing like matchText). A replaced row's change is found by
-		// its time (recordTime); these are what that change must still read as - its insertion as
-		// replacedText (KBSTrackChange::FindRowChangeForHit), its run's deletions as the originalTexts
-		// (KBSReplaceEngine RejectRowsNow). Empty until the row is replaced.
+		// its time (recordTime); these are what that change must still read as - the text it wrote as
+		// replacedText (KBSTrackChange::FindRowChangeForHit), and its run's text with the records taken back
+		// as the originalTexts (KBSReplaceEngine RejectRowsNow / AcceptRowsNow - the run's deletions alone
+		// until 2026-10-04, which a GREP $n's kept characters do not hold). Empty until the row is replaced.
 		PMString	originalText;
 		PMString	replacedText;
 		// The first characters of the match's STORY (2026-09-27, the story level): what a story row of
@@ -131,6 +132,15 @@ namespace KBSResultModel
 		// The time stamp of the tracked changes the replace made for this row (2026-09-26): its change
 		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
 		uint64		recordTime;
+		// ***** WHERE THE ROW'S RECORDS START, INSIDE WHAT IT WROTE (2026-10-04, scenario cross-check 5). *****
+		// How far into the row's replaced text its first record of recordTime stands - the first insertion
+		// piece, or the first deletion when it inserted nothing. 0 for every replace that writes the whole
+		// match; more for a GREP Change To holding $n, which InDesign's one-at-a-time replace writes by KEEPING
+		// the matched characters it names: c(at) -> $1og on "cat" records "og" and the deletion of "at" and
+		// leaves the "c" as it was (measured; Change All records the whole match). Taken when the row is written,
+		// so its change can be found again from its records alone (KBSTrackChange::FindRowChangeForHit). A row
+		// rebuilt from the records (Show Changes) starts at that record: 0.
+		int32		recordLead;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -150,7 +160,7 @@ namespace KBSResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				recordTime(0), pageOrdinal(0), run(-1), inHiddenText(false) {}
+				recordTime(0), recordLead(0), pageOrdinal(0), run(-1), inHiddenText(false) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree (2026-09-27). The struct keeps the name
@@ -540,7 +550,18 @@ namespace KBSResultModel
 	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
 	/** The time stamp of the row's tracked changes (Hit::recordTime); 0 for none or out of range. */
 	uint64 GetHitRecordTime(int32 chapterIdx, int32 hitIdx);
-	void SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time);
+	/** How far into its replaced text the row's first record stands (Hit::recordLead); 0 out of range. */
+	int32 GetHitRecordLead(int32 chapterIdx, int32 hitIdx);
+	/** The row's records as the replace that wrote it left them: their time (0 = none) and where the first
+	    one stands inside the text it wrote (Hit::recordLead). SetHitRecordTime until 2026-10-04. */
+	void SetHitRecord(int32 chapterIdx, int32 hitIdx, uint64 time, int32 lead);
+	/** ***** A REPLACE THAT CHANGED NO CHARACTER (2026-10-04, scenario cross-check 5). ***** The row is replaced,
+	    outside a footnote, and its replace left the text as it was - a Change Format with an empty Change To
+	    (formatting only), or a Change To equal to the match: Track Changes records text only, so nothing was
+	    recorded (recordTime 0) and Reject Change has nothing to take back. Said as such, the way a footnote's
+	    row is - until then such a row was told "Reject Change takes it back", and then "no tracked change is
+	    left (undone, accepted, rejected or deleted?)". False out of range. */
+	bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx);
 	// (GetHitPinned - why a row can never be taken back, an enum with one reason, a footnote - stood here
 	//  from 2026-09-26 to 2026-09-29, beside GetHitInFootnote asking the same thing.)
 
@@ -830,7 +851,8 @@ namespace KBSResultModel
 	    The locator also says " deleted" (gone with the object another ticked row deleted), and since
 	    2026-09-29 " rejected" (a row taken back, on a list rebuilt from the records only - it has no box
 	    to say it), " accepted" (its change accepted) and " no track" (replaced inside a footnote, where
-	    Track Changes records nothing - the user's request). */
+	    Track Changes records nothing - the user's request; since 2026-10-04 also a replace that changed no
+	    character - GetHitTextUnchanged). */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The

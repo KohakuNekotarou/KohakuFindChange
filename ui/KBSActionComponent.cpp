@@ -382,11 +382,11 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// ***** NO PROMPT SINCE 2026-09-27 (the user's call). ***** The confirmation (ConfirmReplace -
 			// KBSReplaceConfirmDialog) asked before every Change Checked; everything a run does is one undo
 			// step and every chapter is left open and unsaved, and the rows' own menus had already gone
-			// without one. What the prompt said about Track Changes is said on the status line instead.
+			// without one. What the prompt said about Track Changes is said on the status line instead - by the
+			// replace's own summary since 2026-10-04 (it counts the rows Track Changes recorded nothing for, which
+			// Reject Change cannot take back; this added the sentence to every run that wrote until then).
 			PMString summary;
-			const int32 replaced = KBSRuns()->ReplaceChecked(summary);
-			if (replaced > 0)
-				summary.Append(" Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back.");
+			(void)KBSRuns()->ReplaceChecked(summary);
 			KBSResultTree::Rebuild();		// replaced rows lose their box and fade
 			KBSResultTree::ShowStatus(summary);
 			break;

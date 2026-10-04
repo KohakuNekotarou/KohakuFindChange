@@ -155,6 +155,8 @@ public:
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KBSResultModel::ChangeOutcome outcome) = 0;
 	/** = KBSResultModel::GetGroupCheckableCount (2026-10-04, D-1 - at the end, as every new method goes). */
 	virtual int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx) = 0;
+	/** = KBSResultModel::GetHitTextUnchanged (2026-10-04, scenario cross-check 5 - at the end). */
+	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKBSResults_h__
