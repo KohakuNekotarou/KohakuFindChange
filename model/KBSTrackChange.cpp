@@ -5,8 +5,8 @@
 //  KohakuBookSearch (KBS)
 //
 //  Track Changes parts for the replace - see KBSTrackChange.h. The command shape of the story's
-//  tracking switch is KCM's (KCMStoryTrackingOn), and the record walk is the one the 2026-09-26 spike
-//  measured (13fe01e).
+//  tracking switch is KCM's (KCMStoryTrackingOn), and the record walk is the one the Track Changes
+//  spike measured (13fe01e).
 //
 //========================================================================================
 
@@ -97,11 +97,11 @@ bool IsSignAuthor(const PMString& who)
 	return who == SignAuthorName();
 }
 
-// ***** A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES (2026-09-29, the official-terms audit A-6). *****
-// ITrackChangeUtils::GetDeletedText reads the deleted-text thread anchored at the deletion - the same text
-// DescribeChangeContent gave for a tab, a return and a footnote reference (measured, KTRedlineProbe deltext:
-// 2 of 2 alike), which stays as the fallback - also when the utility reads nothing there. `it` stands on
-// the deletion. (CollectRecordsOfTimes and CollectSignedRows each read it this way until 2026-10-01.)
+// A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES. ITrackChangeUtils::GetDeletedText reads the
+// deleted-text thread anchored at the deletion - the same text DescribeChangeContent gave for a tab, a
+// return and a footnote reference (measured, KTRedlineProbe deltext: 2 of 2 alike), which stays as the
+// fallback - also when the utility reads nothing there. `it` stands on the deletion. The one reader for
+// CollectRecordsOfTimes and CollectSignedRows alike.
 PMString ReadDeletedText(ITextModel* model, Utils<ITrackChangeUtils>& utils, RedlineIterator* it, TextIndex at)
 {
 	PMString text;
@@ -117,8 +117,8 @@ PMString ReadDeletedText(ITextModel* model, Utils<ITrackChangeUtils>& utils, Red
 // hidden condition's text, and its records with it, stand in a thread past the main text: measured,
 // KTRedlineProbe - a record at 9 read at 16 once its condition was hidden). The walk is not gated by
 // StoryHasChanges: it answers no for a story whose records all stand in hidden text - its header says so
-// (IRedlineDataStrand.h:107-112), and case accept-all-hidden-condition met it (2026-09-29, A-1).
-// firstOnly = stop at 1. outTimes (optional, 2026-09-29, the waste re-check P-2) = every time those records
+// (IRedlineDataStrand.h:107-112), and case accept-all-hidden-condition met it.
+// firstOnly = stop at 1. outTimes (optional) = every time those records
 // carry, gathered on the same walk - what Accept All compares before and after.
 int32 CountSignedRecords(const UIDRef& story, bool firstOnly, std::set<uint64>* outTimes = nil)
 {
@@ -193,8 +193,7 @@ PMString KBSTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
 	// The official one-call read (textiterator.h AppendToStringAndIncrement), as KCM (KCMTextWords.h
 	// WordsAt) and KESCL (KESCLFindInDoc.cpp MatchStillValid) read a range - after the same check they
-	// make that it lies inside the story. A range running past the end reads up to the end, as the
-	// character-by-character loop here did until 2026-09-28.
+	// make that it lies inside the story. A range running past the end reads up to the end.
 	if (model != nil && len > 0 && at >= 0 && at < model->TotalLength())
 	{
 		const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
@@ -232,10 +231,6 @@ KBSTrackChange::TrackingScope::~TrackingScope()
 		SetTracking(UIDRef(fDB, fSwitchedOn[i]), kFalse);
 }
 
-// (CollectRecords - every record of a story, for the bound on the two accept loops below - stood here until
-//  2026-09-29. Accept All is InDesign's own command now, and the pending changes around a match are walked
-//  in the match's own window, which bounds itself.)
-
 bool KBSTrackChange::StoryHasChanges(const UIDRef& story)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
@@ -255,24 +250,19 @@ bool KBSTrackChange::DocumentHasSignedRecords(IDataBase* db)
 	return false;
 }
 
-// (CollectSignedTimes - every signed time of the document, walked once before and once after Accept All to
-//  tell the rows it accepted - stood here for one build on 2026-09-29. AcceptSignedInDocument hands those
-//  times back now, from the walks it makes anyway: the waste re-check P-2.)
-
 int32 KBSTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return 0;
-	// ***** THE MATCH'S OWN WINDOW, NOT THE WHOLE STORY (2026-09-29, the official-terms audit A-3). ***** An
-	// iterator made at a position stands first on the object CONTAINING it - an insertion that runs into the
-	// match is met - but one made just past an insertion's end starts after that insertion, which is exactly
-	// the one touching the match from the left (measured, KTRedlineProbe iterfrom: made at 6 or 7 it stood
-	// on the insertion at 5; made at 8, right after it, it did not). So the walk starts one before the match
-	// and stops past its end - the way RejectRecord, CollectUnsigned and HasRecordsOfTimeIn below walk. It
-	// walked every record of the story from 0, for every ticked match, until then (and once more for the
-	// loop's bound). The records the window holds bound the loop: an accept that leaves its record in place
-	// must not spin.
+	// THE MATCH'S OWN WINDOW, NOT THE WHOLE STORY (not every record of the story from 0, for every ticked
+	// match). An iterator made at a position stands first on the object CONTAINING it - an insertion that
+	// runs into the match is met - but one made just past an insertion's end starts after that insertion,
+	// which is exactly the one touching the match from the left (measured, KTRedlineProbe iterfrom: made at
+	// 6 or 7 it stood on the insertion at 5; made at 8, right after it, it did not). So the walk starts one
+	// before the match and stops past its end - the way RejectRecord, CollectUnsigned and
+	// FirstRecordOfTimeIn below walk. The records the window holds bound the loop: an accept that leaves its
+	// record in place must not spin.
 	const TextIndex windowStart = (from > 0) ? from - 1 : 0;
 	int32 inWindow = 0;
 	{
@@ -345,12 +335,12 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 	for (int32 i = 0; i < count; ++i)
 	{
 		const UIDRef story = storyList->GetNthTextModelUID(i);
-		// The times, not the records, are what is counted (D9b-2, the header): one per replace.
+		// The times, not the records, are what is counted (the header): one per replace.
 		std::set<uint64> timesBefore;
 		if (CountSignedRecords(story, false, &timesBefore) == 0)
 			continue;
-		// ***** InDesign's OWN ACCEPT ALL, TOLD WHOSE (2026-09-29, the official-terms audit A-4 and the user's
-		// ***** call: "only the ones named KohakuFindChange"). ***** kAcceptAllRedlineCmdBoss over the story, as
+		// InDesign's OWN ACCEPT ALL, TOLD WHOSE (the user's call: "only the ones named KohakuFindChange").
+		// kAcceptAllRedlineCmdBoss over the story, as
 		// the product does it (InCopyDocUtils.cpp:2399-2405), with its IStringData set to the author: the
 		// command then accepts that author's changes and leaves everybody else's (measured, KTRedlineProbe
 		// acceptall - SDK use: none. InDesign's own by-author accept is ITrackChangeSuite::AcceptAllByUser,
@@ -358,7 +348,7 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 		// Its IID_IACCEPTREDLINEINHIDDENTEXTDATA is left at its default, false: a change in hidden conditional
 		// text is not accepted (measured) - counted in outLeft and said. InDesign's own Accept All seems to
 		// leave them too (kAcceptAllDocSomeHiddenChangesMsgID, InCopySharedID.h:477 - not measured: its menu
-		// action cannot be run from a script). The loop that stood here from 2026-09-27 accepted every
+		// action cannot be run from a script). Not a loop of our own over the records, which accepts every
 		// change, whoever made it.
 		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kAcceptAllRedlineCmdBoss));
 		InterfacePtr<IStringData> whose(cmd, IID_ISTRINGDATA);
@@ -378,7 +368,7 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 		std::set<uint64> timesAfter;
 		(void)CountSignedRecords(story, false, &timesAfter);
 		outLeft += static_cast<int32>(timesAfter.size());
-		// the times this accept took away - a row carrying one was accepted (re-check R-4)
+		// the times this accept took away - a row carrying one was accepted
 		for (std::set<uint64>::const_iterator t = timesBefore.begin(); t != timesBefore.end(); ++t)
 		{
 			if (timesAfter.count(*t) != 0)
@@ -392,22 +382,20 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 }
 
 // ======================================================================================================
-// THE READ SIDE (2026-09-28): a row's records are the ones carrying its time - KBS hands every row a time
-// no other record can carry (StampForRow, the head of KBSTrackChange.h). Until 2026-09-28 a row's change
-// was found by its texts and the nearest place, pairing records by time (CollectChanges, FindRowChange,
-// FindGroupChange) and taken back by position and "not an earlier run's time" (RejectAt,
-// RejectReplacement).
+// THE READ SIDE: a row's records are the ones carrying its time - KBS hands every row a time no other
+// record can carry (StampForRow, the head of KBSTrackChange.h). Not its texts and the nearest place, and
+// not a position and "not an earlier run's time": both were tried before the time was KBS's own.
 // ======================================================================================================
 void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<uint64>& times, std::vector<Record>& out)
 {
 	out.clear();
-	// ***** NO StoryHasChanges() IN FRONT (2026-10-02, the API re-audit block 9b - CollectSignedRows' rule,
-	// ***** 2026-09-29 A-1). ***** It answers no for a story whose only changes stand in hidden conditional
-	// text (IRedlineDataStrand.h:107-112), and a row's records are looked for wherever they stand: with the
-	// gate, a row whose replaced text the user hid would be told "no tracked change of this replace is
-	// left" while its records were there - and only when nothing else in its story was tracked, since one
-	// visible change anywhere in the story opened the gate and the walk below found the hidden ones too
-	// (read from the code; case reject-hidden-condition is the measurement). Walking is cheap.
+	// NO StoryHasChanges() IN FRONT (CollectSignedRows' rule). It answers no for a story whose only changes
+	// stand in hidden conditional text (IRedlineDataStrand.h:107-112), and a row's records are looked for
+	// wherever they stand: with the gate, a row whose replaced text the user hid would be told "no tracked
+	// change of this replace is left" while its records were there - and only when nothing else in its
+	// story was tracked, since one visible change anywhere in the story opens the gate and the walk below
+	// finds the hidden ones too (read from the code; case reject-hidden-condition is the measurement).
+	// Walking is cheap.
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil || times.empty())
 		return;
@@ -443,10 +431,10 @@ void KBSTrackChange::CollectRecordsOfTimes(const UIDRef& story, const std::set<u
 void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRow>& out)
 {
 	out.clear();
-	// ***** NO StoryHasChanges() IN FRONT (2026-09-29, the official-terms audit A-1). ***** It answers no for a
-	// story whose only changes stand in hidden conditional text (IRedlineDataStrand.h:107-112), so its rows
-	// would drop out of the list for a reason that has nothing to do with KBS - the ledger's warning
-	// (api-official-examples.md, "walk the tracked changes one by one"). Walking is cheap.
+	// NO StoryHasChanges() IN FRONT. It answers no for a story whose only changes stand in hidden
+	// conditional text (IRedlineDataStrand.h:107-112), so its rows would drop out of the list for a reason
+	// that has nothing to do with KBS - the ledger's warning (docs/ai-notes/api-official-examples.md, at
+	// StoryHasChanges). Walking is cheap.
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
 	if (redline == nil)
 		return;
@@ -494,7 +482,7 @@ void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 				row.at = at;
 			row.insLen += len;
 			row.spanLen = at + len - row.at;	// to the end of this piece - the walk runs in position order
-			row.insertedText.Append(ReadText(story, at, len));	// the piece's own text (re-check R-2)
+			row.insertedText.Append(ReadText(story, at, len));	// the piece's own text (see SignedRow)
 		}
 	}
 	delete it;
@@ -510,7 +498,7 @@ void KBSTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 
 namespace
 {
-// Are `part`'s characters those of `whole` with some left out, in their order (2026-10-04)? What a GREP $n's
+// Are `part`'s characters those of `whole` with some left out, in their order? What a GREP $n's
 // kept characters are of the match they came from (FindRowChangeForHit).
 bool IsInOrderPartOf(const PMString& part, const PMString& whole)
 {
@@ -523,7 +511,7 @@ bool IsInOrderPartOf(const PMString& part, const PMString& whole)
 }
 
 // Take back (accept = false) or accept the ONE record standing at `at` of that kind and of exactly that
-// time - RejectRecord's walk, which AcceptRecord shares since 2026-09-29.
+// time - RejectRecord's walk, which AcceptRecord shares.
 bool ProcessRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete, bool accept)
 {
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
@@ -566,12 +554,11 @@ bool KBSTrackChange::AcceptRecord(const UIDRef& story, TextIndex at, uint64 time
 	return ProcessRecord(story, at, time, isDelete, true);
 }
 
-// ***** BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS (2026-09-29, the defect re-check
-// ***** F-3). ***** IsDocStillOpen was asked of the docRef the results held until then: a chapter closed and
-// opened again sits at a new address ("not open" - its replaced rows could not be taken back until a click
-// on one rebound it), and a closed chapter's address taken by a document opened later answered for THAT one.
-// (Each door asked it one by one before 2026-09-29, each with a test for no database in front of
-// IsDocStillOpen, which answers false for that itself.)
+// BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS. Not IsDocStillOpen of the docRef the
+// results hold: a chapter closed and opened again sits at a new address (it would read "not open" - its
+// replaced rows could not be taken back until a click on one rebound it), and a closed chapter's address
+// taken by a document opened later would answer for THAT one. One question for every door, rather than
+// each asking it with a test for no database in front (IsDocStillOpen answers false for that itself).
 bool KBSTrackChange::ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 {
 	IDFile file;
@@ -590,7 +577,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	// A footnote's row is never taken back - see IsInFootnote.
 	if (KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx))
 		return false;
-	// ***** OPEN, OR NOT AT ALL. ***** A chapter closed since the search leaves a dangling database pointer
+	// OPEN, OR NOT AT ALL. A chapter closed since the search leaves a dangling database pointer
 	// behind - asked before anything is read through it (ChapterDocIfOpen, above).
 	UIDRef docRef;
 	if (!ChapterDocIfOpen(chapterIdx, docRef))
@@ -613,13 +600,13 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	std::vector<Record> recs;
 	CollectRecordsOfTimes(outStory, own, recs);
 	Change c;
-	// ***** THE ROW'S RECORDS, AND THE TEXT IT WROTE AROUND THEM (2026-10-04, scenario cross-check 5). ***** The
-	// first record of its time - its first insertion piece, or its first deletion when it inserted nothing - stands
-	// Hit::recordLead into the text the row wrote: 0 for a replace that writes the whole match, more for a GREP
-	// Change To holding $n, which keeps the matched characters $n names and records only around them (the head
-	// of KBSTrackChange.h). The row's change is that whole written text. Until then it was the insertion pieces
-	// alone, read as the replaced text, with one deletion right after them - which a $n's row never is ("k" of
-	// "kat"), so it could be neither taken back nor accepted, and was said to have "no tracked change left".
+	// THE ROW'S RECORDS, AND THE TEXT IT WROTE AROUND THEM. The first record of its time - its first
+	// insertion piece, or its first deletion when it inserted nothing - stands Hit::recordLead into the text
+	// the row wrote: 0 for a replace that writes the whole match, more for a GREP Change To holding $n, which
+	// keeps the matched characters $n names and records only around them (the head of KBSTrackChange.h). The
+	// row's change is that whole written text - not the insertion pieces alone, read as the replaced text,
+	// with one deletion right after them, which a $n's row never is ("k" of "kat"): it could be neither taken
+	// back nor accepted, and would be said to have "no tracked change left".
 	TextIndex firstIns = kInvalidTextIndex, firstDel = kInvalidTextIndex;
 	std::vector<Record> insertions;
 	for (size_t k = 0; k < recs.size(); ++k)
@@ -640,23 +627,23 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	const TextIndex first = (firstIns != kInvalidTextIndex) ? firstIns : firstDel;
 	if (first != kInvalidTextIndex)
 	{
-		// ***** NOT WHILE A HIDDEN CONDITION HOLDS IT (the user's call A, 2026-10-02 - asked here since 2026-10-04). *****
-		// A whole-match replace under a hidden condition was refused by its deletion alone, which stays in the main
-		// text while its insertion goes with the hidden text (RowChangeIsHidden). A GREP $n that only inserted
-		// (cat -> $0s) has no deletion to do that, and its text would read whole in the hidden thread - so it is
-		// asked of the first record itself.
+		// NOT WHILE A HIDDEN CONDITION HOLDS IT (the user's call). A whole-match replace under a hidden
+		// condition is refused by its deletion alone too, which stays in the main text while its insertion goes
+		// with the hidden text (RowChangeIsHidden). A GREP $n that only inserted (cat -> $0s) has no deletion to
+		// do that, and its text would read whole in the hidden thread - so it is asked of the first record
+		// itself.
 		if (IsInHiddenText(outStory, first))
 			return false;
 		c.at = first - KBSResultModel::GetHitRecordLead(chapterIdx, hitIdx);
 		c.insLen = WideString(replacedText).CharCount();
-		// ***** THE TEXT MUST READ, WHERE ITS RECORDS PUT IT, AS WHAT THE ROW WROTE. ***** Somebody else's text
+		// THE TEXT MUST READ, WHERE ITS RECORDS PUT IT, AS WHAT THE ROW WROTE. Somebody else's text
 		// typed in between (an insertion of theirs splitting the row's) means the row's change is not its
 		// own any more (case signed-user-typed-then-reject) - and a piece accepted in the Track Changes
 		// panel leaves the rest short.
 		if (c.insLen > 0 && ReadText(outStory, c.at, c.insLen) != replacedText)
 			return false;
-		// ***** EVERY RECORD OF ITS TIME INSIDE IT (2026-09-28, case reject-next-to-user-edit - "its deletion right
-		// ***** after the insertion" until 2026-10-04). ***** A whole-match replace anchors its deletion at the end of
+		// EVERY RECORD OF ITS TIME INSIDE IT (case reject-next-to-user-edit; not only "its deletion right after
+		// the insertion"). A whole-match replace anchors its deletion at the end of
 		// what it wrote. Somebody else's text typed right after the row - a record of its own now that the row's
 		// records are signed - stands between the two, and taking the row back would put the original text after
 		// that typing, not where it was.
@@ -664,7 +651,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 		(void)OriginalFromRecords(outStory, c.at, c.insLen, recs, inside);
 		if (!inside)
 			return false;
-		// ***** AND WHAT NO INSERTION OF ITS TIME COVERS IS PART OF ITS ORIGINAL TEXT, IN ORDER. ***** For a GREP $n
+		// AND WHAT NO INSERTION OF ITS TIME COVERS IS PART OF ITS ORIGINAL TEXT, IN ORDER. For a GREP $n
 		// that is the characters it kept ("at" of "cat" in "kat"); for a whole-match replace it is nothing. Not the
 		// whole original: a touching group written front to back leaves ONE deletion, carrying the LAST row's time,
 		// so a row of it cannot give back its own original alone - the run's door does (KBSReplaceEngine
@@ -677,7 +664,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	}
 	if (!replacedText.IsEmpty())
 		return false;		// it wrote text, and no record of it is left (accepted, or rejected in the panel)
-	// ***** REPLACED WITH NOTHING, AND JOINED TO A NEIGHBOUR (2026-09-28). ***** A deletion written next to
+	// REPLACED WITH NOTHING, AND JOINED TO A NEIGHBOUR. A deletion written next to
 	// a touching neighbour's is joined to it and carries the neighbour's time: this row is found through a
 	// deletion of a replaced touching neighbour that stands where this row stands and holds its text
 	// (case touching-empty-both).
@@ -778,10 +765,9 @@ void KBSTrackChange::CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::v
 	if (!rangeNow(hitIdx, groupStart, groupEnd))
 		return;
 
-	// ***** OUTWARD FROM THE ROW, IN THE LIST'S ORDER - NOT BY THE STORED RANGES (2026-09-29, the defect
-	// ***** re-check of the "Source Text:"). ***** A stored range is where the row stood when it was last
-	// read, and an edit moves the text under every row of the story at once while only the row clicked is
-	// read again (the jump). Measured with the first version, which grouped by the stored ranges
+	// OUTWARD FROM THE ROW, IN THE LIST'S ORDER - NOT BY THE STORED RANGES. A stored range is where the
+	// row stood when it was last read, and an edit moves the text under every row of the story at once while
+	// only the row clicked is read again (the jump). Measured with a grouping by the stored ranges
 	// (KBSResultModel::GetTouchingGroup): "catcat dog" replaced, "ZZ" typed in front, row 2 clicked - row 2
 	// stood at its new place and row 1 at its old one, they no longer met, and the box read
 	// "ZZkitten[catcat] dog" where the text had been "ZZcatcat dog" (case before-group-after-edit-mixed).
@@ -830,11 +816,9 @@ bool KBSTrackChange::RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx)
 	return true;
 }
 
-// (RecordTimeIn - a replaced row's time read back off its records, the clock's - stood here until
-//  2026-09-28. A row keeps the time it was handed out now: StampForRow, below.)
-
 // ======================================================================================================
-// THE SIGNATURE (2026-09-28) - see the head of KBSTrackChange.h.
+// THE SIGNATURE - see the head of KBSTrackChange.h. A row keeps the time it was handed out (StampForRow,
+// below); nothing reads one back off its records.
 // ======================================================================================================
 const char* const KBSTrackChange::kSignAuthor = "KohakuFindChange";
 
@@ -845,8 +829,8 @@ uint64 gRunT0 = 0;					// the current run's time
 uint64 gRunStartReal = 0;			// the clock at the run's start: a record older than a second before it is not the run's
 uint64 gLastStamp = 0;				// the last time handed out, over the session
 
-// (IsSignAuthor stands at the head of this file since 2026-09-29: Accept All Changes by KohakuFindChange counts
-//  the signed records too.)
+// (IsSignAuthor stands at the head of this file: Accept All Changes by KohakuFindChange counts the signed
+//  records too.)
 
 struct Unsigned
 {
@@ -960,7 +944,7 @@ bool KBSTrackChange::SignRecordsNow(const UIDRef& story, TextIndex from, TextInd
 			found[k].record->GetIsMovedText(), found[k].len, author);
 		redline->RemoveRedlineChange(found[k].at, *found[k].record);
 	}
-	// the deletion: InDesign's own command for a deletion's data (measured on the 2026-09-28 spike)
+	// the deletion: InDesign's own command for a deletion's data (measured on the signing spike)
 	for (size_t k = 0; k < found.size() && ok; ++k)
 	{
 		if (!found[k].isDelete)
