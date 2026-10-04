@@ -83,7 +83,17 @@
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 #include <new>						// std::nothrow - HitBuilder's cache
 
+#ifdef KFC_DIAG
+// The fcquery-load spike (see DiagLoadFindChangeQuery) - a test build only.
+#include "ISysFileData.h"
+#include "IUIFlagData.h"
+#include "FileUtils.h"
+#include <cstdio>
+#include <string>
+#endif
+
 // Project includes:
+#include "KFCDiag.h"			// KFC_DIAG_LOG / KFC_DIAG_FAULT - the fcquery-load spike
 #include "KFCSearchEngine.h"
 #include "KFCTrackChange.h"		// IsInFootnote (a footnote's row cannot be taken back)
 #include "KFCBookScope.h"
@@ -2191,6 +2201,154 @@ const char* SelectionScopeWords(IWalkerScopeFactoryUtils::WalkScopeType selectio
 		default:											return "";
 	}
 }
+
+#ifdef KFC_DIAG
+//----------------------------------------------------------------------------------------
+// SPIKE 2026-10-04 (branch spike/2026-10-04-fc-query-reader) - NOT FOR main, a test build only.
+// Can a plug-in load one of InDesign's saved Find/Change queries from C++? kFCQueryXMLReaderCmdBoss
+// (TextWalkerServiceProviderID.h:135, TEXT WALKER.RPLN) carries ISysFileData + IUIFlagData + IIntData
+// (the 20.5 boss dump, work\Boss.txt:50500-50503) and has no caller in the SDK. The IIntData is guessed
+// to be the IFindChangeOptions::SearchMode - the qid of the file's <QueryType>.
+// While the fault switch fcquery-load is on, SearchBook first runs that command on the query the switch
+// file names and then searches as usual, with whatever the command left in the Find/Change settings.
+// The switch file holds three lines: the IIntData value ("none" = leave it as created), "suppress" or
+// "full" (the IUIFlagData), and the query file's full path in UTF-8. Every step goes to kbs-diag.txt.
+//----------------------------------------------------------------------------------------
+
+std::string DiagUtf8(const WideString& text)
+{
+	return PMString(text).GetUTF8String();
+}
+
+// One mode's settings, one trace line.
+void DiagTraceMode(IFindChangeOptions* opts, int32 m, const char* when)
+{
+	const IFindChangeOptions::SearchMode mode = static_cast<IFindChangeOptions::SearchMode>(m);
+	IDataBase* const db = opts->GetUIDAttrDB();
+	const AttributeBossList* const findAttrs = (db != nil) ? opts->GetFindAttributeBossList(db, mode) : nil;
+	const AttributeBossList* const changeAttrs = (db != nil) ? opts->GetChangeAttributeBossList(db, mode, kFalse) : nil;
+	const uint32 findPara = (db != nil) ? opts->GetFindParaStyle(db, mode).Get() : 0;
+	const uint32 changePara = (db != nil) ? opts->GetChangeParaStyle(db, mode, kFalse).Get() : 0;
+	KFC_DIAG_LOG("fcquery %s mode=%d find=[%s] change=[%s] scope=%d case=%d word=%d kana=%d width=%d foot=%d hidden=%d"
+		" lockedLayers=%d lockedStories=%d master=%d backwards=%d findAttrs=%d changeAttrs=%d findPara=%u changePara=%u",
+		when, static_cast<int>(m), DiagUtf8(opts->GetFindString(mode)).c_str(), DiagUtf8(opts->GetReplaceString(mode)).c_str(),
+		static_cast<int>(opts->GetFindChangeScope(mode)),
+		opts->GetCaseSensitive(mode) ? 1 : 0, opts->GetEntireWord(mode) ? 1 : 0,
+		opts->GetKanaSensitive(mode) ? 1 : 0, opts->GetWidthSensitive(mode) ? 1 : 0,
+		opts->GetIncludeFootnotes(mode) ? 1 : 0, opts->GetIncludeHiddenLayers(mode) ? 1 : 0,
+		opts->GetIncludeLockedLayersForFind(mode) ? 1 : 0, opts->GetIncludeLockedStoriesForFind(mode) ? 1 : 0,
+		opts->GetIncludeMasterPages(mode) ? 1 : 0, opts->GetSearchBackwards(mode) ? 1 : 0,
+		(findAttrs != nil) ? static_cast<int>(findAttrs->CountBosses()) : -1,
+		(changeAttrs != nil) ? static_cast<int>(changeAttrs->CountBosses()) : -1,
+		static_cast<unsigned>(findPara), static_cast<unsigned>(changePara));
+}
+
+void DiagTraceAll(IFindChangeOptions* opts, const char* when)
+{
+	KFC_DIAG_LOG("fcquery %s searchMode=%d glyph find=%d replace=%d", when, static_cast<int>(opts->GetSearchMode()),
+		static_cast<int>(opts->GetFindGlyphID()), static_cast<int>(opts->GetReplaceGlyphID()));
+	for (int32 m = IFindChangeOptions::kTextSearch; m <= IFindChangeOptions::kGlyphSearch; ++m)
+		DiagTraceMode(opts, m, when);
+}
+
+// The switch file's three lines (a UTF-8 BOM and CR LF tolerated). false when it cannot be read or is short.
+bool DiagReadQuerySwitch(std::string& outMode, std::string& outUI, std::string& outPath)
+{
+	char* temp = nullptr;
+	size_t len = 0;
+	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+		return false;
+	const std::string path = std::string(temp) + "\\kbs-diag-fault-fcquery-load";
+	free(temp);
+	FILE* f = nullptr;
+	if (fopen_s(&f, path.c_str(), "rb") != 0 || f == nullptr)
+		return false;
+	std::string text;
+	char buffer[512];
+	size_t got = 0;
+	while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 8192)
+		text.append(buffer, got);
+	fclose(f);
+	if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF && static_cast<unsigned char>(text[1]) == 0xBB
+		&& static_cast<unsigned char>(text[2]) == 0xBF)
+		text.erase(0, 3);
+	std::vector<std::string> lines;
+	std::string line;
+	for (size_t i = 0; i < text.size(); ++i)
+	{
+		if (text[i] == '\r')
+			continue;
+		if (text[i] == '\n')
+		{
+			lines.push_back(line);
+			line.clear();
+		}
+		else
+			line += text[i];
+	}
+	if (!line.empty())
+		lines.push_back(line);
+	if (lines.size() < 3)
+		return false;
+	outMode = lines[0];
+	outUI = lines[1];
+	outPath = lines[2];
+	return true;
+}
+
+void DiagLoadFindChangeQuery()
+{
+	if (!KFC_DIAG_FAULT("fcquery-load"))
+		return;
+	std::string modeText, uiText, pathText;
+	if (!DiagReadQuerySwitch(modeText, uiText, pathText))
+	{
+		KFC_DIAG_LOG("fcquery switch file unreadable - want three lines: <mode>|none, suppress|full, <path>");
+		return;
+	}
+	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
+	if (opts == nil)
+	{
+		KFC_DIAG_LOG("fcquery no IFindChangeOptions on the session");
+		return;
+	}
+	KFC_DIAG_LOG("fcquery request mode=%s ui=%s path=%s", modeText.c_str(), uiText.c_str(), pathText.c_str());
+	DiagTraceAll(opts, "before");
+
+	PMString pathString;
+	pathString.SetUTF8String(pathText);
+	const IDFile file = FileUtils::PMStringToSysFile(pathString);
+	KFC_DIAG_LOG("fcquery file exists=%d", FileUtils::DoesFileExist(file) ? 1 : 0);
+
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFCQueryXMLReaderCmdBoss));
+	if (cmd == nil)
+	{
+		KFC_DIAG_LOG("fcquery CreateCommand(kFCQueryXMLReaderCmdBoss) returned nil");
+		return;
+	}
+	InterfacePtr<ISysFileData> fileData(cmd, UseDefaultIID());
+	InterfacePtr<IUIFlagData> uiData(cmd, UseDefaultIID());
+	InterfacePtr<IIntData> intData(cmd, UseDefaultIID());
+	KFC_DIAG_LOG("fcquery data interfaces file=%d ui=%d int=%d (int as created=%d)", fileData != nil ? 1 : 0,
+		uiData != nil ? 1 : 0, intData != nil ? 1 : 0, intData != nil ? static_cast<int>(intData->Get()) : -1);
+	if (fileData == nil || uiData == nil)
+		return;
+	fileData->Set(file);
+	uiData->Set(uiText == "full" ? kFullUI : kSuppressUI);
+	if (modeText != "none" && intData != nil)
+		intData->Set(static_cast<int32>(atoi(modeText.c_str())));
+
+	const ErrorCode globalBefore = ErrorUtils::PMGetGlobalErrorCode();
+	const ErrorCode result = CmdUtils::ProcessCommand(cmd);
+	const ErrorCode globalAfter = ErrorUtils::PMGetGlobalErrorCode();
+	KFC_DIAG_LOG("fcquery ProcessCommand -> %d (0x%x), global error before=%d after=%d (0x%x)", static_cast<int>(result),
+		static_cast<unsigned>(result), static_cast<int>(globalBefore), static_cast<int>(globalAfter),
+		static_cast<unsigned>(globalAfter));
+	if (globalAfter != kSuccess)
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	DiagTraceAll(opts, "after");
+}
+#endif // KFC_DIAG
 }	// anonymous namespace
 
 int32 KFCSearchEngine::SearchBook(PMString& outSummary)
@@ -2215,6 +2373,10 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		return 0;
 	}
 	const SearchingFlagGuard searchingGuard;
+
+#ifdef KFC_DIAG
+	DiagLoadFindChangeQuery();	// the fcquery-load spike - nothing unless its switch file exists
+#endif
 
 	// EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED.
 	// A run that is turned away has to leave the panel exactly as it found it - a Clear() up here would
