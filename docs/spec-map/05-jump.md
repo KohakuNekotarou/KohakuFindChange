@@ -56,6 +56,8 @@
   - 訂正:
 
 - **JMP-11** **あふれた一致**は、置かれた文字が無いので、あふれの「＋」の位置へスクロールするだけで**印は出さない**（その画素は「＋」のもの）。
+  Show Changes の一覧の**非表示の条件の中の行**（`hidden condition`）は、条件を表示すると文字が戻る場所へ行き、**幅の無い印**を出す
+  （2026-10-04 から＝それまではあふれと見なされて「＋」へ行っていた）。
   - 訂正:
 
 - **JMP-12** ジャンプできないときは、メッセージ欄に理由を出す ――
@@ -97,6 +99,7 @@
 
 - **JMP-18** ★選択しないもの（2026-08-09 の決定）―― ロックされた一致（`That match is locked - it cannot be selected.`）／
   非表示のレイヤーの一致（`That match is on a hidden layer - it cannot be selected.`）／幅の無い一致＝`^` `$` 先読みなど（`That match has no width (^, $ or a lookaround) - there is nothing to select.`）／
+  非表示の条件の中の行（`That match is under a hidden condition - show the condition to select it.`・2026-10-04 から）／
   あふれた一致（`An overset match has no text on the page to select.`）／一致がもうそこに無い行（ジャンプが理由を言っているので黙る）／
   その文書の窓が前に出ていない（ジャンプが失敗したか、まだ開いている最中＝黙る）。
   選択しないときは、ジャンプの印をそのまま残す（「どこか」は答えられるので）。
