@@ -714,15 +714,15 @@ namespace KBSResultModel
 	    hit can never be checked again - the text it matched is gone, so a second replace pass would
 	    have nothing to line it up with.
 
-	    THE STORY IS TAKEN FROM THE COMMAND, NOT LEFT AS THE ROW HAD IT. Nothing inside the walk tests
-	    a match against its row before writing (KBSReplaceEngine.h), so nothing there guarantees that a
-	    checked hit lands on the story it was found in: an edit that removed a whole frame between the
-	    search and the replace has made the Nth match a match in a LATER story. A row holding one story
-	    with the other story's range reads back a line at the end of the chapter, and a hash from it,
-	    from text that has nothing to do with this row (SetHitSegments, SetHitRange). The run refuses a
-	    row that has moved before it starts (ChapterMovedUnderRows) and the walk finds a row by its
-	    place (RowOfMatchAnyOrder); what the command reports writing is still the one answer that
-	    cannot be wrong.
+	    THE STORY IS TAKEN FROM THE COMMAND, NOT LEFT AS THE ROW HAD IT. The walk does not read a
+	    match's text against its row before writing (KBSReplaceEngine.h), and when it lined the Nth match
+	    up with the row numbered N, an edit that removed a whole frame between the search and the
+	    replace made the Nth match a match in a LATER story (measured). A row holding one story with the
+	    other story's range reads back a line at the end of the chapter, and a hash from it, from text
+	    that has nothing to do with this row (SetHitSegments, SetHitRange). The run now refuses a row
+	    that has moved before it starts (ChapterMovedUnderRows) and the walk finds a row by its place
+	    (RowOfMatchAnyOrder); what the command reports writing is still the one answer that cannot be
+	    wrong, so it is the one taken.
 
 	    The three displayed segments are deliberately NOT set here: several matches can share one
 	    paragraph, and a line read at the moment ITS match was written still shows the later matches

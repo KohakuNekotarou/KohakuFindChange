@@ -115,7 +115,7 @@ namespace KBSTrackChange
 	};
 
 	/** Is `at` inside a footnote? Track Changes records nothing there (measured through IDML), so a
-	    footnote's rows are always replaced and can be neither left out nor taken back.
+	    footnote's row, once replaced, cannot be taken back (it can be left unticked like any other).
 	    A footnote's thread IS its reference boss (KCMTextRead's test). */
 	bool IsInFootnote(const UIDRef& story, TextIndex at);
 
