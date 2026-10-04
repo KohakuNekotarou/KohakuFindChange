@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KBS)
 //
-//  "Remember Book Panel Placement" (2026-09-25, the user's request): InDesign's OWN Book panel is
+//  "Remember Book Panel Placement" (the user's request): InDesign's OWN Book panel is
 //  built afresh for every book, so once the last book is closed the next one opens at the default
 //  place and size again - wherever the user had put it. Measured on 21.0 before this was written
 //  (the palette moved with SetWindowPos, not dragged by hand): moved to (900,300), book closed and
@@ -19,15 +19,15 @@
 //        FLOATING  the floating dock's top-left, the panel's size, and whether it is collapsed to
 //                  icons - and, when the floating palette is SHARED with other panels, the same
 //                  kind of neighbours as a dock keeps (a panel in its tab group and its tab's
-//                  place, the nearest panels in the groups above and below). Added 2026-09-25 (the
-//                  user's report): a Book panel tabbed into the floating KBS panel came back as a
-//                  palette of its own laid on top of KBS's, because only the place was kept;
+//                  place, the nearest panels in the groups above and below) - with only the place
+//                  kept, a Book panel tabbed into the floating KBS panel came back as a palette of
+//                  its own laid on top of KBS's (the user's report);
 //        DOCKED    which panels it sits next to - a panel sharing its tab group (and its tab's place
 //                  there), the nearest panels in the tab groups above and below it, and in the
 //                  columns (tab panes) either side - and whether its column is collapsed to icons.
 //                  A dock position is kept as NEIGHBOURS rather than coordinates because that is
 //                  what a dock is made of, and a built-in panel's WidgetID does not change between
-//                  launches (the user's request, 2026-09-25: "in the dock, and its order there").
+//                  launches (the user's request: "in the dock, and its order there").
 //    * the moment a book panel appears where there was none (kPaletteVisibilityChangedMessage, zero
 //      book panels before, one or more now), it is put back: moved into its dock next to the same
 //      neighbours (PaletteRefUtils::ReparentPalette); floating, back into the palette of a neighbour
@@ -39,8 +39,8 @@
 //    * a book panel InDesign itself put in a dock: that is InDesign's own memory at work;
 //    * a floating placement whose title band would land off every screen (a monitor that has gone),
 //      and a docked one whose neighbours are all gone AND whose dock cannot be found again (a file
-//      written before 2026-09-27 does not say which dock; since then a column of its own is made in
-//      the same dock at the same place);
+//      from an older build does not say which dock; otherwise a column of its own is made in the
+//      same dock at the same place);
 //    * a floating neighbour whose palette is closed: the Book panel is not put into a palette that
 //      cannot be seen - it gets its own place and size instead.
 //
@@ -48,8 +48,8 @@
 //  to it the moment it is flipped (one key), and "Save Panel Settings" writes all of it. EVERY key of
 //  this feature is named in the .cpp and only there - KBSPanelState asks this file for them.
 //
-//  *UI code (IPanelMgr, PaletteRefUtils, IControlView): the UI half's (KohakuFindChangeUI) since the
-//   model/UI split of 2026-10-01.
+//  *UI code (IPanelMgr, PaletteRefUtils, IControlView): the UI half's (KohakuFindChangeUI - the
+//   model/UI split).
 //
 //========================================================================================
 
@@ -68,7 +68,7 @@ namespace KBSBookPanelPlacement
 	bool IsOn();
 
 	/** The flyout's "Remember Book Panel Placement": flip the flag, put the command interceptor in or
-	    take it out with it, write THAT ONE KEY to the settings file (the user's rule, 2026-09-25), and
+	    take it out with it, write THAT ONE KEY to the settings file (the user's rule), and
 	    hand back the line for the panel's status line - the new state and, like "Save Panel
 	    Settings", where the file is. */
 	void ToggleAndSave(PMString& outStatus);
