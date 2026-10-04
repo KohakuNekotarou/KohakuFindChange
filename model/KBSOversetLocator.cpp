@@ -37,8 +37,8 @@ namespace
 	// and its outport corner in pasteboard coordinates. Returns false when the thread has no placed
 	// parcel at all (every parcel reports kInvalidUID = overset).
 	//
-	// VERTICAL TEXT NEEDS NO SPECIAL CASE (measured 2026-08-06, on the Japanese build, through
-	// KESCM's copy of this code): the corner is taken in the PARCEL's own coordinates, and
+	// VERTICAL TEXT NEEDS NO SPECIAL CASE (measured on the Japanese build, through KCM's copy of
+	// this code): the corner is taken in the PARCEL's own coordinates, and
 	// GetParcelToFrameMatrix carries the writing direction, so the transformed point lands where
 	// InDesign actually draws the "+" - bottom LEFT for vertical text. Do not add a branch on
 	// writing direction here.
@@ -115,12 +115,11 @@ KBSOversetLoc KBSFindOversetLocator(const UIDRef& storyRef, TextIndex pos)
 
 	// Nothing placed in this thread: the "+" lives on an ancestor thread. Inside a table, the table (or
 	// the row holding this cell) is pushed out of a parent frame, so the cell itself is gone; inside a
-	// FOOTNOTE, its reference character is overset, so the footnote was never placed at all (2026-10-02,
-	// the block 8 re-read B8-1 - this climbed out of tables only, and an overset footnote's match had no
-	// "+" to name: no page on its row, no frame for the lock test, so the replace could write where the
-	// body text beside it was refused). Climb out - the table anchor, or the footnote's reference - until
-	// an ancestor has a placed parcel: ultimately the main frame's "+". Guarded against non-progress /
-	// deep nesting.
+	// FOOTNOTE, its reference character is overset, so the footnote was never placed at all (climbing
+	// out of tables alone leaves an overset footnote's match no "+" to name: no page on its row, no frame
+	// for the lock test, so the replace could write where the body text beside it was refused). Climb
+	// out - the table anchor, or the footnote's reference - until an ancestor has a placed parcel:
+	// ultimately the main frame's "+". Guarded against non-progress / deep nesting.
 	TextIndex cur = pos;
 	for (int32 guard = 0; guard < 32; ++guard)
 	{

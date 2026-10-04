@@ -19,7 +19,7 @@
 //
 //  When the position's own thread has nothing placed (a table or one of its rows is pushed out of
 //  its frame, so the cell itself is gone; a footnote whose reference character is overset, so it was
-//  never placed - 2026-10-02, B8-1), the walk climbs out - the table's anchor, the footnote's
+//  never placed), the walk climbs out - the table's anchor, the footnote's
 //  reference - through any nesting until an ancestor thread IS placed: ultimately the main frame's "+".
 //
 //========================================================================================
@@ -31,7 +31,7 @@
 #include "PMPoint.h"		// PBPMPoint
 #include "KBSModelTypes.h"	// KBSOversetLoc
 
-// (KBSOversetLoc - where the "+" is: KBSModelTypes.h, since 2026-10-01 - the UI's jump reads it.)
+// (KBSOversetLoc - where the "+" is - lives in KBSModelTypes.h: the UI's jump reads it.)
 
 /** Resolve the overset "+" locator for text position 'pos' in 'storyRef'. See file header. */
 KBSOversetLoc KBSFindOversetLocator(const UIDRef& storyRef, TextIndex pos);
