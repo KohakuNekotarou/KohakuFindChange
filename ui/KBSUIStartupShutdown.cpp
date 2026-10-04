@@ -4,15 +4,12 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The UI half's startup/shutdown service (2026-10-01, the model/UI split). KBSStartupShutdown was one
-//  service for both halves until then; a startup/shutdown service is declared per boss, and a model
-//  plug-in's runs on background threads' start and end as well (guide vol1-07, "Threading and
-//  startup/shutdown services"), so the panel's share - the saved settings, the windows it follows, the
-//  marker's countdown, the ear on the model half - stands here, on a boss of its own. The model's share
-//  stays in KBSStartupShutdown.cpp. Neither depends on the other having run: InDesign does not promise
-//  the order two services are called in.
-//
-//  The notes below are KBSStartupShutdown's, carried with the calls.
+//  The UI half's startup/shutdown service (the model/UI split). A startup/shutdown service is declared
+//  per boss, and a model plug-in's runs on background threads' start and end as well (guide vol1-07,
+//  "Threading and startup/shutdown services"), so the panel's share - the saved settings, the windows
+//  it follows, the marker's countdown, the ear on the model half - stands here, on a boss of its own.
+//  The model's share is in KBSStartupShutdown.cpp. Neither depends on the other having run: InDesign
+//  does not promise the order two services are called in.
 //
 //========================================================================================
 
@@ -34,7 +31,7 @@
 #include "KBSPanelState.h"		// the saved settings, read back before anything else runs
 #include "KBSBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KBSResultTree.h"		// the status line's static PMString
-#include "KBSModelObserver.h"	// the UI half's ear on the model half (2026-10-01)
+#include "KBSModelObserver.h"	// the UI half's ear on the model half
 
 /** Implements IStartupShutdownService for the UI half. */
 class KBSUIStartupShutdown : public CPMUnknown<IStartupShutdownService>
@@ -56,7 +53,7 @@ public:
 		//  still comes before the subscription below.
 		KBSLoadPanelStateIfPresent();
 		KBSAttachPanelVisibilityObserver();
-		// The UI half's ear on the model half's notifications (2026-10-01, the model/UI split).
+		// The UI half's ear on the model half's notifications (the model/UI split).
 		KBSModelObserverAttach();
 	}
 
@@ -73,8 +70,8 @@ public:
 		// application each hold a pointer to an observer whose code is in this .pln (KBSPanelAlpha.cpp,
 		// KBSAttachPanelVisibilityObserver), and the panel being destroyed during teardown raises a
 		// notification.
-		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - which is what
-		//  KBSBookWatchDetach has always done for its own subject (2026-08-08).
+		// *Symmetric with the KBSAttachPanelVisibilityObserver in Startup above - as KBSBookWatchDetach
+		//  is for its own subject.
 		KBSDetachPanelVisibilityObserver();
 		// "Remember Book Panel Placement" - the same subject, and the same reason, plus its one-shot
 		// timer and its command interceptor (both hold raw pointers into this .pln). Normally already
@@ -90,8 +87,9 @@ public:
 		// must not outlive us. *It also restores a MINIMISED dialog before undoing anything - see
 		//  KBSRestoreFindChangeStyle for why that order is not optional.
 		KBSShutdownFindChangeMinimize();
-		// The Application Bar link's two hooks, its observer and its pending search and write-back (2026-10-02/03):
-		// the hook procedures and the timers' callbacks are raw pointers into this .pln - KBSShutdownAppBarSearchEnter.
+		// The Application Bar link's two hooks, its observer and its pending search and write-back: the
+		// hook procedures and the timers' callbacks are raw pointers into this .pln -
+		// KBSShutdownAppBarSearchEnter.
 		KBSShutdownAppBarSearchEnter();
 		// The marker's countdown. (The marker's own state is the model half's, emptied by its own
 		// shutdown - KBSHitMarker::ShutdownCleanup refuses every call after it, so a countdown that fires

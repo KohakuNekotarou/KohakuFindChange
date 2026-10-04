@@ -694,7 +694,8 @@ bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, 
 // found". Every other door bounds it too: KBSSearchEngine's RowReadsAsFound, the clamp at the foot of
 // SelectHitText, and the SDK's gotolasttextedit ("reset text index if it is out of range",
 // GTTxtEdtUtils.cpp:107-109). The story's last character is the nearest place there is to where the row
-// was, so the view still goes where the hit used to be. A story that has gone (its UID deleted) reads as nil here and below (IDataBase.h:152-156).
+// was, so the view still goes where the hit used to be. A story that has gone (its UID deleted) reads
+// as nil here and below (IDataBase.h:152-156).
 void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());

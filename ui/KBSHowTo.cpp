@@ -4,7 +4,7 @@
 //
 //  Kohaku Find/Change (KBS)
 //
-//  "How to Use..." on the panel's flyout menu (2026-08-03): the plug-in's operating reference,
+//  "How to Use..." on the panel's flyout menu: the plug-in's operating reference,
 //  shown in a ScriptUI dialog run through the plug-in's own script engine - a multiline edit box,
 //  so the text can be scrolled, selected and copied, none of which CAlert's static text can do.
 //  The recipe (private engine name, pure-ASCII script built by escaping every non-ASCII code unit
@@ -192,7 +192,7 @@ void KBSHowTo::Show()
 	//
 	// It is the one route that needs a heading. The reference itself carries none - the ScriptUI
 	// window puts "Kohaku Find/Change - How to Use" in its title bar, so a first line saying the same
-	// thing was just repeating it (user's call, 2026-08-04) - but CAlert has no title of its own to
+	// thing would just repeat it (the author's call) - but CAlert has no title of its own to
 	// borrow: its bar says "Adobe InDesign", and the text would start mid-reference with nothing
 	// naming what it belongs to. Same wording as the window title, in both languages, so the two
 	// routes are recognisably the same document.
