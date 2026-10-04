@@ -6,7 +6,7 @@
 //
 //  "Minimizable Find/Change" - the implementation. See KBSFindChangeMinimize.h for why the SDK
 //  cannot do this and Win32 can, and for why the chase at the foot of this file has to exist (it
-//  serves Translucent Find/Change too since 2026-10-03).
+//  serves Translucent Find/Change too).
 //
 //========================================================================================
 
@@ -35,20 +35,20 @@ static bool16 sFindChangeMinimizable = kFalse;
 
 #ifdef WINDOWS
 
-// ***The window WE changed, and which of the three flags it already had.***
+// The window WE changed, and which of the three flags it already had.
 //  *ONE set, not a list: a modeless dialog can only be open once at a time, whatever
 //   allowMultipleCopies says (IDialogMgr.h:67).
 //
-//  *****ONLY THE BITS WE TOUCH ARE REMEMBERED - NEVER THE WHOLE STYLE WORD.*****
-//   !This file saved the whole GWL_STYLE and wrote it back on the way out until 2026-08-12, and
-//    that is WRONG in a way that is invisible until it happens: a style word also carries
-//    WS_VISIBLE and WS_MINIMIZE, which are STATE, not settings. Writing back a word captured while
-//    the dialog was open and restored took the window straight back to "not visible" - MEASURED:
+//  ONLY THE BITS WE TOUCH ARE REMEMBERED - NEVER THE WHOLE STYLE WORD.
+//   !Saving the whole GWL_STYLE and writing it back on the way out is WRONG in a way that is
+//    invisible until it happens: a style word also carries WS_VISIBLE and WS_MINIMIZE, which are
+//    STATE, not settings. Writing back a word captured while the dialog was open and restored took
+//    the window straight back to "not visible" - MEASURED:
 //    the dialog vanished, STYLE 0x94C80000 -> 0x84C80000, and nothing but the missing 0x10000000
 //    said why. Microsoft states the same rule from the other side: WS_VISIBLE is changed with
 //    ShowWindow, not with SetWindowLong.
 //   *So each flag is a bool, and each is put back on top of the CURRENT word. This is also what
-//    the translucency side has always done for WS_EX_LAYERED (KBSRestoreOurFindChangeStyle in
+//    the translucency side does for WS_EX_LAYERED (KBSRestoreOurFindChangeStyle in
 //    KBSPanelAlpha.cpp masks one bit off the value it has just read).
 //   *Remembering "did it already have this?" rather than "clear what we set" still protects a
 //    window that arrived carrying the flag: a future build might, and it must keep it.
@@ -68,7 +68,7 @@ static bool            sMinimizeShutdown = false;
 static uint32 KBSFindChangeChaseProc(void* refPtr);
 
 #ifdef KBS_DIAG
-// Fault switch "fcmin-decoy" (test builds only, 2026-10-03): %TEMP%\kbs-diag-fault-fcmin-decoy holds a
+// Fault switch "fcmin-decoy" (test builds only): %TEMP%\kbs-diag-fault-fcmin-decoy holds a
 // window handle in hex, and the record is pointed at it just before it is put back - what a handle the
 // OS has since given to somebody else's window looks like. A test makes a window of its own for it.
 static HWND KBSDiagDecoyWindow()
@@ -91,18 +91,17 @@ static HWND KBSDiagDecoyWindow()
 #endif
 
 // Is the window on record still the Find/Change dialog WE styled?
-// *****A HANDLE IS ONLY A NUMBER, AND THE RECORD OUTLIVES ITS WINDOW (2026-10-03, measured).***** The
-//   dialog's window is destroyed on every close (KBSPanelAlpha.cpp's window-list observer has the
-//   measurement), but the record is kept until the toggle goes off, the next dialog is styled or the
-//   plug-in shuts down - and by then the OS may have given that number to another window, of this
-//   process or of any other. IsWindow alone said yes to such a window; a test build pointed the record
-//   at a window of ANOTHER PROCESS (the "fcmin-decoy" switch) and switching the toggle off took that
-//   window's minimize box away and made it a tool window, off the taskbar.
+// A HANDLE IS ONLY A NUMBER, AND THE RECORD OUTLIVES ITS WINDOW (measured). The dialog's window is
+//   destroyed on every close (KBSPanelAlpha.cpp's window-list observer has the measurement), but the
+//   record is kept until the toggle goes off, the next dialog is styled or the plug-in shuts down - and
+//   by then the OS may have given that number to another window, of this process or of any other.
+//   IsWindow alone says yes to such a window: with the record pointed at a window of ANOTHER PROCESS (a
+//   test build's "fcmin-decoy" switch), switching the toggle off took that window's minimize box away
+//   and made it a tool window, off the taskbar.
 //   So, Win32 only (shutdown is a caller):
 //     . it is still a window of the dialog's kind - THIS process, top level, "DroverLord - Window Class"
-//       (KBSIsFindChangeShapedWindow in KBSPanelAlpha.cpp: asked there for the translucency side's
-//       restore and for the cached handle too, since the block 13/14 recheck S-1 - each had its own
-//       version, one without the process)
+//       (KBSIsFindChangeShapedWindow in KBSPanelAlpha.cpp, which the translucency side's restore and
+//       the cached handle ask as well)
 //     . OUR marks are still on it - what we changed still reads the way we left it
 static bool KBSStillOurFindChangeWindow(HWND h)
 {
@@ -145,15 +144,15 @@ static void KBSRestoreFindChangeStyle()
 		return;
 	}
 
-	// *****RESTORE IT FIRST IF IT IS MINIMISED.***** Putting WS_EX_TOOLWINDOW back while the window
+	// RESTORE IT FIRST IF IT IS MINIMISED. Putting WS_EX_TOOLWINDOW back while the window
 	//   is iconic takes it off the taskbar - and the taskbar is the only way back to it. The user
 	//   would be left with a Find/Change dialog that exists, is not on screen, and cannot be reached
 	//   by any means this plug-in offers.
 	if (::IsIconic(h))
 		::ShowWindow(h, SW_RESTORE);
 
-	// *****EACH FLAG ON ITS OWN, LAID ON TOP OF THE CURRENT WORD.***** Never a saved word written
-	//   back wholesale - see the note over sMinWnd for what that cost when this file did it.
+	// EACH FLAG ON ITS OWN, LAID ON TOP OF THE CURRENT WORD. Never a saved word written back
+	//   wholesale - see the note over sMinWnd for what that costs.
 	LONG_PTR st = ::GetWindowLongPtr(h, GWL_STYLE);
 	if (!sHadMinBox)
 		st &= ~WS_MINIMIZEBOX;
@@ -181,10 +180,10 @@ void KBSSetFindChangeMinimizable(bool16 on)
 {
 	sFindChangeMinimizable = on;
 #ifdef WINDOWS
-	// *****AND DROP WHAT IS CACHED ABOUT WHERE THE DIALOG IS.***** A toggle press is exactly the
-	//   moment when a "not open", established at some earlier moment, must not be allowed to answer.
-	//   The translucency setter has always done this; this one did not until 2026-08-12, and the
-	//   result was a toggle that did nothing whenever the lookup had already been asked and failed.
+	// AND DROP WHAT IS CACHED ABOUT WHERE THE DIALOG IS. A toggle press is exactly the moment when a
+	//   "not open", established at some earlier moment, must not be allowed to answer - as the
+	//   translucency setter does too. Without it the toggle does nothing whenever the lookup has
+	//   already been asked and failed.
 	KBSForgetFindChangeWindow();
 #endif
 }
@@ -209,8 +208,8 @@ bool16 KBSApplyFindChangeMinimizable()
 	if (h == sMinWnd)
 		return kTrue;		// already done, to this very window
 
-	// *****NOT WHILE IT IS MINIMISED.***** Rebuilding the frame of an iconic window with
-	//   SWP_FRAMECHANGED was followed once by the window being destroyed outright (2026-08-12), and
+	// NOT WHILE IT IS MINIMISED. Rebuilding the frame of an iconic window with
+	//   SWP_FRAMECHANGED was followed once by the window being destroyed outright, and
 	//   there is nothing to gain by doing it: a minimised window shows no title bar, so a button
 	//   added now could not be seen anyway. Reported as done, NOT as "no window" - "no window" would
 	//   set the chase running against a state that will not change on its own.
@@ -250,7 +249,7 @@ static bool KBSAnyFindChangeToggleOn()
 // Put each toggle that is ON on the dialog's window, if the lookup can tell the window. True when it
 // could (the toggles are then applied - each one's own Apply decides what that means, "already done" and
 // "minimised, not now" included); false when the dialog cannot be told, which is what the chase waits on.
-// ***** ONE LOOKUP FOR BOTH (2026-10-03, the block 13/14 recheck T-1). ***** The two features are set
+// ONE LOOKUP FOR BOTH. The two features are set
 //   going by the same cue and wait on the same window, so the question "is the dialog there yet" is
 //   asked once here, not by each feature's own Apply.
 static bool KBSApplyFindChangeToggles()
@@ -264,9 +263,9 @@ static bool KBSApplyFindChangeToggles()
 	return true;
 }
 
-// The chase. **There is deliberately no "already booked, do not stack" gate - the panel side
-//   removed one in its 2026-07-29 self-review because a broken chain left the flag raised and the
-//   feature dead for the rest of the session. ICallbackTimer holds one booking per instance, so
+// The chase. **There is deliberately no "already booked, do not stack" gate - a broken chain would
+//   leave such a flag raised and the feature dead for the rest of the session (the panel side's note
+//   on KBSScheduleReapply). ICallbackTimer holds one booking per instance, so
 //   StartTimer over a live booking merely replaces it, and re-arming unconditionally debounces as a
 //   side effect (the count goes back to the full number every time).
 static uint32 KBSFindChangeChaseProc(void* /*refPtr*/)
@@ -281,7 +280,7 @@ static uint32 KBSFindChangeChaseProc(void* /*refPtr*/)
 		return IIdleTask::kEndOfTime;
 	}
 
-	// *****WITHOUT THIS THE CHASE IS A NO-OP.***** The lookup answers a cached "not open" without
+	// WITHOUT THIS THE CHASE IS A NO-OP. The lookup answers a cached "not open" without
 	//   looking again, and "not open" is precisely what it recorded on the try that sent us here.
 	//   See KBSForgetFindChangeWindow in KBSPanelAlpha.h.
 	KBSForgetFindChangeWindow();
@@ -299,13 +298,12 @@ static uint32 KBSFindChangeChaseProc(void* /*refPtr*/)
 	}
 
 	// Ask again after another interval - by the RETURN VALUE, as KBSPanelAlpha's re-apply chain does.
-	// ***** NOT A PROMISE, BUT MEASURED (2026-10-03, the block 15 recheck F-3). ***** IIdleTask.h:195 reads
-	// the return as the delay before running again, while ICallbackTimer.h:42 calls what it registers "a
-	// one time only callback", and its one SDK caller re-arms from OUTSIDE the callback (KBSBookWatch.cpp
-	// has the whole account). A test build's trace of this chase showed ONE booking and then all 8 runs
-	// - the first about 0.48s after the booking, the rest about 50ms apart - so on InDesign 21.0 the
-	// return value does re-arm. (Until then the only measurement was the OLD way failing: StartTimer from
-	// inside, then kEndOfTime, 8 runs became 2.) It stays an observation of this version, not a
+	// NOT A PROMISE, BUT MEASURED. IIdleTask.h:195 reads the return as the delay before running again,
+	// while ICallbackTimer.h:42 calls what it registers "a one time only callback", and its one SDK caller
+	// re-arms from OUTSIDE the callback (KBSBookWatch.cpp has the whole account). A test build's trace of
+	// this chase showed ONE booking and then all 8 runs - the first about 0.48s after the booking, the
+	// rest about 50ms apart - so on InDesign 21.0 the return value does re-arm. (The other way - StartTimer
+	// from inside, then kEndOfTime - made 8 runs into 2.) It stays an observation of this version, not a
 	// contract; WHAT CATCHES IT if a later one stops re-arming:
 	// the chase is then the one run the booking makes, and a dialog still not tellable by then gets
 	// neither its button nor its alpha this time - the next cue does it: opening the dialog again (the
