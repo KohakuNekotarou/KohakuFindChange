@@ -76,23 +76,23 @@ static std::wstring    sPendingText;		// the field's text at the Return, until t
 //   plug-in is going down (sMinimizeShutdown's rule, KBSFindChangeMinimize.cpp).
 static bool            sShutdown = false;
 
-// ***** INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN (2026-10-03, O-1 - the user's call: "fix O-1 too"). *****
+// INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN - THE WRITE-BACK (the user's call).
 // InDesign puts its own "Adobe Stock" into the field when it builds the field - measured: about 24 s into a launch
 // the field is made anew, already holding it - and when a menu is used (the user's observation). Find/Change does
-// not change then, so the field went on saying "Adobe Stock" until its next change, and a Return there searched
-// for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the field being created (WM_CREATE) or written
-// (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook never sees - and books the query to be
-// written back one idle later. Typing is not a WM_SETTEXT (WM_CHAR, the IME and a paste edit the text from inside
-// the Edit - how a Win32 Edit works; NOT YET MEASURED with a person typing into the field, which is hidden on the
-// machine these were measured on), so what the person types is not written over. Two guards:
+// not change then, so without this the field goes on saying "Adobe Stock" until its next change, and a Return there
+// searches for "Adobe Stock". A second thread hook, WH_CALLWNDPROCRET, sees the field being created (WM_CREATE) or
+// written (WM_SETTEXT) - both are SENT messages, which the WH_GETMESSAGE hook never sees - and books the query to
+// be written back one idle later. Typing is not a WM_SETTEXT (WM_CHAR, the IME and a paste edit the text from
+// inside the Edit - how a Win32 Edit works; NOT YET MEASURED with a person typing into the field, which is hidden
+// on the machine these were measured on), so what the person types is not written over. Two guards:
 //   . the field has the keyboard focus -> nothing is written: that is the person's editing (InDesign may clear its
 //     own text as the field takes the focus);
 //   . InDesign writes again within kKBSAppBarRewriteGuardMs of a WRITE-BACK of ours -> it is answering us, so the
 //     field is left to it until Find/Change next changes: a back-and-forth must not run for ever (none was measured).
-//     *Only a write-back counts (2026-10-03, found by KIDMCP's win32_controls the same day): the first version timed
-//      it from ANY write of ours, so a write by InDesign within half a second of an ordinary change of the query -
-//      a menu used right after typing in Find what - was taken for an answer, and the field was left saying
-//      "Adobe Stock" (a Return there then searched for it). A back-and-forth can only start from a write-back.
+//     *Only a write-back counts (found with KIDMCP's win32_controls): timed from ANY write of ours, a write by
+//      InDesign within half a second of an ordinary change of the query - a menu used right after typing in Find
+//      what - is taken for an answer, and the field is left saying "Adobe Stock" (a Return there then searches for
+//      it). A back-and-forth can only start from a write-back.
 static HHOOK           sCallWndRetHook = nullptr;
 static ICallbackTimer* sRemirrorTimer  = nil;
 static bool            sOwnWrite       = false;		// our own WM_SETTEXT is going through the field right now
@@ -131,17 +131,16 @@ static std::wstring FieldText(HWND field)
 	return text;
 }
 
-// ***** THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (2026-10-03, the user's design). *****
+// THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (the user's design).
 // While the toggle is ON, the field carries the query of the tab the dialog is on - the find string of Text and
 // GREP, the glyph of Glyph, the character type of Transliterate - and follows it as it changes (Object and
-// Colour, which this panel does not search, leave the field alone). Measured in a spike the same day (branch
+// Colour, which this panel does not search, leave the field alone). Measured in a spike (branch
 // spike/2026-10-03-appbar-mirror): a settings change arrives on IID_IFINDCHANGEOPTIONS for every keystroke in
 // Find what, not only at Done; the field's usual "Adobe Stock" is real text in the Edit (so a cue banner shows
 // only while the field is focused and empty), and WM_SETTEXT shows at once; InDesign puts its own text back when
-// a menu is used - accepted by the user at first, and since O-1 (the same day) written over again at once (see
-// the second hook, above).
-// (The day's first design took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - and
-//  was dropped once the field showed the dialog's own query. What it measured stays in the note:
+// a menu is used - written over again at once (the write-back - see the second hook, above).
+// (A design that took the tab from the field's triangle - Adobe Stock = Text, Adobe Help = GREP - was dropped
+//  once the field showed the dialog's own query. What it measured stays in the note:
 //  kSessionBoss's IID_IBOOLDATA, kStockSearchPrefImpl, is true for Adobe HELP.)
 
 // What the field is given: the UTF-16 of a PMString, which is UTF-16 already. One converter: the Text and GREP
@@ -158,7 +157,7 @@ static std::wstring WideOf(const PMString& s)
 // dialog keeps on that tab's list, kTextAttrFontUIDBoss (the family) and kTextAttrFontStyleBoss (the style),
 // read the way SnpInsertGlyph.cpp reads them off text (and the way KBSSearchEngine's query signature counts
 // them: "the FONT is two attributes in the list"). Built as a PMString, so a character past U+FFFF becomes its
-// surrogate pair in PMString::AppendW rather than by hand (2026-10-03, the [17] re-check).
+// surrogate pair in PMString::AppendW rather than by hand.
 static PMString GlyphDescription(const IFindChangeOptions* opts)
 {
 	PMString out;
@@ -208,7 +207,7 @@ static PMString GlyphDescription(const IFindChangeOptions* opts)
 }
 
 // The Transliterate tab's query - the character type it finds - in InDesign's UI language, in the very words its
-// Transliterate tab shows (the user's call, 2026-10-03: the English names this first had were not the UI's).
+// Transliterate tab shows (the user's call: English names of our own are not the UI's).
 // The keys are InDesign's own string keys, read off its string tables on disk (idrc_PMST - the Find and Change
 // Panel's for all but Kanji, which the dialog does not offer; that one is CompFontMgr's, a Required plug-in):
 // e.g. "Half-width Katakana" = jaJP "hankaku katakana", "kWesternArabicDigits" = "Arabic Digits (0, 1, ...)".
@@ -245,7 +244,7 @@ static BOOL CALLBACK FindAppBarField(HWND w, LPARAM lp)
 	return TRUE;
 }
 
-// The field, remembered (2026-10-03, the [17] re-check): it is asked for on every keystroke typed into Find what,
+// The field, remembered: it is asked for on every keystroke typed into Find what,
 // and finding it walks every child window of the application frame. Re-checked before each use with the test
 // the hook uses - a Win32 Edit inside the application bar - so a handle the system has since given to another
 // window is never written to; it is looked for again.
@@ -256,8 +255,8 @@ static HWND sField = nullptr;
 // that have a platform window and are not dialogs (measured: the frame alone - palettes and document windows
 // answer nil to GetSysWindow; docs/ai-notes/indesign-win32-window-tree.md). Each such window is searched, so
 // which of them carries the field is not assumed either. *GetNthWindow does not addref; nothing is released.
-// (Until 2026-10-03 the frame was found with EnumWindows and the class name "indesign" - every top-level window
-// on the desktop walked, on every keystroke.)
+// (Not EnumWindows and the class name "indesign": that walks every top-level window on the desktop, on every
+// keystroke.)
 static HWND AppBarField()
 {
 	if (sField != nullptr && IsAppBarSearchField(sField))
@@ -317,8 +316,8 @@ static bool MirrorFindChangeIntoField()
 	return true;
 }
 
-// The query written back over InDesign's own text (O-1, see the statics) - one idle after InDesign wrote, so it has
-// finished whatever it was doing with the field. Never while the person is in the field.
+// The query written back over InDesign's own text (the write-back, see the statics) - one idle after InDesign
+// wrote, so it has finished whatever it was doing with the field. Never while the person is in the field.
 static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
 {
 	if (sShutdown || !sAppBarSearchEnter || sRemirrorHeld)
@@ -331,8 +330,9 @@ static uint32 RemirrorAfterInDesign(void* /*refPtr*/)
 	return IIdleTask::kEndOfTime;
 }
 
-// The second hook (O-1): after a SENT message has been handled on the main thread. Only two messages to one window
-// are looked at - the application bar's search field being created or written - and only to book the write-back.
+// The second hook (the write-back): after a SENT message has been handled on the main thread. Only two messages to
+// one window are looked at - the application bar's search field being created or written - and only to book the
+// write-back.
 // *A field made anew is remembered at once (sField): during the rebuild measured at startup the old field can
 // still exist, and writing to it would leave the new one saying "Adobe Stock".
 static LRESULT CALLBACK AppBarCallWndRetProc(int code, WPARAM wParam, LPARAM lParam)
@@ -368,8 +368,8 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	if (sShutdown || !sAppBarSearchEnter || text.empty())
 		return IIdleTask::kEndOfTime;
 
-	// Return searches on the Text and GREP tabs only - the user's call (2026-10-03, at the first live check; the
-	// WIP searched the dialog's own query on every other tab). On the others the Return is still stopped (no
+	// Return searches on the Text and GREP tabs only - the user's call at the first live check (not the dialog's
+	// own query searched on every other tab). On the others the Return is still stopped (no
 	// browser) and nothing runs; the status line says why - only while the panel is up: ShowStatus also keeps
 	// the line for the panel's next show, where it would stand in place of the last search's report. The panel
 	// is not opened for it.
@@ -480,7 +480,7 @@ public:
 #ifdef WINDOWS
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
-			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again (O-1)
+			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again
 			MirrorFindChangeIntoField();
 		}
 #else
@@ -528,7 +528,7 @@ void KBSSetAppBarSearchEnter(bool16 on)
 			sGetMsgHook = ::SetWindowsHookExW(WH_GETMESSAGE, AppBarGetMsgProc, nullptr, ::GetCurrentThreadId());
 		if (sCallWndRetHook == nullptr)
 			sCallWndRetHook = ::SetWindowsHookExW(WH_CALLWNDPROCRET, AppBarCallWndRetProc, nullptr, ::GetCurrentThreadId());
-		// A fresh start for the guard (the [17] re-check, 2nd pass): a write-back made before an OFF must not make an
+		// A fresh start for the guard: a write-back made before an OFF must not make an
 		// InDesign write just after this ON look like an answer.
 		sRemirrorHeld = false;
 		sWriteBackTick = 0;
