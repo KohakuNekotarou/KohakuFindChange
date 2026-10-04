@@ -33,6 +33,9 @@
 //                handle the OS has since given to another window (work\kbs-fcmin\decoy.ps1 makes one)
 //    jump-no-front (UI half) ui/KBSJump.cpp's EnsureDocFrontmost reports that the hit's window
 //                could not be brought forward (work\kbs-jump\j2-select-unfronted.ps1)
+//    replace-refuse KBSReplaceEngine.cpp's WalkStoryReplacing takes InDesign's replace command as having
+//                refused every row - a chapter where nothing lands after the pending changes next to its ticked
+//                rows were accepted (work\kbs-regress\cases\fault-replace-refuse-on.jsx / -off.jsx)
 //
 //========================================================================================
 

@@ -14,9 +14,17 @@
 //  story it wrote to before it and after it (ITextModel::GetChangeCount, KBSSearchEngine::ReadStoryVersion).
 //
 //  An Undo puts a story back at EXACTLY the version it had (measured - memory text-change-counters), a
-//  Redo at exactly the one after; typing makes a new one. So when every story a write moved is back at its
-//  "before", that write was undone, and its "before" rows go back on the panel; at its "after" again, it
-//  was redone, and the "after" rows do. The row a Reject Change took back and an Undo put back reads
+//  Redo at exactly the one after. So when every story a write moved is back at its "before", that write was
+//  undone, and its "before" rows go back on the panel; at its "after" again, it was redone, and the "after"
+//  rows do.
+//  ! AN EDIT AFTER AN UNDO GOES ON FROM THE NUMBER THE UNDO PUT BACK, ONE PER CHANGE - so as many keystrokes
+//    as the undone write had moved the story by come back to its "after" (measured: a row's Replace moved a
+//    story 6 -> 10; Ctrl+Z, four characters typed -> 10). The version alone cannot tell that from a Redo - a
+//    mark heard from another document then took it for one, measured (the regression case
+//    u1-false-redo-undo-other-type4) - so a Redo is asked the story's TEXT as well: each story's text right after
+//    the write is kept as one number, and only a story that reads that way again was redone (AllAt in the .cpp).
+//    An Undo needs no such question: a version comes back DOWN to "before" only by an Undo.
+//  The row a Reject Change took back and an Undo put back reads
 //  "replaced" again - and its Reject Change is offered again (the rows' own recorded versions come back
 //  with them, so the replace's story-version door - KBSReplaceEngine.cpp, "A STORY'S VERSION" - finds the
 //  story as KBS left it).
@@ -119,6 +127,18 @@ namespace KBSUndoFollow
 	    open), and an Undo in the documents still open would go unfollowed.
 	    Called by KBSCloseDocResponder, before the document goes (its UIDRef is still good). */
 	void ForgetDocument(const UIDRef& docRef);
+
+	/** A CHAPTER OF A BOOK'S LIST IS CLOSING. A book's rows stay when a chapter closes (KBSCloseDocResponder),
+	    so its chapter is not emptied as ForgetDocument's is: the writes of rows in it go (its history goes with
+	    it), its stories come off every Change Checked - which is then still followed in the chapters left open
+	    (an Undo there goes through: the same as All Documents, case sc-alldocs-close-undo) - and a kept whole
+	    result set holding it marks it FROZEN where that write, or one after it, wrote the chapter: when that set
+	    is put back, the chapter keeps the rows the panel has for it at that moment, since nothing an Undo in
+	    another chapter does reaches its file. A chapter nothing wrote is put back with the set, as its file reads
+	    the same (case cb-book-close-unwritten-undo). Without this the whole Change Checked was dropped at the next
+	    follow and an Undo in the open chapters went unfollowed (measured - case cb-book-close-chapter-undo).
+	    Called by KBSCloseDocResponder for every close while a book's list is up - a run's own hand-backs too. */
+	void ForgetBookChapter(const UIDRef& docRef);
 
 	/** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS. The observer attached to it is taken off while the
 	    document is still whole - what is attached is detached. Called by KBSCloseDocResponder for every close, ahead of its other exits. */

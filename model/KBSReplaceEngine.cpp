@@ -158,9 +158,9 @@ struct PendingChapter
 	// Chapters that were already dirty stay dirty; that was not ours to change.
 	bool	wasModified;
 
-	// Did a replacement actually land here? A chapter that got one is the user's to look at and save
-	// (it is given a window and left open); a chapter that got none has nothing in it and is handed
-	// straight back, because it is holding its .indd locked for no reason at all.
+	// Did a replacement actually land here - or a pending change this run accepted first? A chapter that got
+	// one is the user's to look at and save (it is given a window and left open); a chapter that got none has
+	// nothing in it and is handed straight back, because it is holding its .indd locked for no reason at all.
 	bool	tookReplacement;
 
 	// (A changeSinceSearch stood here from 2026-08-08 to 2026-08-10, carrying KBSEditStamp's
@@ -708,7 +708,14 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				const PMString original = KBSTrackChange::ReadText(story, start, end - start);
 				UIDRef written;
 				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
-				if (RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
+				// (Fault switch replace-refuse, a test build's only - KBSDiag.h: InDesign's replace refuses every row,
+				// the one way a test reaches a chapter where nothing lands after its pending changes were accepted.)
+				bool refuseForTest = false;
+#ifdef KBS_DIAG
+				refuseForTest = KBS_DIAG_FAULT("replace-refuse");
+#endif
+				if (!refuseForTest
+					&& RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
 				{
 					++ioReplaced;
 					// ***** SIGNED BEFORE THE NEXT ONE IS WRITTEN (2026-09-28). ***** "KohakuFindChange" at the
@@ -1384,7 +1391,9 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 	// every checked row came back missing, locked or refused leaves every file exactly as it found
 	// it, and "check them and save yourself" there reads as though something HAD been changed - at
 	// the very moment the user is already wondering what became of their hits.
-	if (t.replaced > 0)
+	// ...and a pending change accepted first IS written, replace or no replace: its chapter is kept open and unsaved
+	// with it (ReplaceChecked, tookReplacement - the regression case ca-refused-after-accept).
+	if (t.replaced > 0 || t.acceptedFirst > 0)
 		outSummary.Append(" Not saved - check them and save yourself.");
 
 	// Four sentences stood here until 2026-08-05, all belonging to "save after replace": how many
@@ -2444,7 +2453,13 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// Did anything land here? What decides whether this chapter is kept open for the user -
 		// and given a window, in the loop past the sequence - or handed straight back at the end
 		// of the run (HandBackChaptersWithNothingInThem).
-		pending[pi].tookReplacement = (replaced > 0);
+		// A PENDING CHANGE ACCEPTED FIRST COUNTS: it is a change this run made and keeps, whether or not a
+		// replace came after it (every row of the chapter refused, or its walk broke off before the first).
+		// Handed back as "nothing in it", such a chapter had its unsaved mark put back over the accept - a
+		// document of the user's then said nothing had changed, a held chapter was closed with the accept
+		// thrown away - while the status line said it was accepted (measured with the test build's fault switch
+		// replace-refuse - the regression case ca-refused-after-accept).
+		pending[pi].tookReplacement = (replaced > 0 || acceptedFirst > 0);
 		if (walkFailed)
 		{
 			// The walk STARTED here and broke off. Its unreached rows are already in `missing` above
@@ -2501,7 +2516,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		totals.cancelled = true;
 	}
 
-	// ***** THE MARK (2026-10-02, S-1): in every chapter a replacement landed in, inside this sequence, so the
+	// ***** THE MARK (2026-10-02, S-1): in every chapter this run changed (tookReplacement), inside this sequence, so the
 	// ***** run's Undo and Redo are heard on its documents (KBSUndoFollow::MarkWrite). ***** After the error
 	// state was read above, and a mark that fails puts it back as it found it: the run is never decided by it.
 	if (!totals.cancelled)
@@ -2581,7 +2596,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	KBSResultModel::ForgetRowBackup();
 
 	// ***** THE STORIES WRITTEN TO TAKE THEIR NEW VERSION (2026-09-29, the defect re-check F-2). ***** In each
-	// chapter a replacement landed in, the row stories that were as KBS had left them when the run began -
+	// chapter this run changed (tookReplacement), the row stories that were as KBS had left them when the run began -
 	// so the next Replace, Reject or Change Checked finds them at the version it knows. A chapter nothing
 	// landed in keeps what it had: it is handed back below, closed with its file as it was. BEFORE
 	// KeepCheckedRows, which renumbers the chapters these indices name.
@@ -2605,7 +2620,7 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// nothing left to undo it with. Opening the windows once everything is committed keeps that
 	// command clear of the replacements.
 	//
-	// Every chapter a replacement landed in gets one - PendingChapter::tookReplacement is the
+	// Every chapter this run changed gets one - PendingChapter::tookReplacement is the
 	// record of which those are (a second list of the same chapters stood beside it until
 	// 2026-08-07): the change has to be visible, because it is the user who has to save it.
 	//
