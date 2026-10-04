@@ -30,20 +30,18 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         k_enUS,									// Locale Id
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
-                // The model half's strings (2026-10-01, the model/UI split): what the model writes itself.
-                // Every other string is the UI half's (ui/KFCUI_enUS.fr).
-                // (The Change Checked confirmation's strings stood here until 2026-09-27, when the
-                // prompt was removed.)
+                // The model half's strings: what the model writes itself. Every other string is the UI
+                // half's (ui/KFCUI_enUS.fr). The Japanese for these is KBSLoc.h's.
                 // The replace's own alert, shown INSTEAD of running: the verify walk found a ticked
                 // match that no longer begins where the search left it, and nothing was written.
                 kKBSStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
                 kKBSStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
-                // What Edit > Undo calls a Change Checked run (2026-09-26).
+                // What Edit > Undo calls a Change Checked run.
                 kKBSReplaceStepKey,				"Replace",
-                // ...and a Reject Change and an Accept All Changes by KohakuFindChange (2026-09-29).
+                // ...and a Reject Change and an Accept All Changes by KohakuFindChange.
                 kKBSRejectStepKey,				"Reject Change",
                 kKBSAcceptAllStepKey,			"Accept All Changes by KohakuFindChange",
-                // ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29).
+                // ...and an Accept Change by KohakuFindChange on a row, a story or a run.
                 kKBSAcceptStepKey,				"Accept Change",
         }
 

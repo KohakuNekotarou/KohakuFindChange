@@ -33,8 +33,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         	 // ----- Menu strings
                 kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKBSCompanyValue)
                 kKBSAboutMenuKey,					kKBSDisplayName "...",
-                // kKBSPluginsMenuKey was here until 2026-08-06. Its menu path macro was never used
-                // by the .fr, so nothing ever asked for this string (see KFCUIID.h).
 
                 kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
 
@@ -51,8 +49,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSReplaceCheckedMenuKey,		"Change Checked",
                 kKBSCheckAllMenuKey,			"Check All",
                 kKBSReplaceHitMenuKey,			"Replace",
-                // The Reject / Accept items name KBS as their author (2026-09-29, the user's call - they act on
-                // KBS's own changes only), one name per level. "Reject Change" until then, on all three rows.
+                // The Reject / Accept items name KohakuFindChange as the changes' author - they act on its
+                // own changes only (the plug-in author's call) - one name per level.
                 kKBSRejectChangeMenuKey,		"Reject Change by KohakuFindChange",
                 kKBSStoryRejectMenuKey,			"Reject Changes by KohakuFindChange in This Story",
                 kKBSChapterRejectMenuKey,		"Reject All Changes by KohakuFindChange in This Document",
@@ -62,8 +60,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSRunAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Run",
                 kKBSAcceptAllChangesMenuKey,	"Accept All Changes by KohakuFindChange in This Document",
                 kKBSShowChangesMenuKey,			"Show Changes by KohakuFindChange",
-                // The story and document rows' "Redo" until 2026-09-29 (the user's call): the name says
-                // what it writes with - Find/Change as it stands now, not the replace it takes back.
+                // The story and document rows' second replace (the code's "Redo"). The name says what it
+                // writes with - Find/Change as it stands now, not the replace it takes back (the plug-in
+                // author's call).
                 kKBSRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
                 kKBSUncheckAllMenuKey,			"Uncheck All",
                 // The operating reference. English in every UI language, like the rest of the flyout.
@@ -77,27 +76,22 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKBSPanelTitleKey,				kKBSDisplayName,
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
-                // Read (KBSResultListWidgetMgr.cpp's InitialMessage) whenever the panel is shown with
-                // nothing run this session (KBSResultTree::RestoreStatusOnPanelShow), and when a row's
-                // "Source Text:" is taken down with nothing run yet (KBSResultTree::DropBefore) - the
-                // resource carries no initial text since 2026-09-29, the message area being drawn by hand
-                // (KFCUI.fr). (This said RestoreStatusOnPanelShow was the ONLY reader until 2026-10-02.)
-                // Kept here so the wording is not spelled out in the code. It names no Find command (the user's call,
-                // 2026-10-02): since 2026-09-29 the command's name follows Find/Change's Search:
-                // (KBSSearchEngine::FindCommandName), so "Find in Document" was wrong as often as not.
+                // Read through InitialMessage (KBSResultListWidgetMgr.cpp) whenever the message line falls
+                // back to what a panel with nothing run says; the resource itself carries no initial text,
+                // the message area being drawn by hand (KFCUI.fr). Kept here so the wording is not spelled
+                // out in the code. It names no Find command (the plug-in author's call): the command's name
+                // follows Find/Change's Search: (KBSSearchEngine::FindCommandName), so any one name would
+                // be wrong as often as not.
                 kKBSStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",
 
                 // (The model half's strings - the replace's own alert and what Edit > Undo calls a
-                //  KBS write - stayed in model/KBS_enUS.fr with the split, 2026-10-01.)
+                //  KBS write - are in model/KBS_enUS.fr.)
 
 
 		// ----- Misc strings
                 // The About box is the plug-in's NAME AND VERSION, nothing else, and it reads the
-                // same in every UI language (user's call, 2026-08-09). It used to carry a
-                // description, a credit and the repository URL, and a separate Japanese wording in
-                // KBSLoc.h - all removed. The separator is a plain space: the Japanese version had
-                // an ideographic comma there, which is the sort of thing that had to go for the two
-                // languages to read alike. Same shape as KCM's (KCMUI_enUS.fr, kKCMAboutBoxStringKey).
+                // same in every UI language (the plug-in author's call) - no description, credit, URL
+                // or Japanese wording. Same shape as KCM's (KCMUI_enUS.fr, kKCMAboutBoxStringKey).
                 kKBSAboutBoxStringKey,			kKBSDisplayName " version " kKBSVersion,
 
 

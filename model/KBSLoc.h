@@ -6,15 +6,14 @@
 //
 //  Runtime Japanese for the few strings KBS speaks in Japanese - the replace's own alert and what
 //  Edit > Undo calls KBS's writes - and JapaneseUI() for the How to Use page (KBSHowTo.cpp).
-//  (The About box was one of these until 2026-08-09; it now reads the same in every language.)
 //
-//  There is no jaJP string TABLE any more (2026-08-05, user's call). Every locale reads the
-//  enUS table, and the Japanese is switched in HERE at run time instead, so no CP932 resource
-//  file has to be maintained and no LocaleIndex row can strand a locale on raw keys. What is
-//  asked is the UI LANGUAGE, not the featureset: a Roman-engine install running a Japanese UI
-//  (this machine) gets Japanese, which is what "speak the user's language" means.
+//  There is no jaJP string TABLE (the plug-in author's call). Every locale reads the enUS table,
+//  and the Japanese is switched in HERE at run time instead, so no CP932 resource file has to be
+//  maintained and no LocaleIndex row can strand a locale on raw keys. What is asked is the UI
+//  LANGUAGE, not the featureset: a Roman-engine install running a Japanese UI gets Japanese, which
+//  is what "speak the user's language" means.
 //
-//  ***** THIS FILE IS UTF-8 WITH BOM ***** so the L"..." literals can stay readable Japanese.
+//  THIS FILE IS UTF-8 WITH BOM so the L"..." literals can stay readable Japanese.
 //  (An ASCII file would force \u escapes; a BOM-less one would be read as CP932 by MSVC.)
 //
 //========================================================================================
@@ -42,13 +41,13 @@ namespace KBSLoc
 	{
 		if (JapaneseUI())
 		{
-			// ***** THE HEADER'S OWN CONSTRUCTOR FOR "NOT A KEY" (2026-10-02, the API re-audit). *****
-			// PMString(const wchar_t*) "should be used to set strings that are not keys. Calling
-			// Translate on this string will do nothing" (PMString.h:96-102) - which is exactly what these
-			// are, and is what the header recommends in place of SetTranslatable, which it files under
-			// DISCOURAGED (:698-721). These were char16_t literals put in through SetXString and then
-			// SetTranslatable(kFalse) until then, because wchar_t is UTF-32 on the Mac (:96-97); KBS is
-			// Windows alone (the user's call, 2026-09-28), where wchar_t is UTF-16 and L"" is that.
+			// THE HEADER'S OWN CONSTRUCTOR FOR "NOT A KEY". PMString(const wchar_t*) "should be used to
+			// set strings that are not keys. Calling Translate on this string will do nothing"
+			// (PMString.h:96-102) - which is exactly what these are, and is what the header recommends in
+			// place of SetTranslatable, which it files under DISCOURAGED (:698-721). It relies on wchar_t
+			// being UTF-16, which it is on Windows - KBS is Windows alone (the plug-in author's call). On
+			// the Mac wchar_t is UTF-32 (:96-97): these would have to be char16_t literals put in through
+			// SetXString, then SetTranslatable(kFalse).
 			return PMString(japanese);
 		}
 		// The official one-liner for "here is a string-table key, give me its translation"
@@ -64,32 +63,28 @@ namespace KBSLoc
 	}
 }
 
-// The Japanese the jaJP table used to carry, one constant per retired table entry. The keys
-// these pair with live on in KBSID.h and the enUS table - they ARE the English path.
+// The Japanese for each enUS entry that has one. The keys these pair with are in KBSID.h and the
+// enUS table (KBS_enUS.fr) - they ARE the English path.
 namespace KBSJa
 {
 	// ----- The replace's own alert, shown INSTEAD of running. -----
-	// (The Change Checked confirmation's Japanese stood above it until 2026-09-26, and the prompt
-	//  itself went on 2026-09-27.)
 	// The run stopped before writing anything: the verify walk found a ticked match that no longer
 	// begins where the search left it (KBSReplaceEngine::TellResultsWentStale). An opening that
 	// names the chapter where there is one to name, then what it means for the user.
-	// See KBSID.h for how this came to be a statement rather than a question.
+	// See KBSID.h for why this is a statement rather than a question.
 	const wchar_t kStaleResultsDoc[]        = L"検索結果に変化を確認しましたので、置換を中止しました。";
 	const wchar_t kStaleResultsOne[]        = L"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
-	// What Edit > Undo calls a Change Checked run (2026-09-26, the user's call).
+	// What Edit > Undo calls a Change Checked run (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
-	// ...and a Reject Change and an Accept All Changes by KohakuFindChange (2026-09-29: English on every
-	// UI until then). InDesign's own Track Changes words, the author named as the Track Changes panel
-	// shows it (the user's call: the name says only KohakuFindChange's changes are accepted).
+	// ...and a Reject Change and an Accept All Changes by KohakuFindChange. InDesign's own Track
+	// Changes words, the change's author named as the Track Changes panel shows it (the plug-in
+	// author's call: the name says only KohakuFindChange's changes are accepted).
 	const wchar_t kRejectStep[]             = L"変更を却下";
 	const wchar_t kAcceptAllStep[]          = L"KohakuFindChange によるすべての変更を承認";
-	// ...and an Accept Change by KohakuFindChange on a row, a story or a run (2026-09-29, Show Changes).
+	// ...and an Accept Change by KohakuFindChange on a row, a story or a run (Show Changes).
 	const wchar_t kAcceptStep[]             = L"変更を承認";
-	// (A closing line, u"検索し直してください。", stood here until 2026-08-10. It opened as "Nothing was
-	//  replaced - please search again" and lost its first half that morning for saying what the
-	//  sentence above already said; the user's call the same day took the rest, leaving the alert
-	//  to state the outcome and the status line to carry what to do next.)
+	// (No closing "please search again" line, on purpose: the alert states the outcome and the status
+	//  line carries what to do next - the plug-in author's call.)
 }
 
 #endif // __KBSLoc_h__
