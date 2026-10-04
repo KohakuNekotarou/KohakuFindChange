@@ -90,7 +90,7 @@
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。
   - 訂正:
 
-- **PNL-19** ★**About** は**名前と版数だけ**（`Kohaku Find/Change version 1.2.0`）で、どの UI 言語でも同じ（2026-08-09 の決定＝説明・謝辞・URL は外した）。
+- **PNL-19** ★**About** は**名前と版数だけ**（`Kohaku Find/Change version 1.3.0`）で、どの UI 言語でも同じ（2026-08-09 の決定＝説明・謝辞・URL は外した）。
   パネルメニューの末尾 `About This Plug-in...` と、本体の About のメニューの下から開く。
   - 訂正:
 
