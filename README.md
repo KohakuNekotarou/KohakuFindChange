@@ -38,7 +38,8 @@ published row is never removed.
 
 | Version | File | SHA-256 |
 |---------|------|---------|
-| _next release — to be added_ | | |
+| 1.2.0 | KohakuFindChange.pln | `49ed476b84ce496572888a7abfc2ea74d7739254e9f744719d895956950e7d4d` |
+| 1.2.0 | KohakuFindChangeUI.pln | `63e26563546682660977e6eaef67d69332354b7f709fd4aeb6576570195621f4` |
 
 Verify / 照合方法 (PowerShell):
 
