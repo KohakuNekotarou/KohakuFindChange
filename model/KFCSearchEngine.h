@@ -25,6 +25,7 @@
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "KFCResultModel.h"		// Hit - CollectStoryHits fills them
+#include "KFCBookScope.h"		// ChapterDoc - a query run's held targets (SearchHeldTargets)
 
 #include <vector>
 
@@ -95,6 +96,42 @@ namespace KFCSearchEngine
 	    @param outSummary  a ready-to-show status line for the panel.
 	    @return the total number of matches across the scope. */
 	int32 SearchBook(PMString& outSummary);
+
+	/** What a run searches - asked of Book Scope and Edit > Find/Change's Search: by ResolveRunScope. */
+	struct RunScope
+	{
+		bool		fromBook;			// Book Scope on
+		bool		allDocuments;		// Search: = All Documents (Book Scope off)
+		int32		selectionScope;		// an IWalkerScopeFactoryUtils::WalkScopeType: Document, Story, To End of Story, Selection
+		PMString	fellBackNote;		// a Search: the selection did not offer, said (empty otherwise)
+		RunScope() : fromBook(false), allDocuments(false), selectionScope(0) { fellBackNote.SetTranslatable(kFalse); }
+	};
+
+	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (2026-10-04, so the query run asks the same):
+	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
+	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing. */
+	bool ResolveRunScope(RunScope& out, PMString& outRefusal);
+
+	/** Is there anything to find on the tab Edit > Find/Change is on - a string, a glyph, a character type or a
+	    format? (HasFindQuery, which SearchBook asks before its commit point.) */
+	bool HasFindQueryNow();
+
+	/** What a held search found (SearchHeldTargets). */
+	struct HeldSearchOutcome
+	{
+		int32		total;
+		bool		capped;		// stopped at kKFCCollectHitLimit
+		bool		cancelled;	// Cancel pressed on the bar
+		PMString	notes;		// chapters that could not be searched / broke off, said as SearchBook says them
+		HeldSearchOutcome() : total(0), capped(false), cancelled(false) { notes.SetTranslatable(kFalse); }
+	};
+
+	/** A QUERY RUN'S SEARCH (KFCQuerySequence, 2026-10-04) over documents the caller has OPEN and holds: no door,
+	    no commit point and nothing opened or closed (the caller cleared the model and stated the tab -
+	    CommitSearchMode). Records the scope, the tab, the walk signature and the find format on the results as
+	    SearchBook does, then walks with SearchBook's own loops (CollectTargets) and leaves every hit in the model. */
+	void SearchHeldTargets(std::vector<KFCBookScope::ChapterDoc>& targets, const RunScope& scope,
+		const PMString& bookName, const PMString& barTitle, HeldSearchOutcome& out);
 
 	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
 	    command could otherwise be dispatched INTO a running search. The panel's actions ask this

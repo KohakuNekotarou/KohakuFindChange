@@ -2191,328 +2191,27 @@ const char* SelectionScopeWords(IWalkerScopeFactoryUtils::WalkScopeType selectio
 		default:											return "";
 	}
 }
-}	// anonymous namespace
-
-int32 KFCSearchEngine::SearchBook(PMString& outSummary)
+// What one walk over a run's targets found (CollectTargets).
+struct CollectTally
 {
-	outSummary.Clear();
-	outSummary.SetTranslatable(kFalse);
+	int32					total;
+	int32					chaptersWithHits;
+	bool					truncated;
+	bool					cancelled;
+	std::vector<PMString>	unsearchable;
+	std::vector<PMString>	brokeOff;
+	std::vector<PMString>	unclosed;
+	CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
+};
 
-	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
-	// the progress bar pumps events, so a command could still find its way in here.
-	if (gSearching)
-	{
-		outSummary.Append("A search is already running.");
-		return 0;
-	}
-	// ...and the same door for anything ELSE of ours that is running - a replace.
-	// Asked separately from the line above so each keeps the message that is actually true: what
-	// makes a re-entrant call dangerous is two DIFFERENT runs, one of which hands back the chapters
-	// the other is walking (see KFCRunGuard).
-	if (KFCRunGuard::IsAnyRunning())
-	{
-		outSummary.Append(KFCRunGuard::BusyMessage());
-		return 0;
-	}
-	const SearchingFlagGuard searchingGuard;
-
-	// EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED.
-	// A run that is turned away has to leave the panel exactly as it found it - a Clear() up here would
-	// let "No search text set on the Text tab." throw away the results of the search before it, a
-	// command that did nothing but destroy the previous answer. Nothing between here and the commit
-	// point writes to the model, the book scope, or the Find/Change settings.
-	//
-	// The commit point cannot sit lower than ListBookChapters, either: that records which book the run
-	// is against (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so clearing AFTER the
-	// book is resolved wipes the record the run has just made (measured). So the commit point sits just
-	// above it, and the checks above the commit point.
-
-	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
-	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
-	// not lines of text - so there is nothing for this panel to list, whatever it did with them.
-	//
-	// Named explicitly because the alternative is worse than useless: their find string IS empty, so
-	// without this the panel would answer "No Find/Change text set." and send the user looking for a
-	// field they had not left blank (the user's question).
-	// THE MENU GREYS THE COMMAND ON THESE TABS (the author's call) through the same
-	// question (CanSearchTab); this stays for a caller that never opened the menu - a script invoking
-	// the action by its ID reaches here whatever the menu says.
-	const int32 tab = KFCSearchEngine::CurrentSearchMode();
-	if (!KFCSearchEngine::CanSearchTab(tab))
-	{
-		outSummary.Append("The Find/Change dialog is on the ");
-		PMString tabName(KFCSearchEngine::TabName(tab));
-		tabName.SetTranslatable(kFalse);
-		outSummary.Append(tabName);
-		// Short enough to be read whole at the panel's floor - this one composes a tab name into the
-		// middle of it, so it is longer than it looks here (see KFCPanelMetrics on the four-line
-		// budget, and what a message that outgrew it cost).
-		outSummary.Append(" tab. This panel lists text - use InDesign's own Find/Change.");
-		return 0;
-	}
-
-	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
-	// walked like any other text tab (the author's call: whatever the official panel is set to, this
-	// panel searches and replaces the same way). It rides the same text walker and the same
-	// find/replace commands; what it needs is its axes stated before the walk - the ChangeMode and the
-	// find character type - which CommitSearchMode does, the exact glyph rule again. (On a
-	// Roman-featureset install the tab cannot be reached at all, so the transliterate paths simply lie
-	// dormant there.)
-
-	if (!HasFindQuery())
-	{
-		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
-		// query on another tab is no help and saying so avoids a hunt.
-		//
-		// The HEAD names what is missing, one wording per tab. The TAIL says how to supply it, and
-		// there it is CHOOSE against TYPE rather than a wording per tab: the Glyph and Transliterate
-		// tabs both offer a thing to pick (a glyph from a grid, a character type from a dropdown)
-		// where Text and GREP have a field to type into, and "type what to find" points at a field
-		// neither of the first two has. Naming the thing twice - once in the head and again in the
-		// tail - runs these past what the panel can draw (see KFCPanelMetrics for the four-line budget
-		// and for what a message that outgrew it cost).
-		const bool glyphTab = (tab == IFindChangeOptions::kGlyphSearch);
-		const bool translitTab = (tab == IFindChangeOptions::kTransliterateSearch);
-		outSummary.Append(glyphTab ? "No glyph set on the "
-			: (translitTab ? "No character type set on the " : "No search text set on the "));
-		PMString tabName(KFCSearchEngine::TabName(tab));
-		tabName.SetTranslatable(kFalse);
-		outSummary.Append(tabName);
-		outSummary.Append((glyphTab || translitTab)
-			? " tab. Choose one in Edit > Find/Change, then search again."
-			: " tab. Type what to find in Edit > Find/Change, then search again.");
-		return 0;
-	}
-
-	// Is there anything for the CURRENT scope to run on? Asked HERE, ahead of the commit point, so a
-	// run with no target leaves the previous results on the panel. NO implicit fallback: ON means the
-	// book and nothing else, OFF means what Search: names and nothing else - so the status line can
-	// always state exactly what was searched, and a missing book is reported instead of quietly
-	// searching one document behind the user's back.
-	//
-	// The same two questions KFCBookScope::HasScopeTarget asks for the menu's grey state; asked
-	// separately here because each one has its own sentence to say.
-	const bool fromBook = KFCBookScope::IsBookScopeOn();
-
-	// Search: (the author's call: KFC follows Edit > Find/Change's Search:).
-	// Document, All Documents, Story, To End of Story, Selection - with Book Scope OFF. Book Scope ON is
-	// the whole book, which only Document can mean, so any other value is refused rather than quietly
-	// read as Document ("the scope is never changed behind the user's back" - the rule the toggle has
-	// always kept). An unset Search: reads as Document (CurrentSearchScope); a list of stories is
-	// something only a script can set, and the dialog cannot show - refused too.
-	const int32 searchScope = KFCSearchEngine::CurrentSearchScope();
-	const char* const scopeName = KFCSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
-	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
-	//  Document there, so it is no reason to refuse a book)
-	if (fromBook && KFCSearchEngine::SearchScopeForSelection(searchScope) != IWalkerScopeFactoryUtils::kDocumentScope)
-	{
-		outSummary.Append("Book Scope is on, and Search: is ");
-		outSummary.Append(*scopeName != '\0' ? scopeName : "not Document");
-		outSummary.Append(". Set Search: to Document in Edit > Find/Change, or turn Book Scope off.");
-		return 0;
-	}
-	if (!fromBook && *scopeName == '\0')
-	{
-		outSummary.Append("Search: in Edit > Find/Change is set to something this panel cannot follow. Set it to Document, All Documents, Story, To End of Story or Selection.");
-		return 0;
-	}
-	const bool allDocuments = !fromBook && searchScope == IWalkerScopeFactoryUtils::kAllDocumentScope;
-	// Story / To End of Story / Selection start from the selection (and walk the active document).
-	IWalkerScopeFactoryUtils::WalkScopeType selectionScope = (!fromBook
-		&& (searchScope == IWalkerScopeFactoryUtils::kStoryScope || searchScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
-			|| searchScope == IWalkerScopeFactoryUtils::kSelectionScope))
-		? static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(searchScope) : IWalkerScopeFactoryUtils::kDocumentScope;
-	// ONE THE SELECTION DOES NOT OFFER IS SEARCHED AS DOCUMENT - AND SAID (the author's call: "the same as
-	// InDesign"). The dialog offers Search: values by the selection (SearchScopeForSelection): with none that
-	// fits - Story and nothing selected, Selection and only a caret - it shows Document and searches the
-	// document (measured). So does this; the status line names what happened, so the scope is not changed out
-	// of sight.
-	PMString fellBackNote;
-	fellBackNote.SetTranslatable(kFalse);
-	if (selectionScope != IWalkerScopeFactoryUtils::kDocumentScope
-		&& KFCSearchEngine::SearchScopeForSelection(selectionScope) != selectionScope)
-	{
-		fellBackNote.Append(" Search: is ");
-		fellBackNote.Append(scopeName);
-		fellBackNote.Append(selectionScope == IWalkerScopeFactoryUtils::kSelectionScope ? ", but no text is selected"
-			: selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope ? ", but there is no text cursor"
-			: ", but no text or text frame is selected");
-		fellBackNote.Append(" - the whole document was searched, as Edit > Find/Change does.");
-		selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
-	}
-
-	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
-	// other refusal: refused past it (by ListBookChapters below), the previous results would already be
-	// gone - a whole book's results, for a book with nothing in it (KFCBookScope::GetTargetBook says which
-	// case was in mind; the regression case book-empty-keeps-results measures it).
-	const KFCBookScope::TargetBook targetBook = fromBook ? KFCBookScope::GetTargetBook() : KFCBookScope::kNoTargetBook;
-	if (fromBook && targetBook == KFCBookScope::kNoTargetBook)
-	{
-		outSummary.Append("Book Scope is on, but no book is open.");
-		return 0;
-	}
-	if (fromBook && targetBook == KFCBookScope::kTargetBookEmpty)
-	{
-		outSummary.Append("That book has no chapters.");
-		return 0;
-	}
-	if (!fromBook && KFCBookScope::ActiveDocument() == nil)
-	{
-		outSummary.Append("No open document to search.");
-		return 0;
-	}
-
-	// Forward, whatever the dialog says - and put back as the function ends. Turned here, past every
-	// refusal above, so a search that is turned away touches no setting at all, and still ahead of the
-	// mode commit below, in the order the two always had.
-	KFCForwardSearchScope forward;
-
-	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
-	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
-	// search driven from this panel ran as plain Text whatever tab was on screen. See
-	// KFCSearchEngine::CommitSearchMode.
-	//
-	// ABOVE THE COMMIT POINT, AND ITS ANSWER IS READ. A tab that could not be stated is a refusal like
-	// every other one in this function, so it has to leave the previous results standing - and it must
-	// not search on in whatever mode had been committed last. Asking it this early changes nothing the
-	// user can see: it writes back the value it has just read.
-	if (!KFCSearchEngine::CommitSearchMode())
-	{
-		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
-		return 0;
-	}
-
-	// THE COMMIT POINT. Past this line the run owns the panel: the old results are gone whatever happens
-	// next - and the book and the format they were found with go with them (the format is remembered again
-	// a few lines below; DropResults is one rule with no exceptions to remember).
-	//
-	// THE CHAPTERS THE OLD RESULTS HELD GO NOW, NOT ON A SCHEDULE. DropResults hands them back with
-	// kSchedule - it is called from notifications too - and a scheduled close runs only once this run is
-	// over. Until then such a chapter is still open but no longer held, so the All Documents list below
-	// would take it for a document of the user's: walked, listed, and its rows gone a moment after the
-	// search when the close went through. Closed here, before anything is listed, in the context the book
-	// loop below closes its own chapters in. A chapter with unsaved work, or one with a window, is not
-	// closed - ReleaseHeldDoc's verdicts, unchanged. (Show Changes' commit point has the same two lines -
-	// KFCShowChanges::Run.)
-	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
-	KFCSearchEngine::DropResults();
-
-	std::vector<KFCBookScope::ChapterDoc> targets;
-	PMString bookName;
-	// Chapters the book could not hand over at all. Declared out here so the summary can name them
-	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
-	// they are the only thing that explains what happened.
-	std::vector<KFCBookScope::SkippedChapter> unopenable;
-	if (fromBook)
-	{
-		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
-		// handed straight back once it has been walked, so a book search never holds more than one
-		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
-		// summary reports the ones that could not, after the walk.
-		if (!KFCBookScope::ListBookChapters(targets, bookName) || targets.empty())
-		{
-			// "That book", not "the active book": a run is against the book the BOOK PANEL is showing,
-			// and only falls back to the active one when no panel can be reached
-			// (KFCBookScope::ResolveTargetBook).
-			// (An empty book is refused at the front door. This is the safety net - see the note at the
-			// end of ListBookChapters - and the same sentence.)
-			outSummary.Append("That book has no chapters.");
-			return 0;
-		}
-	}
-	else if (allDocuments)
-	{
-		// EVERY OPEN DOCUMENT, WINDOW OR NOT. InDesign's own All Documents searches a document opened
-		// without a window too (measured: app.findText() counted one), so this does. Each is a "chapter"
-		// of the run - its rows kept apart from the others' - but none is ours to open or close: no file
-		// is recorded (a chapter with no file is found again by its docRef, as the Document search's
-		// always has been), and a chapter KFC holds open from a BOOK search is left out - it is not a
-		// document the user opened. Each is walked from the top by the document form, in this order (the
-		// walk below - not by the dialog's own All Documents scope, which starts at the caret), and this
-		// list is what the matches are filed under, and the T of "M of T document(s)".
-		InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
-		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
-		for (int32 d = 0; d < docCount; ++d)
-		{
-			IDocument* doc = docList->GetNthDoc(d);
-			if (doc == nil)
-				continue;
-			const KFCBookScope::ChapterDoc one = KFCBookScope::DocAsChapter(doc);
-			if (!KFCBookScope::IsHeldDoc(one.docRef))
-				targets.push_back(one);
-		}
-		if (targets.empty())
-		{
-			outSummary.Append("No open document to search.");
-			return 0;
-		}
-	}
-	else
-	{
-		// Re-read rather than carried down from the check above: a command has been processed since
-		// (CommitSearchMode), and a pointer to the active document is not ours to assume survived it.
-		// (Story / To End of Story / Selection walk this one too: the selection is the active document's.)
-		IDocument* doc = KFCBookScope::ActiveDocument();
-		if (doc == nil)
-		{
-			outSummary.Append("No open document to search.");
-			return 0;
-		}
-		targets.push_back(KFCBookScope::DocAsChapter(doc));
-	}
-
-	// Record the scope ON THE RESULTS (KFCResultModel::Clear above wiped the previous value): the
-	// tree reads it to decide whether the chapter rows come up collapsed, and reading it from here
-	// rather than from the toggle keeps an existing result set's display stable if the user flips
-	// Book Scope afterwards.
-	KFCResultModel::SetFromBook(fromBook);
-	// ...and the Search: beside it, for the same reason: All Documents draws its document rows
-	// closed and says which has no window; a Search: changed afterwards changes nothing on screen.
-	KFCResultModel::SetSearchScope(fromBook ? KFCResultModel::kScopeBook
-		: allDocuments ? KFCResultModel::kScopeAllDocuments
-		: (selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? KFCResultModel::kScopeStory
-		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
-		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
-		: KFCResultModel::kScopeDocument);
-
-	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
-	// the two lines around it because it survives finding nothing: a search that returned no hits
-	// has still been run.
-	KFCResultModel::NoteRun();
-
-	// ...and WHICH book, for the tree's book row. Empty for a document search, which has no book
-	// row at all. This is the panel's permanent answer to "what am I looking at": a status line is
-	// one line, gets truncated, and is overwritten by the next message.
-	KFCResultModel::SetBookName(bookName);
-
-	// ...and WHICH TAB was searched. The replace pass re-walks each chapter, and a re-walk in another
-	// mode returns another set of matches - so Change Checked compares this against the tab in force
-	// then and refuses rather than lining rows up with the wrong occurrences.
-	//
-	// Read again rather than reusing `tab` from the top of this function, and that is deliberate:
-	// `tab` was taken BEFORE CommitSearchMode, and what belongs on the results is the mode the walk
-	// is about to actually run in. The two agree today - the commit states the value it just read -
-	// but this is the one that would still be right on the day they stopped agreeing.
-	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
-
-	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
-	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab
-	// alone is not enough: retyping the find string, or turning Include Footnotes off, changes the
-	// match set without changing the tab, and the re-walk would then meet other occurrences where the
-	// hits below stand. See KFCSearchEngine::BuildWalkSignature.
-	{
-		PMString walkSignature;
-		KFCSearchEngine::BuildWalkSignature(walkSignature);
-		KFCResultModel::SetWalkSignature(walkSignature);
-	}
-
-	// ...and the FIND FORMAT itself, kept as a list rather than described in that string, because the
-	// list compares itself properly and a hand-written fingerprint of it did not. Taken here, on the
-	// same side of CommitSearchMode as the signature, for the same reason: a value read on one side
-	// of a mode commit and compared against one read on the other could differ with nothing having
-	// changed. See KFCSearchEngine::RememberFindFormat.
-	KFCSearchEngine::RememberFindFormat();
-
+// SEARCHBOOK'S WALK OVER ITS TARGETS, FOR A SEARCH AND FOR A QUERY RUN (2026-10-04). Every target walked and
+// its hits appended to the model chapter by chapter, under one bar (barTitle; empty = the search's own title).
+// keepOpen = the targets are open and held by the caller (a query run, inside its command sequence): a book's
+// chapter is neither opened here nor handed back.
+void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
+	IWalkerScopeFactoryUtils::WalkScopeType selectionScope, bool keepOpen, const PMString& barTitle,
+	std::vector<KFCBookScope::SkippedChapter>& unopenable, CollectTally& out)
+{
 	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
 	// everything above, they are the same for every chapter by definition (the replace pass has to
 	// re-walk with exactly these), and nothing can change them while the run is on: the progress bar
@@ -2551,7 +2250,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	// The title names the scope, because the bar does not imply it: "Searching book..." when it
 	// really is a book, plain "Searching..." for a single document.
-	PMString progressTitle(fromBook ? "Searching book..." : "Searching...");
+	PMString progressTitle(!barTitle.IsEmpty() ? barTitle : PMString(fromBook ? "Searching book..." : "Searching..."));
 	progressTitle.SetTranslatable(kFalse);
 	KFCProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
@@ -2880,7 +2579,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		std::map<UID, uint32> storyVersions;
 		readStoryVersions(chapterDocRef, hits, storyVersions);
 
-		if (!KFCBookScope::HandBackHeldDocNow(chapterDocRef))
+		if (!keepOpen && !KFCBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
 		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, the
@@ -2936,6 +2635,367 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// another story; a Cancel pressed during the LAST story walked is seen here.)
 	if (!cancelled && progressBar.WasCancelled(kFalse))
 		cancelled = true;
+
+	out.total = total;
+	out.chaptersWithHits = chaptersWithHits;
+	out.truncated = collectionTruncated;
+	out.cancelled = cancelled;
+	out.unsearchable.swap(unsearchable);
+	out.brokeOff.swap(brokeOff);
+	out.unclosed.swap(unclosed);
+}
+
+}	// anonymous namespace
+
+bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
+{
+	out = RunScope();
+	outRefusal.Clear();
+	outRefusal.SetTranslatable(kFalse);
+	const bool fromBook = KFCBookScope::IsBookScopeOn();
+
+	// Search: (the author's call: KFC follows Edit > Find/Change's Search:).
+	// Document, All Documents, Story, To End of Story, Selection - with Book Scope OFF. Book Scope ON is
+	// the whole book, which only Document can mean, so any other value is refused rather than quietly
+	// read as Document ("the scope is never changed behind the user's back" - the rule the toggle has
+	// always kept). An unset Search: reads as Document (CurrentSearchScope); a list of stories is
+	// something only a script can set, and the dialog cannot show - refused too.
+	const int32 searchScope = KFCSearchEngine::CurrentSearchScope();
+	const char* const scopeName = KFCSearchEngine::SearchScopeName(searchScope);	// "" = none this panel follows
+	// (asked of Search: as the selection makes it - what the dialog shows: Story with nothing selected IS
+	//  Document there, so it is no reason to refuse a book)
+	if (fromBook && KFCSearchEngine::SearchScopeForSelection(searchScope) != IWalkerScopeFactoryUtils::kDocumentScope)
+	{
+		outRefusal.Append("Book Scope is on, and Search: is ");
+		outRefusal.Append(*scopeName != '\0' ? scopeName : "not Document");
+		outRefusal.Append(". Set Search: to Document in Edit > Find/Change, or turn Book Scope off.");
+		return false;
+	}
+	if (!fromBook && *scopeName == '\0')
+	{
+		outRefusal.Append("Search: in Edit > Find/Change is set to something this panel cannot follow. Set it to Document, All Documents, Story, To End of Story or Selection.");
+		return false;
+	}
+	const bool allDocuments = !fromBook && searchScope == IWalkerScopeFactoryUtils::kAllDocumentScope;
+	// Story / To End of Story / Selection start from the selection (and walk the active document).
+	IWalkerScopeFactoryUtils::WalkScopeType selectionScope = (!fromBook
+		&& (searchScope == IWalkerScopeFactoryUtils::kStoryScope || searchScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
+			|| searchScope == IWalkerScopeFactoryUtils::kSelectionScope))
+		? static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(searchScope) : IWalkerScopeFactoryUtils::kDocumentScope;
+	// ONE THE SELECTION DOES NOT OFFER IS SEARCHED AS DOCUMENT - AND SAID (the author's call: "the same as
+	// InDesign"). The dialog offers Search: values by the selection (SearchScopeForSelection): with none that
+	// fits - Story and nothing selected, Selection and only a caret - it shows Document and searches the
+	// document (measured). So does this; the status line names what happened, so the scope is not changed out
+	// of sight.
+	PMString fellBackNote;
+	fellBackNote.SetTranslatable(kFalse);
+	if (selectionScope != IWalkerScopeFactoryUtils::kDocumentScope
+		&& KFCSearchEngine::SearchScopeForSelection(selectionScope) != selectionScope)
+	{
+		fellBackNote.Append(" Search: is ");
+		fellBackNote.Append(scopeName);
+		fellBackNote.Append(selectionScope == IWalkerScopeFactoryUtils::kSelectionScope ? ", but no text is selected"
+			: selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope ? ", but there is no text cursor"
+			: ", but no text or text frame is selected");
+		fellBackNote.Append(" - the whole document was searched, as Edit > Find/Change does.");
+		selectionScope = IWalkerScopeFactoryUtils::kDocumentScope;
+	}
+
+	// The target book, asked once - and an EMPTY one refused here, ahead of the commit point like every
+	// other refusal: refused past it (by ListBookChapters below), the previous results would already be
+	// gone - a whole book's results, for a book with nothing in it (KFCBookScope::GetTargetBook says which
+	// case was in mind; the regression case book-empty-keeps-results measures it).
+	const KFCBookScope::TargetBook targetBook = fromBook ? KFCBookScope::GetTargetBook() : KFCBookScope::kNoTargetBook;
+	if (fromBook && targetBook == KFCBookScope::kNoTargetBook)
+	{
+		outRefusal.Append("Book Scope is on, but no book is open.");
+		return false;
+	}
+	if (fromBook && targetBook == KFCBookScope::kTargetBookEmpty)
+	{
+		outRefusal.Append("That book has no chapters.");
+		return false;
+	}
+	if (!fromBook && KFCBookScope::ActiveDocument() == nil)
+	{
+		outRefusal.Append("No open document to search.");
+		return false;
+	}
+	out.fromBook = fromBook;
+	out.allDocuments = allDocuments;
+	out.selectionScope = static_cast<int32>(selectionScope);
+	out.fellBackNote = fellBackNote;
+	return true;
+}
+
+int32 KFCSearchEngine::SearchBook(PMString& outSummary)
+{
+	outSummary.Clear();
+	outSummary.SetTranslatable(kFalse);
+
+	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
+	// the progress bar pumps events, so a command could still find its way in here.
+	if (gSearching)
+	{
+		outSummary.Append("A search is already running.");
+		return 0;
+	}
+	// ...and the same door for anything ELSE of ours that is running - a replace.
+	// Asked separately from the line above so each keeps the message that is actually true: what
+	// makes a re-entrant call dangerous is two DIFFERENT runs, one of which hands back the chapters
+	// the other is walking (see KFCRunGuard).
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outSummary.Append(KFCRunGuard::BusyMessage());
+		return 0;
+	}
+	const SearchingFlagGuard searchingGuard;
+
+	// EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED.
+	// A run that is turned away has to leave the panel exactly as it found it - a Clear() up here would
+	// let "No search text set on the Text tab." throw away the results of the search before it, a
+	// command that did nothing but destroy the previous answer. Nothing between here and the commit
+	// point writes to the model, the book scope, or the Find/Change settings.
+	//
+	// The commit point cannot sit lower than ListBookChapters, either: that records which book the run
+	// is against (gSearchedBookPath) and ReleaseSearchedBook is what forgets it, so clearing AFTER the
+	// book is resolved wipes the record the run has just made (measured). So the commit point sits just
+	// above it, and the checks above the commit point.
+
+	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
+	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
+	// not lines of text - so there is nothing for this panel to list, whatever it did with them.
+	//
+	// Named explicitly because the alternative is worse than useless: their find string IS empty, so
+	// without this the panel would answer "No Find/Change text set." and send the user looking for a
+	// field they had not left blank (the user's question).
+	// THE MENU GREYS THE COMMAND ON THESE TABS (the author's call) through the same
+	// question (CanSearchTab); this stays for a caller that never opened the menu - a script invoking
+	// the action by its ID reaches here whatever the menu says.
+	const int32 tab = KFCSearchEngine::CurrentSearchMode();
+	if (!KFCSearchEngine::CanSearchTab(tab))
+	{
+		outSummary.Append("The Find/Change dialog is on the ");
+		PMString tabName(KFCSearchEngine::TabName(tab));
+		tabName.SetTranslatable(kFalse);
+		outSummary.Append(tabName);
+		// Short enough to be read whole at the panel's floor - this one composes a tab name into the
+		// middle of it, so it is longer than it looks here (see KFCPanelMetrics on the four-line
+		// budget, and what a message that outgrew it cost).
+		outSummary.Append(" tab. This panel lists text - use InDesign's own Find/Change.");
+		return 0;
+	}
+
+	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
+	// walked like any other text tab (the author's call: whatever the official panel is set to, this
+	// panel searches and replaces the same way). It rides the same text walker and the same
+	// find/replace commands; what it needs is its axes stated before the walk - the ChangeMode and the
+	// find character type - which CommitSearchMode does, the exact glyph rule again. (On a
+	// Roman-featureset install the tab cannot be reached at all, so the transliterate paths simply lie
+	// dormant there.)
+
+	if (!HasFindQuery())
+	{
+		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
+		// query on another tab is no help and saying so avoids a hunt.
+		//
+		// The HEAD names what is missing, one wording per tab. The TAIL says how to supply it, and
+		// there it is CHOOSE against TYPE rather than a wording per tab: the Glyph and Transliterate
+		// tabs both offer a thing to pick (a glyph from a grid, a character type from a dropdown)
+		// where Text and GREP have a field to type into, and "type what to find" points at a field
+		// neither of the first two has. Naming the thing twice - once in the head and again in the
+		// tail - runs these past what the panel can draw (see KFCPanelMetrics for the four-line budget
+		// and for what a message that outgrew it cost).
+		const bool glyphTab = (tab == IFindChangeOptions::kGlyphSearch);
+		const bool translitTab = (tab == IFindChangeOptions::kTransliterateSearch);
+		outSummary.Append(glyphTab ? "No glyph set on the "
+			: (translitTab ? "No character type set on the " : "No search text set on the "));
+		PMString tabName(KFCSearchEngine::TabName(tab));
+		tabName.SetTranslatable(kFalse);
+		outSummary.Append(tabName);
+		outSummary.Append((glyphTab || translitTab)
+			? " tab. Choose one in Edit > Find/Change, then search again."
+			: " tab. Type what to find in Edit > Find/Change, then search again.");
+		return 0;
+	}
+
+	// Is there anything for the CURRENT scope to run on? Asked HERE, ahead of the commit point, so a
+	// run with no target leaves the previous results on the panel. NO implicit fallback: ON means the
+	// book and nothing else, OFF means what Search: names and nothing else - so the status line can
+	// always state exactly what was searched, and a missing book is reported instead of quietly
+	// searching one document behind the user's back.
+	//
+	// The same two questions KFCBookScope::HasScopeTarget asks for the menu's grey state; asked
+	// separately here because each one has its own sentence to say.
+	RunScope runScope;
+	if (!KFCSearchEngine::ResolveRunScope(runScope, outSummary))
+		return 0;
+	const bool fromBook = runScope.fromBook;
+	const bool allDocuments = runScope.allDocuments;
+	const IWalkerScopeFactoryUtils::WalkScopeType selectionScope =
+		static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(runScope.selectionScope);
+	const PMString fellBackNote(runScope.fellBackNote);
+
+	// Forward, whatever the dialog says - and put back as the function ends. Turned here, past every
+	// refusal above, so a search that is turned away touches no setting at all, and still ahead of the
+	// mode commit below, in the order the two always had.
+	KFCForwardSearchScope forward;
+
+	// State the tab before anything is walked. A walk runs in the mode last COMMITTED through
+	// kFindSearchModeCmdBoss - not in the one IFindChangeOptions merely reports - so without this a
+	// search driven from this panel ran as plain Text whatever tab was on screen. See
+	// KFCSearchEngine::CommitSearchMode.
+	//
+	// ABOVE THE COMMIT POINT, AND ITS ANSWER IS READ. A tab that could not be stated is a refusal like
+	// every other one in this function, so it has to leave the previous results standing - and it must
+	// not search on in whatever mode had been committed last. Asking it this early changes nothing the
+	// user can see: it writes back the value it has just read.
+	if (!KFCSearchEngine::CommitSearchMode())
+	{
+		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
+		return 0;
+	}
+
+	// THE COMMIT POINT. Past this line the run owns the panel: the old results are gone whatever happens
+	// next - and the book and the format they were found with go with them (the format is remembered again
+	// a few lines below; DropResults is one rule with no exceptions to remember).
+	//
+	// THE CHAPTERS THE OLD RESULTS HELD GO NOW, NOT ON A SCHEDULE. DropResults hands them back with
+	// kSchedule - it is called from notifications too - and a scheduled close runs only once this run is
+	// over. Until then such a chapter is still open but no longer held, so the All Documents list below
+	// would take it for a document of the user's: walked, listed, and its rows gone a moment after the
+	// search when the close went through. Closed here, before anything is listed, in the context the book
+	// loop below closes its own chapters in. A chapter with unsaved work, or one with a window, is not
+	// closed - ReleaseHeldDoc's verdicts, unchanged. (Show Changes' commit point has the same two lines -
+	// KFCShowChanges::Run.)
+	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
+	KFCSearchEngine::DropResults();
+
+	std::vector<KFCBookScope::ChapterDoc> targets;
+	PMString bookName;
+	// Chapters the book could not hand over at all. Declared out here so the summary can name them
+	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
+	// they are the only thing that explains what happened.
+	std::vector<KFCBookScope::SkippedChapter> unopenable;
+	if (fromBook)
+	{
+		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
+		// handed straight back once it has been walked, so a book search never holds more than one
+		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
+		// summary reports the ones that could not, after the walk.
+		if (!KFCBookScope::ListBookChapters(targets, bookName) || targets.empty())
+		{
+			// "That book", not "the active book": a run is against the book the BOOK PANEL is showing,
+			// and only falls back to the active one when no panel can be reached
+			// (KFCBookScope::ResolveTargetBook).
+			// (An empty book is refused at the front door. This is the safety net - see the note at the
+			// end of ListBookChapters - and the same sentence.)
+			outSummary.Append("That book has no chapters.");
+			return 0;
+		}
+	}
+	else if (allDocuments)
+	{
+		// EVERY OPEN DOCUMENT, WINDOW OR NOT. InDesign's own All Documents searches a document opened
+		// without a window too (measured: app.findText() counted one), so this does. Each is a "chapter"
+		// of the run - its rows kept apart from the others' - but none is ours to open or close: no file
+		// is recorded (a chapter with no file is found again by its docRef, as the Document search's
+		// always has been), and a chapter KFC holds open from a BOOK search is left out - it is not a
+		// document the user opened. Each is walked from the top by the document form, in this order (the
+		// walk below - not by the dialog's own All Documents scope, which starts at the caret), and this
+		// list is what the matches are filed under, and the T of "M of T document(s)".
+		InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
+		const int32 docCount = (docList != nil) ? docList->GetDocCount() : 0;
+		for (int32 d = 0; d < docCount; ++d)
+		{
+			IDocument* doc = docList->GetNthDoc(d);
+			if (doc == nil)
+				continue;
+			const KFCBookScope::ChapterDoc one = KFCBookScope::DocAsChapter(doc);
+			if (!KFCBookScope::IsHeldDoc(one.docRef))
+				targets.push_back(one);
+		}
+		if (targets.empty())
+		{
+			outSummary.Append("No open document to search.");
+			return 0;
+		}
+	}
+	else
+	{
+		// Re-read rather than carried down from the check above: a command has been processed since
+		// (CommitSearchMode), and a pointer to the active document is not ours to assume survived it.
+		// (Story / To End of Story / Selection walk this one too: the selection is the active document's.)
+		IDocument* doc = KFCBookScope::ActiveDocument();
+		if (doc == nil)
+		{
+			outSummary.Append("No open document to search.");
+			return 0;
+		}
+		targets.push_back(KFCBookScope::DocAsChapter(doc));
+	}
+
+	// Record the scope ON THE RESULTS (KFCResultModel::Clear above wiped the previous value): the
+	// tree reads it to decide whether the chapter rows come up collapsed, and reading it from here
+	// rather than from the toggle keeps an existing result set's display stable if the user flips
+	// Book Scope afterwards.
+	KFCResultModel::SetFromBook(fromBook);
+	// ...and the Search: beside it, for the same reason: All Documents draws its document rows
+	// closed and says which has no window; a Search: changed afterwards changes nothing on screen.
+	KFCResultModel::SetSearchScope(fromBook ? KFCResultModel::kScopeBook
+		: allDocuments ? KFCResultModel::kScopeAllDocuments
+		: (selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? KFCResultModel::kScopeStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
+		: KFCResultModel::kScopeDocument);
+
+	// ...and that a search HAPPENED, which the panel's illustration follows. Said separately from
+	// the two lines around it because it survives finding nothing: a search that returned no hits
+	// has still been run.
+	KFCResultModel::NoteRun();
+
+	// ...and WHICH book, for the tree's book row. Empty for a document search, which has no book
+	// row at all. This is the panel's permanent answer to "what am I looking at": a status line is
+	// one line, gets truncated, and is overwritten by the next message.
+	KFCResultModel::SetBookName(bookName);
+
+	// ...and WHICH TAB was searched. The replace pass re-walks each chapter, and a re-walk in another
+	// mode returns another set of matches - so Change Checked compares this against the tab in force
+	// then and refuses rather than lining rows up with the wrong occurrences.
+	//
+	// Read again rather than reusing `tab` from the top of this function, and that is deliberate:
+	// `tab` was taken BEFORE CommitSearchMode, and what belongs on the results is the mode the walk
+	// is about to actually run in. The two agree today - the commit states the value it just read -
+	// but this is the one that would still be right on the day they stopped agreeing.
+	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
+
+	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
+	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab
+	// alone is not enough: retyping the find string, or turning Include Footnotes off, changes the
+	// match set without changing the tab, and the re-walk would then meet other occurrences where the
+	// hits below stand. See KFCSearchEngine::BuildWalkSignature.
+	{
+		PMString walkSignature;
+		KFCSearchEngine::BuildWalkSignature(walkSignature);
+		KFCResultModel::SetWalkSignature(walkSignature);
+	}
+
+	// ...and the FIND FORMAT itself, kept as a list rather than described in that string, because the
+	// list compares itself properly and a hand-written fingerprint of it did not. Taken here, on the
+	// same side of CommitSearchMode as the signature, for the same reason: a value read on one side
+	// of a mode commit and compared against one read on the other could differ with nothing having
+	// changed. See KFCSearchEngine::RememberFindFormat.
+	KFCSearchEngine::RememberFindFormat();
+
+	CollectTally tally;
+	CollectTargets(targets, fromBook, allDocuments, selectionScope, false /*keepOpen*/, PMString(), unopenable, tally);
+	const int32 total = tally.total;
+	const int32 chaptersWithHits = tally.chaptersWithHits;
+	const bool collectionTruncated = tally.truncated;
+	const bool cancelled = tally.cancelled;
+	std::vector<PMString>& unsearchable = tally.unsearchable;
+	std::vector<PMString>& brokeOff = tally.brokeOff;
+	std::vector<PMString>& unclosed = tally.unclosed;
 
 	// Cancelled: throw the half-finished result away rather than leave a partial list looking like a
 	// complete one, and give the chapters back - the results that would have needed them are gone.
@@ -3052,6 +3112,47 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// truncates its tail when it has to.
 	outSummary.Append(" Right-click the book or a document row for a menu.");
 	return total;
+}
+
+bool KFCSearchEngine::HasFindQueryNow()
+{
+	return HasFindQuery();
+}
+
+void KFCSearchEngine::SearchHeldTargets(std::vector<KFCBookScope::ChapterDoc>& targets, const RunScope& scope,
+	const PMString& bookName, const PMString& barTitle, HeldSearchOutcome& out)
+{
+	out = HeldSearchOutcome();
+	KFCForwardSearchScope forward;		// forward, as SearchBook walks (put back as this returns)
+	const IWalkerScopeFactoryUtils::WalkScopeType selectionScope =
+		static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(scope.selectionScope);
+	// The results' header, as SearchBook records it past its commit point (the same lines).
+	KFCResultModel::SetFromBook(scope.fromBook);
+	KFCResultModel::SetSearchScope(scope.fromBook ? KFCResultModel::kScopeBook
+		: scope.allDocuments ? KFCResultModel::kScopeAllDocuments
+		: (selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? KFCResultModel::kScopeStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
+		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
+		: KFCResultModel::kScopeDocument);
+	KFCResultModel::NoteRun();
+	KFCResultModel::SetBookName(bookName);
+	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
+	{
+		PMString walkSignature;
+		KFCSearchEngine::BuildWalkSignature(walkSignature);
+		KFCResultModel::SetWalkSignature(walkSignature);
+	}
+	KFCSearchEngine::RememberFindFormat();
+
+	std::vector<KFCBookScope::SkippedChapter> unopenable;	// none: the targets are open
+	CollectTally tally;
+	CollectTargets(targets, scope.fromBook, scope.allDocuments, selectionScope, true /*keepOpen*/, barTitle,
+		unopenable, tally);
+	out.total = tally.total;
+	out.capped = tally.truncated;
+	out.cancelled = tally.cancelled;
+	AppendUnsearchableNote(out.notes, tally.unsearchable);
+	AppendSearchErrorNote(out.notes, tally.brokeOff);
 }
 
 bool KFCSearchEngine::IsSearching()
