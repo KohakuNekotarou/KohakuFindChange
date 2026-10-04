@@ -21,7 +21,7 @@
 //  
 //========================================================================================
 
-// ***** READ THIS FILE AS CP1252, NOT AS THE MACHINE'S ANSI CODE PAGE. ***** (2026-08-11.)
+// READ THIS FILE AS CP1252, NOT AS THE MACHINE'S ANSI CODE PAGE.
 //
 // Without this line the copyright sign comes out as a halfwidth katakana on a Japanese Windows.
 // The SDK writes the sign as a raw byte - CC21BuildNumber.h:107 is
@@ -29,13 +29,13 @@
 // - and 0xA9 is the copyright sign only in CP1252. rc.exe defaults to the SYSTEM's ANSI code page,
 // which on this machine is CP932, where 0xA9 is U+FF69 (halfwidth katakana small U). So the .pln's
 // LegalCopyright read "ｩ 1999-2025 Adobe..." while InDesign's own binaries, built on an English
-// system, read "© 1999-2025 Adobe..." - measured on both, 2026-08-11.
+// system, read "© 1999-2025 Adobe..." - measured on both.
 //
 // *It affects nothing but the string Windows shows under file Properties > Details. It is here
 //  because this plug-in is submitted to Adobe Exchange, and because the SDK's own text was never
 //  meant to say that.
-// *KCM's two halves were fixed the same way on 2026-08-15 (KCM.rc in audit B1, KCMUI.rc the same
-//  day). KESCL and KT still carry the same fault - they share this template.
+// *KCM's and KIDMCP's two halves carry the same line. KESCL and KT still carry the fault - they
+//  share this template.
 #pragma code_page(1252)
 
 #include "WinRezFlags.h"
@@ -65,7 +65,7 @@ BEGIN
             VALUE "InternalName", kKFCUIPluginName, "\0"
             VALUE "LegalCopyright", kShortCopyRightStr, "\0"
 
-            // The UI half (2026-10-01, the model/UI split): KohakuFindChangeUI.pln. The SDK's stock
+            // The UI half: KohakuFindChangeUI.pln. The SDK's stock
             // TargetName would append ".sdk"; the project overrides it in all four configurations,
             // as the model half's does. kKFCUIFileName must match the vcxproj TargetName.
             VALUE "OriginalFilename", kKFCUIFileName ".pln\0"

@@ -24,7 +24,7 @@
 
 #include "VCPlugInHeaders.h"
 
-// ***** THE MODEL HALF'S RESOURCES (2026-10-01, the model/UI split). *****
+// THE MODEL HALF'S RESOURCES.
 // The search and replace engines, the results, the tracked-change signature, the jump marker's
 // adornment and the observers that keep the results true are declared here; everything the panel
 // needs - its bosses, menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's
@@ -41,15 +41,13 @@
 #include "BuildNumber.h"
 #include "PlugInModel_UIAttributes.h"
 #include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
-							// (2026-09-26). It replaced GraphicsID.h, which was here for IID_IDRWEVTHANDLER
-							// alone - the Draw Event marker that went.
 #include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
 
 // Project includes:
 #include "KBSID.h"
 
-// (The UI half's includes - the menu, action, panel, widget, tree and icon definitions, TipsID.h and
-//  AppFrameworkID.h - went to ui/KFCUI.fr with the resources that need them, 2026-10-01.)
+// (The UI half's includes - the menu, action, panel, widget, tree and icon definitions - are in
+//  ui/KFCUI.fr with the resources that need them.)
 
 
 #ifdef __ODFRC__
@@ -66,7 +64,7 @@ resource PluginVersion (kSDKDefPluginVersionResourceID)
 	kKBSCurrentMajorFormatNumber, kKBSCurrentMinorFormatNumber,
 	{ kInDesignProduct },
 	{ kWildFS },
-	kModelPlugIn,		// 2026-10-01, the model/UI split: no UI boss, no UI library, safe on a background thread
+	kModelPlugIn,		// no UI boss, no UI library, safe on a background thread
 	kKBSVersion
 };
 
@@ -92,7 +90,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 
 	/*
-	 * The jump marker (2026-09-26): a global text adornment. Two interfaces, only one of them ours:
+	 * The jump marker: a global text adornment. Two interfaces, only one of them ours:
 	 * the API ships the provider for kGlobalTextAdornmentService (kGlobalTextAdornmentServiceImpl,
 	 * TextID.h) - the same pair as the product's dynamic spelling squiggle (SpellPanelClass.fr) and
 	 * KCM's Story-mode marker (KCM.fr, kKCMStoryMarkerBoss). It replaced kKBSDrawEventServiceBoss,
@@ -108,7 +106,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/** Signs the tracked changes one replace made (2026-09-28): the insertion's pieces and the deletion
+	/** Signs the tracked changes one replace made: the insertion's pieces and the deletion
 		in the range become "KohakuFindChange" at the row's time. KBSSignRecordsCmd.cpp.
 		ItemList: the story. */
 	Class
@@ -123,10 +121,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Startup/shutdown service boss (Task 3) - the MODEL half's since 2026-10-01: starts the book-close
-	 * watcher and clears the model's state during controlled shutdown.
-	 * kCMainThreadStartupShutdownProviderImpl (API-provided) registers it since 2026-10-01 (it was the lazy
-	 * provider): a model plug-in's startup/shutdown service is otherwise ALSO called as each background
+	 * Startup/shutdown service boss - the MODEL half's: starts the book-close watcher and clears the
+	 * model's state during controlled shutdown.
+	 * kCMainThreadStartupShutdownProviderImpl (API-provided) registers it, NOT the lazy provider: a model
+	 * plug-in's startup/shutdown service is otherwise ALSO called as each background
 	 * thread starts and stops (guide vol1-07), and this Shutdown throws the session's results away. The
 	 * shape Adobe uses for a model plug-in that wants the main thread only, with that very reason written
 	 * beside it: private/toolkit/diagnosticlog/DiagLogClass.fr; KCM's model half does the same.
@@ -162,8 +160,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * The three doors the UI half reaches the model half through (2026-10-01, the model/UI split -
-	 * IKBSResults.h / IKBSRuns.h / IKBSChapters.h, forwarding in KBSModelServices.cpp). On the session
+	 * The three doors the UI half reaches the model half through (IKBSResults.h / IKBSRuns.h /
+	 * IKBSChapters.h, forwarding in KBSModelServices.cpp). On the session
 	 * because what is behind them is session state; the model's own implementations, so they are this
 	 * half's.
 	 */
@@ -179,15 +177,15 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * The panel follows an Undo and a Redo of KBS's own writes (2026-09-29, the user: "after an Undo the
-	 * row cannot be rejected again - the panel should come back with it, the way KCM's does").
-	 * ***** ON THE DOCUMENT SINCE 2026-10-02 (S-1). ***** Every write leaves a mark in its undo step
-	 * (kKBSUndoMarkCmdBoss, below): a ModelChange on its document's subject, under IID_IKBSUNDOMARK. This
-	 * LAZY observer hears it on the Do, the Undo and the Redo alike - lazy because that is the only
-	 * notification an Undo and a Redo broadcast (ISubject.h:78-82). KCM's ticks and paws ride the same road
-	 * (KCM.fr, IID_IKCMMARKSOBSERVER). Until then the observer sat on each story a write moved (kTextStoryBoss),
-	 * and a story InDesign purged from memory - it does, switching documents - came back without it: the
-	 * second document's Ctrl+Z went unheard 12 times in 18. A document is not purged while it is open.
+	 * The panel follows an Undo and a Redo of KBS's own writes (the author: "after an Undo the row cannot
+	 * be rejected again - the panel should come back with it, the way KCM's does").
+	 * ON THE DOCUMENT, NOT THE STORY. Every write leaves a mark in its undo step (kKBSUndoMarkCmdBoss,
+	 * below): a ModelChange on its document's subject, under IID_IKBSUNDOMARK. This LAZY observer hears it
+	 * on the Do, the Undo and the Redo alike - lazy because that is the only notification an Undo and a
+	 * Redo broadcast (ISubject.h:78-82). KCM's ticks and paws ride the same road (KCM.fr,
+	 * IID_IKCMMARKSOBSERVER). An observer on each story a write moved (kTextStoryBoss) is lost: a story
+	 * InDesign purges from memory - it does, switching documents - comes back without it (the second
+	 * document's Ctrl+Z went unheard 12 times in 18). A document is not purged while it is open.
 	 * Our own IID: kDocBoss carries other people's IID_IOBSERVER. Attached at run time in KBSUndoFollow.cpp
 	 * (this line only puts our IID, and so the implementation, onto the boss), never written into the
 	 * document. The MODEL half's: it keeps the results true and tells the panel only through
@@ -202,7 +200,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/** The mark (2026-10-02, KBSUndoFollow.cpp): processed inside every write of KBS's own, it changes nothing
+	/** The mark (KBSUndoFollow.cpp): processed inside every write of KBS's own, it changes nothing
 		and raises a ModelChange on its document's subject from DoNotify. ItemList: the document's root. */
 	Class
 	{
@@ -232,9 +230,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			IID_IRESPONDER,         kKBSCloseDocResponderImpl,
 		}
 	},
-
-	// (The scripting provider - kKBSScriptProviderBoss, serving app.kfcStatus / app.kfcResults -
-	//  stood here until 2026-09-27. The regression suite reads the panel through KIDMCP instead.)
 
 }}};
 
@@ -267,36 +262,28 @@ resource LocaleIndex ( kSDKDefStringsResourceID)
 		// customdatalinkui/CusDtLnkUI.fr:437, customdatalink/CusDtLnk.fr:562,
 		// basicshape/BscShp.fr:270 - they all close with this exact line. The other official
 		// shape, a row per locale (basiclocalization/BscL10N.fr:196-219), is for a plug-in that
-		// really carries seventeen translated tables. KBS carries one, so there is nothing for
+		// really carries several translated tables. KBS carries one, so there is nothing for
 		// a per-locale row to select.
 		//
-		// It replaces a list of thirteen named locales that every one of them pointed at this
-		// same enUS table (2026-08-06). That list was NOT equivalent to this line: the lookup
-		// is a match, not a default (LocaleIndex.h:124-134, "Does wildcard matching"), so the
-		// locales absent from it - koKR, zhCN, zhTW, ruRU - matched no row at all and drew
-		// every menu, panel and prompt as its RAW KEY. That exact failure was measured on a
-		// Japanese UI on 2026-08-05 (memory plugin-ui-localization-fr-encoding), and the note
-		// that used to sit here claimed a locale could no longer be stranded - while four
-		// still were.
+		// !Do NOT turn it into a list of named locales that all point at this same table. That
+		// is NOT equivalent: the lookup is a match, not a default (LocaleIndex.h:124-134, "Does
+		// wildcard matching"), so a locale absent from the list matches no row at all and draws
+		// every menu, panel and prompt as its RAW KEY (measured on a Japanese UI - memory
+		// plugin-ui-localization-fr-encoding).
 		//
-		// The Japanese KBS speaks is not in a table any more (2026-08-05, user's call): it is
-		// switched in at RUN TIME by UI language - see KBSLoc.h. The official jaJP shape
-		// (kInDesignJapaneseFS + a jaJP table) was tried and matched NO row on a Roman-engine
-		// install running a Japanese UI, which is what the development machine was on
-		// 2026-08-05 (it became a true Japanese install - featureSet 'Japn' - on 2026-08-06).
-		// kWildFS is what covers both, because the featureset and the UI language are
-		// separate axes and this table is meant for every combination of them.
+		// The Japanese KBS speaks is not in a table (the author's call): it is switched in at RUN
+		// TIME by UI language - see KBSLoc.h. The official jaJP shape (kInDesignJapaneseFS + a
+		// jaJP table) matched NO row on a Roman-engine install running a Japanese UI. kWildFS is
+		// what covers both, because the featureset and the UI language are separate axes and this
+		// table is meant for every combination of them.
 		kWildFS, k_Wild, kSDKDefStringsResourceID + index_enUS
 	}
 };
 
 
 
-// (Scripting - app.kfcStatus and app.kfcResults, a VersionedScriptElementInfo resource - stood here
-//  until 2026-09-27. Never in a published build (1.0.0 predates them), so nothing is kept as Obsolete.)
-
 #endif // __ODFRC__
 
 #include "KBS_enUS.fr"
-// KBS_jaJP.fr is gone (2026-08-05): the Japanese now lives in KBSLoc.h and is switched at run
-// time by UI language. See the LocaleIndex note above.
+// (No KBS_jaJP.fr: the Japanese lives in KBSLoc.h and is switched at run time by UI language. See the
+//  LocaleIndex note above.)
