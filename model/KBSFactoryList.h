@@ -20,21 +20,19 @@
 //  distribution of it requires the prior written permission of Adobe.
 //  
 //========================================================================================
-// The model half's implementations (2026-10-01, the model/UI split). The UI half's are in
-// ui/KFCUIFactoryList.h.
-// Task 3: jump + marker + startup/shutdown. (KBSDrawEventSrvc / KBSDrawEventHandler stood here until
-// 2026-09-26; the marker is the global text adornment below - KBSHitMarker.cpp.)
+// The model half's implementations. The UI half's are in ui/KFCUIFactoryList.h.
+// The jump marker (a global text adornment - KBSHitMarker.cpp) and the startup/shutdown service.
 REGISTER_PMINTERFACE(KBSHitMarkerAdornment, kKBSHitMarkerAdornmentImpl)
 REGISTER_PMINTERFACE(KBSStartupShutdown, kKBSStartupShutdownImpl)
 // Result invalidation: retire a document-scope result set when its document closes.
 REGISTER_PMINTERFACE(KBSCloseDocResponder, kKBSCloseDocResponderImpl)
 // Result invalidation: retire a book-scope result set when its book closes.
 REGISTER_PMINTERFACE(KBSBookWatch, kKBSBookWatchImpl)
-// The replace's signature (2026-09-28): the command and its 64-bit data (KBSSignRecordsCmd.cpp).
+// The replace's signature: the command and its 64-bit data (KBSSignRecordsCmd.cpp).
 REGISTER_PMINTERFACE(KBSSignRecordsCmd, kKBSSignRecordsCmdImpl)
 REGISTER_PMINTERFACE(KBSInt64Data, kKBSInt64DataImpl)
 // The panel follows an Undo and a Redo (KBSUndoFollow.cpp): the mark a write leaves, and the lazy observer
-// AddIn'd on kDocBoss that hears it (2026-10-02 - on kTextStoryBoss from 2026-09-29 until then).
+// AddIn'd on kDocBoss that hears it (not on kTextStoryBoss - KBSID.h, IID_IKBSSTORYUNDOOBSERVER, says why).
 REGISTER_PMINTERFACE(KBSUndoMarkCmd, kKBSUndoMarkCmdImpl)
 REGISTER_PMINTERFACE(KBSDocUndoObserver, kKBSDocUndoObserverImpl)
 // The model half's three session interfaces (KBSModelServices.cpp).

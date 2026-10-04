@@ -20,21 +20,20 @@
 //  distribution of it requires the prior written permission of Adobe.
 //  
 //========================================================================================
-// The UI half's implementations (2026-10-01, the model/UI split - moved from KBSFactoryList.h).
-// The model half's are in model/KBSFactoryList.h.
+// The UI half's implementations. The model half's are in model/KBSFactoryList.h.
 REGISTER_PMINTERFACE(KBSActionComponent, kKBSActionComponentImpl)
-// Result tree (Task 2): hierarchy adapter, row widget manager, the colour cell's view + data.
+// Result tree: hierarchy adapter, row widget manager, the colour cell's view + data.
 REGISTER_PMINTERFACE(KBSResultListAdapter, kKBSResultListAdapterImpl)
 REGISTER_PMINTERFACE(KBSResultListWidgetMgr, kKBSResultListWidgetMgrImpl)
 REGISTER_PMINTERFACE(KBSColorTextView, kKBSColorTextViewImpl)
 REGISTER_PMINTERFACE(KBSRowData, kKBSRowDataImpl)
-// Task 3: the marker's countdown and the hit row's click (the jump).
+// The jump marker's countdown and the hit row's click (the jump).
 REGISTER_PMINTERFACE(KBSMarkerExpiryTask, kKBSMarkerExpiryIdleTaskImpl)
 REGISTER_PMINTERFACE(KBSResultNodeEH, kKBSResultNodeEHImpl)
 // The result LIST's own handler: up / down arrows that open the row they land on. A boss in the
 // .fr naming an implementation that is not registered here takes InDesign down at load time.
 REGISTER_PMINTERFACE(KBSResultTreeEH, kKBSResultTreeEHImpl)
-// The UI half's own startup/shutdown service (2026-10-01, the model/UI split).
+// The UI half's own startup/shutdown service.
 REGISTER_PMINTERFACE(KBSUIStartupShutdown, kKBSUIStartupShutdownImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
@@ -50,20 +49,23 @@ REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)
 // !The roll-over fails SILENTLY without its line here - CREATE_PMINTERFACE alone is not enough.
 REGISTER_PMINTERFACE(KBSPanelVisibilityObserver, kKBSPanelVisibilityObserverImpl)
 REGISTER_PMINTERFACE(KBSPanelRollOver, kKBSPanelRollOverImpl)
-// "Remember Book Panel Placement": the observer on kActiveContextBoss, and the palette-manager
-// service boss's two halves (KBSBookPanelPlacement.cpp). A boss in the .fr naming an implementation
-// that is not registered here takes InDesign down at load time.
+// "Remember Book Panel Placement": the observer on kActiveContextBoss, the palette-manager service
+// boss's two halves and the command interceptor (KBSBookPanelPlacement.cpp) - the observer here, the
+// other three after the next line. A boss in the .fr naming an implementation that is not registered
+// here takes InDesign down at load time.
 REGISTER_PMINTERFACE(KBSBookPanelObserver, kKBSBookPanelObserverImpl)
-// "Link the Application Bar's Search Field to This Panel" (2026-10-03): the observer on kActiveContextBoss that
+// "Link the Application Bar's Search Field to This Panel": the observer on kActiveContextBoss that
 // makes the field follow Find/Change (KBSAppBarSearchEnter.cpp).
 REGISTER_PMINTERFACE(KBSAppBarMirrorObserver, kKBSAppBarMirrorObserverImpl)
+// ...Remember Book Panel Placement again: the palette-manager service boss's two halves and the command
+// interceptor.
 REGISTER_PMINTERFACE(KBSBookPanelServiceProvider, kKBSBookPanelServiceProviderImpl)
 REGISTER_PMINTERFACE(KBSBookPanelPaletteMgrService, kKBSBookPanelPaletteMgrServiceImpl)
 REGISTER_PMINTERFACE(KBSBookPanelCmdWatch, kKBSBookPanelCmdWatchImpl)
-// The panel's message area (2026-09-29): its view and its data (KBSStatusTextView.cpp).
+// The panel's message area: its view and its data (KBSStatusTextView.cpp).
 REGISTER_PMINTERFACE(KBSStatusTextView, kKBSStatusTextViewImpl)
 REGISTER_PMINTERFACE(KBSStatusTextData, kKBSStatusTextDataImpl)
-// The model/UI split's boundary (2026-10-01): the UI half's observer of the model half's notifications.
+// The model/UI split's boundary: the UI half's observer of the model half's notifications.
 REGISTER_PMINTERFACE(KBSModelObserver, kKBSModelObserverImpl)
 // ...and the UI services the model half asks for (the bar, the windows, the Book panel, the alert).
 REGISTER_PMINTERFACE(KBSUIServices, kKBSUIServicesImpl)
