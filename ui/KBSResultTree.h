@@ -87,6 +87,20 @@ namespace KBSResultTree
 	    run this session). Nothing happens when none is standing. */
 	void DropBefore();
 
+	/** ***** WHY A ROW'S RIGHT-CLICK MENU IS GREY (2026-10-04, O-3 - the user's call). ***** Put up OVER what
+	    the box shows - the last message, or a standing "Source Text:" - without replacing it, the way
+	    ShowRowsBefore stands over the last message: the reason is about the row the menu was popped over, so
+	    the next right-click that has nothing to say takes it down again (DropRowMenuReason) instead of
+	    leaving it to read as if it were about that row. Anything that reports through ShowStatus, and a new
+	    "Source Text:", take its place; a panel shown again does not bring it back. KBSResultNodeEH::RButtonDn
+	    is the one caller. */
+	void ShowRowMenuReason(const PMString& reason);
+
+	/** Take a standing reason down and put back what was under it: the "Source Text:" when one stands, the
+	    last message otherwise (or the opening one, with nothing run this session). Nothing happens when no
+	    reason is standing. Every right-click that says nothing calls it. */
+	void DropRowMenuReason();
+
 	/** Put the status read-out back to what THIS session last had on it - a standing "Source Text:" first
 	    (ShowRowsBefore), then the last message - or, when nothing has run since launch, to the opening
 	    message (the string table's kKBSStaticTextKey). Called from the panel's AutoAttach, and only

@@ -70,7 +70,7 @@
 #include "KBSResultNodeID.h"
 #include "KBSJump.h"
 #include "KBSModelAccess.h"		// the model half, through its session interfaces (2026-10-01, the model/UI split)
-#include "KBSResultTree.h"		// ShowStatus - why a hit row's menu has nothing to offer
+#include "KBSResultTree.h"		// ShowRowMenuReason / DropRowMenuReason - why a row's menu has nothing to offer
 
 namespace
 {
@@ -328,15 +328,19 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		// every item grey the popup does not open, so the status line is the only place to say it - and a story
 		// whose replaced text is all under a hidden condition said nothing at all (case
 		// reject-hidden-condition-story). StoryRejectGreyReason, above, says which.
+		// ***** OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (2026-10-04,
+		// ***** O-3, the user's call). ***** Through ShowStatus until then: it became the last message and stayed,
+		// reading as if it were about whatever row was right-clicked next (KBSResultTree::ShowRowMenuReason).
+		PMString why;
 		if (!KBSRuns()->CanRejectStory(chapter, group))
+			why = StoryRejectGreyReason(chapter, group);
+		if (!why.IsEmpty())
 		{
-			PMString why(StoryRejectGreyReason(chapter, group));
-			if (!why.IsEmpty())
-			{
-				why.SetTranslatable(kFalse);
-				KBSResultTree::ShowStatus(why);
-			}
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowRowMenuReason(why);
 		}
+		else
+			KBSResultTree::DropRowMenuReason();
 		PopRowMenu(kKBSResultStoryMenuName, e, this);
 		return kTrue;
 	}
@@ -347,6 +351,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID->IsRunRow())
 	{
 		KBSResults()->SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
+		KBSResultTree::DropRowMenuReason();		// nothing to say over a run row (O-3)
 		PopRowMenu(kKBSResultRunMenuName, e, this);
 		return kTrue;
 	}
@@ -365,11 +370,12 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		KBSResults()->SetContextMenuHit(chapter, hit);
 		bool checked = false, replaced = false, locked = false;
 		KBSResults()->GetHitFlags(chapter, hit, checked, replaced, locked);
+		// (Over the last message since 2026-10-04 - the story row's note above, O-3.)
 		if (KBSResults()->GetHitInFootnote(chapter, hit))
 		{
 			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
 			why.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(why);
+			KBSResultTree::ShowRowMenuReason(why);
 		}
 		else if (replaced && !KBSRuns()->RefreshRowFromRecords(chapter, hit))
 		{
@@ -387,8 +393,10 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 				? "Reject Change: this row's replaced text is under a hidden condition - show the condition and reject again."
 				: "Reject Change: no tracked change of this replace is left for this row (accepted or rejected in the Track Changes panel?).");
 			why.SetTranslatable(kFalse);
-			KBSResultTree::ShowStatus(why);
+			KBSResultTree::ShowRowMenuReason(why);
 		}
+		else
+			KBSResultTree::DropRowMenuReason();
 		PopRowMenu(kKBSResultHitMenuName, e, this);
 		return kTrue;
 	}
@@ -397,6 +405,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		? static_cast<int32>(KBSResultModel::kContextMenuBookRow)
 		: nodeID->GetChapter();
 	KBSResults()->SetContextMenuChapter(target);
+	KBSResultTree::DropRowMenuReason();		// nothing to say over a book or document row (O-3)
 	PopRowMenu(kKBSResultRowMenuName, e, this);
 	return kTrue;
 }

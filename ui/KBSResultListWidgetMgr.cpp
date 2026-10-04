@@ -834,6 +834,12 @@ static PMString gBeforePre;
 static PMString gBeforeOriginal;
 static PMString gBeforePost;
 
+// ***** WHY A ROW'S RIGHT-CLICK MENU IS GREY (2026-10-04, O-3, ShowRowMenuReason). ***** One more layer, over
+// the "Source Text:" or the last message: neither of those is touched while it stands, so the next right-click
+// that has nothing to say - or a selection (DropBefore) - puts back exactly what it covered.
+static bool gShowingReason = false;
+static PMString gReason;
+
 void KBSResultTree::ShutdownCleanup()
 {
 	// The statics this file keeps, emptied for the reason KBSResultModel empties its own: a PMString
@@ -845,6 +851,8 @@ void KBSResultTree::ShutdownCleanup()
 	gBeforePre.Clear();
 	gBeforeOriginal.Clear();
 	gBeforePost.Clear();
+	gShowingReason = false;
+	gReason.Clear();
 }
 
 namespace
@@ -936,6 +944,11 @@ void KBSResultTree::RestoreStatusOnPanelShow()
 	//
 	// So the panel's show is where the line has to be written, exactly as the tab's name and the
 	// illustration already are: whatever is written here outranks the persisted value.
+	//
+	// A right-click menu's reason (ShowRowMenuReason) does not come back with the panel: it was about the row
+	// a menu was popped over, and that moment has passed. What it covered is written below as ever.
+	gShowingReason = false;
+	gReason.Clear();
 	if (gShowingBefore)
 	{
 		// A selected replaced row's "Source Text:" was standing when the panel went away: it comes back
@@ -963,8 +976,11 @@ void KBSResultTree::ShowStatus(const PMString& message)
 	gLastStatus.SetTranslatable(kFalse);
 
 	// A new message takes the place of a standing "Source Text:" (2026-09-29): it reports something that has
-	// happened since, and a jump that fails says why through here - never under an old row's text.
+	// happened since, and a jump that fails says why through here - never under an old row's text. And of a
+	// standing right-click reason (2026-10-04), for the same reason.
 	gShowingBefore = false;
+	gShowingReason = false;
+	gReason.Clear();
 
 	// The illustration follows the same moments this line does, so it is settled here rather than at
 	// every call site. Both directions run through here: an engine reports what it found (the model
@@ -1022,6 +1038,8 @@ void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 	gBeforeOriginal = original;	gBeforeOriginal.SetTranslatable(kFalse);
 	gBeforePost = post;			gBeforePost.SetTranslatable(kFalse);
 	gShowingBefore = true;
+	gShowingReason = false;		// the newly selected row's text takes a right-click reason's place
+	gReason.Clear();
 
 	// The illustration is not settled here: nothing has run, and it follows what runs (ShowStatus).
 	WriteBefore(kTrue /*force the redraw*/);
@@ -1030,15 +1048,48 @@ void KBSResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& r
 void KBSResultTree::DropBefore()
 {
 	if (!gShowingBefore)
-		return;		// nothing standing: the message under it is already what the box shows
+	{
+		// Nothing standing - but a right-click reason over the last message is about a row the user has
+		// now moved away from by selecting another one (2026-10-04, O-3): it goes too.
+		DropRowMenuReason();
+		return;
+	}
 	gShowingBefore = false;
 	gBeforePre.Clear();
 	gBeforeOriginal.Clear();
 	gBeforePost.Clear();
+	gShowingReason = false;		// a reason over the "Source Text:" goes with it
+	gReason.Clear();
 
 	// Back to what the panel said before the row was selected - the last message, untouched by the
 	// "Source Text:" (or, with nothing run this session, the opening one).
 	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
+}
+
+//----------------------------------------------------------------------------------------
+// KBSResultTree::ShowRowMenuReason / DropRowMenuReason - why a row's right-click menu is grey (2026-10-04)
+//----------------------------------------------------------------------------------------
+
+void KBSResultTree::ShowRowMenuReason(const PMString& reason)
+{
+	gReason = reason;
+	gReason.SetTranslatable(kFalse);
+	gShowingReason = true;
+	// Drawn now, before the menu (or, when every item is grey, instead of it). Neither the last message nor a
+	// standing "Source Text:" is touched, and the illustration does not move: nothing has run.
+	WriteMessage(gReason, kTrue /*force the redraw*/);
+}
+
+void KBSResultTree::DropRowMenuReason()
+{
+	if (!gShowingReason)
+		return;		// nothing standing: what is under it is already what the box shows
+	gShowingReason = false;
+	gReason.Clear();
+	if (gShowingBefore)
+		WriteBefore(kTrue /*force the redraw*/);
+	else
+		WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
 }
 
 //----------------------------------------------------------------------------------------
