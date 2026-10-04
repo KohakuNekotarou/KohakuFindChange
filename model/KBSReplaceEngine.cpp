@@ -244,11 +244,15 @@ struct RunTotals
 	// Ticked rows in an endnote story that was left alone (2026-09-27): a match there ends an endnote.
 	int32		endnoteLeft;
 	int32		acceptedFirst;	// pending tracked changes accepted before the first write (2026-09-27)
+	// Rows written that Track Changes recorded nothing for (2026-10-04, scenario cross-check 5): a footnote's, or
+	// a replace that changed no character (Change Format with an empty Change To). Reject Change cannot take
+	// those back, and the line that says it can is decided here (BuildSummary - the panel added it until then).
+	int32		unrecorded;
 
 	RunTotals()
 		: replaced(0), chaptersTouched(0), chaptersSkipped(0),
 		  chaptersNoWindow(0), chaptersLeftHidden(0), chaptersWalkFailed(0),
-		  missing(0), locked(0), refused(0), endnoteLeft(0), acceptedFirst(0),
+		  missing(0), locked(0), refused(0), endnoteLeft(0), acceptedFirst(0), unrecorded(0),
 		  haveFirstSkipped(false), haveFirstWalkFailed(false),
 		  cancelled(false), stoppedByError(false), stoppedByFailure(false)
 	{
@@ -634,10 +638,12 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 // in the same thread (CarryRowsPast); a written row is put where its new text stands. A row that would
 // write at an endnote's end is left, and said so (MatchEndsAnEndnote). What is still in `pending` at the
 // end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
+// ioUnrecorded = the rows written that Track Changes recorded nothing for (a footnote, or a replace that
+// changed no character - 2026-10-04): the status lines say those cannot be taken back.
 // (Cancel is not asked in here - between stories, by the caller: the user's call, story by story.)
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
-	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
+	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, int32& ioUnrecorded, bool& outWalkFailed,
 	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
 	bool& outSignFailed)
 {
@@ -714,21 +720,30 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 						outSignFailed = true;
 						break;
 					}
-					// The row's time only when a record carries it; 0 = none (a footnote records nothing) - set
-					// either way, so a row replaced once, taken back and replaced again where nothing is
-					// recorded does not keep the first replace's time.
-					KBSResultModel::SetHitRecordTime(chapterIdx, hitIdx,
-						KBSTrackChange::HasRecordsOfTimeIn(written, writtenStart, writtenEnd, stamp) ? stamp : 0);
+					// The row's time only when a record carries it; 0 = none (a footnote records nothing, nor does a
+					// replace that changed no character - Change Format with an empty Change To) - set either way, so
+					// a row replaced once, taken back and replaced again where nothing is recorded does not keep the
+					// first replace's time. ***** AND WHERE ITS FIRST RECORD STANDS IN WHAT IT WROTE (2026-10-04,
+					// scenario cross-check 5). ***** 0 for a whole-match replace; a GREP $n keeps the matched
+					// characters it names, and its records start past them (Hit::recordLead).
+					TextIndex firstRecord = kInvalidTextIndex;
+					const bool recorded = KBSTrackChange::FirstRecordOfTimeIn(written, writtenStart, writtenEnd, stamp, firstRecord);
+					KBSResultModel::SetHitRecord(chapterIdx, hitIdx, recorded ? stamp : 0,
+						recorded ? static_cast<int32>(firstRecord - writtenStart) : 0);
+					if (!recorded)
+						++ioUnrecorded;
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
-					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
 					// ***** ITS TWO TEXTS, TAKEN HERE (2026-09-28). ***** Both callers read them for every row -
 					// before the chapter and again after it - until then. The text written now is the text the
 					// row holds at the end: no later replace of the run writes inside it, since every other row
 					// is carried outside it and a match there is none of theirs (stepped over, above).
+					// Set before MarkHitReplaced since 2026-10-04: the row's locator says "no track" at once when
+					// the replace changed no character (KBSResultModel::GetHitTextUnchanged), which asks them.
 					KBSResultModel::SetHitChangeTexts(chapterIdx, hitIdx, original,
 						KBSTrackChange::ReadText(written, writtenStart, writtenEnd - writtenStart));
+					KBSResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
 					// every row after it first, then this row at what was written - so it is not moved by itself
 					CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
 						end - matchThreadStart, writtenEnd - writtenStart);
@@ -844,12 +859,12 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 // Find/Change options or a row cannot be read. The pending tracked changes the ticked matches sit in or
 // next to are accepted before the first write (outAcceptedFirst = how many) - except around a match at
 // an endnote's end, which the walk leaves (2026-10-02). outCancelled / outFailed: the caller aborts the
-// whole run.
+// whole run. outUnrecorded = the rows written that Track Changes recorded nothing for (WalkStoryReplacing).
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	KBSProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
-	int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed, PMString& outWhyNot,
-	const std::set<int32>* onlyHits = nil)
+	int32& outUnrecorded, int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed,
+	PMString& outWhyNot, const std::set<int32>* onlyHits = nil)
 {
 	outAcceptedFirst = 0;
 	outReplaced = 0;
@@ -857,6 +872,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	outLocked = 0;
 	outRefused = 0;
 	outEndnoteLeft = 0;
+	outUnrecorded = 0;
 	outWalkFailed = false;
 	outCancelled = false;
 	outFailed = false;
@@ -1039,8 +1055,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		{
 			bool signFailed = false;
 			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
-				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase, ioProgressReported, done,
-				signFailed))
+				outReplaced, outRefused, outEndnoteLeft, outUnrecorded, outWalkFailed, progressBar, progressBase,
+				ioProgressReported, done, signFailed))
 			{
 				outFailed = true;
 				outWhyNot = "the text walker could not be started";
@@ -1484,6 +1500,27 @@ void BuildSummary(const RunTotals& t, PMString& outSummary)
 		outSummary.Append(" ");
 		outSummary.AppendNumber(t.chaptersLeftHidden);
 		outSummary.Append(" document(s) without a window were changed - still hidden.");
+	}
+
+	// ***** WHAT REJECT CHANGE CAN TAKE BACK, LAST (2026-10-04, scenario cross-check 5). ***** The panel appended
+	// "Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back." to every run that
+	// wrote, until then - also to one whose rows Track Changes recorded nothing for: a replace that changed no
+	// character (Change Format with an empty Change To - measured, case xs5-b2-format-only-cc) or one in a
+	// footnote. Those rows say "no track"; this says how many, and does not promise what cannot be done.
+	if (t.replaced > 0)
+	{
+		if (t.unrecorded < t.replaced)
+		{
+			outSummary.Append(" Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back.");
+			if (t.unrecorded > 0)
+			{
+				outSummary.Append(" Not the ");
+				outSummary.AppendNumber(t.unrecorded);
+				outSummary.Append(" marked \"no track\" - inside a footnote, or no character changed (formatting only): Track Changes records nothing there.");
+			}
+		}
+		else
+			outSummary.Append(" Track Changes recorded nothing for them (inside a footnote, or no character changed - formatting only) - Reject Change cannot take them back; Edit > Undo can.");
 	}
 
 	// One more sentence stood here until 2026-08-05: chapters whose OWN sequence was rolled back,
@@ -2369,13 +2406,14 @@ int32 KBSReplaceEngine::ReplaceChecked(PMString& outSummary)
 		// writes it (WalkStoryReplacing; read here, before and after the chapter, until 2026-09-28).
 		// ***** ONE MATCH AT A TIME, STORY BY STORY (2026-09-27, the user's call). ***** Change All
 		// over whole stories stood here from 2026-09-26 (removed in the 2026-09-27 cleanup).
-		int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, acceptedFirst = 0;
+		int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, unrecorded = 0, acceptedFirst = 0;
 		bool walkFailed = false, runCancelled = false, runFailed = false;
 		PMString whyNot;
 		const bool wrote = ReplaceInChapterOneByOne(ci, docRef, scopeOptions,
 			&progressBar, progressBase, progressReported, replaced, missing, locked, refused, endnoteLeft,
-			acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
+			unrecorded, acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
 		totals.endnoteLeft += endnoteLeft;
+		totals.unrecorded += unrecorded;
 		totals.acceptedFirst += acceptedFirst;
 		if (runCancelled)
 		{
@@ -2892,7 +2930,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			writtenStories.insert(story);
 	}
 
-	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, accepted = 0;
+	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, unrecorded = 0, accepted = 0;
 	bool walkFailed = false, cancelled = false, failed = false;
 	PMString whyNot;
 	bool ok = false;
@@ -2915,7 +2953,8 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		KBSTrackChange::BeginSignedRun();	// the run's time (2026-09-28) - every row it writes is stamped from it
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
-			replaced, missing, locked, refused, endnoteLeft, accepted, walkFailed, cancelled, failed, whyNot, &rowsToReplace);
+			replaced, missing, locked, refused, endnoteLeft, unrecorded, accepted, walkFailed, cancelled, failed, whyNot,
+			&rowsToReplace);
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
 		if (ok)
 			KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
@@ -2987,6 +3026,11 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
+	// ***** WHAT REJECT CHANGE CAN TAKE BACK (2026-10-04, scenario cross-check 5 - BuildSummary's rule). ***** The rows
+	// Track Changes recorded nothing for (`unrecorded`: a footnote's, or a replace that changed no character -
+	// Change Format with an empty Change To) are said, not promised to Reject Change: every line below said "with
+	// Track Changes on - Reject Change ... takes it back" of them too until then (measured, case xs5-b-format-only).
+	const char* const untracked = "inside a footnote, or no character changed - formatting only";
 	if (again)
 	{
 		// Replace Again's own wording (2026-09-29): "Redone N row(s)" until then, written over this line by
@@ -2995,11 +3039,29 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		outStatus.AppendNumber(replaced);
 		outStatus.Append(" row(s) of this ");
 		outStatus.Append(unit);
-		outStatus.Append(" again with the current Find/Change settings (Track Changes on).");
+		outStatus.Append(" again with the current Find/Change settings");
+		if (unrecorded == 0)
+			outStatus.Append(" (Track Changes on).");
+		else if (unrecorded < replaced)
+		{
+			outStatus.Append(" (Track Changes on - not for the ");
+			outStatus.AppendNumber(unrecorded);
+			outStatus.Append(" marked \"no track\": ");
+			outStatus.Append(untracked);
+			outStatus.Append(").");
+		}
+		else
+		{
+			outStatus.Append(" - Track Changes recorded nothing for them (");
+			outStatus.Append(untracked);
+			outStatus.Append("), so Reject Change cannot take them back.");
+		}
 	}
 	else if (rowsToReplace.size() == 1)
 		outStatus = KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx)
 			? "Replaced (inside a footnote - Track Changes records nothing there, so it cannot be taken back with Reject Change)."
+			: KBSResultModel::GetHitTextUnchanged(chapterIdx, hitIdx)
+			? "Replaced (no character changed - formatting only - so Track Changes records nothing for it and Reject Change cannot take it back)."
 			: "Replaced with Track Changes on - Reject Change on the row's right-click menu takes it back.";
 	else
 	{
@@ -3007,7 +3069,24 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		outStatus.AppendNumber(replaced);
 		outStatus.Append(" checked row(s) of this ");
 		outStatus.Append(unit);
-		outStatus.Append(" with Track Changes on - Reject Change on a row's (or its story's) right-click menu takes it back.");
+		if (unrecorded < replaced)
+		{
+			outStatus.Append(" with Track Changes on - Reject Change on a row's (or its story's) right-click menu takes it back.");
+			if (unrecorded > 0)
+			{
+				outStatus.Append(" Not the ");
+				outStatus.AppendNumber(unrecorded);
+				outStatus.Append(" marked \"no track\" - ");
+				outStatus.Append(untracked);
+				outStatus.Append(": Track Changes records nothing there.");
+			}
+		}
+		else
+		{
+			outStatus.Append(" - Track Changes recorded nothing for them (");
+			outStatus.Append(untracked);
+			outStatus.Append("), so Reject Change cannot take them back.");
+		}
 	}
 	if (accepted > 0)
 	{
@@ -3149,16 +3228,70 @@ bool KBSReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 	return RowsToReject(chapterIdx, groupIdx, rows, true);
 }
 
-// What the records' deletions hold, in their order - for the door Reject Change and Accept Change both ask:
-// it must be exactly the rows' original text (see THE RUN'S DELETIONS in RejectRowsNow).
-static PMString DeletedTextOf(const std::vector<KBSTrackChange::Record>& recs)
+// ***** THE DOOR ACCEPT CHANGE ASKS OF ONE STORY'S ROWS - RejectRowsNow's, run by run (2026-10-04, scenario
+// ***** cross-check 5). ***** `rows` = where each row's written text starts, how long it is (KBSTrackChange::Change)
+// and its original text. The rows are split into runs of touching rows (RejectRowsNow's rule), every record goes
+// to the run whose text holds it, and each run's text with its records taken back
+// (KBSTrackChange::OriginalFromRecords) must read as its rows' originals joined. False = one does not, or a
+// record stands outside every run. (DeletedTextOf - the records' deletions joined, compared with the originals -
+// stood here until then: true of a whole-match replace, never of a GREP Change To holding $n, whose kept
+// characters no deletion holds.)
+struct RowSpan
 {
-	PMString deleted;
-	deleted.SetTranslatable(kFalse);
-	for (size_t k = 0; k < recs.size(); ++k)
-		if (recs[k].isDelete)
-			deleted.Append(recs[k].text);
-	return deleted;
+	TextIndex	at;
+	int32		len;
+	PMString	original;
+};
+static bool RecordsGiveBackOriginals(const UIDRef& story, std::vector<RowSpan> rows,
+	const std::vector<KBSTrackChange::Record>& recs)
+{
+	std::stable_sort(rows.begin(), rows.end(), [](const RowSpan& a, const RowSpan& b) { return a.at < b.at; });
+	struct Run
+	{
+		TextIndex	at;
+		TextIndex	end;
+		PMString	original;
+		std::vector<KBSTrackChange::Record>	recs;
+	};
+	std::vector<Run> runs;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		if (runs.empty() || rows[k].at > runs.back().end)
+		{
+			Run fresh;
+			fresh.at = rows[k].at;
+			fresh.end = rows[k].at;
+			fresh.original.SetTranslatable(kFalse);
+			runs.push_back(fresh);
+		}
+		Run& run = runs.back();
+		if (rows[k].at + rows[k].len > run.end)
+			run.end = rows[k].at + rows[k].len;
+		run.original.Append(rows[k].original);
+	}
+	for (size_t r = 0; r < recs.size(); ++r)
+	{
+		const KBSTrackChange::Record& rec = recs[r];
+		size_t home = runs.size();
+		for (size_t k = 0; k < runs.size() && home == runs.size(); ++k)
+		{
+			const bool in = rec.isDelete ? (rec.at >= runs[k].at && rec.at <= runs[k].end)
+				: (rec.at >= runs[k].at && rec.at + rec.len <= runs[k].end);
+			if (in)
+				home = k;
+		}
+		if (home == runs.size())
+			return false;
+		runs[home].recs.push_back(rec);
+	}
+	for (size_t k = 0; k < runs.size(); ++k)
+	{
+		bool inside = false;
+		if (KBSTrackChange::OriginalFromRecords(story, runs[k].at, runs[k].end - runs[k].at, runs[k].recs, inside)
+				!= runs[k].original || !inside)
+			return false;
+	}
+	return true;
 }
 
 // ***** TAKE A SET OF REPLACED ROWS BACK, IN ONE UNDO STEP (2026-09-27: the row's touching group, or a
@@ -3250,7 +3383,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 					AppendShowConditionToRetry(outStatus, "reject");
 				}
 				else
-					outStatus = "Reject Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote, where nothing is recorded) - nothing was changed.";
+					outStatus = "Reject Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote or a replace that changed no character, where nothing is recorded) - nothing was changed.";
 				return false;
 			}
 			const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, p.rows[k]);
@@ -3268,9 +3401,15 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 		// change is gone (accepted in the Track Changes panel) and so is not in the run. Taking it back would
 		// put that neighbour's text back beside the words it was accepted as, and the read-back below would not
 		// see it (it reads the run's own length only): refused before a thing is written.
+		// ***** ASKED OF THE RUN'S TEXT WITH ITS RECORDS TAKEN BACK (2026-10-04, scenario cross-check 5). ***** The
+		// deletions alone were compared until then, which a GREP Change To holding $n never passes: it keeps the
+		// matched characters $n names, and no deletion holds them (c(at) -> k$1 deletes "c" only). Taking every
+		// record of the run back in its text (KBSTrackChange::OriginalFromRecords) is the same question for a
+		// whole-match replace - nothing of its text is kept - and the right one for a $n.
 		{
 			KBSTrackChange::CollectRecordsOfTimes(p.story, p.times, p.recs);
-			if (DeletedTextOf(p.recs) != p.allOriginal)
+			bool inside = false;
+			if (KBSTrackChange::OriginalFromRecords(p.story, p.at, p.insLen, p.recs, inside) != p.allOriginal || !inside)
 			{
 				outStatus = "Reject Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
 				return false;
@@ -3649,7 +3788,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 	// Each row where its change stands now, then its change: the times to accept, story by story, and each
 	// story's rows' original texts in text order.
 	std::map<UID, std::set<uint64> > timesOfStory;
-	std::map<UID, std::vector<std::pair<TextIndex, PMString> > > originalsOfStory;
+	std::map<UID, std::vector<RowSpan> > spansOfStory;
 	for (size_t k = 0; k < rows.size(); ++k)
 	{
 		KBSTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);
@@ -3665,32 +3804,31 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 				AppendShowConditionToRetry(outStatus, "accept");
 			}
 			else
-				outStatus = "Accept Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote, where nothing is recorded) - nothing was changed.";
+				outStatus = "Accept Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote or a replace that changed no character, where nothing is recorded) - nothing was changed.";
 			return false;
 		}
 		const uint64 t = KBSResultModel::GetHitRecordTime(chapterIdx, rows[k]);
 		if (t != 0)
 			timesOfStory[storyRef.GetUID()].insert(t);
-		originalsOfStory[storyRef.GetUID()].push_back(std::make_pair(change.at, originalText));
+		RowSpan span;
+		span.at = change.at;
+		span.len = change.insLen;
+		span.original = originalText;
+		spansOfStory[storyRef.GetUID()].push_back(span);
 	}
-	// ***** THE DELETIONS MUST HOLD EXACTLY THESE ROWS' ORIGINAL TEXT - RejectRowsNow's door. ***** InDesign
+	// ***** THE RECORDS MUST GIVE BACK EXACTLY THESE ROWS' ORIGINAL TEXT - RejectRowsNow's door. ***** InDesign
 	// joins a deletion to the one it touches, whoever made either: accepting such a deletion would make
 	// somebody else's deletion final too, or a neighbour's this accept was not asked about.
+	// (Asked of the rows' text with the records taken back since 2026-10-04 - RecordsGiveBackOriginals; of the
+	// deletions alone until then, which a GREP $n's row never passed.)
 	// The records read for it are the ones the accept below starts from (the waste re-check P-3): nothing
 	// moves in between.
 	std::map<UID, std::vector<KBSTrackChange::Record> > recsOfStory;
 	for (std::map<UID, std::set<uint64> >::const_iterator s = timesOfStory.begin(); s != timesOfStory.end(); ++s)
 	{
-		std::vector<std::pair<TextIndex, PMString> >& originals = originalsOfStory[s->first];
-		std::stable_sort(originals.begin(), originals.end(),
-			[](const std::pair<TextIndex, PMString>& a, const std::pair<TextIndex, PMString>& b) { return a.first < b.first; });
-		PMString allOriginal;
-		allOriginal.SetTranslatable(kFalse);
-		for (size_t k = 0; k < originals.size(); ++k)
-			allOriginal.Append(originals[k].second);
 		std::vector<KBSTrackChange::Record>& recs = recsOfStory[s->first];
 		KBSTrackChange::CollectRecordsOfTimes(UIDRef(db, s->first), s->second, recs);
-		if (DeletedTextOf(recs) != allOriginal)
+		if (!RecordsGiveBackOriginals(UIDRef(db, s->first), spansOfStory[s->first], recs))
 		{
 			outStatus = "Accept Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
 			return false;

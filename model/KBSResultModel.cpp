@@ -82,7 +82,7 @@ namespace
 	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
 	// taken first is the row as the run found it, and it is the one a rollback has to put back. (Every
 	// change was kept until 2026-09-28, a replaced row four or five times over - MarkHitReplaced,
-	// SetHitRecordTime, SetHitChangeTexts, SetHitRange, SetHitSegments - and RollBackRows walked the
+	// SetHitRecordTime (SetHitRecord since 2026-10-04), SetHitChangeTexts, SetHitRange, SetHitSegments - and RollBackRows walked the
 	// copies backwards so the oldest won; every later copy was overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KBSResultModel::Hit& row)
 	{
@@ -133,6 +133,15 @@ namespace
 	{
 		KBSResultModel::Chapter* c = ChapterAt(chapterIdx);
 		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
+	}
+
+	// A replaced row whose replace changed no character, so nothing was recorded for it - the one rule
+	// (2026-10-04, scenario cross-check 5). See KBSResultModel::GetHitTextUnchanged. A row taken back, accepted
+	// or gone with its object has an outcome, and a footnote's row is said as such.
+	bool TextUnchanged(const KBSResultModel::Hit& h)
+	{
+		return h.replaced && !h.inFootnote && h.recordTime == 0 && h.outcome == KBSResultModel::kOutcomeNone
+			&& h.originalText == h.replacedText;
 	}
 
 	KBSResultModel::FontGroup* GroupAt(int32 chapterIdx, int32 groupIdx)
@@ -1086,13 +1095,26 @@ uint64 KBSResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
 	return (h != nil) ? h->recordTime : 0;
 }
 
-void KBSResultModel::SetHitRecordTime(int32 chapterIdx, int32 hitIdx, uint64 time)
+int32 KBSResultModel::GetHitRecordLead(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->recordLead : 0;
+}
+
+void KBSResultModel::SetHitRecord(int32 chapterIdx, int32 hitIdx, uint64 time, int32 lead)
 {
 	Hit* h = HitAt(chapterIdx, hitIdx);
 	if (h == nil)
 		return;
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->recordTime = time;
+	h->recordLead = lead;
+}
+
+bool KBSResultModel::GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return h != nil && TextUnchanged(*h);
 }
 
 bool KBSResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
@@ -1372,11 +1394,13 @@ void KBSResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	// The locator follows at once where the replace changes what it says: a row taken back reads as an
 	// ordinary replaced one again, and a footnote's row says "no track" (2026-09-29) - a row's Replace leaves a
 	// work list, which no pass numbers again afterwards (only a Change Checked's report is - KeepCheckedRows).
-	// Every other row's locator reads the same before and after, so it is not built again for nothing.
+	// So does a row whose replace changed no character (2026-10-04, TextUnchanged - the replace sets the row's
+	// record and texts before this, for it). Every other row's locator reads the same before and after, so it
+	// is not built again for nothing.
 	const bool takenBack = (h.outcome == kOutcomeRejected);
 	if (takenBack)
 		h.outcome = kOutcomeNone;
-	if (takenBack || h.inFootnote)
+	if (takenBack || h.inFootnote || TextUnchanged(h))
 		BuildHitLocator(h);
 }
 
@@ -1505,7 +1529,9 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	// records nothing in a footnote (measured 2026-09-26), so the replace there left no change to take back
 	// or accept, and nothing on the row said so until now (the status line did, once, when it was replaced).
 	// Normal colour, like "locked": a fact about the row, not a failure.
-	if (hit.replaced && hit.inFootnote && hit.outcome == kOutcomeNone)
+	// ...and a replace that changed no character (2026-10-04, scenario cross-check 5 - TextUnchanged): formatting
+	// only, if anything, which Track Changes does not record either.
+	if ((hit.replaced && hit.inFootnote && hit.outcome == kOutcomeNone) || TextUnchanged(hit))
 		hit.locator.Append(" no track");
 }
 

@@ -108,7 +108,8 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 
 // Why a story row's Reject / Accept are grey, in the hit row's words (RButtonDn below) - asked once
 // CanRejectStory has said no. "" = the story has no replaced row, so there is nothing to take back and nothing
-// to say. The hit row's order: a footnote, a closed document, a hidden condition, then no change left.
+// to say. The hit row's order: a footnote, a replace that changed no character (2026-10-04), a closed
+// document, a hidden condition, then no change left.
 // (2026-10-04, R-1: once a story's Check All stopped being offered over rows with no box - D-1 - such a story's
 // menu can be grey from top to bottom, and then it does not open at all; the hidden condition was the only reason
 // said until then.)
@@ -118,7 +119,7 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 	int32 rows = 0;
 	if (!KBSResults()->GetFontDisplay(chapter, group, name, rows))
 		return "";
-	int32 replaced = 0, inFootnote = 0;
+	int32 replaced = 0, inFootnote = 0, formatOnly = 0;
 	for (int32 n = 0; n < rows; ++n)
 	{
 		const int32 hit = KBSResults()->GetFontGroupHit(chapter, group, n);
@@ -128,11 +129,17 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 		++replaced;
 		if (KBSResults()->GetHitInFootnote(chapter, hit))
 			++inFootnote;
+		else if (KBSResults()->GetHitTextUnchanged(chapter, hit))
+			++formatOnly;		// a replace that changed no character (2026-10-04, scenario cross-check 5)
 	}
 	if (replaced == 0)
 		return "";
 	if (inFootnote == replaced)
 		return "Reject / Accept Changes in This Story: not for matches inside a footnote - Track Changes records nothing there.";
+	if (formatOnly == replaced)
+		return "Reject / Accept Changes in This Story: its replaces changed no character (formatting only) - Track Changes records nothing for them.";
+	if (inFootnote + formatOnly == replaced)
+		return "Reject / Accept Changes in This Story: its replaces are inside a footnote or changed no character (formatting only) - Track Changes records nothing for them.";
 	UIDRef storyDoc;
 	IDFile storyFile;
 	if (!(KBSResults()->GetChapterLocation(chapter, storyDoc, storyFile) && KBSChapters()->FindOpenChapterDoc(storyFile, storyDoc)))
@@ -142,7 +149,9 @@ const char* StoryRejectGreyReason(int32 chapter, int32 group)
 	// The guess names every cause measured (2026-10-04, scenario cross-check 1): a Ctrl+Z of the replace that the
 	// list does not follow (a list Show Changes rebuilt - KBSUndoFollow.h), and a deletion with Track Changes on,
 	// which InDesign folds into the deleter's own record (the [9b] re-read O9b-1). "Accepted or rejected" only, until then.
-	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (undone, accepted, rejected or deleted?).";
+	// "Split around other text" since 2026-10-04 (scenario cross-check 5): typing inside a replace, or - on a list
+	// Show Changes rebuilt - a GREP <$0>, whose two records stand around the match it kept.
+	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (undone, accepted, rejected, deleted, or split around other text?).";
 }
 
 }
@@ -380,6 +389,15 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowRowMenuReason(why);
 		}
+		// ...and a replace that changed no character (2026-10-04, scenario cross-check 5): Change Format with an empty
+		// Change To. It was told "no tracked change ... is left (undone, accepted or rejected ..., or deleted?)" until
+		// then - none was ever made (case xs5-b2-format-only-cc).
+		else if (KBSResults()->GetHitTextUnchanged(chapter, hit))
+		{
+			PMString why("Reject Change: this replace changed no character (formatting only) - Track Changes records nothing for it (Edit > Undo takes it back).");
+			why.SetTranslatable(kFalse);
+			KBSResultTree::ShowRowMenuReason(why);
+		}
 		else if (replaced && !KBSRuns()->RefreshRowFromRecords(chapter, hit))
 		{
 			// A closed document is said as such (2026-09-29, the defect re-check F-3): the records may all
@@ -394,7 +412,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 				? "Reject Change: the document of this row is not open - open it to take the replace back."
 				: KBSRuns()->RowChangeIsHidden(chapter, hit)
 				? "Reject Change: this row's replaced text is under a hidden condition - show the condition and reject again."
-				: "Reject Change: no tracked change of this replace is left for this row (undone, accepted or rejected in the Track Changes panel, or deleted?).");
+				: "Reject Change: no tracked change of this replace is left for this row (undone, accepted or rejected in the Track Changes panel, deleted, or split around other text?).");
 			why.SetTranslatable(kFalse);
 			KBSResultTree::ShowRowMenuReason(why);
 		}
