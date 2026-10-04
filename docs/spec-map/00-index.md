@@ -93,7 +93,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 11 | [パネルの見た目](11-panel.md)（開き方・タブ名・3枚の絵・メッセージ欄の高さ・大きさの下限と行の丸め・How to Use・About） | `PNL-` | 4・7・13 | ✅ |
 | 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー・ショートカット・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5・3 | ✅ |
 | 13 | [窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change](13-windows.md)（薄さと戻り方・効く場所・影・浮いた組・ダイアログの見つけ方・最小化ボタンとタスクバー・後始末） | `WIN-` | 14・15 | ✅ |
-| 14 | ブックパネルの位置を覚える（Remember Book Panel Placement） | `BPP-` | 16 | ⬜ |
+| 14 | [ブックパネルの位置を覚える（Remember Book Panel Placement）](14-book-panel.md)（測る瞬間・戻す瞬間・浮いているとき・ドックの隣で覚える・放り出されたとき・ホーム画面） | `BPP-` | 16 | ✅ |
 | 15 | アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel） | `BAR-` | 17 | ⬜ |
 
 **1章ずつ作り、その都度読んでもらう**（KCM の地図と同じ進め方）。章立ては作りながら変わってよい。
