@@ -667,8 +667,15 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// ***** AND A CONVERSION OF IT, WHICH THE LOOKUP BY FILE CANNOT FIND. ***** An older InDesign's
 	// chapter opens as a document with no file (see KBSDocumentLivesInFile), so FindDoc answers nil
 	// about it even while one stands open - and opening the file again below made a second conversion
-	// every time (2026-09-25). A walk of the open documents is the only way to ask; it is short, and
+	// every time (2026-09-25). So the open documents are walked; the walk is short, and
 	// KBSDocumentLivesInFile does the matching, so "is this the chapter" is still decided in one place.
+	//
+	// ! NOT "the only way to ask", as this said until 2026-10-04 (the block 11 re-read A-1): the document
+	//   list has a lookup for exactly this case - FindDocFromPreviousVersion, "Search the open documents to
+	//   see if one is already open (document could be previous version)" (IDocumentList.h:78-82). Nothing
+	//   in the SDK calls it and it has not been measured here, while the walk was measured on a CC 2017
+	//   chapter; so the walk stays until that call is measured on the same chapter. Its answer would go
+	//   through KBSDocumentLivesInFile like every other.
 	//
 	// Both are KBSOpenDocOfChapterFile's (above) since 2026-09-29, which FindOpenChapterDoc asks too.
 	{
@@ -1115,14 +1122,21 @@ bool KBSBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 		// The chapter's .indd. It is what OpenChapterDoc opens by, and what navigation uses to
 		// reopen the chapter after it has been closed.
 		//
-		// ***** THE ANSWER IS KEPT, NOT DISCARDED. ***** GetIDFile "returns kTrue if a file can be
+		// ***** THE ANSWER IS USED, NOT DISCARDED. ***** GetIDFile "returns kTrue if a file can be
 		// obtained for the book content, kFalse otherwise" (IBookContent.h:121-125), so a chapter
 		// whose entry names no file is a state the book API allows. This line dropped that answer
 		// until 2026-08-11, while two places in this module declared the case impossible - and one
 		// of them named THIS call as its authority. What the loss costs is at ChapterHasFile: an
 		// entry with no file reads exactly like a DOCUMENT-scope row, which is the one thing that
 		// may fall back on a docRef the search left behind.
-		chapter.hasFile = (content->GetIDFile(chapter.file) != kFalse);
+		//
+		// On kFalse the file is EMPTIED: the header does not say what GetIDFile leaves in its argument
+		// then, and an empty file is the one way every door here reads "no file" (ChapterHasFile; and
+		// KBSDocumentLivesInFile matches nothing against one, so OpenChapterDoc refuses the entry). From
+		// 2026-08-11 to 2026-10-04 the answer went into ChapterDoc::hasFile instead, which nothing read -
+		// so whatever the call had left in the file stood as the chapter's file (the block 11 re-read R-2).
+		if (content->GetIDFile(chapter.file) == kFalse)
+			chapter.file = IDFile();
 
 		// The chapter's file name for the read-out, built HERE rather than at open time: a chapter
 		// that cannot be opened still has to be named in the report. Via the UTF-16 buffer
@@ -1231,7 +1245,9 @@ bool KBSBookScope::OpenChapterDoc(ChapterDoc& ioChapter, std::vector<SkippedChap
 		// not change what happens to any book we can build today. It is closed because the answer
 		// is the book's to give, not ours to assume, and because falling through costs nothing: an
 		// entry with no file cannot be opened either, so the chapter is reported as unopenable,
-		// which is what a chapter nobody can resolve should look like.
+		// which is what a chapter nobody can resolve should look like. (Such an entry arrives here with
+		// an EMPTY file - ListBookChapters empties it on the book's kFalse - and the test below matches
+		// nothing against an empty file.)
 		if (alreadyOpenDoc != nil && KBSDocumentLivesInFile(alreadyOpenDoc, ioChapter.file))
 		{
 			// The user's (or an earlier run's) own copy. NOT held: closing a document somebody
