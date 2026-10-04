@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  ***** WHAT THE MODEL HALF ASKS THE UI HALF FOR, AND DOES WITHOUT WHEN IT IS NOT THERE *****
-//  (2026-10-01, the model/UI split - docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md 4.3)
+//  WHAT THE MODEL HALF ASKS THE UI HALF FOR, AND DOES WITHOUT WHEN IT IS NOT THERE
+//  (the model/UI split - docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md 4.3)
 //
 //  Two reasons keep these out of the model half, and they are not the same reason:
 //    - A WINDOW and the BOOK PANEL come from UI plug-ins - kOpenLayoutCmdBoss is LayoutUI's, and
@@ -15,16 +15,15 @@
 //      CAlert.h), in the library every plug-in links, and Adobe's own model plug-in incopyfileactions
 //      (InCopy's) calls CAlert itself (InCopyDocUtils.cpp). They are here because the guide lists
 //      DIALOGS as user-interface components (vol1-06, "UI component content") and KBS reads a modal bar
-//      and an alert as dialogs - the user's call, 2026-10-01 (the design's section 0.3: follow the guide
-//      strictly).
+//      and an alert as dialogs - the author's call (the design's section 0.3: follow the guide strictly).
 //  Yet a search has a bar to show, a replace an alert to raise and a chapter to give a window. So the
 //  model asks THIS interface - pure virtual, declared here on the model's side - and the UI half
 //  implements it (KBSUIServices.cpp) and puts it on kSessionBoss from its own resource (guide vol1-07,
 //  Object-Model Rule 2: a UI implementation reaches a model boss only through an AddIn in a UI plug-in's
 //  resource).
 //
-//  ***** kSessionBoss, NOT kUtilsBoss - although Adobe's own precedent for this shape is on kUtilsBoss. *****
-//  (API re-audit, 2026-10-02.) InCopy's model plug-in incopyfileactions asks a UI plug-in's IBGTasksUIUtils
+//  kSessionBoss, NOT kUtilsBoss - although Adobe's own precedent for this shape is on kUtilsBoss.
+//  InCopy's model plug-in incopyfileactions asks a UI plug-in's IBGTasksUIUtils
 //  the same way - Utils<IBGTasksUIUtils>, nil read as "no UI" (InCopyDocUtils.cpp:3048-3049). It is kept
 //  on the session because the guide promises a session per thread ("a separate execution context ... for
 //  each thread", "Threads do not share object-model instances" - vol1-07, "Rules for thread safety"),
@@ -33,7 +32,7 @@
 //  export, which is where KBS's nil has to hold. Both answer nil without the UI on the main thread;
 //  nothing would be gained by moving.
 //
-//  ***** NIL IS AN ANSWER. ***** On a background thread, and under InDesign Server, the UI plug-in is not
+//  NIL IS AN ANSWER. On a background thread, and under InDesign Server, the UI plug-in is not
 //  there and the Query comes back nil - "the system behaves as if the plug-in were missing and returns a
 //  nil pointer. It is critical that you write model code that expects to be able to receive nil pointers"
 //  (vol1-07, "Rules for thread safety"). Every caller in the model half reads nil as "no UI": no bar, no

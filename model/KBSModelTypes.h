@@ -4,14 +4,13 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The model half's PLAIN TYPES that the UI half reads as well (2026-10-01, the model/UI split).
+//  The model half's PLAIN TYPES that the UI half reads as well (the model/UI split).
 //  Structs, enums and constants only: no function is declared here, so a UI file that includes this
 //  cannot reach into the model plug-in's code by accident - every call goes through the session
 //  interfaces (IKBSResults / IKBSRuns / IKBSChapters). The namespaces are the ones these types always
 //  had, so KBSResultModel::RowDisplay is still spelled KBSResultModel::RowDisplay.
-//  Moved here verbatim from KBSResultModel.h and KBSOversetLocator.h. Only what crosses stands here:
-//  Hit, Chapter, the groups, the Undo copies and HitDetail went back to KBSResultModel.h /
-//  KBSSearchEngine.h on 2026-10-01, when the UI half was measured reading none of them.
+//  Only what crosses stands here: a type the UI half does not read lives in KBSResultModel.h /
+//  KBSSearchEngine.h (Hit, Chapter, the groups, the Undo copies, HitDetail).
 //
 //========================================================================================
 
@@ -26,8 +25,8 @@
 namespace KBSResultModel
 {
 	/** The panel shows at most this many hit rows (book order), to keep a huge result set from flooding
-	    the panel. Since 2026-10-04 the search also stops COLLECTING here (kKBSCollectHitLimit is made from
-	    this - the spec map's GEN-34), so the model holds no row the panel does not draw; the cap's own
+	    the panel. The search also stops COLLECTING here (kKBSCollectHitLimit is made from this - the spec
+	    map's GEN-34), so the model holds no row the panel does not draw; the cap's own
 	    machinery (the adapter's counts, the "first N shown" note) stays as the panel's guard. */
 	const int32 kKBSDisplayHitLimit = 5000;
 
@@ -39,16 +38,16 @@ namespace KBSResultModel
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeRejected,	// replaced, then taken back with Reject Change (2026-09-26): the row
-							// shows the original text again and can be replaced once more (Redo)
+		kOutcomeRejected,	// replaced, then taken back with Reject Change: the row shows the
+							// original text again and can be replaced once more (Redo)
 		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
-							// ticked row deleted (2026-09-26) - Change All's own result; no place to jump to
-		kOutcomeEndnoteLeft,// ticked, in the endnote story, left alone: a match there ends an endnote,
-							// and InDesign's replace breaks an endnote at its end (2026-09-27, the
-							// user's call - the whole endnote story is left, Change All works by story)
+							// ticked row deleted - counted as done; no place to jump to
+		kOutcomeEndnoteLeft,// ticked, left alone: the match ends an endnote, and InDesign's replace
+							// breaks an endnote at its end (MatchEndsAnEndnote). Only this row is
+							// left - the replace goes one match at a time
 		kOutcomeAccepted	// replaced, then its tracked change ACCEPTED with Accept Change by
-							// KohakuFindChange (2026-09-29): the replace is final, nothing is left to
-							// take back or accept - the locator says "accepted"
+							// KohakuFindChange: the replace is final, nothing is left to take back
+							// or accept - the locator says "accepted"
 	};
 
 	enum SearchScopeKind
@@ -77,9 +76,7 @@ namespace KBSResultModel
 		bool			hasCheckBox;	// does THIS row carry a check box? RowHasCheckBox's own answer,
 										// so the panel does not have to re-derive it from the four
 										// fields above - see GetHitRow.
-		// (An inFootnote stood here from 2026-09-26 - a footnote's box drawn ticked and greyed, while
-		// the replace was Change All. Nothing read it after the one-at-a-time replace of 2026-09-27;
-		// removed 2026-09-28. A footnote's row is told apart by GetHitInFootnote now.)
+		// (A footnote's row is told apart by GetHitInFootnote, not by a field here.)
 
 		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
 					   hasCheckBox(false) {}
@@ -103,8 +100,8 @@ struct KBSOversetLoc
 	KBSOversetLoc() : found(false), frameUID(kInvalidUID), outportPb(0.0, 0.0) {}
 };
 
-/** What one notification from the model half to the UI half carries (2026-10-01, the model/UI split;
-    sent by KBSModelNotify.h, received by KBSModelObserver.cpp). The model never calls the panel: it
+/** What one notification from the model half to the UI half carries (the model/UI split; sent by
+    KBSModelNotify.h, received by KBSModelObserver.cpp). The model never calls the panel: it
     says what happened on the session's subject, and the panel - when there is one listening - does the
     drawing. Handed over as ISubject::Change's changedBy and read during delivery only, so `text` may
     point at the sender's own string. */

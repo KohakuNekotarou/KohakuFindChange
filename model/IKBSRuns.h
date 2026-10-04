@@ -4,8 +4,8 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  IKBSRuns - one of the three doors the UI half reaches the model half through (2026-10-01, the
-//  model/UI split; docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
+//  IKBSRuns - one of the three doors the UI half reaches the model half through (the model/UI split;
+//  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
 //  The RUNS and what they ask - the search, the replace family and Show Changes, whether one is
 //  running, the Find/Change settings they follow, and the questions the jump asks of a row's text.
@@ -13,15 +13,14 @@
 //  written there (KBSSearchEngine.h / KBSReplaceEngine.h / KBSShowChanges.h / KBSRunGuard.h /
 //  KBSTrackChange.h / KBSOversetLocator.h).
 //
-//  ***** ON kSessionBoss, NOT A FACADE ON kUtilsBoss. ***** What is behind it is session STATE (the results,
-//  the held chapters, the marker), and the guide's facades keep no global or static state (gs-04); the
-//  session is where InDesign keeps its own session state (IBookManager, IClipboardController). The UI
-//  half reaches it with KBSRuns() (KBSModelAccess.h).
-//  ***** EDITED BY HAND SINCE 2026-10-02. ***** Generated on 2026-10-01 with its two siblings and their
-//  implementation (KBSModelServices.cpp) from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py).
-//  Methods have been added to IKBSRuns by hand since, which the table does not know: the generator is a
-//  record now and refuses to write. A new method goes at the END of its interface - a vtable slot is a
-//  promise to every built caller.
+//  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
+//  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
+//  where InDesign keeps its own session state (IBookManager, IClipboardController). The UI half reaches it
+//  with KBSRuns() (KBSModelAccess.h).
+//  EDITED BY HAND. The three doors and their implementation (KBSModelServices.cpp) were first generated from
+//  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
+//  which the table does not know, so the generator is a record only and refuses to write. A new method goes
+//  at the END of its interface - a vtable slot is a promise to every built caller.
 //
 //========================================================================================
 
@@ -129,16 +128,15 @@ public:
 	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KBSTrackChange::CurrentReplacedGroup. */
 	virtual void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed) = 0;
-	// (2026-10-02, appended at the end: a vtable slot is a promise to every built caller.)
+	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
+	// promise to every built caller).
 	/** = KBSTrackChange::RowChangeIsHidden. */
 	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KBSReplaceEngine::StoryChangesHidden. */
 	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) = 0;
-	/** = KBSSearchEngine::SetQuery (2026-10-02, appended at the end like the two above; given its mode on
-	    2026-10-03, before any build of it had shipped). */
+	/** = KBSSearchEngine::SetQuery. */
 	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
-	/** = KBSTrackChange::HiddenTextAnchor (2026-10-04, appended at the end like the ones above - the jump asks
-	    where a row under a hidden condition comes back to). */
+	/** = KBSTrackChange::HiddenTextAnchor - the jump asks where a row under a hidden condition comes back to. */
 	virtual TextIndex HiddenTextAnchor(const UIDRef& storyRef, TextIndex pos) = 0;
 };
 

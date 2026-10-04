@@ -4,23 +4,22 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  IKBSChapters - one of the three doors the UI half reaches the model half through (2026-10-01, the
-//  model/UI split; docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
+//  IKBSChapters - one of the three doors the UI half reaches the model half through (the model/UI split;
+//  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
 //  The CHAPTERS' DOCUMENTS - Book Scope, which documents are open and held, the windows they have
 //  (asked of the UI half through IKBSUIServices), the active book - and the jump marker's place
 //  (KBSHitMarker). Each method forwards to the KBSBookScope / KBSHitMarker function of the same
 //  name, where the contract is written.
 //
-//  ***** ON kSessionBoss, NOT A FACADE ON kUtilsBoss. ***** What is behind it is session STATE (the results,
-//  the held chapters, the marker), and the guide's facades keep no global or static state (gs-04); the
-//  session is where InDesign keeps its own session state (IBookManager, IClipboardController). The UI
-//  half reaches it with KBSChapters() (KBSModelAccess.h).
-//  ***** EDITED BY HAND SINCE 2026-10-02. ***** Generated on 2026-10-01 with its two siblings and their
-//  implementation (KBSModelServices.cpp) from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py).
-//  Methods have been added to IKBSRuns by hand since, which the table does not know: the generator is a
-//  record now and refuses to write. A new method goes at the END of its interface - a vtable slot is a
-//  promise to every built caller.
+//  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
+//  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
+//  where InDesign keeps its own session state (IBookManager, IClipboardController). The UI half reaches it
+//  with KBSChapters() (KBSModelAccess.h).
+//  EDITED BY HAND. The three doors and their implementation (KBSModelServices.cpp) were first generated from
+//  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
+//  which the table does not know, so the generator is a record only and refuses to write. A new method goes
+//  at the END of its interface - a vtable slot is a promise to every built caller.
 //
 //========================================================================================
 

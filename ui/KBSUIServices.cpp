@@ -4,11 +4,11 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  The UI half's side of IKBSUIServices.h (2026-10-01, the model/UI split): the progress bar, the
-//  windows, the Book panel and the alert the model half asks for. AddIn'd on kSessionBoss from the UI
-//  half's resource, so a background thread - which loads no UI plug-in - finds nothing there and the
-//  model does without. Each answer is what KBSBookScope / the engines did themselves until that day,
-//  carried over unchanged; the notes are theirs.
+//  The UI half's side of IKBSUIServices.h (the model/UI split): the progress bar, the windows, the Book
+//  panel and the alert the model half asks for. AddIn'd on kSessionBoss from the UI half's resource, so a
+//  background thread - which loads no UI plug-in - finds nothing there and the model does without. Each
+//  answer is what KBSBookScope / the engines did themselves before the split, carried over unchanged; the
+//  notes are theirs.
 //
 //========================================================================================
 
@@ -73,9 +73,9 @@ public:
 
 	/** Does this document have a WINDOW anywhere - front, or behind another tab? The
 	    all-presentations search, because GetFrontmostPresentationForDocument answers nil for a
-	    document sitting behind another tab (ShowChapterWindow has always asked it this way).
+	    document sitting behind another tab (ShowChapterWindow asks it this way too).
 
-	    Asked by the held-chapter releases since 2026-08-05: a window makes a chapter the USER'S,
+	    Asked by the held-chapter releases: a window makes a chapter the USER'S,
 	    whoever raised the window. ShowChapterWindow and the jump take a chapter off the held list
 	    when they raise one themselves, but a window can be raised behind this module's back - the
 	    book panel lists every chapter, and double-clicking one there windows the very document being
@@ -83,8 +83,8 @@ public:
 	    had saved their work, not even the unsaved-work door would stand in the way.
 
 	    The SDK's own "any presentation" predicate, FindPresCriteria::accept_all, as KCM's UI half uses
-	    it (KCMStoryJump.cpp). A local one stood here while this test lived in a model plug-in, which
-	    cannot reach that predicate: its implementation is in WidgetBin (DocumentPresFindCriteria.h:40-46). */
+	    it (KCMStoryJump.cpp). This test cannot move back to the model half: the predicate's
+	    implementation is in WidgetBin (DocumentPresFindCriteria.h:40-46). */
 	virtual bool DocHasAnyWindow(const UIDRef& docRef)
 	{
 		IDataBase* db = docRef.GetDataBase();
@@ -98,8 +98,8 @@ public:
 	/** The window half of KBSBookScope::ShowChapterWindow, carried over as it stood. */
 	virtual bool OpenLayoutWindow(const UIDRef& docRef)
 	{
-		// ***** THE WINDOW IS ALLOWED NOT TO APPEAR - this function's false says so - so its error
-		// state stays in here. ***** Preserve, then clear, exactly as the open in ReopenChapterDoc does
+		// THE WINDOW IS ALLOWED NOT TO APPEAR - this function's false says so - so its error
+		// state stays in here. Preserve, then clear, exactly as the open in ReopenChapterDoc does
 		// (see that note for the SDK's own shape and the contract at ErrorUtils.h:115-117). Placed
 		// ahead of the command rather than inside the failure branch so that all THREE ways this can
 		// end without a window are covered: the command that would not build, the one that failed, and
@@ -115,11 +115,10 @@ public:
 		// The command's data interface, taken BEFORE processing so the result can be read back off it
 		// afterwards. Nothing is set on it - the defaults are what a chapter window should get.
 		//
-		// ***** NO DATA INTERFACE = FAILURE, and the command is not run at all. ***** The recipe this
-		// follows breaks off here too (SDKLayoutHelper.cpp:268-272). It used to run the command anyway
-		// and skip the window test when this was nil, which returned TRUE without having established the
-		// one thing this function's true means - that the chapter now has a window (block 11 API audit,
-		// 2026-08-08).
+		// NO DATA INTERFACE = FAILURE, and the command is not run at all. The recipe this follows breaks
+		// off here too (SDKLayoutHelper.cpp:268-272). Running the command anyway would have to skip the
+		// window test below, and return true without having established the one thing this function's
+		// true means - that the chapter now has a window.
 		InterfacePtr<IOpenLayoutPresentationCmdData> openData(cmd, IID_IOPENLAYOUTCMDDATA);
 		if (openData == nil)
 			return false;
