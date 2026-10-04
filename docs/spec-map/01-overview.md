@@ -91,8 +91,9 @@
   **Reject Change by KohakuFindChange** とその仲間（`… in This Story`／`Reject All Changes by KohakuFindChange in This Document`／`… in This Run`）／
   **Accept Change by KohakuFindChange** とその仲間（`… in This Story`／`… in This Run`／`Accept All Changes by KohakuFindChange in This Document`）。
   **どれも1回が「編集 > 取り消し」の1段**になる。
-  ⚠行のメニューの書き込みが「全部か無し」で**巻き戻ったとき、本文は元に戻るが「変更あり」の印が残る**（保存済みの文書が、何も変わっていないのに未保存になる）。
-  Change Checked のキャンセルは印も戻すが、行のメニューの側には無い（2026-10-04 に別の検査で実測・直すかは判断待ち＝R9-1 → 第6章）。
+  書き込みが失敗して**巻き戻ったときは、本文と一緒に「変更あり」の印も入る前の状態に戻す**（Change Checked のキャンセルも、行のメニューの「全部か無し」も）
+  ＝保存済みの文書が、何も変わっていないのに未保存になることは無い。
+  （行のメニューの側には無く、印が残っていたのを 2026-10-04 に直した＝R9-1。→ 第6章）
   - 訂正:
 
 - **GEN-17** ★**何も保存しない。** 置換が入った文書は「変更あり・未保存」のまま残し、上書きするかどうかは利用者が決める。
@@ -101,7 +102,9 @@
   開けなかったら ` N chapter(s) were changed but could not be shown - open them from the book panel to save them.` と書く。
   ★**利用者が窓なしで持っている文書（All Documents）は、窓を開かずにそのまま残し**、` N document(s) without a window were changed - still hidden.` と書く
   （2026-09-29 の決定＝重いので隠しているのかもしれない）。
-  ⚠**行のメニューの Replace は今、その隠した文書にも窓を開く**（2026-10-04 に別の検査で実測・直すかは判断待ち＝D9-1 → 第6章）。
+  行のメニューの Replace（Replace Again も）も**同じ規則**で、隠した文書は隠したまま（メッセージ欄に ` The document has no window - still hidden.`）。
+  閉じていた章で行の Replace が**断られた・巻き戻ったとき**は、窓を付けずに閉じて返す。
+  （行のメニューは隠した文書にも、断られた章にも窓を開いていたのを、2026-10-04 に直した＝D9-1・R9-2。→ 第6章）
   - 訂正:
 
 - **GEN-18** 置換を書くとき、その文書のユーザー一覧に **`KohakuFindChange` を UI カラー Amber（琥珀色）で**登録する（すでに Amber なら何もしない）。
