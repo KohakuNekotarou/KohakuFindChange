@@ -732,7 +732,7 @@ void KBSUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	// go, and every write's documents are found again (ResolveDocs drops one with a document closed since; the one
 	// closing now is still open at this signal). Each story's `now` was otherwise the document as the LAST follow
 	// found it, which can be one closed since: the test build's trace below read a story's version through such a
-	// pointer and brought InDesign down (2026-10-04, the regression case book-empty-keeps-results - a script
+	// pointer and brought InDesign down (the regression case book-empty-keeps-results - a script
 	// closing a document). Nothing below reads `now`; the trace does.
 	DropOtherResultSets();
 	ResolveDocs();
@@ -748,7 +748,7 @@ void KBSUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	// chapter - no longer even stands in the way of its Undo). A chapter nothing since wrote reads in the set as it
 	// reads in its file, so it is put back with the set: frozen, it was EMPTIED whenever the list on screen had no
 	// rows for it - a chapter with nothing ticked, which a Change Checked's report drops - and its rows were lost on
-	// the Undo (found re-checking this fix - the regression case cb-book-close-unwritten-undo).
+	// the Undo (measured - the regression case cb-book-close-unwritten-undo).
 	// Found in the set by its file the same way: a set's docRef can be one the chapter had before it was closed and
 	// opened again.
 	bool laterWrote = false;
