@@ -331,11 +331,11 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		const int32 group = nodeID->GetFont();
 		KBSResults()->SetContextMenuGroup(chapter, group);
 		KBSResults()->SetContextMenuRun(-1, -1);		// the run row's: cleared like this one
-		// WHY ITS REJECT / ACCEPT ARE GREY (the user's call). The hit row's rule below: with every item grey the
+		// WHY ITS REJECT / ACCEPT ARE GREY (the author's call). The hit row's rule below: with every item grey the
 		// popup does not open, so the status line is the only place to say it - otherwise a story whose replaced
 		// text is all under a hidden condition says nothing at all (case reject-hidden-condition-story).
 		// StoryRejectGreyReason, above, says which reason.
-		// OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (the user's call).
+		// OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (the author's call).
 		// Not through ShowStatus: it would become the last message and stay, reading as if it were about
 		// whatever row was right-clicked next (KBSResultTree::ShowRowMenuReason).
 		PMString why;
@@ -396,7 +396,7 @@ bool16 KBSResultNodeEH::RButtonDn(IEvent* e)
 		{
 			// A closed document is said as such: the records may all be there, and the row would read "no
 			// tracked change" only because nothing is open to read them in.
-			// ...and so is a hidden condition (the user's call): the records are there too, gone
+			// ...and so is a hidden condition (the author's call): the records are there too, gone
 			// out of the main text with the text the condition hides (case reject-hidden-condition).
 			UIDRef rowDoc;
 			IDFile rowFile;

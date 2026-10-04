@@ -339,7 +339,7 @@ int32 KBSTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMSt
 		std::set<uint64> timesBefore;
 		if (CountSignedRecords(story, false, &timesBefore) == 0)
 			continue;
-		// InDesign's OWN ACCEPT ALL, TOLD WHOSE (the user's call: "only the ones named KohakuFindChange").
+		// InDesign's OWN ACCEPT ALL, TOLD WHOSE (the author's call: "only the ones named KohakuFindChange").
 		// kAcceptAllRedlineCmdBoss over the story, as
 		// the product does it (InCopyDocUtils.cpp:2399-2405), with its IStringData set to the author: the
 		// command then accepts that author's changes and leaves everybody else's (measured, KTRedlineProbe
@@ -627,7 +627,7 @@ bool KBSTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	const TextIndex first = (firstIns != kInvalidTextIndex) ? firstIns : firstDel;
 	if (first != kInvalidTextIndex)
 	{
-		// NOT WHILE A HIDDEN CONDITION HOLDS IT (the user's call). A whole-match replace under a hidden
+		// NOT WHILE A HIDDEN CONDITION HOLDS IT (the author's call). A whole-match replace under a hidden
 		// condition is refused by its deletion alone too, which stays in the main text while its insertion goes
 		// with the hidden text (RowChangeIsHidden). A GREP $n that only inserted (cat -> $0s) has no deletion to
 		// do that, and its text would read whole in the hidden thread - so it is asked of the first record

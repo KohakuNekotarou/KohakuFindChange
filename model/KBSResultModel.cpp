@@ -182,11 +182,11 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KBSResultModel::Hit& hit)
 	{
-		// A list rebuilt from the records offers no replace at all (the user's call).
+		// A list rebuilt from the records offers no replace at all (the author's call).
 		if (gFromRecords)
 			return false;
 
-		// A replace's report offers work only on the rows Reject Change put back (the user's call). This
+		// A replace's report offers work only on the rows Reject Change put back (the author's call). This
 		// is the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
 		// taken back and still open is exactly what makes that question answer no, and every other row
 		// is refused here. (NoRowHasCheckBox is not asked here as well - an answer that cannot change this
@@ -236,7 +236,7 @@ namespace
 		return count;
 	}
 
-	// GROUP A CHAPTER'S HITS BY STORY (the user's call) - the tree's middle level.
+	// GROUP A CHAPTER'S HITS BY STORY (the author's call) - the tree's middle level.
 	// One group per story in first-appearance (page) order - so the stories read in the order their
 	// first matches stand - and every hit given its group. The row reads "P<page of the story's first
 	// match>  <the story's first words>". (The "font" in the names is the level's old name: it held the
@@ -323,7 +323,7 @@ void KBSResultModel::AppendChapter(Chapter&& chapter)
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
 
-	// EVERY ROW STARTS UNTICKED (the user's call). The replace writes one match at a time, so the user
+	// EVERY ROW STARTS UNTICKED (the author's call). The replace writes one match at a time, so the user
 	// ticks what is to be replaced. (Hit::checked is false as a Hit is built - nothing to do here.)
 }
 
@@ -479,7 +479,7 @@ bool KBSResultModel::NoRowHasCheckBox()
 		return true;
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
-	// EXCEPT A REPORT HOLDING A ROW TAKEN BACK (the user's call): that row carries a box.
+	// EXCEPT A REPORT HOLDING A ROW TAKEN BACK (the author's call): that row carries a box.
 	return gShowingOutcome && !KBSResultModel::AnyRejectedRowOpen();
 }
 
@@ -887,12 +887,12 @@ bool KBSResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 // here rather than left as a bare number in the loop below.
 static const UTF32TextChar kKBSReturnArrow = 0x21B5;
 
-// THE CHARACTERS AN OBJECT STANDS ON ARE NOT SHOWN (the user's call). They have
+// THE CHARACTERS AN OBJECT STANDS ON ARE NOT SHOWN (the author's call). They have
 // no glyph in the panel's font and drew as a box: a footnote / endnote reference (0x04 / 0x05), the
 // marks around an endnote's text and other anchors (U+FEFF), a table's anchor and continuation
 // (0x16 / 0x17), the page number and section markers (0x18 / 0x19), an anchored object (U+FFFC).
 // Display only, like the break marks: the model keeps them as they are.
-// EXCEPT THE TABLE'S ANCHOR - it is shown as kKBSTableSign (the user: "the way KCM does it, a table
+// EXCEPT THE TABLE'S ANCHOR - it is shown as kKBSTableSign (the author: "the way KCM does it, a table
 // sign"). Its continuations (one per row after the first) are still dropped: a table is one sign however
 // many rows it has.
 // By TextChar.h's own names (0x18 is also kTextChar_AutoText there - the same code).
@@ -903,7 +903,7 @@ static bool IsHiddenMarker(UTF16TextChar c)
 		|| c == kTextChar_ZeroSpaceNoBreak || c == kTextChar_ObjectReplacementCharacter;
 }
 
-// THE SIGN A TABLE LEAVES IN A ROW (the user: "can it be like KCM - a table mark between the two
+// THE SIGN A TABLE LEAVES IN A ROW (the author: "can it be like KCM - a table mark between the two
 // characters either side of the table"). U+25A6 SQUARE WITH ORTHOGONAL CROSSHATCH FILL,
 // KCM's kKCMTableSign (KCMStoryList.cpp), and for KCM's reasons: NOT the kanji U+7530 the user remembered -
 // KCM's user turned it down there ("that is Japanese": the sign has to read the same to an English
@@ -1465,7 +1465,7 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
-	// overset". EVERY word is spelled out in full (the user's call): these are what explain
+	// overset". EVERY word is spelled out in full (the author's call): these are what explain
 	// a row the user cannot act on, so they are worth the characters. Clipped forms were tried and
 	// dropped - "hid" / "lck" are hard to read, "loc" reads as "location" in English, and "ov" left
 	// the one word a reader most needs to recognise as the least legible of the set.
@@ -1488,8 +1488,8 @@ void KBSResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeEndnoteLeft)
 		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
-	// A rejected row says nothing (the user: "no 'rejected' when I take one back") - it reads its
-	// original text again, which is what the user asked for; the state is still there for the story
+	// A rejected row says nothing (the author: "no 'rejected' when I take one back") - it reads its
+	// original text again, which is what the author asked for; the state is still there for the story
 	// and document rows' Replace Again (Redo in the code); a reader of the panel sees the row's check
 	// box come back.
 	// EXCEPT ON A LIST REBUILT FROM THE RECORDS. No row there carries a box, so nothing else would
@@ -1694,7 +1694,7 @@ int32 KBSResultModel::KeepCheckedRows()
 		hits.swap(keep);
 
 		// RENUMBER the within-page ordinals over what is left, so the rows read "the first
-		// replacement on this page, the second, the third" (the user's call: the count follows the
+		// replacement on this page, the second, the third" (the author's call: the count follows the
 		// REPLACEMENTS rather than the matches they came from).
 		//
 		// Neither of the other two: clearing the ordinal leaves every row on a page reading a bare

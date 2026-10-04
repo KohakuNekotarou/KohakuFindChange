@@ -38,7 +38,7 @@ namespace KBSResultModel
 	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
 	    chapter, so no query or document can pile up an unbounded result set; the search says so in its
 	    summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
-	    THE DISPLAY CAP ITSELF (the user's call). A larger ceiling over a panel that draws
+	    THE DISPLAY CAP ITSELF (the author's call). A larger ceiling over a panel that draws
 	    kKBSDisplayHitLimit (KBSModelTypes.h) lets Check All on a book or document row tick rows the panel
 	    never drew, and Change Checked replace them. Made from the display cap so the two cannot part: every
 	    row collected is a row drawn. A search with more matches stops here and says "narrow your search"; a
@@ -150,7 +150,7 @@ namespace KBSResultModel
 		// hold such a row: a search does not walk hidden conditional text.
 		bool		inHiddenText;
 
-		// checked starts FALSE here and stays so for a search's rows (the user's call - rows ticked by
+		// checked starts FALSE here and stays so for a search's rows (the author's call - rows ticked by
 		// default were tried and turned back).
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
@@ -168,7 +168,7 @@ namespace KBSResultModel
 	{
 		PMString			fontName;	// the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
-		// A STORY GROUP (the user's call). A Find/Change result groups its hits by story, the way KCM's
+		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
 		// Story mode lists stories, and every group is one. A story row carries Replace / Reject Change /
 		// Accept Change / Replace Again (Redo in the code) / Check All / Uncheck All for its rows
 		// (KBSReplaceEngine::ReplaceStory and the rest).
@@ -255,7 +255,7 @@ namespace KBSResultModel
 	void SetSearchScope(SearchScopeKind scope);
 	SearchScopeKind GetSearchScope();
 
-	/** A DOCUMENT OF AN ALL DOCUMENTS LIST WAS CLOSED (the user's call: only its rows go).
+	/** A DOCUMENT OF AN ALL DOCUMENTS LIST WAS CLOSED (the author's call: only its rows go).
 	    Its chapter is emptied - rows, groups, runs, story versions - and unbound (no docRef, no file), but
 	    it KEEPS ITS PLACE: KBSUndoFollow names rows by (chapter, row), and closing up the gap would renumber
 	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
@@ -276,7 +276,7 @@ namespace KBSResultModel
 
 	/** WERE THESE ROWS REBUILT FROM THE TRACK CHANGES RECORDS (Show Changes by KohakuFindChange)?
 	    Such a list was searched by nothing: no query, no walk signature, no search mode - there is
-	    nothing to line a replace up with, so it offers NO replace of any kind (the user's call: to
+	    nothing to line a replace up with, so it offers NO replace of any kind (the author's call: to
 	    replace again, search again). While it is on, no row carries a check box
 	    (RowHasCheckBox, NoRowHasCheckBox) and the replace's doors refuse (KBSReplaceEngine). Reject Change
 	    and Accept Change work on it, and a row they took back says so ("rejected" - there is no box to say
@@ -302,7 +302,7 @@ namespace KBSResultModel
 	bool HasRun();
 
 	// (No "the search stopped short" flag for the replace to ask: it writes the ticked rows only, one
-	//  match at a time, so results that stopped at the limit can be replaced - the user's call.)
+	//  match at a time, so results that stopped at the limit can be replaced - the author's call.)
 
 	/** Does NO row of this result set carry a check box?
 
@@ -690,10 +690,10 @@ namespace KBSResultModel
 	    @return the number of rows left in the model. */
 	int32 KeepCheckedRows();
 
-	/** A ROW TAKEN BACK IS WORK AGAIN (the user's call). A row Reject Change put back to its original
+	/** A ROW TAKEN BACK IS WORK AGAIN (the author's call). A row Reject Change put back to its original
 	    text carries a box again - in a work list and in a replace's report alike - so it can be ticked
 	    and replaced again (Change Checked, or its menu's Replace). (A hit row has no Redo of its own -
-	    the user's call: Replace is the one way; a story or document row's Replace Again is
+	    the author's call: Replace is the one way; a story or document row's Replace Again is
 	    KBSReplaceEngine::RedoStory / RedoChapter.) IsWorkOutcome = nothing said about the row but "taken
 	    back". AnyRejectedRowOpen = does a report hold one (then the report offers work). */
 	bool IsWorkOutcome(ChangeOutcome outcome);
@@ -829,7 +829,7 @@ namespace KBSResultModel
 	    story row's label, FontGroup::fontName, which nothing compares.)
 
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
-	    a table's per-row continuations, page number markers (the user's call: they drew as a box).
+	    a table's per-row continuations, page number markers (the author's call: they drew as a box).
 	    A TABLE'S ANCHOR BECOMES U+25A6 - KCM's table sign, the user's request: `a<table>b` reads
 	    `a<sign>b` on a hit row, a story row and the "Source Text:" alike. */
 	void MarkUpBreaksForDisplay(PMString& s);
@@ -872,7 +872,7 @@ namespace KBSResultModel
 	    were given. */
 	void ForgetRowBackup();
 
-	// THE PANEL FOLLOWS AN UNDO AND A REDO (the user: "after an Undo the row cannot be rejected again -
+	// THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "after an Undo the row cannot be rejected again -
 	// the panel should come back with it, the way KCM's does"). A write of KBS's own is one undo step, and
 	// what it did to the rows is kept beside it (KBSUndoFollow): the rows as they were BEFORE it - the
 	// copies BeginRowBackup takes anyway - and as they are AFTER it, and the story versions it recorded

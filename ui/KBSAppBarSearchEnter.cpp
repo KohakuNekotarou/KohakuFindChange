@@ -76,7 +76,7 @@ static std::wstring    sPendingText;		// the field's text at the Return, until t
 //   plug-in is going down (sMinimizeShutdown's rule, KBSFindChangeMinimize.cpp).
 static bool            sShutdown = false;
 
-// INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN - THE WRITE-BACK (the user's call).
+// INDESIGN'S OWN TEXT, WRITTEN OVER AGAIN - THE WRITE-BACK (the author's call).
 // InDesign puts its own "Adobe Stock" into the field when it builds the field - measured: about 24 s into a launch
 // the field is made anew, already holding it - and when a menu is used (the user's observation). Find/Change does
 // not change then, so without this the field goes on saying "Adobe Stock" until its next change, and a Return there
@@ -131,7 +131,7 @@ static std::wstring FieldText(HWND field)
 	return text;
 }
 
-// THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (the user's design).
+// THE FIELD SHOWS WHAT EDIT > FIND/CHANGE HOLDS (the author's design).
 // While the toggle is ON, the field carries the query of the tab the dialog is on - the find string of Text and
 // GREP, the glyph of Glyph, the character type of Transliterate - and follows it as it changes (Object and
 // Colour, which this panel does not search, leave the field alone). Measured in a spike (branch
@@ -207,7 +207,7 @@ static PMString GlyphDescription(const IFindChangeOptions* opts)
 }
 
 // The Transliterate tab's query - the character type it finds - in InDesign's UI language, in the very words its
-// Transliterate tab shows (the user's call: English names of our own are not the UI's).
+// Transliterate tab shows (the author's call: English names of our own are not the UI's).
 // The keys are InDesign's own string keys, read off its string tables on disk (idrc_PMST - the Find and Change
 // Panel's for all but Kanji, which the dialog does not offer; that one is CompFontMgr's, a Required plug-in):
 // e.g. "Half-width Katakana" = jaJP "hankaku katakana", "kWesternArabicDigits" = "Arabic Digits (0, 1, ...)".
@@ -368,7 +368,7 @@ static uint32 RunPendingSearch(void* /*refPtr*/)
 	if (sShutdown || !sAppBarSearchEnter || text.empty())
 		return IIdleTask::kEndOfTime;
 
-	// Return searches on the Text and GREP tabs only - the user's call at the first live check (not the dialog's
+	// Return searches on the Text and GREP tabs only - the author's call at the first live check (not the dialog's
 	// own query searched on every other tab). On the others the Return is still stopped (no
 	// browser) and nothing runs; the status line says why - only while the panel is up: ShowStatus also keeps
 	// the line for the panel's next show, where it would stand in place of the last search's report. The panel

@@ -55,7 +55,7 @@ namespace KBSReplaceEngine
 	    decision).
 
 	    THE RUN CHECKS THAT THE MATCHES ARE STILL WHERE THE SEARCH FOUND THEM, AND REFUSES TO START
-	    IF THEY ARE NOT (the user's design).
+	    IF THEY ARE NOT (the author's design).
 	    The rows were found at positions the search recorded, and the run lines what it writes up with
 	    them - so if the document has moved since the search in a way that adds, removes or shifts a
 	    match, the rows no longer describe it.
@@ -190,7 +190,7 @@ namespace KBSReplaceEngine
 	    False = nothing changed; outStatus says why either way. */
 	bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** Replace on a hit row's right-click menu (the user's call): that one row, ticked or
+	/** Replace on a hit row's right-click menu (the author's call): that one row, ticked or
 	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
 	    list stays a work list: the row shows its new text and loses its box, every other row is moved to
 	    where its text now stands. Refused - nothing changed, outStatus says why - when the query changed
@@ -202,10 +202,10 @@ namespace KBSReplaceEngine
 	    outcome, and no replace running. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
-	/** A STORY ROW'S MENU. Replace = the story's TICKED rows (the user's call), no prompt, one undo
+	/** A STORY ROW'S MENU. Replace = the story's TICKED rows (the author's call), no prompt, one undo
 	    step, the list stays a work list (as ReplaceHit) - and all or none: one row that cannot be
 	    written (an endnote's end, locked, missing) leaves every row as it was, and outStatus says so and
-	    how many (the user's call - Change Checked writes the rest). Reject Change = every replaced row of
+	    how many (the author's call - Change Checked writes the rest). Reject Change = every replaced row of
 	    the story whose tracked change is still there, one undo step. Redo = the rows taken back, below
 	    (RedoStory - a hit row has no Redo of its own: a row taken back is replaced again with Replace).
 	    Each says what it did - or why nothing - in outStatus. */
@@ -221,7 +221,7 @@ namespace KBSReplaceEngine
 	bool RedoChapter(int32 chapterIdx, PMString& outStatus);
 	bool CanRedoChapter(int32 chapterIdx);
 	bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	/** Redo on a story row (the user's call): every row of the story taken back with Reject Change and
+	/** Redo on a story row (the author's call): every row of the story taken back with Reject Change and
 	    still holding its original text, replaced again with what Find/Change holds now, ticked or not;
 	    the rest are skipped and counted. One undo step, the list stays as it is. The menu item and
 	    every status line it writes say "Replace Again (Current Find/Change Settings)" (the user's
@@ -237,9 +237,9 @@ namespace KBSReplaceEngine
 	    popup does not open at all. */
 	bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx);
 
-	/** Accept All Changes by KohakuFindChange in This Document on a document row (the user's call):
+	/** Accept All Changes by KohakuFindChange in This Document on a document row (the author's call):
 	    the tracked changes signed "KohakuFindChange" in that chapter's document are accepted and
-	    everybody else's are left (the user's call - not every change, as InDesign's own Accept All
+	    everybody else's are left (the author's call - not every change, as InDesign's own Accept All
 	    takes), in ONE undo step (KBSTrackChange::AcceptSignedInDocument). All or nothing - a
 	    story that will not go rolls the step back. Ours in hidden conditional text are left, and the
 	    status says how many. Rows keep what they show; a replaced row's Reject Change then greys out

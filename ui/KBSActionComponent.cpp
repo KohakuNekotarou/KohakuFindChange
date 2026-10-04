@@ -186,7 +186,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKBSOpenFindChangeActionID:
 		{
-			// Open Find/Change... (the user's call): InDesign's own Edit > Find/Change dialog,
+			// Open Find/Change... (the author's call): InDesign's own Edit > Find/Change dialog,
 			// opened from the panel - with no document open as well (a book alone on screen), where the
 			// Edit menu greys it out. The dialog itself needs no document; only the menu's enabling asks
 			// for one, and a panel item has its own. It runs the product's action through the action
@@ -194,7 +194,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// opens exactly as Edit > Find/Change opens it, and nothing of InDesign's own menu is changed.
 			// (Not an IActionFilter taking the "needs a document" bit off the Edit menu's action: the user
 			// prefers KBS to leave InDesign's menu alone.)
-			// *A MINIMISED DIALOG IS BROUGHT BACK, NOT CLOSED (the user's call): that action is a toggle,
+			// *A MINIMISED DIALOG IS BROUGHT BACK, NOT CLOSED (the author's call): that action is a toggle,
 			//  and on a minimised dialog it closes it (measured).
 			if (KBSRestoreMinimizedFindChange())
 				break;
@@ -241,7 +241,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		// (No Find Missing Glyphs / Find Overset: removed on the user's call - the Book panel's
+		// (No Find Missing Glyphs / Find Overset: removed on the author's call - the Book panel's
 		//  preflight reports both over the whole book.)
 
 		case kKBSScopeBookActionID:
@@ -295,7 +295,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				"Minimizable Find/Change", ": on - applies when the Find/Change dialog is open.");
 			break;
 
-		// "Link the Application Bar's Search Field to This Panel" (the user's design): the search field of
+		// "Link the Application Bar's Search Field to This Panel" (the author's design): the search field of
 		// InDesign's application bar shows the query of the tab Find/Change is on, and Return in it searches
 		// with this panel (the triangle does not choose the tab).
 		// *Windows only, OFF by default.
@@ -377,7 +377,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 				break;
 			}
 
-			// NO PROMPT (the user's call). Not a confirmation before every Change Checked: everything a run
+			// NO PROMPT (the author's call). Not a confirmation before every Change Checked: everything a run
 			// does is one undo step and every chapter is left open and unsaved, and the rows' own menus go
 			// without one too. What such a prompt would say about Track Changes is said on the status line
 			// instead - by the replace's own summary (it counts the rows Track Changes recorded nothing for,
@@ -456,7 +456,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			const uint32 id = actionID.Get();
 			bool wrote = false;
 			if (id == kKBSStoryReplaceActionID)
-				wrote = KBSRuns()->ReplaceStory(chapter, group, status);	// no prompt (the user's call)
+				wrote = KBSRuns()->ReplaceStory(chapter, group, status);	// no prompt (the author's call)
 			else if (id == kKBSStoryRejectActionID)
 				wrote = KBSRuns()->RejectStory(chapter, group, status);
 			else if (id == kKBSStoryAcceptActionID)
@@ -489,7 +489,7 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString status;
 			bool wrote = false;
 			if (actionID.Get() == kKBSReplaceHitActionID)
-				wrote = KBSRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the user's call)
+				wrote = KBSRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the author's call)
 			else if (actionID.Get() == kKBSAcceptChangeActionID)
 				wrote = KBSRuns()->AcceptHit(chapter, hit, status);
 			else
@@ -562,7 +562,7 @@ void KBSActionComponent::DoAbout()
 	CAlert::ModalAlert
 	(
 		// THE ONE STRING KBS DOES NOT SWITCH BY UI LANGUAGE. The About box is the plug-in's name and version,
-		// and it reads the same in every UI language (the user's call), so it comes straight from the string
+		// and it reads the same in every UI language (the author's call), so it comes straight from the string
 		// table rather than through KBSLoc::Text. The name and the version are not words - translating them
 		// would be translating an identifier.
 		//
@@ -604,7 +604,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// START a run - Find and Show Changes - share the answer, so it is taken once here. See
 	// KBSBookScope::HasScopeTarget: it asks what the engines themselves ask, so a command that is offered
 	// can always run and one that cannot is visibly grey rather than reporting "No open document to
-	// search." after the fact (the user's call).
+	// search." after the fact (the author's call).
 	//
 	// It is asked HERE rather than declared in the .fr as kDisableIfNoFrontDocument for two reasons
 	// that are written out beside the action definitions: that flag would grey the commands out with
@@ -647,7 +647,7 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			listToUpdate->SetNthActionName(i, name);
 			// The name is written whether or not it can run, so a greyed-out item still says which
 			// scope it would have used.
-			// ...and grey on the Object and Colour tabs too (the user's call): they find page
+			// ...and grey on the Object and Colour tabs too (the author's call): they find page
 			// items, which this panel does not list. The same question the search asks (CanSearchTab).
 			const bool canRun = haveTarget
 				&& KBSRuns()->CanSearchTab(KBSRuns()->CurrentSearchMode());

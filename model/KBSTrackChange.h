@@ -4,12 +4,12 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  Track Changes parts for the replace (the user's design). Every replace KBS makes is written with
+//  Track Changes parts for the replace (the author's design). Every replace KBS makes is written with
 //  Track Changes on, and the records are LEFT in the document - they are what lets one replaced row be
 //  taken back later (Reject Change) and what the jump finds a replaced row by. The story's own "Track
 //  Changes" setting is handed back as it was found (TrackingScope).
 //
-//  SIGNED "KohakuFindChange" AT A TIME KBS HANDS OUT (the user's call; spec
+//  SIGNED "KohakuFindChange" AT A TIME KBS HANDS OUT (the author's call; spec
 //  docs/superpowers/specs/_done/2026-09-28-kbs-signed-designated-time-design.md). InDesign's user name is
 //  not touched (a name the script DOM cannot put back to "unset" is a name that could be left behind -
 //  switching it was tried and dropped): each replace is written under it and its records are rewritten
@@ -18,7 +18,7 @@
 //  millisecond - no panel and no script shows them). A replaced row keeps its time (Hit::recordTime) and
 //  is tied to its records by that time exactly - not by its texts and the nearest position, nor under
 //  the user's own name and the clock's time, both tried before. "Accept All Changes by KohakuFindChange
-//  in This Document" accepts the signed records only (the user's call - not every change, as InDesign's
+//  in This Document" accepts the signed records only (the author's call - not every change, as InDesign's
 //  own Accept All).
 //  ! Touching replaces written front to back leave one insertion per row but ONE deletion, carrying the
 //    LAST row's time: InDesign joins a deletion to the one it touches whoever made either (measured with
@@ -75,7 +75,7 @@ namespace KBSTrackChange
 	    footnote, or a replace that changed no character). A row's Hit::recordLead is that place minus
 	    `from`. */
 	bool FirstRecordOfTimeIn(const UIDRef& story, TextIndex from, TextIndex to, uint64 time, TextIndex& outAt);
-	/** "KohakuFindChange" IN AMBER (the user's call). A tracked change is drawn in
+	/** "KohakuFindChange" IN AMBER (the author's call). A tracked change is drawn in
 	    its AUTHOR's colour, from the document's list of users (IInCopyDocUserList on kDocBoss: a name -> an
 	    index into the session's UI colours, IInCopyUIColors), and the name KBS signs with stands in no
 	    document's list - its changes are drawn on a white background without this (measured, KT app.ktProbe
@@ -138,7 +138,7 @@ namespace KBSTrackChange
 
 	/** Does this replaced row's insertion stand under a hidden condition right now? Then its change cannot be
 	    found where the row is - FindRowChangeForHit refuses it, the deletion having stayed in the main text -
-	    and Reject Change / Accept Change on it are refused until the condition is shown (the user's call:
+	    and Reject Change / Accept Change on it are refused until the condition is shown (the author's call:
 	    refused and SAID, not taken back while hidden). The one question every refusal asks to give
 	    the right reason. False for a row with no insertion (replaced with nothing), a footnote's, or a closed
 	    document's. */
@@ -158,7 +158,7 @@ namespace KBSTrackChange
 	    All Changes by KohakuFindChange accepts. (Not any record.) */
 	bool DocumentHasSignedRecords(IDataBase* db);
 
-	/** ACCEPT ALL CHANGES BY KohakuFindChange - ONLY THE RECORDS SIGNED SO (the user's call: "only the
+	/** ACCEPT ALL CHANGES BY KohakuFindChange - ONLY THE RECORDS SIGNED SO (the author's call: "only the
 	    ones named KohakuFindChange"). InDesign's own Accept All command (kAcceptAllRedlineCmdBoss) over
 	    each story holding such a record, told the author: everybody else's changes stay. A change in
 	    hidden conditional text is not accepted (the command's default, measured). Runs inside the
@@ -175,7 +175,7 @@ namespace KBSTrackChange
 		std::set<uint64>* outAcceptedTimes = nil);
 
 	/** ACCEPT THE PENDING CHANGES A MATCH ABOUT TO BE REPLACED SITS IN OR NEXT TO - ANYBODY'S (the
-	    user's call: "only that part" - not a refusal of the run). Every insertion overlapping or touching
+	    author's call: "only that part" - not a refusal of the run). Every insertion overlapping or touching
 	    [from, to) is accepted, and every deletion anchored in [from, to] (an insertion's own deletion
 	    stands at its end), one whole record at a time, whoever made it; nothing else in the story is
 	    touched. Needed for the user's own insertion at least: replacing text its author inserted and has

@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KBS)
 //
-//  "Link the Application Bar's Search Field to This Panel" - the flyout toggle (the user's design). While
+//  "Link the Application Bar's Search Field to This Panel" - the flyout toggle (the author's design). While
 //  it is ON, the search field of InDesign's APPLICATION BAR (the one with the Adobe Stock / Adobe Help
 //  triangle) and Edit > Find/Change work as one:
 //    . the field SHOWS the query of the tab the dialog is on, and follows it as it is typed (Text / GREP: the
@@ -14,7 +14,7 @@
 //    . Return in the field searches with this panel instead of Adobe Stock / Help - on the Text and GREP tabs
 //      only, the field's text put into that tab first when it differs (KBSSearchEngine::SetQuery). On the
 //      other tabs Return is still stopped but nothing is searched; the status line says so while the panel
-//      is up (the user's call at the first live check - not the dialog's query searched there).
+//      is up (the author's call at the first live check - not the dialog's query searched there).
 //  (The triangle does not choose the tab - a design tried and dropped.)
 //  OFF by default; OFF = the field is not touched at all.
 //

@@ -219,7 +219,7 @@ int32 gReRestores = 0;		// done since the book panel last appeared (RecountAndMa
     does it (kLoadUserWorkspaceCmdBoss is its result - app.applyWorkspace alone leaves the Home screen
     up); the opening of a book does. So when the placement is docked and the Home screen stands over
     an open book, KBS closes the books and opens them again, as the user would - once a session, and
-    only with no document open and no book modified. (The user's call: "the docks visible, as when
+    only with no document open and no book modified. (The author's call: "the docks visible, as when
     the book is opened from InDesign, is best".)
     ONLY AROUND LAUNCH (measured). The Home screen also comes back in the middle of a session: with a
     book open, closing the last document puts it up again. And the checks left over from an opening
@@ -1366,7 +1366,7 @@ void KBSBookPanelPlacement::ToggleAndSave(PMString& outStatus)
 	const char* failure = KBSPanelStateWriteKeys(keys, &repaired);
 
 	// What was set, then WHERE it was written - the full path on a line of its own, the way "Save
-	// Panel Settings" shows it (the user's call), so the file can be found, backed up or
+	// Panel Settings" shows it (the author's call), so the file can be found, backed up or
 	// deleted. The first line stays because, unlike Save Panel Settings, this command also CHANGES
 	// something, and the status line is where it says which way it went.
 	outStatus = gOn ? "Remember book panel placement: on" : "Remember book panel placement: off";
