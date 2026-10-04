@@ -236,7 +236,9 @@ namespace KBSTrackChange
 		// place on the list. insLen when the pieces stand side by side; more when text no record of this time
 		// holds stands between them: a GREP <$0> leaves "<" and ">" around the match it kept, and its row read
 		// "[<c]at>" until then. Such a row is still refused (its pieces do not read as the text between them -
-		// FindRowChangeForHit): a list rebuilt from the records cannot tell kept text from typing.
+		// FindRowChangeForHit): a list rebuilt from the records cannot tell kept text from typing. ***** KEPT SO
+		// - THE USER'S CALL (2026-10-04, scenario cross-check 5 Q-1: "as it is"). ***** Taking back only the
+		// pieces, as the Track Changes panel would, is not to be offered again.
 		int32		spanLen;
 		PMString	insertedText;
 		bool		hasDelete;
