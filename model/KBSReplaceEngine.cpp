@@ -24,14 +24,13 @@
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
-#include "ISession.h"				// GetExecutionContextSession
+#include "ISession.h"				// GetExecutionContextSession - the walker's registry, and where IKBSUIServices sits
 #include "IEndnoteFacade.h"			// MatchEndsAnEndnote - is it the endnote story, and an endnote range's marker
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
 #include "WalkerScopeOptions.h"
 #include "IKBSUIServices.h"			// TellResultsWentStale - the chapter moved under its rows; the alert is the UI half's (2026-10-01)
-#include "ISession.h"					// GetExecutionContextSession - where IKBSUIServices sits
 #include "CmdUtils.h"				// commands and command sequences
 #include "CreateObject.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
@@ -2740,12 +2739,26 @@ static ICommandSequence* BeginPlainSequence(const PMString& stepName, const char
 	return sequence;
 }
 
-static void EndPlainSequence(ICommandSequence* sequence, bool ok)
+// ***** A STEP ROLLED BACK LEAVES THE DOCUMENT AS IT FOUND IT - ITS "UNSAVED" FLAG TOO (2026-10-04, R9-1 - the
+// ***** user's call). ***** The rollback puts the TEXT back and leaves the database marked modified (measured: a saved
+// document, a story's Replace rolled back all or none - case story-replace-endnote-end - came out modified=true
+// with not a character changed, and asked to be saved on close). Change Checked's cancel has put the flag back
+// since 2026-08 (ReplaceChecked); the row menus' steps had no such line. `wasModified` = the database's flag read
+// before the step began: one the user had already changed is left changed.
+static void EndPlainSequence(ICommandSequence* sequence, bool ok, IDataBase* db, bool wasModified)
 {
 	if (!ok)
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);
 	CmdUtils::EndCommandSequence(sequence);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (!ok && !wasModified && db != nil)
+		db->SetModified(kFalse);
+}
+
+// The flag EndPlainSequence puts back - read before the step begins.
+static bool DocIsModified(IDataBase* db)
+{
+	return db != nil && db->IsModified() != kFalse;
 }
 
 // The rows of one chapter replaced now, in ONE undo step - the right-click Replace of a row (one row) or
@@ -2795,18 +2808,45 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		return false;
 	}
 	KBSResultModel::RebindChapterDoc(chapterIdx, docRef);
-	// ***** A CHAPTER THIS OPENED WITHOUT A WINDOW GETS ONE (2026-09-27 re-check). ***** ReopenChapterDoc
-	// opens a closed chapter windowless and holds it; a replace left in it would be seen by nobody and
-	// could not be saved. Change Checked gives every chapter it wrote to a window (ShowChapterWindow);
-	// the one-row Replace does the same, after its sequence, whether it went through or not.
-	struct WindowAfter
+	IDataBase* const db = docRef.GetDataBase();
+	// Read before anything here touches it: a step rolled back puts it back (EndPlainSequence), and so does a
+	// refusal below (ChapterAfter).
+	const bool wasModified = DocIsModified(db);
+	// ***** WHAT THE CHAPTER IS LEFT AS - CHANGE CHECKED'S RULE (2026-10-04, D9-1 and R9-2 - the user's calls). *****
+	// ReopenChapterDoc opens a closed chapter windowless and holds it. WRITTEN: a chapter of ours gets a window,
+	// so the replace can be seen and saved (ShowChapterWindow); a document that is not ours is left as it is -
+	// one with a window has it, and one the user keeps WITHOUT one (Search: = All Documents) stays hidden, as
+	// Change Checked leaves it (2026-09-29, the user's call) and the status line says (the action's NoteNoWindow).
+	// NOT WRITTEN (refused, rolled back): nothing of this is in the document, so a flag the check's walk raised is
+	// put back on a document that was clean (any document), and a chapter of ours is then handed back, as
+	// HandBackChaptersWithNothingInThem does - flag first, since a held chapter that says "unsaved" is not closed.
+	// (Until then every write gave the document a window - ShowChapterWindow asks no IsHeldDoc, so a hidden
+	// document of the user's was shown, measured - and a chapter of ours got one whether the write went through
+	// or not.)
+	struct ChapterAfter
 	{
 		UIDRef doc;
-		bool want;
-		WindowAfter(const UIDRef& d, bool w) : doc(d), want(w) {}
-		~WindowAfter() { if (want) (void)KBSBookScope::ShowChapterWindow(doc); }
-	} windowAfter(docRef, KBSBookScope::IsHeldDoc(docRef));
-	IDataBase* const db = docRef.GetDataBase();
+		bool wasModified;
+		bool wrote;
+		ChapterAfter(const UIDRef& d, bool m) : doc(d), wasModified(m), wrote(false) {}
+		~ChapterAfter()
+		{
+			if (wrote)
+			{
+				if (KBSBookScope::IsHeldDoc(doc))
+					(void)KBSBookScope::ShowChapterWindow(doc);
+				return;
+			}
+			if (!wasModified && KBSBookScope::IsDocStillOpen(doc))
+			{
+				IDataBase* const chapterDB = doc.GetDataBase();
+				if (chapterDB != nil)
+					chapterDB->SetModified(kFalse);
+			}
+			if (KBSBookScope::IsHeldDoc(doc))
+				(void)KBSBookScope::HandBackHeldDocNow(doc);
+		}
+	} chapterAfter(docRef, wasModified);
 	WalkerScopeOptions scopeOptions;
 	KBSSearchEngine::GetKBSWalkerScopeOptions(scopeOptions);
 	// ***** CHANGE CHECKED'S OWN CHECK, OVER THESE ROWS (2026-09-29, the defect re-check F-2). ***** Each row's
@@ -2879,7 +2919,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
 		if (ok)
 			KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
-		EndPlainSequence(sequence, ok);
+		EndPlainSequence(sequence, ok, db, wasModified);
 	}
 	if (!ok)
 	{
@@ -2944,7 +2984,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	NoteStoryVersions(chapterIdx, db, writtenStories);	// the next Replace / Reject finds them as KBS left them
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep(again ? KBSUndoFollow::kStepReplaceAgain : KBSUndoFollow::kStepReplace);
-	windowAfter.want = true;		// written to: it has to be seen and saved (a no-op when it has a window)
+	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
 	// (Each row's two texts - Hit::originalText / replacedText - were read here and before the run until
 	//  2026-09-28; the walk that writes a row takes them now, WalkStoryReplacing.)
 	if (again)
@@ -3259,6 +3299,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	// Recorded for the panel's following of Undo (2026-09-29): the row a reject takes back is a replaced row
 	// again when the reject is undone, and offers Reject Change again. Kept below, once the rows show it.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
+	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (R9-1)
 	// (the step's name was English on every UI until 2026-09-29)
 	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSRejectStepKey, KBSJa::kRejectStep),
 		"Reject Change: ", outStatus);
@@ -3332,7 +3373,7 @@ static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRe
 	}
 	if (ok)
 		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
-	EndPlainSequence(sequence, ok);
+	EndPlainSequence(sequence, ok, db, wasModified);
 	if (!ok)
 	{
 		outStatus = "Reject Change: ";
@@ -3536,6 +3577,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	}
 	// Recorded for the panel's following of Undo (2026-09-29) - Reject Change's reason.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
+	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (R9-1)
 	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSAcceptAllStepKey, KBSJa::kAcceptAllStep),
 		"Accept All Changes by KohakuFindChange: ", outStatus);
 	if (sequence == nil)
@@ -3547,7 +3589,7 @@ bool KBSReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 	const int32 accepted = KBSTrackChange::AcceptSignedInDocument(db, left, why, &acceptedTimes);
 	if (accepted >= 0)
 		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
-	EndPlainSequence(sequence, accepted >= 0);
+	EndPlainSequence(sequence, accepted >= 0, db, wasModified);
 	if (accepted < 0)
 	{
 		outStatus = "Accept All Changes by KohakuFindChange: ";
@@ -3667,6 +3709,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 	// Recorded for the panel's following of Undo (2026-09-29): an accept undone gives the row its time back,
 	// and with it Reject Change and Accept Change.
 	KBSUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
+	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (R9-1)
 	ICommandSequence* sequence = BeginPlainSequence(KBSLoc::Text(kKBSAcceptStepKey, KBSJa::kAcceptStep),
 		"Accept Change: ", outStatus);
 	if (sequence == nil)
@@ -3713,7 +3756,7 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 	}
 	if (ok)
 		KBSUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard (2026-10-02, S-1)
-	EndPlainSequence(sequence, ok);
+	EndPlainSequence(sequence, ok, db, wasModified);
 	if (!ok)
 	{
 		outStatus = "Accept Change: ";
