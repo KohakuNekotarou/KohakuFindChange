@@ -3116,23 +3116,15 @@ int32 KBSSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
-	// Two separate caps can bite:
-	//   * collectionTruncated: the whole-search safety ceiling stopped collection, so the RESULT SET
-	//     itself is capped - the strong "narrow it" note.
-	//   * total > display limit: every hit is stored, but the panel shows only the first N rows.
+	// One cap since 2026-10-04 (the spec map's GEN-34): the whole-search safety ceiling IS the panel's display
+	// cap, so a search that stops there has every row it holds on the panel - "narrow it" is the one note.
+	// (Until then a stopped search also said "Showing first 5000 in the panel", and one with 5,001 to
+	// 10,000 matches said that alone: it held rows the panel did not draw.)
 	if (collectionTruncated)
 	{
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KBSResultModel::kKBSCollectHitLimit);
-		outSummary.Append(" safety limit - narrow your search. Showing first ");
-		outSummary.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
-		outSummary.Append(" in the panel.");
-	}
-	else if (total > KBSResultModel::kKBSDisplayHitLimit)
-	{
-		outSummary.Append(" Showing first ");
-		outSummary.AppendNumber(KBSResultModel::kKBSDisplayHitLimit);
-		outSummary.Append(" in the panel.");
+		outSummary.Append(" safety limit - narrow your search.");
 	}
 
 	outSummary.Append(chapterNotes);

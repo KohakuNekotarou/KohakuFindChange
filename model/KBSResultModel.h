@@ -36,12 +36,16 @@
 namespace KBSResultModel
 {
 	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
-	    chapter, so no query or document can pile up an unbounded result set. Unlike the display cap
-	    (kKBSDisplayHitLimit, KBSModelTypes.h) this bounds the RESULT SET itself; the search says so in
-	    its summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
+	    chapter, so no query or document can pile up an unbounded result set; the search says so in its
+	    summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
+	    ***** THE DISPLAY CAP ITSELF SINCE 2026-10-04 (the user's call, the spec map's GEN-34). ***** It was
+	    10,000 over a panel that draws 5,000 (kKBSDisplayHitLimit, KBSModelTypes.h), so Check All on a book or
+	    document row ticked rows the panel never drew and Change Checked replaced them. Made from the display
+	    cap so the two cannot part again: every row collected is a row drawn. A search with more matches stops
+	    here and says "narrow your search"; a replace writes the rows it has, and searching again finds the rest.
 	    (It lived in KBSSearchEngine.cpp until 2026-08-03, when the two scans were given it too; they
 	    were removed on 2026-09-27.) */
-	const int32 kKBSCollectHitLimit = 10000;
+	const int32 kKBSCollectHitLimit = kKBSDisplayHitLimit;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors point back at the exact occurrence. */
@@ -554,7 +558,9 @@ namespace KBSResultModel
 
 	/** Select / deselect EVERY hit in every chapter - Check All / Uncheck All over the tree's BOOK
 	    row. Applies to all stored hits, including those past the panel's display cap - the display cap
-	    must not silently shrink what a replace touches. Replaced and locked hits are skipped. */
+	    must not silently shrink what a replace touches. Replaced and locked hits are skipped.
+	    (Since 2026-10-04 no stored hit is past the cap: the search stops collecting there - GEN-34,
+	    kKBSCollectHitLimit. The rule stays, for the cap's sake.) */
 	void SetAllChecked(bool checked);
 
 	/** Select / deselect every hit in ONE chapter - the same two commands over a DOCUMENT row

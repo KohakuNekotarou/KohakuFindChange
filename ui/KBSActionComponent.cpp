@@ -515,9 +515,10 @@ void KBSActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// menu - a script firing the action by ID - lands here, and there is no row for it to be
 			// talking about. Do nothing rather than guess at "everything".
 			//
-			// Either way this covers every STORED hit, including the ones past the panel's display cap
-			// (kKBSDisplayHitLimit) - most of them scrolled out of sight, which is why the status line
-			// says afterwards which row it was done over.
+			// Either way this covers every STORED hit - every row the panel draws, since the search stops
+			// collecting at the display cap (2026-10-04, GEN-34; until then it also ticked rows past the cap)
+			// - most of them scrolled out of sight, which is why the status line says afterwards which row it
+			// was done over.
 			const int32 target = KBSResults()->GetContextMenuChapter();
 			if (target == KBSResultModel::kNoContextMenuChapter)
 				break;
@@ -754,9 +755,9 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// row of this list be checked at all" is NoRowHasCheckBox(). This line spelled that out by
 			// hand until 2026-08-08.
 			//
-			// Walks every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling
-			// rather than the smaller number the panel displays. Taken here rather than above the
-			// loop because this is the only action that reads it.
+			// Walks every stored hit - up to kKBSCollectHitLimit of them, the whole-SEARCH ceiling (the
+			// panel's display cap too since 2026-10-04, GEN-34). Taken here rather than above the loop
+			// because this is the only action that reads it.
 			const int32 checkedCount = KBSResults()->GetCheckedCount();
 			const bool16 canReplace = (checkedCount > 0 && !KBSResults()->NoRowHasCheckBox())
 				? kTrue : kFalse;

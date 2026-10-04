@@ -25,9 +25,10 @@
 
 namespace KBSResultModel
 {
-	/** The panel shows at most this many hit rows (book order). The model still HOLDS every hit -
-	    a same-book re-search reuses them, and a replace consumes them ALL - only the tree display is
-	    capped, to keep a huge result set from flooding the panel. */
+	/** The panel shows at most this many hit rows (book order), to keep a huge result set from flooding
+	    the panel. Since 2026-10-04 the search also stops COLLECTING here (kKBSCollectHitLimit is made from
+	    this - the spec map's GEN-34), so the model holds no row the panel does not draw; the cap's own
+	    machinery (the adapter's counts, the "first N shown" note) stays as the panel's guard. */
 	const int32 kKBSDisplayHitLimit = 5000;
 
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
