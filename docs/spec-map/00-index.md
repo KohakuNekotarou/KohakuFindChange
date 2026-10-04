@@ -89,7 +89,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 07 | [変更履歴 ― 署名・色・却下と承認](07-track-changes.md)（時刻つきの署名・Amber・記録の形・脚注・隠し条件・Reject・Accept・Accept All の数え方） | `TRK-` | 9b | ✅ |
 | 08 | [Show Changes by KohakuFindChange](08-show-changes.md)（記録から一覧を作り直す・範囲・読み方・run の行・メッセージ欄・できること／できないこと） | `SHOW-` | 9b | ✅ |
 | 09 | [Undo/Redo への追従](09-undo.md)（追いかける書き込み・追いかけないもの・知り方・順番・やめるとき・メッセージ欄） | `UNDO-` | 6b | ✅ |
-| 10 | 文書・ブックを閉じたとき（結果の消え方・保持中の章・別名で保存・終了） | `LIFE-` | 11 | ⬜ |
+| 10 | [文書・ブックを閉じたとき](10-lifecycle.md)（文書の結果・All Documents・ブックの結果・復帰・ブックの別名保存・保存・起動と終了） | `LIFE-` | 11・13 | ✅ |
 | 11 | パネルの見た目（タブ名・絵・メッセージ欄・大きさの下限・How to Use・About） | `PNL-` | 4・7・13 | ⬜ |
 | 12 | フライアウトと設定の保存（項目の並び・灰色の規則・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5 | ⬜ |
 | 13 | 窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change | `WIN-` | 14・15 | ⬜ |
