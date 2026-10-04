@@ -37,7 +37,11 @@
 //  ***** WHAT IS NOT FOLLOWED: anything that is not a write of KBS's own ***** - typing, the Track Changes
 //  panel, a script, a replace made before Show Changes rebuilt the list. Those leave the rows as they are,
 //  as before; the doors that were there for them (the story's version, the row's text, the records' times)
-//  still stand.
+//  still stand. ***** KEPT SO ON THE USER'S CALL (2026-10-04, the scenario cross-check 1: "A, as it is"). *****
+//  Measured: Show Changes, then a Ctrl+Z of the replace it listed - the text came back, the list kept both rows
+//  and "Found 2 change(s)", and said nothing until a row was touched (its right-click is greyed with the reason,
+//  its jump says "undone, or edited since"). Saying so on the status line, or reading the records again, were
+//  offered and not taken.
 //
 //========================================================================================
 
