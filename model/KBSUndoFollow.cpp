@@ -34,7 +34,7 @@
 #include "KBSBookScope.h"		// FindOpenChapterDoc - a chapter's document found again by its file
 #include "KBSDiag.h"			// KBS_DIAG_LOG - the test build's trace (compiled out of a shipping build)
 #include "KBSResultModel.h"
-#include "KBSModelNotify.h"		// the panel drawn again, and its message line - told, never called (2026-10-01)
+#include "KBSModelNotify.h"		// the panel drawn again, and its message line - told, never called
 #include "KBSRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
 #include "KBSSearchEngine.h"	// ReadStoryVersion - a story's version
 #include "KBSUndoFollow.h"
@@ -73,9 +73,9 @@ struct Step
 // The kept writes, oldest first.
 std::vector<Step> gSteps;
 
-// ***** HOW MANY ARE KEPT. ***** InDesign's own history is longer, but a write older than this is rarely
-// undone through thirty of KBS's own; one that is simply stops being followed (its rows stay as they are -
-// what they did before 2026-09-29). A whole result set is heavy (a large search holds thousands of rows),
+// HOW MANY ARE KEPT. InDesign's own history is longer, but a write older than this is rarely undone through
+// thirty of KBS's own; one that is simply stops being followed (its rows stay as they are). A whole result
+// set is heavy (a large search holds thousands of rows),
 // so only the last three of those are kept, with everything older than the oldest of them: a write older
 // than a Change Checked names the rows in the layout before it, and could only be reached by undoing that
 // Change Checked first.
@@ -166,10 +166,10 @@ void DropOtherResultSets()
 
 // Do the two writes share a document? (InDesign keeps one history per document, so two that do are
 // taken back and done again in order; two that do not, in any order.)
-// ***** A CHANGE CHECKED SHARES WITH EVERY WRITE (2026-10-02, the block 6/6b re-check W-1). ***** What it puts
-// back is the WHOLE result set - every document's rows, the ones it never wrote to as well (ModelSnapshot) - so
-// following its Undo or Redo in one document took back on the panel a Replace or a Reject made since in another:
-// measured, cases uf-alldocs-cc-undo-other-replace-redo and uf-alldocs-replace-cc-reject-undo. Ordered against
+// A CHANGE CHECKED SHARES WITH EVERY WRITE. What it puts back is the WHOLE result set - every document's rows,
+// the ones it never wrote to as well (ModelSnapshot) - so following its Undo or Redo in one document, unordered,
+// takes back on the panel a Replace or a Reject made since in another: measured, the regression cases
+// uf-alldocs-cc-undo-other-replace-redo and uf-alldocs-replace-cc-reject-undo (work/kbs-regress). Ordered against
 // every write, it waits until the writes after it are undone, and a write made after its Undo throws its Redo
 // away (KeepStep). One InDesign takes back or does again out of that order is not followed: the rows stay as
 // they are, and the doors stand behind them as for any edit KBS did not make (the story's version, the
@@ -245,19 +245,18 @@ void DiagSteps(const char* when)
 #define KBS_DIAG_STEPS(when) ((void)0)
 #endif
 
-// ***** WHO TELLS US OF AN UNDO: THE DOCUMENT, NOT THE STORY (2026-10-02, S-1). *****
+// WHO TELLS US OF AN UNDO: THE DOCUMENT, NOT THE STORY.
 // Every write leaves a mark in its own undo step (KBSUndoFollow::MarkWrite - kKBSUndoMarkCmdBoss raises a
 // ModelChange on its document's subject), and a LAZY observer on that subject hears the mark again on the
 // step's Undo and Redo ("At Undo, the runtimes queue up the same message ids that were queued up in Do",
 // LazyNotificationData.h:50-58). KCM's ticks and paws ride the same road (KCMPageMarksCmd.cpp).
-// Until 2026-10-02 the observer sat on each STORY a write moved, under IID_ITEXTMODEL. InDesign purges a story
-// it is not using from memory - switching documents does it - and the story it builds again does not carry the
-// attachment: measured in a test build (KBSDiag.h), the subject of the same story came back as another object
-// and IsAttached said no, and the second document's Ctrl+Z went unheard 12 times in 18. A reference held on
-// the story stopped the purge and every Undo the panel had to follow was followed (5 of 5, in four runs) -
-// which is what proved it - but holding the model's objects is not how the product listens; it watches the
-// document, which is not purged while it is open (the layer, links and timing panels attach their lazy
-// observers to the document's subject).
+// NOT on each STORY a write moved, under IID_ITEXTMODEL. InDesign purges a story it is not using from memory -
+// switching documents does it - and the story it builds again does not carry the attachment: measured in a test
+// build (KBSDiag.h), the subject of the same story came back as another object and IsAttached said no, and the
+// second document's Ctrl+Z went unheard 12 times in 18. A reference held on the story stopped the purge and
+// every Undo the panel had to follow was followed (5 of 5, in four runs) - which is what proved it - but holding
+// the model's objects is not how the product listens; it watches the document, which is not purged while it is
+// open (the layer, links and timing panels attach their lazy observers to the document's subject).
 // Attached at run time, never written into the document; let go of when the document closes (DocumentClosing).
 std::vector<IDataBase*> gWatchedDocs;	// compared, never dereferenced once their document has closed
 
@@ -302,14 +301,14 @@ void KeepStep(Step& step)
 {
 	DropOtherResultSets();
 	ResolveDocs();
-	// ***** A NEW STEP IN A DOCUMENT THROWS ITS REDO AWAY ***** (InDesign's own rule): an undone write sharing a
+	// A NEW STEP IN A DOCUMENT THROWS ITS REDO AWAY (InDesign's own rule): an undone write sharing a
 	// document with this one can never be done again. (An undone Change Checked shares with every write -
 	// ShareDoc - so any new write lets it go: InDesign may still do it again in its own document, and the panel
 	// then does not follow.)
 	for (size_t i = gSteps.size(); i-- > 0; )
 		if (!gSteps[i].done && ShareDoc(gSteps[i], step))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
-	// (Each moved story was watched here until 2026-10-02 - the mark has put the observer on its document.)
+	// (No watch here: MarkWrite has put the observer on the write's document already.)
 	gSteps.push_back(std::move(step));
 
 	// The limits (see kMaxSteps): the oldest first; past the whole-result-set limit, the oldest of those
@@ -397,7 +396,7 @@ public:
 			(const void*)data, IDThreading::IsMainThreadDomain() ? 1 : 0);
 		if (protocol != IID_IKBSUNDOMARK || theSubject == nil)
 			return;
-		// The main thread only (2026-10-01, kModelPlugIn - the split's design section 6): an Undo and a Redo
+		// The main thread only (kModelPlugIn - the split's design, section 6): an Undo and a Redo
 		// happen there, and the results it moves are the session's.
 		if (!IDThreading::IsMainThreadDomain())
 			return;
@@ -417,7 +416,7 @@ void KBSUndoFollow::MarkWrite(IDataBase* db)
 	if (cmd == nil)
 		return;
 	cmd->SetItemList(UIDList(db, db->GetRootUID()));
-	// ***** A MARK THAT FAILS MUST NOT TAKE THE WRITE WITH IT. ***** The write's sequence decides by the global
+	// A MARK THAT FAILS MUST NOT TAKE THE WRITE WITH IT. The write's sequence decides by the global
 	// error state as it ends, and the write has already gone through: a mark that could not be processed costs
 	// the panel this step's following, never the user's replace.
 	const ErrorCode before = ErrorUtils::PMGetGlobalErrorCode();
@@ -449,8 +448,8 @@ KBSUndoFollow::StepRecorder::~StepRecorder()
 {
 	if (!fOpen)
 		return;
-	// Not kept: the write failed or was cancelled. The rows it changed go back (the replace's own rollback
-	// until 2026-09-29 - RollBackRows is harmless where the caller has done it already: nothing is left).
+	// Not kept: the write failed or was cancelled. The rows it changed go back (RollBackRows is harmless
+	// where the caller has done it already: nothing is left).
 	KBSResultModel::RollBackRows();
 	CloseRecording();
 }
@@ -511,16 +510,14 @@ bool KBSUndoFollow::Follow()
 	// replace or Show Changes pumps events behind its bar - KBSRunGuard counts all three).
 	if (gRecording || gSteps.empty() || KBSRunGuard::IsAnyRunning())
 		return false;
-	// (A story's notification came here with its UID until 2026-10-02, and a step that named no such story was
-	//  passed over first - the cheap answer to typing, which reached here on every keystroke. Only KBS's own
-	//  writes leave a mark, so nothing but their Undo and Redo comes now.)
+	// (Only KBS's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
 	DropOtherResultSets();
 	ResolveDocs();
 	KBS_DIAG_STEPS("resolved");
 	if (gSteps.empty())
 		return false;
 
-	// ***** ONE WRITE AT A TIME, IN THE ORDER INDESIGN TAKES THEM. ***** An Undo takes back the newest write
+	// ONE WRITE AT A TIME, IN THE ORDER INDESIGN TAKES THEM. An Undo takes back the newest write
 	// of a document, a Redo does the oldest undone one again - so a write is followed only when no later
 	// standing write (for an Undo), or no earlier undone one (for a Redo), shares a document with it. The
 	// loop goes on until nothing more moves: one notification can stand for several steps (a Change Checked
@@ -547,7 +544,7 @@ bool KBSUndoFollow::Follow()
 		if (pick == gSteps.size())
 			break;
 		Step& step = gSteps[pick];
-		// ***** THE ROWS ARE NUMBERED IN ONE LAYOUT. ***** A write's rows are put back only onto the layout they
+		// THE ROWS ARE NUMBERED IN ONE LAYOUT. A write's rows are put back only onto the layout they
 		// were taken from; any other (which the order above should never leave) means the write can no
 		// longer be followed, and it is dropped rather than written onto the wrong rows.
 		if (KBSResultModel::GetLayoutGeneration() != (undo ? step.layoutAfter : step.layoutBefore))
