@@ -499,7 +499,8 @@ DECLARE_PMID(kWidgetIDSpace, kKBSIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKBSSeparator3MenuItemPosition		2.0
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
-// commands in block 1 run on. Then Hide Previous Chapter. The next three are window appearance: the
+// commands in block 1 run on. Then Hide Previous Chapter, and Link the Application Bar's Search Field
+// (2026-10-02) - a search toggle too, so it stands before the window ones. The next three are window appearance: the
 // two that act on InDesign's OWN Find/Change dialog first (translucency, then the minimize box),
 // and this panel's own translucency. Remember Book Panel Placement closes the block: it is about
 // InDesign's own Book panel, the other window the plug-in looks after.

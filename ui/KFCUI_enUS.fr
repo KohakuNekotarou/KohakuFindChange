@@ -31,7 +31,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         kEuropeanWinToMacEncodingConverter,		// Character encoding converter (irp) I made this WinToMac as we have a bias to generate on Win...
         {
         	 // ----- Menu strings
-                kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KESCM-style; distinct from kKBSCompanyValue)
+                kKBSCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKBSCompanyValue)
                 kKBSAboutMenuKey,					kKBSDisplayName "...",
                 // kKBSPluginsMenuKey was here until 2026-08-06. Its menu path macro was never used
                 // by the .fr, so nothing ever asked for this string (see KFCUIID.h).

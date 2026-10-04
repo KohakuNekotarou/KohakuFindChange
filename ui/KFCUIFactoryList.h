@@ -38,9 +38,10 @@ REGISTER_PMINTERFACE(KBSResultTreeEH, kKBSResultTreeEHImpl)
 REGISTER_PMINTERFACE(KBSUIStartupShutdown, kKBSUIStartupShutdownImpl)
 // Replace feature: the hit row check box's observer.
 REGISTER_PMINTERFACE(KBSResultCheckObserver, kKBSResultCheckObserverImpl)
-// Panel tab name: writes the scope onto the tab when the panel appears.
+// The panel's observer (KBSPanelTitle.cpp): the tab's name, the layout, the picture and the message as the panel
+// appears, the picture's click, and the tab's name following the Find/Change settings and the selection.
 REGISTER_PMINTERFACE(KBSPanelObserver, kKBSPanelObserverImpl)
-// The panel's own view: the minimum size the panel can be dragged to.
+// The panel's own view: a floor under how small it can be dragged, and a height rounded to whole result rows.
 REGISTER_PMINTERFACE(KBSPanelView, kKBSPanelViewImpl)
 // The panel illustration's tooltip (the URL a click on it opens).
 REGISTER_PMINTERFACE(KBSIconTip, kKBSIconTipImpl)

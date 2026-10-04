@@ -696,6 +696,22 @@ void KBSResultModel::SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool chec
 	}
 }
 
+int32 KBSResultModel::GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx)
+{
+	// The rows SetGroupChecked above would set, counted the same way (2026-10-04, D-1).
+	if (NoRowHasCheckBox())
+		return 0;
+	std::vector<int32> rows;
+	GetGroupHits(chapterIdx, groupIdx, rows);
+	int32 count = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		if (RowHasCheckBox(gChapters[chapterIdx].hits[rows[k]]))
+			++count;
+	}
+	return count;
+}
+
 void KBSResultModel::SetContextMenuGroup(int32 chapterIdx, int32 groupIdx)
 {
 	gContextMenuGroupChapter = chapterIdx;

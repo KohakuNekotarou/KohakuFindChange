@@ -171,7 +171,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	/*
 	 * The panel's illustration: the system rollover icon button plus a tooltip of our own, so
 	 * hovering the picture says where clicking it goes. Nothing else is added - the click itself is
-	 * heard by the panel's observer, which is already there for the tab name.
+	 * heard by the panel's observer (KBSPanelTitle.cpp), which is already there.
 	 *
 	 * Same shape as kLinksUIButtonBoss in open/components/linksui, and as KCM's
 	 * kKCMIconWidgetBoss - which is where this panel's layout comes from.
@@ -188,7 +188,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	/*
 	 * Result tree list (Task 2): the tree-view widget carrying our hierarchy adapter and row
 	 * widget manager. The framework provides the tree controller and default event handling
-	 * (selection, expand/collapse); the row-click jump handler arrives in Task 3.
+	 * (selection, expand/collapse); the row-click jump handler is the row's (kKBSResultNodeWidgetBoss, below).
 	 */
 	Class
 	{
@@ -515,18 +515,19 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSHidePrevChapterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
+		// field of InDesign's application bar searches with this panel. *Windows only. KBSAppBarSearchEnter.h.
+		// A search toggle, so it comes before the window ones below.
+		kKBSAppBarSearchEnterActionID,
+		kKBSTargetMenuPath
+		kKBSAppBarSearchEnterMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Translucent Find/Change: toggle (check mark) for InDesign's OWN Find/Change dialog.
 		// *Windows only.
 		kKBSTranslucentFindChangeActionID,
 		kKBSTargetMenuPath
 		kKBSTranslucentFindChangeMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Link the Application Bar's Search Field to This Panel: toggle (check mark). Return in the search
-		// field of InDesign's application bar searches with this panel. *Windows only. KBSAppBarSearchEnter.h.
-		kKBSAppBarSearchEnterActionID,
-		kKBSTargetMenuPath
-		kKBSAppBarSearchEnterMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Minimizable Find/Change: toggle (check mark). Puts a minimize box on InDesign's OWN
@@ -537,9 +538,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKBSMinimizableFindChangeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Translucent Panel: the same idea applied to this panel - drawn faint while it floats, and
-		// back to solid while the pointer is on it. Directly under the one above; the two read as a
-		// pair. *Windows only.
+		// Translucent Panel: Translucent Find/Change's idea applied to this panel - drawn faint while it
+		// floats, and back to solid while the pointer is on it. Under the two that act on InDesign's
+		// dialog. *Windows only.
 		kKBSTranslucentPanelActionID,
 		kKBSTargetMenuPath
 		kKBSTranslucentPanelMenuItemPosition,

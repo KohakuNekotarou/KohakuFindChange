@@ -90,6 +90,7 @@ public:
 	virtual bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx) { return KBSResultModel::GetHitInFootnote(chapterIdx, hitIdx); }
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) { KBSResultModel::RebindChapterDoc(chapterIdx, newDocRef); }
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KBSResultModel::ChangeOutcome outcome) { KBSResultModel::SetHitOutcome(chapterIdx, hitIdx, outcome); }
+	virtual int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx) { return KBSResultModel::GetGroupCheckableCount(chapterIdx, groupIdx); }
 };
 
 CREATE_PMINTERFACE(KBSResultsSession, kKBSResultsImpl)

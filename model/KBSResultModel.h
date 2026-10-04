@@ -452,6 +452,11 @@ namespace KBSResultModel
 	int32 GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx);
 	/** Check All / Uncheck All on a story row: every row of the group that carries a box. */
 	void SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked);
+	/** How many of those rows there are - the story row's Check All / Uncheck All are offered while it is above
+	    zero, as GetChapterCheckableCount offers them on a document row (2026-10-04, D-1: the whole result set's
+	    NoRowHasCheckBox until then, so a story whose rows had all been replaced still offered them, changed
+	    nothing and said "all checked"). */
+	int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx);
 	/** The story row a right-click menu was popped over (2026-09-27); cleared by the other rows'
 	    right-clicks and by Clear(). False = none. */
 	void SetContextMenuGroup(int32 chapterIdx, int32 groupIdx);

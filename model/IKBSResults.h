@@ -153,6 +153,8 @@ public:
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) = 0;
 	/** = KBSResultModel::SetHitOutcome. */
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KBSResultModel::ChangeOutcome outcome) = 0;
+	/** = KBSResultModel::GetGroupCheckableCount (2026-10-04, D-1 - at the end, as every new method goes). */
+	virtual int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx) = 0;
 };
 
 #endif // __IKBSResults_h__

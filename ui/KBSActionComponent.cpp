@@ -778,7 +778,11 @@ void KBSActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				else if (action == kKBSStoryRedoActionID)
 					enable = KBSRuns()->CanRedoStory(chapter, group);
 				else
-					enable = !KBSResults()->NoRowHasCheckBox();
+					// Check All / Uncheck All: while THIS story has a row with a box - the document row's question
+					// (GetChapterCheckableCount below), one level down. The whole result set's NoRowHasCheckBox until
+					// 2026-10-04 (D-1): a story whose rows had all been replaced still offered them, while another story
+					// had boxes, and they changed nothing and said "This story: all checked." (measured RED).
+					enable = KBSResults()->GetGroupCheckableCount(chapter, group) > 0;
 			}
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
