@@ -1787,6 +1787,140 @@ QueryCompared CompareQueryWithSearch()
 	return (signatureDiffers || KFCSearchEngine::FindFormatHasChanged()) ? kQueryChanged : kQueryUnchanged;
 }
 
+// THE WRITING LOOP OF A RUN, INSIDE A COMMAND SEQUENCE ITS CALLER HOLDS OPEN (2026-10-04, the query run -
+// docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md). Every chapter of `pending` the caller has
+// open, one match at a time (ReplaceInChapterOneByOne), the bar moved and Cancel asked between chapters;
+// fills `totals` and each chapter's tookReplacement. It opens no document and closes none: an open processed
+// between two chapters' replacements throws away the undo history of the chapters already written (measured -
+// the resolve pass in ReplaceChecked). Change Checked and the query run (KFCQuerySequence) both write through it.
+void WriteCheckedChapters(std::vector<PendingChapter>& pending, const WalkerScopeOptions& scopeOptions,
+	KFCProgressBar& progressBar, RunTotals& totals)
+{
+	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
+	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
+	// actually been advanced - what lets KFCAdvanceProgress swallow an advance too small to repaint
+	// for - so it has to be carried along rather than recomputed.
+	int32 progressBase = 0;
+	int32 progressReported = 0;
+
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+	{
+		// The count the run was sized with, carried on the chapter - see PendingChapter::
+		// checkedCount for why it is still right when this chapter's turn comes. (A recount taken
+		// after the chapter ran would find zero, its hits being marked replaced by then.)
+		const int32 chapterChecked = pending[pi].checkedCount;
+
+		PMString chapterName;
+		int32 chapterHits = 0;
+		KFCResultModel::GetChapterDisplay(pending[pi].chapterIdx, chapterName, chapterHits);
+		chapterName.SetTranslatable(kFalse);
+		KFCSetChapterTask(progressBar, "Chapter", pi, pending.size(), chapterName);
+		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+
+		// Cancel is asked here, after the bar has been moved - inside the chapter and just above
+		// (KFCAdvanceProgress; which call on the bar takes the click is not measured, see there).
+		//
+		// kFALSE: do NOT raise the global error state. The error state is not the mechanism - it does not
+		// carry a rollback across a book's several documents (measured, see the sequence above) - and the
+		// sequence is aborted outright. Worse than not needed: it would still be standing while
+		// AbortCommandSequence runs, and would then fail whatever the application does next.
+		//
+		// Cancelling means ONE thing (the author's call): the whole run is undone. Keeping the
+		// finished chapters would leave the book half changed with nothing on screen saying where
+		// the line fell. The cost is that the work done so far is thrown away - breaking off a
+		// 900-of-1000 run starts over.
+		if (progressBar.WasCancelled(kFalse))
+		{
+			totals.cancelled = true;
+			break;
+		}
+
+		// A chapter the resolve pass could not open. It is in this list for the bar's sake and for
+		// nothing else - it was counted and named in the summary where the opening failed - so its
+		// hits are counted past here and it is skipped.
+		if (!pending[pi].opened)
+		{
+			progressBase += chapterChecked;
+			continue;
+		}
+
+		const int32 ci = pending[pi].chapterIdx;
+		const UIDRef& docRef = pending[pi].docRef;
+
+		// EVERY REPLACE IS TRACKED. The story's own Track Changes setting is handed back as it was found
+		// (TrackingScope), and every replace's records are signed "KohakuFindChange" at the row's time
+		// (KFCTrackChange.h). A replaced row's two texts - before and after, Hit::originalText /
+		// replacedText - are taken by the walk that writes it (WalkStoryReplacing).
+		// ONE MATCH AT A TIME, STORY BY STORY (the author's call) - not Change All over whole stories.
+		int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, unrecorded = 0, acceptedFirst = 0;
+		bool walkFailed = false, runCancelled = false, runFailed = false;
+		PMString whyNot;
+		const bool wrote = ReplaceInChapterOneByOne(ci, docRef, scopeOptions,
+			&progressBar, progressBase, progressReported, replaced, missing, locked, refused, endnoteLeft,
+			unrecorded, acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
+		totals.endnoteLeft += endnoteLeft;
+		totals.unrecorded += unrecorded;
+		totals.acceptedFirst += acceptedFirst;
+		if (runCancelled)
+		{
+			totals.cancelled = true;
+			break;
+		}
+		// Could not go on (runFailed), or could not start (!wrote: the document, the options or a row
+		// could not be read): the abort below takes back what earlier chapters wrote.
+		if (runFailed || !wrote)
+		{
+			totals.stoppedByFailure = true;
+			totals.errorText = whyNot;
+			totals.errorText.SetTranslatable(kFalse);
+			totals.cancelled = true;	// everything a cancel does, this needs too
+			break;
+		}
+		progressBase += chapterChecked;
+		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
+		// line up) must still hand the bar on at the right place.
+		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
+		totals.replaced += replaced;
+		totals.missing += missing;
+		totals.locked += locked;
+		totals.refused += refused;
+		if (replaced > 0)
+			++totals.chaptersTouched;
+
+		// Did anything land here? What decides whether this chapter is kept open for the user -
+		// and given a window, in the loop past the sequence - or handed straight back at the end
+		// of the run (HandBackChaptersWithNothingInThem).
+		// A PENDING CHANGE ACCEPTED FIRST COUNTS: it is a change this run made and keeps, whether or not a
+		// replace came after it (every row of the chapter refused, or its walk broke off before the first).
+		// Handed back as "nothing in it", such a chapter would have its unsaved mark put back over the
+		// accept - a document of the user's would then say nothing had changed, a held chapter would be
+		// closed with the accept thrown away - while the status line said it was accepted (measured with
+		// the test build's fault switch replace-refuse - the regression case ca-refused-after-accept).
+		pending[pi].tookReplacement = (replaced > 0 || acceptedFirst > 0);
+		if (walkFailed)
+		{
+			// The walk STARTED here and broke off. Its unreached rows are already in `missing` above
+			// - there is nothing truer to put on them one at a time - so this names the chapter to
+			// say that the shortfall is a search error, not the document having moved on.
+			NoteChapter(ci, totals.chaptersWalkFailed, totals.firstWalkFailed, totals.haveFirstWalkFailed);
+		}
+	}
+
+	// ASK ONCE MORE, now that the loop is over.
+	//
+	// The test inside the loop sits at the TOP of each pass, so it only ever sees a cancel that
+	// arrived while an EARLIER chapter was running. A cancel pressed during the LAST chapter has no
+	// next pass to be noticed in, and the run would finish as though nothing had been asked - which is
+	// exactly what "cancelling works in the first document but not across documents" was (the user's
+	// report; a one-chapter book could never be cancelled at all).
+	//
+	// The work is already done by this point, so this changes nothing about what was written - but it
+	// is what decides between committing that work and throwing it away, which is the whole promise
+	// of the button.
+	if (!totals.cancelled && progressBar.WasCancelled(kFalse))
+		totals.cancelled = true;
+}
+
 } // anonymous namespace
 
 bool KFCReplaceEngine::RefuseChangedQuery(PMString& outSummary)
@@ -2271,129 +2405,7 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	seq->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	KFCTrackChange::BeginSignedRun();	// the run's time - every row of every chapter is stamped from it
 
-	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
-	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
-	// actually been advanced - what lets KFCAdvanceProgress swallow an advance too small to repaint
-	// for - so it has to be carried along rather than recomputed.
-	int32 progressBase = 0;
-	int32 progressReported = 0;
-
-	for (size_t pi = 0; pi < pending.size(); ++pi)
-	{
-		// The count the run was sized with, carried on the chapter - see PendingChapter::
-		// checkedCount for why it is still right when this chapter's turn comes. (A recount taken
-		// after the chapter ran would find zero, its hits being marked replaced by then.)
-		const int32 chapterChecked = pending[pi].checkedCount;
-
-		PMString chapterName;
-		int32 chapterHits = 0;
-		KFCResultModel::GetChapterDisplay(pending[pi].chapterIdx, chapterName, chapterHits);
-		chapterName.SetTranslatable(kFalse);
-		KFCSetChapterTask(progressBar, "Chapter", pi, pending.size(), chapterName);
-		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
-
-		// Cancel is asked here, after the bar has been moved - inside the chapter and just above
-		// (KFCAdvanceProgress; which call on the bar takes the click is not measured, see there).
-		//
-		// kFALSE: do NOT raise the global error state. The error state is not the mechanism - it does not
-		// carry a rollback across a book's several documents (measured, see the sequence above) - and the
-		// sequence is aborted outright. Worse than not needed: it would still be standing while
-		// AbortCommandSequence runs, and would then fail whatever the application does next.
-		//
-		// Cancelling means ONE thing (the author's call): the whole run is undone. Keeping the
-		// finished chapters would leave the book half changed with nothing on screen saying where
-		// the line fell. The cost is that the work done so far is thrown away - breaking off a
-		// 900-of-1000 run starts over.
-		if (progressBar.WasCancelled(kFalse))
-		{
-			totals.cancelled = true;
-			break;
-		}
-
-		// A chapter the resolve pass could not open. It is in this list for the bar's sake and for
-		// nothing else - it was counted and named in the summary where the opening failed - so its
-		// hits are counted past here and it is skipped.
-		if (!pending[pi].opened)
-		{
-			progressBase += chapterChecked;
-			continue;
-		}
-
-		const int32 ci = pending[pi].chapterIdx;
-		const UIDRef& docRef = pending[pi].docRef;
-
-		// EVERY REPLACE IS TRACKED. The story's own Track Changes setting is handed back as it was found
-		// (TrackingScope), and every replace's records are signed "KohakuFindChange" at the row's time
-		// (KFCTrackChange.h). A replaced row's two texts - before and after, Hit::originalText /
-		// replacedText - are taken by the walk that writes it (WalkStoryReplacing).
-		// ONE MATCH AT A TIME, STORY BY STORY (the author's call) - not Change All over whole stories.
-		int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, unrecorded = 0, acceptedFirst = 0;
-		bool walkFailed = false, runCancelled = false, runFailed = false;
-		PMString whyNot;
-		const bool wrote = ReplaceInChapterOneByOne(ci, docRef, scopeOptions,
-			&progressBar, progressBase, progressReported, replaced, missing, locked, refused, endnoteLeft,
-			unrecorded, acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
-		totals.endnoteLeft += endnoteLeft;
-		totals.unrecorded += unrecorded;
-		totals.acceptedFirst += acceptedFirst;
-		if (runCancelled)
-		{
-			totals.cancelled = true;
-			break;
-		}
-		// Could not go on (runFailed), or could not start (!wrote: the document, the options or a row
-		// could not be read): the abort below takes back what earlier chapters wrote.
-		if (runFailed || !wrote)
-		{
-			totals.stoppedByFailure = true;
-			totals.errorText = whyNot;
-			totals.errorText.SetTranslatable(kFalse);
-			totals.cancelled = true;	// everything a cancel does, this needs too
-			break;
-		}
-		progressBase += chapterChecked;
-		// Land exactly on the chapter boundary: a chapter that finished early (nothing left to
-		// line up) must still hand the bar on at the right place.
-		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
-		totals.replaced += replaced;
-		totals.missing += missing;
-		totals.locked += locked;
-		totals.refused += refused;
-		if (replaced > 0)
-			++totals.chaptersTouched;
-
-		// Did anything land here? What decides whether this chapter is kept open for the user -
-		// and given a window, in the loop past the sequence - or handed straight back at the end
-		// of the run (HandBackChaptersWithNothingInThem).
-		// A PENDING CHANGE ACCEPTED FIRST COUNTS: it is a change this run made and keeps, whether or not a
-		// replace came after it (every row of the chapter refused, or its walk broke off before the first).
-		// Handed back as "nothing in it", such a chapter would have its unsaved mark put back over the
-		// accept - a document of the user's would then say nothing had changed, a held chapter would be
-		// closed with the accept thrown away - while the status line said it was accepted (measured with
-		// the test build's fault switch replace-refuse - the regression case ca-refused-after-accept).
-		pending[pi].tookReplacement = (replaced > 0 || acceptedFirst > 0);
-		if (walkFailed)
-		{
-			// The walk STARTED here and broke off. Its unreached rows are already in `missing` above
-			// - there is nothing truer to put on them one at a time - so this names the chapter to
-			// say that the shortfall is a search error, not the document having moved on.
-			NoteChapter(ci, totals.chaptersWalkFailed, totals.firstWalkFailed, totals.haveFirstWalkFailed);
-		}
-	}
-
-	// ASK ONCE MORE, now that the loop is over.
-	//
-	// The test inside the loop sits at the TOP of each pass, so it only ever sees a cancel that
-	// arrived while an EARLIER chapter was running. A cancel pressed during the LAST chapter has no
-	// next pass to be noticed in, and the run would finish as though nothing had been asked - which is
-	// exactly what "cancelling works in the first document but not across documents" was (the user's
-	// report; a one-chapter book could never be cancelled at all).
-	//
-	// The work is already done by this point, so this changes nothing about what was written - but it
-	// is what decides between committing that work and throwing it away, which is the whole promise
-	// of the button.
-	if (!totals.cancelled && progressBar.WasCancelled(kFalse))
-		totals.cancelled = true;
+	WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
 
 	// The sequence ends HERE, and HOW it ends is the cancel. Aborting is a statement - "undo
 	// everything this sequence did" - where ending it only offers the changes up and lets the error
@@ -2577,6 +2589,70 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// ordinary case.
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return totals.replaced;
+}
+
+bool KFCReplaceEngine::WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out)
+{
+	out = WriteOutcome();
+	if (!KFCSearchEngine::CommitReplaceSide())
+	{
+		out.failed = true;
+		out.why = "the Find/Change settings could not be read";
+		return false;
+	}
+	WalkerScopeOptions scopeOptions;
+	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+
+	// The run's chapter list, as ReplaceChecked builds it - every chapter with a checked row - but every one of
+	// them must already be open: the query run holds its documents for the whole run.
+	std::vector<PendingChapter> pending;
+	int32 totalChecked = 0;
+	const int32 chapterCount = KFCResultModel::GetChapterCount();
+	for (int32 ci = 0; ci < chapterCount; ++ci)
+	{
+		const int32 checkedHere = KFCResultModel::GetChapterCheckedCount(ci);
+		if (checkedHere <= 0)
+			continue;
+		PendingChapter chapter;
+		chapter.chapterIdx = ci;
+		chapter.checkedCount = checkedHere;
+		IDFile file;
+		if (!KFCResultModel::GetChapterLocation(ci, chapter.docRef, file) || !KFCBookScope::IsDocStillOpen(chapter.docRef))
+		{
+			out.failed = true;
+			out.why = "a document of the run was not open";
+			return false;
+		}
+		chapter.opened = true;
+		pending.push_back(chapter);
+		totalChecked += checkedHere;
+	}
+	if (pending.empty())
+		return true;
+
+	const KFCBackwardSearchScope writeDirection(WriteBackward());
+	KFCTrackChange::BeginSignedRun();
+	RunTotals totals;
+	{
+		KFCProgressBar progressBar(barTitle, 0, totalChecked, kTrue, kTrue);
+		progressBar.DisableChildProgressBars(kTrue);
+		WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
+	}
+	out.replaced = totals.replaced;
+	out.missing = totals.missing;
+	out.locked = totals.locked;
+	out.refused = totals.refused;
+	out.endnoteLeft = totals.endnoteLeft;
+	out.unrecorded = totals.unrecorded;
+	out.acceptedFirst = totals.acceptedFirst;
+	out.failed = totals.stoppedByFailure;
+	out.cancelled = totals.cancelled && !totals.stoppedByFailure;
+	if (out.failed)
+		out.why = totals.errorText;
+	for (size_t pi = 0; pi < pending.size(); ++pi)
+		if (pending[pi].tookReplacement)
+			out.touchedDocs.push_back(pending[pi].docRef);
+	return !out.cancelled && !out.failed;
 }
 
 bool KFCReplaceEngine::IsReplacing()
