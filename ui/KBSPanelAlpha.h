@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KBS)
 //
-//  The "Translucent Panel" flyout toggle. Ported from KESCM's KESCMPanelAlpha (2026-08-04),
-//  where it shipped in KESCM 1.2.0 - the mechanism is not specific to which panel it is pointed at.
+//  The "Translucent Panel" flyout toggle. Ported from KCM's panel translucency (KCMPanelAlpha, shipped
+//  in its 1.2.0) - the mechanism is not specific to which panel it is pointed at.
 //
 //  *Windows only. The alpha is put on the panel's window with Win32's
 //    SetLayeredWindowAttributes; on Mac the three calls below still exist but
@@ -24,10 +24,10 @@
 
 #include "BaseType.h"
 
-// (The tuning constants - the alpha (kKBSPanelAlphaValue) and the chase's count and interval - stood
-//  here until 2026-10-02 and are now at the top of KBSPanelAlpha.cpp, the one file that reads them:
-//  the shape KCM gave its own on 2026-08-30 and the product code uses for a file-local tuning value
-//  (linksui/LinksUIUtils.cpp:606-608). Nothing that includes this header needs them.)
+// (The tuning constants - the alpha (kKBSPanelAlphaValue) and the chase's count and interval - are at
+//  the top of KBSPanelAlpha.cpp, the one file that reads them: the shape KCM gives its own and the
+//  product code uses for a file-local tuning value (linksui/LinksUIUtils.cpp:606-608). Nothing that
+//  includes this header needs them.)
 
 // The toggle's current state (*OFF by default).
 bool16	KBSGetPanelTranslucent();
@@ -39,7 +39,7 @@ bool16	KBSGetPanelTranslucent();
 void	KBSSetPanelTranslucent(bool16 on);
 
 // Write the current flag onto the panel's window.
-//  ***IT DOES NOT CHECK THE TOGGLE - THE CALLER MUST.*** While OFF this writes alpha 255 and shows
+//  IT DOES NOT CHECK THE TOGGLE - THE CALLER MUST. While OFF this writes alpha 255 and shows
 //    the shadow again, because that IS the restoring the OFF menu item does. Anything that calls it
 //    on some other cue (the pointer arriving, the widgets being rebuilt) has to ask
 //    KBSGetPanelTranslucent first, or it will cancel the translucency of ANY OTHER panel grouped
@@ -55,7 +55,7 @@ void	KBSSetPanelTranslucent(bool16 on);
 bool16	KBSApplyPanelTranslucency();
 
 //----------------------------------------------------------------------------------------
-// The same treatment for InDesign's OWN Find/Change dialog (2026-08-04, the user's request).
+// The same treatment for InDesign's OWN Find/Change dialog (the user's request).
 //
 //   Measured on the real application before it was built (work/findchange-window-probe.ps1):
 //     class   = "DroverLord - Window Class"   top-level, owner = the main frame ("indesign")
@@ -63,7 +63,7 @@ bool16	KBSApplyPanelTranslucency();
 //   So the style has to be added by us - and taken off again when the toggle goes OFF, which is
 //   the opposite of the panel side, where InDesign's own style must never be touched.
 //   Adding it turned out to have no side effects at all: text, frame and every control stayed
-//   correct and usable (user's check, 2026-08-04).
+//   correct and usable (the user's check).
 //
 //   *"DroverLord - Window Class" is a GENERIC class - a document window's canvas is one too, and
 //    so is every other dialog - so the class alone cannot identify it. That is why this window is
@@ -89,12 +89,12 @@ void	KBSSetFindChangeTranslucent(bool16 on);
 //    to opaque, and the WS_EX_LAYERED we added comes off the window WE ADDED IT TO, which need not
 //    be the one open now and may be no open window at all. A window that already carried the style
 //    is left with it.
-//    *Until 2026-08-04 both hung off "is a dialog open", so switching OFF with the dialog closed ran
-//     no clean-up at all and left the record standing against a handle the OS can recycle.
+//    *They are NOT both hung off "is a dialog open": then switching OFF with the dialog closed would
+//     run no clean-up at all and leave the record standing against a handle the OS can recycle.
 bool16	KBSApplyFindChangeTranslucency();
 
 // InDesign's OWN Find/Change dialog's platform window, or nullptr when it is not open.
-// *Shared with KBSFindChangeMinimize.cpp (2026-08-12) so that "which window is the Find/Change
+// *Shared with KBSFindChangeMinimize.cpp so that "which window is the Find/Change
 //  dialog" is decided in ONE place. It is not a trivial question - the window class is generic and
 //  the title is translated - and the answer walks the SDK's window list for the dialog whose panel
 //  answers kFindChangeParentWidgetID, a NUMBER. See the block comment over KBSQueryFindChangeIWindow
@@ -102,7 +102,7 @@ bool16	KBSApplyFindChangeTranslucency();
 // The contract:
 //   . the result is CACHED, and the cache is dropped by the window-list observer whenever a window
 //     is added or removed - so ask again rather than keeping the handle
-//   . ***do not hold the returned HWND across events.*** The OS recycles handles, and a stale one
+//   . do not hold the returned HWND across events. The OS recycles handles, and a stale one
 //     can name somebody else's window (memory/panel-hwnd-from-paletteref.md)
 //   . nullptr means "not open", and also "open, but the platform window does not exist yet"
 #ifdef WINDOWS
@@ -116,48 +116,47 @@ typedef struct HWND__* HWND;
 HWND	KBSQueryFindChangeWindow();
 
 // Could 'h' still be the Find/Change dialog's window - a live, top-level "DroverLord - Window Class"
-// window of THIS process? Win32 only, so shutdown can ask it. (2026-10-03, the block 13/14 recheck S-1.)
-// *The ONE place that answers it. Three did, each its own way: the minimize side's
-//  KBSStillOurFindChangeWindow (process, top level, class - the block 15 F-1 fix), the translucency
-//  side's KBSRestoreOurFindChangeStyle (top level, class; no process) and the cached handle in
-//  KBSQueryFindChangeWindow (IsWindow alone - and the cache is filled again with the CLOSING dialog,
-//  which is still in the window list when kRemoveWindowMessage arrives). A handle is a number the OS
-//  hands on, so each of them could name another window by the time it was used.
+// window of THIS process? Win32 only, so shutdown can ask it.
+// *The ONE place that answers it, for the minimize side (KBSStillOurFindChangeWindow), the
+//  translucency side (KBSRestoreOurFindChangeStyle) and the cached handle in
+//  KBSQueryFindChangeWindow - not three tests each its own way (IsWindow alone is not enough: the
+//  cache is filled again with the CLOSING dialog, which is still in the window list when
+//  kRemoveWindowMessage arrives). A handle is a number the OS hands on, so a weaker test could name
+//  another window by the time it is used.
 // *It says nothing about whether the window carries OUR marks: each caller asks that of its own bits.
 bool	KBSIsFindChangeShapedWindow(HWND h);
 
 // Make a SetWindowLongPtr style change on 'h' take effect without pulling the window forward:
 // SetWindowPos with the combination Microsoft's SetWindowPos Remarks prescribe (SWP_NOMOVE |
 // SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) plus SWP_NOACTIVATE, then a full redraw. Shared by
-// the two features that change the Find/Change dialog's style (each wrote it out until 2026-10-01).
+// the two features that change the Find/Change dialog's style.
 void	KBSCommitWindowStyle(HWND h);
 #endif
 
 // Throw away what is cached about where the dialog is, so the NEXT ask walks the window list again.
-// *****THIS IS NOT OPTIONAL FOR ANYONE WAITING FOR THE DIALOG TO APPEAR.***** The lookup above
-//   records "looked, found nothing" and then answers nullptr WITHOUT LOOKING AGAIN - which is right
-//   for its ordinary caller (it stops a walk of every window on every mouse move) and useless for a
-//   caller whose whole purpose is to ask the same question until the answer changes.
-//   !MEASURED 2026-08-12: a retry loop that did not call this ran its full count against the cached
-//    "no" and never saw the window that had appeared in the meantime.
-// *The translucency toggle has always done this from its own setter, for the stated reason that "a
+// THIS IS NOT OPTIONAL FOR ANYONE WAITING FOR THE DIALOG TO APPEAR. The lookup above records
+//   "looked, found nothing" and then answers nullptr WITHOUT LOOKING AGAIN - which is right for its
+//   ordinary caller (it stops a walk of every window on every mouse move) and useless for a caller
+//   whose whole purpose is to ask the same question until the answer changes.
+//   !MEASURED: a retry loop that did not call this ran its full count against the cached "no" and
+//    never saw the window that had appeared in the meantime.
+// *The translucency toggle does this from its own setter, for the stated reason that "a
 //  toggle press is exactly when 'not open', established at some earlier moment, must not be allowed
 //  to answer". The minimize toggle does it from its setter too, and so does every turn of the chase
 //  both toggles share (KBSChaseFindChangeWindow in KBSFindChangeMinimize.h).
 void	KBSForgetFindChangeWindow();
 
-// Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? (2026-10-03, the
-// block 15 recheck F-3.) The chase waits for that dialog's window (KBSChaseFindChangeWindow - the
-// minimize box's alone until the block 13/14 recheck T-1, both toggles' since), and until this it was set
-// going by EVERY window that opened - !MEASURED with the dialog closed: a new document's window started
+// Could the window a kWindowAddedMessage names be InDesign's own Find/Change dialog? The chase waits
+// for that dialog's window (KBSChaseFindChangeWindow - both toggles'), and without this test it is set
+// going by EVERY window that opens - !MEASURED with the dialog closed: a new document's window started
 // it, and it walked the window list 8 times over about a second before giving up.
-// What the message carries, measured the same day on a test build: changedBy IS the added IWindow (the
+// What the message carries, measured on a test build: changedBy IS the added IWindow (the
 // same pointer as the newest entry of the window list), and
 //   . a document window is no dialog (IDialog absent)                 -> kFalse
 //   . the Find/Change dialog opened for the FIRST time in a session is a dialog whose panel is NOT SET
 //     YET (GetDialogPanel nil) - which is why the window-list lookup cannot see it at that moment, and
-//     why the chase exists (not on every first opening: on 2026-10-03 one session's first dialog was
-//     styled at the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
+//     why the chase exists (not on every first opening: one session's first dialog was styled at
+//     the cue itself, untraced, and the next session's was not - its trace read "1 dialog(s)
 //     without a panel")                                                -> kTrue
 //     (another dialog opened for the first time looks the same, and is chased the same - the chase is
 //      bounded, and a dialog's first opening is rare next to documents opening)
@@ -165,7 +164,7 @@ void	KBSForgetFindChangeWindow();
 //   . any other dialog, its panel set                                  -> kFalse
 // *changedBy is matched against the list's own pointers BY VALUE before anything is asked of it, so a
 //  pointer of some other kind is never dereferenced; one that matches nothing answers kTrue - the chase
-//  as it ran before, rather than a dialog left without its button. Always kFalse on Mac.
+//  runs, rather than a dialog being left without its button. Always kFalse on Mac.
 bool16	KBSWindowMayBeFindChange(void* changedBy);
 
 // Start listening for the panel being shown, hidden, docked or floated.
@@ -175,13 +174,13 @@ bool16	KBSWindowMayBeFindChange(void* changedBy);
 //   and that subscription is picked up on the AutoAttach pass instead. Each attachment asks
 //   IsAttached first, so repeating the call attaches nothing twice.
 // *How: kPaletteVisibilityChangedMessage, broadcast from kPanelManagerBoss's IID_IPANELMGR subject
-//   (identified on a debug build's Spy, 2026-07-29). Two further subjects hang off kAppBoss - see
+//   (identified on a debug build's Spy). Two further subjects hang off kAppBoss - see
 //   the function itself.
 void	KBSAttachPanelVisibilityObserver();
 
 // Undo every attachment the above makes. Called from the plug-in's shutdown, BEFORE
 // KBSShutdownPanelAlpha, so that notifications stop before the timer and the hook are torn down.
-// *Why it exists (2026-08-08): while attached, the session holds a pointer into this .pln, and a
+// *Why it exists: while attached, the session holds a pointer into this .pln, and a
 //   notification arriving during teardown would run the observer in code that is going away - the
 //   same reasoning, and the same shape, as KBSBookWatchDetach.
 void	KBSDetachPanelVisibilityObserver();
@@ -192,13 +191,13 @@ void	KBSDetachPanelVisibilityObserver();
 // KBSPanelAlpha.cpp (empty on Mac). In order:
 //   . the flag that stops another timer or hook being made afterwards
 //   . the Win32 event hook
-//   . ***InDesign's own Find/Change dialog, put back as it was*** - the WS_EX_LAYERED on it is OURS,
+//   . InDesign's own Find/Change dialog, put back as it was - the WS_EX_LAYERED on it is OURS,
 //     and a style plus an alpha left on a window nobody maintains any more would outlive this
 //     plug-in. This one is easy to overlook, being the only thing here that touches somebody else's
 //     window.
 //   . the remembered window handles
-//   . the one-shot timer, stopped and released (until 2026-10-03 this list put it first, beside the
-//     flag; the flag is what has to come first, and no idle task runs inside this call)
+//   . the one-shot timer, stopped and released (the flag is what has to come first, and no idle task
+//     runs inside this call)
 void	KBSShutdownPanelAlpha();
 
 #endif // __KBSPanelAlpha_h__
