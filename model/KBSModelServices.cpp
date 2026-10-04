@@ -5,10 +5,10 @@
 //  KohakuBookSearch (KBS)
 //
 //  The model half's three session interfaces (IKBSResults.h / IKBSRuns.h / IKBSChapters.h), each method
-//  forwarding to the function it names - nothing is decided here (2026-10-01, the model/UI split).
-//  ***** EDITED BY HAND SINCE 2026-10-02. ***** Generated on 2026-10-01 from one table with the headers
+//  forwarding to the function it names - nothing is decided here (the model/UI split).
+//  EDITED BY HAND. First generated from one table with the headers
 //  (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); a method appended to a header since is forwarded
-//  here by hand, and the table does not know it - the generator is a record now and refuses to write.
+//  here by hand, and the table does not know it - the generator is a record only and refuses to write.
 //
 //========================================================================================
 

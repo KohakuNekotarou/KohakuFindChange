@@ -4,22 +4,21 @@
 //
 //  KohakuBookSearch (KBS)
 //
-//  IKBSResults - one of the three doors the UI half reaches the model half through (2026-10-01, the
-//  model/UI split; docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
+//  IKBSResults - one of the three doors the UI half reaches the model half through (the model/UI split;
+//  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
 //  The RESULT SET - KBSResultModel's questions and the few changes the panel makes to it (the
 //  boxes, the row a right-click menu was popped over, where a jump found a row). Each method is the
 //  KBSResultModel function of the same name; the contract is written there.
 //
-//  ***** ON kSessionBoss, NOT A FACADE ON kUtilsBoss. ***** What is behind it is session STATE (the results,
-//  the held chapters, the marker), and the guide's facades keep no global or static state (gs-04); the
-//  session is where InDesign keeps its own session state (IBookManager, IClipboardController). The UI
-//  half reaches it with KBSResults() (KBSModelAccess.h).
-//  ***** EDITED BY HAND SINCE 2026-10-02. ***** Generated on 2026-10-01 with its two siblings and their
-//  implementation (KBSModelServices.cpp) from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py).
-//  Methods have been added by hand since - to IKBSRuns, and to this one (2026-10-04) - which the table does
-//  not know: the generator is a record now and refuses to write. A new method goes at the END of its interface - a vtable slot is a
-//  promise to every built caller.
+//  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
+//  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
+//  where InDesign keeps its own session state (IBookManager, IClipboardController). The UI half reaches it
+//  with KBSResults() (KBSModelAccess.h).
+//  EDITED BY HAND. The three doors and their implementation (KBSModelServices.cpp) were first generated from
+//  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
+//  which the table does not know, so the generator is a record only and refuses to write. A new method goes
+//  at the END of its interface - a vtable slot is a promise to every built caller.
 //
 //========================================================================================
 
@@ -153,9 +152,9 @@ public:
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) = 0;
 	/** = KBSResultModel::SetHitOutcome. */
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KBSResultModel::ChangeOutcome outcome) = 0;
-	/** = KBSResultModel::GetGroupCheckableCount (2026-10-04, D-1 - at the end, as every new method goes). */
+	/** = KBSResultModel::GetGroupCheckableCount (appended - every new method goes at the end). */
 	virtual int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx) = 0;
-	/** = KBSResultModel::GetHitTextUnchanged (2026-10-04, scenario cross-check 5 - at the end). */
+	/** = KBSResultModel::GetHitTextUnchanged (appended). */
 	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
