@@ -87,7 +87,7 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 05 | [ジャンプと印](05-jump.md)（行ごとの行き先・ジャンプの順・一致がもう無いとき・ダブルクリックの選択・約1秒の印・矢印キー・Hide Previous Chapter） | `JMP-` | 12 | ✅ |
 | 06 | [置換 ― Change Checked と行のメニューの Replace](06-replace.md)（1件ずつ書く・断る順・条件と文書の照合・置換されない理由・報告への変わり方・取り消し1段・行のメニューと Replace Again） | `REP-` | 9 | ✅ |
 | 07 | [変更履歴 ― 署名・色・却下と承認](07-track-changes.md)（時刻つきの署名・Amber・記録の形・脚注・隠し条件・Reject・Accept・Accept All の数え方） | `TRK-` | 9b | ✅ |
-| 08 | Show Changes by KohakuFindChange（記録から一覧を作り直す・run の行・できること／できないこと） | `SHOW-` | 9b | ⬜ |
+| 08 | [Show Changes by KohakuFindChange](08-show-changes.md)（記録から一覧を作り直す・範囲・読み方・run の行・メッセージ欄・できること／できないこと） | `SHOW-` | 9b | ✅ |
 | 09 | Undo/Redo への追従（KFC 自身の書き込みの取り消し・やり直しに一覧が付いてくる範囲） | `UNDO-` | 6b | ⬜ |
 | 10 | 文書・ブックを閉じたとき（結果の消え方・保持中の章・別名で保存・終了） | `LIFE-` | 11 | ⬜ |
 | 11 | パネルの見た目（タブ名・絵・メッセージ欄・大きさの下限・How to Use・About） | `PNL-` | 4・7・13 | ⬜ |
