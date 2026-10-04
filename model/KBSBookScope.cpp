@@ -623,8 +623,8 @@ static UIDRef KBSOpenDocOfChapterFile(const IDFile& file)
 	// Test builds only (2026-10-04, the block 11 re-read A-1): what the document list's own lookup for an
 	// older version's document answers where the walk above has to be used - FindDocFromPreviousVersion,
 	// "document could be previous version" (IDocumentList.h:78-82), called by nothing in the SDK. The walk
-	// decides; this only records whether that call names the same document, so the walk can be replaced
-	// by it on a measurement rather than on its header.
+	// decides; this only records whether that call names the same document. Measured the day it went in: the
+	// same with one conversion open, a different copy with two - why the walk stays (ReopenChapterDoc's note).
 	{
 		IDocument* const previous = docList->FindDocFromPreviousVersion(file);
 		KBS_DIAG_LOG("PREVVERSION file=%s findDoc=%p walk=%p previous=%p previousLivesInFile=%d same=%d",
@@ -690,10 +690,14 @@ bool KBSBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	//
 	// ! NOT "the only way to ask", as this said until 2026-10-04 (the block 11 re-read A-1): the document
 	//   list has a lookup for exactly this case - FindDocFromPreviousVersion, "Search the open documents to
-	//   see if one is already open (document could be previous version)" (IDocumentList.h:78-82). Nothing
-	//   in the SDK calls it and it has not been measured here, while the walk was measured on a CC 2017
-	//   chapter; so the walk stays until that call is measured on the same chapter. Its answer would go
-	//   through KBSDocumentLivesInFile like every other.
+	//   see if one is already open (document could be previous version)" (IDocumentList.h:78-82), which
+	//   nothing in the SDK calls. MEASURED the same day on the CC 2017 chapter (a test build's PREVVERSION
+	//   line, work/kbs-regress/b11-a1-*.ps1): with ONE conversion open - the user's, in a window, or one this
+	//   module holds windowless - it names the same document as the walk. With TWO open it does not: the walk
+	//   took the copy opened first (the one the results were already bound to), the call the copy opened
+	//   later - so a jump or a Reject Change would have moved to the copy that holds none of this plug-in's
+	//   writes. ***** So the walk stays, on purpose. ***** (Which of two copies is "the" chapter is not
+	//   something either answer decides; the walk only kept the results where they were in that measurement.)
 	//
 	// Both are KBSOpenDocOfChapterFile's (above) since 2026-09-29, which FindOpenChapterDoc asks too.
 	{
