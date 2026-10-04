@@ -1796,9 +1796,11 @@ bool KBSSearchEngine::CommitReplaceSide()
 // of nine value-carrying interfaces (ITextAttrUID / Font / String / WideString / Int32 / Int16 /
 // RealNumber / Boolean / ClassID) - takes an attribute answering none of the nine as its CLASS alone,
 // so "this condition was added or removed" is seen while "same condition, DIFFERENT VALUE" is not.
-// Nothing else catches that gap - a row's place and text say nothing of the format it was found by -
-// so it would be a wrong replacement made in silence. There is no generic value READ, but there is a
-// generic COMPARE. (The operators are private - AttributeBossList.h:245-252 - which is a normal C++ way of
+// The other doors do not close that gap: a row's place and text say nothing of the format it was
+// found by, so the verify walk (KBSReplaceEngine's ChapterMovedUnderRows) refuses only a ticked row
+// that is no longer a match - a changed value that still matches the rows would let the run go ahead,
+// in silence, under a query the panel was not searched with, which is what RefuseChangedQuery is there
+// to refuse. There is no generic value READ, but there is a generic COMPARE. (The operators are private - AttributeBossList.h:245-252 - which is a normal C++ way of
 // making callers say which comparison they mean: IsEqual, deep, beside Intersects and
 // IntersectionContainsDifferences.)
 //
