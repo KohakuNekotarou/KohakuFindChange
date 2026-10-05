@@ -1301,11 +1301,11 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// Adobe's own examples all wrap a SINGLE ProcessCommand instead (SnpFindAndReplace.cpp:788,
 	// spellpanel's SpellSkipObserver.cpp:532-537 and SpellChangeAllObserver.cpp:317). That shape is
 	// right for what they do - one Find Next per key press - and wrong here, because of what the
-	// section actually contains: spellpanel says outright that SaveKeyboardEventHandler
-	// (SpellCheckWalker.cpp:85-141) "is the same code as EnterWalkerSelections_CriticalSection", and
-	// that code takes the keyboard focus away (RelinquishKeyFocus) and gives it back on the way out
-	// (AcquireKeyFocus + SelectRange on an edit box). Entering and leaving it per match would run
-	// that dance thousands of times in one search.
+	// section contains. spellpanel's note on its SaveKeyboardEventHandler (SpellCheckWalker.cpp:85-141)
+	// reads "SEIssue hmm same code as in TextWalkerSelectionUtils::EnterWalkerSelections_CriticalSection"
+	// - hedged (the "hmm" is theirs) - and that code takes the keyboard focus away (RelinquishKeyFocus)
+	// and gives it back on the way out (AcquireKeyFocus + SelectRange on an edit box). Entering and
+	// leaving it per match would run that dance thousands of times in one search.
 	//
 	// What holding it may not keep out: the walk below moves the bar every few matches, inside this section,
 	// and some call on the bar lets events in - which one is not measured (KFCAdvanceProgress). Cancel is

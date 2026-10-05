@@ -1663,9 +1663,11 @@ void TellResultsWentStale(int32 chapterIdx)
 
 	// WarningAlert - THE OFFICIAL CALL FOR EXACTLY THIS: a message and a warning icon.
 	// CAlert.h:75-79 ("Modal alert, displaying text plus eWarningIcon"). It is what the product uses
-	// to make this kind of statement: spellpanel says "Change All cannot run" this way
-	// (SpellChangeAllObserver.cpp:292), and so do SpellSkipObserver.cpp:519,543 and
-	// PrivateSpellingUtils.cpp:816.
+	// for a one-button notice - by far the most common shape in its code. Two that InDesign runs:
+	// spellpanel's PrivateSpellingUtils.cpp:816 (a word too long for the user dictionary) and
+	// AutoCorrectButtonObservers.cpp:375,380,382,384 (an AutoCorrect pair that is not valid).
+	// (SpellChangeAllObserver.cpp:292 and SpellSkipObserver.cpp:519,543 do not count: the first is
+	// InCopy's branch, the other two sit under #if NO_DIALOG.)
 	//
 	// NOT A ONE-BUTTON ModalAlert. Its one argument for it - ModalAlert is the shape
 	// IAlertHandler::HandleAlert takes, so KT's alert recorder could read the alert back - does not hold

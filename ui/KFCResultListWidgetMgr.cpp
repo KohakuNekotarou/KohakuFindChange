@@ -161,14 +161,16 @@ public:
 		if (nodeID != nil && nodeID->IsHitRow())
 			rsrcID = kKFCResultHitNodeWidgetRsrcID;
 
-		// Built the way the layer panel builds its rows (LayerPanelTreeViewWidgetMgr.cpp), in three
-		// steps rather than one CreateObject, because the ORDER is the point:
+		// Built the way the layer panel builds its rows (LayerPanelTreeViewWidgetMgr.cpp:403-416), in
+		// three steps rather than one CreateObject, so that the ORDER is spelled out:
 		//   1. CreateObjectNoInit - make the boss but do not build its child hierarchy yet.
 		//   2. SetThemeForView(kIDPanelTheme) - tell it that it is going to live in a palette. The
 		//      row is created here, long before the tree hands it to the panel's window, so nothing
 		//      else is going to say which theme it draws in.
 		//   3. DoPostCreate - NOW build the children, with the theme already settled.
-		// Doing it in one CreateObject call leaves the children built first and themed never.
+		// The layer panel is the only product tree built this way (linksui and conditionaltextui, among
+		// others, make the row in one CreateObject and set no theme). The three steps stay as the safe
+		// side - whether one call leaves the children unthemed was not measured.
 		//
 		// Both row resources are declared in KFCUIID.h and defined in KFCUI.fr, so nil here would mean
 		// this plug-in's own resources did not load - not a case any handling on this side could
