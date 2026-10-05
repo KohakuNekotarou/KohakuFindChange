@@ -54,8 +54,9 @@
 - **SHOW-10** 進捗バーが出る ―― 題はブックなら `Reading the book's changes...`、文書なら `Reading changes...`。Cancel で**全部捨てる**（`Show Changes cancelled.`）。
   - 訂正:
 
-- **SHOW-11** 集める上限は検索と同じ **5,000 行**（GEN-34）。止まったら ` Stopped at the 5000 safety limit.`
-  - 訂正:
+- **SHOW-11** 集める上限は検索と同じ **10,000 行**（GEN-34）。止まったら ` Stopped at the 10000 safety limit.`。
+  パネルに描くのは 1,000 行まで ―― 超えたら ` Showing first 1000 in the panel.`（行ごとの Reject／Accept は描いた行から。文書の行の Reject All は文書の記録に対してなので描いていない行の分にも届く＝Change Checked の一覧では `reject-many-alike` で 1,200 件が全部戻ると確かめた・Show Changes の一覧では未測）。
+  - 訂正: ✅2026-10-05 夜（コードを変更・`0388c59`）→ GEN-34 の変更に合わせて書き直した（`cap-replace-show`＝1,200 件で ` Showing first 1000 in the panel.`）。
 
 ---
 
@@ -118,6 +119,6 @@
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
 
 - SHOW-13：日付の「OS の短い形」は Windows の地域設定で変わる（日本語なら `2026/10/04` の形のはず）。実機の表示は、この章のためには見ていない。
-- SHOW-11：Show Changes の上限 5,000 は実機で踏んでいない（GEN-34 の未確認と同じ）。
+- SHOW-11：Show Changes の上限 10,000 は実機で踏んでいない（1,000 行超は `cap-replace-show` で踏んだ・GEN-34 の未確認と同じ）。
 - SHOW-07：利用者から見えない内部のストーリーに KFC の記録が付く場面が実際にあるかは知らない（コードは「どこにあっても数える」と決めているだけ）。
 - SHOW-22：コードから読んだ振る舞いで、作り直した一覧の行が見つからない場面を実機では試していない。

@@ -189,9 +189,9 @@
   KFC が開いたのに閉じられなかった章。名前は3つまで、それ以上は `...`。
   - 訂正:
 
-- **FIND-37** 安全の上限（5,000 行＝パネルに描く上限と同じ・GEN-34）で止まったときは ` Stopped at the 5000 safety limit - narrow your search.` を書き足す。
-  上限で止まると、それより先の章・文書は歩かない。（2026-10-04 までは上限が 10,000 で、後ろに ` Showing first 5000 in the panel.` も付いていた。）
-  - 訂正:
+- **FIND-37** 安全の上限（10,000 行・GEN-34）で止まったときは ` Stopped at the 10000 safety limit - narrow your search.` を、パネルに描く上限（1,000 行）を超えたときは ` Showing first 1000 in the panel. Check All on a book or document row ticks the rows not shown too.` を書き足す（両方付くことがある）。
+  上限で止まると、それより先の章・文書は歩かない。（2026-10-04〜05 は上限 5,000＝描く上限と同じで止まる文だけ、その前は上限 10,000 で ` Showing first 5000 in the panel.` も付いていた。）
+  - 訂正: ✅2026-10-05 夜（コードを変更・`0388c59`）→ GEN-34 の変更に合わせて書き直した（`display-cap`・`cap-1001`・`cap-10001` で実機確認）。
 
 ---
 
