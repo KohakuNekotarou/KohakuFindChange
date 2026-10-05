@@ -322,8 +322,9 @@ int32 KFCTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 				continue;
 			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
 			// A QUERY RUN'S OWN RECORD STAYS PENDING (SetOwnRunFloor): not accepted, and not a reason to stop looking.
-			const bool ownRun = (gOwnRunFloor != 0) && IsSignAuthor(record->GetUserName())
-				&& record->GetTimeStamp() >= gOwnRunFloor;
+			// (any author: a query run signs its records only at its end - the spec's D14 - so until then they are
+			// the user's; and while it runs, nobody else writes - every record at or after the floor is the run's)
+			const bool ownRun = (gOwnRunFloor != 0) && record->GetTimeStamp() >= gOwnRunFloor;
 			delete record;
 			if (ownRun)
 				continue;
@@ -879,7 +880,10 @@ void CollectUnsigned(IRedlineDataStrand* redline, TextIndex from, TextIndex to, 
 	RedlineIterator* it = redline->NewRedlineIterator(from);
 	if (it == nil)
 		return;
-	const uint64 notBefore = (gRunStartReal > GlobalTime::kOneSecond) ? gRunStartReal - GlobalTime::kOneSecond : 0;
+	// A query run signs at its end (SignRunPlaces, the spec's D14): what it wrote reaches back to its floor, not to a
+	// second before the last BeginSignedRun.
+	const uint64 notBefore = (gOwnRunFloor != 0) ? gOwnRunFloor
+		: (gRunStartReal > GlobalTime::kOneSecond) ? gRunStartReal - GlobalTime::kOneSecond : 0;
 	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
 	{
 		TextIndex at = 0;
@@ -973,7 +977,7 @@ bool KFCTrackChange::RunOwnChars(const UIDRef& story, TextIndex from, TextIndex 
 				if (record == nil)
 					continue;
 				const bool ownInsert = (record->GetChangeType() == VOSRedlineChange::kInsert) && len > 0
-					&& IsSignAuthor(record->GetUserName()) && record->GetTimeStamp() >= gOwnRunFloor;
+					&& record->GetTimeStamp() >= gOwnRunFloor;		// any author (D14 - see AcceptPendingAround)
 				delete record;		// the caller owns it (redlineiterator.h:137-138)
 				if (ownInsert)
 					for (TextIndex i = (at > from ? at : from); i < at + len && i < to; ++i)
@@ -1138,6 +1142,115 @@ void KFCTrackChange::ApplyRunNotes(const UIDRef& story, std::vector<Record>& ioR
 		if (RunMaskedText(story, ioRecs[k].time, ioRecs[k].text, masked))
 			ioRecs[k].text = masked;
 	}
+}
+
+bool KFCTrackChange::QueryRunWriting()
+{
+	return gOwnRunFloor != 0;
+}
+
+bool KFCTrackChange::HasRunRecordIn(const UIDRef& story, TextIndex from, TextIndex to)
+{
+	if (gOwnRunFloor == 0)
+		return false;
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil)
+		return false;
+	RedlineIterator* it = redline->NewRedlineIterator((from > 0) ? from - 1 : 0);
+	if (it == nil)
+		return false;
+	bool found = false;
+	for (bool16 more = kTrue; more && !found && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+		const bool runs = record->GetTimeStamp() >= gOwnRunFloor;
+		delete record;
+		if (runs && (isDelete ? (from <= at && at <= to) : (len > 0 && at < to && at + len > from)))
+			found = true;
+	}
+	delete it;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return found;
+}
+
+int32 KFCTrackChange::SignRunPlaces(IDataBase* db)
+{
+	if (gOwnRunFloor == 0 || db == nil)
+		return 0;
+	InterfacePtr<IStoryList> storyList(db, db->GetRootUID(), UseDefaultIID());
+	if (storyList == nil)
+		return 0;
+	// One time per place, from a time of its own (never before the run's floor: BeginSignedRun takes the clock,
+	// and never at or before a time already handed out). A place's row number is its place in this count - the
+	// four digits below the millisecond (StampForRow's convention), so past 9999 places a new time is taken.
+	BeginSignedRun();
+	int32 k = 0;
+	int32 signedPlaces = 0;
+	// Every text model, not only the user-accessible ones: a record counts wherever it stands (CollectSignedRows).
+	const int32 count = storyList->GetAllTextModelCount();
+	for (int32 i = 0; i < count; ++i)
+	{
+		const UIDRef story = storyList->GetNthTextModelUID(i);
+		InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+		if (redline == nil)
+			continue;
+		// THE RUN'S RECORDS, AS PLACES: unsigned and at or after the floor, in position order, the ones that overlap
+		// or touch taken together - an insertion and the deletion beside it, two touching matches (InDesign joined
+		// their insertions: they were written unsigned, by one author).
+		std::vector<std::pair<TextIndex, TextIndex> > raw;
+		RedlineIterator* it = redline->NewRedlineIterator(0);
+		if (it == nil)
+			continue;
+		for (bool16 more = kTrue; more; more = it->Increment(kFalse))
+		{
+			TextIndex at = 0;
+			int32 len = 0;
+			const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+			if (record == nil)
+				continue;
+			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+			const bool runs = !IsSignAuthor(record->GetUserName()) && record->GetTimeStamp() >= gOwnRunFloor;
+			delete record;
+			if (runs)
+				raw.push_back(std::make_pair(at, isDelete ? at : at + len));
+		}
+		delete it;
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		if (raw.empty())
+			continue;
+		std::sort(raw.begin(), raw.end());
+		std::vector<std::pair<TextIndex, TextIndex> > places;
+		for (size_t r = 0; r < raw.size(); ++r)
+		{
+			if (!places.empty() && raw[r].first <= places.back().second)
+			{
+				if (raw[r].second > places.back().second)
+					places.back().second = raw[r].second;
+			}
+			else
+				places.push_back(raw[r]);
+		}
+		for (size_t p = 0; p < places.size(); ++p)
+		{
+			if (k > 9999)
+			{
+				BeginSignedRun();
+				k = 0;
+			}
+			const uint64 stamp = gRunT0 + static_cast<uint64>(k++);
+			if (stamp > gLastStamp)
+				gLastStamp = stamp;
+			if (!SignReplace(story, places[p].first, places[p].second, stamp))
+				return -1;
+			++signedPlaces;
+		}
+	}
+	return signedPlaces;
 }
 
 void KFCTrackChange::ClearRunNotes()

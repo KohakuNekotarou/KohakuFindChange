@@ -18,6 +18,7 @@
 #include "IDocumentList.h"
 #include "ISysFileData.h"
 #include "IUIFlagData.h"
+#include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - the Change All scope of a document-wide run
 
 // General includes:
 #include "CmdUtils.h"
@@ -339,7 +340,10 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 				KFCResultModel::SetAllChecked(true);		// (a row with no box - a locked one - is skipped: SetAllChecked)
 				locked += found.total - KFCResultModel::GetCheckedCount();
 				KFCReplaceEngine::WriteOutcome wrote;
-				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote);
+				// CHANGE ALL, STORY BY STORY, IN THE SEARCH'S SCOPE (the spec's D13): a document, all documents or a
+				// book's chapter -> each story's own scope; a Story / To End of Story / Selection Search: -> that scope.
+				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote, (scope.fromBook || scope.allDocuments)
+					? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope);
 				if (wrote.cancelled)
 				{
 					cancelled = true;
@@ -377,6 +381,16 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 		failed = true;
 		why = ErrorUtils::PMGetGlobalErrorString();
 	}
+	// THE RUN SIGNS ITS RECORDS NOW, ONCE (the spec's D14 - the author's "A"): nothing was signed while it wrote, so
+	// each place is one deletion of what stood there before the run and one insertion of what stands there now.
+	// Inside the sequence, so the Undo takes the signing back with the writes; a signing that fails takes the run back.
+	if (!cancelled && !failed)
+		for (size_t t = 0; t < touched.size() && !failed; ++t)
+			if (KFCTrackChange::SignRunPlaces(touched[t].GetDataBase()) < 0)
+			{
+				failed = true;
+				why = "the tracked changes could not be signed";
+			}
 	// THE MARK - inside the sequence, so the run's Undo and Redo are heard (KFCUndoFollow::MarkWrite).
 	if (!cancelled && !failed)
 		for (size_t t = 0; t < touched.size(); ++t)

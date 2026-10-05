@@ -231,6 +231,19 @@ namespace KFCTrackChange
 	void ApplyRunNotes(const UIDRef& story, std::vector<Record>& ioRecs);
 	void ClearRunNotes();
 
+	/** A QUERY RUN SIGNS AT ITS END (2026-10-05, the spec's D14 - the author's "A"). While a floor is set, nothing the
+	    run writes is signed as it goes: a later query that deletes what an earlier one wrote then deletes the user's
+	    own pending insertion, which records nothing (measured), and each place ends as one pair - the deletion of
+	    what stood there before the run and the insertion of what stands there after it. QueryRunWriting = is a floor
+	    set (a write path asks it to leave signing to the end). HasRunRecordIn = does any record at or after the floor
+	    stand in [from, to] (a write's "was it recorded", with no stamp to look for). SignRunPlaces, once, inside the
+	    run's sequence before it ends: every text model of `db`, its records at or after the floor not yet signed,
+	    taken as PLACES (overlapping or touching ones together) and each place signed at a time of its own. Returns
+	    the places signed, or -1 when a signing failed (the caller takes the whole run back). */
+	bool QueryRunWriting();
+	bool HasRunRecordIn(const UIDRef& story, TextIndex from, TextIndex to);
+	int32 SignRunPlaces(IDataBase* db);
+
 
 	/** Every record of the story carrying one of `times`, in position order - a deletion with its
 	    deleted text. The records of a row, or of a touching group, found by their time alone
