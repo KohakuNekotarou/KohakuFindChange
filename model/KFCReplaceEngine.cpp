@@ -63,96 +63,10 @@
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
-#include "IDocument.h"			// the perf-mute experiment's document subject - test builds only
-#include "IHierarchy.h"			// ...and the frames' own items up to the spline
-#include "ISubject.h"			// ISubject::Mute
-#include "ITextFrameColumn.h"
 #endif
 
 namespace
 {
-
-#ifdef KFC_DIAG
-// THE perf-mute EXPERIMENT (test builds only, 2026-10-05 - the author's request: "try ISubject::Mute"). Profiled, about
-// a sixth of a write's time went to InDesign's own observers answering the notifications a find's recomposition and a
-// replace send (transparency, spline, the galley, InCopy's shared code). ISubject::Mute stops a subject's messages
-// (ISubject.h: "make changes to the object without notifying its observers"); the only official use mutes a WIDGET'S
-// subject, a scroll bar's, while its increments are set (sdksamples/cellpanel/TableCellView.cpp). Muting the MODEL's
-// subjects hides the changes from every observer of them, InDesign's own included, and nothing tells them afterwards -
-// which is exactly what the experiment is to find out about, next to the time. The switch file holds a mask:
-// 1 the document, 2 the story, 4 every frame of the story with the items above it up to the spline. Each subject is
-// put back to the state it had (IsMuted) when the walk ends, on every way out. Throwaway documents only.
-class KFCDiagMuteForWalk
-{
-public:
-	KFCDiagMuteForWalk(const UIDRef& storyRef, int mask)
-	{
-		if (mask == 0 || storyRef.GetDataBase() == nil)
-			return;
-		IDataBase* const db = storyRef.GetDataBase();
-		if ((mask & 1) != 0)
-		{
-			InterfacePtr<IDocument> doc(db, db->GetRootUID(), UseDefaultIID());
-			Add(doc);
-		}
-		InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
-		if ((mask & 2) != 0)
-			Add(model);
-		if ((mask & 4) != 0 && model != nil)
-		{
-			InterfacePtr<IFrameList> frames(model->QueryFrameList());
-			for (int32 i = 0; frames != nil && i < frames->GetFrameCount(); ++i)
-			{
-				InterfacePtr<ITextFrameColumn> column(frames->QueryNthFrame(i));
-				Add(column);
-				// up to the spline: the column's multi-column item, then its spline
-				InterfacePtr<IHierarchy> level(column, UseDefaultIID());
-				for (int up = 0; level != nil && up < 2; ++up)
-				{
-					InterfacePtr<IHierarchy> parent(level->QueryParent());
-					Add(parent);
-					level = parent;
-				}
-			}
-		}
-		KFC_DIAG_LOG("MUTE story=%u mask=%d subjects=%d", storyRef.GetUID().Get(), mask, (int)fMuted.size());
-	}
-
-	~KFCDiagMuteForWalk()
-	{
-		for (std::vector<Muted>::reverse_iterator it = fMuted.rbegin(); it != fMuted.rend(); ++it)
-			it->subject->Mute(it->wasMuted);
-		if (!fMuted.empty())
-			KFC_DIAG_LOG("MUTE off subjects=%d", (int)fMuted.size());
-	}
-
-private:
-	struct Muted
-	{
-		InterfacePtr<ISubject> subject;
-		bool16 wasMuted;
-	};
-
-	void Add(IPMUnknown* boss)
-	{
-		if (boss == nil)
-			return;
-		InterfacePtr<ISubject> subject(boss, UseDefaultIID());
-		if (subject == nil)
-			return;
-		for (size_t k = 0; k < fMuted.size(); ++k)
-			if (fMuted[k].subject.get() == subject.get())
-				return;		// the same subject reached twice (two columns of one frame)
-		Muted m;
-		m.subject = subject;
-		m.wasMuted = subject->IsMuted();
-		subject->Mute(kTrue);
-		fMuted.push_back(m);
-	}
-
-	std::vector<Muted> fMuted;
-};
-#endif
 
 // A QUERY RUN'S LIST IS TAKEN BACK WHOLE (2026-10-05 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md,
 // D5): the whole run is one undo step, not a row at a time, so every Reject and Accept below refuses on that list
@@ -769,8 +683,6 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		const int restartMode = KFCDiagFaultValue("perf-fresh-walker", 0, 0);
 		const int restartEvery = KFCDiagFaultValue("perf-fresh-walker", 1, 50);
 		const bool walkingBackward = opts->GetSearchBackwards(opts->GetSearchMode()) != kFalse;
-		// The fault switch perf-mute (the class above): the subjects muted for this walk, put back when it ends.
-		const KFCDiagMuteForWalk mutedForTest(storyRef, KFCDiagFaultValue("perf-mute", 0, 0));
 		int32 writesSinceRestart = 0, restarts = 0;
 		bool justRestarted = false;
 		TextIndex restartAt = kInvalidTextIndex;
