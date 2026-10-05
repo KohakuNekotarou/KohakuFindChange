@@ -188,6 +188,16 @@ namespace KFCTrackChange
 	    (outWhy says so). Leaves the error state clear. */
 	int32 AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy);
 
+	/** A QUERY RUN KEEPS ITS OWN CHANGES PENDING (2026-10-04 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md
+	    §3). While a floor is set, AcceptPendingAround passes over every record signed "KohakuFindChange" whose time is at
+	    or after it: a later query that writes over an earlier query's replacement leaves that one pending, so the records
+	    read "the text before the run -> the text after it". Everybody else's pending changes are accepted as before.
+	    OwnRunFloorNow = the clock cut to the millisecond, in the stamps' units - at or before every T0 BeginSignedRun hands
+	    out after it. Clear it as the run ends, whichever way. */
+	uint64 OwnRunFloorNow();
+	void SetOwnRunFloor(uint64 floor);
+	void ClearOwnRunFloor();
+
 
 	/** Every record of the story carrying one of `times`, in position order - a deletion with its
 	    deleted text. The records of a row, or of a touching group, found by their time alone

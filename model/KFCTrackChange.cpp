@@ -97,6 +97,10 @@ bool IsSignAuthor(const PMString& who)
 	return who == SignAuthorName();
 }
 
+// A query run's floor (KFCTrackChange::SetOwnRunFloor): 0 = none. AcceptPendingAround leaves a signed record at or
+// after it pending.
+uint64 gOwnRunFloor = 0;
+
 // A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES. ITrackChangeUtils::GetDeletedText reads the
 // deleted-text thread anchored at the deletion - the same text DescribeChangeContent gave for a tab, a
 // return and a footnote reference (measured, KTRedlineProbe deltext: 2 of 2 alike), which stays as the
@@ -298,7 +302,12 @@ int32 KFCTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 			if (record == nil)
 				continue;
 			const bool isDelete = (record->GetChangeType() == VOSRedlineChange::kDelete);
+			// A QUERY RUN'S OWN RECORD STAYS PENDING (SetOwnRunFloor): not accepted, and not a reason to stop looking.
+			const bool ownRun = (gOwnRunFloor != 0) && IsSignAuthor(record->GetUserName())
+				&& record->GetTimeStamp() >= gOwnRunFloor;
 			delete record;
+			if (ownRun)
+				continue;
 			if (isDelete ? (from <= at && at <= to) : (len > 0 && from <= at + len && at <= to))
 				found = true;
 		}
@@ -898,6 +907,23 @@ void KFCTrackChange::BeginSignedRun()
 	const uint64 floorNow = (gRunStartReal / kTicksPerMs) * kTicksPerMs;
 	// never at or before the last time handed out: two runs in one millisecond take the next one
 	gRunT0 = (gLastStamp == 0 || floorNow > gLastStamp) ? floorNow : (gLastStamp / kTicksPerMs + 1) * kTicksPerMs;
+}
+
+uint64 KFCTrackChange::OwnRunFloorNow()
+{
+	GlobalTime now;
+	now.CurrentTime();
+	return (now.GetTime() / kTicksPerMs) * kTicksPerMs;
+}
+
+void KFCTrackChange::SetOwnRunFloor(uint64 floor)
+{
+	gOwnRunFloor = floor;
+}
+
+void KFCTrackChange::ClearOwnRunFloor()
+{
+	gOwnRunFloor = 0;
 }
 
 uint64 KFCTrackChange::StampForRow(int32 chapterIdx, int32 hitIdx)
