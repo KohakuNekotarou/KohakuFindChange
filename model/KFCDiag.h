@@ -55,6 +55,10 @@
 //                not on a timing run.
 //    perf-backward  KFCReplaceEngine.cpp's WriteBackward answers yes: every write walks backward (the same study:
 //                what the direction does to the find's time). Throwaway documents only.
+//    perf-mute  the file holds a mask: WalkStoryReplacing mutes (ISubject::Mute) the document (1), the story (2) and the
+//                story's frames up to their splines (4) while it writes, and puts each back after - the author's
+//                question (2026-10-05): what stopping InDesign's own observers' notifications buys, and what it breaks.
+//                Throwaway documents only.
 //    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
 //                ExpandNode with all its descendants per open document row, mode 2 every row opened before ChangeRoot
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
