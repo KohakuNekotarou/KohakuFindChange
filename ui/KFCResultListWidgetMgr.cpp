@@ -67,6 +67,7 @@
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
+#include "KFCDiag.h"			// TREETIME and the tree-expand fault switch - test builds only
 
 namespace
 {
@@ -664,12 +665,35 @@ void KFCResultTree::Rebuild()
 	if (treeMgr == nil)
 		return;
 
+#ifdef KFC_DIAG
+	// TEST BUILDS ONLY (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): how long the rebuild takes and how
+	// many rows it opens one by one (TREETIME) - and, with the fault switch tree-expand, the same rows opened another way:
+	// mode 1 = one ExpandNode with all its descendants for a document row that opens; mode 2 = every row opened BEFORE
+	// ChangeRoot (ITreeViewMgr.h: expansion is kept across ChangeRoot while the root is the same).
+	KFC_CLOCK(cTree);
+	int32 expandCalls = 0;
+	const int expandMode = KFCDiagFaultValue("tree-expand", 0, 0);
+	const bool16 expandAllBelow = (expandMode == 1) ? kTrue : kFalse;
+#else
+	const bool16 expandAllBelow = kFalse;
+#endif
+	auto expand = [&](const NodeID& node, bool16 allDescendants)
+	{
+#ifdef KFC_DIAG
+		++expandCalls;
+#endif
+		treeMgr->ExpandNode(node, allDescendants);
+	};
+
 	// ClearTree(kTrue) forgets the old expansion state (rebuilt by the priming below);
 	// ChangeRoot(kTrue) says every row widget has the same height, which they do - both row
 	// resources are kKFCResultRowHeight tall and GetNodeWidgetHeight answers that for every node.
 	// (The number itself is not spelled out here, for the reason kRowHeight gives at the top.)
 	treeMgr->ClearTree(kTrue);
-	treeMgr->ChangeRoot(kTrue);
+#ifdef KFC_DIAG
+	if (expandMode != 2)
+#endif
+		treeMgr->ChangeRoot(kTrue);
 
 	// A BOOK's chapters come up CLOSED. A book-wide search can fill the panel with the first
 	// chapter's hits, which buries the fact that other chapters matched at all; closed chapters show
@@ -682,18 +706,22 @@ void KFCResultTree::Rebuild()
 	// "expand to make the arrow appear" rule is the tree framework's own default, and this widget
 	// manager overrides it.
 	const int32 chapters = KFCResults()->GetDisplayChapterCount();
+	// (A test build's tree-expand mode 1 opens such a document row with everything under it in one call, and the
+	// loop below then leaves its rows alone.)
+	bool chaptersOpenedWhole = false;
 	if (KFCResults()->IsFromBook())
 	{
 		// The book row is the root's only child, so leaving it closed would show a panel with one
 		// line on it and nothing else. Open it; the chapters underneath stay closed.
-		treeMgr->ExpandNode(KFCResultNodeID::CreateBook(), kFalse);
+		expand(KFCResultNodeID::CreateBook(), kFalse);
 	}
 	else if (KFCResults()->GetSearchScope() != KFCResultModel::kScopeAllDocuments)
 	{
 		// A single document has just the one chapter, so open it - otherwise the result is one closed
 		// row and the hits take an extra click to reach.
 		for (int32 n = 0; n < chapters; ++n)
-			treeMgr->ExpandNode(KFCResultNodeID::Create(KFCResults()->GetShownChapter(n)), kFalse);
+			expand(KFCResultNodeID::Create(KFCResults()->GetShownChapter(n)), expandAllBelow);
+		chaptersOpenedWhole = (expandAllBelow != kFalse);
 	}
 	// (All Documents - the author's call - leaves its document rows CLOSED, for the book's reason above:
 	//  one document's hits would bury the fact that the others matched at all.)
@@ -701,17 +729,28 @@ void KFCResultTree::Rebuild()
 	// THE STORY ROWS COME UP OPEN. The level is a grouping, not a place to hide rows: a story row closed
 	// would put every hit one click further away. Opened in a closed chapter too (a book's), so the chapter's arrow shows
 	// its hits at once.
-	for (int32 n = 0; n < chapters; ++n)
+	for (int32 n = 0; n < chapters && !chaptersOpenedWhole; ++n)
 	{
 		const int32 c = KFCResults()->GetShownChapter(n);
 		// ...and the RUN rows above them the same (Show Changes): a grouping, not a hiding place.
 		const int32 runs = KFCResults()->GetDisplayRunCount(c);
 		for (int32 r = 0; r < runs; ++r)
-			treeMgr->ExpandNode(KFCResultNodeID::CreateRun(c, r), kFalse);
+			expand(KFCResultNodeID::CreateRun(c, r), kFalse);
 		const int32 groups = KFCResults()->GetDisplayFontCount(c);
 		for (int32 g = 0; g < groups; ++g)
-			treeMgr->ExpandNode(KFCResultNodeID::CreateFont(c, g), kFalse);
+			expand(KFCResultNodeID::CreateFont(c, g), kFalse);
 	}
+
+#ifdef KFC_DIAG
+	if (expandMode == 2)
+		treeMgr->ChangeRoot(kTrue);		// the rows were opened above, before the tree was connected again
+	{
+		double tTree = 0;
+		KFC_SPENT(tTree, cTree);
+		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms", (int)KFCResults()->GetTotalHitCount(),
+			(int)chapters, (int)expandCalls, expandMode, tTree);
+	}
+#endif
 }
 
 //----------------------------------------------------------------------------------------

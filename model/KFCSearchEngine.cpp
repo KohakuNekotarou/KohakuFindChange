@@ -1046,6 +1046,18 @@ enum HitDetail
 // containing paragraph's text split into (before / matched / after) with the hash of the whole match;
 // then the page, the flags and the story's first words. The offsets are CODE POINTS, not UTF-16
 // units - see the note at the head of this file.
+#ifdef KFC_DIAG
+// TEST BUILDS ONLY (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): where BuildHit spends its time over one
+// walk - the line's text, the story's lead, the thread questions (hidden text, footnote), the place (frame, page,
+// overset). Reset and written by CollectHitsInDoc (SEARCHTIME).
+struct BuildHitTimes
+{
+	double text, lead, threads, place;
+	BuildHitTimes() : text(0), lead(0), threads(0), place(0) {}
+};
+BuildHitTimes gBuildHitTimes;
+#endif
+
 void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
 	HitDetail detail, WalkCache& cache, KFCResultModel::Hit& outHit)
 {
@@ -1057,15 +1069,20 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// test the JUMP and the replace's row doors run. Both describe THIS match as the search found it,
 	// and both come out of one reading of the story - see ReadHitText. The segments are capped for
 	// drawing; the hash never is, because it is the one that gets compared.
+	KFC_CLOCK(cText);
 	ReadHitText(storyRef, start, end, outHit);
+	KFC_SPENT(gBuildHitTimes.text, cText);
 	if (detail == kHitPlaceAndText)
 		return;
 
 	// The story's first words, for its row in the tree - read once per story per walk.
+	KFC_CLOCK(cLead);
 	std::map<UID, PMString>::const_iterator lead = cache.storyLeads.find(outHit.storyUID);
 	if (lead == cache.storyLeads.end())
 		lead = cache.storyLeads.insert(std::make_pair(outHit.storyUID, StoryLeadText(storyRef))).first;
 	outHit.storyLead = lead->second;
+	KFC_SPENT(gBuildHitTimes.lead, cLead);
+	KFC_CLOCK(cThreads);
 
 	// UNDER A HIDDEN CONDITION: ASKED WHERE THE TEXT COMES BACK TO. Such text stands in a thread no frame
 	// holds - asked as it stands, the row would read "P1(2) overset". It occurs on a list Show Changes
@@ -1075,6 +1092,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	const TextIndex hiddenAnchor = KFCTrackChange::HiddenTextAnchor(storyRef, start);
 	outHit.inHiddenText = (hiddenAnchor != kInvalidTextIndex);
 	const TextIndex placeAt = outHit.inHiddenText ? hiddenAnchor : start;
+	KFC_SPENT(gBuildHitTimes.threads, cThreads);
+	KFC_CLOCK(cPlace);
 
 	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
 	// that follows from the frame comes out of the cache.
@@ -1120,8 +1139,11 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// (A locked row's box is kept off by KFCResultModel's RowHasCheckBox, the one door every tick goes
 	// through - nothing to untick here: a hit starts unticked.)
 	outHit.isLocked = facts->isLocked;
+	KFC_SPENT(gBuildHitTimes.place, cPlace);
 	// Inside a footnote? Such a row cannot be taken back - Track Changes records nothing there.
+	KFC_CLOCK(cFootnote);
 	outHit.inFootnote = KFCTrackChange::IsInFootnote(storyRef, start);
+	KFC_SPENT(gBuildHitTimes.threads, cFootnote);
 }
 
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
@@ -1333,6 +1355,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// document: a Search: walk of All Documents meets several, and UIDs mean nothing across them.
 	std::map<IDataBase*, WalkCache> walkCaches;
 
+#ifdef KFC_DIAG
+	// TEST BUILDS ONLY: the find command's time against BuildHit's, over this walk (SEARCHTIME, below).
+	double tSearchFind = 0, tSearchBuild = 0;
+	const size_t hitsBefore = outHits.size();
+	gBuildHitTimes = BuildHitTimes();
+	KFC_CLOCK(cSearchWalk);
+#endif
+
 	// (No per-story change count is stamped on the hits to let the replace skip its same-occurrence test
 	// for a story nobody edited: such a fast path skips the POSITION test as well, which lets a query
 	// retyped between the search and the replace rewrite the wrong occurrences. See KFCReplaceEngine.cpp's
@@ -1392,7 +1422,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// KFCReplaceEngine.cpp). Official shape: SnpFindAndReplace.cpp:790-796 folds a failed
 		// ProcessCommand into kFailure as well, and its caller (:642-670) turns kFailure - and only
 		// kFailure - into a failure.
-		if (!ProcessFindChangeCmd(findCmd))
+		KFC_CLOCK(cSearchFind);
+		const bool processed = ProcessFindChangeCmd(findCmd);
+		KFC_SPENT(tSearchFind, cSearchFind);
+		if (!processed)
 		{
 			outResult = kChapterWalkFailed;		// the end of THIS walk only - its error state is cleared
 			break;
@@ -1484,13 +1517,24 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		const UIDRef hitDocRef = bySearchScope
 			? UIDRef(storyDB, (storyDB != nil) ? storyDB->GetRootUID() : kInvalidUID) : docRef;
 		KFCResultModel::Hit& hit = outHits.emplace_back();
+		KFC_CLOCK(cSearchBuild);
 		BuildHit(hitDocRef, story, start, end, detail, walkCaches[storyDB], hit);
+		KFC_SPENT(tSearchBuild, cSearchBuild);
 		if (outHitDBs != nil)
 			outHitDBs->push_back(storyDB);
 	}
 
 	if (walker->IsWalking())
 		walker->Halt();
+#ifdef KFC_DIAG
+	{
+		double tWalk = 0;
+		KFC_SPENT(tWalk, cSearchWalk);
+		KFC_DIAG_LOG("SEARCHTIME hits=%d detail=%d walk=%.0f find=%.0f build=%.0f (text=%.0f lead=%.0f threads=%.0f place=%.0f) ms",
+			(int)(outHits.size() - hitsBefore), (int)detail, tWalk, tSearchFind, tSearchBuild, gBuildHitTimes.text,
+			gBuildHitTimes.lead, gBuildHitTimes.threads, gBuildHitTimes.place);
+	}
+#endif
 }
 
 // Every match of the current query in one story of an open document, as the search's walk meets them
@@ -2760,6 +2804,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		return 0;
 	}
 	const SearchingFlagGuard searchingGuard;
+	KFC_DIAG_PHASE(phaseSearch, "search");	// a test build's timer (KFCDiag.h)
 
 	// EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED.
 	// A run that is turned away has to leave the panel exactly as it found it - a Clear() up here would

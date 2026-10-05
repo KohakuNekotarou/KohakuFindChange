@@ -60,25 +60,11 @@
 #include "KFCTrackChange.h"	// every replace under Track Changes, its records left
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #ifdef KFC_DIAG
-#include <chrono>					// the walk's timers (KFC_CLOCK) - test builds only
+#include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #endif
 
 namespace
 {
-
-#ifdef KFC_DIAG
-// TEST BUILDS ONLY: where a story's walk spends its time (2026-10-05 - a query run that wrote 6000 rows in two
-// 3000-row stories took 23 minutes). Summed per phase over one story's walk and written once (WALKTIME).
-double KfcNowMs()
-{
-	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-#define KFC_CLOCK(var) const double var = KfcNowMs()
-#define KFC_SPENT(slot, var) ((slot) += KfcNowMs() - (var))
-#else
-#define KFC_CLOCK(var) ((void)0)
-#define KFC_SPENT(slot, var) ((void)0)
-#endif
 
 // A QUERY RUN'S LIST IS TAKEN BACK WHOLE (2026-10-05 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md,
 // D5): the whole run is one undo step, not a row at a time, so every Reject and Accept below refuses on that list
@@ -675,8 +661,20 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	{
 		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 #ifdef KFC_DIAG
+		// TEST BUILDS ONLY: where a story's walk spends its time (2026-10-05 - a query run that wrote 6000 rows in two
+		// 3000-row stories took 23 minutes). Summed per phase over one story's walk and written once (WALKTIME); every
+		// 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does something pile up?).
 		double tFind = 0, tMatch = 0, tPre = 0, tReplace = 0, tSign = 0, tRecord = 0, tTexts = 0, tCarry = 0;
-		int32 timedRows = 0;
+		double tFindStep = 0;
+		int32 timedRows = 0, finds = 0;
+		// The fault switch perf-fresh-walker (KFCDiag.h): the walk started again after every `restartEvery` writes -
+		// forward only (a backward walk's restart point would be the write's START, not measured).
+		const int restartMode = KFCDiagFaultValue("perf-fresh-walker", 0, 0);
+		const int restartEvery = KFCDiagFaultValue("perf-fresh-walker", 1, 50);
+		const bool walkingBackward = opts->GetSearchBackwards(opts->GetSearchMode()) != kFalse;
+		int32 writesSinceRestart = 0, restarts = 0;
+		bool justRestarted = false;
+		TextIndex restartAt = kInvalidTextIndex;
 #endif
 		// The range the last replacement wrote: a match inside it ("cat" -> "cat cat") is none of ours.
 		UID lastStory = kInvalidUID;
@@ -688,6 +686,25 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			KFC_CLOCK(cFind);
 			const IFindChangeService::FindChangeResult found = RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
 			KFC_SPENT(tFind, cFind);
+#ifdef KFC_DIAG
+			KFC_SPENT(tFindStep, cFind);
+			if (justRestarted)
+			{
+				KFC_DIAG_LOG("RESTART story=%u n=%d at=%d first=%d result=%d", storyRef.GetUID().Get(), (int)restarts,
+					(int)restartAt, (int)start, (int)found);
+				justRestarted = false;
+			}
+			if (++finds % 100 == 0)
+			{
+				InterfacePtr<ITextModel> stepModel(storyRef, UseDefaultIID());
+				InterfacePtr<ITextFocusManager> stepFoci(stepModel, UseDefaultIID());
+				KFC_DIAG_LOG("WALKSTEP story=%u finds=%d rows=%d last100=%.1f ms/find foci=%d length=%d at=%d walker=%p",
+					storyRef.GetUID().Get(), (int)finds, (int)timedRows, tFindStep / 100.0,
+					(stepFoci != nil) ? (int)stepFoci->GetFocusCount() : -1,
+					(stepModel != nil) ? (int)stepModel->TotalLength() : -1, (int)start, (void*)walker.get());
+				tFindStep = 0;
+			}
+#endif
 			if (found != IFindChangeService::kSuccess)
 			{
 				if (found == IFindChangeService::kFailure)
@@ -812,6 +829,39 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 						end - matchThreadStart, writtenEnd - writtenStart);
 					KeepRowAt(db, rowNow, keptRows, hitIdx, written.GetUID(), writtenStart, writtenEnd);
 					KFC_SPENT(tCarry, cCarry);
+#ifdef KFC_DIAG
+					// THE WALK STARTED AGAIN (fault switch perf-fresh-walker - a measurement, not the product's walk): a
+					// new scope and a new find/change client on the walker, mode 2 from where this write ended (a
+					// story scope given a range starts there and loops back to the top - IWalkerScopeFactoryUtils.h;
+					// the rows the loop meets again are none of the pending ones, RowOfMatchAnyOrder), mode 3 from the
+					// top. GREP's lookbehind does not see past where a walk resumes either way.
+					if (restartMode >= 2 && restartEvery > 0 && !walkingBackward && !pending.empty()
+						&& ++writesSinceRestart >= restartEvery)
+					{
+						writesSinceRestart = 0;
+						Text::StoryRangeList from;
+						from.push_back(Text::StoryRange(writtenEnd, writtenEnd));
+						InterfacePtr<ITextWalkerScope> freshScope((restartMode == 2)
+							? Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, from, scopeOptions)
+							: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
+						InterfacePtr<ITextWalkerClient> freshClient(static_cast<ITextWalkerClient*>(
+							::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+						if (freshScope != nil && freshClient != nil)
+						{
+							if (walker->IsWalking())
+								walker->Halt();
+							walker->Initialize(freshClient, freshScope, opts, nil);
+							scope.reset(freshScope.forget());
+							client.reset(freshClient.forget());
+							++restarts;
+							justRestarted = true;
+							restartAt = writtenEnd;
+							// the written range is behind the walk now; a loop back past it meets no pending row
+						}
+						else
+							KFC_DIAG_LOG("RESTART story=%u could not build the scope or the client", storyRef.GetUID().Get());
+					}
+#endif
 				}
 				else
 				{
@@ -824,8 +874,9 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
 		}
 #ifdef KFC_DIAG
-		KFC_DIAG_LOG("WALKTIME story=%u rows=%d find=%.0f match=%.0f pre=%.0f replace=%.0f sign=%.0f record=%.0f texts=%.0f carry=%.0f ms",
-			storyRef.GetUID().Get(), (int)timedRows, tFind, tMatch, tPre, tReplace, tSign, tRecord, tTexts, tCarry);
+		KFC_DIAG_LOG("WALKTIME story=%u rows=%d finds=%d restarts=%d find=%.0f match=%.0f pre=%.0f replace=%.0f sign=%.0f record=%.0f texts=%.0f carry=%.0f ms",
+			storyRef.GetUID().Get(), (int)timedRows, (int)finds, (int)restarts, tFind, tMatch, tPre, tReplace, tSign, tRecord,
+			tTexts, tCarry);
 #endif
 	}
 	if (walker->IsWalking())
@@ -2191,6 +2242,7 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 		return 0;
 	}
 	const ReplacingFlagGuard replacingGuard;
+	KFC_DIAG_PHASE(phaseReplace, "replace-checked");	// a test build's timer (KFCDiag.h)
 
 	const int32 chapterCount = KFCResultModel::GetChapterCount();
 	if (chapterCount <= 0)
@@ -2604,7 +2656,10 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	seq->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	KFCTrackChange::BeginSignedRun();	// the run's time - every row of every chapter is stamped from it
 
-	WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
+	{
+		KFC_DIAG_PHASE(phaseWrite, "replace-write");	// a test build's timer: the writing alone, the checks before it apart
+		WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
+	}
 
 	// The sequence ends HERE, and HOW it ends is the cancel. Aborting is a statement - "undo
 	// everything this sequence did" - where ending it only offers the changes up and lets the error

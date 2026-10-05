@@ -42,6 +42,16 @@
 //    perf-no-sign / perf-no-track  KFCReplaceEngine.cpp's write leaves its rows unsigned / writes untracked - to
 //                measure what each costs the next find (2026-10-05, WALKTIME; work\note-scripts\2026-10-05-kfc-query-run\
 //                t10_perf.ps1). Throwaway documents only.
+//    perf-fresh-walker  the file holds "<mode> <n>": WalkStoryReplacing starts its walk again after every n writes -
+//                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
+//                scope (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
+//                walk?). Throwaway documents only.
+//    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
+//                ExpandNode with all its descendants per open document row, mode 2 every row opened before ChangeRoot
+//                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
+//
+//  AND TIMERS (2026-10-05): KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
+//  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
 //
 //========================================================================================
 
@@ -101,10 +111,72 @@ inline bool KFCDiagFault(const char* name)
 
 #define KFC_DIAG_FAULT(name) KFCDiagFault(name)
 
+// The nth whole number (from 0) the fault switch <name>'s file holds, separated by white space - `fallback` when the
+// switch is off, or holds fewer numbers, or one that is not a number.
+inline int KFCDiagFaultValue(const char* name, int nth, int fallback)
+{
+	char* temp = nullptr;
+	size_t len = 0;
+	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+		return fallback;
+	char path[600] = { 0 };
+	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
+	free(temp);
+	FILE* f = nullptr;
+	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
+		return fallback;
+	int value = fallback;
+	for (int i = 0; i <= nth; ++i)
+	{
+		int read = 0;
+		if (fscanf_s(f, "%d", &read) != 1)
+		{
+			value = fallback;
+			break;
+		}
+		value = read;
+	}
+	fclose(f);
+	return value;
+}
+
+// Milliseconds on a clock that only goes forward - for the timers below.
+inline double KFCDiagNowMs()
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+#define KFC_CLOCK(var) const double var = KFCDiagNowMs()
+#define KFC_SPENT(slot, var) ((slot) += KFCDiagNowMs() - (var))
+
+// "PHASE <name> begin" now and "PHASE <name> end <ms>" when the scope ends.
+class KFCDiagPhase
+{
+public:
+	explicit KFCDiagPhase(const char* name) : fName(name), fStart(KFCDiagNowMs())
+	{
+		KFCDiagLog("PHASE %s begin", fName);
+	}
+	~KFCDiagPhase()
+	{
+		KFCDiagLog("PHASE %s end %.0f ms", fName, KFCDiagNowMs() - fStart);
+	}
+	KFCDiagPhase(const KFCDiagPhase&) = delete;
+	KFCDiagPhase& operator=(const KFCDiagPhase&) = delete;
+private:
+	const char*	fName;
+	double		fStart;
+};
+
+#define KFC_DIAG_PHASE(var, name) const KFCDiagPhase var(name)
+
 #else
 
 #define KFC_DIAG_LOG(...) ((void)0)
 #define KFC_DIAG_FAULT(name) false
+#define KFC_CLOCK(var) ((void)0)
+#define KFC_SPENT(slot, var) ((void)0)
+#define KFC_DIAG_PHASE(var, name) ((void)0)
 
 #endif // KFC_DIAG
 
