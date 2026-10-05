@@ -25,6 +25,7 @@
 #include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - the gate in LazyUpdate
 #include "FileUtils.h"				// IsEqual - a frozen chapter found again by its file
 #include "ITextModel.h"				// StoryTextHash - the story's text, read whole
+#include "IStoryList.h"				// RunRecorder::ReadStories - every text model of a query run's documents
 #include "textiterator.h"			// StoryTextHash
 #include "UIDList.h"
 
@@ -356,6 +357,7 @@ const char* KindName(KFCUndoFollow::StepKind kind)
 		case KFCUndoFollow::kStepReject:		return "Reject Change";
 		case KFCUndoFollow::kStepAccept:		return "Accept Change";
 		case KFCUndoFollow::kStepAcceptAll:		return "Accept All Changes by KohakuFindChange";
+		case KFCUndoFollow::kStepRunQueries:	return "Run Queries";
 	}
 	return "a change";
 }
@@ -562,6 +564,89 @@ void KFCUndoFollow::StepRecorder::Keep(StepKind kind)
 	if (step.stories.empty() || step.resultSet != KFCResultModel::GetResultSetId())
 		return;
 	KeepStep(step);
+}
+
+KFCUndoFollow::RunRecorder::RunRecorder()
+	: fOpen(true)
+{
+	CloseRecording();
+	gRecording = true;
+	gPendingWhole = true;
+	gPendingLayout = KFCResultModel::GetLayoutGeneration();
+	KFCResultModel::TakeModelSnapshot(gPendingBefore);
+}
+
+KFCUndoFollow::RunRecorder::~RunRecorder()
+{
+	if (fOpen)
+		CloseRecording();
+}
+
+void KFCUndoFollow::RunRecorder::ReadStories(const std::vector<KFCBookScope::ChapterDoc>& docs)
+{
+	for (size_t d = 0; d < docs.size(); ++d)
+	{
+		IDataBase* const db = docs[d].docRef.GetDataBase();
+		InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
+		if (storyList == nil)
+			continue;
+		const int32 count = storyList->GetAllTextModelCount();
+		for (int32 i = 0; i < count; ++i)
+		{
+			const UID story = storyList->GetNthTextModelUID(i).GetUID();
+			uint32 version = 0;
+			if (!KFCSearchEngine::ReadStoryVersion(db, story, version))
+				continue;
+			StoryMoved s;
+			s.file = docs[d].file;
+			s.doc = docs[d].docRef;
+			s.story = story;
+			s.before = version;
+			s.now = db;
+			gPendingStories.push_back(s);
+		}
+	}
+}
+
+void KFCUndoFollow::RunRecorder::Keep()
+{
+	if (!fOpen)
+		return;
+	fOpen = false;
+	Step step;		// done (the run stands)
+	step.kind = kStepRunQueries;
+	step.whole = true;
+	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
+	step.layoutBefore = gPendingLayout;
+	// the stories the run moved - the rest cannot tell an Undo of it from anything else
+	for (size_t k = 0; k < gPendingStories.size(); ++k)
+	{
+		StoryMoved s = gPendingStories[k];
+		s.now = DocOf(s);
+		uint32 version = 0;
+		if (s.now == nil || !KFCSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
+			continue;
+		s.after = version;
+		s.afterText = StoryTextHash(s.now, s.story);
+		step.stories.push_back(s);
+	}
+	step.before = std::move(gPendingBefore);	// the list before the run, header and all
+	KFCResultModel::TakeModelSnapshot(step.after);
+	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
+	CloseRecording();
+	KFC_DIAG_LOG("KEEP RUN moved=%u set=%u", (unsigned)step.stories.size(), step.resultSet);
+	if (step.stories.empty())
+		return;
+	KeepStep(step);
+}
+
+void KFCUndoFollow::RunRecorder::RestoreBefore()
+{
+	if (!fOpen)
+		return;
+	fOpen = false;
+	KFCResultModel::RestoreModelSnapshot(gPendingBefore);
+	CloseRecording();
 }
 
 //========================================================================================

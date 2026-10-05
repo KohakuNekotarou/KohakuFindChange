@@ -284,6 +284,12 @@ namespace KFCResultModel
 	void SetFromRecords(bool fromRecords);
 	bool IsFromRecords();
 
+	/** IS THIS LIST A QUERY RUN'S (KFCQuerySequence, 2026-10-04)? Rebuilt from the records like Show Changes'
+	    (SetFromRecords is set with it), but its rows are not taken back one at a time: the whole run is one undo step
+	    (the spec's D5), so Reject Change and Accept Change refuse on it and say to use Ctrl+Z. Cleared by Clear(). */
+	void SetFromQueryRun(bool fromQueryRun);
+	bool IsFromQueryRun();
+
 	/** Has a command been RUN since the results were last discarded?
 
 	    NOT the same question as "are there any hits": a search that found nothing has still been
@@ -924,7 +930,18 @@ namespace KFCResultModel
 		std::vector<Chapter>	chapters;
 		bool					showingOutcome;
 		uint32					layout;
-		ModelSnapshot() : showingOutcome(false), layout(0) {}
+		// the list's header (2026-10-04, the query run: its Undo puts back a list of another kind - Change Checked's
+		// before and after share one, so nothing changes for it)
+		bool					fromBook;
+		SearchScopeKind			searchScope;
+		bool					fromRecords;
+		bool					fromQueryRun;
+		PMString				bookName;
+		int32					searchMode;
+		PMString				walkSignature;
+		bool					hasRun;
+		ModelSnapshot() : showingOutcome(false), layout(0), fromBook(false), searchScope(kScopeDocument),
+			fromRecords(false), fromQueryRun(false), searchMode(-1), hasRun(false) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);
 	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they

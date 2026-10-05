@@ -63,6 +63,22 @@
 namespace
 {
 
+// A QUERY RUN'S LIST IS TAKEN BACK WHOLE (2026-10-05 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md,
+// D5): the whole run is one undo step, not a row at a time, so every Reject and Accept below refuses on that list
+// (KFCResultModel::IsFromQueryRun) - the Can... ones answer false, the rest say why.
+const char* const kQueryRunRefusal = "This list is a query run's - undo the whole run with Ctrl+Z (Edit > Undo Run Queries).";
+
+// True = refused, outStatus says why.
+bool RefusedOnQueryRun(PMString& outStatus)
+{
+	if (!KFCResultModel::IsFromQueryRun())
+		return false;
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	outStatus.Append(kQueryRunRefusal);
+	return true;
+}
+
 // Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
 // on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
 // which is the header's own contract (IFindChangeService.h:46-49) rather than a convention here:
@@ -3206,6 +3222,8 @@ bool KFCReplaceEngine::CanReplaceStory(int32 chapterIdx, int32 groupIdx)
 
 bool KFCReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
 {
+	if (KFCResultModel::IsFromQueryRun())
+		return false;
 	std::vector<int32> rows;
 	return RowsToReject(chapterIdx, groupIdx, rows, true);
 }
@@ -3550,6 +3568,8 @@ static void RowWithTouchingChanges(int32 chapterIdx, int32 hitIdx, std::vector<i
 
 bool KFCReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
@@ -3637,17 +3657,23 @@ static bool RejectRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMS
 //  scope for that already.)
 bool KFCReplaceEngine::CanRejectChapter(int32 chapterIdx)
 {
+	if (KFCResultModel::IsFromQueryRun())
+		return false;
 	std::vector<int32> rows;
 	return RowsToReject(chapterIdx, -1, rows, true);
 }
 
 bool KFCReplaceEngine::RejectChapter(int32 chapterIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	return RejectRowsIn(chapterIdx, -1, "document", outStatus);
 }
 
 bool KFCReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	return RejectRowsIn(chapterIdx, groupIdx, "story", outStatus);
 }
 
@@ -3657,12 +3683,16 @@ bool KFCReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& o
 // ======================================================================================================
 bool KFCReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
 {
+	if (KFCResultModel::IsFromQueryRun())
+		return false;
 	UIDRef docRef;
 	return KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef) && KFCTrackChange::DocumentHasSignedRecords(docRef.GetDataBase());
 }
 
 bool KFCReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
@@ -3886,6 +3916,8 @@ static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, cons
 
 bool KFCReplaceEngine::CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx)
 {
+	if (KFCResultModel::IsFromQueryRun())
+		return false;
 	UIDRef storyRef;
 	KFCTrackChange::Change change;
 	return KFCTrackChange::FindRowChangeForHit(chapterIdx, hitIdx, storyRef, change);
@@ -3893,6 +3925,8 @@ bool KFCReplaceEngine::CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx)
 
 bool KFCReplaceEngine::AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	UIDRef docRef;
@@ -3961,6 +3995,8 @@ static bool AcceptRowsOf(int32 chapterIdx, const std::vector<int32>& scope, cons
 
 bool KFCReplaceEngine::AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	std::vector<int32> scope;
 	ScopeRows(chapterIdx, groupIdx, scope);
 	return AcceptRowsOf(chapterIdx, scope, "story", outStatus);
@@ -3968,6 +4004,8 @@ bool KFCReplaceEngine::AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& o
 
 bool KFCReplaceEngine::CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx)
 {
+	if (KFCResultModel::IsFromQueryRun())
+		return false;
 	std::vector<int32> scope, rows;
 	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
 	return RowsWithChangeOf(chapterIdx, scope, rows, true);
@@ -3975,6 +4013,8 @@ bool KFCReplaceEngine::CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx)
 
 bool KFCReplaceEngine::RejectRun(int32 chapterIdx, int32 runIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	std::vector<int32> scope;
 	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
 	return RejectRowsOf(chapterIdx, scope, "run", outStatus);
@@ -3982,6 +4022,8 @@ bool KFCReplaceEngine::RejectRun(int32 chapterIdx, int32 runIdx, PMString& outSt
 
 bool KFCReplaceEngine::AcceptRun(int32 chapterIdx, int32 runIdx, PMString& outStatus)
 {
+	if (RefusedOnQueryRun(outStatus))
+		return false;
 	std::vector<int32> scope;
 	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
 	return AcceptRowsOf(chapterIdx, scope, "run", outStatus);

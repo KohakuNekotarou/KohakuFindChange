@@ -37,6 +37,9 @@ namespace
 	// Were these rows rebuilt from the Track Changes records? See KFCResultModel::SetFromRecords.
 	bool gFromRecords = false;
 
+	// Is this list a query run's? See KFCResultModel::SetFromQueryRun.
+	bool gFromQueryRun = false;
+
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
@@ -334,6 +337,7 @@ void KFCResultModel::Clear()
 	gFromBook = false;
 	gSearchScope = kScopeDocument;
 	gFromRecords = false;
+	gFromQueryRun = false;
 	gBookName.Clear();
 	gSearchMode = -1;
 	gWalkSignature.Clear();
@@ -470,6 +474,16 @@ void KFCResultModel::SetFromRecords(bool fromRecords)
 bool KFCResultModel::IsFromRecords()
 {
 	return gFromRecords;
+}
+
+void KFCResultModel::SetFromQueryRun(bool fromQueryRun)
+{
+	gFromQueryRun = fromQueryRun;
+}
+
+bool KFCResultModel::IsFromQueryRun()
+{
+	return gFromQueryRun;
 }
 
 bool KFCResultModel::NoRowHasCheckBox()
@@ -1633,6 +1647,14 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 	out.chapters = gChapters;
 	out.showingOutcome = gShowingOutcome;
 	out.layout = gLayoutGeneration;
+	out.fromBook = gFromBook;
+	out.searchScope = gSearchScope;
+	out.fromRecords = gFromRecords;
+	out.fromQueryRun = gFromQueryRun;
+	out.bookName = gBookName;
+	out.searchMode = gSearchMode;
+	out.walkSignature = gWalkSignature;
+	out.hasRun = gHasRun;
 }
 
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
@@ -1640,6 +1662,14 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	gChapters = snapshot.chapters;
 	gShowingOutcome = snapshot.showingOutcome;
 	gLayoutGeneration = snapshot.layout;
+	gFromBook = snapshot.fromBook;
+	gSearchScope = snapshot.searchScope;
+	gFromRecords = snapshot.fromRecords;
+	gFromQueryRun = snapshot.fromQueryRun;
+	gBookName = snapshot.bookName;
+	gSearchMode = snapshot.searchMode;
+	gWalkSignature = snapshot.walkSignature;
+	gHasRun = snapshot.hasRun;
 	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
 	ForgetContextMenus();
 	ForgetRowBackup();

@@ -58,6 +58,7 @@
 #define __KFCUndoFollow_h__
 
 #include "UIDRef.h"		// UIDRef
+#include "KFCBookScope.h"	// ChapterDoc - a query run's documents (RunRecorder)
 
 #include <vector>
 
@@ -73,7 +74,8 @@ namespace KFCUndoFollow
 		kStepReplaceAgain,
 		kStepReject,
 		kStepAccept,
-		kStepAcceptAll
+		kStepAcceptAll,
+		kStepRunQueries		// the query run (KFCQuerySequence) - RunRecorder's
 	};
 
 	/** ONE WRITE, RECORDED - made before a character is written (outside the write's command
@@ -101,6 +103,26 @@ namespace KFCUndoFollow
 		bool fOpen;
 		StepRecorder(const StepRecorder&);
 		StepRecorder& operator=(const StepRecorder&);
+	};
+
+	/** A QUERY RUN, RECORDED (KFCQuerySequence, 2026-10-04) - not a StepRecorder: the stories it writes are known only
+	    once each query has searched, and the list it leaves is a new one. Made at the run's commit point, BEFORE the
+	    list is cleared: the list as it is then is copied whole (what an Undo puts back). ReadStories = every text model's
+	    version in the run's documents, before a character is written. Keep = the run went through and the list shows it:
+	    kept as kStepRunQueries, in the result set the list is now. RestoreBefore = the run was undone (cancelled, failed):
+	    the list goes back as it was and nothing is kept. While one stands nothing is followed. */
+	class RunRecorder
+	{
+	public:
+		RunRecorder();
+		~RunRecorder();
+		void ReadStories(const std::vector<KFCBookScope::ChapterDoc>& docs);
+		void Keep();
+		void RestoreBefore();
+	private:
+		bool fOpen;
+		RunRecorder(const RunRecorder&);
+		RunRecorder& operator=(const RunRecorder&);
 	};
 
 	/** THE MARK. Processed by every write of KFC's own INSIDE its command sequence,
