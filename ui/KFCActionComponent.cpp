@@ -45,6 +45,7 @@
 #include "KFCAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel"
 #include "KFCPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
+#include "KFCDiag.h"				// a test build's UIOBS line (KFCDiagCounter)
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -222,7 +223,14 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			KFCPanelTitle::Update();
 
 			PMString summary;
+#ifdef KFC_DIAG
+			// how often the UI half's observers ran while the search did (guide vol2-15: not per match, one hopes)
+			const int titleBefore = KFCDiagCounter(0), mirrorBefore = KFCDiagCounter(1);
+#endif
 			KFCRuns()->SearchBook(summary);
+#ifdef KFC_DIAG
+			KFC_DIAG_LOG("UIOBS search title=%d mirror=%d", KFCDiagCounter(0) - titleBefore, KFCDiagCounter(1) - mirrorBefore);
+#endif
 			KFCResultTree::Rebuild();
 			KFCResultTree::ShowStatus(summary);
 			break;
@@ -383,7 +391,13 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// instead - by the replace's own summary (it counts the rows Track Changes recorded nothing for,
 			// which Reject Change cannot take back).
 			PMString summary;
+#ifdef KFC_DIAG
+			const int titleBefore = KFCDiagCounter(0), mirrorBefore = KFCDiagCounter(1);	// (as the search's, above)
+#endif
 			(void)KFCRuns()->ReplaceChecked(summary);
+#ifdef KFC_DIAG
+			KFC_DIAG_LOG("UIOBS replace title=%d mirror=%d", KFCDiagCounter(0) - titleBefore, KFCDiagCounter(1) - mirrorBefore);
+#endif
 			KFCResultTree::Rebuild();		// replaced rows lose their box and fade
 			KFCResultTree::ShowStatus(summary);
 			break;

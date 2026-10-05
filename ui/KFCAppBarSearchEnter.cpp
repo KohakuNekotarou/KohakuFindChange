@@ -52,6 +52,7 @@
 #include "KFCModelAccess.h"		// KFCRuns()->SetQuery - the Find/Change settings are the model half's
 #include "KFCResultTree.h"		// ShowStatus - a query that could not be set is said
 #include "KFCUIID.h"			// kKFCSearchBookActionID, kKFCPanelWidgetID
+#include "KFCDiag.h"			// a test build counts the mirrors (KFCDiagCounter)
 
 // *windows.h goes AFTER the SDK headers, so its macros cannot collide with SDK names (KFCPanelAlpha.cpp's order).
 #ifdef WINDOWS
@@ -480,6 +481,9 @@ public:
 #ifdef WINDOWS
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
+#ifdef KFC_DIAG
+			++KFCDiagCounter(1);	// how often this runs during a search or a write (UIOBS, KFCActionComponent)
+#endif
 			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again
 			MirrorFindChangeIntoField();
 		}

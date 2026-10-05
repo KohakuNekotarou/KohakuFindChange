@@ -48,6 +48,7 @@ namespace GoToURLUtils
 #include "KFCPanelMetrics.h"	// how tall the message block has to be in this UI language
 #include "KFCPanelTitle.h"
 #include "KFCResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
+#include "KFCDiag.h"			// a test build counts the recomputes (KFCDiagCounter)
 
 namespace
 {
@@ -133,6 +134,9 @@ void SetTabLabel(const PMString& label)
 
 void KFCPanelTitle::Update()
 {
+#ifdef KFC_DIAG
+	++KFCDiagCounter(0);	// how often this runs during a search or a write (UIOBS, KFCActionComponent)
+#endif
 	// A plain ASCII hyphen, not an em dash: on a tab this size the long dash reads as a gap
 	// (the author's call). Staying inside ASCII also keeps this file free of the CP932
 	// mangling a non-ASCII literal in a BOM-less .cpp would bring.

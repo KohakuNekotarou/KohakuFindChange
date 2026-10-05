@@ -225,6 +225,15 @@ private:
 
 #define KFC_DIAG_PHASE(var, name) const KFCDiagPhase var(name)
 
+// Counters a test build bumps where something may run more often than it should (2026-10-05, guide vol2-15 "do not
+// update the user interface from an observer"): 0 = the panel's tab name recomputed (KFCPanelTitle::Update), 1 = the
+// app bar's mirror of the Find/Change field (KFCAppBarSearchEnter). One set per plug-in (both are the UI half's).
+inline int& KFCDiagCounter(int which)
+{
+	static int counters[8] = { 0 };
+	return counters[(which >= 0 && which < 8) ? which : 7];
+}
+
 #else
 
 #define KFC_DIAG_LOG(...) ((void)0)
