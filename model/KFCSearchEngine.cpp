@@ -91,6 +91,8 @@
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 #include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - RelocateStaleRow looks again only under its own query
+#include "KFCDiag.h"			// the fault switch queries-run (SearchBook's head)
+#include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
 
 namespace
 {
@@ -2732,6 +2734,14 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
+
+#ifdef KFC_DIAG
+	// THE QUERY RUN'S WAY IN UNTIL ITS PANEL EXISTS (plan A, 2026-10-05): while the fault switch queries-run is on,
+	// the Find action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch) - ahead of the re-entry
+	// stop below, because the run asks the same doors itself and sets its own flag.
+	if (KFC_DIAG_FAULT("queries-run"))
+		return KFCQuerySequence::RunFromDiagSwitch(outSummary);
+#endif
 
 	// Last-resort re-entry stop. The panel's actions grey themselves out while a search runs, but
 	// the progress bar pumps events, so a command could still find its way in here.

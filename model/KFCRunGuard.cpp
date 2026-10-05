@@ -15,6 +15,7 @@
 #include "KFCSearchEngine.h"
 #include "KFCReplaceEngine.h"
 #include "KFCShowChanges.h"
+#include "KFCQuerySequence.h"
 
 bool KFCRunGuard::IsAnyRunning()
 {
@@ -25,7 +26,8 @@ bool KFCRunGuard::IsAnyRunning()
 	// search.)
 	return KFCSearchEngine::IsSearching()
 		|| KFCReplaceEngine::IsReplacing()
-		|| KFCShowChanges::IsShowing();
+		|| KFCShowChanges::IsShowing()
+		|| KFCQuerySequence::IsRunning();		// the query run (2026-10-04): a search and a write under one sequence
 }
 
 const char* KFCRunGuard::BusyMessage()

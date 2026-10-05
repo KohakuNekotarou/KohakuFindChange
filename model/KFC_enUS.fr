@@ -38,6 +38,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
                 // What Edit > Undo calls a Change Checked run.
                 kKFCReplaceStepKey,				"Replace",
+                kKFCRunQueriesStepKey,			"Run Queries",
                 // ...and a Reject Change and an Accept All Changes by KohakuFindChange.
                 kKFCRejectStepKey,				"Reject Change",
                 kKFCAcceptAllStepKey,			"Accept All Changes by KohakuFindChange",

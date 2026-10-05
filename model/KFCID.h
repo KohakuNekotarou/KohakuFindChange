@@ -171,6 +171,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDocUndoObserverImpl, kKFCPrefix + 41)
 // What Edit > Undo calls a Change Checked run ("Replace" - the author's call; the Japanese UI's is
 // KFCJa::kReplaceStep). See the sequence in KFCReplaceEngine::ReplaceChecked for why it is named.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
+#define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 // ...and what it calls a Reject Change and an Accept All Changes by KohakuFindChange.
 #define kKFCRejectStepKey			kKFCStringPrefix "kKFCRejectStepKey"
 #define kKFCAcceptAllStepKey		kKFCStringPrefix "kKFCAcceptAllStepKey"

@@ -76,6 +76,7 @@ namespace KFCJa
 	const wchar_t kStaleResultsOne[]        = L"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
 	// What Edit > Undo calls a Change Checked run (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
+	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
 	// ...and a Reject Change and an Accept All Changes by KohakuFindChange. InDesign's own Track
 	// Changes words, the change's author named as the Track Changes panel shows it (the plug-in
 	// author's call: the name says only KohakuFindChange's changes are accepted).

@@ -36,6 +36,9 @@
 //    replace-refuse KFCReplaceEngine.cpp's WalkStoryReplacing takes InDesign's replace command as having
 //                refused every row - a chapter where nothing lands after the pending changes next to its ticked
 //                rows were accepted (work\kbs-regress\cases\fault-replace-refuse-on.jsx / -off.jsx)
+//    queries-run  the file holds one query path per line (UTF-8); the panel's Find runs the query run over them
+//                (KFCQuerySequence::RunFromDiagSwitch) - the way in until the panel of its own exists
+//                (work\kbs-regress\cases\qs-*.jsx write it, qs-off.jsx takes it off)
 //
 //========================================================================================
 
