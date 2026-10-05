@@ -83,6 +83,9 @@ DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)
 // nothing and raises a ModelChange on its document's subject, so the panel hears that step's Undo and
 // Redo through an observer on the document. (+ 22: + 19 ... + 21 went to the UI half at the split.)
 DECLARE_PMID(kClassIDSpace, kKFCUndoMarkCmdBoss, kKFCPrefix + 22)
+// The test build's command counter (KFCDiagCommands.h, 2026-10-05): an ICommandInterceptor, created and installed only
+// in a build with KFC_DIAG while the fault switch perf-commands is on - in every other build it is never created.
+DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 
 
 // InterfaceIDs:
@@ -144,6 +147,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCInt64DataImpl, kKFCPrefix + 35)		// IIn
 // on the document that hears it. (+ 40: + 39 went to the UI half at the split.)
 DECLARE_PMID(kImplementationIDSpace, kKFCUndoMarkCmdImpl, kKFCPrefix + 40)
 DECLARE_PMID(kImplementationIDSpace, kKFCDocUndoObserverImpl, kKFCPrefix + 41)
+// The test build's command counter (KFCDiagCommands.cpp) - see kKFCDiagCmdCountBoss.
+DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): the replace's own alert and what Edit > Undo calls a

@@ -51,6 +51,7 @@
 // Project includes:
 #include "KFCReplaceEngine.h"
 #include "KFCDiag.h"			// KFC_DIAG_LOG - why a write was refused, in a test build (compiled out of a shipping one)
+#include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCID.h"				// the string keys the stale-results alert and the Undo step are worded from
 #include "KFCLoc.h"				// runtime Japanese - there is no jaJP string table
 #include "KFCResultModel.h"
@@ -61,6 +62,7 @@
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
+#include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
 #endif
 
 namespace
@@ -579,6 +581,12 @@ bool GrepQueryHoldsLineStart(const WideString& query)
 // Should this run's writing walk go backward? Only on the GREP tab, and only when the query holds ^.
 bool WriteBackward()
 {
+#ifdef KFC_DIAG
+	// (Fault switch perf-backward, a test build's only - KFCDiag.h: every write walks backward, to measure what the
+	// direction does to the find's time. Throwaway documents only.)
+	if (KFC_DIAG_FAULT("perf-backward"))
+		return true;
+#endif
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	if (opts == nil || opts->GetSearchMode() != IFindChangeOptions::kGrepSearch)
 		return false;
@@ -667,6 +675,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		double tFind = 0, tMatch = 0, tPre = 0, tReplace = 0, tSign = 0, tRecord = 0, tTexts = 0, tCarry = 0;
 		double tFindStep = 0;
 		int32 timedRows = 0, finds = 0;
+		KFCDiagPerf stepPerf;		// InDesign's counters over the last 100 finds (KFCDiag.h)
+		int stepCommands = KFCDiagCommands::Count();	// ...and the commands processed (0 unless perf-commands is on)
 		// The fault switch perf-fresh-walker (KFCDiag.h): the walk started again after every `restartEvery` writes -
 		// forward only (a backward walk's restart point would be the write's START, not measured).
 		const int restartMode = KFCDiagFaultValue("perf-fresh-walker", 0, 0);
@@ -683,6 +693,16 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		{
 			UIDRef story;
 			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+#ifdef KFC_DIAG
+			// the 100th find's story: its first damaged frame before the find (-1 = none) - does the find compose?
+			int32 damagedBefore = -2;
+			if ((finds + 1) % 100 == 0)
+			{
+				InterfacePtr<ITextModel> damageModel(storyRef, UseDefaultIID());
+				InterfacePtr<IFrameList> damageFrames(damageModel != nil ? damageModel->QueryFrameList() : nil);
+				damagedBefore = (damageFrames != nil) ? damageFrames->GetFirstDamagedFrameIndex() : -3;
+			}
+#endif
 			KFC_CLOCK(cFind);
 			const IFindChangeService::FindChangeResult found = RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
 			KFC_SPENT(tFind, cFind);
@@ -698,11 +718,19 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			{
 				InterfacePtr<ITextModel> stepModel(storyRef, UseDefaultIID());
 				InterfacePtr<ITextFocusManager> stepFoci(stepModel, UseDefaultIID());
-				KFC_DIAG_LOG("WALKSTEP story=%u finds=%d rows=%d last100=%.1f ms/find foci=%d length=%d at=%d walker=%p",
+				InterfacePtr<IFrameList> stepFrames(stepModel != nil ? stepModel->QueryFrameList() : nil);
+				char stepCounters[300] = { 0 };
+				stepPerf.Since(stepCounters, sizeof(stepCounters));
+				const int commandsNow = KFCDiagCommands::Count();
+				KFC_DIAG_LOG("WALKSTEP story=%u finds=%d rows=%d last100=%.1f ms/find foci=%d length=%d at=%d walker=%p damaged=%d->%d cmds=%d %s",
 					storyRef.GetUID().Get(), (int)finds, (int)timedRows, tFindStep / 100.0,
 					(stepFoci != nil) ? (int)stepFoci->GetFocusCount() : -1,
-					(stepModel != nil) ? (int)stepModel->TotalLength() : -1, (int)start, (void*)walker.get());
+					(stepModel != nil) ? (int)stepModel->TotalLength() : -1, (int)start, (void*)walker.get(),
+					(int)damagedBefore, (stepFrames != nil) ? (int)stepFrames->GetFirstDamagedFrameIndex() : -3,
+					commandsNow - stepCommands, stepCounters);
 				tFindStep = 0;
+				stepPerf.Take();
+				stepCommands = commandsNow;
 			}
 #endif
 			if (found != IFindChangeService::kSuccess)
@@ -2243,6 +2271,7 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	}
 	const ReplacingFlagGuard replacingGuard;
 	KFC_DIAG_PHASE(phaseReplace, "replace-checked");	// a test build's timer (KFCDiag.h)
+	KFC_DIAG_COMMANDS(commandsReplace, "replace-checked");	// ...and its command count (KFCDiagCommands.h)
 
 	const int32 chapterCount = KFCResultModel::GetChapterCount();
 	if (chapterCount <= 0)

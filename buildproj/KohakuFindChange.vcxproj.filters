@@ -54,6 +54,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagCommands.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

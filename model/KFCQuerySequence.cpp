@@ -35,6 +35,7 @@
 #include "KFCQuerySequence.h"
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
+#include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
@@ -153,6 +154,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 		return 0;
 	}
 	const RunningFlagGuard runningGuard;
+	KFC_DIAG_PHASE(phaseRun, "query-run");		// a test build's timer (KFCDiag.h)
+	KFC_DIAG_COMMANDS(commandsRun, "query-run");	// ...and its command count (KFCDiagCommands.h)
 	if (queries.empty())
 	{
 		outSummary.Append("No queries in the run order.");

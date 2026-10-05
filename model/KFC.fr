@@ -211,6 +211,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/** The test build's command counter (KFCDiagCommands.h, 2026-10-05): which commands a search or a write made
+		InDesign run, and how many. Created by name and handed to ICommandProcessor::InstallInterceptor - only in a build
+		with KFC_DIAG, only while the fault switch perf-commands is on. Declared in every build because a resource
+		cannot follow that define, and a boss named here with no implementation behind it would not load; in a build
+		without it nothing ever creates this. kInvalidClass, as KIDMCP's kKIDMCPCmdWatchBoss: nothing looks it up. */
+	Class
+	{
+		kKFCDiagCmdCountBoss,
+		kInvalidClass,
+		{
+			IID_ICOMMANDINTERCEPTOR,	kKFCDiagCmdCountImpl,
+		}
+	},
+
 	/*
 	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
 	 * is closed - a row naming a closed document would still jump, and Change Checked would still

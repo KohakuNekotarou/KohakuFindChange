@@ -92,6 +92,7 @@
 #include "KFCOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 #include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - RelocateStaleRow looks again only under its own query
 #include "KFCDiag.h"			// the fault switch queries-run (SearchBook's head)
+#include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
 
 namespace
@@ -1361,6 +1362,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	const size_t hitsBefore = outHits.size();
 	gBuildHitTimes = BuildHitTimes();
 	KFC_CLOCK(cSearchWalk);
+	const KFCDiagPerf searchPerf;		// what the walk made InDesign do (KFCDiag.h)
 #endif
 
 	// (No per-story change count is stamped on the hits to let the replace skip its same-occurrence test
@@ -1530,9 +1532,11 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	{
 		double tWalk = 0;
 		KFC_SPENT(tWalk, cSearchWalk);
-		KFC_DIAG_LOG("SEARCHTIME hits=%d detail=%d walk=%.0f find=%.0f build=%.0f (text=%.0f lead=%.0f threads=%.0f place=%.0f) ms",
+		char counters[300] = { 0 };
+		searchPerf.Since(counters, sizeof(counters));
+		KFC_DIAG_LOG("SEARCHTIME hits=%d detail=%d walk=%.0f find=%.0f build=%.0f (text=%.0f lead=%.0f threads=%.0f place=%.0f) ms %s",
 			(int)(outHits.size() - hitsBefore), (int)detail, tWalk, tSearchFind, tSearchBuild, gBuildHitTimes.text,
-			gBuildHitTimes.lead, gBuildHitTimes.threads, gBuildHitTimes.place);
+			gBuildHitTimes.lead, gBuildHitTimes.threads, gBuildHitTimes.place, counters);
 	}
 #endif
 }
@@ -2805,6 +2809,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	}
 	const SearchingFlagGuard searchingGuard;
 	KFC_DIAG_PHASE(phaseSearch, "search");	// a test build's timer (KFCDiag.h)
+	KFC_DIAG_COMMANDS(commandsSearch, "search");	// ...and its command count (KFCDiagCommands.h)
 
 	// EVERY REFUSAL BELOW COMES BEFORE THE MODEL IS TOUCHED.
 	// A run that is turned away has to leave the panel exactly as it found it - a Clear() up here would

@@ -671,6 +671,7 @@ void KFCResultTree::Rebuild()
 	// mode 1 = one ExpandNode with all its descendants for a document row that opens; mode 2 = every row opened BEFORE
 	// ChangeRoot (ITreeViewMgr.h: expansion is kept across ChangeRoot while the root is the same).
 	KFC_CLOCK(cTree);
+	const KFCDiagPerf treePerf;		// what the rebuild made InDesign do (KFCDiag.h)
 	int32 expandCalls = 0;
 	const int expandMode = KFCDiagFaultValue("tree-expand", 0, 0);
 	const bool16 expandAllBelow = (expandMode == 1) ? kTrue : kFalse;
@@ -747,8 +748,10 @@ void KFCResultTree::Rebuild()
 	{
 		double tTree = 0;
 		KFC_SPENT(tTree, cTree);
-		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms", (int)KFCResults()->GetTotalHitCount(),
-			(int)chapters, (int)expandCalls, expandMode, tTree);
+		char counters[300] = { 0 };
+		treePerf.Since(counters, sizeof(counters));
+		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms %s", (int)KFCResults()->GetTotalHitCount(),
+			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
 #endif
 }

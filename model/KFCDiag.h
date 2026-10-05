@@ -46,6 +46,11 @@
 //                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
 //                scope (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
 //                walk?). Throwaway documents only.
+//    perf-commands  every command InDesign processes is counted, by class, over a search, a Change Checked and a query
+//                run (KFCDiagCommands.h - "COMMANDS" lines, and cmds= on WALKSTEP). The count itself costs time:
+//                not on a timing run.
+//    perf-backward  KFCReplaceEngine.cpp's WriteBackward answers yes: every write walks backward (the same study:
+//                what the direction does to the find's time). Throwaway documents only.
 //    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
 //                ExpandNode with all its descendants per open document row, mode 2 every row opened before ChangeRoot
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
@@ -64,6 +69,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
+#include "PerformanceStats.h"			// InDesign's own counters (KFCDiagPerf) - guide vol2-16
+#include "PerformanceMetricsID.h"
 
 // Appends one line: "<ms since the epoch> <the formatted text>". Opened and closed per line, so a crash
 // right after it still leaves the line on disk.
@@ -149,7 +156,52 @@ inline double KFCDiagNowMs()
 #define KFC_CLOCK(var) const double var = KFCDiagNowMs()
 #define KFC_SPENT(slot, var) ((slot) += KFCDiagNowMs() - (var))
 
-// "PHASE <name> begin" now and "PHASE <name> end <ms>" when the scope ends.
+// WHAT A STRETCH OF KFC MADE INDESIGN DO (2026-10-05, the speed-up study - guide vol2-16, Performance Metrics API):
+// InDesign's own counters (PerformanceMetricsID.h), read with PerformanceStats::GetValue when this is made and again
+// when Since is asked - composition in the layout and in galley (count, time), the change manager's Update calls (the
+// observers notified: count, time), undo snapshots (count, time to make), new UIDs and instantiations, and drawing.
+// Since writes "lcomp=<n>/<t> gcomp=<n>/<t> notify=<n>/<t> snap=<n>/<t> uid=<n> inst=<n> draw=<t>": the change, in
+// whatever unit each counter keeps.
+class KFCDiagPerf
+{
+public:
+	KFCDiagPerf() { Take(); }
+	void Take()
+	{
+		for (int i = 0; i < kCount; ++i)
+			fV[i] = PerformanceStats::GetValue(Id(i));
+	}
+	void Since(char* buf, size_t n) const
+	{
+		unsigned long long d[kCount];
+		for (int i = 0; i < kCount; ++i)
+			d[i] = (unsigned long long)(PerformanceStats::GetValue(Id(i)) - fV[i]);
+		_snprintf_s(buf, n, _TRUNCATE, "lcomp=%llu/%llu gcomp=%llu/%llu notify=%llu/%llu snap=%llu/%llu uid=%llu inst=%llu draw=%llu",
+			d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10]);
+	}
+private:
+	enum { kCount = 11 };
+	static PerformanceMetricID Id(int i)
+	{
+		switch (i)
+		{
+			case 0: return kLayoutCompositionCountPerfID;
+			case 1: return kLayoutCompositionTimePerfID;
+			case 2: return kGalleyCompositionCountPerfID;
+			case 3: return kGalleyCompositionTimePerfID;
+			case 4: return kChangeMgrUpdateCallCountPerfID;
+			case 5: return kChangeMgrUpdateCallTimePerfID;
+			case 6: return kSnapshotCountPerfID;
+			case 7: return kNewSnapshotTimePerfID;
+			case 8: return kDBNewUIDCountPerfID;
+			case 9: return kDBInstantiateCountPerfID;
+			default: return kDrawMgrDrawTimePerfID;
+		}
+	}
+	uint64	fV[kCount];
+};
+
+// "PHASE <name> begin" now and "PHASE <name> end <ms> <InDesign's counters over it>" when the scope ends.
 class KFCDiagPhase
 {
 public:
@@ -159,13 +211,16 @@ public:
 	}
 	~KFCDiagPhase()
 	{
-		KFCDiagLog("PHASE %s end %.0f ms", fName, KFCDiagNowMs() - fStart);
+		char perf[300] = { 0 };
+		fPerf.Since(perf, sizeof(perf));
+		KFCDiagLog("PHASE %s end %.0f ms %s", fName, KFCDiagNowMs() - fStart, perf);
 	}
 	KFCDiagPhase(const KFCDiagPhase&) = delete;
 	KFCDiagPhase& operator=(const KFCDiagPhase&) = delete;
 private:
 	const char*	fName;
 	double		fStart;
+	KFCDiagPerf	fPerf;
 };
 
 #define KFC_DIAG_PHASE(var, name) const KFCDiagPhase var(name)

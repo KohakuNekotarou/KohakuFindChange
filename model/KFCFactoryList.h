@@ -35,6 +35,7 @@ REGISTER_PMINTERFACE(KFCInt64Data, kKFCInt64DataImpl)
 // AddIn'd on kDocBoss that hears it (not on kTextStoryBoss - KFCID.h, IID_IKFCSTORYUNDOOBSERVER, says why).
 REGISTER_PMINTERFACE(KFCUndoMarkCmd, kKFCUndoMarkCmdImpl)
 REGISTER_PMINTERFACE(KFCDocUndoObserver, kKFCDocUndoObserverImpl)
+REGISTER_PMINTERFACE(KFCDiagCmdCount, kKFCDiagCmdCountImpl)
 // The model half's three session interfaces (KFCModelServices.cpp).
 REGISTER_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
 REGISTER_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

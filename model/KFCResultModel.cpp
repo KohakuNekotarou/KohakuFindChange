@@ -256,18 +256,18 @@ namespace
 	void BuildFontGroups(KFCResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
+		// Each (story, run)'s group, looked up rather than searched for: a chapter of 5000 hits in as many stories
+		// would otherwise compare every hit with every group made before it (2026-10-05, the speed-up study). The
+		// groups are still made in first-appearance order - the map only finds them.
+		std::map<std::pair<UID, int32>, int32> groupOf;
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KFCResultModel::Hit& hit = chapter.hits[i];
 			int32 found = -1;
-			for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
-			{
-				if (chapter.fontGroups[g].story == hit.storyUID && chapter.fontGroups[g].run == hit.run)
-				{
-					found = static_cast<int32>(g);
-					break;
-				}
-			}
+			const std::pair<UID, int32> key(hit.storyUID, hit.run);
+			const std::map<std::pair<UID, int32>, int32>::const_iterator known = groupOf.find(key);
+			if (known != groupOf.end())
+				found = known->second;
 			if (found < 0)
 			{
 				KFCResultModel::FontGroup group;
@@ -285,6 +285,7 @@ namespace
 				group.fontName.SetTranslatable(kFalse);
 				chapter.fontGroups.push_back(group);
 				found = static_cast<int32>(chapter.fontGroups.size()) - 1;
+				groupOf[key] = found;
 			}
 			KFCResultModel::FontGroup& group = chapter.fontGroups[found];
 			hit.fontGroup = found;
