@@ -753,6 +753,45 @@ void KFCResultTree::Rebuild()
 		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms %s", (int)KFCResults()->GetTotalHitCount(),
 			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
+	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds, 2026-10-05). GetDisplayFontCount and
+	// GetDisplayRunGroupCount find the shown groups by halving now; here every group and every run is counted one
+	// by one, as they were before, after the timing above. A difference is logged as DISPCOUNT MISMATCH - the
+	// regression runs grep for it.
+	for (int32 n = 0; n < chapters; ++n)
+	{
+		const int32 c = KFCResults()->GetShownChapter(n);
+		int32 fontsByGroup = 0;
+		for (int32 g = 0; KFCResults()->IsStoryGroup(c, g); ++g)
+			if (KFCResults()->GetDisplayFontHitCount(c, g) > 0)
+				++fontsByGroup;
+		const int32 fontsNow = KFCResults()->GetDisplayFontCount(c);
+		if (fontsNow != fontsByGroup)
+			KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d fonts now=%d by group=%d", (int)c, (int)fontsNow, (int)fontsByGroup);
+		int32 runsByGroup = 0;
+		PMString runLabel;
+		int32 runHits = 0;
+		for (int32 r = 0; KFCResults()->GetRunDisplay(c, r, runLabel, runHits); ++r)
+		{
+			int32 groupsByGroup = 0;
+			for (int32 k = 0; ; ++k)
+			{
+				const int32 g = KFCResults()->GetRunGroup(c, r, k);
+				if (g < 0)
+					break;
+				if (KFCResults()->GetDisplayFontHitCount(c, g) > 0)
+					++groupsByGroup;
+			}
+			const int32 groupsNow = KFCResults()->GetDisplayRunGroupCount(c, r);
+			if (groupsNow != groupsByGroup)
+				KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d run=%d groups now=%d by group=%d", (int)c, (int)r,
+					(int)groupsNow, (int)groupsByGroup);
+			if (groupsByGroup > 0)
+				++runsByGroup;
+		}
+		const int32 runsNow = KFCResults()->GetDisplayRunCount(c);
+		if (runsNow != runsByGroup)
+			KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d runs now=%d by group=%d", (int)c, (int)runsNow, (int)runsByGroup);
+	}
 #endif
 }
 
@@ -781,8 +820,9 @@ void KFCResultTree::RefreshRows()
 		treeMgr->NodeChanged(KFCResultNodeID::CreateBook(), kFalse /*children handled below*/);
 
 	// The chapter AND each of its story rows, because childrenChangedAlso reaches a node's children -
-	// and under the story level the hit rows are GRANDchildren. A chapter has a few stories with hits,
-	// not a few thousand, so this stays a handful of calls.
+	// and under the story level the hit rows are GRANDchildren. One call per story row: a handful for most
+	// documents, one per hit for a document of one-hit stories (a frame per entry) - still one per row, never
+	// more.
 	const int32 chapters = KFCResults()->GetDisplayChapterCount();
 	for (int32 n = 0; n < chapters; ++n)
 	{

@@ -73,13 +73,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
+#include <mutex>
+#include <thread>
 #include "PerformanceStats.h"			// InDesign's own counters (KFCDiagPerf) - guide vol2-16
 #include "PerformanceMetricsID.h"
 
 // Appends one line: "<ms since the epoch> <the formatted text>". Opened and closed per line, so a crash
 // right after it still leaves the line on disk.
+//
+// ONE WRITER AT A TIME (2026-10-05 - guide vol1-07: a file a plug-in writes is synchronised like a global). The model
+// half's code is called on a background task's thread too (an export's - KFCUndoFollow writes its line before its own
+// main-thread gate), and fopen_s opens for this caller alone: a second append while the file is open fails, and its
+// line was lost without a word. The lock puts this half's threads in a queue; the other half (the UI plug-in, main
+// thread only) can still meet a background write, so a refused open is tried again a few times before the line goes.
 inline void KFCDiagLog(const char* fmt, ...)
 {
+	static std::mutex writer;
+	const std::lock_guard<std::mutex> lock(writer);
 	char* temp = nullptr;
 	size_t len = 0;
 	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
@@ -88,7 +98,14 @@ inline void KFCDiagLog(const char* fmt, ...)
 	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag.txt", temp);
 	free(temp);
 	FILE* f = nullptr;
-	if (fopen_s(&f, path, "a") != 0 || f == nullptr)
+	for (int attempt = 0; attempt < 20; ++attempt)
+	{
+		if (fopen_s(&f, path, "a") == 0 && f != nullptr)
+			break;
+		f = nullptr;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	if (f == nullptr)
 		return;
 	const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(
 		std::chrono::system_clock::now().time_since_epoch()).count();

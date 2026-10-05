@@ -16,7 +16,7 @@
 // General includes:
 #include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign and the hidden markers - see MarkUpBreaksForDisplay
 
-#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group; std::sort
+#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group; std::partition_point - the groups it leaves shown; std::sort
 #include <set>			// the rows already copied aside - see BackUpRow
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
@@ -657,13 +657,19 @@ int32 KFCResultModel::GetDisplayFontCount(int32 chapterIdx)
 	if (c == nil)
 		return 0;
 
-	int32 shownGroups = 0;
-	for (int32 g = 0; g < static_cast<int32>(c->fontGroups.size()); ++g)
-	{
-		if (GetDisplayFontHitCount(chapterIdx, g) > 0)
-			++shownGroups;
-	}
-	return shownGroups;
+	// FOUND BY HALVING, NOT GROUP BY GROUP (2026-10-05, the speed-up study). The tree asks this for EVERY child of a
+	// document row (KFCResultListAdapter::GetNthChild) and for every story row the rebuild opens, so counting group by
+	// group cost the groups squared per rebuild - 25 million group counts for a document of 5000 one-hit stories.
+	//
+	// A group shows while its FIRST hit is under the cap (its hitIndices ascend - GetDisplayFontHitCount). BuildFontGroups
+	// makes a group at the first hit of its story, scanning the hits in order, so every group holds a hit and the groups'
+	// first hits ascend with the group index: the groups that show are a PREFIX, and its length is the first group whose
+	// first hit is not under the cap.
+	const int32 shown = GetDisplayHitCount(chapterIdx);
+	const std::vector<FontGroup>& groups = c->fontGroups;
+	const std::vector<FontGroup>::const_iterator end = std::partition_point(groups.begin(), groups.end(),
+		[shown](const FontGroup& group) { return !group.hitIndices.empty() && group.hitIndices.front() < shown; });
+	return static_cast<int32>(end - groups.begin());
 }
 
 bool KFCResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
@@ -754,12 +760,20 @@ int32 KFCResultModel::GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx)
 	const RunGroup* run = RunAt(chapterIdx, runIdx);
 	if (run == nil)
 		return 0;
-	// The groups the cap left a hit to: the first N of the run's (they stand in hit order).
-	int32 shown = 0;
-	for (size_t k = 0; k < run->groups.size(); ++k)
-		if (GetDisplayFontHitCount(chapterIdx, run->groups[k]) > 0)
-			++shown;
-	return shown;
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return 0;
+	// The groups the cap left a hit to: the first N of the run's (they stand in hit order). Found by halving, for
+	// GetDisplayFontCount's reason (2026-10-05): a run's groups are listed in ascending group index, so their first
+	// hits ascend too.
+	const int32 shown = GetDisplayHitCount(chapterIdx);
+	const std::vector<FontGroup>& groups = c->fontGroups;
+	const std::vector<int32>::const_iterator end = std::partition_point(run->groups.begin(), run->groups.end(),
+		[shown, &groups](int32 g) {
+			return g >= 0 && g < static_cast<int32>(groups.size()) && !groups[g].hitIndices.empty()
+				&& groups[g].hitIndices.front() < shown;
+		});
+	return static_cast<int32>(end - run->groups.begin());
 }
 
 int32 KFCResultModel::GetDisplayRunCount(int32 chapterIdx)

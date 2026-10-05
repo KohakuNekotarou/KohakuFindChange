@@ -670,7 +670,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 #ifdef KFC_DIAG
 		// TEST BUILDS ONLY: where a story's walk spends its time (2026-10-05 - a query run that wrote 6000 rows in two
-		// 3000-row stories took 23 minutes). Summed per phase over one story's walk and written once (WALKTIME); every
+		// 3000-row stories took 23 minutes; each story was ONE paragraph, which every find recomposed whole - in short
+		// paragraphs a row costs about 7 ms, flat). Summed per phase over one story's walk and written once (WALKTIME); every
 		// 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does something pile up?).
 		double tFind = 0, tMatch = 0, tPre = 0, tReplace = 0, tSign = 0, tRecord = 0, tTexts = 0, tCarry = 0;
 		double tFindStep = 0;
@@ -912,9 +913,11 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	return true;
 }
 
-// A QUERY RUN'S STORY, WRITTEN WITH INDESIGN'S OWN CHANGE ALL (2026-10-05, the spec's D13). Writing one match at a
-// time, each find got slower after every write (300 rows: 15 ms a find, 1000: 36 ms - WALKTIME; a plain search of
-// 1000 hits takes 0.87 s, InDesign's Change All of 3000 tracked ones 4.4 s), so a query run - which writes every match
+// A QUERY RUN'S STORY, WRITTEN WITH INDESIGN'S OWN CHANGE ALL (2026-10-05, the spec's D13). Written one match at a
+// time, a row costs a find and a replace - about 7 ms in a document of ordinary paragraphs (1000 tracked rows in
+// 8 s, measured that night: docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 9), and far more when the matches
+// stand in one long paragraph, where each find recomposes all of it (36 ms a find at 1000 rows - the measurement this
+// was first decided on); InDesign's Change All writes 3000 tracked matches in 4.4 s. So a query run - which writes every match
 // it finds, no row picked out - hands the story to kReplaceAllTextCmdBoss: the command of the Find/Change dialog's
 // Change All, run the way SnpFindAndReplace.cpp runs it (ProcessFindChangeCommand: a walker initialised on a scope,
 // the find/change client and the session's options, inside the selections' critical section). GREP and its $n are
