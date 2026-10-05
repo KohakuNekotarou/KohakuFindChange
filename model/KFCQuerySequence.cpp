@@ -18,7 +18,6 @@
 #include "IDocumentList.h"
 #include "ISysFileData.h"
 #include "IUIFlagData.h"
-#include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - the Change All scope of a document-wide run
 
 // General includes:
 #include "CmdUtils.h"
@@ -343,10 +342,9 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 				KFCResultModel::SetAllChecked(true);		// (a row with no box - a locked one - is skipped: SetAllChecked)
 				locked += found.total - KFCResultModel::GetCheckedCount();
 				KFCReplaceEngine::WriteOutcome wrote;
-				// CHANGE ALL, STORY BY STORY, IN THE SEARCH'S SCOPE (the spec's D13): a document, all documents or a
-				// book's chapter -> each story's own scope; a Story / To End of Story / Selection Search: -> that scope.
-				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote, (scope.fromBook || scope.allDocuments)
-					? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope);
+				// ONE MATCH AT A TIME - Change Checked's own writing loop (the spec's D13, InDesign's Change All, was taken
+				// back by the author on 2026-10-05 evening).
+				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote);
 				if (wrote.cancelled)
 				{
 					cancelled = true;

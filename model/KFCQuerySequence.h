@@ -7,9 +7,9 @@
 //  THE QUERY RUN (2026-10-04 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md). The saved
 //  Find/Change queries a user lined up, run in that order: each one loaded into Edit > Find/Change
 //  (kFCQueryXMLReaderCmdBoss), searched with KFC's own search and every match written through Change Checked's
-//  writing loop - but a story at a time with InDesign's own Change All (the spec's D13, 2026-10-05: one match at a
-//  time grew slower with every write), and nothing signed until the run's end (D14 - KFCTrackChange::SignRunPlaces:
-//  one pair of records per place) - ALL OF IT ONE UNDO STEP ("Run Queries"): one abortable command sequence around every
+//  writing loop, one match at a time (the spec's D13 - InDesign's Change All - was taken back on 2026-10-05), and
+//  nothing signed until the run's end (D14 - KFCTrackChange::SignRunPlaces: one pair of records per place) -
+//  ALL OF IT ONE UNDO STEP ("Run Queries"): one abortable command sequence around every
 //  query, the run's documents opened and held from before it opens to after it ends (an open inside it
 //  throws the undo history of what was written away - the resolve pass in KFCReplaceEngine::ReplaceChecked).
 //  Then Edit > Find/Change is emptied (the spec's D7) and - when the panel's toggle asks for it (D12) - the

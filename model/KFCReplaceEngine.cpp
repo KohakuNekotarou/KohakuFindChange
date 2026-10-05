@@ -913,61 +913,6 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	return true;
 }
 
-// A QUERY RUN'S STORY, WRITTEN WITH INDESIGN'S OWN CHANGE ALL (2026-10-05, the spec's D13). Written one match at a
-// time, a row costs a find and a replace - about 7 ms in a document of ordinary paragraphs (1000 tracked rows in
-// 8 s, measured that night: docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 9), and far more when the matches
-// stand in one long paragraph, where each find recomposes all of it (36 ms a find at 1000 rows - the measurement this
-// was first decided on); InDesign's Change All writes 3000 tracked matches in 4.4 s. So a query run - which writes every match
-// it finds, no row picked out - hands the story to kReplaceAllTextCmdBoss: the command of the Find/Change dialog's
-// Change All, run the way SnpFindAndReplace.cpp runs it (ProcessFindChangeCommand: a walker initialised on a scope,
-// the find/change client and the session's options, inside the selections' critical section). GREP and its $n are
-// the dialog's own, as with the one-at-a-time commands beside it.
-// THE SCOPE IS THE SEARCH'S: `changeAllScope` = kDocumentScope - the story's own (QueryStoryWalkerScope, as
-// WalkStoryReplacing walks it); a Story / To End of Story / Selection Search: - that scope again
-// (QueryWalkerScope_UsingSelections, as the search took it), so nothing outside it is written.
-// outCount = what the command reports (IFindChangeCmdData::GetReplacementCount), -1 when it says nothing. False = the
-// walk could not start or the command failed; the error state is left clear.
-bool ChangeAllInStory(const UIDRef& storyRef, int32 changeAllScope, const WalkerScopeOptions& scopeOptions,
-	IFindChangeOptions* opts, int32& outCount)
-{
-	outCount = -1;
-	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
-	InterfacePtr<IK2ServiceProvider> provider(registry != nil
-		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
-	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
-	InterfacePtr<ITextWalkerScope> scope(
-		(changeAllScope == static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope))
-			? Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions)
-			: Utils<IWalkerScopeFactoryUtils>()->QueryWalkerScope_UsingSelections(
-				static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(changeAllScope), scopeOptions));
-	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
-	if (walker == nil || scope == nil || client == nil || opts == nil)
-		return false;
-	if (walker->IsWalking())
-		walker->Halt();
-	walker->Initialize(client, scope, opts, nil);
-	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceAllTextCmdBoss));
-	InterfacePtr<IFindChangeCmdData> cmdData(cmd, UseDefaultIID());
-	bool ok = false;
-	if (selUtils != nil && cmd != nil && cmdData != nil)
-	{
-		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
-		cmdData->SetTextWalker(walker);
-		if (CmdUtils::ProcessCommand(cmd) == kSuccess)
-		{
-			const IFindChangeService::FindChangeResult result = cmdData->GetFindChangeResult();
-			ok = (result != IFindChangeService::kFailure);
-			outCount = cmdData->GetReplacementCount();
-			KFC_DIAG_LOG("CHANGEALL story=%u result=%d count=%d", storyRef.GetUID().Get(), (int)result, (int)outCount);
-		}
-	}
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (walker->IsWalking())
-		walker->Halt();
-	return ok;
-}
-
 // IS THE ROW'S STORED PLACE STILL ITS TEXT? A row is carried and read back only when it is: a replaced
 // row is first put where its tracked change stands (the record moves with the text -
 // RefreshRowFromRecords), any other row must still read as it was found (KFCSearchEngine::RowReadsAsFound
@@ -1065,7 +1010,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
 	int32& outUnrecorded, int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed,
-	PMString& outWhyNot, const std::set<int32>* onlyHits = nil, int32 changeAllScope = -1)
+	PMString& outWhyNot, const std::set<int32>* onlyHits = nil)
 {
 	outAcceptedFirst = 0;
 	outReplaced = 0;
@@ -1261,44 +1206,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			return true;
 		}
 		std::set<int32>& pending = s->second;
-		// A QUERY RUN WRITES A STORY WITH CHANGE ALL (2026-10-05, the spec's D13 - ChangeAllInStory): every match the
-		// search listed there is written, none picked out - a match at an endnote's end too, as InDesign's own Change
-		// All writes it (which breaks that endnote's range - InDesign's own fault, the author's call: "ignore it";
-		// the one-at-a-time walk below still leaves such a match for Change Checked).
-		if (changeAllScope >= 0 && db->IsValidUID(s->first))
-		{
-			const UIDRef storyRef(db, s->first);
-			int32 inFootnotes = 0;
-			for (std::set<int32>::const_iterator p = pending.begin(); p != pending.end(); ++p)
-			{
-				const RowNow& row = rowNow[static_cast<size_t>(*p)];
-				TextIndex at = kInvalidTextIndex;
-				if (RowStartNow(db, row, at) && KFCTrackChange::IsInFootnote(storyRef, at))
-					++inFootnotes;
-			}
-			{
-				// "Recorded?" asked of the whole story before and after: a footnote records nothing, nor does a
-				// format-only change - a story that had no record of the run's and has none now recorded nothing.
-				const TextIndex wholeStory = 0x7FFFFFFF;
-				const bool hadRunRecords = KFCTrackChange::HasRunRecordIn(storyRef, 0, wholeStory);
-				int32 count = -1;
-				if (!ChangeAllInStory(storyRef, changeAllScope, scopeOptions, opts, count))
-				{
-					outFailed = true;
-					outWhyNot = "InDesign's Change All could not run";
-					return true;
-				}
-				const int32 rows = static_cast<int32>(pending.size());
-				const int32 written = (count > 0) ? count : rows;
-				outReplaced += written;
-				outUnrecorded += (!hadRunRecords && !KFCTrackChange::HasRunRecordIn(storyRef, 0, wholeStory))
-					? written : inFootnotes;
-				done += rows;
-				pending.clear();
-				KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
-				continue;
-			}
-		}
 		// A story an earlier story's replace deleted (an anchored object's): its rows never come up.
 		if (db->IsValidUID(s->first))
 		{
@@ -1349,10 +1256,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	// chapter has stopped changing: a line read as its own match was written would still show the later
 	// matches of its paragraph as they were. (A replaced row's time - what Reject Change and the jump find
 	// its records by - is set when it is written, WalkStoryReplacing, not read back off the records here.)
-	// (Not for a query run's Change All: nothing carried the rows past what it wrote, and a query run's list is
-	// rebuilt from the records anyway - KFCShowChanges::ListOwnRun.)
-	if (changeAllScope >= 0)
-		return true;
 	for (size_t k = 0; k < keptRows.size(); ++k)
 	{
 		const int32 hitIdx = keptRows[k];
@@ -2072,10 +1975,8 @@ QueryCompared CompareQueryWithSearch()
 // fills `totals` and each chapter's tookReplacement. It opens no document and closes none: an open processed
 // between two chapters' replacements throws away the undo history of the chapters already written (measured -
 // the resolve pass in ReplaceChecked). Change Checked and the query run (KFCQuerySequence) both write through it.
-// `changeAllScope` (the query run only - WriteCheckedInHeldSequence): -1 = one match at a time (Change Checked);
-// otherwise the run's Search: scope, and each story is written with Change All (ReplaceInChapterOneByOne).
 void WriteCheckedChapters(std::vector<PendingChapter>& pending, const WalkerScopeOptions& scopeOptions,
-	KFCProgressBar& progressBar, RunTotals& totals, int32 changeAllScope = -1)
+	KFCProgressBar& progressBar, RunTotals& totals)
 {
 	// How many hits the bar has behind it. The bar is sized in hits, so each chapter starts where
 	// the last one ended and moves the bar itself as it goes. progressReported is how far it has
@@ -2138,7 +2039,7 @@ void WriteCheckedChapters(std::vector<PendingChapter>& pending, const WalkerScop
 		PMString whyNot;
 		const bool wrote = ReplaceInChapterOneByOne(ci, docRef, scopeOptions,
 			&progressBar, progressBase, progressReported, replaced, missing, locked, refused, endnoteLeft,
-			unrecorded, acceptedFirst, walkFailed, runCancelled, runFailed, whyNot, nil, changeAllScope);
+			unrecorded, acceptedFirst, walkFailed, runCancelled, runFailed, whyNot);
 		totals.endnoteLeft += endnoteLeft;
 		totals.unrecorded += unrecorded;
 		totals.acceptedFirst += acceptedFirst;
@@ -2899,7 +2800,7 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	return totals.replaced;
 }
 
-bool KFCReplaceEngine::WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out, int32 changeAllScope)
+bool KFCReplaceEngine::WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out)
 {
 	out = WriteOutcome();
 	if (!KFCSearchEngine::CommitReplaceSide())
@@ -2944,7 +2845,7 @@ bool KFCReplaceEngine::WriteCheckedInHeldSequence(const PMString& barTitle, Writ
 	{
 		KFCProgressBar progressBar(barTitle, 0, totalChecked, kTrue, kTrue);
 		progressBar.DisableChildProgressBars(kTrue);
-		WriteCheckedChapters(pending, scopeOptions, progressBar, totals, changeAllScope);
+		WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
 	}
 	out.replaced = totals.replaced;
 	out.missing = totals.missing;

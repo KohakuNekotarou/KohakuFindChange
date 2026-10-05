@@ -158,16 +158,12 @@ namespace KFCReplaceEngine
 	    here, and a chapter that is not open fails the write before a character is written. States the change side
 	    (KFCSearchEngine::CommitReplaceSide), turns the session's direction for a GREP ^ query as Change Checked
 	    does, and starts a signed run of its own (KFCTrackChange::BeginSignedRun). No verify pass: the rows come
-	    from a search made a moment ago inside the same sequence.
-	    `changeAllScope` (2026-10-05, the spec's D13): -1 = one match at a time; otherwise the run's Search: scope (an
-	    IWalkerScopeFactoryUtils::WalkScopeType - kDocumentScope for a document, all documents or a book's chapter),
-	    and each story with rows is written with InDesign's Change All in that scope (ChangeAllInStory) - a match at
-	    an endnote's end too, as InDesign's own Change All writes it (the author's call: InDesign's fault, ignored).
-	    The query run's message keeps the write's endnote-left count, which then comes only from a story written
-	    one at a time (none, while every story goes through Change All). Nothing is signed while a query run writes
-	    (KFCTrackChange::QueryRunWriting): the run signs at its end (KFCTrackChange::SignRunPlaces).
+	    from a search made a moment ago inside the same sequence. Nothing is signed while a query run writes
+	    (KFCTrackChange::QueryRunWriting): the run signs at its end, a place at a time (KFCTrackChange::SignRunPlaces -
+	    the spec's D14; its D13, InDesign's Change All, was taken back on 2026-10-05: one match at a time, as Change
+	    Checked writes).
 	    @return true when it went through (not cancelled, not failed). */
-	bool WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out, int32 changeAllScope = -1);
+	bool WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out);
 
 	/** Do the current Find/Change settings still describe the search the panel's results came from?
 
