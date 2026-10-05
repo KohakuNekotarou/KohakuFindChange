@@ -38,12 +38,14 @@ namespace KFCResultModel
 	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
 	    chapter, so no query or document can pile up an unbounded result set; the search says so in its
 	    summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
-	    THE DISPLAY CAP ITSELF (the author's call). A larger ceiling over a panel that draws
-	    kKFCDisplayHitLimit (KFCModelTypes.h) lets Check All on a book or document row tick rows the panel
-	    never drew, and Change Checked replace them. Made from the display cap so the two cannot part: every
-	    row collected is a row drawn. A search with more matches stops here and says "narrow your search"; a
+	    TEN THOUSAND, OVER A PANEL THAT DRAWS kKFCDisplayHitLimit (KFCModelTypes.h) - the author's call of
+	    2026-10-05 (the spec map's GEN-34 as changed: from 10-04 to that day the two were one number): Check All
+	    on a book or document row ticks the rows the panel does not draw, and Change Checked replaces them.
+	    Not more: a replaced row's signed time is its run's millisecond plus its row number in the four digits
+	    below it (KFCTrackChange::StampForRow), and Show Changes tells runs apart by that millisecond - a run of
+	    more rows would list as two. A search with more matches stops here and says "narrow your search"; a
 	    replace writes the rows it has, and searching again finds the rest. */
-	const int32 kKFCCollectHitLimit = kKFCDisplayHitLimit;
+	const int32 kKFCCollectHitLimit = 10000;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors point back at the exact occurrence. */
@@ -558,9 +560,7 @@ namespace KFCResultModel
 
 	/** Select / deselect EVERY hit in every chapter - Check All / Uncheck All over the tree's BOOK
 	    row. Applies to all stored hits, including those past the panel's display cap - the display cap
-	    must not silently shrink what a replace touches. The rows that carry no check box are skipped.
-	    (No stored hit is past the cap today: the search stops collecting there - kKFCCollectHitLimit.
-	    The rule stays, for the cap's sake.) */
+	    must not silently shrink what a replace touches. The rows that carry no check box are skipped. */
 	void SetAllChecked(bool checked);
 
 	/** Select / deselect every hit in ONE chapter - the same two commands over a DOCUMENT row (the

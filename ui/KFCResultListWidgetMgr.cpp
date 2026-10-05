@@ -353,9 +353,9 @@ private:
 	// which a status line cannot be (one line, truncated, overwritten by the next message).
 	// "  - first N shown" when the tree is drawing fewer hit rows than it holds (kKFCDisplayHitLimit),
 	// on the OUTERMOST row only - the book row, or a document's row when there is no book - and once,
-	// because a sentence on the status line is replaced by the next click. !A GUARD NOW: the search stops
-	// collecting at the same number (kKFCCollectHitLimit, the spec map's GEN-34), so the model holds no
-	// row the tree does not draw and this does not fire; it stays for the day the two limits part.
+	// because a sentence on the status line is replaced by the next click. A list holds up to kKFCCollectHitLimit
+	// rows over a tree that draws kKFCDisplayHitLimit (again since 2026-10-05 - the spec map's GEN-34 as changed),
+	// so this fires whenever a list holds more than the tree draws.
 	static void AppendDisplayCapNote(PMString& label)
 	{
 		if (KFCResults()->GetTotalHitCount() <= KFCResultModel::kKFCDisplayHitLimit)

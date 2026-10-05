@@ -24,11 +24,12 @@
 
 namespace KFCResultModel
 {
-	/** The panel shows at most this many hit rows (book order), to keep a huge result set from flooding
-	    the panel. The search also stops COLLECTING here (kKFCCollectHitLimit is made from this - the spec
-	    map's GEN-34), so the model holds no row the panel does not draw; the cap's own
-	    machinery (the adapter's counts, the "first N shown" note) stays as the panel's guard. */
-	const int32 kKFCDisplayHitLimit = 5000;
+	/** The panel draws at most this many hit rows (book order), to keep a large result set from flooding the
+	    panel. A list holds up to kKFCCollectHitLimit (KFCResultModel.h) - more than this since 2026-10-05 (the
+	    author's call, the spec map's GEN-34 as changed): the rows past this one are held and not drawn, Check All on
+	    a book or document row ticks them too, and Change Checked writes them. The cap's own machinery (the
+	    adapter's counts, the "first N shown" note, the close responder's rebuild) keeps the panel to it. */
+	const int32 kKFCDisplayHitLimit = 1000;
 
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
 	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */

@@ -456,6 +456,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	KFCResultModel::SetFromRecords(true);
 	KFCResultModel::SetFromQueryRun(true);
 	bool listCapped = false;
+	int32 listed = 0;
 	// THE LIST ONLY WHEN IT IS ASKED FOR (the panel's toggle, the spec's D12): off, the list stays empty - the records
 	// stay in the documents, and Show Changes by KohakuFindChange lists them whenever they are wanted.
 	if (listResults)
@@ -465,7 +466,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 			for (size_t k = 0; k < touched.size(); ++k)
 				if (SameDoc(touched[k], targets[i].docRef))
 					written.push_back(targets[i]);
-		KFCShowChanges::ListOwnRun(written, floor, listCapped);
+		listed = KFCShowChanges::ListOwnRun(written, floor, listCapped);
 	}
 	KFCTrackChange::ClearRunNotes();		// read by ListOwnRun only - they end with the list
 	recorder.Keep();
@@ -522,11 +523,19 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	}
 	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
+	// THE LIST'S TWO CAPS (2026-10-05, the spec's E7 as changed): stopped by the ceiling (kKFCCollectHitLimit) - said of
+	// the LIST, since the run itself went through - and drawn to the panel's display cap (kKFCDisplayHitLimit).
 	if (listCapped)
 	{
-		outSummary.Append(" Showing the first ");
+		outSummary.Append(" The list stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-		outSummary.Append(" rows.");
+		outSummary.Append(" safety limit.");
+	}
+	if (listed > KFCResultModel::kKFCDisplayHitLimit)
+	{
+		outSummary.Append(" Showing first ");
+		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
+		outSummary.Append(" in the panel.");
 	}
 	if (!listResults && replaced > 0)
 		outSummary.Append(" The changes were not listed - Show Changes by KohakuFindChange lists them.");

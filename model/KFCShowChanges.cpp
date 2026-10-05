@@ -521,13 +521,19 @@ int32 KFCShowChanges::Run(PMString& outSummary)
 	outSummary.Append(" change(s) by KohakuFindChange in ");
 	outSummary.AppendNumber(runCount);
 	outSummary.Append(" run(s) - right-click a row to reject or accept them. To replace again, search again.");
-	// One cap: the ceiling is the panel's display cap (kKFCCollectHitLimit), so a list that stops there has
-	// every row it holds on the panel - no second "showing the first N" note.
+	// Two caps since 2026-10-05 (the spec map's GEN-34 as changed), as the search says them: the ceiling
+	// (kKFCCollectHitLimit) stopped the reading, and the panel draws the first kKFCDisplayHitLimit of what it holds.
 	if (capped)
 	{
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
 		outSummary.Append(" safety limit.");
+	}
+	if (total > KFCResultModel::kKFCDisplayHitLimit)
+	{
+		outSummary.Append(" Showing first ");
+		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
+		outSummary.Append(" in the panel.");
 	}
 	outSummary.Append(chapterNotes);
 	return total;

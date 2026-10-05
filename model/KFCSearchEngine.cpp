@@ -3152,13 +3152,24 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
-	// One cap: the whole-search safety ceiling IS the panel's display cap (kKFCCollectHitLimit, KFCResultModel.h),
-	// so a search that stops there has every row it holds on the panel - "narrow it" is the one note.
+	// Two caps since 2026-10-05 (the spec map's GEN-34 as changed - from 10-04 to that day they were one), and both
+	// can bite:
+	//   * collectionTruncated: the whole-search safety ceiling (kKFCCollectHitLimit, KFCResultModel.h) stopped the
+	//     collection, so the RESULT SET itself is capped - the strong "narrow it" note.
+	//   * total > the display cap (kKFCDisplayHitLimit): every row is held, the panel draws the first ones - and Check
+	//     All on a book or document row reaches the rest too, which is what a replace then writes; said, since
+	//     nothing on screen shows the rows it ticks.
 	if (collectionTruncated)
 	{
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
 		outSummary.Append(" safety limit - narrow your search.");
+	}
+	if (total > KFCResultModel::kKFCDisplayHitLimit)
+	{
+		outSummary.Append(" Showing first ");
+		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
+		outSummary.Append(" in the panel. Check All on a book or document row ticks the rows not shown too.");
 	}
 
 	outSummary.Append(chapterNotes);
