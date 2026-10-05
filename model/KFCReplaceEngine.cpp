@@ -117,6 +117,12 @@ IFindChangeService::FindChangeResult RunWalkerCmd(const ClassID& cmdBoss, ITextW
 	outStory = UIDRef();
 	outStart = kInvalidTextIndex;
 	outEnd = kInvalidTextIndex;
+#ifdef KFC_DIAG
+	// (Fault switch perf-direct-walk, a test build's only - KFCDiag.h: the speed-up's S2, the replace's finds - the
+	// verify walk's and the write walk's - without kFindTextCmdBoss: KFCSearchEngine::DirectFindForTest.)
+	if (cmdBoss == kFindTextCmdBoss && KFC_DIAG_FAULT("perf-direct-walk"))
+		return KFCSearchEngine::DirectFindForTest(walker, outStory, outStart, outEnd);
+#endif
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
@@ -648,18 +654,19 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	bool& outSignFailed)
 {
 	IDataBase* const db = storyRef.GetDataBase();
-	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
-	InterfacePtr<IK2ServiceProvider> provider(registry != nil
-		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
-	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
+	// The walker, and the shared walker's selection utilities the critical section is taken on
+	// (KFCSearchEngine::AcquireWalker - the session's shared walker, or a test build's own one: S1).
+	InterfacePtr<ITextWalker> walker;
+	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
+	bool ownWalker = false;
+	const bool haveWalker = KFCSearchEngine::AcquireWalker(walker, selUtils, ownWalker);
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
 	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
-	if (db == nil || walker == nil || scope == nil || client == nil)
+	if (db == nil || !haveWalker || walker == nil || scope == nil || client == nil)
 		return false;
 	if (walker->IsWalking())
 		walker->Halt();
 	walker->Initialize(client, scope, opts, nil);
-	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	if (selUtils == nil)
 	{
 		if (walker->IsWalking())
@@ -1398,11 +1405,12 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 		return false;
 
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
-	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
-	InterfacePtr<IK2ServiceProvider> provider(registry != nil
-		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
-	InterfacePtr<ITextWalker> walker(provider, UseDefaultIID());
-	if (opts == nil || walker == nil)
+	// The walker, and the shared walker's selection utilities the critical section is taken on
+	// (KFCSearchEngine::AcquireWalker - the session's shared walker, or a test build's own one: S1).
+	InterfacePtr<ITextWalker> walker;
+	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
+	bool ownWalker = false;
+	if (opts == nil || !KFCSearchEngine::AcquireWalker(walker, selUtils, ownWalker) || walker == nil)
 		return false;
 
 	for (std::map<UID, std::map<std::pair<TextIndex, TextIndex>, int32> >::iterator s = waiting.begin(); s != waiting.end(); ++s)
@@ -1422,7 +1430,6 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 		// The shape is Adobe's (SpellPreviousObserver.cpp:200-201: ask IsWalking, then Halt). The refusal in
 		// the walk below is the likeliest exit of all: editing the document between the search and the
 		// replace is the ordinary way a run ends here.
-		InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 		if (selUtils == nil)
 		{
 			if (walker->IsWalking())

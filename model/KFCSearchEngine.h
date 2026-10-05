@@ -21,15 +21,21 @@
 #ifndef __KFCSearchEngine_h__
 #define __KFCSearchEngine_h__
 
+#include "InterfacePtr.h"
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "KFCResultModel.h"		// Hit - CollectStoryHits fills them
 #include "KFCBookScope.h"		// ChapterDoc - a query run's held targets (SearchHeldTargets)
+#ifdef KFC_DIAG
+#include "IFindChangeService.h"	// FindChangeResult - DirectFindForTest (a test build's only)
+#endif
 
 #include <vector>
 
 class KFCProgressBar;		// the run's bar (KFCProgressBar.h) - a RangeProgressBar the UI half holds
+class ITextWalker;			// AcquireWalker
+class ITextWalkerSelectionUtils;
 
 /** Move the run's progress bar to an absolute position. ioReported is the position already sent, so
     that advances too small to be worth a repaint can be swallowed (see the .cpp); pass force = true
@@ -494,6 +500,29 @@ namespace KFCSearchEngine
 	    same number is what tells KFCUndoFollow a write was undone or redone.
 	    False when the story cannot be read (no database, a UID that is not valid, no text model). */
 	bool ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion);
+
+	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's (2026-10-05, the speed-up's S1:
+	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3). outWalker = the walker to
+	    Initialize and drive: the session's shared one (kTextWalkerServiceProviderBoss - Edit > Find/Change and the
+	    spelling panel walk it and watch its ISubject), or, in a test build with the fault switch perf-own-walker on
+	    (KFCDiag.h), a kBasicTextWalkerBoss of KFC's own, which carries IID_ITEXTWALKER alone. outSelUtils = what the
+	    walk's critical section is taken on: always the SHARED walker's - InDesign's own spelling Change All takes the
+	    same shape (spellpanel SpellChangeAllObserver.cpp:257 walks a kBasicTextWalkerBoss, :318-319 takes the section on
+	    the shared walker). outOwn = outWalker is KFC's own. False = no walker at all; outSelUtils can still be nil -
+	    each caller keeps its own gate on it. */
+	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils,
+		bool& outOwn);
+
+#ifdef KFC_DIAG
+	/** THE SPEED-UP'S S2, A TEST BUILD'S ONLY (fault switch perf-direct-walk): the find without kFindTextCmdBoss -
+	    ITextWalker::Walk until the find/change client suspends the walk on a match, the match read off the walker's
+	    client selection (ITextWalker.h: GetClientSelection; ITextFocus::QueryModel is AddRef'd). Answers as the
+	    find command does - kSuccess with the range, kNotFound when the walk is over, kFailure. A step that lands
+	    where the last one did is logged ("DIRECTWALK stuck") and answered kFailure, so a test cannot hang InDesign -
+	    never a product shape: the advance is the walker's alone (2026-08-05). */
+	IFindChangeService::FindChangeResult DirectFindForTest(ITextWalker* walker, UIDRef& outStory, TextIndex& outStart,
+		TextIndex& outEnd);
+#endif
 
 	/** Let go of the module's static storage during InDesign's controlled shutdown, so every static
 	    destructor at DLL unload finds nothing left to do.
