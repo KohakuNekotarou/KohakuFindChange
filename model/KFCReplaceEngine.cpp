@@ -2656,7 +2656,18 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// before the sequence, so neither the Undo step nor an abort carries the switch - and put back when
 	// this function returns, after the sequence has ended. A switch that fails clears its own error.
 	const KFCBackwardSearchScope writeDirection(WriteBackward());
-	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
+	IAbortableCmdSeq* seq = nil;
+	// (Fault switch perf-plain-seq, a test build's only - KFCDiag.h: a REGULAR sequence instead, to measure what the
+	// abortable one costs the walk - ICommandSequence.h: abortable sequences "incur a heavy performance overhead".
+	// Its cancel rolls back through the error state, which the note above measured NOT to carry across a book's
+	// documents: one throwaway document only.)
+	ICommandSequence* plainSeqForTest = nil;
+#ifdef KFC_DIAG
+	if (KFC_DIAG_FAULT("perf-plain-seq"))
+		plainSeqForTest = CmdUtils::BeginCommandSequence("KFC Replace (test: plain sequence)");
+	else
+#endif
+		seq = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
 
 	// NO SEQUENCE, NO RUN. BeginAbortableCmdSeq answers nil on error (CmdUtils.h:135),
 	// and everything this function promises rests on the sequence it hands back: one Ctrl+Z for the
@@ -2664,7 +2675,7 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// as loose commands - undoable one at a time at best - and, worse, a CANCEL would find no
 	// sequence to abort while still reporting "nothing was changed" over a book that had been
 	// rewritten. Refusing before a character is written is the only honest answer.
-	if (seq == nil)
+	if (seq == nil && plainSeqForTest == nil)
 	{
 		// Nothing was written, so there is nothing to roll back and nothing to keep: drop the row
 		// backup, and hand back every chapter the resolve pass opened - none of them took a
@@ -2682,7 +2693,10 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	// Edit > Undo read "Undo Set User Name" - measured, case undo-then-reject).
 	// (The string passed to BeginAbortableCmdSeq is TRACKING DATA, not that name - CmdUtils.h:134 - so
 	// it names this caller in a lost-sequence report and nowhere else.)
-	seq->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+	if (seq != nil)
+		seq->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+	else
+		plainSeqForTest->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	KFCTrackChange::BeginSignedRun();	// the run's time - every row of every chapter is stamped from it
 
 	{
@@ -2730,7 +2744,15 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 			if (pending[pi].tookReplacement)
 				KFCUndoFollow::MarkWrite(pending[pi].docRef.GetDataBase());
 
-	if (totals.cancelled)
+	if (plainSeqForTest != nil)
+	{
+		// (the test build's plain sequence - see where it began: a cancel rolls back through the error state)
+		if (totals.cancelled)
+			ErrorUtils::PMSetGlobalErrorCode(kCancel);
+		CmdUtils::EndCommandSequence(plainSeqForTest);
+		plainSeqForTest = nil;
+	}
+	else if (totals.cancelled)
 		CmdUtils::AbortCommandSequence(seq);
 	else
 		CmdUtils::EndCommandSequence(seq);

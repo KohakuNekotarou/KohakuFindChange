@@ -46,6 +46,10 @@
 //                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
 //                scope (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
 //                walk?). Throwaway documents only.
+//    perf-plain-seq  Change Checked writes inside a REGULAR command sequence instead of the abortable one
+//                (KFCReplaceEngine.cpp - ICommandSequence.h: abortable sequences "incur a heavy performance overhead").
+//                A cancel then rolls back through the error state, which does not carry across a book's documents
+//                (measured, the note at the sequence): one throwaway document only.
 //    perf-commands  every command InDesign processes is counted, by class, over a search, a Change Checked and a query
 //                run (KFCDiagCommands.h - "COMMANDS" lines, and cmds= on WALKSTEP). The count itself costs time:
 //                not on a timing run.
