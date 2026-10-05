@@ -96,6 +96,86 @@ PMString RunLabel(uint64 t0)
 	return label;
 }
 
+// A row's text before the run (ListOwnRun): the run's note for it when an earlier query had written into what it
+// replaced (KFCTrackChange::RunOriginalOf), otherwise its deletion's text.
+PMString RunOriginalOfRow(const UIDRef& story, const KFCTrackChange::SignedRow& row)
+{
+	PMString noted;
+	if (KFCTrackChange::RunOriginalOf(story, row.time, noted))
+		return noted;
+	PMString deleted(row.hasDelete ? row.deletedText : PMString());
+	deleted.SetTranslatable(kFalse);
+	return deleted;
+}
+
+bool RowBefore(const KFCTrackChange::SignedRow& a, const KFCTrackChange::SignedRow& b)
+{
+	return (a.at != b.at) ? (a.at < b.at) : (a.time < b.time);
+}
+
+// A QUERY RUN'S ROWS AT ONE PLACE, DRAWN AS ONE (ListOwnRun - the spec's section 4: "the same place written by two
+// queries is one row"). Measured 2026-10-05 on the regression case qs-chain (" - " -> " - " with an en dash, then the
+// en dash -> an em dash): the records came out as TWO rows - the first query's pieces either side of the gap the
+// second wrote into, and the second's deletion holding the first one's en dash. Rows that overlap or touch, from two
+// runs or more, become one: the range they cover, the text standing there now, and their texts before the run joined
+// in place order (RunOriginalOfRow - what the first query's dash was is in no record). Rows of one run alone - a
+// touching group of one query - stay as Show Changes draws them. The rows' times stay apart in the records, so the
+// merged row takes the earliest; a query run's list takes nothing back by row (KFCResultModel::IsFromQueryRun).
+void MergeRunRows(const UIDRef& story, std::vector<KFCTrackChange::SignedRow>& ioRows)
+{
+	std::vector<KFCTrackChange::SignedRow> rows(ioRows);
+	std::sort(rows.begin(), rows.end(), RowBefore);
+	ioRows.clear();
+	size_t i = 0;
+	while (i < rows.size())
+	{
+		TextIndex end = rows[i].at + rows[i].spanLen;
+		bool twoRuns = false;
+		size_t j = i + 1;
+		for (; j < rows.size() && rows[j].at <= end; ++j)
+		{
+			if (rows[j].at + rows[j].spanLen > end)
+				end = rows[j].at + rows[j].spanLen;
+			if (RunStartOf(rows[j].time) != RunStartOf(rows[i].time))
+				twoRuns = true;
+		}
+		if (!twoRuns)
+		{
+			for (size_t k = i; k < j; ++k)
+			{
+				KFCTrackChange::SignedRow row = rows[k];
+				PMString noted;
+				if (KFCTrackChange::RunOriginalOf(story, row.time, noted))
+				{
+					row.deletedText = noted;
+					row.hasDelete = true;
+				}
+				ioRows.push_back(row);
+			}
+			i = j;
+			continue;
+		}
+		KFCTrackChange::SignedRow merged;
+		merged.time = rows[i].time;
+		merged.at = rows[i].at;
+		merged.spanLen = end - rows[i].at;
+		merged.insLen = merged.spanLen;
+		merged.insertedText = KFCTrackChange::ReadText(story, merged.at, merged.spanLen);
+		merged.insertedText.SetTranslatable(kFalse);
+		merged.deletedText.SetTranslatable(kFalse);
+		for (size_t k = i; k < j; ++k)
+		{
+			if (rows[k].time < merged.time)
+				merged.time = rows[k].time;
+			merged.deletedText.Append(RunOriginalOfRow(story, rows[k]));
+		}
+		merged.hasDelete = !merged.deletedText.empty();
+		merged.delAt = merged.at + merged.spanLen;
+		ioRows.push_back(merged);
+		i = j;
+	}
+}
+
 // Read one open document's signed rows into outHits (in story order, each story's in position order),
 // and each story's version where it was read. A row replaced with nothing is the zero-width row at its
 // deletion. Stops at maxHits (outCapped). False = the document could not be read at all.
@@ -130,6 +210,16 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, uint64 floor, std::v
 		const UIDRef story = storyList->GetNthTextModelUID(i);
 		std::vector<KFCTrackChange::SignedRow> rows;
 		KFCTrackChange::CollectSignedRows(story, rows);
+		if (floor != 0)
+		{
+			// A query run's list (ListOwnRun): its own rows only, and those at one place drawn as one.
+			std::vector<KFCTrackChange::SignedRow> own;
+			for (size_t k = 0; k < rows.size(); ++k)
+				if (rows[k].time >= floor)
+					own.push_back(rows[k]);
+			MergeRunRows(story, own);
+			rows.swap(own);
+		}
 		if (rows.empty())
 			continue;
 

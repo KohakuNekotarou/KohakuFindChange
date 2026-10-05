@@ -363,6 +363,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	if (cancelled || failed)
 	{
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		KFCTrackChange::ClearRunNotes();		// the rows they named were taken back
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
 			if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))
@@ -422,6 +423,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 					written.push_back(targets[i]);
 		KFCShowChanges::ListOwnRun(written, floor, listCapped);
 	}
+	KFCTrackChange::ClearRunNotes();		// read by ListOwnRun only - they end with the list
 	recorder.Keep();
 
 	// ===== THE MESSAGE (the spec's section 4).

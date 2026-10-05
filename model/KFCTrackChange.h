@@ -189,7 +189,7 @@ namespace KFCTrackChange
 	int32 AcceptPendingAround(const UIDRef& story, TextIndex from, TextIndex to, PMString& outWhy);
 
 	/** A QUERY RUN KEEPS ITS OWN CHANGES PENDING (2026-10-04 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md
-	    §3). While a floor is set, AcceptPendingAround passes over every record signed "KohakuFindChange" whose time is at
+	    section 3). While a floor is set, AcceptPendingAround passes over every record signed "KohakuFindChange" whose time is at
 	    or after it: a later query that writes over an earlier query's replacement leaves that one pending, so the records
 	    read "the text before the run -> the text after it". Everybody else's pending changes are accepted as before.
 	    OwnRunFloorNow = the clock cut to the millisecond, in the stamps' units - at or before every T0 BeginSignedRun hands
@@ -197,6 +197,20 @@ namespace KFCTrackChange
 	uint64 OwnRunFloorNow();
 	void SetOwnRunFloor(uint64 floor);
 	void ClearOwnRunFloor();
+
+	/** A QUERY RUN'S CHAINED WRITE (2026-10-05 - measured on the regression case qs-chain): a later query that
+	    replaces text an earlier query of the same run wrote leaves a DELETION holding that text - InDesign records
+	    the deletion of another author's insertion, and the earlier one is signed "KohakuFindChange" by then
+	    (deleting one's own pending insertion records nothing - measured the same day). So that deletion's text is
+	    not what stood there before the run. RunOriginalPart, asked before a row of the run is written: false when
+	    no floor is set or no insertion of the run stands in [from, to); true = outOriginal holds the range's text
+	    without the run's own insertions. NoteRunOriginal keeps it by the row's time once the row is signed;
+	    RunOriginalOf hands it back (KFCShowChanges::ListOwnRun). SetOwnRunFloor starts the notes afresh and
+	    ClearRunNotes ends them - after the list is built, not with the floor. */
+	bool RunOriginalPart(const UIDRef& story, TextIndex from, TextIndex to, PMString& outOriginal);
+	void NoteRunOriginal(const UIDRef& story, uint64 stamp, const PMString& original);
+	bool RunOriginalOf(const UIDRef& story, uint64 stamp, PMString& outOriginal);
+	void ClearRunNotes();
 
 
 	/** Every record of the story carrying one of `times`, in position order - a deletion with its

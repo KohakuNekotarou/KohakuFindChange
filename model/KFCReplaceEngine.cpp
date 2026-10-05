@@ -695,6 +695,11 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			{
 				// The row's text as it stands the moment before it is written (Hit::originalText).
 				const PMString original = KFCTrackChange::ReadText(story, start, end - start);
+				// A QUERY RUN'S CHAINED WRITE (2026-10-05): the part of it an earlier query of the run did not write,
+				// kept by the row's time once it is signed - its deletion will hold both (KFCTrackChange.h,
+				// RunOriginalPart). Nothing outside a query run: no floor, no note.
+				PMString runOriginal;
+				const bool chained = KFCTrackChange::RunOriginalPart(story, start, end, runOriginal);
 				UIDRef written;
 				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
 				// (Fault switch replace-refuse, a test build's only - KFCDiag.h: InDesign's replace refuses every row,
@@ -728,6 +733,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 						recorded ? static_cast<int32>(firstRecord - writtenStart) : 0);
 					if (!recorded)
 						++ioUnrecorded;
+					else if (chained)
+						KFCTrackChange::NoteRunOriginal(written, stamp, runOriginal);
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;

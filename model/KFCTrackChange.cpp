@@ -101,6 +101,24 @@ bool IsSignAuthor(const PMString& who)
 // after it pending.
 uint64 gOwnRunFloor = 0;
 
+// A query run's chained writes (KFCTrackChange::NoteRunOriginal): a row's text before the run, by the row's place -
+// its document, its story and its time. Only the rows that wrote over the run's own insertions are here.
+struct RunNoteKey
+{
+	IDataBase*	db;
+	UID			story;
+	uint64		stamp;
+	bool operator<(const RunNoteKey& o) const
+	{
+		if (db != o.db)
+			return db < o.db;
+		if (story != o.story)
+			return story < o.story;
+		return stamp < o.stamp;
+	}
+};
+std::map<RunNoteKey, PMString> gRunNotes;
+
 // A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES. ITrackChangeUtils::GetDeletedText reads the
 // deleted-text thread anchored at the deletion - the same text DescribeChangeContent gave for a tab, a
 // return and a footnote reference (measured, KTRedlineProbe deltext: 2 of 2 alike), which stays as the
@@ -919,11 +937,84 @@ uint64 KFCTrackChange::OwnRunFloorNow()
 void KFCTrackChange::SetOwnRunFloor(uint64 floor)
 {
 	gOwnRunFloor = floor;
+	gRunNotes.clear();		// a new run's notes start empty
 }
 
 void KFCTrackChange::ClearOwnRunFloor()
 {
 	gOwnRunFloor = 0;
+}
+
+bool KFCTrackChange::RunOriginalPart(const UIDRef& story, TextIndex from, TextIndex to, PMString& outOriginal)
+{
+	outOriginal.Clear();
+	outOriginal.SetTranslatable(kFalse);
+	if (gOwnRunFloor == 0 || to <= from)
+		return false;
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	if (redline == nil || !redline->StoryHasChanges())
+		return false;
+	// The run's own insertions in [from, to), as ranges - the window AcceptPendingAround walks (one before).
+	std::vector<std::pair<TextIndex, TextIndex> > own;
+	RedlineIterator* it = redline->NewRedlineIterator((from > 0) ? from - 1 : 0);
+	if (it == nil)
+		return false;
+	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+	{
+		TextIndex at = 0;
+		int32 len = 0;
+		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+		if (record == nil)
+			continue;
+		const bool ownInsert = (record->GetChangeType() == VOSRedlineChange::kInsert) && len > 0
+			&& IsSignAuthor(record->GetUserName()) && record->GetTimeStamp() >= gOwnRunFloor;
+		delete record;		// the caller owns it (redlineiterator.h:137-138)
+		if (!ownInsert)
+			continue;
+		const TextIndex s = (at > from) ? at : from;
+		const TextIndex e = (at + len < to) ? at + len : to;
+		if (s < e)
+			own.push_back(std::make_pair(s, e));
+	}
+	delete it;
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	if (own.empty())
+		return false;
+	// The text between them, in order.
+	std::sort(own.begin(), own.end());
+	TextIndex at = from;
+	for (size_t k = 0; k < own.size(); ++k)
+	{
+		if (own[k].first > at)
+			outOriginal.Append(ReadText(story, at, own[k].first - at));
+		if (own[k].second > at)
+			at = own[k].second;
+	}
+	if (at < to)
+		outOriginal.Append(ReadText(story, at, to - at));
+	return true;
+}
+
+void KFCTrackChange::NoteRunOriginal(const UIDRef& story, uint64 stamp, const PMString& original)
+{
+	RunNoteKey key = { story.GetDataBase(), story.GetUID(), stamp };
+	gRunNotes[key] = original;
+}
+
+bool KFCTrackChange::RunOriginalOf(const UIDRef& story, uint64 stamp, PMString& outOriginal)
+{
+	RunNoteKey key = { story.GetDataBase(), story.GetUID(), stamp };
+	std::map<RunNoteKey, PMString>::const_iterator found = gRunNotes.find(key);
+	if (found == gRunNotes.end())
+		return false;
+	outOriginal = found->second;
+	outOriginal.SetTranslatable(kFalse);
+	return true;
+}
+
+void KFCTrackChange::ClearRunNotes()
+{
+	gRunNotes.clear();
 }
 
 uint64 KFCTrackChange::StampForRow(int32 chapterIdx, int32 hitIdx)
