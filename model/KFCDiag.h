@@ -67,6 +67,10 @@
 //                Throwaway documents only.
 //    perf-progress-step  the file holds "<n>": KFCAdvanceProgress moves a bar every n rows instead of every
 //                kKFCProgressReportStep (the S3).
+//    no-accept-around  the replace leaves the pending changes around the ticked matches as they are (no
+//                AcceptPendingAround), so InDesign joins and rewrites them - the partial-reject experiment (2026-10-06:
+//                can a joined record's KFC part alone be taken back? KT's app.ktProbe "redline ... rejectrange").
+//                Throwaway documents only.
 //
 //  AND TIMERS (2026-10-05): KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

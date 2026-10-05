@@ -1145,7 +1145,14 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	// ! Each row's place is asked NOW, from its thread offset (RowStartNow): an accepted deletion's
 	//   deleted-text thread goes, which moves the story indexes of the cells and footnotes behind it.
 	KFC_CLOCK(cAccept);
-	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
+	bool acceptAround = true;
+#ifdef KFC_DIAG
+	// (Fault switch no-accept-around, a test build's only - KFCDiag.h: the pending changes around the ticked matches are
+	// left as they are, so InDesign joins and rewrites them as it does for its own Change - the partial-reject experiment
+	// of 2026-10-06. Throwaway documents only.)
+	acceptAround = !KFC_DIAG_FAULT("no-accept-around");
+#endif
+	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); acceptAround && s != pendingByStory.end(); ++s)
 	{
 		const UIDRef storyRef(db, s->first);
 		if (!KFCTrackChange::StoryHasChanges(storyRef))
