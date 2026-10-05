@@ -36,6 +36,7 @@
 #include "KFCDiag.h"
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
+#include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -235,6 +236,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	std::vector<PMString> skippedNoFile, skippedNothing;
 	std::vector<UIDRef> touched;
 	int32 replaced = 0, unrecorded = 0, locked = 0;
+	int32 missing = 0, refused = 0, endnoteLeft = 0, acceptedFirst = 0;		// the write's other counts, said as Change Checked says them
 	bool cancelled = false, failed = false;
 	PMString why;
 	why.SetTranslatable(kFalse);
@@ -249,95 +251,122 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	}
 	seq->SetName(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep));
 
-	for (size_t q = 0; q < queries.size() && !cancelled && !failed; ++q)
+	// ONE BAR FOR THE WHOLE RUN (2026-10-05, the deferred minor of the re-check): the search and the write put up a bar
+	// of their own for every query x chapter - a window opened and closed each time. This one stands for the run, a
+	// query x chapter a step, and theirs subdivide its current step instead (ProgressBar.h: a progress bar further
+	// down the stack subdivides the one above unless that one called DisableChildProgressBars) - one window stays up.
+	// Its Cancel is asked between steps too. It comes down before the sequence ends: chapters are handed back and
+	// the list is built with no bar up, as Change Checked does.
 	{
-		const QueryItem& query = queries[q];
-		if (!FileUtils::DoesFileExist(query.file))
+		const int32 units = static_cast<int32>(queries.size() * targets.size());
+		KFCProgressBar runBar(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep), 0, units, kTrue, kTrue);
+		int32 unit = 0;
+		for (size_t q = 0; q < queries.size() && !cancelled && !failed; ++q)
 		{
-			skippedNoFile.push_back(query.name);
-			continue;
-		}
-		if (!LoadQuery(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
-			|| !KFCSearchEngine::HasFindQueryNow())
-		{
-			skippedNothing.push_back(query.name);
-			continue;
-		}
-		if (!KFCSearchEngine::CommitSearchMode())
-		{
-			failed = true;
-			why = "the Find/Change tab could not be set for ";
-			why.Append(query.name);
-			break;
-		}
-		perQuery[q] = 0;
-		// ONE CHAPTER (DOCUMENT) AT A TIME (the spec's D8, 2026-10-05): searched and written before the next, so the
-		// collect limit (kKFCCollectHitLimit) counts a chapter, not the book - a book of ten thousand matches goes
-		// through. Every chapter is already open and held: nothing is opened or closed between the writes.
-		for (size_t d = 0; d < targets.size() && !cancelled && !failed; ++d)
-		{
-			PMString title("Query ");
-			title.SetTranslatable(kFalse);
-			title.AppendNumber(static_cast<int32>(q + 1));
-			title.Append(" of ");
-			title.AppendNumber(static_cast<int32>(queries.size()));
-			title.Append(": ");
-			title.Append(query.name);
-			if (targets.size() > 1)
+			const QueryItem& query = queries[q];
+			if (!FileUtils::DoesFileExist(query.file))
 			{
-				title.Append(" - ");
-				title.Append(targets[d].shortName);
-			}
-			std::vector<KFCBookScope::ChapterDoc> one(1, targets[d]);
-
-			KFCResultModel::Clear();
-			KFCSearchEngine::ForgetSearchedFindFormat();
-			KFCSearchEngine::HeldSearchOutcome found;
-			KFCSearchEngine::SearchHeldTargets(one, scope, bookName, title, found);
-			if (found.cancelled)
-			{
-				cancelled = true;
-				break;
-			}
-			if (found.capped)
-			{
-				failed = true;
-				why = "\"";
-				why.Append(query.name);
-				why.Append("\" found more than ");
-				why.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-				why.Append(" matches in ");
-				why.Append(targets[d].shortName);
-				why.Append(" - narrow the query");
-				break;
-			}
-			if (found.total == 0)
+				skippedNoFile.push_back(query.name);
+				unit += static_cast<int32>(targets.size());
+				runBar.SetPosition(unit);
 				continue;
-			KFCResultModel::SetAllChecked(true);		// (a row with no box - a locked one - is skipped: SetAllChecked)
-			locked += found.total - KFCResultModel::GetCheckedCount();
-			KFCReplaceEngine::WriteOutcome wrote;
-			KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote);
-			if (wrote.cancelled)
-			{
-				cancelled = true;
-				break;
 			}
-			if (wrote.failed)
+			if (!LoadQuery(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
+				|| !KFCSearchEngine::HasFindQueryNow())
+			{
+				skippedNothing.push_back(query.name);
+				unit += static_cast<int32>(targets.size());
+				runBar.SetPosition(unit);
+				continue;
+			}
+			if (!KFCSearchEngine::CommitSearchMode())
 			{
 				failed = true;
-				why = wrote.why;
+				why = "the Find/Change tab could not be set for ";
+				why.Append(query.name);
 				break;
 			}
-			perQuery[q] += wrote.replaced;
-			replaced += wrote.replaced;
-			unrecorded += wrote.unrecorded;
-			for (size_t t = 0; t < wrote.touchedDocs.size(); ++t)
+			perQuery[q] = 0;
+			// ONE CHAPTER (DOCUMENT) AT A TIME (the spec's D8, 2026-10-05): searched and written before the next, so the
+			// collect limit (kKFCCollectHitLimit) counts a chapter, not the book - a book of ten thousand matches goes
+			// through. Every chapter is already open and held: nothing is opened or closed between the writes.
+			for (size_t d = 0; d < targets.size() && !cancelled && !failed; ++d)
 			{
-				bool known = false;
-				for (size_t k = 0; k < touched.size() && !known; ++k)
-					known = SameDoc(touched[k], wrote.touchedDocs[t]);
-				if (!known)
-					touched.push_back(wrote.touchedDocs[t]);
+				PMString title("Query ");
+				title.SetTranslatable(kFalse);
+				title.AppendNumber(static_cast<int32>(q + 1));
+				title.Append(" of ");
+				title.AppendNumber(static_cast<int32>(queries.size()));
+				title.Append(": ");
+				title.Append(query.name);
+				if (targets.size() > 1)
+				{
+					title.Append(" - ");
+					title.Append(targets[d].shortName);
+				}
+				std::vector<KFCBookScope::ChapterDoc> one(1, targets[d]);
+				runBar.SetPosition(unit++);
+				runBar.SetTaskText(title);
+				if (runBar.WasCancelled(kFalse))
+				{
+					cancelled = true;
+					break;
+				}
+
+				KFCResultModel::Clear();
+				KFCSearchEngine::ForgetSearchedFindFormat();
+				KFCSearchEngine::HeldSearchOutcome found;
+				KFCSearchEngine::SearchHeldTargets(one, scope, bookName, title, found);
+				if (found.cancelled)
+				{
+					cancelled = true;
+					break;
+				}
+				if (found.capped)
+				{
+					failed = true;
+					why = "\"";
+					why.Append(query.name);
+					why.Append("\" found more than ");
+					why.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
+					why.Append(" matches in ");
+					why.Append(targets[d].shortName);
+					why.Append(" - narrow the query");
+					break;
+				}
+				if (found.total == 0)
+					continue;
+				KFCResultModel::SetAllChecked(true);		// (a row with no box - a locked one - is skipped: SetAllChecked)
+				locked += found.total - KFCResultModel::GetCheckedCount();
+				KFCReplaceEngine::WriteOutcome wrote;
+				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote);
+				if (wrote.cancelled)
+				{
+					cancelled = true;
+					break;
+				}
+				if (wrote.failed)
+				{
+					failed = true;
+					why = wrote.why;
+					break;
+				}
+				perQuery[q] += wrote.replaced;
+				replaced += wrote.replaced;
+				unrecorded += wrote.unrecorded;
+				missing += wrote.missing;
+				refused += wrote.refused;
+				endnoteLeft += wrote.endnoteLeft;
+				acceptedFirst += wrote.acceptedFirst;
+				locked += wrote.locked;		// a ticked row the write found locked (the rows with no box are counted above)
+				for (size_t t = 0; t < wrote.touchedDocs.size(); ++t)
+				{
+					bool known = false;
+					for (size_t k = 0; k < touched.size() && !known; ++k)
+						known = SameDoc(touched[k], wrote.touchedDocs[t]);
+					if (!known)
+						touched.push_back(wrote.touchedDocs[t]);
+				}
 			}
 		}
 	}
@@ -448,6 +477,33 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 		outSummary.Append(" ");
 		outSummary.AppendNumber(locked);
 		outSummary.Append(" locked matches were not replaced.");
+	}
+	// THE REST OF WHAT THE WRITE COUNTED (2026-10-05 re-check): a query's total that comes up short says why, in
+	// Change Checked's own sentences (KFCReplaceEngine.cpp, the summary) - and the pending changes of somebody
+	// else's accepted before a write are said too, since they leave the Track Changes panel.
+	if (missing > 0)
+	{
+		outSummary.Append(" ! ");
+		outSummary.AppendNumber(missing);
+		outSummary.Append(" hit(s) missing - not found when the chapter was searched again.");
+	}
+	if (endnoteLeft > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(endnoteLeft);
+		outSummary.Append(" hit(s) in endnotes not replaced - a match ends an endnote, and InDesign's replace breaks an endnote there.");
+	}
+	if (refused > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(refused);
+		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
+	}
+	if (acceptedFirst > 0)
+	{
+		outSummary.Append(" ");
+		outSummary.AppendNumber(acceptedFirst);
+		outSummary.Append(" pending tracked change(s) accepted first.");
 	}
 	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);

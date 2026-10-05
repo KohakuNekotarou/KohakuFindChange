@@ -27,6 +27,7 @@
 
 #include <algorithm>				// std::sort - the runs, newest first
 #include <map>
+#include <set>						// MergeRunRows - the merged rows' times
 #include <utility>					// std::move - a finished chapter is handed to the model
 #include <vector>
 
@@ -96,16 +97,18 @@ PMString RunLabel(uint64 t0)
 	return label;
 }
 
-// A row's text before the run (ListOwnRun): the run's note for it when an earlier query had written into what it
-// replaced (KFCTrackChange::RunOriginalOf), otherwise its deletion's text.
+// A row's deleted text with the run's own characters taken out (ListOwnRun): masked where a write of the run put
+// characters an earlier query had written into it (KFCTrackChange::RunMaskedText), otherwise as it stands.
 PMString RunOriginalOfRow(const UIDRef& story, const KFCTrackChange::SignedRow& row)
 {
-	PMString noted;
-	if (KFCTrackChange::RunOriginalOf(story, row.time, noted))
-		return noted;
-	PMString deleted(row.hasDelete ? row.deletedText : PMString());
-	deleted.SetTranslatable(kFalse);
-	return deleted;
+	PMString text;
+	text.SetTranslatable(kFalse);
+	if (!row.hasDelete)
+		return text;
+	if (!KFCTrackChange::RunMaskedText(story, row.time, row.deletedText, text))
+		text = row.deletedText;
+	text.SetTranslatable(kFalse);
+	return text;
 }
 
 bool RowBefore(const KFCTrackChange::SignedRow& a, const KFCTrackChange::SignedRow& b)
@@ -117,8 +120,9 @@ bool RowBefore(const KFCTrackChange::SignedRow& a, const KFCTrackChange::SignedR
 // queries is one row"). Measured 2026-10-05 on the regression case qs-chain (" - " -> " - " with an en dash, then the
 // en dash -> an em dash): the records came out as TWO rows - the first query's pieces either side of the gap the
 // second wrote into, and the second's deletion holding the first one's en dash. Rows that overlap or touch, from two
-// runs or more, become one: the range they cover, the text standing there now, and their texts before the run joined
-// in place order (RunOriginalOfRow - what the first query's dash was is in no record). Rows of one run alone - a
+// runs or more, become one: the range they cover, the text standing there now, and the range's text before the run
+// read from their records (below - what the first query's dash was is in no record, so the run noted it when it
+// wrote: KFCTrackChange::NoteRunDeletions). Rows of one run alone - a
 // touching group of one query - stay as Show Changes draws them. The rows' times stay apart in the records, so the
 // merged row takes the earliest; a query run's list takes nothing back by row (KFCResultModel::IsFromQueryRun).
 void MergeRunRows(const UIDRef& story, std::vector<KFCTrackChange::SignedRow>& ioRows)
@@ -144,12 +148,7 @@ void MergeRunRows(const UIDRef& story, std::vector<KFCTrackChange::SignedRow>& i
 			for (size_t k = i; k < j; ++k)
 			{
 				KFCTrackChange::SignedRow row = rows[k];
-				PMString noted;
-				if (KFCTrackChange::RunOriginalOf(story, row.time, noted))
-				{
-					row.deletedText = noted;
-					row.hasDelete = true;
-				}
+				row.deletedText = RunOriginalOfRow(story, row);
 				ioRows.push_back(row);
 			}
 			i = j;
@@ -163,12 +162,30 @@ void MergeRunRows(const UIDRef& story, std::vector<KFCTrackChange::SignedRow>& i
 		merged.insertedText = KFCTrackChange::ReadText(story, merged.at, merged.spanLen);
 		merged.insertedText.SetTranslatable(kFalse);
 		merged.deletedText.SetTranslatable(kFalse);
+		// THE TEXT BEFORE THE RUN, FROM THE RECORDS (2026-10-05, the deferred minor of the re-check): the range read
+		// with every insertion of these rows left out and every deletion put back where it stands, its text as the
+		// run noted it (KFCTrackChange::ApplyRunNotes) - so the characters a GREP $n kept, which no record holds, are
+		// read where they stand. Joining the rows' deleted texts instead dropped those, and put a chained row's
+		// characters out of place. When a record stands outside the range, the joined texts are the fallback.
+		std::set<uint64> times;
 		for (size_t k = i; k < j; ++k)
 		{
 			if (rows[k].time < merged.time)
 				merged.time = rows[k].time;
-			merged.deletedText.Append(RunOriginalOfRow(story, rows[k]));
+			times.insert(rows[k].time);
 		}
+		std::vector<KFCTrackChange::Record> recs;
+		KFCTrackChange::CollectRecordsOfTimes(story, times, recs);
+		KFCTrackChange::ApplyRunNotes(story, recs);
+		bool allInside = false;
+		merged.deletedText = KFCTrackChange::OriginalFromRecords(story, merged.at, merged.spanLen, recs, allInside);
+		if (!allInside)
+		{
+			merged.deletedText.Clear();
+			for (size_t k = i; k < j; ++k)
+				merged.deletedText.Append(RunOriginalOfRow(story, rows[k]));
+		}
+		merged.deletedText.SetTranslatable(kFalse);
 		merged.hasDelete = !merged.deletedText.empty();
 		merged.delAt = merged.at + merged.spanLen;
 		ioRows.push_back(merged);

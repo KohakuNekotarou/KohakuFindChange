@@ -178,7 +178,11 @@ namespace KFCSearchEngine
 	            (SnpFindAndReplace.cpp:511-516, :598-603).
 
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
-	          command inside the replace sequence would become part of that undo step. */
+	          command inside the replace sequence would become part of that undo step.
+	          ! ONE CALLER DOES NOT, BY DESIGN: the query run (KFCQuerySequence) states each query's tab
+	          inside its one sequence, between queries, and loads the query there too. Measured 2026-10-05
+	          (the spec's M3, case qs-undo): a Ctrl+Z of the run brought no Find/Change setting back - the
+	          strings stayed empty. */
 	bool CommitSearchMode();
 
 	/** State what a replace will WRITE, for the tabs whose change side is not a string: the Glyph
@@ -197,7 +201,9 @@ namespace KFCSearchEngine
 	    exists to prevent.
 
 	    @return true when it is safe to replace.
-	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence. */
+	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence (and the same one exception:
+	          the query run's write, KFCReplaceEngine::WriteCheckedInHeldSequence, states it inside the run's
+	          sequence). */
 	bool CommitReplaceSide();
 
 	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value):

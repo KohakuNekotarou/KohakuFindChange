@@ -39,6 +39,9 @@
 //    queries-run  the file holds one query path per line (UTF-8); the panel's Find runs the query run over them
 //                (KFCQuerySequence::RunFromDiagSwitch) - the way in until the panel of its own exists
 //                (work\kbs-regress\cases\qs-*.jsx write it, qs-off.jsx takes it off)
+//    perf-no-sign / perf-no-track  KFCReplaceEngine.cpp's write leaves its rows unsigned / writes untracked - to
+//                measure what each costs the next find (2026-10-05, WALKTIME; work\note-scripts\2026-10-05-kfc-query-run\
+//                t10_perf.ps1). Throwaway documents only.
 //
 //========================================================================================
 

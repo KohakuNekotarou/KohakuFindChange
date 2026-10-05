@@ -101,8 +101,9 @@ bool IsSignAuthor(const PMString& who)
 // after it pending.
 uint64 gOwnRunFloor = 0;
 
-// A query run's chained writes (KFCTrackChange::NoteRunOriginal): a row's text before the run, by the row's place -
-// its document, its story and its time. Only the rows that wrote over the run's own insertions are here.
+// A query run's masks (KFCTrackChange::NoteRunDeletions): by a deletion's place - its document, its story and its
+// time - one flag per character of its text, set where the run itself had written that character. Only the run's
+// deletions that took characters from a write of the run are here.
 struct RunNoteKey
 {
 	IDataBase*	db;
@@ -117,7 +118,7 @@ struct RunNoteKey
 		return stamp < o.stamp;
 	}
 };
-std::map<RunNoteKey, PMString> gRunNotes;
+std::map<RunNoteKey, std::vector<bool> > gRunNotes;
 
 // A DELETION'S TEXT FROM THE UTILITY THE GUIDE NAMES. ITrackChangeUtils::GetDeletedText reads the
 // deleted-text thread anchored at the deletion - the same text DescribeChangeContent gave for a tab, a
@@ -945,71 +946,198 @@ void KFCTrackChange::ClearOwnRunFloor()
 	gOwnRunFloor = 0;
 }
 
-bool KFCTrackChange::RunOriginalPart(const UIDRef& story, TextIndex from, TextIndex to, PMString& outOriginal)
+bool KFCTrackChange::RunOwnChars(const UIDRef& story, TextIndex from, TextIndex to, WideString& outMatch,
+	std::vector<bool>& outOwn)
 {
-	outOriginal.Clear();
-	outOriginal.SetTranslatable(kFalse);
+	outMatch.clear();
+	outOwn.clear();
 	if (gOwnRunFloor == 0 || to <= from)
 		return false;
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (model == nil || to > model->TotalLength())
+		return false;
+	std::vector<bool> own(static_cast<size_t>(to - from), false);
+	// The run's own insertions in [from, to), position by position - the window AcceptPendingAround walks (one
+	// before: an iterator made at a position stands on the record containing it).
 	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil || !redline->StoryHasChanges())
-		return false;
-	// The run's own insertions in [from, to), as ranges - the window AcceptPendingAround walks (one before).
-	std::vector<std::pair<TextIndex, TextIndex> > own;
-	RedlineIterator* it = redline->NewRedlineIterator((from > 0) ? from - 1 : 0);
+	if (redline != nil && redline->StoryHasChanges())
+	{
+		RedlineIterator* it = redline->NewRedlineIterator((from > 0) ? from - 1 : 0);
+		if (it != nil)
+		{
+			for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+			{
+				TextIndex at = 0;
+				int32 len = 0;
+				const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
+				if (record == nil)
+					continue;
+				const bool ownInsert = (record->GetChangeType() == VOSRedlineChange::kInsert) && len > 0
+					&& IsSignAuthor(record->GetUserName()) && record->GetTimeStamp() >= gOwnRunFloor;
+				delete record;		// the caller owns it (redlineiterator.h:137-138)
+				if (ownInsert)
+					for (TextIndex i = (at > from ? at : from); i < at + len && i < to; ++i)
+						own[static_cast<size_t>(i - from)] = true;
+			}
+			delete it;
+		}
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
+	// one character per position, the way OriginalFromRecords reads a range
+	TextIterator ti(model, from);
+	for (TextIndex i = from; i < to; ++i, ++ti)
+		outMatch.Append(*ti);
+	outOwn.swap(own);
+	return true;
+}
+
+void KFCTrackChange::SnapshotRunDeletions(const UIDRef& story, TextIndex from, TextIndex to, std::vector<RunDeletion>& out)
+{
+	out.clear();
+	if (gOwnRunFloor == 0)
+		return;
+	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	if (redline == nil || model == nil)
+		return;
+	Utils<ITrackChangeUtils> utils;
+	const TextIndex lo = (from > 0) ? from - 1 : 0;
+	RedlineIterator* it = redline->NewRedlineIterator(lo > 0 ? lo - 1 : 0);
 	if (it == nil)
-		return false;
-	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to; more = it->Increment(kFalse))
+		return;
+	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= to + 1; more = it->Increment(kFalse))
 	{
 		TextIndex at = 0;
 		int32 len = 0;
 		const VOSRedlineChange* record = it->GetCurrentChangeRecord(&at, &len);
 		if (record == nil)
 			continue;
-		const bool ownInsert = (record->GetChangeType() == VOSRedlineChange::kInsert) && len > 0
-			&& IsSignAuthor(record->GetUserName()) && record->GetTimeStamp() >= gOwnRunFloor;
-		delete record;		// the caller owns it (redlineiterator.h:137-138)
-		if (!ownInsert)
+		const bool runDeletion = (record->GetChangeType() == VOSRedlineChange::kDelete)
+			&& record->GetTimeStamp() >= gOwnRunFloor;
+		const uint64 time = record->GetTimeStamp();
+		delete record;
+		if (!runDeletion || at < lo || at > to + 1)
 			continue;
-		const TextIndex s = (at > from) ? at : from;
-		const TextIndex e = (at + len < to) ? at + len : to;
-		if (s < e)
-			own.push_back(std::make_pair(s, e));
+		RunDeletion d;
+		d.time = time;
+		d.text = ReadDeletedText(model, utils, it, at);
+		out.push_back(d);
 	}
 	delete it;
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (own.empty())
-		return false;
-	// The text between them, in order.
-	std::sort(own.begin(), own.end());
-	TextIndex at = from;
-	for (size_t k = 0; k < own.size(); ++k)
+}
+
+void KFCTrackChange::NoteRunDeletions(const UIDRef& story, TextIndex from, TextIndex to,
+	const std::vector<RunDeletion>& before, const WideString& match, const std::vector<bool>& own)
+{
+	std::vector<RunDeletion> after;
+	SnapshotRunDeletions(story, from, to, after);
+	// A time that two deletions in either look carry cannot be followed by its time: dropped.
+	std::map<uint64, int32> seen;
+	for (size_t k = 0; k < before.size(); ++k)
+		++seen[before[k].time];
+	std::map<uint64, int32> seenAfter;
+	for (size_t k = 0; k < after.size(); ++k)
+		++seenAfter[after[k].time];
+	const int32 matchCount = match.CharCount();
+	int32 m = 0;		// the match characters are taken in order, across the deletions that grew
+	for (size_t k = 0; k < after.size(); ++k)
 	{
-		if (own[k].first > at)
-			outOriginal.Append(ReadText(story, at, own[k].first - at));
-		if (own[k].second > at)
-			at = own[k].second;
+		const uint64 time = after[k].time;
+		RunNoteKey key = { story.GetDataBase(), story.GetUID(), time };
+		if (seenAfter[time] > 1 || seen[time] > 1)
+		{
+			gRunNotes.erase(key);
+			continue;
+		}
+		PMString prior;
+		for (size_t b = 0; b < before.size(); ++b)
+			if (before[b].time == time)
+				prior = before[b].text;
+		const WideString now(after[k].text);
+		const WideString old(prior);
+		if (now == old)
+			continue;		// not touched by this write
+		// THE OLD TEXT INSIDE THE NEW ONE: the write's characters went in front of it, behind it, or both.
+		int32 at = -1;
+		for (int32 p = 0; p + old.CharCount() <= now.CharCount() && at < 0; ++p)
+		{
+			bool same = true;
+			for (int32 q = 0; q < old.CharCount() && same; ++q)
+				same = (now[p + q] == old[q]);
+			if (same)
+				at = p;
+		}
+		if (at < 0)
+		{
+			gRunNotes.erase(key);
+			continue;
+		}
+		std::vector<bool> oldMask;
+		std::map<RunNoteKey, std::vector<bool> >::const_iterator found = gRunNotes.find(key);
+		if (found != gRunNotes.end() && static_cast<int32>(found->second.size()) == old.CharCount())
+			oldMask = found->second;
+		else
+			oldMask.assign(static_cast<size_t>(old.CharCount()), false);		// written by a row with nothing of the run in it
+		// the new characters, in order, lined up through the match
+		std::vector<bool> mask;
+		bool fits = true;
+		for (int32 c = 0; c < now.CharCount() && fits; ++c)
+		{
+			if (c >= at && c < at + old.CharCount())
+			{
+				mask.push_back(oldMask[static_cast<size_t>(c - at)]);
+				continue;
+			}
+			while (m < matchCount && match[m] != now[c])
+				++m;
+			if (m >= matchCount || static_cast<size_t>(m) >= own.size())
+				fits = false;
+			else
+				mask.push_back(own[static_cast<size_t>(m++)]);
+		}
+		bool anyOwn = false;
+		for (size_t c = 0; c < mask.size(); ++c)
+			anyOwn = anyOwn || mask[c];
+		if (!fits || !anyOwn)
+			gRunNotes.erase(key);		// no line-up: read as it stands; nothing of the run in it: nothing to take out
+		else
+			gRunNotes[key] = mask;
 	}
-	if (at < to)
-		outOriginal.Append(ReadText(story, at, to - at));
-	return true;
 }
 
-void KFCTrackChange::NoteRunOriginal(const UIDRef& story, uint64 stamp, const PMString& original)
+bool KFCTrackChange::RunMaskedText(const UIDRef& story, uint64 time, const PMString& text, PMString& outText)
 {
-	RunNoteKey key = { story.GetDataBase(), story.GetUID(), stamp };
-	gRunNotes[key] = original;
-}
-
-bool KFCTrackChange::RunOriginalOf(const UIDRef& story, uint64 stamp, PMString& outOriginal)
-{
-	RunNoteKey key = { story.GetDataBase(), story.GetUID(), stamp };
-	std::map<RunNoteKey, PMString>::const_iterator found = gRunNotes.find(key);
-	if (found == gRunNotes.end())
+	RunNoteKey key = { story.GetDataBase(), story.GetUID(), time };
+	std::map<RunNoteKey, std::vector<bool> >::const_iterator found = gRunNotes.find(key);
+	const WideString w(text);
+	if (found == gRunNotes.end() || static_cast<int32>(found->second.size()) != w.CharCount())
 		return false;
-	outOriginal = found->second;
-	outOriginal.SetTranslatable(kFalse);
+	WideString kept;
+	for (int32 c = 0; c < w.CharCount(); ++c)
+		if (!found->second[static_cast<size_t>(c)])
+			kept.Append(w[c]);
+	outText = PMString(kept);
+	outText.SetTranslatable(kFalse);
 	return true;
+}
+
+void KFCTrackChange::ApplyRunNotes(const UIDRef& story, std::vector<Record>& ioRecs)
+{
+	if (gRunNotes.empty())
+		return;
+	std::map<uint64, int32> deletionsOf;
+	for (size_t k = 0; k < ioRecs.size(); ++k)
+		if (ioRecs[k].isDelete)
+			++deletionsOf[ioRecs[k].time];
+	for (size_t k = 0; k < ioRecs.size(); ++k)
+	{
+		if (!ioRecs[k].isDelete || deletionsOf[ioRecs[k].time] != 1)
+			continue;		// one deletion per time is what a mask follows
+		PMString masked;
+		if (RunMaskedText(story, ioRecs[k].time, ioRecs[k].text, masked))
+			ioRecs[k].text = masked;
+	}
 }
 
 void KFCTrackChange::ClearRunNotes()

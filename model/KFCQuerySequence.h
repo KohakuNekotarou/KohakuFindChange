@@ -10,10 +10,12 @@
 //  own writing loop - ALL OF IT ONE UNDO STEP ("Run Queries"): one abortable command sequence around every
 //  query, the run's documents opened and held from before it opens to after it ends (an open inside it
 //  throws the undo history of what was written away - the resolve pass in KFCReplaceEngine::ReplaceChecked).
-//  Then Edit > Find/Change is emptied (the spec's D7) and the list is rebuilt from the run's own signed
-//  records - one row per place, the text before the run and after it (KFCShowChanges::ListOwnRun).
-//  A query whose file is gone, or that has nothing to find, is skipped and named; one that finds more than
-//  kKFCCollectHitLimit, a failed write or Cancel takes the whole run back (the spec's D8).
+//  Then Edit > Find/Change is emptied (the spec's D7) and - when the panel's toggle asks for it (D12) - the
+//  list is rebuilt from the run's own signed records: one row per place, the text before the run and after
+//  it (KFCShowChanges::ListOwnRun). A query whose file is gone, or that has nothing to find, is skipped and
+//  named; one that finds more than kKFCCollectHitLimit in ONE chapter (document), a failed write or Cancel
+//  takes the whole run back (the spec's D8 as changed on 2026-10-05: each query is searched and written a
+//  chapter at a time).
 //
 //========================================================================================
 

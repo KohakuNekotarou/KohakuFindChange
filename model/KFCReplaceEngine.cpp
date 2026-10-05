@@ -59,9 +59,26 @@
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
 #include "KFCTrackChange.h"	// every replace under Track Changes, its records left
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
+#ifdef KFC_DIAG
+#include <chrono>					// the walk's timers (KFC_CLOCK) - test builds only
+#endif
 
 namespace
 {
+
+#ifdef KFC_DIAG
+// TEST BUILDS ONLY: where a story's walk spends its time (2026-10-05 - a query run that wrote 6000 rows in two
+// 3000-row stories took 23 minutes). Summed per phase over one story's walk and written once (WALKTIME).
+double KfcNowMs()
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+#define KFC_CLOCK(var) const double var = KfcNowMs()
+#define KFC_SPENT(slot, var) ((slot) += KfcNowMs() - (var))
+#else
+#define KFC_CLOCK(var) ((void)0)
+#define KFC_SPENT(slot, var) ((void)0)
+#endif
 
 // A QUERY RUN'S LIST IS TAKEN BACK WHOLE (2026-10-05 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md,
 // D5): the whole run is one undo step, not a row at a time, so every Reject and Accept below refuses on that list
@@ -657,6 +674,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	}
 	{
 		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+#ifdef KFC_DIAG
+		double tFind = 0, tMatch = 0, tPre = 0, tReplace = 0, tSign = 0, tRecord = 0, tTexts = 0, tCarry = 0;
+		int32 timedRows = 0;
+#endif
 		// The range the last replacement wrote: a match inside it ("cat" -> "cat cat") is none of ours.
 		UID lastStory = kInvalidUID;
 		TextIndex lastStart = kInvalidTextIndex, lastEnd = kInvalidTextIndex;
@@ -664,7 +685,9 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		{
 			UIDRef story;
 			TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+			KFC_CLOCK(cFind);
 			const IFindChangeService::FindChangeResult found = RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
+			KFC_SPENT(tFind, cFind);
 			if (found != IFindChangeService::kSuccess)
 			{
 				if (found == IFindChangeService::kFailure)
@@ -677,8 +700,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			UID matchDict = kInvalidUID;
 			uint32 matchKey = 0;
 			TextIndex matchThreadStart = kInvalidTextIndex;
+			KFC_CLOCK(cMatch);
 			const int32 hitIdx = RowOfMatchAnyOrder(db, rowNow, pending, story.GetUID(), start, end,
 				matchDict, matchKey, matchThreadStart);
+			KFC_SPENT(tMatch, cMatch);
 			if (hitIdx < 0)
 				continue;
 			pending.erase(hitIdx);
@@ -694,12 +719,19 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			else
 			{
 				// The row's text as it stands the moment before it is written (Hit::originalText).
+				KFC_CLOCK(cPre);
 				const PMString original = KFCTrackChange::ReadText(story, start, end - start);
-				// A QUERY RUN'S CHAINED WRITE (2026-10-05): the part of it an earlier query of the run did not write,
-				// kept by the row's time once it is signed - its deletion will hold both (KFCTrackChange.h,
-				// RunOriginalPart). Nothing outside a query run: no floor, no note.
-				PMString runOriginal;
-				const bool chained = KFCTrackChange::RunOriginalPart(story, start, end, runOriginal);
+				// A QUERY RUN'S CHAINED WRITE (2026-10-05): which characters of the match an earlier query of the run
+				// wrote, and the run's deletions around it, read now - once the row is written, the deletions that grew
+				// are masked where the run's own characters went into them (KFCTrackChange.h, RunOwnChars /
+				// SnapshotRunDeletions / NoteRunDeletions). Nothing outside a query run: no floor, no mask.
+				WideString runMatch;
+				std::vector<bool> runOwn;
+				std::vector<KFCTrackChange::RunDeletion> runBefore;
+				const bool inQueryRun = KFCTrackChange::RunOwnChars(story, start, end, runMatch, runOwn);
+				if (inQueryRun)
+					KFCTrackChange::SnapshotRunDeletions(story, start, end, runBefore);
+				KFC_SPENT(tPre, cPre);
 				UIDRef written;
 				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
 				// (Fault switch replace-refuse, a test build's only - KFCDiag.h: InDesign's replace refuses every row,
@@ -708,15 +740,30 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 #ifdef KFC_DIAG
 				refuseForTest = KFC_DIAG_FAULT("replace-refuse");
 #endif
-				if (!refuseForTest
-					&& RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess)
+				KFC_CLOCK(cReplace);
+				const bool replacedHere = !refuseForTest
+					&& RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess;
+				KFC_SPENT(tReplace, cReplace);
+				if (replacedHere)
 				{
 					++ioReplaced;
+#ifdef KFC_DIAG
+					++timedRows;
+#endif
 					// SIGNED BEFORE THE NEXT ONE IS WRITTEN. "KohakuFindChange" at the
 					// row's time (KFCTrackChange.h) - a replace written next to this one has to meet records
 					// already signed, or InDesign joins its insertion to this one's.
+					KFC_CLOCK(cSign);
 					const uint64 stamp = KFCTrackChange::StampForRow(chapterIdx, hitIdx);
-					if (!KFCTrackChange::SignReplace(written, writtenStart, writtenEnd, stamp))
+					bool skipSignForTest = false;
+#ifdef KFC_DIAG
+					// (Fault switch perf-no-sign, a test build's only - KFCDiag.h: a measurement of what signing costs the next
+					// find; the rows are left unsigned. Never on a document anybody keeps.)
+					skipSignForTest = KFC_DIAG_FAULT("perf-no-sign");
+#endif
+					const bool signedHere = skipSignForTest || KFCTrackChange::SignReplace(written, writtenStart, writtenEnd, stamp);
+					KFC_SPENT(tSign, cSign);
+					if (!signedHere)
 					{
 						outSignFailed = true;
 						break;
@@ -727,14 +774,16 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 					// first replace's time. AND WHERE ITS FIRST RECORD STANDS IN WHAT IT WROTE: 0 for a
 					// whole-match replace; a GREP $n keeps the matched characters it names, and its records
 					// start past them (Hit::recordLead).
+					KFC_CLOCK(cRecord);
 					TextIndex firstRecord = kInvalidTextIndex;
 					const bool recorded = KFCTrackChange::FirstRecordOfTimeIn(written, writtenStart, writtenEnd, stamp, firstRecord);
 					KFCResultModel::SetHitRecord(chapterIdx, hitIdx, recorded ? stamp : 0,
 						recorded ? static_cast<int32>(firstRecord - writtenStart) : 0);
 					if (!recorded)
 						++ioUnrecorded;
-					else if (chained)
-						KFCTrackChange::NoteRunOriginal(written, stamp, runOriginal);
+					if (inQueryRun)
+						KFCTrackChange::NoteRunDeletions(written, writtenStart, writtenEnd, runBefore, runMatch, runOwn);
+					KFC_SPENT(tRecord, cRecord);
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
@@ -744,13 +793,17 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 					// is none of theirs (stepped over, above).
 					// Set before MarkHitReplaced: the row's locator says "no track" at once when the replace
 					// changed no character (KFCResultModel::GetHitTextUnchanged), which asks them.
+					KFC_CLOCK(cTexts);
 					KFCResultModel::SetHitChangeTexts(chapterIdx, hitIdx, original,
 						KFCTrackChange::ReadText(written, writtenStart, writtenEnd - writtenStart));
 					KFCResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+					KFC_SPENT(tTexts, cTexts);
+					KFC_CLOCK(cCarry);
 					// every row after it first, then this row at what was written - so it is not moved by itself
 					CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
 						end - matchThreadStart, writtenEnd - writtenStart);
 					KeepRowAt(db, rowNow, keptRows, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+					KFC_SPENT(tCarry, cCarry);
 				}
 				else
 				{
@@ -762,6 +815,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			++ioDone;
 			KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
 		}
+#ifdef KFC_DIAG
+		KFC_DIAG_LOG("WALKTIME story=%u rows=%d find=%.0f match=%.0f pre=%.0f replace=%.0f sign=%.0f record=%.0f texts=%.0f carry=%.0f ms",
+			storyRef.GetUID().Get(), (int)timedRows, tFind, tMatch, tPre, tReplace, tSign, tRecord, tTexts, tCarry);
+#endif
 	}
 	if (walker->IsWalking())
 		walker->Halt();
@@ -992,6 +1049,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	// take it back with the replaces.
 	// ! Each row's place is asked NOW, from its thread offset (RowStartNow): an accepted deletion's
 	//   deleted-text thread goes, which moves the story indexes of the cells and footnotes behind it.
+	KFC_CLOCK(cAccept);
 	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
 	{
 		const UIDRef storyRef(db, s->first);
@@ -1023,10 +1081,23 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			outAcceptedFirst += accepted;
 		}
 	}
+#ifdef KFC_DIAG
+	{
+		double tAccept = 0;
+		KFC_SPENT(tAccept, cAccept);
+		KFC_DIAG_LOG("ACCEPTTIME rows=%u accepted=%d %.0f ms", (unsigned)rowNow.size(), (int)outAcceptedFirst, tAccept);
+	}
+#endif
 
 	std::set<UID> targetStories;
 	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
 		targetStories.insert(s->first);
+#ifdef KFC_DIAG
+	// (Fault switch perf-no-track, a test build's only - KFCDiag.h: a measurement of what Track Changes costs the
+	// walk; the stories are written untracked. Never on a document anybody keeps.)
+	if (KFC_DIAG_FAULT("perf-no-track"))
+		targetStories.clear();
+#endif
 	KFCTrackChange::TrackingScope tracking(db, targetStories);
 	if (!tracking.Ok())
 	{

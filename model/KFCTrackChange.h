@@ -43,6 +43,7 @@
 
 #include "PMString.h"
 #include "UIDRef.h"
+#include "WideString.h"		// RunOwnChars - a match's characters, one per position
 
 #include <set>
 #include <vector>
@@ -202,14 +203,32 @@ namespace KFCTrackChange
 	    replaces text an earlier query of the same run wrote leaves a DELETION holding that text - InDesign records
 	    the deletion of another author's insertion, and the earlier one is signed "KohakuFindChange" by then
 	    (deleting one's own pending insertion records nothing - measured the same day). So that deletion's text is
-	    not what stood there before the run. RunOriginalPart, asked before a row of the run is written: false when
-	    no floor is set or no insertion of the run stands in [from, to); true = outOriginal holds the range's text
-	    without the run's own insertions. NoteRunOriginal keeps it by the row's time once the row is signed;
-	    RunOriginalOf hands it back (KFCShowChanges::ListOwnRun). SetOwnRunFloor starts the notes afresh and
-	    ClearRunNotes ends them - after the list is built, not with the floor. */
-	bool RunOriginalPart(const UIDRef& story, TextIndex from, TextIndex to, PMString& outOriginal);
-	void NoteRunOriginal(const UIDRef& story, uint64 stamp, const PMString& original);
-	bool RunOriginalOf(const UIDRef& story, uint64 stamp, PMString& outOriginal);
+	    not what stood there before the run.
+	    ! AND THE DELETION NEED NOT BE THE LATER ROW'S: GREP (c)at -> $1og, then (c)og -> $1ow, left ONE deletion
+	    "ogat" carrying the FIRST row's time (measured 2026-10-05, case qs-chain-grep) - InDesign put the "og" it
+	    deleted into the deletion standing next to it. So the run's characters are followed into whichever of the
+	    run's deletions takes them: a MASK per deletion (by its time), one flag per character, set = the run wrote it.
+	    RunOwnChars, asked before a row of a query run is written: false outside a query run (no floor); true =
+	    outMatch holds [from, to)'s characters, one per position, and outOwn which of them the run itself wrote.
+	    SnapshotRunDeletions, also before: the run's deletions anchored in [from - 1, to + 1], by time and text.
+	    NoteRunDeletions, once the row is written and signed: the same window around what was written - each of the
+	    run's deletions that grew (a new one counts as grown from nothing) has its new characters lined up with the
+	    match in order (a GREP $n keeps some of the match: those are stepped over) and its mask extended. A deletion
+	    that does not line up, or a time that carries two deletions in the window, loses its mask (read as it
+	    stands). ApplyRunNotes takes the masked characters out of the records CollectRecordsOfTimes read;
+	    RunMaskedText does it for one deletion's text (KFCShowChanges::ListOwnRun). SetOwnRunFloor starts the masks
+	    afresh and ClearRunNotes ends them - after the list is built, not with the floor. */
+	struct RunDeletion
+	{
+		uint64		time;
+		PMString	text;
+	};
+	bool RunOwnChars(const UIDRef& story, TextIndex from, TextIndex to, WideString& outMatch, std::vector<bool>& outOwn);
+	void SnapshotRunDeletions(const UIDRef& story, TextIndex from, TextIndex to, std::vector<RunDeletion>& out);
+	void NoteRunDeletions(const UIDRef& story, TextIndex from, TextIndex to, const std::vector<RunDeletion>& before,
+		const WideString& match, const std::vector<bool>& own);
+	bool RunMaskedText(const UIDRef& story, uint64 time, const PMString& text, PMString& outText);
+	void ApplyRunNotes(const UIDRef& story, std::vector<Record>& ioRecs);
 	void ClearRunNotes();
 
 

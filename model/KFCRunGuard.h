@@ -4,9 +4,9 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because three different things
-//  can be running - a search, a replace and Show Changes by KohakuFindChange - and every guard has to
-//  know about all of them.
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
+//  can be running - a search, a replace, Show Changes by KohakuFindChange and a query run (2026-10-05,
+//  KFCQuerySequence) - and every guard has to know about all of them.
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -27,7 +27,7 @@
 //
 //    * the panel's actions (KFCActionComponent, the UI half - through IKFCRuns): UpdateActionStates
 //      greys everything out, and RefusedWhileRunning turns away a command that arrives anyway;
-//    * each run's own front door (KFCSearchEngine, KFCReplaceEngine, KFCShowChanges), for a caller
+//    * each run's own front door (KFCSearchEngine, KFCReplaceEngine, KFCShowChanges, KFCQuerySequence), for a caller
 //      that never went through the menu - a script firing an action by ID reaches the engine
 //      whatever the menu says;
 //    * the book-close watcher (KFCBookWatch, twice: the deferred callback, and the question it asks -
@@ -46,7 +46,7 @@
 
 namespace KFCRunGuard
 {
-	/** Is a search, a replace or a Show Changes by KohakuFindChange running right now? */
+	/** Is a search, a replace, a Show Changes by KohakuFindChange or a query run running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not
