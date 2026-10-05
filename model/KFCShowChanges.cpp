@@ -103,7 +103,7 @@ PMString RunLabel(uint64 t0)
 // Read-only, inside a SaveRestoreModifiedState guard like the search's walk: building a hit asks for
 // the frame a position composes into, and composing marks a database modified - a chapter this run
 // opened must come out as clean as it went in, or ReleaseHeldDoc will not close it.
-bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KFCResultModel::Hit>& outHits,
+bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, uint64 floor, std::vector<KFCResultModel::Hit>& outHits,
 	std::map<UID, uint32>& outVersions, bool& outCapped, KFCProgressBar* bar, int32 progressBase,
 	int32& ioProgressReported)
 {
@@ -141,6 +141,8 @@ bool ReadDocumentRows(const UIDRef& docRef, size_t maxHits, std::vector<KFCResul
 
 		for (size_t k = 0; k < rows.size(); ++k)
 		{
+			if (rows[k].time < floor)
+				continue;		// a record older than the run asked for (ListOwnRun) - Show Changes passes 0
 			if (outHits.size() >= maxHits)
 			{
 				outCapped = true;
@@ -344,7 +346,7 @@ int32 KFCShowChanges::Run(PMString& outSummary)
 		std::vector<KFCResultModel::Hit> hits;
 		std::map<UID, uint32> storyVersions;
 		bool docCapped = false;
-		const bool read = ReadDocumentRows(chapterDocRef, static_cast<size_t>(remaining), hits, storyVersions,
+		const bool read = ReadDocumentRows(chapterDocRef, static_cast<size_t>(remaining), 0, hits, storyVersions,
 			docCapped, &progressBar, progressBase, progressReported);
 		progressBase += kShowChapterProgressSpan;
 		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
@@ -421,6 +423,43 @@ int32 KFCShowChanges::Run(PMString& outSummary)
 		outSummary.Append(" safety limit.");
 	}
 	outSummary.Append(chapterNotes);
+	return total;
+}
+
+int32 KFCShowChanges::ListOwnRun(const std::vector<KFCBookScope::ChapterDoc>& docs, uint64 floor, bool& outCapped)
+{
+	outCapped = false;
+	int32 total = 0;
+	int32 noBar = 0;
+	for (size_t i = 0; i < docs.size(); ++i)
+	{
+		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - total;
+		if (remaining <= 0)
+		{
+			outCapped = true;
+			break;
+		}
+		std::vector<KFCResultModel::Hit> hits;
+		std::map<UID, uint32> storyVersions;
+		bool docCapped = false;
+		if (!ReadDocumentRows(docs[i].docRef, static_cast<size_t>(remaining), floor, hits, storyVersions, docCapped,
+				nil, 0, noBar))
+			continue;
+		if (docCapped)
+			outCapped = true;
+		if (hits.empty())
+			continue;
+		KFCSearchEngine::FinalizeHits(hits);		// page order and locators, as a search's rows (no runs: Hit::run stays -1)
+		KFCResultModel::Chapter chapter;
+		chapter.name = docs[i].shortName;
+		chapter.name.SetTranslatable(kFalse);
+		chapter.docRef = docs[i].docRef;
+		chapter.file = docs[i].file;
+		chapter.hits.swap(hits);
+		chapter.storyVersions.swap(storyVersions);
+		total += static_cast<int32>(chapter.hits.size());
+		KFCResultModel::AppendChapter(std::move(chapter));
+	}
 	return total;
 }
 

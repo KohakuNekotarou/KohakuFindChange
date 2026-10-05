@@ -27,6 +27,9 @@
 #define __KFCShowChanges_h__
 
 #include "PMString.h"
+#include "KFCBookScope.h"		// ChapterDoc - a query run's documents (ListOwnRun)
+
+#include <vector>
 
 namespace KFCShowChanges
 {
@@ -38,6 +41,12 @@ namespace KFCShowChanges
 	/** Is Show Changes reading right now? Its progress bar pumps events, so a menu command can arrive
 	    in the middle of it - KFCRunGuard asks this beside the search and the replace. */
 	bool IsShowing();
+
+	/** A QUERY RUN'S LIST (KFCQuerySequence, 2026-10-04): every record signed "KohakuFindChange" at or after `floor`
+	    in these OPEN documents, as Show Changes builds its rows, but in ONE list - no run rows: each row reads the
+	    text before the run and after it. Nothing is opened or closed; the caller cleared the model and set its
+	    header. Stops at kKFCCollectHitLimit (outCapped). Returns how many rows went in. */
+	int32 ListOwnRun(const std::vector<KFCBookScope::ChapterDoc>& docs, uint64 floor, bool& outCapped);
 }
 
 #endif // __KFCShowChanges_h__
