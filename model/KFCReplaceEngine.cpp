@@ -702,6 +702,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 // reading such a row back at its old place takes the line AND the hash from the wrong characters, so a click
 // then selects them (measured: "ZZkitt"); left alone, its jump looks for it again
 // (KFCSearchEngine::RelocateStaleRow) and says it is no longer here when no one place is found.
+bool StoryAsKFCLeftIt(int32 chapterIdx, IDataBase* db, UID story);	// below, with the story versions
 bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 {
 	bool replaced = false, locked = false;
@@ -717,8 +718,16 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 		// that does not - an edit since, which KFC does not follow - is left as it is; its jump looks for it again
 		// (KFCSearchEngine::RelocateStaleRow).
 		PMString written;
-		return haveIdentity && KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, written) && !written.IsEmpty()
-			&& KFCSearchEngine::ReadText(UIDRef(db, story), a, b - a) == written;
+		if (!haveIdentity || !KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, written))
+			return false;
+		// A REPLACE THAT WROTE NOTHING (an empty Change To) leaves nothing to read back. Its row stands where it was
+		// carried to while its story is at the version KFC left it at: every write of KFC's carries every row past it
+		// (CarryRowsPast), so the place is exact until something else edits the story. Asked by reading, it was never
+		// carried - its line kept the text of the moment it was written, and a write before it left its place behind
+		// (cases adjacent-delete, jump-replaced-empty; until 2026-10-06 its tracked change found it).
+		if (written.IsEmpty())
+			return a == b && StoryAsKFCLeftIt(chapterIdx, db, story);
+		return KFCSearchEngine::ReadText(UIDRef(db, story), a, b - a) == written;
 	}
 	// The match AND the line around it: a row an Undo left on another occurrence of its own text passes the
 	// match's hash alone, and would then be read back THERE - from then on describing that other
@@ -835,7 +844,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			// a locked row the report keeps (it never had a box), a replaced row - and every row, for
 			// the one-row Replace: each has to stand where its text is afterwards. ONLY a row whose
 			// stored place is still its text (RowStillStands - a replaced row must still hold what it
-			// wrote): one an edit has moved is left as it is, never read back at a place
+			// wrote, or, having written nothing, sit in a story as KFC left it): one an edit has moved is left as it
+			// is, never read back at a place
 			// that is no longer its own.
 			// ...and a row with an outcome (missing, refused, an endnote's end): the list keeps it, so it is carried
 			// like the rest.
