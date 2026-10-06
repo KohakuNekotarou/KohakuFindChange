@@ -58,15 +58,6 @@
 //    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
 //                ExpandNode with all its descendants per open document row, mode 2 every row opened before ChangeRoot
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
-//    perf-own-walker  KFCSearchEngine::AcquireWalker hands the search, the verify walk and the write a
-//                kBasicTextWalkerBoss of KFC's own instead of the session's shared walker - the critical section stays
-//                on the shared one (2026-10-05 evening, the speed-up's S1:
-//                docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3).
-//    perf-direct-walk  the replace's finds (the verify walk's and the write walk's) without kFindTextCmdBoss -
-//                ITextWalker::Walk and the walker's client selection (KFCSearchEngine::DirectFindForTest; the S2).
-//                Throwaway documents only.
-//    perf-progress-step  the file holds "<n>": KFCAdvanceProgress moves a bar every n rows instead of every
-//                kKFCProgressReportStep (the S3).
 //    no-accept-around  the replace leaves the pending changes around the ticked matches as they are (no
 //                AcceptPendingAround), so InDesign joins and rewrites them - the partial-reject experiment (2026-10-06:
 //                can a joined record's KFC part alone be taken back? KT's app.ktProbe "redline ... rejectrange").

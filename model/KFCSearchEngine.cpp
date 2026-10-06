@@ -34,7 +34,6 @@
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
-#include "ITextFocus.h"				// DirectFindForTest (a test build's only) - the walker's client selection
 #include "ITextStoryThread.h"		// a story row's first words: the threads after the body (StoryLeadText)
 #include "ITextWalker.h"			// also declares ITextWalkerClient
 #include "ITextWalkerScope.h"
@@ -1237,8 +1236,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		}
 	}
 
-	// The walker, and the shared walker's selection utilities the critical section below is taken on
-	// (KFCSearchEngine::AcquireWalker - the session's shared walker, or a test build's own one: S1).
+	// KFC's own walker, and the shared walker's selection utilities the critical section below is taken on
+	// (KFCSearchEngine::AcquireWalker).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	bool ownWalker = false;
@@ -1255,11 +1254,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// time and wants to carry on the walk it already has. This panel lists a whole document in one
 	// run, so it always wants a walk of its own from the top.
 	//
-	// What that costs, stated because nothing else here states it: the walker comes from the service
-	// provider, so it is SHARED with the Find/Change dialog. A search started from this panel
-	// therefore throws away a Find Next sequence the user had going there, and their next click on
-	// Find Next begins again from the top. Not measured - it follows from the two lines below and
-	// from the guard the snippet puts around its own Initialize.
+	// (Since 2026-10-06 the walker is KFC's own - AcquireWalker - so a search started from this panel leaves a Find
+	// Next sequence the user had going in the Find/Change dialog where it was: measured, s1-findnext2.ps1.)
 	if (walker->IsWalking())
 		walker->Halt();
 
@@ -1656,13 +1652,7 @@ void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bo
 	const int32 delta = target - ioReported;
 	if (delta <= 0)
 		return;
-	int32 step = kKFCProgressReportStep;
-#ifdef KFC_DIAG
-	// (Fault switch perf-progress-step "<n>", a test build's only - KFCDiag.h: the speed-up's S3, the bar moved every
-	// n rows instead.)
-	step = KFCDiagFaultValue("perf-progress-step", 0, kKFCProgressReportStep);
-#endif
-	if (!force && delta < step)
+	if (!force && delta < kKFCProgressReportStep)
 		return;		// too small to be worth a call on the bar for
 
 	// SetPosition, which takes the absolute position - hence no use for delta beyond the guard above.
@@ -3199,65 +3189,17 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		return false;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(shared, UseDefaultIID());
 	outSelUtils.reset(selUtils.forget());
-	bool own = false;
-#ifdef KFC_DIAG
-	// (Fault switch perf-own-walker, a test build's only - KFCDiag.h: the speed-up's S1, measured before it is taken.)
-	own = KFC_DIAG_FAULT("perf-own-walker");
-#endif
-	if (own)
-	{
-		InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
-		if (mine != nil)
-		{
-			outWalker.reset(mine.forget());
-			outOwn = true;
-			return true;
-		}
-	}
-	outWalker.reset(shared.forget());
+	// KFC'S OWN WALKER (2026-10-05, the speed-up's S1 - taken: 20-35 % off Change Checked, the per-find composition
+	// gone, the answer unchanged; docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12). Nothing watches it and
+	// nobody else walks it, so the dialog's Find Next is left where it was (measured 2026-10-06, s1-findnext2.ps1: the
+	// shared walker sent Find Next back to the match it had just found; KFC's own let it go on to the next).
+	InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
+	if (mine == nil)
+		return false;
+	outWalker.reset(mine.forget());
+	outOwn = true;
 	return true;
 }
-
-#ifdef KFC_DIAG
-IFindChangeService::FindChangeResult KFCSearchEngine::DirectFindForTest(ITextWalker* walker, UIDRef& outStory,
-	TextIndex& outStart, TextIndex& outEnd)
-{
-	static ITextWalker* lastWalker = nil;
-	static UID lastStory = kInvalidUID;
-	static TextIndex lastStart = kInvalidTextIndex;
-	outStory = UIDRef();
-	outStart = kInvalidTextIndex;
-	outEnd = kInvalidTextIndex;
-	if (walker == nil)
-		return IFindChangeService::kFailure;
-	walker->Walk();
-	if (!walker->IsSuspended())
-	{
-		lastWalker = nil;
-		return walker->IsCompleted() ? IFindChangeService::kNotFound : IFindChangeService::kFailure;
-	}
-	TextIndex start = kInvalidTextIndex;
-	int32 length = 0;
-	ITextFocus* const focus = walker->GetClientSelection(&start, &length);
-	InterfacePtr<ITextModel> model(focus != nil ? focus->QueryModel() : nil);
-	if (model == nil || start == kInvalidTextIndex)
-		return IFindChangeService::kFailure;
-	const UIDRef storyRef = ::GetUIDRef(model);
-	if (walker == lastWalker && storyRef.GetUID() == lastStory && start == lastStart)
-	{
-		KFC_DIAG_LOG("DIRECTWALK stuck story=%u at=%d", storyRef.GetUID().Get(), (int)start);
-		lastWalker = nil;
-		return IFindChangeService::kFailure;
-	}
-	lastWalker = walker;
-	lastStory = storyRef.GetUID();
-	lastStart = start;
-	outStory = storyRef;
-	outStart = start;
-	outEnd = start + length;
-	return IFindChangeService::kSuccess;
-}
-#endif
 
 void KFCSearchEngine::SearchHeldTargets(std::vector<KFCBookScope::ChapterDoc>& targets, const RunScope& scope,
 	const PMString& bookName, const PMString& barTitle, HeldSearchOutcome& out)

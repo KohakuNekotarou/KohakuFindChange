@@ -117,12 +117,6 @@ IFindChangeService::FindChangeResult RunWalkerCmd(const ClassID& cmdBoss, ITextW
 	outStory = UIDRef();
 	outStart = kInvalidTextIndex;
 	outEnd = kInvalidTextIndex;
-#ifdef KFC_DIAG
-	// (Fault switch perf-direct-walk, a test build's only - KFCDiag.h: the speed-up's S2, the replace's finds - the
-	// verify walk's and the write walk's - without kFindTextCmdBoss: KFCSearchEngine::DirectFindForTest.)
-	if (cmdBoss == kFindTextCmdBoss && KFC_DIAG_FAULT("perf-direct-walk"))
-		return KFCSearchEngine::DirectFindForTest(walker, outStory, outStart, outEnd);
-#endif
 
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
@@ -655,7 +649,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 {
 	IDataBase* const db = storyRef.GetDataBase();
 	// The walker, and the shared walker's selection utilities the critical section is taken on
-	// (KFCSearchEngine::AcquireWalker - the session's shared walker, or a test build's own one: S1).
+	// (KFCSearchEngine::AcquireWalker - KFC's own).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	bool ownWalker = false;
@@ -1413,7 +1407,7 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	// The walker, and the shared walker's selection utilities the critical section is taken on
-	// (KFCSearchEngine::AcquireWalker - the session's shared walker, or a test build's own one: S1).
+	// (KFCSearchEngine::AcquireWalker - KFC's own).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
 	bool ownWalker = false;
