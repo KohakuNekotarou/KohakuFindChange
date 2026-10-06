@@ -34,13 +34,11 @@
 
 namespace KFCResultModel
 {
-	/** The whole-RUN safety ceiling: a search stops collecting after this many hit rows across every
-	    chapter, so no query or document can pile up an unbounded result set; the search says so in its
-	    summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
-	    TEN THOUSAND, OVER A PANEL THAT DRAWS kKFCDisplayHitLimit (KFCModelTypes.h) - the author's call of
-	    2026-10-05 (the spec map's GEN-34 as changed: from 10-04 to that day the two were one number). A search with
-	    more matches stops here and says "narrow your search". */
-	const int32 kKFCCollectHitLimit = 10000;
+	/** THE WHOLE-RUN CEILING - the same number the panel draws (kKFCDisplayHitLimit, KFCModelTypes.h - F9 of
+	    docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md): a search stops collecting there and
+	    says so ("Stopped at the 300 limit - narrow the search, or use ..."), so no query can pile up rows nobody
+	    will replace one by one. Counted in ROWS. */
+	const int32 kKFCCollectHitLimit = kKFCDisplayHitLimit;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors point back at the exact occurrence. */

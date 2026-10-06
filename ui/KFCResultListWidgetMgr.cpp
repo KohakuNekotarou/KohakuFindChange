@@ -328,24 +328,10 @@ private:
 	// The BOOK row: which book these results came from. Only ever built for a book search, where it
 	// is the root's single child - so it is the panel's standing answer to which book is the target,
 	// which a status line cannot be (one line, truncated, overwritten by the next message).
-	// "  - first N shown" when the tree is drawing fewer hit rows than it holds (kKFCDisplayHitLimit),
-	// on the OUTERMOST row only - the book row, or a document's row when there is no book - and once,
-	// because a sentence on the status line is replaced by the next click. A list holds up to kKFCCollectHitLimit
-	// rows over a tree that draws kKFCDisplayHitLimit (again since 2026-10-05 - the spec map's GEN-34 as changed),
-	// so this fires whenever a list holds more than the tree draws.
-	static void AppendDisplayCapNote(PMString& label)
-	{
-		if (KFCResults()->GetTotalHitCount() <= KFCResultModel::kKFCDisplayHitLimit)
-			return;
-		label.Append("  - first ");
-		label.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
-		label.Append(" shown");
-	}
-
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
 		IPanelControlData* rowData) const
 	{
-		// "<book>  (N)" - how many hits the book's search holds (the stored ones, past the display cap too).
+		// "<book>  (N)" - how many hits the book's search holds (every one drawn - one limit since 2026-10-06, F9).
 		// Drawn even when the search found nothing - the hierarchy adapter gives the root one child whenever the
 		// results came from a book, which is how the panel goes on naming the book it just searched - and then
 		// it reads "(0)", which is also how KFCBookWatch describes it (the user's own measurement); keep the two
@@ -355,7 +341,6 @@ private:
 		label.Append("  (");
 		label.AppendNumber(KFCResults()->GetTotalHitCount());
 		label.Append(")");
-		AppendDisplayCapNote(label);
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
@@ -370,8 +355,7 @@ private:
 			return;
 
 		// "<name>  (N)" - the chapter's hits, the same read-out the book row carries. About the work, not the
-		// drawing - never "(shown / total)": how many rows are drawn is one note on the OUTERMOST row, outside
-		// the brackets (AppendDisplayCapNote).
+		// drawing - never "(shown / total)".
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
@@ -389,10 +373,6 @@ private:
 		label.Append("  (");
 		label.AppendNumber(fullCount);
 		label.Append(")");
-		// A document's results have no book row above this one, so the note goes here instead.
-		if (!KFCResults()->IsFromBook())
-			AppendDisplayCapNote(label);
-
 		// (No "cancelled" note: a cancel puts the WHOLE run back, so no chapter is left half-reached.)
 
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);

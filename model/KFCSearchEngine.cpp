@@ -94,11 +94,12 @@
 #include "KFCDiag.h"			// the fault switch queries-run (SearchBook's head)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
+#include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List) (F18)
 
 namespace
 {
 
-// (The whole-run safety ceiling is kKFCCollectHitLimit, in KFCResultModel.h beside the display cap.
+// (The limit is kKFCCollectHitLimit, in KFCResultModel.h - the number the panel draws, since 2026-10-06 (F9).
 // Read the contract there; this file uses it in SearchBook.)
 
 // The smallest advance worth reporting to the progress bar. Moving the bar keeps Cancel answering (which
@@ -3144,23 +3145,19 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
-	// Two caps since 2026-10-05 (the spec map's GEN-34 as changed - from 10-04 to that day they were one), and both
-	// can bite:
-	//   * collectionTruncated: the whole-search safety ceiling (kKFCCollectHitLimit, KFCResultModel.h) stopped the
-	//     collection, so the RESULT SET itself is capped - the strong "narrow it" note.
-	//   * total > the display cap (kKFCDisplayHitLimit): every row is held, the panel draws the first ones - said,
-	//     since nothing on screen shows the rows past it.
+	// One limit since 2026-10-06 (F9): collected = drawn.
 	if (collectionTruncated)
 	{
+		// THE LIMIT (F9): the rows are a list to walk and replace one at a time - more than this is a Change All's
+		// work: KFC's own for a book, InDesign's Find/Change dialog's for anything else (F18).
 		outSummary.Append(" Stopped at the ");
 		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-		outSummary.Append(" safety limit - narrow your search.");
-	}
-	if (total > KFCResultModel::kKFCDisplayHitLimit)
-	{
-		outSummary.Append(" Showing first ");
-		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
-		outSummary.Append(" in the panel.");
+		outSummary.Append(" limit - narrow the search, or use ");
+		if (fromBook)
+			outSummary.Append(KFCChangeAll::CommandName());				// Change All in Book (No List) - F18
+		else
+			outSummary.Append("Change All in InDesign's Find/Change");	// a document's: InDesign's own (F18)
+		outSummary.Append(".");
 	}
 
 	outSummary.Append(chapterNotes);

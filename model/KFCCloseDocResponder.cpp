@@ -203,8 +203,9 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KFCUndoFollow::ForgetDocument(closingDocRef);
 		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
-		// draws; under it, only that row goes and the others stay as they are (open or closed). (A list holds up to
-		// kKFCCollectHitLimit rows over a panel that draws kKFCDisplayHitLimit - rows past the cap again since 2026-10-05.)
+		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit since
+		// 2026-10-06, F9: the panel draws every row a list holds, so this rebuild is not reached now - kept for a cap
+		// that ever differs again.)
 		const bool overCap = KFCResultModel::GetTotalHitCount() > KFCResultModel::kKFCDisplayHitLimit;
 		if (!overCap)
 			KFCNotifyChapterRowGoes(closingChapter);

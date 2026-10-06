@@ -24,12 +24,12 @@
 
 namespace KFCResultModel
 {
-	/** The panel draws at most this many hit rows (book order), to keep a large result set from flooding the
-	    panel. A list holds up to kKFCCollectHitLimit (KFCResultModel.h) - more than this since 2026-10-05 (the
-	    author's call, the spec map's GEN-34 as changed): the rows past this one are held and not drawn, Check All on
-	    a book or document row ticks them too, and Change Checked writes them. The cap's own machinery (the
-	    adapter's counts, the "first N shown" note, the close responder's rebuild) keeps the panel to it. */
-	const int32 kKFCDisplayHitLimit = 1000;
+	/** THE LIMIT, ONE NUMBER (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F9 - the
+	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit,
+	    KFCResultModel.h, is this number). More than this is not a list to walk and replace row by row - a Change All
+	    writes any number without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's
+	    counts, the close responder's rebuild) stays: with one number it never cuts a row. */
+	const int32 kKFCDisplayHitLimit = 300;
 
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
 	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */
