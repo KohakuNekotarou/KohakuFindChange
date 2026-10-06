@@ -92,7 +92,7 @@ namespace KFCReplaceEngine
 	    undo step ("Replace"). The list stays a work list: the row shows its new text, every other row is
 	    moved to where its text now stands. Refused - nothing changed, outStatus says why - when the query
 	    changed since the search, the row's text is not the one the search found, the chapter cannot be
-	    opened, or the row would not be replaced (locked since, missing, an endnote's end). */
+	    opened, or the row would not be replaced (locked since, missing, refused). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no

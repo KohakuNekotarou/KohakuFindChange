@@ -102,7 +102,7 @@ namespace KFCResultModel
 		// storyVersions are a door BESIDE that test, not instead of it.)
 		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
 								// Kept OUT of locator so the cell can paint it separately; built by
-								// BuildHitLocator alongside it. Only "missing", "refused" and "not replaced" earn
+								// BuildHitLocator alongside it. Only "missing" and "refused" earn
 								// it - the other flags stay in locator and read in the normal colour.
 		// --- what the replace wrote ---
 		// The WHOLE text a replace wrote at the row's place, taken as it was written (not capped for drawing like
@@ -460,8 +460,8 @@ namespace KFCResultModel
 
 
 	/** Is a row with this outcome still work - one its Replace can write? Only a row nothing was said about
-	    (kOutcomeNone): a row the replace found missing, locked, refused, deleted or left at an endnote's end
-	    says why on its locator and is not offered again. */
+	    (kOutcomeNone): a row the replace found missing, locked, refused or deleted says
+	    why on its locator and is not offered again. */
 	bool IsWorkOutcome(ChangeOutcome outcome);
 
 
@@ -542,7 +542,7 @@ namespace KFCResultModel
 	    pass and the post-replace thinning both call it, so the two cannot drift apart.
 
 	        P<page>(<n>) overset hidden locked     -> hit.locator
-	        missing | refused | not replaced       -> hit.accentFlag, drawn after it in accent colour
+	        missing | refused                      -> hit.accentFlag, drawn after it in accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
 	    spaces and spelled out IN FULL rather than clipped, because each one explains a row the user
@@ -551,7 +551,7 @@ namespace KFCResultModel
 
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
 	    found changed. Only the words that come from the row's outcome exclude each other, being values
-	    of one field: missing, refused, not replaced, and on the locator deleted.
+	    of one field: missing, refused, and on the locator deleted.
 
 	    The locator also says " deleted" (gone with the object another replaced row deleted). */
 	void BuildHitLocator(Hit& hit);

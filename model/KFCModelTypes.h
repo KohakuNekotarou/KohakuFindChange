@@ -39,11 +39,8 @@ namespace KFCResultModel
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
+		kOutcomeDeleted		// ticked, and gone WITH the footnote / table / anchored object another
 							// ticked row deleted - counted as done; no place to jump to
-		kOutcomeEndnoteLeft	// ticked, left alone: the match ends an endnote, and InDesign's replace
-							// breaks an endnote at its end (MatchEndsAnEndnote). Only this row is
-							// left - the replace goes one match at a time
 	};
 
 	enum SearchScopeKind
@@ -60,7 +57,7 @@ namespace KFCResultModel
 	struct RowDisplay
 	{
 		PMString		locator;	// "P1(2) overset hidden locked" - drawn at the full text colour
-		PMString		accentFlag;	// "missing" / "refused" / "not replaced", or empty - drawn in the accent
+		PMString		accentFlag;	// "missing" / "refused", or empty - drawn in the accent
 									// colour (BuildHitLocator's tests are the list of both strings)
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;

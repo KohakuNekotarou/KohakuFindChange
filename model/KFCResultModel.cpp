@@ -904,7 +904,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	//     and what has happened to it since: deleted;
 	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
 	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
-	//     would not run there), not replaced.
+	//     would not run there).
 	// Only hidden and locked come from the search itself; the rest are put there later - by a replace
 	// or a jump that finds the text gone. They stack on
 	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
@@ -931,8 +931,6 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
-	else if (hit.outcome == kOutcomeEndnoteLeft)
-		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 

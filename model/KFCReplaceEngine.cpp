@@ -25,7 +25,6 @@
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
 #include "ISession.h"				// GetExecutionContextSession - the walker's registry
-#include "IEndnoteFacade.h"			// MatchEndsAnEndnote - is it the endnote story, and an endnote range's marker
 
 // General includes:
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss / kTWReplaceTextCmdBoss / kFindChangeClientBoss
@@ -35,7 +34,6 @@
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode, GlobalErrorStatePreserver
 #include "ITextModel.h"				// QueryStoryThread / FindStoryThread - a row kept as "this far into this thread" (RowNow)
 #include "ITextStoryThread.h"
-#include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote's fallback)
 #include "WideString.h"			// GrepQueryHoldsLineStart: the query read as code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "KFCProgressBar.h"	// the replace's progress + cancel, as the search does it - the bar is the UI half's
@@ -302,33 +300,6 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 // dropped (the author's call) - it is in git history (c876bc7 and before).
 // ======================================================================================================
 
-// A REPLACE THAT WOULD WRITE AT AN ENDNOTE'S END. InDesign's replace - Change All,
-// changeText, one write over a range - that writes at the END of an endnote leaves the endnote's range
-// (IDML EndnoteRange) ending short, and the character before the overhang can never be deleted again
-// (measured, work/kbs-regress/probe-endnote-*-0927.jsx; no Track Changes needed). True = `matchEnd` is in
-// the endnote story and stands on an endnote range's marker. Asked by the replace (per row, as the walk
-// meets it).
-// ASKED OF InDesign's ENDNOTE FACADE.
-// Facade::IEndnoteFacade::IsEndnoteStory (as the product asks it, InCopyDocUtils.cpp:2389-2390) and
-// IsEndnoteTextRangeMarker: true on the U+FEFF an endnote range starts and ends with, false on the U+FEFF
-// of an index marker in the endnote's text (measured, KTRedlineProbe endnote) - which the class test
-// (kEndnoteStoryBoss and any U+FEFF, SnpManipulateTextEndnotes::IsEndnoteStory) takes for an endnote's
-// end, refusing a match that ends before an index marker. That test stays as the fallback, when the
-// facade is not there.
-bool MatchEndsAnEndnote(const UIDRef& story, TextIndex matchEnd)
-{
-	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	if (model == nil || matchEnd < 0 || matchEnd >= model->TotalLength())
-		return false;
-	Utils<Facade::IEndnoteFacade> endnotes;
-	if (endnotes)
-		return endnotes->IsEndnoteStory(story) && endnotes->IsEndnoteTextRangeMarker(matchEnd, model);
-	if (::GetClass(model) != kEndnoteStoryBoss)
-		return false;
-	TextIterator it(model, matchEnd);
-	return !it.IsNull() && (*it).GetValue() == kTextChar_ZeroSpaceNoBreak;
-}
-
 // ======================================================================================================
 // ONE MATCH AT A TIME, STORY BY STORY (the author's call). Only the rows asked for are written, one at a time
 // (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current), a story at a time, with Track
@@ -479,13 +450,13 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 
 // One story's walk: every pending row the walk meets is written, one at a time, in the direction the
 // session is set to (the caller's KFCBackwardSearchScope). What the walk writes moves every row after it
-// in the same thread (CarryRowsPast); a written row is put where its new text stands. A row that would
-// write at an endnote's end is left, and said so (MatchEndsAnEndnote). What is still in `pending` at the
+// in the same thread (CarryRowsPast); a written row is put where its new text stands - an endnote's
+// last match too, written as InDesign writes it (2026-10-06, spec F12). What is still in `pending` at the
 // end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
 // (Cancel is not asked in here - between stories, by the caller: the author's call, story by story.)
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
-	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
+	int32& ioReplaced, int32& ioRefused, bool& outWalkFailed,
 	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone)
 {
 	IDataBase* const db = storyRef.GetDataBase();
@@ -596,92 +567,81 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				continue;
 			pending.erase(hitIdx);
 
-			if (MatchEndsAnEndnote(story, end))
+			UIDRef written;
+			TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
+			// (Fault switch replace-refuse, a test build's only - KFCDiag.h: InDesign's replace refuses every row,
+			// the one way a test reaches a chapter where nothing lands.)
+			bool refuseForTest = false;
+#ifdef KFC_DIAG
+			refuseForTest = KFC_DIAG_FAULT("replace-refuse");
+#endif
+			KFC_CLOCK(cReplace);
+			const bool replacedHere = !refuseForTest
+				&& RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess;
+			KFC_SPENT(tReplace, cReplace);
+			if (replacedHere)
 			{
-				// InDesign's replace at an endnote's end breaks the endnote's range for good (see
-				// MatchEndsAnEndnote) - one at a time, only this row is left.
-				++ioEndnoteLeft;
-				KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeEndnoteLeft);
-				KeepRowAt(db, rowNow, keptRows, hitIdx, story.GetUID(), start, end);
+				++ioReplaced;
+#ifdef KFC_DIAG
+				++timedRows;
+#endif
+				lastStory = written.GetUID();
+				lastStart = writtenStart;
+				lastEnd = writtenEnd;
+				// WHAT IT WROTE, TAKEN HERE - once (Hit::replacedText): the jump looks for a moved row by it
+				// (KFCSearchEngine::RelocateStaleRow). The text written now is the text the row holds at the end: no
+				// later replace of the run writes inside it, since every other row is carried outside it and a match
+				// there is none of theirs (stepped over, above).
+				KFC_CLOCK(cTexts);
+				KFCResultModel::SetHitWrittenText(chapterIdx, hitIdx,
+					KFCSearchEngine::ReadText(written, writtenStart, writtenEnd - writtenStart));
+				KFCResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+				KFC_SPENT(tTexts, cTexts);
+				KFC_CLOCK(cCarry);
+				// every row after it first, then this row at what was written - so it is not moved by itself
+				CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
+					end - matchThreadStart, writtenEnd - writtenStart);
+				KeepRowAt(db, rowNow, keptRows, hitIdx, written.GetUID(), writtenStart, writtenEnd);
+				KFC_SPENT(tCarry, cCarry);
+#ifdef KFC_DIAG
+				// THE WALK STARTED AGAIN (fault switch perf-fresh-walker - a measurement, not the product's walk): a
+				// new scope and a new find/change client on the walker, mode 2 from where this write ended (a
+				// story scope given a range starts there and loops back to the top - IWalkerScopeFactoryUtils.h;
+				// the rows the loop meets again are none of the pending ones, RowOfMatchAnyOrder), mode 3 from the
+				// top. GREP's lookbehind does not see past where a walk resumes either way.
+				if (restartMode >= 2 && restartEvery > 0 && !walkingBackward && !pending.empty()
+					&& ++writesSinceRestart >= restartEvery)
+				{
+					writesSinceRestart = 0;
+					Text::StoryRangeList from;
+					from.push_back(Text::StoryRange(writtenEnd, writtenEnd));
+					InterfacePtr<ITextWalkerScope> freshScope((restartMode == 2)
+						? Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, from, scopeOptions)
+						: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
+					InterfacePtr<ITextWalkerClient> freshClient(static_cast<ITextWalkerClient*>(
+						::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
+					if (freshScope != nil && freshClient != nil)
+					{
+						if (walker->IsWalking())
+							walker->Halt();
+						walker->Initialize(freshClient, freshScope, opts, nil);
+						scope.reset(freshScope.forget());
+						client.reset(freshClient.forget());
+						++restarts;
+						justRestarted = true;
+						restartAt = writtenEnd;
+						// the written range is behind the walk now; a loop back past it meets no pending row
+					}
+					else
+						KFC_DIAG_LOG("RESTART story=%u could not build the scope or the client", storyRef.GetUID().Get());
+				}
+#endif
 			}
 			else
 			{
-				UIDRef written;
-				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
-				// (Fault switch replace-refuse, a test build's only - KFCDiag.h: InDesign's replace refuses every row,
-				// the one way a test reaches a chapter where nothing lands.)
-				bool refuseForTest = false;
-#ifdef KFC_DIAG
-				refuseForTest = KFC_DIAG_FAULT("replace-refuse");
-#endif
-				KFC_CLOCK(cReplace);
-				const bool replacedHere = !refuseForTest
-					&& RunWalkerCmd(kTWReplaceTextCmdBoss, walker, written, writtenStart, writtenEnd) == IFindChangeService::kSuccess;
-				KFC_SPENT(tReplace, cReplace);
-				if (replacedHere)
-				{
-					++ioReplaced;
-#ifdef KFC_DIAG
-					++timedRows;
-#endif
-					lastStory = written.GetUID();
-					lastStart = writtenStart;
-					lastEnd = writtenEnd;
-					// WHAT IT WROTE, TAKEN HERE - once (Hit::replacedText): the jump looks for a moved row by it
-					// (KFCSearchEngine::RelocateStaleRow). The text written now is the text the row holds at the end: no
-					// later replace of the run writes inside it, since every other row is carried outside it and a match
-					// there is none of theirs (stepped over, above).
-					KFC_CLOCK(cTexts);
-					KFCResultModel::SetHitWrittenText(chapterIdx, hitIdx,
-						KFCSearchEngine::ReadText(written, writtenStart, writtenEnd - writtenStart));
-					KFCResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
-					KFC_SPENT(tTexts, cTexts);
-					KFC_CLOCK(cCarry);
-					// every row after it first, then this row at what was written - so it is not moved by itself
-					CarryRowsPast(rowNow, story.GetUID(), matchDict, matchKey, start - matchThreadStart,
-						end - matchThreadStart, writtenEnd - writtenStart);
-					KeepRowAt(db, rowNow, keptRows, hitIdx, written.GetUID(), writtenStart, writtenEnd);
-					KFC_SPENT(tCarry, cCarry);
-#ifdef KFC_DIAG
-					// THE WALK STARTED AGAIN (fault switch perf-fresh-walker - a measurement, not the product's walk): a
-					// new scope and a new find/change client on the walker, mode 2 from where this write ended (a
-					// story scope given a range starts there and loops back to the top - IWalkerScopeFactoryUtils.h;
-					// the rows the loop meets again are none of the pending ones, RowOfMatchAnyOrder), mode 3 from the
-					// top. GREP's lookbehind does not see past where a walk resumes either way.
-					if (restartMode >= 2 && restartEvery > 0 && !walkingBackward && !pending.empty()
-						&& ++writesSinceRestart >= restartEvery)
-					{
-						writesSinceRestart = 0;
-						Text::StoryRangeList from;
-						from.push_back(Text::StoryRange(writtenEnd, writtenEnd));
-						InterfacePtr<ITextWalkerScope> freshScope((restartMode == 2)
-							? Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, from, scopeOptions)
-							: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
-						InterfacePtr<ITextWalkerClient> freshClient(static_cast<ITextWalkerClient*>(
-							::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
-						if (freshScope != nil && freshClient != nil)
-						{
-							if (walker->IsWalking())
-								walker->Halt();
-							walker->Initialize(freshClient, freshScope, opts, nil);
-							scope.reset(freshScope.forget());
-							client.reset(freshClient.forget());
-							++restarts;
-							justRestarted = true;
-							restartAt = writtenEnd;
-							// the written range is behind the walk now; a loop back past it meets no pending row
-						}
-						else
-							KFC_DIAG_LOG("RESTART story=%u could not build the scope or the client", storyRef.GetUID().Get());
-					}
-#endif
-				}
-				else
-				{
-					++ioRefused;
-					KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeRefused);
-					KeepRowAt(db, rowNow, keptRows, hitIdx, story.GetUID(), start, end);
-				}
+				++ioRefused;
+				KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeRefused);
+				KeepRowAt(db, rowNow, keptRows, hitIdx, story.GetUID(), start, end);
 			}
 			++ioDone;
 			KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
@@ -792,7 +752,7 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 // outCancelled / outFailed: the caller aborts the whole run.
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
-	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
+	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused,
 	bool& outWalkFailed, bool& outCancelled, bool& outFailed,
 	PMString& outWhyNot, const std::set<int32>* onlyHits = nil)
 {
@@ -800,7 +760,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
-	outEndnoteLeft = 0;
 	outWalkFailed = false;
 	outCancelled = false;
 	outFailed = false;
@@ -847,7 +806,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			// wrote, or, having written nothing, sit in a story as KFC left it): one an edit has moved is left as it
 			// is, never read back at a place
 			// that is no longer its own.
-			// ...and a row with an outcome (missing, refused, an endnote's end): the list keeps it, so it is carried
+			// ...and a row with an outcome (missing, refused): the list keeps it, so it is carried
 			// like the rest.
 			// Its place is taken only here, after RowStillStands, which can move it: every other row not
 			// written stays unknown - neither carried nor read back.
@@ -919,7 +878,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		if (db->IsValidUID(s->first))
 		{
 			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
-				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase,
+				outReplaced, outRefused, outWalkFailed, progressBar, progressBase,
 				ioProgressReported, done))
 			{
 				outFailed = true;
@@ -1482,7 +1441,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			writtenStories.insert(story);
 	}
 
-	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0;
+	int32 replaced = 0, missing = 0, locked = 0, refused = 0;
 	bool walkFailed = false, cancelled = false, failed = false;
 	PMString whyNot;
 	bool ok = false;
@@ -1503,7 +1462,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		// (the row backup was started by the recorder, above)
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
-			replaced, missing, locked, refused, endnoteLeft, walkFailed, cancelled, failed, whyNot,
+			replaced, missing, locked, refused, walkFailed, cancelled, failed, whyNot,
 			&rowsToReplace);
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
 		if (ok)
@@ -1518,12 +1477,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		const char* why = nil;
 		int32 stopping = 0;
 		bool searchAgain = false;
-		if (endnoteLeft > 0)
-		{
-			stopping = endnoteLeft;
-			why = "the match ends an endnote, and InDesign's replace breaks an endnote there";
-		}
-		else if (locked > 0)
+		if (locked > 0)
 		{
 			stopping = locked;
 			why = "the match is locked now (a locked layer or story)";
