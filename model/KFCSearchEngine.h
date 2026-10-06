@@ -26,7 +26,6 @@
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
 #include "KFCResultModel.h"		// Hit - CollectStoryHits fills them
-#include "KFCBookScope.h"		// ChapterDoc - a query run's held targets (SearchHeldTargets)
 #ifdef KFC_DIAG
 #endif
 
@@ -121,23 +120,6 @@ namespace KFCSearchEngine
 	    format? (HasFindQuery, which SearchBook asks before its commit point.) */
 	bool HasFindQueryNow();
 
-	/** What a held search found (SearchHeldTargets). */
-	struct HeldSearchOutcome
-	{
-		int32		total;
-		bool		capped;		// stopped at kKFCCollectHitLimit
-		bool		cancelled;	// Cancel pressed on the bar
-		PMString	notes;		// chapters that could not be searched / broke off, said as SearchBook says them
-		HeldSearchOutcome() : total(0), capped(false), cancelled(false) { notes.SetTranslatable(kFalse); }
-	};
-
-	/** A QUERY RUN'S SEARCH (KFCQuerySequence, 2026-10-04) over documents the caller has OPEN and holds: no door,
-	    no commit point and nothing opened or closed (the caller cleared the model and stated the tab -
-	    CommitSearchMode). Records the scope, the tab, the walk signature and the find format on the results as
-	    SearchBook does, then walks with SearchBook's own loops (CollectTargets) and leaves every hit in the model. */
-	void SearchHeldTargets(std::vector<KFCBookScope::ChapterDoc>& targets, const RunScope& scope,
-		const PMString& bookName, const PMString& barTitle, HeldSearchOutcome& out);
-
 	/** Is a search running right now? The progress bar pumps events while it is up, so a menu
 	    command could otherwise be dispatched INTO a running search. The panel's actions ask this
 	    and grey themselves out; SearchBook itself turns a re-entrant call away as a last resort. */
@@ -207,8 +189,7 @@ namespace KFCSearchEngine
 
 	    @return true when it is safe to replace.
 	    @note Same as CommitSearchMode - call it OUTSIDE any command sequence (and the same one exception:
-	          the query run's write, KFCReplaceEngine::WriteCheckedInHeldSequence, states it inside the run's
-	          sequence). */
+	          the query run, KFCQuerySequence::Run, states it for each query inside the run's sequence). */
 	bool CommitReplaceSide();
 
 	/** The Find/Change dialog's English name for a tab (an IFindChangeOptions::SearchMode value):

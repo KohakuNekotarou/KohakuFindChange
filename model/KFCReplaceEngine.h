@@ -134,37 +134,6 @@ namespace KFCReplaceEngine
 	    @return the number of hits actually replaced (0 on any early exit). */
 	int32 ReplaceChecked(PMString& outSummary);
 
-	/** What a query run's write did (WriteCheckedInHeldSequence). */
-	struct WriteOutcome
-	{
-		int32		replaced;		// rows rewritten
-		int32		missing;		// checked rows whose text was not where the row says
-		int32		locked;			// checked rows on a locked layer or in a locked story
-		int32		refused;		// rows InDesign's replace command said no to
-		int32		endnoteLeft;	// rows at an endnote's end, left alone
-		int32		unrecorded;		// rows written that left no tracked change (a footnote's)
-		int32		acceptedFirst;	// pending changes of somebody else's accepted before a write
-		bool		cancelled;		// Cancel pressed on the bar
-		bool		failed;			// the write could not go on - `why` says so
-		PMString	why;
-		std::vector<UIDRef>	touchedDocs;	// documents a replacement (or an accept) landed in
-		WriteOutcome() : replaced(0), missing(0), locked(0), refused(0), endnoteLeft(0), unrecorded(0),
-			acceptedFirst(0), cancelled(false), failed(false) { why.SetTranslatable(kFalse); }
-	};
-
-	/** A QUERY RUN'S WRITE (KFCQuerySequence, 2026-10-04): every checked row of the results, inside the command
-	    sequence the CALLER holds open, through Change Checked's own writing loop (WriteCheckedChapters). Every
-	    chapter with a checked row must be OPEN - the caller opened and holds them; nothing is opened or closed
-	    here, and a chapter that is not open fails the write before a character is written. States the change side
-	    (KFCSearchEngine::CommitReplaceSide), turns the session's direction for a GREP ^ query as Change Checked
-	    does, and starts a signed run of its own (KFCTrackChange::BeginSignedRun). No verify pass: the rows come
-	    from a search made a moment ago inside the same sequence. Nothing is signed while a query run writes
-	    (KFCTrackChange::QueryRunWriting): the run signs at its end, a place at a time (KFCTrackChange::SignRunPlaces -
-	    the spec's D14; its D13, InDesign's Change All, was taken back on 2026-10-05: one match at a time, as Change
-	    Checked writes).
-	    @return true when it went through (not cancelled, not failed). */
-	bool WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out);
-
 	/** Do the current Find/Change settings still describe the search the panel's results came from?
 
 	    Two questions, most specific first:

@@ -34,12 +34,6 @@ namespace
 	// The Search: they were searched with. See KFCResultModel::SetSearchScope.
 	KFCResultModel::SearchScopeKind gSearchScope = KFCResultModel::kScopeDocument;
 
-	// Were these rows rebuilt from the Track Changes records? See KFCResultModel::SetFromRecords.
-	bool gFromRecords = false;
-
-	// Is this list a query run's? See KFCResultModel::SetFromQueryRun.
-	bool gFromQueryRun = false;
-
 	// The book those results came from (file name only). Drawn on the tree's book row.
 	PMString gBookName;
 
@@ -181,10 +175,6 @@ namespace
 	// to change it; an outcome already says why it was left alone.
 	bool RowHasCheckBox(const KFCResultModel::Hit& hit)
 	{
-		// A list rebuilt from the records offers no replace at all (the author's call).
-		if (gFromRecords)
-			return false;
-
 		// A replace's report offers work only on the rows Reject Change put back (the author's call). This
 		// is the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
 		// taken back and still open is exactly what makes that question answer no, and every other row
@@ -316,8 +306,6 @@ void KFCResultModel::Clear()
 	gShowingOutcome = false;
 	gFromBook = false;
 	gSearchScope = kScopeDocument;
-	gFromRecords = false;
-	gFromQueryRun = false;
 	gBookName.Clear();
 	gSearchMode = -1;
 	gWalkSignature.Clear();
@@ -440,31 +428,8 @@ int32 KFCResultModel::GetShownChapterPos(int32 chapterIdx)
 	return (pos < GetDisplayChapterCount()) ? pos : -1;
 }
 
-void KFCResultModel::SetFromRecords(bool fromRecords)
-{
-	gFromRecords = fromRecords;
-}
-
-bool KFCResultModel::IsFromRecords()
-{
-	return gFromRecords;
-}
-
-void KFCResultModel::SetFromQueryRun(bool fromQueryRun)
-{
-	gFromQueryRun = fromQueryRun;
-}
-
-bool KFCResultModel::IsFromQueryRun()
-{
-	return gFromQueryRun;
-}
-
 bool KFCResultModel::NoRowHasCheckBox()
 {
-	// A list rebuilt from the records has no box anywhere - RowHasCheckBox's first answer.
-	if (gFromRecords)
-		return true;
 	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
 	// The two are the same question - see the header for why both halves have to be asked.
 	// EXCEPT A REPORT HOLDING A ROW TAKEN BACK (the author's call): that row carries a box.
@@ -1311,10 +1276,6 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// original text again, which is what the author asked for; the state is still there for the story
 	// and document rows' Replace Again (Redo in the code); a reader of the panel sees the row's check
 	// box come back.
-	// EXCEPT ON A LIST REBUILT FROM THE RECORDS. No row there carries a box, so nothing else would
-	// tell a row taken back from one still replaced.
-	else if (hit.outcome == kOutcomeRejected && gFromRecords)
-		hit.locator.Append(" rejected");
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 
@@ -1452,8 +1413,6 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 	out.layout = gLayoutGeneration;
 	out.fromBook = gFromBook;
 	out.searchScope = gSearchScope;
-	out.fromRecords = gFromRecords;
-	out.fromQueryRun = gFromQueryRun;
 	out.bookName = gBookName;
 	out.searchMode = gSearchMode;
 	out.walkSignature = gWalkSignature;
@@ -1467,8 +1426,6 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	gLayoutGeneration = snapshot.layout;
 	gFromBook = snapshot.fromBook;
 	gSearchScope = snapshot.searchScope;
-	gFromRecords = snapshot.fromRecords;
-	gFromQueryRun = snapshot.fromQueryRun;
 	gBookName = snapshot.bookName;
 	gSearchMode = snapshot.searchMode;
 	gWalkSignature = snapshot.walkSignature;

@@ -3193,42 +3193,6 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 	return true;
 }
 
-void KFCSearchEngine::SearchHeldTargets(std::vector<KFCBookScope::ChapterDoc>& targets, const RunScope& scope,
-	const PMString& bookName, const PMString& barTitle, HeldSearchOutcome& out)
-{
-	out = HeldSearchOutcome();
-	KFCForwardSearchScope forward;		// forward, as SearchBook walks (put back as this returns)
-	const IWalkerScopeFactoryUtils::WalkScopeType selectionScope =
-		static_cast<IWalkerScopeFactoryUtils::WalkScopeType>(scope.selectionScope);
-	// The results' header, as SearchBook records it past its commit point (the same lines).
-	KFCResultModel::SetFromBook(scope.fromBook);
-	KFCResultModel::SetSearchScope(scope.fromBook ? KFCResultModel::kScopeBook
-		: scope.allDocuments ? KFCResultModel::kScopeAllDocuments
-		: (selectionScope == IWalkerScopeFactoryUtils::kStoryScope) ? KFCResultModel::kScopeStory
-		: (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope) ? KFCResultModel::kScopeToEndOfStory
-		: (selectionScope == IWalkerScopeFactoryUtils::kSelectionScope) ? KFCResultModel::kScopeSelection
-		: KFCResultModel::kScopeDocument);
-	KFCResultModel::NoteRun();
-	KFCResultModel::SetBookName(bookName);
-	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
-	{
-		PMString walkSignature;
-		KFCSearchEngine::BuildWalkSignature(walkSignature);
-		KFCResultModel::SetWalkSignature(walkSignature);
-	}
-	KFCSearchEngine::RememberFindFormat();
-
-	std::vector<KFCBookScope::SkippedChapter> unopenable;	// none: the targets are open
-	CollectTally tally;
-	CollectTargets(targets, scope.fromBook, scope.allDocuments, selectionScope, true /*keepOpen*/, barTitle,
-		unopenable, tally);
-	out.total = tally.total;
-	out.capped = tally.truncated;
-	out.cancelled = tally.cancelled;
-	AppendUnsearchableNote(out.notes, tally.unsearchable);
-	AppendSearchErrorNote(out.notes, tally.brokeOff);
-}
-
 bool KFCSearchEngine::IsSearching()
 {
 	return gSearching;

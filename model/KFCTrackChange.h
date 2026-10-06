@@ -187,7 +187,7 @@ namespace KFCTrackChange
 	    match in order (a GREP $n keeps some of the match: those are stepped over) and its mask extended. A deletion
 	    that does not line up, or a time that carries two deletions in the window, loses its mask (read as it
 	    stands). ApplyRunNotes takes the masked characters out of the records CollectRecordsOfTimes read;
-	    RunMaskedText does it for one deletion's text (KFCShowChanges::ListOwnRun). SetOwnRunFloor starts the masks
+	    RunMaskedText does it for one deletion's text (the query run's list - gone 2026-10-06). SetOwnRunFloor starts the masks
 	    afresh and ClearRunNotes ends them - after the list is built, not with the floor. */
 	struct RunDeletion
 	{

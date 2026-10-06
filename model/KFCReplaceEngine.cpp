@@ -2132,12 +2132,6 @@ bool KFCReplaceEngine::RefuseChangedQuery(PMString& outSummary)
 
 bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 {
-	// NO SEARCH, NOTHING TO COMPARE WITH. A list rebuilt from the records has no tab and no signature on
-	// it, which CompareQueryWithSearch reads as "cannot tell" and so as UNCHANGED - and the jump would then
-	// walk the story under whatever Find/Change holds now to look for a row (RelocateStaleRow). Those rows
-	// were never a query's matches.
-	if (KFCResultModel::IsFromRecords())
-		return false;
 	return CompareQueryWithSearch() == kQueryUnchanged;
 }
 
@@ -2173,14 +2167,6 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	if (chapterCount <= 0)
 	{
 		outSummary.Append("No results to replace - run a search first.");
-		return 0;
-	}
-	// A LIST REBUILT FROM THE RECORDS OFFERS NO REPLACE (the author's call). No row
-	// there carries a box and the menu greys this command; this is the same door for a caller that never
-	// went through the menu. Asked ahead of the report's door below, which would call it a report.
-	if (KFCResultModel::IsFromRecords())
-	{
-		outSummary.Append("Change Checked: these rows were rebuilt from Track Changes - search again to replace.");
 		return 0;
 	}
 	// The panel is a report of what the LAST replace did, not a work list. Asked first, because a
@@ -2792,70 +2778,6 @@ int32 KFCReplaceEngine::ReplaceChecked(PMString& outSummary)
 	return totals.replaced;
 }
 
-bool KFCReplaceEngine::WriteCheckedInHeldSequence(const PMString& barTitle, WriteOutcome& out)
-{
-	out = WriteOutcome();
-	if (!KFCSearchEngine::CommitReplaceSide())
-	{
-		out.failed = true;
-		out.why = "the Find/Change settings could not be read";
-		return false;
-	}
-	WalkerScopeOptions scopeOptions;
-	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-
-	// The run's chapter list, as ReplaceChecked builds it - every chapter with a checked row - but every one of
-	// them must already be open: the query run holds its documents for the whole run.
-	std::vector<PendingChapter> pending;
-	int32 totalChecked = 0;
-	const int32 chapterCount = KFCResultModel::GetChapterCount();
-	for (int32 ci = 0; ci < chapterCount; ++ci)
-	{
-		const int32 checkedHere = KFCResultModel::GetChapterCheckedCount(ci);
-		if (checkedHere <= 0)
-			continue;
-		PendingChapter chapter;
-		chapter.chapterIdx = ci;
-		chapter.checkedCount = checkedHere;
-		IDFile file;
-		if (!KFCResultModel::GetChapterLocation(ci, chapter.docRef, file) || !KFCBookScope::IsDocStillOpen(chapter.docRef))
-		{
-			out.failed = true;
-			out.why = "a document of the run was not open";
-			return false;
-		}
-		chapter.opened = true;
-		pending.push_back(chapter);
-		totalChecked += checkedHere;
-	}
-	if (pending.empty())
-		return true;
-
-	const KFCBackwardSearchScope writeDirection(WriteBackward());
-	KFCTrackChange::BeginSignedRun();
-	RunTotals totals;
-	{
-		KFCProgressBar progressBar(barTitle, 0, totalChecked, kTrue, kTrue);
-		progressBar.DisableChildProgressBars(kTrue);
-		WriteCheckedChapters(pending, scopeOptions, progressBar, totals);
-	}
-	out.replaced = totals.replaced;
-	out.missing = totals.missing;
-	out.locked = totals.locked;
-	out.refused = totals.refused;
-	out.endnoteLeft = totals.endnoteLeft;
-	out.unrecorded = totals.unrecorded;
-	out.acceptedFirst = totals.acceptedFirst;
-	out.failed = totals.stoppedByFailure;
-	out.cancelled = totals.cancelled && !totals.stoppedByFailure;
-	if (out.failed)
-		out.why = totals.errorText;
-	for (size_t pi = 0; pi < pending.size(); ++pi)
-		if (pending[pi].tookReplacement)
-			out.touchedDocs.push_back(pending[pi].docRef);
-	return !out.cancelled && !out.failed;
-}
-
 bool KFCReplaceEngine::IsReplacing()
 {
 	return gReplacing;
@@ -2933,8 +2855,7 @@ static void WriteBackRows(int32 chapterIdx, IDataBase* db, const std::vector<Row
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
 	bool checked = false, replaced = false, locked = false;
-	// (not on a list rebuilt from the records - the author's call: to replace again, search again)
-	return !gReplacing && !KFCResultModel::IsFromRecords()
+	return !gReplacing
 		&& KFCResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked)
 		&& !replaced && !locked
 		&& KFCResultModel::IsWorkOutcome(KFCResultModel::GetHitOutcome(chapterIdx, hitIdx));

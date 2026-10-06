@@ -244,22 +244,6 @@ namespace KFCResultModel
 	/** The reverse: chapter 'chapterIdx''s place among the shown chapters; -1 = not shown. */
 	int32 GetShownChapterPos(int32 chapterIdx);
 
-	/** WERE THESE ROWS REBUILT FROM THE TRACK CHANGES RECORDS (Show Changes by KohakuFindChange)?
-	    Such a list was searched by nothing: no query, no walk signature, no search mode - there is
-	    nothing to line a replace up with, so it offers NO replace of any kind (the author's call: to
-	    replace again, search again). While it is on, no row carries a check box
-	    (RowHasCheckBox, NoRowHasCheckBox) and the replace's doors refuse (KFCReplaceEngine). Reject Change
-	    and Accept Change work on it, and a row they took back says so ("rejected" - there is no box to say
-	    it). Set beside SetFromBook, after the commit point; cleared by Clear(). */
-	void SetFromRecords(bool fromRecords);
-	bool IsFromRecords();
-
-	/** IS THIS LIST A QUERY RUN'S (KFCQuerySequence, 2026-10-04)? Rebuilt from the records like Show Changes'
-	    (SetFromRecords is set with it), but its rows are not taken back one at a time: the whole run is one undo step
-	    (the spec's D5), so Reject Change and Accept Change refuse on it and say to use Ctrl+Z. Cleared by Clear(). */
-	void SetFromQueryRun(bool fromQueryRun);
-	bool IsFromQueryRun();
-
 	/** Has a command been RUN since the results were last discarded?
 
 	    NOT the same question as "are there any hits": a search that found nothing has still been
@@ -282,7 +266,7 @@ namespace KFCResultModel
 
 	/** Does NO row of this result set carry a check box?
 
-	    A property of the WHOLE list: a list rebuilt from the records (IsFromRecords), or a replace's
+	    A property of the WHOLE list: a replace's
 	    REPORT - what is left after every row lost its box at once (IsShowingReplaceOutcome) - unless a
 	    row of it has been taken back with Reject Change.
 
@@ -859,14 +843,12 @@ namespace KFCResultModel
 		// before and after share one, so nothing changes for it)
 		bool					fromBook;
 		SearchScopeKind			searchScope;
-		bool					fromRecords;
-		bool					fromQueryRun;
 		PMString				bookName;
 		int32					searchMode;
 		PMString				walkSignature;
 		bool					hasRun;
 		ModelSnapshot() : showingOutcome(false), layout(0), fromBook(false), searchScope(kScopeDocument),
-			fromRecords(false), fromQueryRun(false), searchMode(-1), hasRun(false) {}
+			searchMode(-1), hasRun(false) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);
 	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they

@@ -43,13 +43,12 @@
 //  panel to follow it.
 //
 //  WHAT IS NOT FOLLOWED: anything that is not a write of KFC's own - typing, the Track Changes panel, a
-//  script, a replace made before Show Changes rebuilt the list. Those leave the rows as they are; the
-//  doors that are there for them (the story's version, the row's text, the records' times) still stand.
-//  KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer it again. Measured: Show Changes, then a
-//  Ctrl+Z of the replace it listed - the text came back, the list kept both rows and "Found 2 change(s)",
-//  and said nothing until a row was touched (its right-click is greyed with the reason, its jump says
-//  "undone, or edited since"). Saying so on the status line, or reading the records again, were offered
-//  and not taken.
+//  script. Those leave the rows as they are; the doors that are there for them (the story's version, the
+//  row's text, the records' times) still stand. KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer
+//  it again. (Measured on a list Show Changes had rebuilt - a command gone since 2026-10-06: after a Ctrl+Z
+//  of the replace it listed, the list kept its rows and said nothing until a row was touched - its
+//  right-click greyed with the reason, its jump saying "undone, or edited since". Saying so on the status
+//  line, or reading the records again, were offered and not taken.)
 //
 //========================================================================================
 
@@ -101,11 +100,12 @@ namespace KFCUndoFollow
 	};
 
 	/** A QUERY RUN, RECORDED (KFCQuerySequence, 2026-10-04) - not a StepRecorder: the stories it writes are known only
-	    once each query has searched, and the list it leaves is a new one. Made at the run's commit point, BEFORE the
-	    list is cleared: the list as it is then is copied whole (what an Undo puts back). ReadStories = every text model's
-	    version in the run's documents, before a character is written. Keep = the run went through and the list shows it:
-	    kept as kStepRunQueries, in the result set the list is now. RestoreBefore = the run was undone (cancelled, failed):
-	    the list goes back as it was and nothing is kept. While one stands nothing is followed. */
+	    once each query has run, and the list it leaves is a new one - an empty one since 2026-10-06 (F7: each query
+	    with InDesign's Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it
+	    is then is copied whole (what an Undo puts back). ReadStories = every text model's version in the run's
+	    documents, before a character is written. Keep = the run went through: kept as kStepRunQueries, in the result
+	    set the list is now. RestoreBefore = the run was undone (cancelled, failed): the list goes back as it was and
+	    nothing is kept. While one stands nothing is followed. */
 	class RunRecorder
 	{
 	public:

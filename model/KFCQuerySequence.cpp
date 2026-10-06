@@ -18,6 +18,7 @@
 #include "IDocumentList.h"
 #include "ISysFileData.h"
 #include "IUIFlagData.h"
+#include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
 
 // General includes:
 #include "CmdUtils.h"
@@ -33,17 +34,15 @@
 // Project includes:
 #include "KFCQuerySequence.h"
 #include "KFCBookScope.h"
+#include "KFCChangeAll.h"		// WriteDocument - each query a document at a time with InDesign's own Change All (F7)
 #include "KFCDiag.h"
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
-#include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
 #include "KFCSearchEngine.h"
-#include "KFCShowChanges.h"
-#include "KFCTrackChange.h"
 #include "KFCUndoFollow.h"
 
 namespace
@@ -136,7 +135,7 @@ bool KFCQuerySequence::IsRunning()
 	return gRunning;
 }
 
-int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResults, PMString& outSummary)
+int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 {
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
@@ -233,20 +232,16 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	recorder.ReadStories(targets);
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
-	const uint64 floor = KFCTrackChange::OwnRunFloorNow();
-	KFCTrackChange::SetOwnRunFloor(floor);
 	std::vector<int32> perQuery(queries.size(), -1);
 	std::vector<PMString> skippedNoFile, skippedNothing;
 	std::vector<UIDRef> touched;
-	int32 replaced = 0, unrecorded = 0, locked = 0;
-	int32 missing = 0, refused = 0, endnoteLeft = 0, acceptedFirst = 0;		// the write's other counts, said as Change Checked says them
+	int32 replaced = 0;
 	bool cancelled = false, failed = false;
 	PMString why;
 	why.SetTranslatable(kFalse);
 	IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC Run Queries");
 	if (seq == nil)
 	{
-		KFCTrackChange::ClearOwnRunFloor();
 		KFCBookScope::ReleaseHeldDocs(true);
 		recorder.RestoreBefore();
 		outSummary.Append("Could not start an undoable step - nothing was run.");
@@ -254,12 +249,9 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	}
 	seq->SetName(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep));
 
-	// ONE BAR FOR THE WHOLE RUN (2026-10-05, the deferred minor of the re-check): the search and the write put up a bar
-	// of their own for every query x chapter - a window opened and closed each time. This one stands for the run, a
-	// query x chapter a step, and theirs subdivide its current step instead (ProgressBar.h: a progress bar further
-	// down the stack subdivides the one above unless that one called DisableChildProgressBars) - one window stays up.
-	// Its Cancel is asked between steps too. It comes down before the sequence ends: chapters are handed back and
-	// the list is built with no bar up, as Change Checked does.
+	// ONE BAR FOR THE WHOLE RUN (2026-10-05, the deferred minor of the re-check): a query x document a step, its Cancel
+	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
+	// before the sequence ends: the chapters are handed back with no bar up.
 	{
 		const int32 units = static_cast<int32>(queries.size() * targets.size());
 		KFCProgressBar runBar(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep), 0, units, kTrue, kTrue);
@@ -290,9 +282,20 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 				break;
 			}
 			perQuery[q] = 0;
-			// ONE CHAPTER (DOCUMENT) AT A TIME (the spec's D8, 2026-10-05): searched and written before the next, so the
-			// collect limit (kKFCCollectHitLimit) counts a chapter, not the book - a book of ten thousand matches goes
-			// through. Every chapter is already open and held: nothing is opened or closed between the writes.
+			// THE CHANGE SIDE, STATED HERE - inside the run's sequence (the query run's one exception to CommitReplaceSide's
+			// rule): a Ctrl+Z of the run takes the whole of it back, the stated side included.
+			if (!KFCSearchEngine::CommitReplaceSide())
+			{
+				failed = true;
+				why = "the Change To in Find/Change could not be stated for ";
+				why.Append(query.name);
+				break;
+			}
+			// THE QUERY'S OWN FIVE SWITCHES (footnotes, hidden layers, locked layers and stories, master pages): the query
+			// just loaded set them, so they are read now - read once for the run, every query would walk with the first's.
+			WalkerScopeOptions scopeOptions;
+			KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+			// ONE DOCUMENT AT A TIME - every one already open and held: nothing is opened or closed between the writes.
 			for (size_t d = 0; d < targets.size() && !cancelled && !failed; ++d)
 			{
 				PMString title("Query ");
@@ -307,7 +310,6 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 					title.Append(" - ");
 					title.Append(targets[d].shortName);
 				}
-				std::vector<KFCBookScope::ChapterDoc> one(1, targets[d]);
 				runBar.SetPosition(unit++);
 				runBar.SetTaskText(title);
 				if (runBar.WasCancelled(kFalse))
@@ -316,61 +318,28 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 					break;
 				}
 
-				KFCResultModel::Clear();
-				KFCSearchEngine::ForgetSearchedFindFormat();
-				KFCSearchEngine::HeldSearchOutcome found;
-				KFCSearchEngine::SearchHeldTargets(one, scope, bookName, title, found);
-				if (found.cancelled)
-				{
-					cancelled = true;
-					break;
-				}
-				if (found.capped)
+				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
+				// section 5): no rows collected, no limit. A book or All Documents writes each document whole; Story / To End
+				// of Story / Selection write that part of the front document (the one target).
+				const int32 writeScope = (scope.fromBook || scope.allDocuments)
+					? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope;
+				int32 count = 0;
+				if (!KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count))
 				{
 					failed = true;
-					why = "\"";
+					why = "InDesign's Change All failed for ";
 					why.Append(query.name);
-					why.Append("\" found more than ");
-					why.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-					why.Append(" matches in ");
-					why.Append(targets[d].shortName);
-					why.Append(" - narrow the query");
 					break;
 				}
-				if (found.total == 0)
-					continue;
-				KFCResultModel::SetAllChecked(true);		// (a row with no box - a locked one - is skipped: SetAllChecked)
-				locked += found.total - KFCResultModel::GetCheckedCount();
-				KFCReplaceEngine::WriteOutcome wrote;
-				// ONE MATCH AT A TIME - Change Checked's own writing loop (the spec's D13, InDesign's Change All, was taken
-				// back by the author on 2026-10-05 evening).
-				KFCReplaceEngine::WriteCheckedInHeldSequence(title, wrote);
-				if (wrote.cancelled)
-				{
-					cancelled = true;
-					break;
-				}
-				if (wrote.failed)
-				{
-					failed = true;
-					why = wrote.why;
-					break;
-				}
-				perQuery[q] += wrote.replaced;
-				replaced += wrote.replaced;
-				unrecorded += wrote.unrecorded;
-				missing += wrote.missing;
-				refused += wrote.refused;
-				endnoteLeft += wrote.endnoteLeft;
-				acceptedFirst += wrote.acceptedFirst;
-				locked += wrote.locked;		// a ticked row the write found locked (the rows with no box are counted above)
-				for (size_t t = 0; t < wrote.touchedDocs.size(); ++t)
+				perQuery[q] += count;
+				replaced += count;
+				if (count > 0)
 				{
 					bool known = false;
 					for (size_t k = 0; k < touched.size() && !known; ++k)
-						known = SameDoc(touched[k], wrote.touchedDocs[t]);
+						known = SameDoc(touched[k], targets[d].docRef);
 					if (!known)
-						touched.push_back(wrote.touchedDocs[t]);
+						touched.push_back(targets[d].docRef);
 				}
 			}
 		}
@@ -382,16 +351,6 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 		failed = true;
 		why = ErrorUtils::PMGetGlobalErrorString();
 	}
-	// THE RUN SIGNS ITS RECORDS NOW, ONCE (the spec's D14 - the author's "A"): nothing was signed while it wrote, so
-	// each place is one deletion of what stood there before the run and one insertion of what stands there now.
-	// Inside the sequence, so the Undo takes the signing back with the writes; a signing that fails takes the run back.
-	if (!cancelled && !failed)
-		for (size_t t = 0; t < touched.size() && !failed; ++t)
-			if (KFCTrackChange::SignRunPlaces(touched[t].GetDataBase()) < 0)
-			{
-				failed = true;
-				why = "the tracked changes could not be signed";
-			}
 	// THE MARK - inside the sequence, so the run's Undo and Redo are heard (KFCUndoFollow::MarkWrite).
 	if (!cancelled && !failed)
 		for (size_t t = 0; t < touched.size(); ++t)
@@ -401,13 +360,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
-	KFCTrackChange::ClearOwnRunFloor();
 	ClearFindChange();		// outside the sequence (the spec's section 5)
 
 	if (cancelled || failed)
 	{
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		KFCTrackChange::ClearRunNotes();		// the rows they named were taken back
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
 			if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))
@@ -445,30 +402,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 			unclosed.push_back(targets[i].shortName);
 	}
 
-	// ===== THE LIST - the run's own records, one list (the spec's section 4).
+	// ===== NO LIST (F7 - the spec's section 5: the panel is left EMPTY). No header either: a book's row would read "(0)"
+	// over a run that wrote hundreds. NoteRun keeps the panel's icon on "a command ran".
 	KFCResultModel::Clear();
 	KFCSearchEngine::ForgetSearchedFindFormat();
-	KFCResultModel::SetFromBook(scope.fromBook);
-	KFCResultModel::SetSearchScope(scope.fromBook ? KFCResultModel::kScopeBook
-		: scope.allDocuments ? KFCResultModel::kScopeAllDocuments : KFCResultModel::kScopeDocument);
 	KFCResultModel::NoteRun();
-	KFCResultModel::SetBookName(bookName);
-	KFCResultModel::SetFromRecords(true);
-	KFCResultModel::SetFromQueryRun(true);
-	bool listCapped = false;
-	int32 listed = 0;
-	// THE LIST ONLY WHEN IT IS ASKED FOR (the panel's toggle, the spec's D12): off, the list stays empty - the records
-	// stay in the documents, and Show Changes by KohakuFindChange lists them whenever they are wanted.
-	if (listResults)
-	{
-		std::vector<KFCBookScope::ChapterDoc> written;
-		for (size_t i = 0; i < targets.size(); ++i)
-			for (size_t k = 0; k < touched.size(); ++k)
-				if (SameDoc(touched[k], targets[i].docRef))
-					written.push_back(targets[i]);
-		listed = KFCShowChanges::ListOwnRun(written, floor, listCapped);
-	}
-	KFCTrackChange::ClearRunNotes();		// read by ListOwnRun only - they end with the list
 	recorder.Keep();
 
 	// ===== THE MESSAGE (the spec's section 4).
@@ -481,64 +419,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 	outSummary.Append(").");
 	if (replaced > 0)
 		outSummary.Append(" Ctrl+Z undoes all of them.");
-	if (unrecorded > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(unrecorded);
-		// (a footnote's replace, and a format-only one, leave no tracked change - KFCReplaceEngine's unrecorded)
-		outSummary.Append(" left no tracked change (in a footnote, or format only) and are not listed.");
-	}
-	if (locked > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(locked);
-		outSummary.Append(" locked matches were not replaced.");
-	}
-	// THE REST OF WHAT THE WRITE COUNTED (2026-10-05 re-check): a query's total that comes up short says why, in
-	// Change Checked's own sentences (KFCReplaceEngine.cpp, the summary) - and the pending changes of somebody
-	// else's accepted before a write are said too, since they leave the Track Changes panel.
-	if (missing > 0)
-	{
-		outSummary.Append(" ! ");
-		outSummary.AppendNumber(missing);
-		outSummary.Append(" hit(s) missing - not found when the chapter was searched again.");
-	}
-	if (endnoteLeft > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(endnoteLeft);
-		outSummary.Append(" hit(s) in endnotes not replaced - a match ends an endnote, and InDesign's replace breaks an endnote there.");
-	}
-	if (refused > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(refused);
-		outSummary.Append(" hit(s) could not be changed - InDesign refused the change there.");
-	}
-	if (acceptedFirst > 0)
-	{
-		outSummary.Append(" ");
-		outSummary.AppendNumber(acceptedFirst);
-		outSummary.Append(" pending tracked change(s) accepted first.");
-	}
 	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
-	// THE LIST'S TWO CAPS (2026-10-05, the spec's E7 as changed): stopped by the ceiling (kKFCCollectHitLimit) - said of
-	// the LIST, since the run itself went through - and drawn to the panel's display cap (kKFCDisplayHitLimit).
-	if (listCapped)
-	{
-		outSummary.Append(" The list stopped at the ");
-		outSummary.AppendNumber(KFCResultModel::kKFCCollectHitLimit);
-		outSummary.Append(" safety limit.");
-	}
-	if (listed > KFCResultModel::kKFCDisplayHitLimit)
-	{
-		outSummary.Append(" Showing first ");
-		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
-		outSummary.Append(" in the panel.");
-	}
-	if (!listResults && replaced > 0)
-		outSummary.Append(" The changes were not listed - Show Changes by KohakuFindChange lists them.");
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return replaced;
@@ -550,7 +432,6 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, bool listResu
 int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 {
 	std::vector<QueryItem> queries;
-	bool listResults = true;
 	char* temp = nullptr;
 	size_t len = 0;
 	if (_dupenv_s(&temp, &len, "TEMP") == 0 && temp != nullptr)
@@ -579,9 +460,7 @@ int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 					line += text[i];
 					continue;
 				}
-				if (line == "#nolist")
-					listResults = false;		// the panel's toggle off (the spec's D12)
-				else if (!line.empty())
+				if (!line.empty() && line[0] != '#')		// a line starting "#" is skipped
 				{
 					QueryItem item;
 					PMString p;
@@ -598,8 +477,8 @@ int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 			}
 		}
 	}
-	KFC_DIAG_LOG("queries-run: %d queries from the switch, list %d", (int)queries.size(), listResults ? 1 : 0);
-	return Run(queries, listResults, outSummary);
+	KFC_DIAG_LOG("queries-run: %d queries from the switch", (int)queries.size());
+	return Run(queries, outSummary);
 }
 #endif
 
