@@ -349,7 +349,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.AppendNumber(replaced);
 		outSummary.Append(" replaced in ");
 		outSummary.AppendNumber(static_cast<int32>(touched.size()));
-		outSummary.Append(" chapter(s). Ctrl+Z undoes all of them.");
+		outSummary.Append(" chapter(s).");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);

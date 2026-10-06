@@ -417,9 +417,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	outSummary.AppendNumber(replaced);
 	outSummary.Append(" replaced (");
 	AppendPerQuery(outSummary, perQuery);
-	outSummary.Append(").");
-	if (replaced > 0)
-		outSummary.Append(" Ctrl+Z undoes all of them.");
+	outSummary.Append(").");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);

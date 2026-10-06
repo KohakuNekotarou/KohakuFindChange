@@ -1730,9 +1730,9 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
 	// (Each row's two texts - Hit::originalText / replacedText - are taken by the walk that writes it,
 	//  WalkStoryReplacing.)
-	// WHAT IT DID AND HOW IT IS TAKEN BACK (2026-10-06, spec F16 / F19): the row's Replace is the one write from the
-	// list, one undo step - Ctrl+Z takes it back. (The Track Changes wording went with Reject Change.)
-	outStatus = "Replaced. Ctrl+Z undoes it.";
+	// WHAT IT DID (2026-10-06, spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step.
+	// The message says nothing of Ctrl+Z (the author's call); the Track Changes wording went with Reject Change.
+	outStatus = "Replaced.";
 	if (accepted > 0)
 	{
 		outStatus.Append(" ");
