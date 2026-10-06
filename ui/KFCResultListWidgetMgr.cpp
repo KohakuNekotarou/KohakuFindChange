@@ -740,4 +740,41 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	WriteMessage(message, kTrue /*force the redraw*/);
 }
 
+bool KFCResultTree::RefusedWhileRunning()
+{
+	if (!KFCRuns()->IsAnyRunning())
+		return false;
+	PMString busy(KFCRuns()->BusyMessage());
+	busy.SetTranslatable(kFalse);
+	ShowStatus(busy);
+	return true;
+}
+
+bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
+{
+	if (RefusedWhileRunning())
+		return false;
+	if (!KFCRuns()->CanReplaceHit(chapterIdx, hitIdx))
+		return false;
+	PMString status;
+	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, status);	// no prompt (the author's call)
+	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
+	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
+	// write is over (a book chapter the Replace reopened has been given its window by then).
+	UIDRef docRef;
+	IDFile file;
+	if (wrote && KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
+		&& !KFCChapters()->HasWindow(docRef))
+		status.Append(" The document has no window - still hidden.");
+	// Repainted in place - or the tree rebuilt, when the write threw the results away: a refusal on a changed
+	// Find/Change query clears them (KFCReplaceEngine::RefuseChangedQuery), and RefreshRows repaints only the chapters
+	// the model still holds - none, so the old rows would stay drawn and answer nothing until the next search.
+	if (KFCResults()->HasRun())
+		RefreshRows();
+	else
+		Rebuild();
+	ShowStatus(status);
+	return wrote;
+}
+
 // End, KFCResultListWidgetMgr.cpp.

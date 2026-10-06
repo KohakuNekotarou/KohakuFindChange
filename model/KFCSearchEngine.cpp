@@ -3162,12 +3162,12 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	outSummary.Append(chapterNotes);
 
-	// How to replace (2026-10-06, spec F19): a hit row's Replace, on its right-click menu, is the one write from
-	// the list - and nothing else on screen says so (the user's request).
+	// How to replace (2026-10-06, spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
+	// (F17) - is the one write from the list, and nothing else on screen says so (the user's request).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
 	// truncates its tail when it has to.
-	outSummary.Append(" Replace a row with its right-click menu.");
+	outSummary.Append(" Replace a row with its right-click menu, or select it and press Return.");
 	return total;
 }
 

@@ -5,7 +5,7 @@
 //  KohakuFindChange (KFC)
 //
 //  Event handler for the result list ITSELF (the tree-view boss, not a row). It adds two things
-//  to the stock up / down arrows and leaves everything else alone:
+//  to the stock up / down arrows, Return to a hit row, and leaves everything else alone:
 //
 //    1. A row that is CLOSED opens when the arrows land on it. The stock keys walk the VISIBLE
 //       rows only, and a book search deliberately comes up with every chapter closed
@@ -13,9 +13,11 @@
 //       never once step inside a chapter. Opening on arrival means holding the down arrow tours
 //       the whole book: land on a chapter, it opens, the next press is its first hit.
 //    2. The landing runs the row's action - KFCJump::ActivateNode, exactly what a click on that
-//       row would do: a hit row jumps, a chapter row shows its document, a STORY ("font") or RUN
-//       row shows the document it sits in (neither names a hit, so both take the chapter's arm),
-//       the book row activates its book.
+//       row would do: a hit row jumps, a chapter row shows its document, a STORY ("font") row
+//       shows the document it sits in (it names no hit, so it takes the chapter's arm), the book
+//       row activates its book.
+//    3. RETURN / ENTER ON A HIT ROW REPLACES IT (2026-10-06, spec F17) - see KeyDown. With the arrows,
+//       the keyboard alone walks the rows and replaces where the match is right.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
@@ -47,13 +49,14 @@
 #include "ITreeViewMgr.h"
 
 // General includes:
-#include "keyboarddefs.h"			// kVirtualUpArrowKey / kVirtualDownArrowKey
+#include "keyboarddefs.h"			// kVirtualUpArrowKey / kVirtualDownArrowKey / kVirtualReturnKey / kVirtualEnterKey
 #include "TreeViewEventHandler.h"	// stock base (source/open/includes/widgets; on the CPP.rsp path)
 
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCResultNodeID.h"
 #include "KFCJump.h"
+#include "KFCResultTree.h"		// ReplaceRow - Return on a hit row
 
 namespace
 {
@@ -72,7 +75,8 @@ public:
 
 }
 
-/** Up / down arrows that open what they land on, then run that row's action (see the top). */
+/** Up / down arrows that open what they land on, then run that row's action; Return / Enter that replaces a
+    selected hit row (see the top). */
 class KFCResultTreeEH : public TreeViewEventHandler
 {
 public:
@@ -80,6 +84,7 @@ public:
 	virtual ~KFCResultTreeEH() {}
 
 	virtual bool16 HandleUpDownKey(IEvent* e, const VirtualKey& key);
+	virtual bool16 KeyDown(IEvent* e);
 };
 
 CREATE_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
@@ -128,6 +133,41 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	// That action activated a document window - or, on a book row, the Book panel - which took the
 	// key focus with it. Take it back, or the NEXT arrow press lands in the document instead of
 	// walking on. IKeyBoard lives on the application boss.
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+	if (keyBoard != nil && keyBoard->GetKeyFocus() != this)
+		keyBoard->AcquireKeyFocus(this);
+	return kTrue;
+}
+
+// RETURN REPLACES THE SELECTED ROW (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F17 - the
+// author: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
+// the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the right-click Replace's own door
+// (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced). Any other key, a modified Return, or
+// Return on a story / document / book row goes to the stock handler. Only while the TREE holds the keyboard - typing
+// in a document never comes here.
+bool16 KFCResultTreeEH::KeyDown(IEvent* e)
+{
+	const VirtualKey key = e->GetVirtualKey();
+	if ((!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey)) || e->ShiftKeyDown() || e->CmdKeyDown() || e->OptionAltKeyDown())
+		return TreeViewEventHandler::KeyDown(e);
+	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());
+	if (controller == nil)
+		return TreeViewEventHandler::KeyDown(e);
+	NodeIDList selected;
+	controller->GetSelectedItems(selected);
+	if (selected.size() != 1)
+		return TreeViewEventHandler::KeyDown(e);
+	TreeNodePtr<KFCResultNodeID> node(selected[0]);
+	if (node == nil || node->IsRoot() || !node->IsHitRow())
+		return TreeViewEventHandler::KeyDown(e);
+	// A previous landing is still opening a document - see gWalking. The key is taken, and nothing is written from a
+	// half-made selection.
+	if (gWalking)
+		return kTrue;
+	(void)KFCResultTree::ReplaceRow(node->GetChapter(), node->GetHit());
+	// The write may have opened a closed chapter and given it a window, which takes the key focus - take it back, or the
+	// next arrow press lands in the document instead of walking on (as HandleUpDownKey does).
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
 	if (keyBoard != nil && keyBoard->GetKeyFocus() != this)

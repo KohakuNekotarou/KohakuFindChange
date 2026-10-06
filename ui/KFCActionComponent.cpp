@@ -97,47 +97,6 @@ CREATE_PMINTERFACE(KFCActionComponent, kKFCActionComponentImpl)
 
 namespace
 {
-// A run of ours is up - its progress bar pumps events, so an action can arrive in the middle of it:
-// say so on the status line, and the caller turns the action away. (One place for the hit row's Replace
-// and Clear Results.)
-bool RefusedWhileRunning()
-{
-	if (!KFCRuns()->IsAnyRunning())
-		return false;
-	PMString busy(KFCRuns()->BusyMessage());
-	busy.SetTranslatable(kFalse);
-	KFCResultTree::ShowStatus(busy);
-	return true;
-}
-
-// The rows after a row menu's command: repainted in place - or the tree rebuilt, when the command threw
-// the results away. A hit row's Replace refused on a changed Find/Change query clears
-// them (KFCReplaceEngine::RefuseChangedQuery, whose caller is to redraw the tree), and RefreshRows repaints
-// only the chapters the model still holds: none, so the old rows would stay drawn and answer nothing until
-// the next search.
-void RedrawAfterRowMenu()
-{
-	if (KFCResults()->HasRun())
-		KFCResultTree::RefreshRows();
-	else
-		KFCResultTree::Rebuild();
-}
-
-// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents). It goes through and nothing
-// opens one - the user may keep a heavy document hidden on purpose - so the line says
-// what the screen cannot show. Asked once the write is over (a book chapter the one-row Replace reopened
-// has been given its window by then).
-void NoteNoWindow(bool wrote, int32 chapter, PMString& status)
-{
-	if (!wrote)
-		return;
-	UIDRef docRef;
-	IDFile file;
-	if (KFCResults()->GetChapterLocation(chapter, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
-		&& !KFCChapters()->HasWindow(docRef))
-		status.Append(" The document has no window - still hidden.");
-}
-
 // One of the three Windows-only appearance toggles (Translucent Panel, Translucent Find/Change,
 // Minimizable Find/Change): flipped, put on whatever window it can reach, and the status line says
 // which it came to. The wording follows whether a window was actually reached - ticking one with
@@ -250,7 +209,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKFCClearResultsActionID:
 		{
 			// Clear Results: the list emptied, so Change All can run (the old design's C8). The documents are not touched.
-			if (RefusedWhileRunning())
+			if (KFCResultTree::RefusedWhileRunning())
 				break;
 			PMString status;
 			(void)KFCRuns()->ClearResults(status);
@@ -350,18 +309,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCReplaceHitActionID:
 		{
-			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit
-			// row (a script firing the action by ID): do nothing.
+			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit row (a script firing the
+			// action by ID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
 			int32 chapter = -1, hit = -1;
-			if (!KFCResults()->GetContextMenuHit(chapter, hit))
-				break;
-			if (RefusedWhileRunning())
-				break;
-			PMString status;
-			const bool wrote = KFCRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the author's call)
-			NoteNoWindow(wrote, chapter, status);
-			RedrawAfterRowMenu();
-			KFCResultTree::ShowStatus(status);
+			if (KFCResults()->GetContextMenuHit(chapter, hit))
+				(void)KFCResultTree::ReplaceRow(chapter, hit);
 			break;
 		}
 

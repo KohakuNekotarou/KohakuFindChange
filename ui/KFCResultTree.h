@@ -57,6 +57,18 @@ namespace KFCResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
+	/** REPLACE ONE ROW (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
+	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
+	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the
+	    row menu greys Replace by); then the row's one replace (KFCRuns()->ReplaceHit, no prompt - one undo step, the
+	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. */
+	bool ReplaceRow(int32 chapterIdx, int32 hitIdx);
+
+	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
+	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRow -
+	    the row's Replace and Return - and Clear Results). */
+	bool RefusedWhileRunning();
+
 	/** Put the status read-out back to what THIS session last had on it - the last message - or, when
 	    nothing has run since launch, to the opening message (the string table's kKFCStaticTextKey). Called from the panel's AutoAttach, and only
 	    from there.
