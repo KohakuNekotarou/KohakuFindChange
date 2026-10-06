@@ -896,8 +896,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		// saying two things at once. What the mismatch means there is also different: the row's
 		// match text is what the REPLACE wrote, so finding something else in its place means the
 		// replacement is gone, undone or edited away, not that the search's text has moved.
-		bool checked = false, replaced = false, locked = false;
-		KFCResults()->GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked);
+		bool replaced = false, locked = false;
+		KFCResults()->GetHitFlags(chapterIdx, hitIdx, replaced, locked);
 
 		PMString message;
 		message.SetTranslatable(kFalse);

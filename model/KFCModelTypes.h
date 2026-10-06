@@ -39,8 +39,6 @@ namespace KFCResultModel
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeRejected,	// replaced, then taken back with Reject Change: the row shows the
-							// original text again and can be replaced once more (Redo)
 		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
 							// ticked row deleted - counted as done; no place to jump to
 		kOutcomeEndnoteLeft	// ticked, left alone: the match ends an endnote, and InDesign's replace
@@ -67,23 +65,12 @@ namespace KFCResultModel
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;
 		PMString		postText;
-		bool			checked;
 		bool			replaced;
 		bool			locked;
 		ChangeOutcome	outcome;
-		bool			hasCheckBox;	// does THIS row carry a check box? RowHasCheckBox's own answer,
-										// so the panel does not have to re-derive it from the four
-										// fields above - see GetHitRow.
 		// (A footnote's row is told apart by GetHitInFootnote, not by a field here.)
 
-		RowDisplay() : checked(false), replaced(false), locked(false), outcome(kOutcomeNone),
-					   hasCheckBox(false) {}
-	};
-
-	enum
-	{
-		kContextMenuBookRow		= -1,	// the BOOK row: the commands reach every chapter
-		kNoContextMenuChapter	= -2	// nothing has been right-clicked: they do nothing at all
+		RowDisplay() : replaced(false), locked(false), outcome(kOutcomeNone) {}
 	};
 }
 

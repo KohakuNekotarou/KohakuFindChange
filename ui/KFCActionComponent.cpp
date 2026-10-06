@@ -98,8 +98,8 @@ CREATE_PMINTERFACE(KFCActionComponent, kKFCActionComponentImpl)
 namespace
 {
 // A run of ours is up - its progress bar pumps events, so an action can arrive in the middle of it:
-// say so on the status line, and the caller turns the action away. (One place for the row menus'
-// cases and Change Checked.)
+// say so on the status line, and the caller turns the action away. (One place for the hit row's Replace
+// and Clear Results.)
 bool RefusedWhileRunning()
 {
 	if (!KFCRuns()->IsAnyRunning())
@@ -111,7 +111,7 @@ bool RefusedWhileRunning()
 }
 
 // The rows after a row menu's command: repainted in place - or the tree rebuilt, when the command threw
-// the results away. A row / story / document Replace refused on a changed Find/Change query clears
+// the results away. A hit row's Replace refused on a changed Find/Change query clears
 // them (KFCReplaceEngine::RefuseChangedQuery, whose caller is to redraw the tree), and RefreshRows repaints
 // only the chapters the model still holds: none, so the old rows would stay drawn and answer nothing until
 // the next search.
@@ -126,7 +126,7 @@ void RedrawAfterRowMenu()
 // A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents). It goes through and nothing
 // opens one - the user may keep a heavy document hidden on purpose - so the line says
 // what the screen cannot show. Asked once the write is over (a book chapter the one-row Replace reopened
-// has been given its window by then). Change Checked counts these in its own summary.
+// has been given its window by then).
 void NoteNoWindow(bool wrote, int32 chapter, PMString& status)
 {
 	if (!wrote)
@@ -348,105 +348,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKFCReplaceCheckedActionID:
-		{
-			// Another run of ours is already up, reached through the events its progress bar pumps.
-			// Asked about EVERY run rather than only another replace: a search cancelled underneath
-			// this one hands back the chapters it is about to write to (see KFCRunGuard).
-			//
-			// THIS DOOR AND THE ONES BELOW ARE THE ENGINE'S TOO, ASKED HERE SO A REFUSAL LEAVES THE TREE
-			// AS IT IS. A refusal here does not reach the Rebuild after
-			// ReplaceChecked, which re-expands the tree and loses what the user had opened or closed. (Has the
-			// Find/Change query changed is NOT asked here: its refusal rebuilds the tree anyway, so it is the
-			// engine's alone.)
-			if (RefusedWhileRunning())
-				break;
-
-			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
-			// this command out in that state (see UpdateActionStates), but a caller that never went
-			// through the menu - a script invoking the action - lands here whatever the menu says.
-			// Asked before the checked count: the rows the last run never reached keep their check so
-			// the report can account for them, so GetCheckedCount() is still positive. Same wording
-			// as the engine's own door.
-			if (KFCResults()->NoRowHasCheckBox())		// a report - with no row taken back in it
-			{
-				PMString report("This is the last replace's report - search again to replace more.");
-				report.SetTranslatable(kFalse);
-				KFCResultTree::ShowStatus(report);
-				break;
-			}
-
-			if (KFCResults()->GetCheckedCount() <= 0)
-			{
-				PMString nothing("Nothing checked.");
-				nothing.SetTranslatable(kFalse);
-				KFCResultTree::ShowStatus(nothing);
-				break;
-			}
-
-			// NO PROMPT (the author's call). Not a confirmation before every Change Checked: everything a run
-			// does is one undo step and every chapter is left open and unsaved, and the rows' own menus go
-			// without one too. What such a prompt would say about Track Changes is said on the status line
-			// instead - by the replace's own summary (it counts the rows Track Changes recorded nothing for,
-			// which Reject Change cannot take back).
-			PMString summary;
-#ifdef KFC_DIAG
-			const int titleBefore = KFCDiagCounter(0), mirrorBefore = KFCDiagCounter(1);	// (as the search's, above)
-#endif
-			(void)KFCRuns()->ReplaceChecked(summary);
-#ifdef KFC_DIAG
-			KFC_DIAG_LOG("UIOBS replace title=%d mirror=%d", KFCDiagCounter(0) - titleBefore, KFCDiagCounter(1) - mirrorBefore);
-#endif
-			KFCResultTree::Rebuild();		// replaced rows lose their box and fade
-			KFCResultTree::ShowStatus(summary);
-			break;
-		}
-
-		case kKFCChapterReplaceActionID:
-		{
-			// A DOCUMENT row's Replace: that document's ticked rows, no prompt. The book row (and nothing stashed - a
-			// script firing the action by ID) does nothing.
-			const int32 chapter = KFCResults()->GetContextMenuChapter();
-			if (chapter < 0 || chapter >= KFCResults()->GetChapterCount())
-				break;
-			if (RefusedWhileRunning())
-				break;
-			PMString status;
-			const bool wrote = KFCRuns()->ReplaceChapter(chapter, status);
-			NoteNoWindow(wrote, chapter, status);
-			RedrawAfterRowMenu();
-			KFCResultTree::ShowStatus(status);
-			break;
-		}
-
-		case kKFCStoryReplaceActionID:
-		case kKFCStoryCheckAllActionID:
-		case kKFCStoryUncheckAllActionID:
-		{
-			// A story row's menu. Nothing stashed = nobody right-clicked a story row.
-			int32 chapter = -1, group = -1;
-			if (!KFCResults()->GetContextMenuGroup(chapter, group))
-				break;
-			if (RefusedWhileRunning())
-				break;
-			PMString status;
-			status.SetTranslatable(kFalse);
-			const uint32 id = actionID.Get();
-			bool wrote = false;
-			if (id == kKFCStoryReplaceActionID)
-				wrote = KFCRuns()->ReplaceStory(chapter, group, status);	// no prompt (the author's call)
-			else
-			{
-				const bool check = (id == kKFCStoryCheckAllActionID);
-				KFCResults()->SetGroupChecked(chapter, group, check);
-				status = check ? "This story: all checked." : "This story: all unchecked.";
-			}
-			NoteNoWindow(wrote, chapter, status);
-			RedrawAfterRowMenu();
-			KFCResultTree::ShowStatus(status);
-			break;
-		}
-
 		case kKFCReplaceHitActionID:
 		{
 			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit
@@ -463,54 +364,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			KFCResultTree::ShowStatus(status);
 			break;
 		}
-
-		case kKFCCheckAllActionID:
-		case kKFCUncheckAllActionID:
-		{
-			// Both commands live on the result rows' right-click menu, so the row the menu was popped
-			// over is what says how far they reach: the BOOK row means every chapter, and a document
-			// row means that chapter alone. KFCResultNodeEH stashed it just before popping the menu.
-			//
-			// Nothing stashed means nobody right-clicked a row: a caller that never went through the
-			// menu - a script firing the action by ID - lands here, and there is no row for it to be
-			// talking about. Do nothing rather than guess at "everything".
-			//
-			// Either way this covers every STORED hit, the rows past the panel's display cap as well (a list holds up
-			// to kKFCCollectHitLimit over a panel that draws kKFCDisplayHitLimit - again since 2026-10-05) - most of
-			// them out of sight, which is why the status line says afterwards which row it was done over.
-			const int32 target = KFCResults()->GetContextMenuChapter();
-			if (target == KFCResultModel::kNoContextMenuChapter)
-				break;
-			const bool check = (actionID.Get() == kKFCCheckAllActionID);
-
-			// The row's own name, READ FIRST and changed second. Nothing here renames a row, so the
-			// order cannot matter today - it is written this way because the sentence the status line
-			// is about ("this row, all checked") names the row as it was ASKED, and a reader should
-			// not have to prove that the call in between left it alone. The name comes from the same
-			// place the row draws it from.
-			PMString targetName;
-			if (target == KFCResultModel::kContextMenuBookRow)
-			{
-				targetName = KFCResults()->GetBookName();
-				KFCResults()->SetAllChecked(check);
-			}
-			else
-			{
-				int32 targetHits = 0;
-				KFCResults()->GetChapterDisplay(target, targetName, targetHits);
-				KFCResults()->SetChapterChecked(target, check);
-			}
-			targetName.SetTranslatable(kFalse);
-
-			// Only what the rows DRAW changed - the tree's shape is untouched - so repaint them in
-			// place instead of rebuilding. One notification per chapter, and the expansion state
-			// survives (a chapter the user collapsed stays collapsed).
-			KFCResultTree::RefreshRows();
-			KFCResultTree::ShowCheckAllStatus(targetName, check);
-			break;
-		}
-
-
 
 		default:
 		{
@@ -553,9 +406,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// A run of ours is standing behind its modal progress bar. The bar pumps events, so this list
 	// can be asked for its states from inside the run: lock everything until it returns.
 	//
-	// Every run, through KFCRunGuard - the search and the replace family. The replace needs
-	// it at least as much as the search: it works with a command sequence standing open, and a second walk
-	// underneath would Halt() its walker mid-walk.
+	// Every run, through KFCRunGuard - the search, Change All in Book and the query run: each works behind a
+	// modal bar that pumps events, and a second walk underneath one would Halt() its walker mid-walk.
 	if (KFCRuns()->IsAnyRunning())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
@@ -575,19 +427,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// a book open and no document window - the state a book run is FOR - and it skips this hook, so
 	// the search command would also lose the name that carries the scope.
 	const bool16 haveTarget = KFCChapters()->HasScopeTarget() ? kTrue : kFalse;
-
-	// How many rows still carry a check box in the range Check All / Uncheck All would act on. That
-	// range is the row their right-click menu was popped over, so it is read here rather
-	// than model-wide: over a document whose every hit is locked or already replaced, both commands
-	// are no-ops and go grey - exactly as they do over a book with nothing left anywhere.
-	//
-	// TAKEN LAZILY: BOTH READERS ARE ON THE RIGHT-CLICK MENU, AND THIS HOOK ALSO RUNS FOR THE FLYOUT.
-	// Whichever of the pair is reached first pays for the count (it walks the context row's hits, up to
-	// kKFCCollectHitLimit of them), the other reads it, and a menu that holds neither - the flyout - never
-	// asks. The CHECKED count has one reader, the replace command, and is taken inside that branch.
-	// contextChapter is also what the document row's commands are about.
-	const int32 contextChapter = KFCResults()->GetContextMenuChapter();
-	int32 contextCheckable = -1;		// not counted yet - see the two commands at the end of the loop
 
 	for (int32 i = 0; i < listToUpdate->Length(); i++)
 	{
@@ -704,51 +543,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				actionState |= kSelectedAction;		// show the check mark when ON
 			listToUpdate->SetNthActionState(i, actionState);
 		}
-		else if (action == kKFCReplaceCheckedActionID)
-		{
-			// Needs something checked, AND a work list to check it on. After a replace the panel is
-			// a report of what that replace did, and no row on it has a check box - but the rows the
-			// run never reached (a chapter that would not open, a cancelled run)
-			// stay checked so the report can hold them, so the count alone would leave this enabled
-			// over a list with nothing selectable anywhere on it: a destructive command, offered
-			// against something the user cannot see or change. Check All / Uncheck All grey
-			// themselves out on the same page through GetCheckableCount, which asks this question
-			// for them.
-			//
-			// The Find/Change strings are deliberately NOT tested here - an empty change string is a
-			// valid "delete the matches" request, and greying the command out for it would say nothing
-			// about why.
-			//
-			// THE SECOND HALF IS ONE QUESTION, AND THE MODEL ALREADY OWNS IT. "Can any row of this
-			// list be checked at all" is NoRowHasCheckBox() - not spelled out again here.
-			//
-			// Walks every stored hit - up to kKFCCollectHitLimit of them, the whole-SEARCH ceiling (more than
-			// the panel draws since 2026-10-05). Taken here rather than above the loop
-			// because this is the only action that reads it.
-			const int32 checkedCount = KFCResults()->GetCheckedCount();
-			const bool16 canReplace = (checkedCount > 0 && !KFCResults()->NoRowHasCheckBox())
-				? kTrue : kFalse;
-			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCStoryReplaceActionID || action == kKFCStoryCheckAllActionID
-			|| action == kKFCStoryUncheckAllActionID)
-		{
-			// A story row's menu: each item while it has something to do in that story.
-			int32 chapter = -1, group = -1;
-			bool enable = KFCResults()->GetContextMenuGroup(chapter, group);
-			if (enable)
-			{
-				if (action == kKFCStoryReplaceActionID)
-					enable = KFCRuns()->CanReplaceStory(chapter, group);
-				else
-					// Check All / Uncheck All: while THIS story has a row with a box - the document row's question
-					// (GetChapterCheckableCount below), one level down. Not the whole result set's NoRowHasCheckBox:
-					// a story whose rows had all been replaced would still offer them while another story had boxes -
-					// changing nothing and saying "This story: all checked." (measured).
-					enable = KFCResults()->GetGroupCheckableCount(chapter, group) > 0;
-			}
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
 		else if (action == kKFCReplaceHitActionID)
 		{
 			// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
@@ -758,41 +552,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			if (enable)
 				enable = KFCRuns()->CanReplaceHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCChapterReplaceActionID)
-		{
-			// A document row's Replace: while that document has a ticked row to replace. The book row greys it: it
-			// is about one document (Change Checked is the whole book's). The DoAction case asks the same range
-			// first.
-			const bool enable = contextChapter >= 0 && contextChapter < KFCResults()->GetChapterCount()
-				&& KFCRuns()->CanReplaceChapter(contextChapter);
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCCheckAllActionID || action == kKFCUncheckAllActionID)
-		{
-			// Nothing to check without results - and nothing to check after a replace either, where
-			// the panel lists what CHANGED and no row has a box left. Both commands would be no-ops
-			// there, so they go grey along with the boxes. Not a toggle - no check mark either way.
-			//
-			// Measured when these two were the WHOLE right-click menu: a popup whose every item
-			// is disabled is not shown at all (the user accepted that as the better behaviour). It also
-			// proves this hook runs for the popup menu, which is what lets the enablement follow the
-			// right-clicked row at all.
-			//
-			// The count these two share, taken on whichever of them the loop reaches first. Nothing
-			// between the two visits can change it - this method reads the model, it never writes to
-			// it - so the second reader gets the same answer the first paid for. See the note above
-			// the declaration for why it is not taken before the loop.
-			if (contextCheckable < 0)
-			{
-				contextCheckable = 0;
-				if (contextChapter == KFCResultModel::kContextMenuBookRow)
-					contextCheckable = KFCResults()->GetCheckableCount();
-				else if (contextChapter != KFCResultModel::kNoContextMenuChapter)
-					contextCheckable = KFCResults()->GetChapterCheckableCount(contextChapter);
-			}
-			const bool16 haveCheckable = (contextCheckable > 0) ? kTrue : kFalse;
-			listToUpdate->SetNthActionState(i, haveCheckable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

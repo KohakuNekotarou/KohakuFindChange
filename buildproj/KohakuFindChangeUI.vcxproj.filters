@@ -66,9 +66,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelView.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultCheckObserver.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListAdapter.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

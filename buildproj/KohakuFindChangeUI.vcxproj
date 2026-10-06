@@ -233,7 +233,6 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelState.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelTitle.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelView.cpp"/>
-      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultCheckObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListAdapter.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultListWidgetMgr.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeEH.cpp"/>

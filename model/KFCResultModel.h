@@ -98,9 +98,7 @@ namespace KFCResultModel
 		// numbered again with a walk of the whole chapter. A row is found by its PLACE: the verify walk
 		// asks for a match at the row's start (ChapterMovedUnderRows), the writing walk for one at its
 		// thread, offset and length (RowOfMatchAnyOrder).)
-		bool		checked;	// selected for replacement. Every row starts UNTICKED (the user's
-								// call - AppendChapter); the user ticks what is to be replaced.
-		bool		replaced;	// already replaced in this result set - not selectable any more
+		bool		replaced;	// already replaced in this result set - its Replace is greyed
 		ChangeOutcome outcome;	// why this row was NOT replaced (kOutcomeNone = it was, or was never
 								// reached at all). The locator shows it as a word.
 		// (No per-hit change count that lets the replace take an unedited story on trust and skip the
@@ -143,12 +141,10 @@ namespace KFCResultModel
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
 
-		// checked starts FALSE here and stays so for a search's rows (the author's call - rows ticked by
-		// default were tried and turned back).
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
+				replaced(false), outcome(kOutcomeNone), inFootnote(false),
 				recordTime(0), recordLead(0), pageOrdinal(0) {}
 	};
 
@@ -264,20 +260,6 @@ namespace KFCResultModel
 	// (No "the search stopped short" flag for the replace to ask: it writes the ticked rows only, one
 	//  match at a time, so results that stopped at the limit can be replaced - the author's call.)
 
-	/** Does NO row of this result set carry a check box?
-
-	    A property of the WHOLE list: a replace's
-	    REPORT - what is left after every row lost its box at once (IsShowingReplaceOutcome) - unless a
-	    row of it has been taken back with Reject Change.
-
-	    ASKED BY THE BRANCH ROWS TOO, AND THAT IS WHY IT IS HERE. The book row and the document rows
-	    read out "(N/M checked)", which is a sentence only a work list can mean. On a list where nothing
-	    has a box the checked count is 0 by definition, so those rows would read "(0/55 checked)" over a
-	    list that has nothing to check (KFCResultListWidgetMgr::ApplyBookRow / ApplyChapterRow ask this
-	    one home). ApplyHitRow, which narrows the check-box column on the same condition, asks it here
-	    as well: three rows of one tree cannot be allowed to disagree about whether the list they are in
-	    offers work. */
-	bool NoRowHasCheckBox();
 
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
@@ -381,19 +363,6 @@ namespace KFCResultModel
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
 	/** Every hit of the group, chapter-wide indexes in the chapter's order (empty when out of range). */
 	void GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits);
-	/** The group's rows that are checked and still waiting to be replaced (GetChapterCheckedCount's rule). */
-	int32 GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx);
-	/** Check All / Uncheck All on a story row: every row of the group that carries a box. */
-	void SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked);
-	/** How many of those rows there are - the story row's Check All / Uncheck All are offered while it is above
-	    zero, as GetChapterCheckableCount offers them on a document row. (Not the whole result set's
-	    NoRowHasCheckBox: under that, a story whose rows had all been replaced would still offer them, change
-	    nothing and say "all checked".) */
-	int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx);
-	/** The story row a right-click menu was popped over; cleared by the other rows'
-	    right-clicks and by Clear(). False = none. */
-	void SetContextMenuGroup(int32 chapterIdx, int32 groupIdx);
-	bool GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx);
 
 	// (RowDisplay - everything a hit row needs to draw itself, see GetHitRow: KFCModelTypes.h.)
 
@@ -443,13 +412,6 @@ namespace KFCResultModel
 	    Empty for an index out of range. */
 	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
 
-	/** Select / deselect one hit for replacement. Ignored for anything the panel draws no check box
-	    on - a hit already replaced (the text it matched is gone), a locked one (InDesign offers no
-	    way to change locked content), one that already says why it was left alone, and every row of
-	    a replace's report but the ones taken back. It asks that question the same way the panel does,
-	    so the model can never hold a checked hit that no row offered; it is a backstop rather than
-	    the first line of defence, since those rows carry no box to click in the first place. */
-	void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked);
 
 	/** The rows touching `hitIdx` in its chapter - same story, ranges meeting or overlapping, followed
 	    both ways - in TEXT order, `hitIdx` included. Reads the ranges as they stand (the search's
@@ -473,78 +435,30 @@ namespace KFCResultModel
 	    of range. */
 	bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx);
 
-	/** A hit's row-cell flags: selected, already replaced, and locked. The last two both mean "this
-	    row gets no check box", for different reasons. false = index out of range.
-	    (This also answers "is it checked?" - every asker wants the other two flags in the same breath,
-	    so there is no getter for that alone.) */
-	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked);
+	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
+	    reasons. false = index out of range. */
+	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked);
 
 	/** The two flags that say the match IS in the document but is out of the user's reach there:
 	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no
 	    way to change it) and HIDDEN (a switched-off layer - the text is composed and can be jumped
 	    to, but draws nothing). false = index out of range.
 
-	    Separate from GetHitFlags, which answers "what does this row's check box do?". These two
+	    Separate from GetHitFlags, which answers "can this row be replaced?". These two
 	    answer "can the user work on this match where it is?" - the question the double-click asks
 	    before it selects (KFCJump::SelectHitText). isLocked appears in both because it is a fact
 	    that bears on both questions; the DECISIONS made from it stay one per place. */
 	bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden);
 
-	/** Select / deselect EVERY hit in every chapter - Check All / Uncheck All over the tree's BOOK
-	    row. Applies to all stored hits, including those past the panel's display cap - the display cap
-	    must not silently shrink what a replace touches. The rows that carry no check box are skipped. */
-	void SetAllChecked(bool checked);
 
-	/** Select / deselect every hit in ONE chapter - the same two commands over a DOCUMENT row (the
-	    rows' right-click menu). Identical rules to SetAllChecked, applied to one chapter: every stored
-	    hit including those past the display cap, and the rows that carry no check box are left alone.
-	    An index out of range, and a list where no row carries a box (NoRowHasCheckBox), are both
-	    no-ops. */
-	void SetChapterChecked(int32 chapterIdx, bool checked);
 
-	/** How many hits are selected across all chapters (uncapped) - for the status read-out and for
-	    the replace command's enablement. */
-	int32 GetCheckedCount();
 
-	/** The same count for ONE chapter - what its row in the tree reads out as "(N/M checked)".
-	    Uncapped like the whole-model count: a chapter's hits past the panel's display cap are
-	    still its hits, and Check All still ticks them. Out of range = 0. */
-	int32 GetChapterCheckedCount(int32 chapterIdx);
 
-	/** How many hits COULD be checked at all: every hit that is neither replaced nor locked, i.e.
-	    every row that actually has a check box (uncapped). Zero means no row has one - the panel is
-	    showing a replace's aftermath, or every match landed in locked content - and Check All /
-	    Uncheck All have nothing to act on, so they are greyed out. */
-	int32 GetCheckableCount();
 
-	/** The same count for ONE chapter, which is the range Check All / Uncheck All cover when the
-	    right-click menu was popped over a document row. Zero greys them out there for the same reason
-	    the whole-model count does over the book row: every row in that document has lost its box. */
-	int32 GetChapterCheckableCount(int32 chapterIdx);
 
-	/** Which row the result tree's right-click menu was popped over. KFCResultNodeEH stashes it
-	    immediately before HandlePopupMenu and the book and document rows' commands (Check All /
-	    Uncheck All, Replace and the rest) read it back - an
-	    action component is handed no widget context of its own. (The pattern is KESCL's
-	    KESCLBatchCheck::SetContextMenuNode, which its "Copy as Text" row menu uses the same way.)
 
-	    Clear() puts it back to kNoContextMenuChapter, so an index taken from one result set can never
-	    name a chapter of the next one; the readers range-check it as well, because a caller that never
-	    went through the menu - a script firing the action - reaches them with whatever is stored.
-
-	    !Clear() is not the only pass that makes a stored index mean something else: KeepCheckedRows
-	     drops the chapters a replace left empty, which renumbers the ones after them, and it does NOT
-	     reset this. What keeps that safe is that the index is written again the moment a row is
-	     right-clicked (KFCResultNodeEH, just before the menu pops), so no menu acts on an index from
-	     before the renumbering; the range check stands behind it for a caller arriving by ActionID.
-	     Anything that ever drops chapters WITHOUT a right-click in between has to reset this the way
-	     Clear() does. */
-	// (kContextMenuBookRow / kNoContextMenuChapter: KFCModelTypes.h.)
-	void SetContextMenuChapter(int32 chapterIdx);
-	int32 GetContextMenuChapter();
-
-	/** The hit row the right-click menu was popped over (Replace, Reject Change and Accept Change act
-	    on it). Cleared with the result set; false when no hit row is stashed or it is out of range. */
+	/** The hit row the right-click menu was popped over (its Replace acts on it). Cleared with the result set;
+	    false when no hit row is stashed or it is out of range. */
 	void SetContextMenuHit(int32 chapterIdx, int32 hitIdx);
 	bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx);
 
@@ -560,9 +474,6 @@ namespace KFCResultModel
 	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
 		PMString& outReplacedText);
 
-	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
-	    longer replaced, and says "rejected". */
-	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
 	// (A row taken back is replaced again like any other - MarkHitReplaced clears its "taken back".)
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
@@ -590,39 +501,12 @@ namespace KFCResultModel
 	// occurrences the user has never seen. See Hit's note, and the one on the SAME-OCCURRENCE TEST in
 	// KFCReplaceEngine.cpp.)
 
-	/** Turn the result set into a REPORT of what the replace did. Keeps every row the replace was
-	    asked about - the ones it changed, and the ones it left alone with the reason on the
-	    locator - plus the locked rows, which account for a search that turned up more than the
-	    replace was allowed to touch, and every row that already says something about itself, ticked
-	    or not: an outcome set before this run (a row Reject Change took back, one a jump found
-	    missing) stays on screen, and a row taken back is work again (KFCReplaceEngine.cpp carries
-	    these rows' places through the run). Drops the other rows the user had left unticked, and
-	    then the chapters left with nothing.
 
-	    Does NOTHING when no row was asked about, so a replace that was asked for nothing never
-	    wipes the result set. Sets the aftermath flag (see IsShowingReplaceOutcome), which takes
-	    every check box off the panel.
-	    @return the number of rows left in the model. */
-	int32 KeepCheckedRows();
-
-	/** A ROW TAKEN BACK IS WORK AGAIN (the author's call). A row Reject Change put back to its original
-	    text carries a box again - in a work list and in a replace's report alike - so it can be ticked
-	    and replaced again (Change Checked, or its menu's Replace). (A hit row has no Redo of its own -
-	    the author's call: Replace is the one way; a story or document row's Replace Again is
-	    KFCReplaceEngine::RedoStory / RedoChapter.) IsWorkOutcome = nothing said about the row but "taken
-	    back". AnyRejectedRowOpen = does a report hold one (then the report offers work). */
+	/** Is a row with this outcome still work - one its Replace can write? Only a row nothing was said about
+	    (kOutcomeNone): a row the replace found missing, locked, refused, deleted or left at an endnote's end
+	    says why on its locator and is not offered again. */
 	bool IsWorkOutcome(ChangeOutcome outcome);
-	bool AnyRejectedRowOpen();
 
-	/** IS THIS ROW CHANGE CHECKED'S WORK? (one rule, asked everywhere) Ticked, not replaced, and nothing
-	    said about it but "taken back" (IsWorkOutcome). What the checked counts count - the run is sized
-	    with them - and what the replace writes and its verify walk checks: the bar's size rests on their
-	    agreeing, so the rule is spelled out here only. Out of range = false.
-	    AND ITS BOX ON SCREEN: ticked AND RowHasCheckBox. A replace's report keeps the rows of a chapter
-	    that could not be opened still ticked, with no box to see or clear; once a row of that report is
-	    taken back with Reject Change the report offers work again, and "ticked" alone would have Change
-	    Checked (or a story's Replace) write those unseen rows as well. */
-	bool IsHitCheckedWork(int32 chapterIdx, int32 hitIdx);
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
 	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced
@@ -750,17 +634,11 @@ namespace KFCResultModel
 	void MarkUpBreaksForDisplay(PMString& s);
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
-	    and clears the selection - a row that says why it cannot be changed must not stay checked.
+	    and the row is not offered again (IsWorkOutcome).
 	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
 	    longer the text the row describes. Ignored for a hit that WAS replaced. */
 	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
 
-	/** Is the panel showing the AFTERMATH of a replace rather than a search's results? Set by
-	    KeepCheckedRows, cleared by Clear. While it is on, no row offers a check box:
-	    the list is a report, not a work list. It is asked as well as the per-row flags because the
-	    aftermath can hold rows with no flag at all - a chapter that could not be opened. Those
-	    were never looked at, so nothing can be said about them. */
-	bool IsShowingReplaceOutcome();
 
 	/** Start remembering every row a replace changes, so a run the user stops can be put back.
 	    Only the rows actually written to are copied - one copy each, taken just before the change -
@@ -837,7 +715,6 @@ namespace KFCResultModel
 	struct ModelSnapshot
 	{
 		std::vector<Chapter>	chapters;
-		bool					showingOutcome;
 		uint32					layout;
 		// the list's header (2026-10-04, the query run: its Undo puts back a list of another kind - Change Checked's
 		// before and after share one, so nothing changes for it)
@@ -847,7 +724,7 @@ namespace KFCResultModel
 		int32					searchMode;
 		PMString				walkSignature;
 		bool					hasRun;
-		ModelSnapshot() : showingOutcome(false), layout(0), fromBook(false), searchScope(kScopeDocument),
+		ModelSnapshot() : layout(0), fromBook(false), searchScope(kScopeDocument),
 			searchMode(-1), hasRun(false) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);

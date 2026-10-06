@@ -67,8 +67,7 @@ namespace KFCUndoFollow
 	/** Which write a step is - named on the status line when an Undo or a Redo takes it. */
 	enum StepKind
 	{
-		kStepChangeChecked = 0,
-		kStepReplace,
+		kStepReplace = 0,	// a hit row's Replace
 		kStepRunQueries		// the query run (KFCQuerySequence) - RunRecorder's
 	};
 
@@ -77,8 +76,8 @@ namespace KFCUndoFollow
 
 	    The constructor reads the version of every story holding a row in `chapters` (their documents must
 	    be open) and starts the row backup (KFCResultModel::BeginRowBackup) - so a caller does not start one
-	    of its own. `wholeResultSet` = the write reshapes the list (Change Checked): the whole result set is
-	    copied now, and again at Keep.
+	    of its own. The rows before and after are kept, not the whole result set (that is RunRecorder's, the
+	    query run's - Change Checked, which reshaped the list too, went on 2026-10-06).
 
 	    Not kept - the write failed or was cancelled - the destructor puts back every row it changed
 	    (KFCResultModel::RollBackRows), which is what the replace's own rollback did, and records nothing.
@@ -86,7 +85,7 @@ namespace KFCUndoFollow
 	class StepRecorder
 	{
 	public:
-		StepRecorder(const std::vector<int32>& chapters, bool wholeResultSet);
+		explicit StepRecorder(const std::vector<int32>& chapters);
 		~StepRecorder();
 
 		/** The write went through and the rows show it: kept, if a story's version moved (a write that

@@ -38,12 +38,8 @@
 //  the user asked for it. (Booked for the double-click interval instead, so that a double click never
 //  flashes one, every single click's marker arrives about half a second after the view has moved.)
 //
-//  The row's "replace me" check box is a real widget of its own (kKFCResultCheckWidgetBoss) that
-//  swallows its own clicks, so ticking a hit never arrives here and never jumps. Its observer is
-//  KFCResultCheckObserver.
-//
-//  RIGHT-click pops the row's own context menu - the book / document rows', a story row's,
-//  a run row's or a hit row's. See RButtonDn at the foot of this file.
+//  RIGHT-click on a hit row pops its menu (Replace); on any other row it does nothing (2026-10-06, spec F16 -
+//  the book, document and story rows' menus went with Change Checked). See RButtonDn at the foot of this file.
 //
 //========================================================================================
 
@@ -93,8 +89,8 @@ namespace
 // to "the click going on right now" rather than to any one row. One click happens at a time.
 bool gSelectOnNextButtonUp = false;
 
-// Pop one of the rows' right-click menus (a MenuDef subtree, by its internal name) at the click. The item
-// the user picks fires through the ordinary action component.
+// Pop a row's right-click menu (a MenuDef subtree, by its internal name) at the click. The item the user picks
+// fires through the ordinary action component.
 void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 {
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
@@ -248,17 +244,15 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	return result;
 }
 
-// Right-click on a row: pop that kind of row's menu at the cursor (PopRowMenu). Same machinery as the
-// real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as KESCL's own report
-// rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a MenuDef
-// subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
-// component. The clicked row is stashed FIRST - the action is handed no widget context of its own,
-// so the model's context-menu row (KFCResultModel::GetContextMenuChapter and its siblings) is how it
-// learns what the menu was about.
+// Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call) - at the cursor (PopRowMenu).
+// Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
+// KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
+// MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
+// component. The clicked row is stashed FIRST - the action is handed no widget context of its own, so the
+// model's context-menu row (KFCResultModel::GetContextMenuHit) is how it learns what the menu was about.
 //
-// What the book / document rows' commands reach is exactly the row this was popped over: the BOOK row
-// means every chapter, a document row means that chapter alone. That question is the whole reason
-// Check All / Uncheck All live here and not on the flyout - a flyout has no row to ask about.
+// The book, document and story rows have no menu since 2026-10-06 (spec F16: their Replace, Check All and
+// Uncheck All went with Change Checked) - their right-click is taken and does nothing.
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -273,34 +267,12 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	if (nodeID == nil || nodeID->IsRoot())
 		return TreeNodeEventHandler::RButtonDn(e);
 
-	// Every menu below consumes the click - no stock handling, so the row is not selected and nothing jumps.
-	//
-	// A STORY ROW: its own menu, over that story's rows.
-	// Every other right-click clears the story it named, so a story menu item fired later (a script, a
-	// shortcut) cannot act on a story nobody right-clicked this time.
-	if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
-	{
-		const int32 chapter = nodeID->GetChapter();
-		const int32 group = nodeID->GetFont();
-		KFCResults()->SetContextMenuGroup(chapter, group);
-		PopRowMenu(kKFCResultStoryMenuName, e, this);
-		return kTrue;
-	}
-	KFCResults()->SetContextMenuGroup(-1, -1);
-
-	// Hit rows carry their own menu - Replace, about THIS row (the user's call).
+	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
 	if (nodeID->IsHitRow())
 	{
 		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
 		PopRowMenu(kKFCResultHitMenuName, e, this);
-		return kTrue;
 	}
-
-	const int32 target = nodeID->IsBookRow()
-		? static_cast<int32>(KFCResultModel::kContextMenuBookRow)
-		: nodeID->GetChapter();
-	KFCResults()->SetContextMenuChapter(target);
-	PopRowMenu(kKFCResultRowMenuName, e, this);
 	return kTrue;
 }
 

@@ -39,100 +39,6 @@
 
 namespace KFCReplaceEngine
 {
-	/** Replace every checked hit in the current result set.
-
-	    The WHOLE run is ONE command sequence, across every chapter, so a book-wide replace undoes
-	    with a single Ctrl+Z whichever chapter the user has in front, and cancelling puts the whole
-	    book back. Every chapter that has work is opened before the first character is written, and
-	    every one a replacement lands in stays open and unsaved afterwards (below). NOT one sequence
-	    per chapter, though "undo is per document" makes the chapter look like the largest grain
-	    available: measured on the running application, that arrangement is actively harmful -
-	    undoing in one document removes the step from the other chapters' histories as well WITHOUT
-	    reverting their text, leaving them replaced with no way back. The price is that the run is
-	    all-or-nothing - an error left standing when the sequence ends rolls back every chapter.
-
-	    NO CHAPTER-AT-A-TIME SHAPE, so a book of twenty chapters is all open at once. Such a shape can
-	    only serve runs that SAVE: a chapter that has not been written to disk cannot be closed,
-	    because closing it would throw its replacements away - and nothing is ever saved (below). A
-	    machine that cannot hold a whole book open is served by ticking fewer rows instead (the user's
-	    decision).
-
-	    THE RUN CHECKS THAT THE MATCHES ARE STILL WHERE THE SEARCH FOUND THEM, AND REFUSES TO START
-	    IF THEY ARE NOT (the author's design).
-	    The rows were found at positions the search recorded, and the run lines what it writes up with
-	    them - so if the document has moved since the search in a way that adds, removes or shifts a
-	    match, the rows no longer describe it.
-
-	    So each chapter is walked before it is written. That walk writes nothing: for every ticked row
-	    it asks whether the row's story is at the version KFC left it at, whether the row still reads
-	    as it was found, and whether a match of the walk still stands at the row's start and length
-	    (the three questions at ChapterMovedUnderRows in the .cpp). One that does not - or one ticked
-	    row the walk never reaches - and the whole run stops, with an alert saying so and the results cleared
-	    (TellResultsWentStale, and the verify pass in the resolve loop). Only if every chapter passes
-	    does the second walk open a command sequence and write. (The walk does not line the Nth match
-	    up with the row numbered N: it finds each row by its place and reads its text - see
-	    ChapterMovedUnderRows in the .cpp.)
-
-	    IN THE RESOLVE PASS, AND NOWHERE ELSE. That is the one moment where the question is both
-	    answerable and free: the chapter has just been reopened, and NOT ONE CHARACTER has been
-	    written yet - so the positions are still the ones the search recorded (no replacements of
-	    this run's own to cancel out) and a refusal has nothing to roll back.
-
-	    WHY POSITIONS RATHER THAN A FINGERPRINT OF THE CHAPTER. A record of every story's change
-	    counter, warning rather than refusing, answers "does this chapter look untouched?", which
-	    means enumerating every way a document can move - text, stories added or deleted, layers
-	    hidden or locked, conditions, master pages - and that list is never finished. Comparing the
-	    positions asks about the thing itself: whatever the cause, if a ticked match is not where it
-	    was, the row no longer describes it. (The story version asked first is not that fingerprint:
-	    it covers only the stories holding a ticked row, and it refuses rather than warns - A STORY'S
-	    VERSION in the .cpp.)
-
-	    The same test does not stand INSIDE the replacing walk, per hit. See the note on the
-	    SAME-OCCURRENCE TEST in KFCReplaceEngine.cpp for why it cannot work there and what remains of
-	    it (KFCSearchEngine::RowReadsAsFound, which the jump and the row menus' doors ask).
-
-	    A checked hit that does not get replaced is ALWAYS counted and named in the summary, never
-	    allowed to make the total quietly come up short. The ways that happens:
-	      - locked: on a locked layer or in a locked story. The Find/Change dialog can be told to
-	        search those, but InDesign offers no way to change them ("Search Only"), so KFC follows.
-	      - missing: the walk never met the row's match as the search listed it - this run's own
-	        replaces moved the text around it (GREP's ^, $ or a lookahead now reads something else).
-	      - endnote left: the match ends an endnote, where InDesign's replace breaks the endnote (see
-	        MatchEndsAnEndnote in the .cpp); that row alone is left.
-	      - refused: the replace command itself declined.
-	      - deleted: the row went with a footnote, table or object another ticked row deleted.
-
-	    NOTHING IS EVER SAVED. Every chapter a replacement lands in is left MODIFIED AND UNSAVED, with
-	    a window open on it, and the summary says so: overwriting the user's files is the user's own
-	    step to take.
-
-	    WHAT IS LEFT OPEN IS EXACTLY WHAT HAS SOMETHING IN IT. A chapter a replacement
-	    landed in stays open, gets a window, and is left unsaved - the replacements are in it and only
-	    the user can decide about them. Every OTHER chapter this run opened is handed back
-	    (KFCBookScope::ReleaseHeldDoc), because each one locks its .indd while it stands and a
-	    windowless document cannot even be closed by hand - it is in no menu. Three cases:
-
-	      - a run that is CANCELLED has put every character back, so no chapter holds anything of it
-	        and they all go (ReleaseHeldDocs), as the search's do on its own cancel;
-	      - a run that goes THROUGH hands back the chapters no replacement landed in - every checked
-	        hit there came back locked, missing, refused or left at an endnote's end. Otherwise such a
-	        chapter stays open, windowless and locked for the rest of the session, and WITH ITS
-	        MODIFIED FLAG SET, because a walk can mark a database changed without changing a
-	        character (which is why the SEARCH guards its own walk with SaveRestoreModifiedState and
-	        this one deliberately does not). That flag then stops anything from ever closing it;
-	      - a run that cannot start its command sequence at all writes nothing and hands back
-	        everything, the same way.
-
-	    A chapter the USER had open, or had already edited, is on none of these lists: it was never
-	    held, so it is not this run's to close and stays exactly as it was.
-
-	    Refuses to run at all while another replace is up (see IsReplacing), and while no row of the
-	    list carries a box (KFCResultModel::NoRowHasCheckBox - a replace's report with no row taken
-	    back in it, or a list rebuilt from the records).
-
-	    @param outSummary OUT a ready-to-show status line (counts, chapters that did not line up).
-	    @return the number of hits actually replaced (0 on any early exit). */
-	int32 ReplaceChecked(PMString& outSummary);
 
 	/** Do the current Find/Change settings still describe the search the panel's results came from?
 
@@ -197,24 +103,7 @@ namespace KFCReplaceEngine
 	    outcome, and no replace running. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
-	/** A STORY ROW'S MENU. Replace = the story's TICKED rows (the author's call), no prompt, one undo
-	    step, the list stays a work list (as ReplaceHit) - and all or none: one row that cannot be
-	    written (an endnote's end, locked, missing) leaves every row as it was, and outStatus says so and
-	    how many (the author's call - Change Checked writes the rest). It says what it did - or why
-	    nothing - in outStatus. */
-	bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	/** Replace on a DOCUMENT row: that document's ticked rows, as ReplaceStory. */
-	bool ReplaceChapter(int32 chapterIdx, PMString& outStatus);
-	bool CanReplaceChapter(int32 chapterIdx);
-	/** Is there anything for the story row's Replace to do (the menu's greying). */
-	bool CanReplaceStory(int32 chapterIdx, int32 groupIdx);
 
-	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
-	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the
-	    search guards against with KFCSearchEngine::IsSearching, and a worse one here: the run holds
-	    an open command sequence, and a second walk started underneath it would Halt() the first
-	    one's walker out from under it. The panel greys every action out while this is true. */
-	bool IsReplacing();
 
 }
 

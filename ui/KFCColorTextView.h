@@ -26,13 +26,9 @@
     drawn faded).
     Set by the widget manager on every apply, read by KFCColorTextView::Draw. Non-persistent.
 
-    The row's check box is NOT drawn here - it is a real check box widget beside this cell
-    (kKFCResultCheckWidgetBoss), so it follows the UI theme and can be reached from outside.
-
-    A replaced row draws exactly like a found one: after a replace the panel lists only what was
-    changed, and the new text is what the user wants to read, so it gets the same emphasis a match
-    does. (The check box next to it is hidden instead - there is nothing left to select - until
-    Reject Change takes it back.) */
+    A replaced row draws exactly like a found one: the new text is what the user wants to read, so it
+    gets the same emphasis a match does. (Its right-click Replace is greyed instead. The rows carried a
+    check box beside this cell until 2026-10-06 - spec F16.) */
 class IKFCRowData : public IPMUnknown
 {
 public:

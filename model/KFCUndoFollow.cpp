@@ -66,7 +66,7 @@ struct Step
 	KFCUndoFollow::StepKind			kind;
 	bool							done;			// the write stands (false: an Undo took it back)
 	uint32							resultSet;		// KFCResultModel::GetResultSetId when it was made
-	bool							whole;			// it reshaped the result set (Change Checked)
+	bool							whole;			// it reshaped the result set (a query run - RunRecorder)
 	uint32							layoutBefore;	// the layout the row indices named before it...
 	uint32							layoutAfter;	// ...and after it (the same, for a write of rows)
 	std::vector<StoryMoved>			stories;
@@ -351,7 +351,6 @@ const char* KindName(KFCUndoFollow::StepKind kind)
 {
 	switch (kind)
 	{
-		case KFCUndoFollow::kStepChangeChecked:	return "Change Checked";
 		case KFCUndoFollow::kStepReplace:		return "Replace";
 		case KFCUndoFollow::kStepRunQueries:	return "Run Queries";
 	}
@@ -491,18 +490,16 @@ void KFCUndoFollow::MarkWrite(IDataBase* db)
 //========================================================================================
 // Recording.
 //========================================================================================
-KFCUndoFollow::StepRecorder::StepRecorder(const std::vector<int32>& chapters, bool wholeResultSet)
+KFCUndoFollow::StepRecorder::StepRecorder(const std::vector<int32>& chapters)
 	: fOpen(true)
 {
 	CloseRecording();
 	gRecording = true;
-	gPendingWhole = wholeResultSet;
+	gPendingWhole = false;		// rows, not the whole set (RunRecorder's)
 	gPendingResultSet = KFCResultModel::GetResultSetId();
 	gPendingLayout = KFCResultModel::GetLayoutGeneration();
 	for (size_t i = 0; i < chapters.size(); ++i)
 		ReadChapterStories(chapters[i], gPendingStories);
-	if (wholeResultSet)
-		KFCResultModel::TakeModelSnapshot(gPendingBefore);
 	KFCResultModel::BeginRowBackup();
 }
 
@@ -541,7 +538,7 @@ void KFCUndoFollow::StepRecorder::Keep(StepKind kind)
 	}
 	if (step.whole)
 	{
-		KFCResultModel::ForgetRowBackup();		// the whole set is copied instead (Change Checked has ended it already)
+		KFCResultModel::ForgetRowBackup();		// the whole set is copied instead
 		step.before = std::move(gPendingBefore);	// moved, not copied: a large search's set is not held twice
 		KFCResultModel::TakeModelSnapshot(step.after);
 		step.layoutAfter = KFCResultModel::GetLayoutGeneration();

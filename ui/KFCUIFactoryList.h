@@ -36,7 +36,6 @@ REGISTER_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
 // The UI half's own startup/shutdown service.
 REGISTER_PMINTERFACE(KFCUIStartupShutdown, kKFCUIStartupShutdownImpl)
 // Replace feature: the hit row check box's observer.
-REGISTER_PMINTERFACE(KFCResultCheckObserver, kKFCResultCheckObserverImpl)
 // The panel's observer (KFCPanelTitle.cpp): the tab's name, the layout, the picture and the message as the panel
 // appears, the picture's click, and the tab's name following the Find/Change settings and the selection.
 REGISTER_PMINTERFACE(KFCPanelObserver, kKFCPanelObserverImpl)

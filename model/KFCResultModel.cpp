@@ -45,10 +45,6 @@ namespace
 	// set - as one opaque key. See KFCResultModel::SetWalkSignature.
 	PMString gWalkSignature;
 
-	// Is the panel showing a replace's aftermath rather than a search's results? See
-	// KFCResultModel::IsShowingReplaceOutcome.
-	bool gShowingOutcome = false;
-
 	// Has a command been run since the results were last discarded? See KFCResultModel::NoteRun.
 	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
 	bool gHasRun = false;
@@ -88,25 +84,17 @@ namespace
 	}
 
 
-	// Which row the result tree's right-click menu was popped over (KFCResultNodeEH stashes it just
-	// before HandlePopupMenu; Check All / Uncheck All read it back). See the header for the two
-	// negative values it can hold.
-	int32 gContextMenuChapter = KFCResultModel::kNoContextMenuChapter;
-	// ...and which HIT row, for the hit row's own menu (Replace, Reject Change, Accept Change). -1 = none.
+	// Which HIT row the result tree's right-click menu was popped over, for its menu (Replace) - KFCResultNodeEH
+	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu since 2026-10-06 - spec F16.)
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
-	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked
-	int32 gContextMenuGroup = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
 	// RestoreModelSnapshot).
 	void ForgetContextMenus()
 	{
-		gContextMenuChapter = KFCResultModel::kNoContextMenuChapter;
 		gContextMenuHitChapter = -1;
 		gContextMenuHit = -1;
-		gContextMenuGroupChapter = -1;
-		gContextMenuGroup = -1;
 	}
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
@@ -166,63 +154,6 @@ namespace
 			c->storyVersions[v.story] = v.version;
 		else
 			c->storyVersions.erase(v.story);
-	}
-
-	// Does this row carry a check box? THE one definition of the question, so the commands that set
-	// the boxes and the counts that decide whether to offer those commands cannot drift apart:
-	// a row the model quietly checked but the panel drew no box for would be replaced without ever
-	// having been asked for. Replaced = the text it matched is gone; locked = InDesign offers no way
-	// to change it; an outcome already says why it was left alone.
-	bool RowHasCheckBox(const KFCResultModel::Hit& hit)
-	{
-		// A replace's report offers work only on the rows Reject Change put back (the author's call). This
-		// is the ROW's half of NoRowHasCheckBox, and it is the whole of it for a row: over a report, a row
-		// taken back and still open is exactly what makes that question answer no, and every other row
-		// is refused here. (NoRowHasCheckBox is not asked here as well - an answer that cannot change this
-		// one, and a walk of every row per row: squared in the rows over a report. The callers that loop
-		// ask it once, as their early exit.)
-		if (KFCResultModel::IsShowingReplaceOutcome() && hit.outcome != KFCResultModel::kOutcomeRejected)
-			return false;
-
-		return !hit.replaced && !hit.isLocked && KFCResultModel::IsWorkOutcome(hit.outcome);
-	}
-
-	// Change Checked's work - see KFCResultModel::IsHitCheckedWork. Ticked and carrying a box: the box's own
-	// question (RowHasCheckBox) - not "not replaced, and a work outcome", which says yes over a report to
-	// the ticked rows of a chapter the run could not open, rows that have no box there.
-	bool IsCheckedWork(const KFCResultModel::Hit& hit)
-	{
-		return hit.checked && RowHasCheckBox(hit);
-	}
-
-	// One chapter's rows, for the whole-model and the one-chapter versions of the same question
-	// (SetAllChecked / SetChapterChecked, GetCheckedCount / GetChapterCheckedCount, GetCheckableCount /
-	// GetChapterCheckableCount). The rows that carry no check box are not ticked by Check All either -
-	// otherwise the model would hold checked hits the panel shows no box for.
-	void SetBoxesIn(std::vector<KFCResultModel::Hit>& hits, bool checked)
-	{
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-			if (RowHasCheckBox(hits[hi]))
-				hits[hi].checked = checked;
-	}
-
-	int32 CountBoxesIn(const std::vector<KFCResultModel::Hit>& hits)
-	{
-		int32 count = 0;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-			if (RowHasCheckBox(hits[hi]))
-				++count;
-		return count;
-	}
-
-	// Checked and still waiting: a REPLACED row does not count, because it is no longer waiting to be done.
-	int32 CountCheckedWorkIn(const std::vector<KFCResultModel::Hit>& hits)
-	{
-		int32 count = 0;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-			if (IsCheckedWork(hits[hi]))
-				++count;
-		return count;
 	}
 
 	// GROUP A CHAPTER'S HITS BY STORY (the author's call) - the tree's middle level.
@@ -296,14 +227,11 @@ void KFCResultModel::AppendChapter(Chapter&& chapter)
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
 
-	// EVERY ROW STARTS UNTICKED (the author's call). The replace writes one match at a time, so the user
-	// ticks what is to be replaced. (Hit::checked is false as a Hit is built - nothing to do here.)
 }
 
 void KFCResultModel::Clear()
 {
 	gChapters.clear();
-	gShowingOutcome = false;
 	gFromBook = false;
 	gSearchScope = kScopeDocument;
 	gBookName.Clear();
@@ -370,17 +298,10 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 	// Emptied and unbound, in place (see the header for why the place is kept).
 	EmptyChapter(*c);
 	// A right-click target inside it names rows that are gone.
-	if (gContextMenuChapter == chapterIdx)
-		gContextMenuChapter = kNoContextMenuChapter;
 	if (gContextMenuHitChapter == chapterIdx)
 	{
 		gContextMenuHitChapter = -1;
 		gContextMenuHit = -1;
-	}
-	if (gContextMenuGroupChapter == chapterIdx)
-	{
-		gContextMenuGroupChapter = -1;
-		gContextMenuGroup = -1;
 	}
 }
 
@@ -428,35 +349,9 @@ int32 KFCResultModel::GetShownChapterPos(int32 chapterIdx)
 	return (pos < GetDisplayChapterCount()) ? pos : -1;
 }
 
-bool KFCResultModel::NoRowHasCheckBox()
-{
-	// gShowingOutcome rather than IsShowingReplaceOutcome() only because this file owns the flag.
-	// The two are the same question - see the header for why both halves have to be asked.
-	// EXCEPT A REPORT HOLDING A ROW TAKEN BACK (the author's call): that row carries a box.
-	return gShowingOutcome && !KFCResultModel::AnyRejectedRowOpen();
-}
-
 bool KFCResultModel::IsWorkOutcome(ChangeOutcome outcome)
 {
-	return outcome == kOutcomeNone || outcome == kOutcomeRejected;
-}
-
-bool KFCResultModel::IsHitCheckedWork(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return h != nil && IsCheckedWork(*h);
-}
-
-bool KFCResultModel::AnyRejectedRowOpen()
-{
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-		for (size_t hi = 0; hi < gChapters[ci].hits.size(); ++hi)
-		{
-			const Hit& h = gChapters[ci].hits[hi];
-			if (h.outcome == kOutcomeRejected && !h.replaced && !h.isLocked)
-				return true;
-		}
-	return false;
+	return outcome == kOutcomeNone;
 }
 
 void KFCResultModel::SetSearchMode(int32 mode)
@@ -623,64 +518,6 @@ void KFCResultModel::GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<
 		outHits = group->hitIndices;
 }
 
-int32 KFCResultModel::GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx)
-{
-	std::vector<int32> rows;
-	GetGroupHits(chapterIdx, groupIdx, rows);
-	int32 count = 0;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		if (IsCheckedWork(gChapters[chapterIdx].hits[rows[k]]))
-			++count;
-	}
-	return count;
-}
-
-void KFCResultModel::SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked)
-{
-	if (NoRowHasCheckBox())
-		return;
-	std::vector<int32> rows;
-	GetGroupHits(chapterIdx, groupIdx, rows);
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		Hit& h = gChapters[chapterIdx].hits[rows[k]];
-		if (RowHasCheckBox(h))
-			h.checked = checked;
-	}
-}
-
-int32 KFCResultModel::GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx)
-{
-	// The rows SetGroupChecked above would set, counted the same way.
-	if (NoRowHasCheckBox())
-		return 0;
-	std::vector<int32> rows;
-	GetGroupHits(chapterIdx, groupIdx, rows);
-	int32 count = 0;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		if (RowHasCheckBox(gChapters[chapterIdx].hits[rows[k]]))
-			++count;
-	}
-	return count;
-}
-
-void KFCResultModel::SetContextMenuGroup(int32 chapterIdx, int32 groupIdx)
-{
-	gContextMenuGroupChapter = chapterIdx;
-	gContextMenuGroup = groupIdx;
-}
-
-bool KFCResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx)
-{
-	if (!IsStoryGroup(gContextMenuGroupChapter, gContextMenuGroup))
-		return false;
-	outChapterIdx = gContextMenuGroupChapter;
-	outGroupIdx = gContextMenuGroup;
-	return true;
-}
-
 
 bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
 {
@@ -724,15 +561,9 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.preText = h.preText;
 	out.matchText = h.matchText;
 	out.postText = h.postText;
-	out.checked = h.checked;
 	out.replaced = h.replaced;
 	out.locked = h.isLocked;
 	out.outcome = h.outcome;
-	// The same call SetHitChecked makes before it accepts a tick, so the panel cannot draw a box the
-	// model would refuse. The flags above are handed over as well - the row still says WHY it was
-	// left alone ("locked" in the locator, "missing" / "refused" in the accent word) - but nothing
-	// outside this file has to add them up into this answer.
-	out.hasCheckBox = RowHasCheckBox(h);
 	return true;
 }
 
@@ -876,22 +707,6 @@ void KFCResultModel::GetChapterStories(int32 chapterIdx, std::set<UID>& outStori
 				outStories.insert(c->hits[hi].storyUID);
 }
 
-void KFCResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
-{
-	Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil)
-		return;
-	// The same question the panel asks before it draws a box, asked here so the model can never hold
-	// a checked hit that no row offered - a replace's report above all, where only the rows taken back
-	// carry a box.
-	//
-	// ONE ROW AT A TIME. The replace writes only the ticked matches, so every box is the row's own:
-	// touching matches do not go on and off together, and a footnote's row can be left out. (Reject
-	// Change still takes a touching group together - GetTouchingGroup.)
-	if (RowHasCheckBox(*h))
-		h->checked = checked;
-}
-
 uint64 KFCResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -957,10 +772,9 @@ bool KFCResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
 	return h != nil && h->inFootnote;
 }
 
-bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked)
+bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
-	outChecked = h != nil && h->checked;
 	outReplaced = h != nil && h->replaced;
 	outLocked = h != nil && h->isLocked;
 	return h != nil;
@@ -972,67 +786,6 @@ bool KFCResultModel::GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked
 	outLocked = h != nil && h->isLocked;
 	outHidden = h != nil && h->isHidden;
 	return h != nil;
-}
-
-void KFCResultModel::SetAllChecked(bool checked)
-{
-	// Nothing on a list that offers no work is selectable. A short cut, not a second opinion: the
-	// per-row test below asks the same question, and this only saves walking every hit to be told
-	// so once per row.
-	if (NoRowHasCheckBox())
-		return;
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-		SetBoxesIn(gChapters[ci].hits, checked);
-}
-
-void KFCResultModel::SetChapterChecked(int32 chapterIdx, bool checked)
-{
-	if (NoRowHasCheckBox())
-		return;		// the same short cut SetAllChecked takes, over one chapter
-	if (Chapter* c = ChapterAt(chapterIdx))
-		SetBoxesIn(c->hits, checked);
-}
-
-int32 KFCResultModel::GetCheckedCount()
-{
-	int32 count = 0;
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-		count += CountCheckedWorkIn(gChapters[ci].hits);
-	return count;
-}
-
-int32 KFCResultModel::GetChapterCheckedCount(int32 chapterIdx)
-{
-	const Chapter* c = ChapterAt(chapterIdx);
-	return (c != nil) ? CountCheckedWorkIn(c->hits) : 0;
-}
-
-int32 KFCResultModel::GetCheckableCount()
-{
-	if (NoRowHasCheckBox())
-		return 0;	// no row of this list has a box, so Check All / Uncheck All grey out
-	int32 count = 0;
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-		count += CountBoxesIn(gChapters[ci].hits);
-	return count;
-}
-
-int32 KFCResultModel::GetChapterCheckableCount(int32 chapterIdx)
-{
-	if (NoRowHasCheckBox())
-		return 0;	// no row has a box, whichever chapter the menu was popped over
-	const Chapter* c = ChapterAt(chapterIdx);
-	return (c != nil) ? CountBoxesIn(c->hits) : 0;
-}
-
-void KFCResultModel::SetContextMenuChapter(int32 chapterIdx)
-{
-	gContextMenuChapter = chapterIdx;
-}
-
-int32 KFCResultModel::GetContextMenuChapter()
-{
-	return gContextMenuChapter;
 }
 
 void KFCResultModel::SetContextMenuHit(int32 chapterIdx, int32 hitIdx)
@@ -1071,27 +824,11 @@ bool KFCResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString&
 	PMString& outReplacedText)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil || (!h->replaced && h->outcome != kOutcomeRejected))
+	if (h == nil || !h->replaced)
 		return false;
 	outOriginalText = h->originalText;
 	outReplacedText = h->replacedText;
 	return true;
-}
-
-void KFCResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
-{
-	Hit* hp = HitAt(chapterIdx, hitIdx);
-	if (hp == nil)
-		return;
-	Hit& h = *hp;
-	BackUpRow(chapterIdx, hitIdx, h);
-	h.storyUID = storyUID;
-	h.textStart = start;
-	h.textEnd = end;
-	h.replaced = false;
-	h.checked = false;
-	h.outcome = kOutcomeRejected;
-	BuildHitLocator(h);
 }
 
 void KFCResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
@@ -1104,7 +841,6 @@ void KFCResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
 	h.textStart = kInvalidTextIndex;
 	h.textEnd = kInvalidTextIndex;
 	h.replaced = true;
-	h.checked = false;
 	h.outcome = kOutcomeDeleted;
 	BuildHitLocator(h);
 }
@@ -1156,18 +892,11 @@ void KFCResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;
-	h.checked = false;
-	// a row taken back and replaced again is an ordinary replaced row once more
-	// The locator follows at once where the replace changes what it says: a row taken back reads as an
-	// ordinary replaced one again, and a footnote's row says "no track" - a row's Replace leaves a work
-	// list, which no pass numbers again afterwards (only a Change Checked's report is - KeepCheckedRows).
-	// So does a row whose replace changed no character (TextUnchanged - the replace sets the row's record
-	// and texts before this, for it). Every other row's locator reads the same before and after, so it is
-	// not built again for nothing.
-	const bool takenBack = (h.outcome == kOutcomeRejected);
-	if (takenBack)
-		h.outcome = kOutcomeNone;
-	if (takenBack || h.inFootnote || TextUnchanged(h))
+	// The locator follows at once where the replace changes what it says: a footnote's row says "no track" - a
+	// row's Replace leaves a work list, which no pass numbers again afterwards. So does a row whose replace
+	// changed no character (TextUnchanged - the replace sets the row's record and texts before this, for it).
+	// Every other row's locator reads the same before and after, so it is not built again for nothing.
+	if (h.inFootnote || TextUnchanged(h))
 		BuildHitLocator(h);
 }
 
@@ -1319,13 +1048,7 @@ void KFCResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome
 		return;		// it WAS replaced - nothing went wrong with it
 	BackUpRow(chapterIdx, hitIdx, h);
 	h.outcome = outcome;
-	h.checked = false;
 	BuildHitLocator(h);
-}
-
-bool KFCResultModel::IsShowingReplaceOutcome()
-{
-	return gShowingOutcome;
 }
 
 void KFCResultModel::BeginRowBackup()
@@ -1409,7 +1132,6 @@ void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 {
 	out.chapters = gChapters;
-	out.showingOutcome = gShowingOutcome;
 	out.layout = gLayoutGeneration;
 	out.fromBook = gFromBook;
 	out.searchScope = gSearchScope;
@@ -1422,7 +1144,6 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 {
 	gChapters = snapshot.chapters;
-	gShowingOutcome = snapshot.showingOutcome;
 	gLayoutGeneration = snapshot.layout;
 	gFromBook = snapshot.fromBook;
 	gSearchScope = snapshot.searchScope;
@@ -1433,98 +1154,6 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
 	ForgetContextMenus();
 	ForgetRowBackup();
-}
-
-int32 KFCResultModel::KeepCheckedRows()
-{
-	// A replace that was asked for nothing must not empty the panel, so check before touching
-	// anything. A row counts as asked about when any of these hold:
-	//   replaced - it was changed (its check was cleared when it was written)
-	//   outcome  - it says something about itself: this run reached it and left it alone (its check was
-	//              cleared then too), or something before the run did - Reject Change took it back, a
-	//              jump found it missing - ticked or not
-	//   checked  - still selected, so the run never reached it: a chapter that would not open. Those
-	//              rows carry no reason, on purpose. (A cancel never gets here - the run's cancel exit
-	//              rolls every row back and leaves the search's results; KFCReplaceEngine.cpp.)
-	//   isLocked - found by the search and never offerable. Kept so the list can account for a
-	//              search that turned up more than the replace was allowed to touch.
-	bool anyAsked = false;
-	for (size_t ci = 0; ci < gChapters.size() && !anyAsked; ++ci)
-	{
-		const std::vector<Hit>& hits = gChapters[ci].hits;
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			if (hits[hi].replaced || hits[hi].checked || hits[hi].isLocked
-				|| hits[hi].outcome != kOutcomeNone)
-			{
-				anyAsked = true;
-				break;
-			}
-		}
-	}
-	if (!anyAsked)
-		return GetTotalHitCount();
-
-	// Thin each chapter down to the rows the replace was asked about...
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		std::vector<Hit>& hits = gChapters[ci].hits;
-		std::vector<Hit> keep;
-		keep.reserve(hits.size());
-		for (size_t hi = 0; hi < hits.size(); ++hi)
-		{
-			if (!hits[hi].replaced && !hits[hi].checked && !hits[hi].isLocked
-				&& hits[hi].outcome == kOutcomeNone)
-				continue;
-			// The source vector is thrown away at the swap below, so the hit is moved out rather
-			// than copied - a Hit carries its texts as PMStrings. (Its fontGroup / fontGroupPos are
-			// left as they were: BuildFontGroups below writes every hit's pair.)
-			keep.push_back(std::move(hits[hi]));
-		}
-		hits.swap(keep);
-
-		// RENUMBER the within-page ordinals over what is left, so the rows read "the first
-		// replacement on this page, the second, the third" (the author's call: the count follows the
-		// REPLACEMENTS rather than the matches they came from).
-		//
-		// Neither of the other two: clearing the ordinal leaves every row on a page reading a bare
-		// "P1", saying nothing about which of them it is; keeping the search's numbers leaves them
-		// full of gaps. Both were tried.
-		//
-		// The search's own numbering, over what is left: thinning preserves the page order the search
-		// sorted into. The locators are rebuilt here rather than as each row was kept - the flags may
-		// have changed too, and this is the one pass that has the final ordinal to bake in.
-		NumberHitsWithinPages(hits);
-
-		// AND THE STORY GROUPS, because the thinning renumbered the hits they point AT.
-		// A group holds POSITIONS in the chapter's hits vector (FontGroup::hitIndices), and every
-		// hit holds the group it is in and its place inside it - all three of which were true of
-		// the vector this pass has just replaced. Left alone, GetFontGroupHit would hand the tree
-		// positions that name a different row or none at all, and KFCResultNodeID::Create(chapter,
-		// hit) would stamp a stale group onto the node: two nodes naming one hit while carrying
-		// different groups, which is the one thing that header says must never happen.
-		BuildFontGroups(gChapters[ci]);
-	}
-
-	// ...then drop the chapters left with nothing.
-	std::vector<Chapter> remaining;
-	remaining.reserve(gChapters.size());
-	int32 kept = 0;
-	for (size_t ci = 0; ci < gChapters.size(); ++ci)
-	{
-		if (gChapters[ci].hits.empty())
-			continue;
-		kept += static_cast<int32>(gChapters[ci].hits.size());	// counted BEFORE the move
-		remaining.push_back(std::move(gChapters[ci]));
-	}
-	gChapters.swap(remaining);
-
-	// From here the panel is a report, not a work list: no row offers a check box but one taken back
-	// (RowHasCheckBox).
-	gShowingOutcome = true;
-	// ...with its rows numbered again: an index taken before this names another row now.
-	gLayoutGeneration = ++gIdCounter;
-	return kept;
 }
 
 // End, KFCResultModel.cpp.

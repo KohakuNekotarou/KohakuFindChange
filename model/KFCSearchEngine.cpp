@@ -3135,9 +3135,8 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// can bite:
 	//   * collectionTruncated: the whole-search safety ceiling (kKFCCollectHitLimit, KFCResultModel.h) stopped the
 	//     collection, so the RESULT SET itself is capped - the strong "narrow it" note.
-	//   * total > the display cap (kKFCDisplayHitLimit): every row is held, the panel draws the first ones - and Check
-	//     All on a book or document row reaches the rest too, which is what a replace then writes; said, since
-	//     nothing on screen shows the rows it ticks.
+	//   * total > the display cap (kKFCDisplayHitLimit): every row is held, the panel draws the first ones - said,
+	//     since nothing on screen shows the rows past it.
 	if (collectionTruncated)
 	{
 		outSummary.Append(" Stopped at the ");
@@ -3148,19 +3147,17 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	{
 		outSummary.Append(" Showing first ");
 		outSummary.AppendNumber(KFCResultModel::kKFCDisplayHitLimit);
-		outSummary.Append(" in the panel. Check All on a book or document row ticks the rows not shown too.");
+		outSummary.Append(" in the panel.");
 	}
 
 	outSummary.Append(chapterNotes);
 
-	// Where the commands are. Check All / Uncheck All live on the ROWS' right-click menu - not on the
-	// panel flyout, which has no row to ask about, and those two have to know whether they mean the
-	// whole book or one chapter. Nothing else on screen says so, which would leave the one command
-	// that turns a result list into a work list undiscoverable (the user's request).
+	// How to replace (2026-10-06, spec F19): a hit row's Replace, on its right-click menu, is the one write from
+	// the list - and nothing else on screen says so (the user's request).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
 	// truncates its tail when it has to.
-	outSummary.Append(" Right-click the book or a document row for a menu.");
+	outSummary.Append(" Replace a row with its right-click menu.");
 	return total;
 }
 
@@ -3348,8 +3345,8 @@ void KFCSearchEngine::ShutdownCleanup()
 bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& ioStart, TextIndex& ioEnd)
 {
-	bool checked = false, replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || replaced)
+	bool replaced = false, locked = false;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || replaced)
 		return false;
 	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
 	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,

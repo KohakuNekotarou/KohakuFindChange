@@ -75,28 +75,15 @@ namespace
 	// indent is off, as in KESCL).
 	const PMReal kRowInset = 2.0;
 	const PMReal kExpanderZone = 16.0;
-	// How much further right than its chapter row a hit row's content starts. ZERO: the check box
-	// begins exactly where the chapter row's expander arrow ends, so the two line up down the left
-	// edge (the author's call, from a screen shot - "put the check where the arrow is").
-	//
-	// A full expander zone, or half of one, only leaves a gap in front of the check box that buys
-	// nothing. The hierarchy is still legible without it: the chapter row's LABEL and
-	// the hit row's LOCATOR are what the eye compares, and the check box's width keeps those apart.
+	// How much further right than its chapter row a hit row's content starts. ZERO: it begins exactly where
+	// the chapter row's expander arrow ends, so the two line up down the left edge (the author's call, from
+	// a screen shot - "put the check where the arrow is"; the check box went on 2026-10-06, spec F16).
 	const PMReal kHitExtraIndent = 0.0;
-	// The hit row's check box occupies this much at the start of the row's content, and the
-	// colour cell starts after it.
-	const PMReal kCheckZone = 16.0;
-	// What that same column shrinks to when NO row of the list carries a check box: a replace's report,
-	// or a list rebuilt from the records - see everyRowLostBox in ApplyHitRow, which is the one place
-	// that decides. Half a check zone, so the hit rows land 8px right of the row above them: the step
-	// the book and story levels already use, which makes the whole tree one even staircase (the
-	// author's call - "make it a nice staircase, shifted left by the check"). (The name is from the
-	// scans, since removed, whose lists had no boxes either.)
-	// Half rather than all of it: giving back the full 16px would line the hit rows up with their
-	// story row's LABEL, leaving no step at all between a branch and the rows under it. The full
-	// zone is still kept for a WORK LIST, where some rows have a box and some do not and the
-	// locators have to stay in one column (see ApplyHitRow).
-	const PMReal kScanCheckZone = 8.0;
+	// The hit row's colour cell starts this far right of the row's content: 8px, the step the book and story
+	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
+	// staircase"). Until 2026-10-06 a check box took 16px here (spec F16 took it away); this half zone was what
+	// the lists with no boxes used.
+	const PMReal kHitCellStep = 8.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
 	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
@@ -358,44 +345,16 @@ private:
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
 		IPanelControlData* rowData) const
 	{
-		// "<book>  (N/M checked)" - how many of this book's hits are ticked, out of all of them
-		// (the author's wording). The row a Check All over the book acts on is this row, so what it
-		// did is answered in the same place it was asked.
-		//
-		// Both numbers count every stored hit - what Check All ticks and what a replace would rewrite.
-		//
-		// ONLY ON A LIST THAT HAS BOXES, AND ONLY ON A LIST THAT HAS ROWS. A replace's report and a list
-		// rebuilt from the records have no boxes at all, so "checked" is a word about nothing there and
-		// the count is 0 by definition ("(0/120 checked)"). Those lists go back to the plain total, which
-		// is what this row says when there is no work to offer.
-		//
-		// AND A BOOK SEARCH THAT FOUND NOTHING IS THE SAME SENTENCE ABOUT NOTHING. This row is drawn
-		// even when the search found no hits at all - the hierarchy adapter gives the root one child
-		// whenever the results came from a book, which is deliberate: it is how the panel goes on
-		// naming the book it just searched. With no hits and a Find/Change kind NoRowHasCheckBox is
-		// false, so without the hit-count test the row would read "book.indb  (0/0 checked)". It reads
-		// "(0)" - which is also how KFCBookWatch describes it (the user's own measurement); keep the
-		// two together.
-		//
-		// M counts LOCKED hits too, though Check All cannot tick them (RowHasCheckBox turns them
-		// away) - so a fully checked chapter of locked-and-free hits reads short of its own total on
-		// purpose. The alternative, a denominator that leaves them out, would disagree with the hit
-		// count every other part of the panel reports.
+		// "<book>  (N)" - how many hits the book's search holds (the stored ones, past the display cap too).
+		// Drawn even when the search found nothing - the hierarchy adapter gives the root one child whenever the
+		// results came from a book, which is how the panel goes on naming the book it just searched - and then
+		// it reads "(0)", which is also how KFCBookWatch describes it (the user's own measurement); keep the two
+		// together.
 		PMString label(KFCResults()->GetBookName());
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (KFCResults()->NoRowHasCheckBox() || KFCResults()->GetTotalHitCount() == 0)
-		{
-			label.AppendNumber(KFCResults()->GetTotalHitCount());
-			label.Append(")");
-		}
-		else
-		{
-			label.AppendNumber(KFCResults()->GetCheckedCount());
-			label.Append("/");
-			label.AppendNumber(KFCResults()->GetTotalHitCount());
-			label.Append(" checked)");
-		}
+		label.AppendNumber(KFCResults()->GetTotalHitCount());
+		label.Append(")");
 		AppendDisplayCapNote(label);
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
@@ -410,21 +369,9 @@ private:
 		if (!KFCResults()->GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
 			return;
 
-		// "<name>  (N/M checked)" - the same read-out the book row carries, for this chapter alone
-		// (the author's wording). A Check All over a DOCUMENT row means that chapter, so this is
-		// where its answer belongs.
-		//
-		// Both numbers are about the work, not the drawing - never "(shown / total)", which is the
-		// panel talking about ITSELF. How many rows are drawn is one note on the OUTERMOST row,
-		// outside the brackets (AppendDisplayCapNote).
-		//
-		// And, exactly as on the book row, only where there are boxes to count: a list with none falls
-		// back to the plain total. See ApplyBookRow for the whole of it.
-		//
-		// The book row's OTHER fall-back - an empty result set - has no case here and gets no test:
-		// a chapter is only ever appended with at least one hit (KFCResultModel::AppendChapter), so
-		// a document row with fullCount 0 does not exist. A gate nothing can reach reads as a case
-		// that happens.
+		// "<name>  (N)" - the chapter's hits, the same read-out the book row carries. About the work, not the
+		// drawing - never "(shown / total)": how many rows are drawn is one note on the OUTERMOST row, outside
+		// the brackets (AppendDisplayCapNote).
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
@@ -440,18 +387,8 @@ private:
 				label.Append(" (no window)");
 		}
 		label.Append("  (");
-		if (KFCResults()->NoRowHasCheckBox())
-		{
-			label.AppendNumber(fullCount);
-			label.Append(")");
-		}
-		else
-		{
-			label.AppendNumber(KFCResults()->GetChapterCheckedCount(nodeID->GetChapter()));
-			label.Append("/");
-			label.AppendNumber(fullCount);
-			label.Append(" checked)");
-		}
+		label.AppendNumber(fullCount);
+		label.Append(")");
 		// A document's results have no book row above this one, so the note goes here instead.
 		if (!KFCResults()->IsFromBook())
 			AppendDisplayCapNote(label);
@@ -472,24 +409,14 @@ private:
 		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
-		// "P3  first words...  (N/M checked)", the way a document row reads out its count, like the rows
+		// "P3  first words...  (N)", the way a document row reads out its count, like the rows
 		// above it: what the row holds, not what the panel drew of it. (A group that answered
 		// GetFontDisplay is in range - no further test needed.)
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		label.Append("  (");
-		if (!KFCResults()->NoRowHasCheckBox())
-		{
-			label.AppendNumber(KFCResults()->GetGroupCheckedCount(nodeID->GetChapter(), nodeID->GetFont()));
-			label.Append("/");
-			label.AppendNumber(fullCount);
-			label.Append(" checked)");
-		}
-		else
-		{
-			label.AppendNumber(fullCount);
-			label.Append(")");
-		}
+		label.AppendNumber(fullCount);
+		label.Append(")");
 		this->LayOutBranchRow(node, widget, rowData,
 			this->LevelShift() + kFontLevelIndent, label);
 	}
@@ -505,96 +432,18 @@ private:
 		if (!KFCResults()->GetHitRow(nodeID->GetChapter(), nodeID->GetHit(), row))
 			return;
 
-		// Reasons a row has NOTHING to select. THE MODEL ANSWERS ALL OF THEM IN ONE FIELD
-		// (row.hasCheckBox = RowHasCheckBox), and what follows is the list of what that covers -
-		// not a second copy of the rule (the model's is the one that decides).
-		//   replaced - it has been changed already, and cannot be changed again
-		//   locked   - InDesign gives no way to change locked content, so a box would offer an
-		//              action that quietly does nothing (the locator says locked)
-		//   outcome  - the row already carries a reason it was left alone (its accent word)
-		//   report   - the panel is showing the aftermath of a replace, where only the rows taken back
-		//              are selectable - or a list rebuilt from the records, where none is. This is the
-		//              one that catches the rows carrying no reason at all: a chapter that could not be
-		//              opened. It is a property of the list rather than of the row.
-		//
-		// Asked as its own question first because it says something the per-row tests cannot: NO row
-		// in this list has a box, which is a property of the WHOLE list. That is what makes it safe
-		// to narrow the column in front of the locators for every row at once (see the cell's frame
-		// below) - nothing is left ragged, because there is nothing left to line up with. A work list
-		// is the case that has to keep the full zone: it mixes rows that have a box with rows that do
-		// not, and those locators have to stay in one column. The question lives in
-		// KFCResultModel::NoRowHasCheckBox - the branch rows above ask it to decide whether "checked"
-		// is a word their label may use at all, and three rows of one tree must not disagree about it.
-		//
-		// Asked HERE as well as through row.hasCheckBox because the two want different things: the
-		// row wants to know whether IT has a box, and the cell's frame below wants to know whether
-		// the WHOLE LIST has none (only then may the column move).
-		const bool everyRowLostBox = KFCResults()->NoRowHasCheckBox();
-		const bool noCheckBox = !row.hasCheckBox;
-
-		// Draw our own indent: the check box sits where the hit row's content starts (one expander
-		// zone right of the chapter row's text), and the colour cell follows it to the row's edge.
+		// Draw our own indent: the row's content starts one expander zone right of the chapter row's text,
+		// and the colour cell follows it to the row's edge.
 		const PMReal rowRight = widget->GetFrame().Width() - kRowInset;
 		const PMReal xStart = kRowInset + kExpanderZone + kHitExtraIndent
 			+ this->LevelShift() + this->FontShift(nodeID->GetChapter());
-
-		// The check box. A row with nothing to select loses it completely; the space it would have
-		// taken is left empty rather than reclaimed, so the locators stay in one column (see the
-		// cell's frame below). Hiding alone would not be enough - a hidden widget still takes
-		// clicks - so it is disabled as well.
-		IControlView* checkView = rowData->FindWidget(kKFCResultCheckWidgetID);
-		if (checkView != nil && noCheckBox)
-		{
-			checkView->ShowView(kFalse);
-			checkView->Disable();
-		}
-		else if (checkView != nil)
-		{
-			PMRect checkFrame = checkView->GetFrame();
-			checkFrame.Left(xStart);
-			checkFrame.Right(xStart + kCheckZone);
-			checkView->SetFrame(checkFrame);
-
-			// Push the model's state in WITHOUT notifying. A notify here would come straight back
-			// through KFCResultCheckObserver as a phantom click and overwrite the model with
-			// whatever this recycled row happened to be showing.
-			InterfacePtr<ITriStateControlData> state(checkView, UseDefaultIID());
-			if (state != nil)
-			{
-				state->SetState(row.checked ? ITriStateControlData::kSelected : ITriStateControlData::kUnselected,
-					kTrue /*invalidate*/, kFalse /*do NOT notify*/);
-			}
-
-			// Rows are recycled as the tree scrolls, so a row that once showed a replaced or locked
-			// hit has to get its box back.
-			checkView->ShowView(kTrue);
-			// (A footnote's row is ticked by hand like any other - only its Reject Change and Accept Change
-			// stay off, since Track Changes records nothing in a footnote.)
-			checkView->Enable();
-		}
 
 		IControlView* cell = rowData->FindWidget(kKFCResultTextWidgetID);
 		if (cell != nil)
 		{
 			PMRect frame = cell->GetFrame();
-			// ALWAYS past the check zone, box or no box: the locators line up in one column down
-			// the whole list and the check box sits in the margin to their left.
-			//
-			//     [v] P1(1)
-			//         P1(2) lock
-			//         P1(3) lock
-			//
-			// Rows without a box reclaiming those 16px read as a ragged left edge once a search turns
-			// up a lot of locked hits (the author's call, from a screen shot). A column that does not
-			// move is worth more than the width.
-			//
-			// A list where NO row has a box is the case where the column can move, because it moves
-			// for every row at once and nothing is left ragged: a replace's report (every row lost its
-			// box together) or a list rebuilt from the records. There it keeps half the zone
-			// (kScanCheckZone) instead of all of it, which steps the hit rows off the row above by the
-			// same 8px the levels use rather than sinking them a full check box deeper than anything
-			// else in the tree.
-			frame.Left(xStart + (everyRowLostBox ? kScanCheckZone : kCheckZone));
+			// One step right of the row above (kHitCellStep) - the staircase the levels make.
+			frame.Left(xStart + kHitCellStep);
 			frame.Right(rowRight);
 			cell->SetFrame(frame);
 
@@ -614,7 +463,7 @@ CREATE_PMINTERFACE(KFCResultListWidgetMgr, kKFCResultListWidgetMgrImpl)
 namespace
 {
 // The panel's result tree, reached through the panel - nil when the panel is closed, which is an ordinary
-// state: Rebuild, RefreshRows, RefreshCheckedCounts and BeforeChapterRowGoes then do nothing.
+// state: Rebuild, RefreshRows and BeforeChapterRowGoes then do nothing.
 ITreeViewMgr* QueryResultTreeMgr()
 {
 	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
@@ -755,9 +604,9 @@ void KFCResultTree::RefreshRows()
 	// requires.
 	//
 	// The BOOK row first, and it has to be asked for by name. childrenChangedAlso refreshes a node's
-	// children, so refreshing the chapters does NOT reach the row above them. It carries
-	// "(N/M checked)", so it goes stale the moment anything is ticked -
-	// which is exactly what this function is called for. Only drawn on a book search; NodeChanged
+	// children, so refreshing the chapters does NOT reach the row above them. It carries the book's
+	// count, so it goes stale the moment a row is replaced or taken out - which is what this function is
+	// called for. Only drawn on a book search; NodeChanged
 	// on a node the tree does not hold is harmless.
 	if (KFCResults()->IsFromBook())
 		treeMgr->NodeChanged(KFCResultNodeID::CreateBook(), kFalse /*children handled below*/);
@@ -774,32 +623,6 @@ void KFCResultTree::RefreshRows()
 		const int32 fonts = KFCResults()->GetDisplayFontCount(c);
 		for (int32 f = 0; f < fonts; ++f)
 			treeMgr->NodeChanged(KFCResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);
-	}
-}
-
-//----------------------------------------------------------------------------------------
-// KFCResultTree::RefreshCheckedCounts - repaint only the rows that read out a checked count
-//----------------------------------------------------------------------------------------
-
-void KFCResultTree::RefreshCheckedCounts(int32 chapterIdx)
-{
-	InterfacePtr<ITreeViewMgr> treeMgr(QueryResultTreeMgr());
-	if (treeMgr == nil)
-		return;
-
-	// The rows that read out a count, and childrenChangedAlso is kFalse for each. Ticking one box changes
-	// what the book row, that chapter's row and its story rows read out and NOTHING else: the box that
-	// was clicked draws itself, and every other hit row is unaffected. RefreshRows would repaint every chapter and every story
-	// row in the panel to say the same thing.
-	if (KFCResults()->IsFromBook())
-		treeMgr->NodeChanged(KFCResultNodeID::CreateBook(), kFalse);
-	if (chapterIdx >= 0)
-	{
-		treeMgr->NodeChanged(KFCResultNodeID::Create(chapterIdx), kFalse);
-		// ...and its STORY rows, which read out a checked count too
-		const int32 groups = KFCResults()->GetDisplayFontCount(chapterIdx);
-		for (int32 g = 0; g < groups; ++g)
-			treeMgr->NodeChanged(KFCResultNodeID::CreateFont(chapterIdx, g), kFalse);
 	}
 }
 
@@ -935,43 +758,6 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	// The panel is on screen and this is a report of something that just happened, so it is drawn
 	// immediately (the restore path above is the one that must not force a redraw).
 	WriteMessage(message, kTrue /*force the redraw*/);
-}
-
-//----------------------------------------------------------------------------------------
-// KFCResultTree::ShowCheckAllStatus - what Check All / Uncheck All just did, and to which row
-//----------------------------------------------------------------------------------------
-
-void KFCResultTree::ShowCheckAllStatus(const PMString& targetName, bool nowChecked)
-{
-	if (KFCResults()->GetTotalHitCount() == 0)
-		return;		// no results: leave whatever the search left on the line
-
-	// "<name>  all checked" - the row's own name first, spaced the way the tree spaces its label
-	// from its count, so the line reads as an echo of the row that was clicked.
-	//
-	// The NAME is what matters here and the counts are deliberately left out: the row itself reads
-	// "(N/M checked)", and this line exists to answer "which one did I just do that to?" - the same
-	// two commands mean one chapter or the whole book depending on where the menu was popped, and
-	// that is the part the panel cannot show afterwards.
-	PMString msg(targetName);
-	msg.SetTranslatable(kFalse);
-	msg.Append(nowChecked ? "  all checked" : "  all unchecked");
-	KFCResultTree::ShowStatus(msg);
-}
-
-//----------------------------------------------------------------------------------------
-// KFCResultTree::ShowHitCheckStatus - one box, named by the row's own locator
-//----------------------------------------------------------------------------------------
-
-void KFCResultTree::ShowHitCheckStatus(const PMString& locator, bool nowChecked)
-{
-	// Same shape as the Check All line above, one row narrower: what was clicked, then what it now
-	// is. The locator is what the row LEADS with, so the two read as the same thing said twice -
-	// which is the point, since the row that changed may be anywhere in a long list.
-	PMString msg(locator);
-	msg.SetTranslatable(kFalse);
-	msg.Append(nowChecked ? "  checked" : "  unchecked");
-	KFCResultTree::ShowStatus(msg);
 }
 
 // End, KFCResultListWidgetMgr.cpp.

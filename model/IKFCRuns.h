@@ -46,20 +46,10 @@ public:
 
 	/** = KFCSearchEngine::SearchBook. */
 	virtual int32 SearchBook(PMString& outSummary) = 0;
-	/** = KFCReplaceEngine::ReplaceChecked. */
-	virtual int32 ReplaceChecked(PMString& outSummary) = 0;
 	/** = KFCReplaceEngine::ReplaceHit. */
 	virtual bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) = 0;
 	/** = KFCReplaceEngine::CanReplaceHit. */
 	virtual bool CanReplaceHit(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCReplaceEngine::ReplaceStory. */
-	virtual bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) = 0;
-	/** = KFCReplaceEngine::CanReplaceStory. */
-	virtual bool CanReplaceStory(int32 chapterIdx, int32 groupIdx) = 0;
-	/** = KFCReplaceEngine::ReplaceChapter. */
-	virtual bool ReplaceChapter(int32 chapterIdx, PMString& outStatus) = 0;
-	/** = KFCReplaceEngine::CanReplaceChapter. */
-	virtual bool CanReplaceChapter(int32 chapterIdx) = 0;
 	/** = KFCRunGuard::IsAnyRunning. */
 	virtual bool IsAnyRunning() = 0;
 	/** = KFCRunGuard::BusyMessage. */

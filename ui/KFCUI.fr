@@ -251,21 +251,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * The hit row's check box (replace feature): a STOCK check box with our observer aggregated on
-	 * it, so a click flips that hit's "replace me" flag. The system draws the box, so it follows
-	 * the UI theme and needs no icon resources of ours - the layer panel's eyeball pattern
-	 * (source/open/components/layerpanel). Only the hit row resource carries one.
-	 */
-	Class
-	{
-		kKFCResultCheckWidgetBoss,
-		kCheckBoxWidgetBoss,
-		{
-			IID_IOBSERVER, kKFCResultCheckObserverImpl,
-		}
-	},
-
-	/*
 	 * Marker-expiry idle task boss: a one-shot idle task, armed each time the marker is
 	 * shown, that takes it back off the screen a second later. IID_IIDLETASK comes from ShuksanID.h.
 	 */
@@ -464,14 +449,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCChangeAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// (No rule between the search and Change Checked - the author's call.)
-
-		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
-		kKFCReplaceCheckedActionID,
-		kKFCTargetMenuPath
-		kKFCReplaceCheckedMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Clear Results: the list emptied, so Change All can run.
 		kKFCClearResultsActionID,
 		kKFCTargetMenuPath
@@ -575,52 +552,12 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCAboutThisMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- The book and document rows' right-click context menu -----
-		// A menu of its own, not part of the flyout above - which is why it is written last here,
-		// after that menu has been laid out from top to bottom. Popped at the cursor by the row event
-		// handler (KFCResultNodeEH::RButtonDn, through IMenuManager::HandlePopupMenu with this
-		// subtree's name). Check All / Uncheck All live here, not on the flyout, where they could only
-		// ever mean "every hit everywhere". Here they mean the row the menu was popped over - the BOOK
-		// row for all of it, a document row for that chapter alone.
-		// Replace: the ticked rows of the document the menu was popped over, no prompt.
-		kKFCChapterReplaceActionID,
-		kKFCResultRowMenuName
-		kKFCChapterReplaceMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCCheckAllActionID,
-		kKFCResultRowMenuName
-		kKFCCheckAllMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCUncheckAllActionID,
-		kKFCResultRowMenuName
-		kKFCUncheckAllMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// ----- A hit row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row alone with no
 		// prompt.
 		kKFCReplaceHitActionID,
 		kKFCResultHitMenuName
 		kKFCReplaceHitMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// ----- A STORY row's right-click menu -----
-		// Popped by KFCResultNodeEH::RButtonDn over a story row: each command over that story's rows.
-		kKFCStoryReplaceActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryReplaceMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCStoryCheckAllActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryCheckAllMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCStoryUncheckAllActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 	}
@@ -786,31 +723,9 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Change Checked. kCustomEnabling so UpdateActionStates can grey it out while nothing is
-		// checked - the same flag the toggles need. NOT kDisableIfNoFrontDocument: replacing in
-		// windowless book chapters is a supported case, and a book search leaves no document window
-		// open at all, so that flag would grey out the very run this panel exists for.
-		// !Nothing here and nothing in UpdateActionStates asks whether a hit's document is still
-		//  OPEN, and nothing should. A closed chapter is REOPENED by the replace itself
-		//  (KFCReplaceEngine -> KFCBookScope::ReopenChapterDoc), and a document-scope result set is
-		//  retired the moment its document closes (KFCCloseDocResponder) - both cases are answered
-		//  before this command can be reached. A per-hit door there is exactly the one that would grey
-		//  out a book-wide replace.
-		// IN THE KEYBOARD SHORTCUTS EDITOR (the author's call), under Palette Menus
-		// as "Kohaku Find/Change: <name>" - KCM's shape (kKFCPanelMenuActionArea). The enabling is
-		// unchanged: a shortcut runs the same UpdateActionStates test the flyout does.
-		kKFCActionComponentBoss,
-		kKFCReplaceCheckedActionID,
-		kKFCReplaceCheckedMenuKey,		// "Change Checked"
-		kKFCPanelMenuActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefVisibleInKBSCEditorFlag,
-
 		// Change All in Book (No List). kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
 		// the panel, no book to run on, the Object and Colour tabs, nothing to find). In the Keyboard Shortcuts editor
-		// under Palette Menus, like Find and Change Checked.
+		// under Palette Menus, like Find.
 		kKFCActionComponentBoss,
 		kKFCChangeAllActionID,
 		kKFCChangeAllMenuKey,			// "Change All in Book (No List)"
@@ -830,70 +745,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// Check All / Uncheck All - the book and document rows' right-click menu (the MenuDef above). kCustomEnabling so UpdateActionStates can grey them out when the row the menu was
-		// popped over has nothing left to check; it is also what lets that hook see them at all, and
-		// the hook is where the right-click target is read.
-		kKFCActionComponentBoss,
-		kKFCCheckAllActionID,
-		kKFCCheckAllMenuKey,			// "Check All"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCUncheckAllActionID,
-		kKFCUncheckAllMenuKey,			// "Uncheck All"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Replace - a hit row's right-click menu.
-		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys it by the row the
-		// menu is over.
+		// Replace - a hit row's right-click menu (since 2026-10-06 the one write from the list - spec F16).
+		// kCustomEnabling: UpdateActionStates greys it by the row the menu is over.
 		kKFCActionComponentBoss,
 		kKFCReplaceHitActionID,
-		kKFCReplaceHitMenuKey,			// "Replace"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// A story row's right-click menu - the same names as the rows' own commands.
-		kKFCActionComponentBoss,
-		kKFCStoryReplaceActionID,
-		kKFCReplaceHitMenuKey,			// "Replace"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCStoryCheckAllActionID,
-		kKFCCheckAllMenuKey,			// "Check All"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCStoryUncheckAllActionID,
-		kKFCUncheckAllMenuKey,			// "Uncheck All"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Replace - a document row's right-click menu: that document's ticked rows.
-		kKFCActionComponentBoss,
-		kKFCChapterReplaceActionID,
 		kKFCReplaceHitMenuKey,			// "Replace"
 		kOtherActionArea,
 		kNormalAction,
@@ -1021,10 +876,6 @@ type KFCColorTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCColorT
 // code decides all of them, and the line count is the box's own height (KFCStatusTextView.cpp). KCM's
 // KCMStatusTextWidget is the same type.
 type KFCStatusTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCStatusTextWidgetBoss)
-{
-};
-
-type KFCResultCheckWidget(kViewRsrcType) : CheckBoxWidget(ClassID = kKFCResultCheckWidgetBoss)
 {
 };
 
@@ -1307,19 +1158,6 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 	kTrue, kTrue,						// Visible, Enabled
 	"",									// Panel name
 	{
-		// The "replace me" check box. A stock check box drawn by the system (kSysCheckBoxPMRsrcId),
-		// so it matches the UI theme with no icon art of ours. The widget manager re-places it and
-		// pushes its state in on every apply; its observer flips the model when it is clicked.
-		KFCResultCheckWidget
-		(
-			kKFCResultCheckWidgetID, kSysCheckBoxPMRsrcId,	// WidgetId, RsrcId
-			kBindLeft | kBindTop | kBindBottom,	// Frame binding: stay at the row's left
-			Frame(34, 1, 50, 17),			// Frame (the widget manager re-places it)
-			kTrue, kTrue,					// Visible, Enabled
-			kAlignLeft,						// Alignment
-			"",								// No label: the box alone
-		),
-
 		KFCColorTextWidget
 		(
 			kKFCResultTextWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId

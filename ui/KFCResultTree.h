@@ -44,12 +44,6 @@ namespace KFCResultTree
 	    re-expands everything). Safe to call when the panel is closed (does nothing then). */
 	void RefreshRows();
 
-	/** Repaint ONLY the rows that read out a checked count: the book row, the one chapter row named
-	    here and its story rows. What a single check box changes and nothing more - the box draws
-	    itself, and no other hit row is affected - so this is what a box's observer calls instead of
-	    RefreshRows.
-	    Pass -1 for the chapter to refresh the book row alone. Safe when the panel is closed. */
-	void RefreshCheckedCounts(int32 chapterIdx);
 
 	/** ONE DOCUMENT ROW IS ABOUT TO GO (All Documents: a document was closed). Tells
 	    the tree BEFORE the model empties the chapter (KFCResultModel::CloseChapter) - ITreeViewMgr's
@@ -81,36 +75,6 @@ namespace KFCResultTree
 	    status line - a PMString, exactly the kind of static the rule was written for
 	    (KFCResultModel::ShutdownCleanup). */
 	void ShutdownCleanup();
-
-	/** Say on the status line WHAT was just ticked or cleared, and over WHICH row:
-
-	        ch1.indd  all checked
-	        selftest.indb  all unchecked
-
-	    Check All / Uncheck All only. Those two reach every hit of a book or of a
-	    document, most of them scrolled out of sight, so what they did has to be said somewhere the
-	    user is looking - and WHICH row they were asked over is the whole question, since the same
-	    two commands mean "this chapter" or "the whole book" depending on it.
-
-	    Ticking a single box does not come through HERE - it has a line of its own, one row narrower:
-	    ShowHitCheckStatus below. It says WHICH row it was ("P1(2)  checked") and no count: the book
-	    and document rows read the "(n/m checked)" out themselves.
-
-	    @param targetName the row the menu was popped over - a chapter's name, or the book's.
-	    @param nowChecked true = Check All, false = Uncheck All. */
-	void ShowCheckAllStatus(const PMString& targetName, bool nowChecked);
-
-	/** The same, for ONE box:
-
-	        P1(2)  checked
-	        P4  unchecked
-
-	    Named by its LOCATOR, which is what the row itself leads with - so the line reads as an echo
-	    of the row that was clicked, the way the Check All line echoes a chapter's name.
-
-	    @param locator the hit row's page locator (KFCResultModel::GetHitDisplay's first field).
-	    @param nowChecked the state the box was just put into. */
-	void ShowHitCheckStatus(const PMString& locator, bool nowChecked);
 }
 
 #endif // __KFCResultTree_h__

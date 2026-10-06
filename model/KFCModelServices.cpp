@@ -49,7 +49,6 @@ public:
 	virtual int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitFontGroup(chapterIdx, hitIdx); }
 	virtual int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitFontGroupPos(chapterIdx, hitIdx); }
 	virtual bool IsStoryGroup(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::IsStoryGroup(chapterIdx, groupIdx); }
-	virtual int32 GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::GetGroupCheckedCount(chapterIdx, groupIdx); }
 	virtual bool GetHitRow(int32 chapterIdx, int32 hitIdx, KFCResultModel::RowDisplay& out) { return KFCResultModel::GetHitRow(chapterIdx, hitIdx, out); }
 	virtual bool GetHitDisplay(int32 chapterIdx, int32 hitIdx, PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost) { return KFCResultModel::GetHitDisplay(chapterIdx, hitIdx, outLocator, outPre, outMatch, outPost); }
 	virtual void MarkUpBreaksForDisplay(PMString& s) { KFCResultModel::MarkUpBreaksForDisplay(s); }
@@ -57,30 +56,15 @@ public:
 	virtual KFCResultModel::SearchScopeKind GetSearchScope() { return KFCResultModel::GetSearchScope(); }
 	virtual PMString GetBookName() { return KFCResultModel::GetBookName(); }
 	virtual bool HasRun() { return KFCResultModel::HasRun(); }
-	virtual bool IsShowingReplaceOutcome() { return KFCResultModel::IsShowingReplaceOutcome(); }
-	virtual bool NoRowHasCheckBox() { return KFCResultModel::NoRowHasCheckBox(); }
-	virtual int32 GetCheckedCount() { return KFCResultModel::GetCheckedCount(); }
-	virtual int32 GetChapterCheckedCount(int32 chapterIdx) { return KFCResultModel::GetChapterCheckedCount(chapterIdx); }
-	virtual int32 GetCheckableCount() { return KFCResultModel::GetCheckableCount(); }
-	virtual int32 GetChapterCheckableCount(int32 chapterIdx) { return KFCResultModel::GetChapterCheckableCount(chapterIdx); }
-	virtual void SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked) { KFCResultModel::SetHitChecked(chapterIdx, hitIdx, checked); }
-	virtual void SetGroupChecked(int32 chapterIdx, int32 groupIdx, bool checked) { KFCResultModel::SetGroupChecked(chapterIdx, groupIdx, checked); }
-	virtual void SetChapterChecked(int32 chapterIdx, bool checked) { KFCResultModel::SetChapterChecked(chapterIdx, checked); }
-	virtual void SetAllChecked(bool checked) { KFCResultModel::SetAllChecked(checked); }
-	virtual void SetContextMenuChapter(int32 chapterIdx) { KFCResultModel::SetContextMenuChapter(chapterIdx); }
-	virtual int32 GetContextMenuChapter() { return KFCResultModel::GetContextMenuChapter(); }
-	virtual void SetContextMenuGroup(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuGroup(chapterIdx, groupIdx); }
-	virtual bool GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuGroup(outChapterIdx, outGroupIdx); }
 	virtual void SetContextMenuHit(int32 chapterIdx, int32 hitIdx) { KFCResultModel::SetContextMenuHit(chapterIdx, hitIdx); }
 	virtual bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx) { return KFCResultModel::GetContextMenuHit(outChapterIdx, outHitIdx); }
 	virtual bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile) { return KFCResultModel::GetChapterLocation(chapterIdx, outDocRef, outFile); }
 	virtual bool GetHitLocation(int32 chapterIdx, int32 hitIdx, UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd) { return KFCResultModel::GetHitLocation(chapterIdx, hitIdx, outDocRef, outFile, outStoryUID, outStart, outEnd); }
-	virtual bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outChecked, bool& outReplaced, bool& outLocked) { return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, outChecked, outReplaced, outLocked); }
+	virtual bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked) { return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, outReplaced, outLocked); }
 	virtual bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden) { return KFCResultModel::GetHitReach(chapterIdx, hitIdx, outLocked, outHidden); }
 	virtual bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitInFootnote(chapterIdx, hitIdx); }
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) { KFCResultModel::RebindChapterDoc(chapterIdx, newDocRef); }
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) { KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, outcome); }
-	virtual int32 GetGroupCheckableCount(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::GetGroupCheckableCount(chapterIdx, groupIdx); }
 	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitTextUnchanged(chapterIdx, hitIdx); }
 };
 
@@ -92,13 +76,8 @@ public:
 	KFCRunsSession(IPMUnknown* boss) : CPMUnknown<IKFCRuns>(boss) {}
 
 	virtual int32 SearchBook(PMString& outSummary) { return KFCSearchEngine::SearchBook(outSummary); }
-	virtual int32 ReplaceChecked(PMString& outSummary) { return KFCReplaceEngine::ReplaceChecked(outSummary); }
 	virtual bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceHit(chapterIdx, hitIdx, outStatus); }
 	virtual bool CanReplaceHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanReplaceHit(chapterIdx, hitIdx); }
-	virtual bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceStory(chapterIdx, groupIdx, outStatus); }
-	virtual bool CanReplaceStory(int32 chapterIdx, int32 groupIdx) { return KFCReplaceEngine::CanReplaceStory(chapterIdx, groupIdx); }
-	virtual bool ReplaceChapter(int32 chapterIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceChapter(chapterIdx, outStatus); }
-	virtual bool CanReplaceChapter(int32 chapterIdx) { return KFCReplaceEngine::CanReplaceChapter(chapterIdx); }
 	virtual bool IsAnyRunning() { return KFCRunGuard::IsAnyRunning(); }
 	virtual const char* BusyMessage() { return KFCRunGuard::BusyMessage(); }
 	virtual const char* FindCommandName(bool bookScopeOn) { return KFCSearchEngine::FindCommandName(bookScopeOn); }

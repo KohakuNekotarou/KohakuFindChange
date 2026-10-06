@@ -46,12 +46,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCRememberBookPanelMenuKey,	"Remember Book Panel Placement",
                 kKFCAppBarSearchEnterMenuKey,	"Link the Application Bar's Search Field to This Panel",
                 kKFCSavePanelSettingsMenuKey,	"Save Panel Settings",
-                kKFCReplaceCheckedMenuKey,		"Change Checked",
                 kKFCChangeAllMenuKey,			"Change All in Book (No List)",
                 kKFCClearResultsMenuKey,		"Clear Results",
-                kKFCCheckAllMenuKey,			"Check All",
                 kKFCReplaceHitMenuKey,			"Replace",
-                kKFCUncheckAllMenuKey,			"Uncheck All",
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",

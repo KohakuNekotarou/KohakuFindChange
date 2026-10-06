@@ -52,10 +52,8 @@ DECLARE_PMID(kClassIDSpace, kKFCResultNodeWidgetBoss, kKFCUIPrefix + 3)
 DECLARE_PMID(kClassIDSpace, kKFCColorTextWidgetBoss, kKFCUIPrefix + 4)
 // The jump marker's expiry idle task boss. (This half's startup/shutdown service boss is + 20 below.)
 DECLARE_PMID(kClassIDSpace, kKFCMarkerExpiryIdleTaskBoss, kKFCUIPrefix + 6)
-// Replace feature: the hit row's check box. A stock check box (kCheckBoxWidgetBoss, drawn by the
-// system so it follows the UI theme) with our observer aggregated on it, the layer panel's eyeball
-// pattern. Only hit rows carry one - the chapter row resource has no check box.
-DECLARE_PMID(kClassIDSpace, kKFCResultCheckWidgetBoss, kKFCUIPrefix + 8)
+// (+ 8 was the hit row's check box - a stock check box with our observer aggregated on it.)
+//DECLARE_PMID(kClassIDSpace, kKFCResultCheckWidgetBoss, kKFCUIPrefix + 8)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 // The panel's illustration: the system rollover icon button plus a tooltip of its own, so hovering
 // it says where clicking it goes. Same shape as kLinksUIButtonBoss in open/components/linksui, and
 // as KCM's kKCMIconWidgetBoss - which is where the panel this copies got it from.
@@ -115,8 +113,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCRowDataImpl, kKFCUIPrefix + 4)
 // The jump marker's expiry idle task and the hit row's event handler (click -> jump).
 DECLARE_PMID(kImplementationIDSpace, kKFCMarkerExpiryIdleTaskImpl, kKFCUIPrefix + 7)
 DECLARE_PMID(kImplementationIDSpace, kKFCResultNodeEHImpl, kKFCUIPrefix + 8)
-// Replace feature: the hit row check box's observer (click -> flip that hit's checked flag).
-DECLARE_PMID(kImplementationIDSpace, kKFCResultCheckObserverImpl, kKFCUIPrefix + 10)
+//DECLARE_PMID(kImplementationIDSpace, kKFCResultCheckObserverImpl, kKFCUIPrefix + 10)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 // The panel's observer (KFCPanelTitle.cpp): on the panel boss, it writes the tab's name, the layout,
 // the picture and the message the moment the panel appears, hears the picture's click, and keeps the
 // tab's name following the Find/Change settings and the selection (an ActiveSelectionObserver).
@@ -174,11 +171,11 @@ DECLARE_PMID(kActionIDSpace, kKFCScopeBookActionID, kKFCUIPrefix + 6)
 // RETIRED (not reused): the separator between the search command and the toggles - Change Checked sits
 // right under the search (the author's call).
 //DECLARE_PMID(kActionIDSpace, kKFCSeparator2ActionID, kKFCPrefix + 7)
-// Replace feature: a separator, the replace command, and the two bulk check commands.
+// The rule under block 1 (the search, Change All in Book, Clear Results), above the toggles.
 DECLARE_PMID(kActionIDSpace, kKFCSeparator3ActionID, kKFCUIPrefix + 8)
-DECLARE_PMID(kActionIDSpace, kKFCReplaceCheckedActionID, kKFCUIPrefix + 9)
-DECLARE_PMID(kActionIDSpace, kKFCCheckAllActionID, kKFCUIPrefix + 10)
-DECLARE_PMID(kActionIDSpace, kKFCUncheckAllActionID, kKFCUIPrefix + 11)
+//DECLARE_PMID(kActionIDSpace, kKFCReplaceCheckedActionID, kKFCUIPrefix + 9)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
+//DECLARE_PMID(kActionIDSpace, kKFCCheckAllActionID, kKFCUIPrefix + 10)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
+//DECLARE_PMID(kActionIDSpace, kKFCUncheckAllActionID, kKFCUIPrefix + 11)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 // RETIRED (not reused - an old workspace referring to an ActionID must not bind to something else):
 // + 12 "Undo All Replacements" - not needed: the replace is ONE command sequence across every chapter, so
 //      a single Ctrl+Z puts a book-wide replace back.
@@ -239,16 +236,14 @@ DECLARE_PMID(kActionIDSpace, kKFCRememberBookPanelActionID, kKFCUIPrefix + 24)
 // "Replace" on a hit row's right-click menu (the author's call): replaces that one row, with no prompt;
 // the list stays a work list (KFCReplaceEngine::ReplaceHit).
 DECLARE_PMID(kActionIDSpace, kKFCReplaceHitActionID, kKFCUIPrefix + 29)
-// A STORY row's right-click menu: Replace (its ticked rows), Check All, Uncheck All - each over that story's
-// rows.
-DECLARE_PMID(kActionIDSpace, kKFCStoryReplaceActionID, kKFCUIPrefix + 30)
+// A STORY row's right-click menu was Replace (its ticked rows), Check All, Uncheck All.
+//DECLARE_PMID(kActionIDSpace, kKFCStoryReplaceActionID, kKFCUIPrefix + 30)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 //DECLARE_PMID(kActionIDSpace, kKFCStoryRejectActionID, kKFCUIPrefix + 31)		// retired 2026-10-06 (above)
 //DECLARE_PMID(kActionIDSpace, kKFCStoryRedoActionID, kKFCUIPrefix + 32)		// retired 2026-10-06 (above)
-DECLARE_PMID(kActionIDSpace, kKFCStoryCheckAllActionID, kKFCUIPrefix + 33)
-DECLARE_PMID(kActionIDSpace, kKFCStoryUncheckAllActionID, kKFCUIPrefix + 34)
-// "Replace" on a DOCUMENT row's right-click menu: that document's ticked rows, no prompt, the list stays
-// a work list (KFCReplaceEngine::ReplaceChapter). The book row greys it.
-DECLARE_PMID(kActionIDSpace, kKFCChapterReplaceActionID, kKFCUIPrefix + 35)
+//DECLARE_PMID(kActionIDSpace, kKFCStoryCheckAllActionID, kKFCUIPrefix + 33)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
+//DECLARE_PMID(kActionIDSpace, kKFCStoryUncheckAllActionID, kKFCUIPrefix + 34)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
+// "Replace" on a DOCUMENT row's right-click menu was that document's ticked rows.
+//DECLARE_PMID(kActionIDSpace, kKFCChapterReplaceActionID, kKFCUIPrefix + 35)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 //DECLARE_PMID(kActionIDSpace, kKFCChapterRejectActionID, kKFCUIPrefix + 36)	// retired 2026-10-06 (above)
 //DECLARE_PMID(kActionIDSpace, kKFCChapterRedoActionID, kKFCUIPrefix + 37)		// retired 2026-10-06 (above)
 //DECLARE_PMID(kActionIDSpace, kKFCShowChangesActionID, kKFCUIPrefix + 38)		// retired 2026-10-06 (above)
@@ -281,8 +276,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCResultChapterNodeWidgetID, kKFCUIPrefix + 3)
 DECLARE_PMID(kWidgetIDSpace, kKFCResultChapterLabelWidgetID, kKFCUIPrefix + 4)
 DECLARE_PMID(kWidgetIDSpace, kKFCResultHitNodeWidgetID, kKFCUIPrefix + 5)
 DECLARE_PMID(kWidgetIDSpace, kKFCResultTextWidgetID, kKFCUIPrefix + 6)
-// Replace feature: the hit row's check box (hit rows only).
-DECLARE_PMID(kWidgetIDSpace, kKFCResultCheckWidgetID, kKFCUIPrefix + 7)
+//DECLARE_PMID(kWidgetIDSpace, kKFCResultCheckWidgetID, kKFCUIPrefix + 7)	// retired 2026-10-06 (Change Checked - spec F16) - never reuse
 // RETIRED (not reused), like every commented-out widget id below: the Glyph tab's replace confirmation
 // dialog and its parts. A widget id that once shipped stays spent - a saved workspace reads a widget id
 // that comes back on a DIFFERENT control as the old one; the numbers cost nothing.
@@ -339,10 +333,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // Change All in Book (No List) and Clear Results (2026-10-06).
 #define kKFCChangeAllMenuKey			kKFCStringPrefix "kKFCChangeAllMenuKey"
 #define kKFCClearResultsMenuKey			kKFCStringPrefix "kKFCClearResultsMenuKey"
-// Replace feature menu item keys.
-#define kKFCReplaceCheckedMenuKey		kKFCStringPrefix "kKFCReplaceCheckedMenuKey"
-#define kKFCCheckAllMenuKey				kKFCStringPrefix "kKFCCheckAllMenuKey"
-#define kKFCUncheckAllMenuKey			kKFCStringPrefix "kKFCUncheckAllMenuKey"
 // The hit row's own right-click menu.
 #define kKFCReplaceHitMenuKey			kKFCStringPrefix "kKFCReplaceHitMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
@@ -378,23 +368,19 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCPanelMenuActionAreaValue	"Palette Menus:Kohaku Find/Change"
 #define kKFCTargetMenuPath kKFCInternalPopupMenuNameKey
 
-// The result rows' right-click context menu: the popup's internal name.
+// The HIT rows' right-click menu (Replace, about that one row): the popup's internal name.
 // KFCResultNodeEH::RButtonDn pops the MenuDef subtree of this name at the cursor with
 // IMenuManager::HandlePopupMenu - the same machinery as the real Links / Layers panel row menus, and
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
-// plain literal rather than a translated key.
-#define kKFCResultRowMenuName				"KFCRtMenuResultRow"
-// ...and the HIT rows' menu: Replace, about that one row.
-// A subtree of its own because the two menus never share an item.
+// plain literal rather than a translated key. (The book / document rows' "KFCRtMenuResultRow" and the
+// story rows' "KFCRtMenuResultStory" went with Change Checked, 2026-10-06 - spec F16.)
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
-// A story row's own right-click menu.
-#define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
 
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.25   Open Find/Change..., Find in <scope>, Change All in Book (No List), Change Checked
-//                 (the two commands that write to the DOCUMENTS), Clear Results
+//    0.5 - 1.25   Open Find/Change..., Find in <scope>, Change All in Book (No List) (the one command that
+//                 writes to the DOCUMENTS here), Clear Results
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -404,14 +390,14 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then the two writes and Clear Results with no rule between (the author's call),
-// then a rule. The scope they run on is set by Book Scope (Change All runs on the book alone - F18).
+// Block 1 - the search, then Change All in Book (No List) and Clear Results with no rule between (the
+// author's call), then a rule. The scope the search runs on is set by Book Scope (Change All runs on the book
+// alone - F18). (Change Checked stood at 1.2 until 2026-10-06 - spec F16.)
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
-// Change All in Book (No List) under Find, Clear Results under Change Checked (2026-10-06, the spec's section 4).
+// Change All in Book (No List) under Find, then Clear Results (2026-10-06, the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
-#define kKFCReplaceCheckedMenuItemPosition	1.2
 #define kKFCClearResultsMenuItemPosition	1.25
 // (Block 2 - the two scans - is gone; so is Show Changes by KohakuFindChange, 2026-10-06.)
 #define kKFCSeparator3MenuItemPosition		2.0
@@ -442,15 +428,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCHowToMenuItemPosition			10.5
 #define kKFCAboutThisMenuItemPosition		11.0
 
-// The book and document rows' right-click menu, not the flyout: Check All / Uncheck All at that
-// menu's own 1 and 2, and the document row's commands around them.
-#define kKFCChapterReplaceMenuItemPosition	0.5		// a document row's only (the book row greys it)
-#define kKFCCheckAllMenuItemPosition		1.0
-#define kKFCUncheckAllMenuItemPosition		2.0
-// The story row's menu: Replace, then the two check commands.
-#define kKFCStoryReplaceMenuItemPosition	1.0
-#define kKFCStoryCheckAllMenuItemPosition	4.0
-#define kKFCStoryUncheckAllMenuItemPosition	5.0
 // The hit row's menu: Replace.
 #define kKFCReplaceHitMenuItemPosition		0.5
 

@@ -473,8 +473,8 @@ bool KFCTrackChange::ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 
 bool KFCTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange)
 {
-	bool checked = false, replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
+	bool replaced = false, locked = false;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || !replaced)
 		return false;
 	// A footnote's row is never taken back - see IsInFootnote.
 	if (KFCResultModel::GetHitInFootnote(chapterIdx, hitIdx))
@@ -599,8 +599,8 @@ void KFCTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::
 	KFCResultModel::GetTouchingGroup(chapterIdx, hitIdx, group);	// in text order
 	for (size_t k = 0; k < group.size(); ++k)
 	{
-		bool checked = false, replaced = false, locked = false;
-		if (KFCResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) && replaced
+		bool replaced = false, locked = false;
+		if (KFCResultModel::GetHitFlags(chapterIdx, group[k], replaced, locked) && replaced
 			&& !KFCResultModel::GetHitInFootnote(chapterIdx, group[k]))
 			outRows.push_back(group[k]);
 	}
