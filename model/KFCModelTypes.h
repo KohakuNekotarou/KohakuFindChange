@@ -43,12 +43,9 @@ namespace KFCResultModel
 							// original text again and can be replaced once more (Redo)
 		kOutcomeDeleted,	// ticked, and gone WITH the footnote / table / anchored object another
 							// ticked row deleted - counted as done; no place to jump to
-		kOutcomeEndnoteLeft,// ticked, left alone: the match ends an endnote, and InDesign's replace
+		kOutcomeEndnoteLeft	// ticked, left alone: the match ends an endnote, and InDesign's replace
 							// breaks an endnote at its end (MatchEndsAnEndnote). Only this row is
 							// left - the replace goes one match at a time
-		kOutcomeAccepted	// replaced, then its tracked change ACCEPTED with Accept Change by
-							// KohakuFindChange: the replace is final, nothing is left to take back
-							// or accept - the locator says "accepted"
 	};
 
 	enum SearchScopeKind

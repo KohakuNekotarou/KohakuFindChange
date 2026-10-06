@@ -111,7 +111,7 @@ bool RefusedWhileRunning()
 }
 
 // The rows after a row menu's command: repainted in place - or the tree rebuilt, when the command threw
-// the results away. A row / story / document Replace or Redo refused on a changed Find/Change query clears
+// the results away. A row / story / document Replace refused on a changed Find/Change query clears
 // them (KFCReplaceEngine::RefuseChangedQuery, whose caller is to redraw the tree), and RefreshRows repaints
 // only the chapters the model still holds: none, so the old rows would stay drawn and answer nothing until
 // the next search.
@@ -236,19 +236,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKFCShowChangesActionID:
-		{
-			// Show Changes by KohakuFindChange: the list rebuilt from the Track Changes records
-			// KFC signed, over the current scope - the search's shape exactly (the engine keeps its own doors
-			// and says why on a refusal; the tree is drawn once, when it returns).
-			KFCPanelTitle::Update();
-			PMString summary;
-			KFCRuns()->ShowChanges(summary);
-			KFCResultTree::Rebuild();
-			KFCResultTree::ShowStatus(summary);
-			break;
-		}
-
 		// (No Find Missing Glyphs / Find Overset: removed on the author's call - the Book panel's
 		//  preflight reports both over the whole book.)
 
@@ -352,17 +339,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 
-			// A list rebuilt from the records (Show Changes) offers no replace - the engine's
-			// door, asked here for the reason the report's door below is: a refusal leaves the tree as it is.
-			// Asked first, because the report's door would call such a list a report.
-			if (KFCResults()->IsFromRecords())
-			{
-				PMString rebuilt("Change Checked: these rows were rebuilt from Track Changes - search again to replace.");
-				rebuilt.SetTranslatable(kFalse);
-				KFCResultTree::ShowStatus(rebuilt);
-				break;
-			}
-
 			// The panel is a REPORT of what the last replace did, not a work list. The menu greys
 			// this command out in that state (see UpdateActionStates), but a caller that never went
 			// through the menu - a script invoking the action - lands here whatever the menu says.
@@ -403,59 +379,24 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
-		case kKFCChapterRejectActionID:
-		case kKFCChapterRedoActionID:
 		case kKFCChapterReplaceActionID:
-		case kKFCAcceptAllChangesActionID:
 		{
-			// A DOCUMENT row's menu: that document's rows, no prompt. The book row (and
-			// nothing stashed - a script firing the action by ID) does nothing.
+			// A DOCUMENT row's Replace: that document's ticked rows, no prompt. The book row (and nothing stashed - a
+			// script firing the action by ID) does nothing.
 			const int32 chapter = KFCResults()->GetContextMenuChapter();
 			if (chapter < 0 || chapter >= KFCResults()->GetChapterCount())
 				break;
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
-			bool wrote = false;
-			if (actionID.Get() == kKFCChapterRejectActionID)
-				wrote = KFCRuns()->RejectChapter(chapter, status);
-			else if (actionID.Get() == kKFCChapterRedoActionID)
-				wrote = KFCRuns()->RedoChapter(chapter, status);	// no prompt, like Replace
-			else if (actionID.Get() == kKFCAcceptAllChangesActionID)
-				// the tracked changes signed "KohakuFindChange" in that document (not anybody's)
-				wrote = KFCRuns()->AcceptAllInChapter(chapter, status);
-			else
-				wrote = KFCRuns()->ReplaceChapter(chapter, status);
+			const bool wrote = KFCRuns()->ReplaceChapter(chapter, status);
 			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KFCResultTree::ShowStatus(status);
 			break;
 		}
 
-		case kKFCRunRejectActionID:
-		case kKFCRunAcceptActionID:
-		{
-			// A run row's menu (a list rebuilt from the records). Nothing stashed = nobody
-			// right-clicked a run row.
-			int32 chapter = -1, run = -1;
-			if (!KFCResults()->GetContextMenuRun(chapter, run))
-				break;
-			if (RefusedWhileRunning())
-				break;
-			PMString status;
-			if (actionID.Get() == kKFCRunRejectActionID)
-				KFCRuns()->RejectRun(chapter, run, status);
-			else
-				KFCRuns()->AcceptRun(chapter, run, status);
-			RedrawAfterRowMenu();
-			KFCResultTree::ShowStatus(status);
-			break;
-		}
-
 		case kKFCStoryReplaceActionID:
-		case kKFCStoryRejectActionID:
-		case kKFCStoryAcceptActionID:
-		case kKFCStoryRedoActionID:
 		case kKFCStoryCheckAllActionID:
 		case kKFCStoryUncheckAllActionID:
 		{
@@ -471,12 +412,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			bool wrote = false;
 			if (id == kKFCStoryReplaceActionID)
 				wrote = KFCRuns()->ReplaceStory(chapter, group, status);	// no prompt (the author's call)
-			else if (id == kKFCStoryRejectActionID)
-				wrote = KFCRuns()->RejectStory(chapter, group, status);
-			else if (id == kKFCStoryAcceptActionID)
-				wrote = KFCRuns()->AcceptStory(chapter, group, status);
-			else if (id == kKFCStoryRedoActionID)
-				wrote = KFCRuns()->RedoStory(chapter, group, status);	// no prompt, like Replace
 			else
 			{
 				const bool check = (id == kKFCStoryCheckAllActionID);
@@ -490,8 +425,6 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		}
 
 		case kKFCReplaceHitActionID:
-		case kKFCRejectChangeActionID:
-		case kKFCAcceptChangeActionID:
 		{
 			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit
 			// row (a script firing the action by ID): do nothing.
@@ -501,13 +434,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			if (RefusedWhileRunning())
 				break;
 			PMString status;
-			bool wrote = false;
-			if (actionID.Get() == kKFCReplaceHitActionID)
-				wrote = KFCRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the author's call)
-			else if (actionID.Get() == kKFCAcceptChangeActionID)
-				wrote = KFCRuns()->AcceptHit(chapter, hit, status);
-			else
-				wrote = KFCRuns()->RejectHit(chapter, hit, status);
+			const bool wrote = KFCRuns()->ReplaceHit(chapter, hit, status);	// no prompt (the author's call)
 			NoteNoWindow(wrote, chapter, status);
 			RedrawAfterRowMenu();
 			KFCResultTree::ShowStatus(status);
@@ -603,7 +530,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	// A run of ours is standing behind its modal progress bar. The bar pumps events, so this list
 	// can be asked for its states from inside the run: lock everything until it returns.
 	//
-	// Every run, through KFCRunGuard - the search, Show Changes and the replace family. The replace needs
+	// Every run, through KFCRunGuard - the search and the replace family. The replace needs
 	// it at least as much as the search: it works with a command sequence standing open, and a second walk
 	// underneath would Halt() its walker mid-walk.
 	if (KFCRuns()->IsAnyRunning())
@@ -614,8 +541,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	}
 
 	// Is there anything for the current scope to run on at all - the target book, with a chapter in it,
-	// while Book Scope is ON, the active document (IActiveContext) while it is OFF? The two commands that
-	// START a run - Find and Show Changes - share the answer, so it is taken once here. See
+	// while Book Scope is ON, the active document (IActiveContext) while it is OFF? The command that STARTS a
+	// run - Find - asks it, so it is taken once here. See
 	// KFCBookScope::HasScopeTarget: it asks what the engines themselves ask, so a command that is offered
 	// can always run and one that cannot is visibly grey rather than reporting "No open document to
 	// search." after the fact (the author's call).
@@ -666,12 +593,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			const bool canRun = haveTarget
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCShowChangesActionID)
-		{
-			// Show Changes by KohakuFindChange: while the current scope has something to read -
-			// the search's own question (runs are greyed above, before this loop).
-			listToUpdate->SetNthActionState(i, haveTarget ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCScopeBookActionID)
 		{
@@ -768,9 +689,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				? kTrue : kFalse;
 			listToUpdate->SetNthActionState(i, canReplace ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKFCStoryReplaceActionID || action == kKFCStoryRejectActionID || action == kKFCStoryRedoActionID
-			|| action == kKFCStoryCheckAllActionID || action == kKFCStoryUncheckAllActionID
-			|| action == kKFCStoryAcceptActionID)
+		else if (action == kKFCStoryReplaceActionID || action == kKFCStoryCheckAllActionID
+			|| action == kKFCStoryUncheckAllActionID)
 		{
 			// A story row's menu: each item while it has something to do in that story.
 			int32 chapter = -1, group = -1;
@@ -779,10 +699,6 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			{
 				if (action == kKFCStoryReplaceActionID)
 					enable = KFCRuns()->CanReplaceStory(chapter, group);
-				else if (action == kKFCStoryRejectActionID || action == kKFCStoryAcceptActionID)
-					enable = KFCRuns()->CanRejectStory(chapter, group);	// Accept: the same rows
-				else if (action == kKFCStoryRedoActionID)
-					enable = KFCRuns()->CanRedoStory(chapter, group);
 				else
 					// Check All / Uncheck All: while THIS story has a row with a box - the document row's question
 					// (GetChapterCheckableCount below), one level down. Not the whole result set's NoRowHasCheckBox:
@@ -792,47 +708,23 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			}
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKFCReplaceHitActionID || action == kKFCRejectChangeActionID
-			|| action == kKFCAcceptChangeActionID)
+		else if (action == kKFCReplaceHitActionID)
 		{
 			// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
-			// with nothing said about it (KFCReplaceEngine::CanReplaceHit); Reject Change - and its twin Accept
-			// Change - while the row's tracked change is still there.
+			// with nothing said about it (KFCReplaceEngine::CanReplaceHit).
 			int32 chapter = -1, hit = -1;
 			bool enable = KFCResults()->GetContextMenuHit(chapter, hit);
 			if (enable)
-				enable = (action == kKFCReplaceHitActionID) ? KFCRuns()->CanReplaceHit(chapter, hit)
-					: KFCRuns()->CanAcceptOrRejectHit(chapter, hit);
+				enable = KFCRuns()->CanReplaceHit(chapter, hit);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
-		else if (action == kKFCRunRejectActionID || action == kKFCRunAcceptActionID)
+		else if (action == kKFCChapterReplaceActionID)
 		{
-			// A run row's menu: while the run has a replaced row with its change left.
-			int32 chapter = -1, run = -1;
-			const bool enable = KFCResults()->GetContextMenuRun(chapter, run)
-				&& KFCRuns()->CanRejectOrAcceptRun(chapter, run);
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCChapterReplaceActionID || action == kKFCChapterRejectActionID
-			|| action == kKFCChapterRedoActionID || action == kKFCAcceptAllChangesActionID)
-		{
-			// A document row's menu: each item while it has something to do in that document - a ticked row to
-			// replace, a replaced row to take back, a row taken back to replace again, a tracked change signed
-			// "KohakuFindChange" to accept while the document is open. The book row greys them all: they are
-			// about one document (Change Checked is the whole book's). The DoAction case asks the same range
+			// A document row's Replace: while that document has a ticked row to replace. The book row greys it: it
+			// is about one document (Change Checked is the whole book's). The DoAction case asks the same range
 			// first.
-			bool enable = contextChapter >= 0 && contextChapter < KFCResults()->GetChapterCount();
-			if (enable)
-			{
-				if (action == kKFCChapterReplaceActionID)
-					enable = KFCRuns()->CanReplaceChapter(contextChapter);
-				else if (action == kKFCChapterRejectActionID)
-					enable = KFCRuns()->CanRejectChapter(contextChapter);
-				else if (action == kKFCChapterRedoActionID)
-					enable = KFCRuns()->CanRedoChapter(contextChapter);
-				else
-					enable = KFCRuns()->CanAcceptAllInChapter(contextChapter);
-			}
+			const bool enable = contextChapter >= 0 && contextChapter < KFCResults()->GetChapterCount()
+				&& KFCRuns()->CanReplaceChapter(contextChapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCCheckAllActionID || action == kKFCUncheckAllActionID)

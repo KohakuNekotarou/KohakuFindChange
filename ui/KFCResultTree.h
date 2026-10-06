@@ -20,7 +20,6 @@
 
 #include "PMString.h"
 
-#include <vector>		// ShowRowsBefore's rows
 
 namespace KFCResultTree
 {
@@ -59,51 +58,13 @@ namespace KFCResultTree
 	    them all again). Safe when the panel is closed. */
 	void BeforeChapterRowGoes(int32 chapterIdx);
 
-	/** Write a message to the panel's message area (drawn by hand - KFCStatusTextView). Takes the place of a standing "Source Text:" (ShowRowsBefore). Safe
+	/** Write a message to the panel's message area (drawn by hand - KFCStatusTextView). Safe
 	    to call when the panel is closed (does nothing then). Lives with the tree because it reaches
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
-	/** A REPLACED ROW, ONCE SELECTED, SHOWS ITS TEXT AS IT WAS BEFORE THE REPLACE (the author's request -
-	    "the way KCM does"). The message area reads
-
-	        Source Text:
-	        <the row's words before>  <the text the replace took>  <the row's words after>
-
-	    the taken text at the theme's text colour and the words around it faded, breaks drawn as marks;
-	    a replace that took nothing (an insertion) shows the bar there instead. A row touching others it
-	    was replaced with shows what the whole group took (KFCResultModel::GetRowsBefore).
-	    Put up OVER the last message, which stays kept: no rows (the row holds no replace) - or rows that
-	    are not all replaced, or not rows - take a standing one down instead (DropBefore), and so does
-	    anything that reports through ShowStatus.
-	    Called by the jump once it has landed on the row (KFCJump::ActivateNode), with the group as the
-	    records have it (KFCTrackChange::CurrentReplacedGroup); safe when the panel is closed (the
-	    "Source Text:" is kept, and comes back with the panel).
-	    @param rows the row and the replaced rows written side by side with it, in text order. */
-	void ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& rows);
-
-	/** Take a standing "Source Text:" down and put the last message back (or the opening one, with nothing
-	    run this session). Nothing happens when none is standing. */
-	void DropBefore();
-
-	/** WHY A ROW'S RIGHT-CLICK MENU IS GREY (the author's call). Put up OVER what
-	    the box shows - the last message, or a standing "Source Text:" - without replacing it, the way
-	    ShowRowsBefore stands over the last message: the reason is about the row the menu was popped over, so
-	    the next right-click that has nothing to say takes it down again (DropRowMenuReason) instead of
-	    leaving it to read as if it were about that row. Anything that reports through ShowStatus, and a new
-	    "Source Text:", take its place; a panel shown again does not bring it back. KFCResultNodeEH::RButtonDn
-	    is the one caller. */
-	void ShowRowMenuReason(const PMString& reason);
-
-	/** Take a standing reason down and put back what was under it: the "Source Text:" when one stands, the
-	    last message otherwise (or the opening one, with nothing run this session). Nothing happens when no
-	    reason is standing. Every right-click that says nothing calls it, and so does selecting a row with
-	    no "Source Text:" to show (DropBefore). */
-	void DropRowMenuReason();
-
-	/** Put the status read-out back to what THIS session last had on it - a standing "Source Text:" first
-	    (ShowRowsBefore), then the last message - or, when nothing has run since launch, to the opening
-	    message (the string table's kKFCStaticTextKey). Called from the panel's AutoAttach, and only
+	/** Put the status read-out back to what THIS session last had on it - the last message - or, when
+	    nothing has run since launch, to the opening message (the string table's kKFCStaticTextKey). Called from the panel's AutoAttach, and only
 	    from there.
 
 	    Why it is needed: a widget's string is persisted in the WORKSPACE, so a rebuilt panel comes
@@ -117,8 +78,8 @@ namespace KFCResultTree
 
 	/** Release this module's static storage during the controlled shutdown (the UI half's,
 	    KFCUIStartupShutdown), so no static destructor at DLL unload finds work left to do: the kept
-	    status line and a standing "Source Text:"'s pieces - PMStrings, exactly the kind of static the
-	    rule was written for (KFCResultModel::ShutdownCleanup). */
+	    status line - a PMString, exactly the kind of static the rule was written for
+	    (KFCResultModel::ShutdownCleanup). */
 	void ShutdownCleanup();
 
 	/** Say on the status line WHAT was just ticked or cleared, and over WHICH row:

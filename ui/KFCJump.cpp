@@ -741,8 +741,7 @@ bool FrontChapter(const UIDRef& docRef)
     @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
           still the text the row describes (overset or not). False for every other end: a bad index,
           a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
-          text is no longer there (each of which has said why, or has nothing to say). ActivateNode
-          reads it to decide whether the row's "Source Text:" goes up. */
+          text is no longer there (each of which has said why, or has nothing to say). */
 bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 {
 	UIDRef docRef;
@@ -806,16 +805,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!sameOccurrence)
 		ClampIntoStory(storyRef, start, end);	// a place the story no longer reaches - see ClampIntoStory
 
-	// UNDER A HIDDEN CONDITION: THE PLACE ITS TEXT COMES BACK TO. Such a row - only a list Show Changes
-	// rebuilt can hold one - stands in a thread no frame holds, so asked as it stands the overset test
-	// below says yes and the view goes to the frame's "+" (measured). The view goes to the place the
-	// condition puts the text back (KFCTrackChange::HiddenTextAnchor) and the marker stands there with
-	// no width. Why nothing is there to see is the row's own word, " hidden
-	// condition" - as " hidden" says it for a switched-off layer, whose jump lands the same way.
-	const TextIndex hiddenAnchor = KFCRuns()->HiddenTextAnchor(storyRef, start);
-	const bool underHiddenCondition = (hiddenAnchor != kInvalidTextIndex);
-	const TextIndex placeStart = underHiddenCondition ? hiddenAnchor : start;
-	const TextIndex placeEnd = underHiddenCondition ? hiddenAnchor : end;
+	const TextIndex placeStart = start;
+	const TextIndex placeEnd = end;
 
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KFCSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
@@ -1106,17 +1097,6 @@ bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (!RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, storyUID, start, end))
 		return false;
 
-	// UNDER A HIDDEN CONDITION: NOTHING ON THE PAGE TO SELECT. Asked before the overset test, which says
-	// yes for it - its text stands in a thread no frame holds - and so would give the overset reason. The
-	// jump goes to the place the text comes back to.
-	if (KFCRuns()->HiddenTextAnchor(storyRef, start) != kInvalidTextIndex)
-	{
-		PMString message("That match is under a hidden condition - show the condition to select it.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
-		return false;
-	}
-
 	// OVERSET: move there, but do not select. (Same rule as locked and hidden above - the author's
 	// call.) There is no on-page text to highlight. The jump has the same split and
 	// scrolls to the "+" indicator instead.
@@ -1239,40 +1219,12 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
-	// THE MESSAGE AREA FOLLOWS THE ROW (the user's request - "show the text as it was before, the way
-	// KCM does, when a row is selected"). Settled here, the one door, so a click and a
-	// keyboard walk cannot disagree about it:
-	//   * a hit row the jump LANDED on shows its "Source Text:" when it holds a replace (a replaced row, an
-	//     accepted one, a footnote's) - with the rows written side by side with it, as the RECORDS have
-	//     them now (KFCTrackChange::CurrentReplacedGroup: the stored ranges of every row but this one are
-	//     behind any edit made since) - and takes a standing one down when it does not;
-	//   * a jump that did not land has said why through ShowStatus, which takes it down already - or had
-	//     nothing to say, and then the last message comes back rather than another row's text;
-	//   * a document, story or book row has no "before" of its own.
 	if (hitIdx >= 0)
-	{
-		if (JumpToHit(chapterIdx, hitIdx))
-		{
-			std::vector<int32> group;
-			bool neighboursRead = false;
-			KFCRuns()->CurrentReplacedGroup(chapterIdx, hitIdx, group, neighboursRead);
-			if (neighboursRead)
-				KFCResultTree::RefreshRows();		// their lines were read again - show them as they are
-			KFCResultTree::ShowRowsBefore(chapterIdx, group);	// no rows = no replace: takes one down
-		}
-		else
-			KFCResultTree::DropBefore();
-	}
+		(void)JumpToHit(chapterIdx, hitIdx);
 	else if (chapterIdx >= 0)
-	{
-		KFCResultTree::DropBefore();
 		ShowChapter(chapterIdx);
-	}
 	else if (chapterIdx == -1)
-	{
-		KFCResultTree::DropBefore();
 		ShowBook();
-	}
 }
 
 // End, KFCJump.cpp.

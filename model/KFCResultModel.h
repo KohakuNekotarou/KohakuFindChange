@@ -142,15 +142,6 @@ namespace KFCResultModel
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
-		// The RUN this row belongs to - an index into its chapter's runs - on a list rebuilt from the
-		// Track Changes records (Show Changes by KohakuFindChange); -1 on every other list,
-		// which has no run level. Set by whoever builds the hits; the groups follow it (AppendChapter).
-		int32		run;
-		// The match stands in text a HIDDEN CONDITION holds -> the
-		// locator gets " hidden condition", and its page is the one the text comes back to when the
-		// condition is shown (KFCTrackChange::HiddenTextAnchor). Only a list rebuilt from the records can
-		// hold such a row: a search does not walk hidden conditional text.
-		bool		inHiddenText;
 
 		// checked starts FALSE here and stays so for a search's rows (the author's call - rows ticked by
 		// default were tried and turned back).
@@ -158,7 +149,7 @@ namespace KFCResultModel
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				checked(false), replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				recordTime(0), recordLead(0), pageOrdinal(0), run(-1), inHiddenText(false) {}
+				recordTime(0), recordLead(0), pageOrdinal(0) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -171,30 +162,10 @@ namespace KFCResultModel
 		PMString			fontName;	// the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
-		// Story mode lists stories, and every group is one. A story row carries Replace / Reject Change /
-		// Accept Change / Replace Again (Redo in the code) / Check All / Uncheck All for its rows
-		// (KFCReplaceEngine::ReplaceStory and the rest).
+		// Story mode lists stories, and every group is one. A story row carries Replace / Check All /
+		// Uncheck All for its rows (KFCReplaceEngine::ReplaceStory and the rest).
 		UID					story;
-		// The run the group sits under (Hit::run of its hits); -1 = no run level. A story
-		// that two runs changed stands once under each: the groups are keyed by (run, story).
-		int32				run;
-		FontGroup() : story(kInvalidUID), run(-1) {}
-	};
-
-	/** ONE RUN OF A LIST REBUILT FROM THE RECORDS (Show Changes by KohakuFindChange).
-	    Every record KFC signs carries its run's start in its time (KFCTrackChange.h, the head): the rows
-	    whose times share t0 (the time with its low four decimal digits dropped) were written by one
-	    replace. A run row of the tree stands between the document row and the story rows.
-
-	    groups index the chapter's fontGroups, ASCENDING - rebuilt with the groups (AppendChapter,
-	    KeepCheckedRows). The builder hands the hits over sorted by run, so the runs' groups and hits
-	    stand in run order and the display cap cuts the LAST runs first. */
-	struct RunGroup
-	{
-		uint64				t0;		// the run's start - the time of its rows, low four digits dropped
-		PMString			label;	// the run row's text: the run's start as a local date and time
-		std::vector<int32>	groups;	// the run's story groups
-		RunGroup() : t0(0) {}
+		FontGroup() : story(kInvalidUID) {}
 	};
 
 	/** One chapter that holds at least one hit. */
@@ -205,9 +176,6 @@ namespace KFCResultModel
 		IDFile					file;	// the chapter's .indd (to reopen a closed chapter)
 		std::vector<Hit>		hits;
 		std::vector<FontGroup>	fontGroups;	// its story groups - every hit is in one
-		// The runs (Show Changes by KohakuFindChange): empty on every list but one rebuilt from the
-		// records, where each hit's run indexes this, newest run first.
-		std::vector<RunGroup>	runs;
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
 		// - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
@@ -424,27 +392,6 @@ namespace KFCResultModel
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
 
-	/** THE RUN LEVEL (Show Changes by KohakuFindChange). Only a list rebuilt from the
-	    records has one (Chapter::runs); every question below answers 0 / -1 / false / nothing for any other.
-
-	    GetDisplayRunCount: the runs that still show a hit under the panel's cap - the first N, since the
-	    hits stand in run order and the cap keeps a prefix of them (GetDisplayFontCount's reasoning).
-	    GetRunDisplay: the run row's label and its FULL hit count. GetDisplayRunGroupCount / GetRunGroup:
-	    the story rows under a run row, the nth as a chapter-wide group index. GetGroupRun /
-	    GetGroupPosInRun: a story row's parent and its place under it (-1 = no run). GetRunHits: every hit
-	    of the run, chapter-wide indexes in the chapter's order. */
-	int32 GetDisplayRunCount(int32 chapterIdx);
-	bool GetRunDisplay(int32 chapterIdx, int32 runIdx, PMString& outLabel, int32& outHitCount);
-	int32 GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx);
-	int32 GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth);
-	int32 GetGroupRun(int32 chapterIdx, int32 groupIdx);
-	int32 GetGroupPosInRun(int32 chapterIdx, int32 groupIdx);
-	void GetRunHits(int32 chapterIdx, int32 runIdx, std::vector<int32>& outHits);
-	/** The run row a right-click menu was popped over (SetContextMenuGroup's twin); cleared by Clear().
-	    False = none, or no longer in range. */
-	void SetContextMenuRun(int32 chapterIdx, int32 runIdx);
-	bool GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx);
-
 	/** Is this one of the chapter's story groups? Every group is one, so this is the
 	    index's range (the tree asks it of a node before using it). */
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
@@ -524,6 +471,7 @@ namespace KFCResultModel
 	    both ways - in TEXT order, `hitIdx` included. Reads the ranges as they stand (the search's
 	    before a replace, the replaced text's after one). */
 	void GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
+
 	/** Is the row inside a footnote (Hit::inFootnote)? False for an out-of-range index. */
 	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
 	/** The time stamp of the row's tracked changes (Hit::recordTime); 0 for none or out of range. */
@@ -628,32 +576,9 @@ namespace KFCResultModel
 	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
 		PMString& outReplacedText);
 
-	/** What REPLACED rows written side by side read before the replace (the panel's
-	    "Source Text:", KFCResultTree::ShowRowsBefore): the first row's leading words, the text they took
-	    joined in text order, the last row's trailing words (a list rebuilt from the records keeps a
-	    group's one deletion on its last row, so a row alone could say nothing). WHICH rows is the caller's
-	    question - KFCTrackChange::CurrentReplacedGroup, which asks the records rather than the stored
-	    ranges. One row is a group of one.
-	    The text is as stored: raw breaks (the caller marks them up), the context cut the way the row's is.
-	    An accepted row and a footnote's row ("no track") are replaced rows too.
-	    @param rows the rows, in text order.
-	    @return false - and three empty strings - for no rows, a row that holds no replace (not replaced,
-	        taken back) or an index out of range. */
-	bool GetRowsBefore(int32 chapterIdx, const std::vector<int32>& rows, PMString& outPre,
-		PMString& outOriginal, PMString& outPost);
-
-	/** Every row of hitIdx's STORY, in the list's order, hitIdx included. The list's order
-	    is the search's walk order sorted by page, so rows of one story stand in the order of their text
-	    within a thread - which, unlike the stored ranges, no edit can change. */
-	void GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
-
 	/** Reject Change took this row back: it shows its original text at [start, end) again, is no
 	    longer replaced, and says "rejected". */
 	void SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end);
-	/** Accept Change by KohakuFindChange accepted this row's tracked change: the replace is final.
-	    It stays replaced, says "accepted", and keeps no record time - there is nothing left to find, so
-	    neither Reject Change nor Accept Change is offered on it again. */
-	void SetHitAccepted(int32 chapterIdx, int32 hitIdx);
 	// (A row taken back is replaced again like any other - MarkHitReplaced clears its "taken back".)
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);

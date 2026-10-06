@@ -119,8 +119,8 @@ namespace KFCBookScope
 
 	/** The document a document-scope run searches: the ACTIVE document - the one the user is working
 	    in, and the one Edit > Find/Change searches - through IActiveContext::GetContextDocument.
-	    Non-owning; nil when there is none. The one place the menu's grey state (HasScopeTarget), the
-	    search (KFCSearchEngine::SearchBook) and Show Changes (KFCShowChanges::Run) ask.
+	    Non-owning; nil when there is none. The one place the menu's grey state (HasScopeTarget) and the
+	    search (KFCSearchEngine::SearchBook) ask.
 
 	    NOT ILayoutUIUtils::GetFrontDocument. That one answers "the document of the frontmost LAYOUT
 	    presentation" (ILayoutUIUtils.h:95-98) - a UI question, nil off the main thread - while the

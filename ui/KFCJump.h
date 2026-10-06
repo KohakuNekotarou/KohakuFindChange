@@ -34,10 +34,6 @@ namespace KFCJump
 	    Called by the row click and by the keyboard walk, which is why it exists - two callers must not
 	    drift apart - and it holds the "one activation at a time" guard, which is why the three are in
 	    KFCJump.cpp and not here (JumpToHit, ShowChapter, ShowBook).
-	    AND IT SETTLES THE MESSAGE AREA'S "Source Text:": a hit row the jump
-	    landed on that holds a replace shows its text as it was before the replace
-	    (KFCResultTree::ShowRowsBefore); any other row - and a jump that did not land - takes a standing
-	    one down (DropBefore).
 	    @param chapterIdx the chapter index, or -1 for the book row.
 	    @param hitIdx the hit index, or -1 when the row is not a hit row. */
 	void ActivateNode(int32 chapterIdx, int32 hitIdx);

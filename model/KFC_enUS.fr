@@ -39,11 +39,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // What Edit > Undo calls a Change Checked run.
                 kKFCReplaceStepKey,				"Replace",
                 kKFCRunQueriesStepKey,			"Run Queries",
-                // ...and a Reject Change and an Accept All Changes by KohakuFindChange.
-                kKFCRejectStepKey,				"Reject Change",
-                kKFCAcceptAllStepKey,			"Accept All Changes by KohakuFindChange",
-                // ...and an Accept Change by KohakuFindChange on a row, a story or a run.
-                kKFCAcceptStepKey,				"Accept Change",
         }
 
 };

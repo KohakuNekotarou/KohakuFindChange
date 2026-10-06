@@ -1085,14 +1085,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	KFC_SPENT(gBuildHitTimes.lead, cLead);
 	KFC_CLOCK(cThreads);
 
-	// UNDER A HIDDEN CONDITION: ASKED WHERE THE TEXT COMES BACK TO. Such text stands in a thread no frame
-	// holds - asked as it stands, the row would read "P1(2) overset". It occurs on a list Show Changes
-	// rebuilt from the records, the only kind that can hold one (a search does not walk hidden
-	// conditional text). Its frame, page and overset test are those of the place the condition puts
-	// the text back (KFCTrackChange::HiddenTextAnchor), and the row says why it shows nothing there.
-	const TextIndex hiddenAnchor = KFCTrackChange::HiddenTextAnchor(storyRef, start);
-	outHit.inHiddenText = (hiddenAnchor != kInvalidTextIndex);
-	const TextIndex placeAt = outHit.inHiddenText ? hiddenAnchor : start;
+	const TextIndex placeAt = start;
 	KFC_SPENT(gBuildHitTimes.threads, cThreads);
 	KFC_CLOCK(cPlace);
 
@@ -2913,8 +2906,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// would take it for a document of the user's: walked, listed, and its rows gone a moment after the
 	// search when the close went through. Closed here, before anything is listed, in the context the book
 	// loop below closes its own chapters in. A chapter with unsaved work, or one with a window, is not
-	// closed - ReleaseHeldDoc's verdicts, unchanged. (Show Changes' commit point has the same two lines -
-	// KFCShowChanges::Run.)
+	// closed - ReleaseHeldDoc's verdicts, unchanged.
 	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
 	KFCSearchEngine::DropResults();
 

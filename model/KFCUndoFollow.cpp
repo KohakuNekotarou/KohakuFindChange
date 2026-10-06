@@ -353,10 +353,6 @@ const char* KindName(KFCUndoFollow::StepKind kind)
 	{
 		case KFCUndoFollow::kStepChangeChecked:	return "Change Checked";
 		case KFCUndoFollow::kStepReplace:		return "Replace";
-		case KFCUndoFollow::kStepReplaceAgain:	return "Replace Again";
-		case KFCUndoFollow::kStepReject:		return "Reject Change";
-		case KFCUndoFollow::kStepAccept:		return "Accept Change";
-		case KFCUndoFollow::kStepAcceptAll:		return "Accept All Changes by KohakuFindChange";
 		case KFCUndoFollow::kStepRunQueries:	return "Run Queries";
 	}
 	return "a change";

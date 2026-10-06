@@ -225,52 +225,38 @@ DECLARE_PMID(kActionIDSpace, kKFCMinimizableFindChangeActionID, kKFCUIPrefix + 2
 // default. *Unlike the toggles above, flipping it WRITES ITS OWN KEY to the settings file at once (the
 // author's rule) - see KFCBookPanelPlacement.h.
 DECLARE_PMID(kActionIDSpace, kKFCRememberBookPanelActionID, kKFCUIPrefix + 24)
-// "Reject Change" on a replaced hit row's right-click menu: takes back that row's replacement by
-// rejecting its tracked change - the name is the Track Changes panel's own item.
-DECLARE_PMID(kActionIDSpace, kKFCRejectChangeActionID, kKFCUIPrefix + 25)
+// RETIRED 2026-10-06 (never reuse - a keyboard shortcut is recorded against the ActionID): the items that took
+// back or accepted KFC's tracked changes, Show Changes by KohakuFindChange and Replace Again, gone with Track
+// Changes (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F2 - KCM handles the records):
+// + 25 Reject Change (hit row), + 27 Accept All Changes by KohakuFindChange in This Document, + 31 / + 32 the
+// story row's Reject and Replace Again, + 36 / + 37 the document row's, + 38 Show Changes, + 39 its rule,
+// + 40 / + 41 Accept Change (hit row, story row), + 42 / + 43 the run row's Reject and Accept.
+//DECLARE_PMID(kActionIDSpace, kKFCRejectChangeActionID, kKFCUIPrefix + 25)
 // (+ 26 was "Redo" on the same menu - a row taken back is replaced again with Replace. Not reused.)
-// "Accept All Changes by KohakuFindChange in This Document" on a document row's right-click menu: accepts
-// the changes signed "KohakuFindChange" in that chapter's document and leaves everybody else's - unlike
-// InDesign's own "Accept All Changes in This Document" (the author's call; the item names the changes'
-// author so it says so).
-DECLARE_PMID(kActionIDSpace, kKFCAcceptAllChangesActionID, kKFCUIPrefix + 27)
+//DECLARE_PMID(kActionIDSpace, kKFCAcceptAllChangesActionID, kKFCUIPrefix + 27)
 // RETIRED (not reused): the rule between Change Checked and the two scans, gone with them.
 //DECLARE_PMID(kActionIDSpace, kKFCSeparator5ActionID, kKFCPrefix + 28)
 // "Replace" on a hit row's right-click menu (the author's call): replaces that one row, with no prompt;
 // the list stays a work list (KFCReplaceEngine::ReplaceHit).
 DECLARE_PMID(kActionIDSpace, kKFCReplaceHitActionID, kKFCUIPrefix + 29)
-// A STORY row's right-click menu: Replace (its ticked rows), Reject Change, Accept Change (+ 41), Redo,
-// Check All, Uncheck All - each over that story's rows.
+// A STORY row's right-click menu: Replace (its ticked rows), Check All, Uncheck All - each over that story's
+// rows.
 DECLARE_PMID(kActionIDSpace, kKFCStoryReplaceActionID, kKFCUIPrefix + 30)
-DECLARE_PMID(kActionIDSpace, kKFCStoryRejectActionID, kKFCUIPrefix + 31)
-// A story row's Redo (the author's call): the story's rows taken back with Reject Change, replaced again
-// with what Find/Change holds now - the one way to do them all without ticking them. Its menu name is
-// "Replace Again (Current Find/Change Settings)"; the IDs keep "Redo".
-DECLARE_PMID(kActionIDSpace, kKFCStoryRedoActionID, kKFCUIPrefix + 32)
+//DECLARE_PMID(kActionIDSpace, kKFCStoryRejectActionID, kKFCUIPrefix + 31)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCStoryRedoActionID, kKFCUIPrefix + 32)		// retired 2026-10-06 (above)
 DECLARE_PMID(kActionIDSpace, kKFCStoryCheckAllActionID, kKFCUIPrefix + 33)
 DECLARE_PMID(kActionIDSpace, kKFCStoryUncheckAllActionID, kKFCUIPrefix + 34)
 // "Replace" on a DOCUMENT row's right-click menu: that document's ticked rows, no prompt, the list stays
 // a work list (KFCReplaceEngine::ReplaceChapter). The book row greys it.
 DECLARE_PMID(kActionIDSpace, kKFCChapterReplaceActionID, kKFCUIPrefix + 35)
-// "Reject Change" on a DOCUMENT row's right-click menu: every replaced row of that document whose
-// tracked change is still there (KFCReplaceEngine::RejectChapter).
-DECLARE_PMID(kActionIDSpace, kKFCChapterRejectActionID, kKFCUIPrefix + 36)
-// "Redo" on a DOCUMENT row's right-click menu: that document's rows taken back, replaced again with what
-// Find/Change holds now (KFCReplaceEngine::RedoChapter). Named "Replace Again (Current Find/Change
-// Settings)", like the story row's.
-DECLARE_PMID(kActionIDSpace, kKFCChapterRedoActionID, kKFCUIPrefix + 37)
-// "Show Changes by KohakuFindChange" on the flyout: the list rebuilt from the Track Changes records KFC
-// signed (KFCShowChanges). Under Change Checked, a rule between them.
-DECLARE_PMID(kActionIDSpace, kKFCShowChangesActionID, kKFCUIPrefix + 38)
-DECLARE_PMID(kActionIDSpace, kKFCSeparator6ActionID, kKFCUIPrefix + 39)
-// Accept Change by KohakuFindChange on a hit row and on a story row: the twin of Reject Change there -
-// the row's (or the story's rows') tracked changes accepted (KFCReplaceEngine AcceptHit / AcceptStory).
-DECLARE_PMID(kActionIDSpace, kKFCAcceptChangeActionID, kKFCUIPrefix + 40)
-DECLARE_PMID(kActionIDSpace, kKFCStoryAcceptActionID, kKFCUIPrefix + 41)
-// A RUN row's right-click menu (a list rebuilt from the records only): Reject / Accept the rows of that
-// run in that document (KFCReplaceEngine RejectRun / AcceptRun).
-DECLARE_PMID(kActionIDSpace, kKFCRunRejectActionID, kKFCUIPrefix + 42)
-DECLARE_PMID(kActionIDSpace, kKFCRunAcceptActionID, kKFCUIPrefix + 43)
+//DECLARE_PMID(kActionIDSpace, kKFCChapterRejectActionID, kKFCUIPrefix + 36)	// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCChapterRedoActionID, kKFCUIPrefix + 37)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCShowChangesActionID, kKFCUIPrefix + 38)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCSeparator6ActionID, kKFCUIPrefix + 39)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCAcceptChangeActionID, kKFCUIPrefix + 40)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCStoryAcceptActionID, kKFCUIPrefix + 41)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCRunRejectActionID, kKFCUIPrefix + 42)		// retired 2026-10-06 (above)
+//DECLARE_PMID(kActionIDSpace, kKFCRunAcceptActionID, kKFCUIPrefix + 43)		// retired 2026-10-06 (above)
 // "Open Find/Change..." on the flyout (the author's call): InDesign's own Edit > Find/Change dialog,
 // opened from the panel - with no document open too. Shortcut-assignable. (+ 44 was never spent at
 // kKFCPrefix either.)
@@ -352,20 +338,6 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCUncheckAllMenuKey			kKFCStringPrefix "kKFCUncheckAllMenuKey"
 // The hit row's own right-click menu.
 #define kKFCReplaceHitMenuKey			kKFCStringPrefix "kKFCReplaceHitMenuKey"
-// The Reject items, one name per level (the author's call: "by KohakuFindChange" in the name, so it
-// says it acts on KFC's changes only). The hit row's keeps its original key name.
-#define kKFCRejectChangeMenuKey			kKFCStringPrefix "kKFCRejectChangeMenuKey"		// "Reject Change by KohakuFindChange"
-#define kKFCStoryRejectMenuKey			kKFCStringPrefix "kKFCStoryRejectMenuKey"		// "...in This Story"
-#define kKFCChapterRejectMenuKey		kKFCStringPrefix "kKFCChapterRejectMenuKey"		// "Reject All ...in This Document"
-#define kKFCRunRejectMenuKey			kKFCStringPrefix "kKFCRunRejectMenuKey"			// "...in This Run"
-// ...and their Accept twins. The document row's is Accept All Changes, below.
-#define kKFCAcceptChangeMenuKey			kKFCStringPrefix "kKFCAcceptChangeMenuKey"		// "Accept Change by KohakuFindChange"
-#define kKFCStoryAcceptMenuKey			kKFCStringPrefix "kKFCStoryAcceptMenuKey"		// "...in This Story"
-#define kKFCRunAcceptMenuKey			kKFCStringPrefix "kKFCRunAcceptMenuKey"			// "...in This Run"
-#define kKFCAcceptAllChangesMenuKey		kKFCStringPrefix "kKFCAcceptAllChangesMenuKey"
-// "Show Changes by KohakuFindChange".
-#define kKFCShowChangesMenuKey			kKFCStringPrefix "kKFCShowChangesMenuKey"
-#define kKFCRedoMenuKey					kKFCStringPrefix "kKFCRedoMenuKey"	// the story and document rows' Redo - "Replace Again (Current Find/Change Settings)"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
 // half's alert and Undo names (kKFCStaleResultsDocKey and friends, KFCID.h) and this page's body.
@@ -405,21 +377,17 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
 // plain literal rather than a translated key.
 #define kKFCResultRowMenuName				"KFCRtMenuResultRow"
-// ...and the HIT rows' menu: Replace, Reject Change and Accept Change, about that one row.
+// ...and the HIT rows' menu: Replace, about that one row.
 // A subtree of its own because the two menus never share an item.
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
 // A story row's own right-click menu.
 #define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
-// A run row's own right-click menu (Show Changes by KohakuFindChange).
-#define kKFCResultRunMenuName				"KFCRtMenuResultRun"
 
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
 //    0.5 - 1.2    Open Find/Change..., Find in <scope>, Change Checked (the one command that writes
 //                 to the DOCUMENTS)
-//   ---- 1.3
-//    1.4          Show Changes by KohakuFindChange
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -435,10 +403,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
 #define kKFCReplaceCheckedMenuItemPosition	1.2
-// (Block 2 - the two scans - is gone.)
-// Show Changes by KohakuFindChange (the author's place: under Change Checked, a rule between).
-#define kKFCSeparator6MenuItemPosition		1.3
-#define kKFCShowChangesMenuItemPosition		1.4
+// (Block 2 - the two scans - is gone; so is Show Changes by KohakuFindChange, 2026-10-06.)
 #define kKFCSeparator3MenuItemPosition		2.0
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
@@ -470,25 +435,14 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // The book and document rows' right-click menu, not the flyout: Check All / Uncheck All at that
 // menu's own 1 and 2, and the document row's commands around them.
 #define kKFCChapterReplaceMenuItemPosition	0.5		// a document row's only (the book row greys it)
-#define kKFCChapterRejectMenuItemPosition	0.6		// a document row's only (the book row greys it)
-#define kKFCChapterRedoMenuItemPosition		0.7		// a document row's only (the book row greys it)
 #define kKFCCheckAllMenuItemPosition		1.0
 #define kKFCUncheckAllMenuItemPosition		2.0
-#define kKFCAcceptAllChangesMenuItemPosition	3.0		// a document row's only (the book row greys it)
-// The story row's menu: the three commands, then the two check commands.
+// The story row's menu: Replace, then the two check commands.
 #define kKFCStoryReplaceMenuItemPosition	1.0
-#define kKFCStoryRejectMenuItemPosition		2.0
-#define kKFCStoryAcceptMenuItemPosition		2.5		// beside its Reject
-#define kKFCStoryRedoMenuItemPosition		3.0
 #define kKFCStoryCheckAllMenuItemPosition	4.0
 #define kKFCStoryUncheckAllMenuItemPosition	5.0
-// The hit row's menu: Replace first, then its own 1 and 2.
+// The hit row's menu: Replace.
 #define kKFCReplaceHitMenuItemPosition		0.5
-#define kKFCRejectChangeMenuItemPosition	1.0
-#define kKFCAcceptChangeMenuItemPosition	2.0
-// The run row's menu.
-#define kKFCRunRejectMenuItemPosition		1.0
-#define kKFCRunAcceptMenuItemPosition		2.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

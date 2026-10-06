@@ -69,7 +69,6 @@
 #include "KFCResultNodeID.h"
 #include "KFCJump.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
-#include "KFCResultTree.h"		// ShowRowMenuReason / DropRowMenuReason - why a row's menu has nothing to offer
 
 namespace
 {
@@ -103,52 +102,6 @@ void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
 	InterfacePtr<IMenuManager> menuMgr(actionMgr, UseDefaultIID());
 	if (menuMgr != nil)
 		menuMgr->HandlePopupMenu(menuName, e->GlobalWhere(), e->GlobalWhere(), kTrue, widget);
-}
-
-// Why a story row's Reject / Accept are grey, in the hit row's words (RButtonDn below) - asked once
-// CanRejectStory has said no. "" = the story has no replaced row, so there is nothing to take back and nothing
-// to say. The hit row's order: a footnote, a replace that changed no character, a closed document, a hidden
-// condition, then no change left.
-// (Every reason is said, not only the hidden condition: with Check All not offered over rows with no box, a
-// story's menu can be grey from top to bottom, and then it does not open at all.)
-const char* StoryRejectGreyReason(int32 chapter, int32 group)
-{
-	PMString name;
-	int32 rows = 0;
-	if (!KFCResults()->GetFontDisplay(chapter, group, name, rows))
-		return "";
-	int32 replaced = 0, inFootnote = 0, formatOnly = 0;
-	for (int32 n = 0; n < rows; ++n)
-	{
-		const int32 hit = KFCResults()->GetFontGroupHit(chapter, group, n);
-		bool checked = false, wasReplaced = false, locked = false;
-		if (hit < 0 || !KFCResults()->GetHitFlags(chapter, hit, checked, wasReplaced, locked) || !wasReplaced)
-			continue;
-		++replaced;
-		if (KFCResults()->GetHitInFootnote(chapter, hit))
-			++inFootnote;
-		else if (KFCResults()->GetHitTextUnchanged(chapter, hit))
-			++formatOnly;		// a replace that changed no character
-	}
-	if (replaced == 0)
-		return "";
-	if (inFootnote == replaced)
-		return "Reject / Accept Changes in This Story: not for matches inside a footnote - Track Changes records nothing there.";
-	if (formatOnly == replaced)
-		return "Reject / Accept Changes in This Story: its replaces changed no character (formatting only) - Track Changes records nothing for them.";
-	if (inFootnote + formatOnly == replaced)
-		return "Reject / Accept Changes in This Story: its replaces are inside a footnote or changed no character (formatting only) - Track Changes records nothing for them.";
-	UIDRef storyDoc;
-	IDFile storyFile;
-	if (!(KFCResults()->GetChapterLocation(chapter, storyDoc, storyFile) && KFCChapters()->FindOpenChapterDoc(storyFile, storyDoc)))
-		return "Reject / Accept Changes in This Story: its document is not open - open it to take the replace back.";
-	if (KFCRuns()->StoryChangesHidden(chapter, group))
-		return "Reject / Accept Changes in This Story: the replaced text is under a hidden condition - show the condition and try again.";
-	// The guess names every cause measured: a Ctrl+Z of the replace that the list does not follow (a list Show
-	// Changes rebuilt - KFCUndoFollow.h); a deletion with Track Changes on, which InDesign folds into the deleter's
-	// own record; and "split around other text" - typing inside a replace, or, on a list Show Changes rebuilt, a
-	// GREP <$0>, whose two records stand around the match it kept.
-	return "Reject / Accept Changes in This Story: no tracked change of its replaces is left (undone, accepted, rejected, deleted, or split around other text?).";
 }
 
 }
@@ -330,88 +283,15 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		const int32 chapter = nodeID->GetChapter();
 		const int32 group = nodeID->GetFont();
 		KFCResults()->SetContextMenuGroup(chapter, group);
-		KFCResults()->SetContextMenuRun(-1, -1);		// the run row's: cleared like this one
-		// WHY ITS REJECT / ACCEPT ARE GREY (the author's call). The hit row's rule below: with every item grey the
-		// popup does not open, so the status line is the only place to say it - otherwise a story whose replaced
-		// text is all under a hidden condition says nothing at all (case reject-hidden-condition-story).
-		// StoryRejectGreyReason, above, says which reason.
-		// OVER THE LAST MESSAGE, AND TAKEN DOWN BY THE NEXT RIGHT-CLICK WITH NOTHING TO SAY (the author's call).
-		// Not through ShowStatus: it would become the last message and stay, reading as if it were about
-		// whatever row was right-clicked next (KFCResultTree::ShowRowMenuReason).
-		PMString why;
-		if (!KFCRuns()->CanRejectStory(chapter, group))
-			why = StoryRejectGreyReason(chapter, group);
-		if (!why.IsEmpty())
-		{
-			why.SetTranslatable(kFalse);
-			KFCResultTree::ShowRowMenuReason(why);
-		}
-		else
-			KFCResultTree::DropRowMenuReason();
 		PopRowMenu(kKFCResultStoryMenuName, e, this);
 		return kTrue;
 	}
 	KFCResults()->SetContextMenuGroup(-1, -1);
 
-	// A RUN ROW (Show Changes by KohakuFindChange): its own menu, over that run's rows in this document.
-	// Cleared by every other right-click, like the story row's.
-	if (nodeID->IsRunRow())
-	{
-		KFCResults()->SetContextMenuRun(nodeID->GetChapter(), nodeID->GetRun());
-		KFCResultTree::DropRowMenuReason();		// nothing to say over a run row
-		PopRowMenu(kKFCResultRunMenuName, e, this);
-		return kTrue;
-	}
-	KFCResults()->SetContextMenuRun(-1, -1);
-
-	// Hit rows carry their own menu - Replace, Reject Change and Accept Change, about THIS row (the user's
-	// call).
-	//
-	// WHY REJECT CHANGE IS GREY IS SAID HERE, BEFORE THE MENU. When every item is disabled the popup does
-	// not open at all (measured with Check All), so the status line is the only place left to say it.
+	// Hit rows carry their own menu - Replace, about THIS row (the user's call).
 	if (nodeID->IsHitRow())
 	{
-		const int32 chapter = nodeID->GetChapter();
-		const int32 hit = nodeID->GetHit();
-		KFCResults()->SetContextMenuHit(chapter, hit);
-		bool checked = false, replaced = false, locked = false;
-		KFCResults()->GetHitFlags(chapter, hit, checked, replaced, locked);
-		// (Over the last message - the story row's note above.)
-		if (KFCResults()->GetHitInFootnote(chapter, hit))
-		{
-			PMString why("Reject Change: not for a match inside a footnote - Track Changes records nothing there.");
-			why.SetTranslatable(kFalse);
-			KFCResultTree::ShowRowMenuReason(why);
-		}
-		// ...and a replace that changed no character: Change Format with an empty Change To. Not "no tracked change
-		// ... is left (undone, accepted or rejected ..., or deleted?)" - none was ever made (case
-		// xs5-b2-format-only-cc).
-		else if (KFCResults()->GetHitTextUnchanged(chapter, hit))
-		{
-			PMString why("Reject Change: this replace changed no character (formatting only) - Track Changes records nothing for it (Edit > Undo takes it back).");
-			why.SetTranslatable(kFalse);
-			KFCResultTree::ShowRowMenuReason(why);
-		}
-		else if (replaced && !KFCRuns()->RefreshRowFromRecords(chapter, hit))
-		{
-			// A closed document is said as such: the records may all be there, and the row would read "no
-			// tracked change" only because nothing is open to read them in.
-			// ...and so is a hidden condition (the author's call): the records are there too, gone
-			// out of the main text with the text the condition hides (case reject-hidden-condition).
-			UIDRef rowDoc;
-			IDFile rowFile;
-			const bool open = KFCResults()->GetChapterLocation(chapter, rowDoc, rowFile)
-				&& KFCChapters()->FindOpenChapterDoc(rowFile, rowDoc);
-			PMString why(!open
-				? "Reject Change: the document of this row is not open - open it to take the replace back."
-				: KFCRuns()->RowChangeIsHidden(chapter, hit)
-				? "Reject Change: this row's replaced text is under a hidden condition - show the condition and reject again."
-				: "Reject Change: no tracked change of this replace is left for this row (undone, accepted or rejected in the Track Changes panel, deleted, or split around other text?).");
-			why.SetTranslatable(kFalse);
-			KFCResultTree::ShowRowMenuReason(why);
-		}
-		else
-			KFCResultTree::DropRowMenuReason();
+		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
 		PopRowMenu(kKFCResultHitMenuName, e, this);
 		return kTrue;
 	}
@@ -420,7 +300,6 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		? static_cast<int32>(KFCResultModel::kContextMenuBookRow)
 		: nodeID->GetChapter();
 	KFCResults()->SetContextMenuChapter(target);
-	KFCResultTree::DropRowMenuReason();		// nothing to say over a book or document row
 	PopRowMenu(kKFCResultRowMenuName, e, this);
 	return kTrue;
 }

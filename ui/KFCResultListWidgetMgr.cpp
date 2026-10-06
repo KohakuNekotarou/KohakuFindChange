@@ -55,7 +55,6 @@
 #include "LocaleSetting.h"
 #include "PMString.h"
 #include "RsrcSpec.h"
-#include "TextChar.h"		// kTextChar_Ellipse - the mark on a cut "Source Text:"
 #include "Utils.h"
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
 
@@ -243,8 +242,6 @@ public:
 				this->ApplyBookRow(node, widget, rowData);
 			else if (nodeID->IsFontRow())
 				this->ApplyFontRow(nodeID, node, widget, rowData);
-			else if (nodeID->IsRunRow())
-				this->ApplyRunRow(nodeID, node, widget, rowData);
 			else
 				this->ApplyChapterRow(nodeID, node, widget, rowData);
 		}
@@ -274,7 +271,7 @@ public:
 		TreeNodePtr<KFCResultNodeID> nodeID(node);
 		if (nodeID != nil && nodeID->IsHitRow())
 			return PMReal(kHitExtraIndent);
-		if (nodeID != nil && (nodeID->IsFontRow() || nodeID->IsRunRow()))
+		if (nodeID != nil && nodeID->IsFontRow())
 			return PMReal(kFontLevelIndent);
 		return 0.0;
 	}
@@ -288,17 +285,10 @@ private:
 	}
 
 	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story
-	// row every hit sits under, and the run step where there is one.
-	PMReal FontShift(int32 chapterIdx) const
+	// row every hit sits under.
+	PMReal FontShift(int32 /*chapterIdx*/) const
 	{
-		return kFontLevelIndent + this->RunShift(chapterIdx);
-	}
-
-	// One more step for the story and hit rows of a chapter that has RUN rows above them (Show Changes)
-	// - asked from the adapter's own count, like FontShift.
-	PMReal RunShift(int32 chapterIdx) const
-	{
-		return (KFCResults()->GetDisplayRunCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
+		return kFontLevelIndent;
 	}
 
 	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label
@@ -501,25 +491,7 @@ private:
 			label.Append(")");
 		}
 		this->LayOutBranchRow(node, widget, rowData,
-			this->LevelShift() + kFontLevelIndent + this->RunShift(nodeID->GetChapter()), label);
-	}
-
-	// A RUN row (Show Changes by KohakuFindChange): one replace's rows, "<date> <time>  (N)" -
-	// the branch shape one step right of its document row. No checked count: a list rebuilt from the
-	// records has no boxes.
-	void ApplyRunRow(const TreeNodePtr<KFCResultNodeID>& nodeID, const NodeID& node,
-		IControlView* widget, IPanelControlData* rowData) const
-	{
-		PMString name;
-		int32 fullCount = 0;
-		if (!KFCResults()->GetRunDisplay(nodeID->GetChapter(), nodeID->GetRun(), name, fullCount))
-			return;
-		PMString label(name);
-		label.SetTranslatable(kFalse);
-		label.Append("  (");
-		label.AppendNumber(fullCount);
-		label.Append(")");
-		this->LayOutBranchRow(node, widget, rowData, this->LevelShift() + kFontLevelIndent, label);
+			this->LevelShift() + kFontLevelIndent, label);
 	}
 
 	// A hit row: the match's line into the custom colour cell (IKFCRowData's parts), no expander,
@@ -733,10 +705,6 @@ void KFCResultTree::Rebuild()
 	for (int32 n = 0; n < chapters && !chaptersOpenedWhole; ++n)
 	{
 		const int32 c = KFCResults()->GetShownChapter(n);
-		// ...and the RUN rows above them the same (Show Changes): a grouping, not a hiding place.
-		const int32 runs = KFCResults()->GetDisplayRunCount(c);
-		for (int32 r = 0; r < runs; ++r)
-			expand(KFCResultNodeID::CreateRun(c, r), kFalse);
 		const int32 groups = KFCResults()->GetDisplayFontCount(c);
 		for (int32 g = 0; g < groups; ++g)
 			expand(KFCResultNodeID::CreateFont(c, g), kFalse);
@@ -753,10 +721,9 @@ void KFCResultTree::Rebuild()
 		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms %s", (int)KFCResults()->GetTotalHitCount(),
 			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
-	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds, 2026-10-05). GetDisplayFontCount and
-	// GetDisplayRunGroupCount find the shown groups by halving now; here every group and every run is counted one
-	// by one, as they were before, after the timing above. A difference is logged as DISPCOUNT MISMATCH - the
-	// regression runs grep for it.
+	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds, 2026-10-05). GetDisplayFontCount finds
+	// the shown groups by halving now; here every group is counted one by one, as they were before, after the timing
+	// above. A difference is logged as DISPCOUNT MISMATCH - the regression runs grep for it.
 	for (int32 n = 0; n < chapters; ++n)
 	{
 		const int32 c = KFCResults()->GetShownChapter(n);
@@ -767,30 +734,6 @@ void KFCResultTree::Rebuild()
 		const int32 fontsNow = KFCResults()->GetDisplayFontCount(c);
 		if (fontsNow != fontsByGroup)
 			KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d fonts now=%d by group=%d", (int)c, (int)fontsNow, (int)fontsByGroup);
-		int32 runsByGroup = 0;
-		PMString runLabel;
-		int32 runHits = 0;
-		for (int32 r = 0; KFCResults()->GetRunDisplay(c, r, runLabel, runHits); ++r)
-		{
-			int32 groupsByGroup = 0;
-			for (int32 k = 0; ; ++k)
-			{
-				const int32 g = KFCResults()->GetRunGroup(c, r, k);
-				if (g < 0)
-					break;
-				if (KFCResults()->GetDisplayFontHitCount(c, g) > 0)
-					++groupsByGroup;
-			}
-			const int32 groupsNow = KFCResults()->GetDisplayRunGroupCount(c, r);
-			if (groupsNow != groupsByGroup)
-				KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d run=%d groups now=%d by group=%d", (int)c, (int)r,
-					(int)groupsNow, (int)groupsByGroup);
-			if (groupsByGroup > 0)
-				++runsByGroup;
-		}
-		const int32 runsNow = KFCResults()->GetDisplayRunCount(c);
-		if (runsNow != runsByGroup)
-			KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d runs now=%d by group=%d", (int)c, (int)runsNow, (int)runsByGroup);
 	}
 #endif
 }
@@ -828,10 +771,6 @@ void KFCResultTree::RefreshRows()
 	{
 		const int32 c = KFCResults()->GetShownChapter(n);	// (chapter n, but for an emptied one before it)
 		treeMgr->NodeChanged(KFCResultNodeID::Create(c), kTrue /*childrenChangedAlso*/);
-		// the run rows: the story rows' parents there, so the chapter's call stops at them
-		const int32 runs = KFCResults()->GetDisplayRunCount(c);
-		for (int32 r = 0; r < runs; ++r)
-			treeMgr->NodeChanged(KFCResultNodeID::CreateRun(c, r), kTrue /*childrenChangedAlso*/);
 		const int32 fonts = KFCResults()->GetDisplayFontCount(c);
 		for (int32 f = 0; f < fonts; ++f)
 			treeMgr->NodeChanged(KFCResultNodeID::CreateFont(c, f), kTrue /*childrenChangedAlso*/);
@@ -888,21 +827,6 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 // again (RestoreStatusOnPanelShow).
 static PMString gLastStatus;
 
-// THE "Source Text:" A SELECTED REPLACED ROW PUT UP (ShowRowsBefore). Its pieces, and
-// whether it is standing - kept beside gLastStatus for the same reason: the panel can be closed and
-// shown again while it stands. It stands OVER the last message rather than replacing it, so that
-// selecting a row that has no "before" puts that message back (DropBefore); gLastStatus is not touched.
-static bool gShowingBefore = false;
-static PMString gBeforePre;
-static PMString gBeforeOriginal;
-static PMString gBeforePost;
-
-// WHY A ROW'S RIGHT-CLICK MENU IS GREY (ShowRowMenuReason). One more layer, over
-// the "Source Text:" or the last message: neither of those is touched while it stands, so the next right-click
-// that has nothing to say - or a selection (DropBefore) - puts back exactly what it covered.
-static bool gShowingReason = false;
-static PMString gReason;
-
 void KFCResultTree::ShutdownCleanup()
 {
 	// The statics this file keeps, emptied for the reason KFCResultModel empties its own: a PMString
@@ -910,18 +834,12 @@ void KFCResultTree::ShutdownCleanup()
 	// already torn itself down (the KESCL ShutdownCleanup rule). When a static is added above, it is
 	// added here too.
 	gLastStatus.Clear();
-	gShowingBefore = false;
-	gBeforePre.Clear();
-	gBeforeOriginal.Clear();
-	gBeforePost.Clear();
-	gShowingReason = false;
-	gReason.Clear();
 }
 
 namespace
 {
 
-/** Put these pieces on the panel's message area (IKFCStatusTextData.h says what each is). Does nothing
+/** Put this message on the panel's message area (IKFCStatusTextData.h). Does nothing
     when the panel is closed, which is an ordinary state. Shared by every writer below, so they all
     reach the box the same way; they decide only WHAT it says.
 
@@ -933,8 +851,7 @@ namespace
 
     @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
                        there is nothing on screen to force yet, and this runs mid-construction. */
-void WriteStatusWidget(const PMString& label, const PMString& pre, const PMString& mid,
-	const PMString& post, bool16 wantCaret, bool16 forceRedraw)
+void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
 {
 	// Reach the box through the panel; nil when the panel is closed (do nothing then) - the same reach
 	// Rebuild uses, which is why this lives here rather than in the action component.
@@ -948,9 +865,9 @@ void WriteStatusWidget(const PMString& label, const PMString& pre, const PMStrin
 	if (textData == nil)
 		return;
 
-	textData->SetSegments(label, pre, mid, post, wantCaret);
+	textData->SetText(message);
 
-	// The pieces are not something the view watches, so it is told to repaint - and, for a report, made
+	// The text is not something the view watches, so it is told to repaint - and, for a report, made
 	// to repaint NOW (ShowStatus says why): an invalidated view waits for the next event loop (memory
 	// statictext-widget-immediate-update).
 	// ONE call for each case: ForceRedraw with no region draws the whole view now ("Redraws the invalid
@@ -964,21 +881,7 @@ void WriteStatusWidget(const PMString& label, const PMString& pre, const PMStrin
 /** An ordinary message: the sentence alone, in the theme's text colour - what the stock widget drew. */
 void WriteMessage(const PMString& message, bool16 forceRedraw)
 {
-	const PMString kNothing;
-	WriteStatusWidget(kNothing, kNothing, message, kNothing, kFalse, forceRedraw);
-}
-
-/** The "Source Text:" that is standing (ShowRowsBefore): the heading, then the row's line with the text the
-    replace took in the middle - or the bar, when it took nothing (an insertion). */
-void WriteBefore(bool16 forceRedraw)
-{
-	// "Source Text:", KCM's word (the author's call). KCM's
-	// message area says the same thing in the same place: the row shows the newer side, the box the older
-	// one. Here the older side is what Track Changes holds as the deletion - what Reject brings back.
-	PMString label("Source Text:");
-	label.SetTranslatable(kFalse);
-	WriteStatusWidget(label, gBeforePre, gBeforeOriginal, gBeforePost,
-		gBeforeOriginal.IsEmpty() ? kTrue : kFalse, forceRedraw);
+	WriteStatusWidget(message, forceRedraw);
 }
 
 /** What the box says when nothing has run since launch - the string table's, so it cannot drift from
@@ -1003,18 +906,6 @@ void KFCResultTree::RestoreStatusOnPanelShow()
 	//
 	// So the panel's show is where the line has to be written, exactly as the tab's name and the
 	// illustration already are: whatever is written here outranks the persisted value.
-	//
-	// A right-click menu's reason (ShowRowMenuReason) does not come back with the panel: it was about the row
-	// a menu was popped over, and that moment has passed. What it covered is written below as ever.
-	gShowingReason = false;
-	gReason.Clear();
-	if (gShowingBefore)
-	{
-		// A selected replaced row's "Source Text:" was standing when the panel went away: it comes back
-		// with the panel, the way the message under it would have.
-		WriteBefore(kFalse /*still being built*/);
-		return;
-	}
 	if (!gLastStatus.IsEmpty())
 	{
 		// Something ran in THIS session: put its message back. This also restores the line when the
@@ -1034,13 +925,6 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	gLastStatus = message;
 	gLastStatus.SetTranslatable(kFalse);
 
-	// A new message takes the place of a standing "Source Text:": it reports something that has happened
-	// since, and a jump that fails says why through here - never under an old row's text. And of a standing
-	// right-click reason, for the same reason.
-	gShowingBefore = false;
-	gShowingReason = false;
-	gReason.Clear();
-
 	// The illustration follows the same moments this line does, so it is settled here rather than at
 	// every call site. Both directions run through here: an engine reports what it found (the model
 	// says a run happened, so the searching cat), and a close responder reports that the results
@@ -1051,104 +935,6 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	// The panel is on screen and this is a report of something that just happened, so it is drawn
 	// immediately (the restore path above is the one that must not force a redraw).
 	WriteMessage(message, kTrue /*force the redraw*/);
-}
-
-//----------------------------------------------------------------------------------------
-// KFCResultTree::ShowRowsBefore / DropBefore - a replaced row's text as it was before the replace
-//----------------------------------------------------------------------------------------
-
-void KFCResultTree::ShowRowsBefore(int32 chapterIdx, const std::vector<int32>& rows)
-{
-	PMString pre, original, post;
-	if (!KFCResults()->GetRowsBefore(chapterIdx, rows, pre, original, post))
-	{
-		// Not a replaced row (or not a row): nothing to show before it, and an older row's "Source Text:"
-		// must not stand beside this one.
-		DropBefore();
-		return;
-	}
-
-	// CUT LONG BEFORE THE BOX HAS TO MEASURE IT. The original text is the WHOLE match (a GREP
-	// across paragraphs, a format-only search: a story's worth), where a row's own is capped at 50
-	// characters for drawing (KFCSearchEngine's kKFCMaxLineChars) - and the box lays its text out by
-	// measuring prefixes, again for every width it tries (KFCStatusTextView.cpp), on every repaint. It
-	// holds four lines, about 120 characters on a Japanese UI; past that the view ends it in an ellipsis
-	// anyway, so the tail is cut here, marked the same way.
-	const int32 kBeforeMaxChars = 300;
-	if (original.CharCount() > kBeforeMaxChars)
-	{
-		// Not through the middle of a surrogate pair (the doubt KFCStatusTextView's KFCSafeCut carries).
-		int32 keep = kBeforeMaxChars;
-		const uint32 at = original.GetChar(keep).GetValue();
-		if (at >= 0xDC00 && at <= 0xDFFF)
-			--keep;
-		original.Truncate(original.CharCount() - keep);
-		original.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
-	}
-
-	// The breaks as marks - the pilcrow and the return arrow a hit row draws (the same function). A raw
-	// CR here would be taken by the box as a line break, and "which characters were replaced" would
-	// lose the one that was a paragraph's end.
-	KFCResults()->MarkUpBreaksForDisplay(pre);
-	KFCResults()->MarkUpBreaksForDisplay(original);
-	KFCResults()->MarkUpBreaksForDisplay(post);
-
-	gBeforePre = pre;			gBeforePre.SetTranslatable(kFalse);
-	gBeforeOriginal = original;	gBeforeOriginal.SetTranslatable(kFalse);
-	gBeforePost = post;			gBeforePost.SetTranslatable(kFalse);
-	gShowingBefore = true;
-	gShowingReason = false;		// the newly selected row's text takes a right-click reason's place
-	gReason.Clear();
-
-	// The illustration is not settled here: nothing has run, and it follows what runs (ShowStatus).
-	WriteBefore(kTrue /*force the redraw*/);
-}
-
-void KFCResultTree::DropBefore()
-{
-	if (!gShowingBefore)
-	{
-		// Nothing standing - but a right-click reason over the last message is about a row the user has
-		// now moved away from by selecting another one: it goes too.
-		DropRowMenuReason();
-		return;
-	}
-	gShowingBefore = false;
-	gBeforePre.Clear();
-	gBeforeOriginal.Clear();
-	gBeforePost.Clear();
-	gShowingReason = false;		// a reason over the "Source Text:" goes with it
-	gReason.Clear();
-
-	// Back to what the panel said before the row was selected - the last message, untouched by the
-	// "Source Text:" (or, with nothing run this session, the opening one).
-	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
-}
-
-//----------------------------------------------------------------------------------------
-// KFCResultTree::ShowRowMenuReason / DropRowMenuReason - why a row's right-click menu is grey
-//----------------------------------------------------------------------------------------
-
-void KFCResultTree::ShowRowMenuReason(const PMString& reason)
-{
-	gReason = reason;
-	gReason.SetTranslatable(kFalse);
-	gShowingReason = true;
-	// Drawn now, before the menu (or, when every item is grey, instead of it). Neither the last message nor a
-	// standing "Source Text:" is touched, and the illustration does not move: nothing has run.
-	WriteMessage(gReason, kTrue /*force the redraw*/);
-}
-
-void KFCResultTree::DropRowMenuReason()
-{
-	if (!gShowingReason)
-		return;		// nothing standing: what is under it is already what the box shows
-	gShowingReason = false;
-	gReason.Clear();
-	if (gShowingBefore)
-		WriteBefore(kTrue /*force the redraw*/);
-	else
-		WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
 }
 
 //----------------------------------------------------------------------------------------

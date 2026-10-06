@@ -69,14 +69,7 @@ public:
 			return KFCResultNodeID::Create(nodeID->GetChapter());
 		}
 		if (nodeID->IsFontRow())
-		{
-			// a story row -> its run row when the list has runs, its document row when it has not
-			if (nodeID->GetRun() >= 0)
-				return KFCResultNodeID::CreateRun(nodeID->GetChapter(), nodeID->GetRun());
-			return KFCResultNodeID::Create(nodeID->GetChapter());
-		}
-		if (nodeID->IsRunRow())
-			return KFCResultNodeID::Create(nodeID->GetChapter());	// run -> its document row
+			return KFCResultNodeID::Create(nodeID->GetChapter());	// a story row -> its document row
 		if (nodeID->IsBookRow())
 			return KFCResultNodeID::CreateRoot();
 		// A document row hangs off the book row when the results came from a book, and off the root
@@ -95,14 +88,9 @@ public:
 			return KFCResults()->GetDisplayChapterCount();
 		if (nodeID->IsFontRow())
 			return KFCResults()->GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
-		if (nodeID->IsRunRow())
-			return KFCResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun());
 
-		// A document row: its RUN rows when the list has runs; else its story ("font") rows
-		// (its hits directly only for a chapter with no groups - see the head of the file).
-		const int32 runs = KFCResults()->GetDisplayRunCount(nodeID->GetChapter());
-		if (runs > 0)
-			return runs;
+		// A document row: its story ("font") rows (its hits directly only for a chapter with no groups - see the
+		// head of the file).
 		const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 			return fonts;
@@ -138,28 +126,10 @@ public:
 				return kInvalidNodeID;
 			return KFCResultNodeID::Create(nodeID->GetChapter(), hit);
 		}
-		if (nodeID->IsRunRow())
-		{
-			// The run hands back a CHAPTER-wide group index; the cap wipes out a run's LAST groups, so the
-			// nth displayed one is the nth.
-			if (nth < 0 || nth >= KFCResults()->GetDisplayRunGroupCount(nodeID->GetChapter(), nodeID->GetRun()))
-				return kInvalidNodeID;
-			const int32 group = KFCResults()->GetRunGroup(nodeID->GetChapter(), nodeID->GetRun(), nth);
-			if (group < 0)
-				return kInvalidNodeID;
-			return KFCResultNodeID::CreateFont(nodeID->GetChapter(), group);
-		}
 
 		// A document row. The groups the display cap wipes out are the LAST ones (they are in
 		// first-appearance order and the cap keeps a prefix of the chapter's hits), so the nth
-		// displayed group is simply the nth group - and the same holds for the runs.
-		const int32 runs = KFCResults()->GetDisplayRunCount(nodeID->GetChapter());
-		if (runs > 0)
-		{
-			if (nth < 0 || nth >= runs)
-				return kInvalidNodeID;
-			return KFCResultNodeID::CreateRun(nodeID->GetChapter(), nth);
-		}
+		// displayed group is simply the nth group.
 		const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 		{
@@ -184,14 +154,7 @@ public:
 			return (pos >= 0) ? pos : childID->GetHit();
 		}
 		if (childID->IsFontRow())
-		{
-			// under a run row: its place among the run's groups; under a document row: the group itself
-			if (childID->GetRun() >= 0)
-				return KFCResults()->GetGroupPosInRun(childID->GetChapter(), childID->GetFont());
-			return childID->GetFont();
-		}
-		if (childID->IsRunRow())
-			return childID->GetRun();
+			return childID->GetFont();		// under its document row: the group itself
 		if (childID->IsBookRow())
 			return 0;		// the root's only child
 		return KFCResults()->GetShownChapterPos(childID->GetChapter());	// GetNthChild's reverse

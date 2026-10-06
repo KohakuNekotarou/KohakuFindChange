@@ -103,8 +103,6 @@ namespace
 	int32 gContextMenuHit = -1;
 	int32 gContextMenuGroupChapter = -1;	// the story row right-clicked
 	int32 gContextMenuGroup = -1;
-	int32 gContextMenuRunChapter = -1;		// the run row right-clicked
-	int32 gContextMenuRun = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
 	// RestoreModelSnapshot).
@@ -115,13 +113,11 @@ namespace
 		gContextMenuHit = -1;
 		gContextMenuGroupChapter = -1;
 		gContextMenuGroup = -1;
-		gContextMenuRunChapter = -1;
-		gContextMenuRun = -1;
 	}
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
 	// is out of range, which is how a repaint racing a rebuild (or a stale node id) reads "nothing" rather
-	// than crashing. Every getter and setter below starts here; RunAt, further down, is the run level's.
+	// than crashing. Every getter and setter below starts here.
 	KFCResultModel::Chapter* ChapterAt(int32 chapterIdx)
 	{
 		return (chapterIdx >= 0 && chapterIdx < static_cast<int32>(gChapters.size())) ? &gChapters[chapterIdx] : nil;
@@ -247,32 +243,25 @@ namespace
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
 	// the hit held before - a search's new hits and the hits KeepCheckedRows carries over alike.
-	//
-	// KEYED BY (RUN, STORY) (Show Changes by KohakuFindChange). On a list rebuilt from the records a
-	// story two runs changed stands under each run, so a group is one story of one run; every other
-	// list has run -1 throughout, where the key is the story alone. Each run's own
-	// list of groups is rebuilt at the end, from the groups (the runs themselves - start and label - are
-	// the builder's and stay).
 	void BuildFontGroups(KFCResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
-		// Each (story, run)'s group, looked up rather than searched for: a chapter of 5000 hits in as many stories
+		// Each story's group, looked up rather than searched for: a chapter of 5000 hits in as many stories
 		// would otherwise compare every hit with every group made before it (2026-10-05, the speed-up study). The
 		// groups are still made in first-appearance order - the map only finds them.
-		std::map<std::pair<UID, int32>, int32> groupOf;
+		std::map<UID, int32> groupOf;
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KFCResultModel::Hit& hit = chapter.hits[i];
 			int32 found = -1;
-			const std::pair<UID, int32> key(hit.storyUID, hit.run);
-			const std::map<std::pair<UID, int32>, int32>::const_iterator known = groupOf.find(key);
+			const UID key = hit.storyUID;
+			const std::map<UID, int32>::const_iterator known = groupOf.find(key);
 			if (known != groupOf.end())
 				found = known->second;
 			if (found < 0)
 			{
 				KFCResultModel::FontGroup group;
 				group.story = hit.storyUID;
-				group.run = hit.run;
 				group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
 				if (!hit.pageString.IsEmpty())
 					group.fontName.Append(hit.pageString);
@@ -291,16 +280,6 @@ namespace
 			hit.fontGroup = found;
 			hit.fontGroupPos = static_cast<int32>(group.hitIndices.size());
 			group.hitIndices.push_back(static_cast<int32>(i));
-		}
-
-		// Each run's groups, ascending (a group of a run the chapter does not hold is left out).
-		for (size_t r = 0; r < chapter.runs.size(); ++r)
-			chapter.runs[r].groups.clear();
-		for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
-		{
-			const int32 run = chapter.fontGroups[g].run;
-			if (run >= 0 && run < static_cast<int32>(chapter.runs.size()))
-				chapter.runs[run].groups.push_back(static_cast<int32>(g));
 		}
 	}
 
@@ -415,11 +394,6 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 		gContextMenuGroupChapter = -1;
 		gContextMenuGroup = -1;
 	}
-	if (gContextMenuRunChapter == chapterIdx)
-	{
-		gContextMenuRunChapter = -1;
-		gContextMenuRun = -1;
-	}
 }
 
 void KFCResultModel::EmptyChapter(Chapter& chapter)
@@ -428,7 +402,6 @@ void KFCResultModel::EmptyChapter(Chapter& chapter)
 	// the next search.
 	std::vector<Hit>().swap(chapter.hits);
 	std::vector<FontGroup>().swap(chapter.fontGroups);
-	std::vector<RunGroup>().swap(chapter.runs);
 	chapter.storyVersions.clear();
 	chapter.docRef = UIDRef(nil, kInvalidUID);
 	chapter.file = IDFile();
@@ -743,119 +716,6 @@ bool KFCResultModel::GetContextMenuGroup(int32& outChapterIdx, int32& outGroupId
 	return true;
 }
 
-// ---- The run level (Show Changes by KohakuFindChange) - see the header. ----
-
-namespace
-{
-	// The run, or nil for an index out of range (either index) - ChapterAt's shape, one level down.
-	const KFCResultModel::RunGroup* RunAt(int32 chapterIdx, int32 runIdx)
-	{
-		const KFCResultModel::Chapter* c = ChapterAt(chapterIdx);
-		return (c != nil && runIdx >= 0 && runIdx < static_cast<int32>(c->runs.size())) ? &c->runs[runIdx] : nil;
-	}
-}
-
-int32 KFCResultModel::GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx)
-{
-	const RunGroup* run = RunAt(chapterIdx, runIdx);
-	if (run == nil)
-		return 0;
-	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil)
-		return 0;
-	// The groups the cap left a hit to: the first N of the run's (they stand in hit order). Found by halving, for
-	// GetDisplayFontCount's reason (2026-10-05): a run's groups are listed in ascending group index, so their first
-	// hits ascend too.
-	const int32 shown = GetDisplayHitCount(chapterIdx);
-	const std::vector<FontGroup>& groups = c->fontGroups;
-	const std::vector<int32>::const_iterator end = std::partition_point(run->groups.begin(), run->groups.end(),
-		[shown, &groups](int32 g) {
-			return g >= 0 && g < static_cast<int32>(groups.size()) && !groups[g].hitIndices.empty()
-				&& groups[g].hitIndices.front() < shown;
-		});
-	return static_cast<int32>(end - run->groups.begin());
-}
-
-int32 KFCResultModel::GetDisplayRunCount(int32 chapterIdx)
-{
-	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil)
-		return 0;
-	int32 shown = 0;
-	for (int32 r = 0; r < static_cast<int32>(c->runs.size()); ++r)
-		if (GetDisplayRunGroupCount(chapterIdx, r) > 0)
-			++shown;
-	return shown;
-}
-
-bool KFCResultModel::GetRunDisplay(int32 chapterIdx, int32 runIdx, PMString& outLabel, int32& outHitCount)
-{
-	const RunGroup* run = RunAt(chapterIdx, runIdx);
-	if (run == nil)
-		return false;
-	outLabel = run->label;
-	outLabel.SetTranslatable(kFalse);
-	// The FULL count, like every other number the tree reads out (GetFontDisplay).
-	outHitCount = 0;
-	for (size_t k = 0; k < run->groups.size(); ++k)
-		outHitCount += static_cast<int32>(gChapters[chapterIdx].fontGroups[run->groups[k]].hitIndices.size());
-	return true;
-}
-
-int32 KFCResultModel::GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth)
-{
-	const RunGroup* run = RunAt(chapterIdx, runIdx);
-	if (run == nil || nth < 0 || nth >= static_cast<int32>(run->groups.size()))
-		return -1;
-	return run->groups[nth];
-}
-
-int32 KFCResultModel::GetGroupRun(int32 chapterIdx, int32 groupIdx)
-{
-	const FontGroup* group = GroupAt(chapterIdx, groupIdx);
-	return (group != nil) ? group->run : -1;
-}
-
-int32 KFCResultModel::GetGroupPosInRun(int32 chapterIdx, int32 groupIdx)
-{
-	const RunGroup* run = RunAt(chapterIdx, GetGroupRun(chapterIdx, groupIdx));
-	if (run == nil)
-		return -1;
-	for (size_t k = 0; k < run->groups.size(); ++k)
-		if (run->groups[k] == groupIdx)
-			return static_cast<int32>(k);
-	return -1;
-}
-
-void KFCResultModel::GetRunHits(int32 chapterIdx, int32 runIdx, std::vector<int32>& outHits)
-{
-	outHits.clear();
-	const RunGroup* run = RunAt(chapterIdx, runIdx);
-	if (run == nil)
-		return;
-	for (size_t k = 0; k < run->groups.size(); ++k)
-	{
-		const std::vector<int32>& idx = gChapters[chapterIdx].fontGroups[run->groups[k]].hitIndices;
-		outHits.insert(outHits.end(), idx.begin(), idx.end());
-	}
-	// The stories' rows interleave in page order: back into the chapter's order.
-	std::sort(outHits.begin(), outHits.end());
-}
-
-void KFCResultModel::SetContextMenuRun(int32 chapterIdx, int32 runIdx)
-{
-	gContextMenuRunChapter = chapterIdx;
-	gContextMenuRun = runIdx;
-}
-
-bool KFCResultModel::GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx)
-{
-	if (RunAt(gContextMenuRunChapter, gContextMenuRun) == nil)
-		return false;
-	outChapterIdx = gContextMenuRunChapter;
-	outRunIdx = gContextMenuRun;
-	return true;
-}
 
 bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
 {
@@ -1051,37 +911,6 @@ void KFCResultModel::GetChapterStories(int32 chapterIdx, std::set<UID>& outStori
 				outStories.insert(c->hits[hi].storyUID);
 }
 
-void KFCResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
-{
-	outHits.clear();
-	const Hit* mep = HitAt(chapterIdx, hitIdx);
-	if (mep == nil)
-		return;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	const Hit& me = *mep;
-	// the story's rows with a place, in text order
-	std::vector<std::pair<TextIndex, int32> > order;
-	for (size_t i = 0; i < hits.size(); ++i)
-		if (hits[i].storyUID == me.storyUID && hits[i].textStart != kInvalidTextIndex)
-			order.push_back(std::make_pair(hits[i].textStart, static_cast<int32>(i)));
-	std::sort(order.begin(), order.end());
-	size_t at = 0;
-	while (at < order.size() && order[at].second != hitIdx)
-		++at;
-	if (at == order.size())
-	{
-		outHits.push_back(hitIdx);
-		return;
-	}
-	size_t from = at, to = at;
-	while (from > 0 && hits[order[from - 1].second].textEnd >= hits[order[from].second].textStart)
-		--from;
-	while (to + 1 < order.size() && hits[order[to].second].textEnd >= hits[order[to + 1].second].textStart)
-		++to;
-	for (size_t k = from; k <= to; ++k)
-		outHits.push_back(order[k].second);
-}
-
 void KFCResultModel::SetHitChecked(int32 chapterIdx, int32 hitIdx, bool checked)
 {
 	Hit* h = HitAt(chapterIdx, hitIdx);
@@ -1124,6 +953,37 @@ bool KFCResultModel::GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
 	return h != nil && TextUnchanged(*h);
+}
+
+void KFCResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
+{
+	outHits.clear();
+	const Hit* mep = HitAt(chapterIdx, hitIdx);
+	if (mep == nil)
+		return;
+	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
+	const Hit& me = *mep;
+	// the story's rows with a place, in text order
+	std::vector<std::pair<TextIndex, int32> > order;
+	for (size_t i = 0; i < hits.size(); ++i)
+		if (hits[i].storyUID == me.storyUID && hits[i].textStart != kInvalidTextIndex)
+			order.push_back(std::make_pair(hits[i].textStart, static_cast<int32>(i)));
+	std::sort(order.begin(), order.end());
+	size_t at = 0;
+	while (at < order.size() && order[at].second != hitIdx)
+		++at;
+	if (at == order.size())
+	{
+		outHits.push_back(hitIdx);
+		return;
+	}
+	size_t from = at, to = at;
+	while (from > 0 && hits[order[from - 1].second].textEnd >= hits[order[from].second].textStart)
+		--from;
+	while (to + 1 < order.size() && hits[order[to].second].textEnd >= hits[order[to + 1].second].textStart)
+		++to;
+	for (size_t k = from; k <= to; ++k)
+		outHits.push_back(order[k].second);
 }
 
 bool KFCResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
@@ -1253,54 +1113,6 @@ bool KFCResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString&
 	return true;
 }
 
-bool KFCResultModel::GetRowsBefore(int32 chapterIdx, const std::vector<int32>& rows, PMString& outPre,
-	PMString& outOriginal, PMString& outPost)
-{
-	outPre.Clear();			outPre.SetTranslatable(kFalse);
-	outOriginal.Clear();	outOriginal.SetTranslatable(kFalse);
-	outPost.Clear();		outPost.SetTranslatable(kFalse);
-	const Chapter* c = ChapterAt(chapterIdx);
-	if (rows.empty() || c == nil)
-		return false;
-	const std::vector<Hit>& hits = c->hits;
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k] < 0 || rows[k] >= static_cast<int32>(hits.size()) || !hits[rows[k]].replaced)
-			return false;
-
-	// THE ROWS AS ONE. Matches written side by side are one run of new text in the
-	// document, and on a list rebuilt from the records their ONE deletion stands on the last row
-	// (KFCShowChanges.cpp) - so a row alone may have no original text to show at all. Their originals
-	// joined in text order are what the group took, whichever list this is: a search's rows each carry
-	// their own match, and joining them gives the same text. Which rows those are is the document's
-	// question, not the model's - the stored ranges go stale with every edit (KFCTrackChange::
-	// CurrentReplacedGroup asks the records).
-	//
-	// The words around them: before the first row, after the last - each row's line is read around its
-	// own range (KFCSearchEngine::ReadHitText), so the first one's leading context is the group's, and the
-	// last one's trailing context is.
-	outPre = hits[rows.front()].preText;
-	outPost = hits[rows.back()].postText;
-	for (size_t k = 0; k < rows.size(); ++k)
-		outOriginal.Append(hits[rows[k]].originalText);
-	outPre.SetTranslatable(kFalse);
-	outOriginal.SetTranslatable(kFalse);
-	outPost.SetTranslatable(kFalse);
-	return true;
-}
-
-void KFCResultModel::GetStoryRowsInOrder(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
-{
-	outRows.clear();
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil)
-		return;
-	const UID story = h->storyUID;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	for (size_t i = 0; i < hits.size(); ++i)
-		if (hits[i].storyUID == story)
-			outRows.push_back(static_cast<int32>(i));
-}
-
 void KFCResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
 {
 	Hit* hp = HitAt(chapterIdx, hitIdx);
@@ -1314,22 +1126,6 @@ void KFCResultModel::SetHitRejected(int32 chapterIdx, int32 hitIdx, UID storyUID
 	h.replaced = false;
 	h.checked = false;
 	h.outcome = kOutcomeRejected;
-	BuildHitLocator(h);
-}
-
-void KFCResultModel::SetHitAccepted(int32 chapterIdx, int32 hitIdx)
-{
-	Hit* hp = HitAt(chapterIdx, hitIdx);
-	if (hp == nil)
-		return;
-	Hit& h = *hp;
-	BackUpRow(chapterIdx, hitIdx, h);
-	// Still replaced - the text it wrote stays - but its records are gone: nothing is left to find by
-	// that time, so it offers neither Reject Change nor Accept Change again (both look the row up by it).
-	h.replaced = true;
-	h.checked = false;
-	h.recordTime = 0;
-	h.outcome = kOutcomeAccepted;
 	BuildHitLocator(h);
 }
 
@@ -1474,23 +1270,17 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		if (hit.isOverset)
 			hit.locator.Append(" overset");
 	}
-	// Under a hidden condition: nothing of it is on the page named, which is the page the text comes back
-	// to - "P1(2) hidden condition" (not "P1(2) overset", which it is not).
-	if (hit.inHiddenText)
-		hit.locator.Append(" hidden condition");
-
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
-	//   on the locator, in the row's own colour = facts about the row: hidden condition (above - only on a
-	//     list rebuilt from the records), hidden (on a switched-off layer,
+	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
 	//     so the page will look empty on arrival), locked (no check box; the replace will not touch it),
 	//     and what has happened to it since: rejected (on a list rebuilt from the records only),
-	//     deleted, accepted, no track;
+	//     deleted, no track;
 	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
 	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
 	//     would not run there), not replaced.
 	// Only hidden and locked come from the search itself; the rest are put there later - by a replace,
-	// Reject / Accept, a jump that finds the text gone, or the records (Show Changes). They stack on
+	// a jump that finds the text gone, or the records (a query run's list). They stack on
 	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
@@ -1527,8 +1317,6 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" rejected");
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
-	else if (hit.outcome == kOutcomeAccepted)
-		hit.locator.Append(" accepted");	// its change accepted: final, nothing left to act on
 
 	// "no track" - REPLACED INSIDE A FOOTNOTE (the user's request). Track Changes records nothing in a
 	// footnote (measured), so the replace there left no change to take back or accept, and only the

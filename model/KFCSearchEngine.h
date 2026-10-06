@@ -47,7 +47,7 @@ class ITextWalkerSelectionUtils;
 void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force = false);
 
 /** Put "<noun> <index + 1> / <count> - <name>" on the run's bar ("Chapter 3 / 12 - ch03.indd") - the one
-    line the search, the replace and Show Changes all write. Text only - the bar's position is
+    line the search and the replace write. Text only - the bar's position is
     KFCAdvanceProgress's. */
 void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
 
@@ -424,7 +424,7 @@ namespace KFCSearchEngine
 	    match. */
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** A HIT FROM A RANGE, BUILT THE WAY THE SEARCH BUILDS ITS OWN (Show Changes by KohakuFindChange). The
+	/** A HIT FROM A RANGE, BUILT THE WAY THE SEARCH BUILDS ITS OWN (a query run's list - KFCQuerySequence). The
 	    rows of a list rebuilt from the Track Changes records are made by the search's own BuildHit
 	    (kHitEverything: the line, the page, the flags, the story's first words), so they read exactly like
 	    a search's. One HitBuilder per document read: it keeps the frames' answers and the stories' first
@@ -443,7 +443,7 @@ namespace KFCSearchEngine
 	};
 
 	/** A chapter's hits put in page order, each numbered within its page with its locator - the search's
-	    own finishing pass, and Show Changes'. */
+	    own finishing pass, and a query run's list's. */
 	void FinalizeHits(std::vector<KFCResultModel::Hit>& hits);
 
 	// (MatchIsSameOccurrence and HashMatchText are inside the .cpp, with their notes: every door asks

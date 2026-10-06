@@ -49,21 +49,6 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCReplaceCheckedMenuKey,		"Change Checked",
                 kKFCCheckAllMenuKey,			"Check All",
                 kKFCReplaceHitMenuKey,			"Replace",
-                // The Reject / Accept items name KohakuFindChange as the changes' author - they act on its
-                // own changes only (the plug-in author's call) - one name per level.
-                kKFCRejectChangeMenuKey,		"Reject Change by KohakuFindChange",
-                kKFCStoryRejectMenuKey,			"Reject Changes by KohakuFindChange in This Story",
-                kKFCChapterRejectMenuKey,		"Reject All Changes by KohakuFindChange in This Document",
-                kKFCRunRejectMenuKey,			"Reject Changes by KohakuFindChange in This Run",
-                kKFCAcceptChangeMenuKey,		"Accept Change by KohakuFindChange",
-                kKFCStoryAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Story",
-                kKFCRunAcceptMenuKey,			"Accept Changes by KohakuFindChange in This Run",
-                kKFCAcceptAllChangesMenuKey,	"Accept All Changes by KohakuFindChange in This Document",
-                kKFCShowChangesMenuKey,			"Show Changes by KohakuFindChange",
-                // The story and document rows' second replace (the code's "Redo"). The name says what it
-                // writes with - Find/Change as it stands now, not the replace it takes back (the plug-in
-                // author's call).
-                kKFCRedoMenuKey,				"Replace Again (Current Find/Change Settings)",
                 kKFCUncheckAllMenuKey,			"Uncheck All",
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",

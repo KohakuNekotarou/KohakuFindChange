@@ -187,29 +187,6 @@ bool KFCTrackChange::IsInHiddenText(const UIDRef& story, TextIndex at)
 	return thread != nil && ::GetClass(thread) == kHiddenTextBoss;
 }
 
-TextIndex KFCTrackChange::HiddenTextAnchor(const UIDRef& story, TextIndex at)
-{
-	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	if (model == nil)
-		return kInvalidTextIndex;
-	TextIndex anchor = kInvalidTextIndex;
-	TextIndex pos = at;
-	// A condition can stand inside text another hidden condition holds: climbed until the place shows. A
-	// thread cannot hold its own anchor, so the bound is only a guard.
-	for (int32 depth = 0; depth < 8; ++depth)
-	{
-		InterfacePtr<ITextStoryThread> thread(model->QueryStoryThread(pos, nil, nil));
-		if (thread == nil || ::GetClass(thread) != kHiddenTextBoss)
-			break;
-		InterfacePtr<IOwnedItem> owned(thread, UseDefaultIID());
-		const TextIndex next = (owned != nil) ? owned->GetTextIndex() : kInvalidTextIndex;
-		if (next == kInvalidTextIndex || next == pos)
-			break;
-		anchor = pos = next;
-	}
-	return anchor;
-}
-
 PMString KFCTrackChange::ReadText(const UIDRef& story, TextIndex at, int32 len)
 {
 	WideString w;
@@ -346,70 +323,6 @@ int32 KFCTrackChange::AcceptPendingAround(const UIDRef& story, TextIndex from, T
 	return done;
 }
 
-int32 KFCTrackChange::AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy,
-	std::set<uint64>* outAcceptedTimes)
-{
-	outLeft = 0;
-	if (outAcceptedTimes != nil)
-		outAcceptedTimes->clear();
-	InterfacePtr<IStoryList> storyList(db, db != nil ? db->GetRootUID() : kInvalidUID, UseDefaultIID());
-	if (storyList == nil)
-	{
-		outWhy = "the document's stories could not be read";
-		return -1;
-	}
-	const PMString author = SignAuthorName();
-	int32 total = 0;
-	const int32 count = storyList->GetAllTextModelCount();
-	for (int32 i = 0; i < count; ++i)
-	{
-		const UIDRef story = storyList->GetNthTextModelUID(i);
-		// The times, not the records, are what is counted (the header): one per replace.
-		std::set<uint64> timesBefore;
-		if (CountSignedRecords(story, false, &timesBefore) == 0)
-			continue;
-		// InDesign's OWN ACCEPT ALL, TOLD WHOSE (the author's call: "only the ones named KohakuFindChange").
-		// kAcceptAllRedlineCmdBoss over the story, as
-		// the product does it (InCopyDocUtils.cpp:2399-2405), with its IStringData set to the author: the
-		// command then accepts that author's changes and leaves everybody else's (measured, KTRedlineProbe
-		// acceptall - SDK use: none. InDesign's own by-author accept is ITrackChangeSuite::AcceptAllByUser,
-		// whose way down to the command the SDK does not show).
-		// Its IID_IACCEPTREDLINEINHIDDENTEXTDATA is left at its default, false: a change in hidden conditional
-		// text is not accepted (measured) - counted in outLeft and said. InDesign's own Accept All seems to
-		// leave them too (kAcceptAllDocSomeHiddenChangesMsgID, InCopySharedID.h:477 - not measured: its menu
-		// action cannot be run from a script). Not a loop of our own over the records, which accepts every
-		// change, whoever made it.
-		InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kAcceptAllRedlineCmdBoss));
-		InterfacePtr<IStringData> whose(cmd, IID_ISTRINGDATA);
-		if (cmd == nil || whose == nil)
-		{
-			outWhy = "InDesign's accept command could not be made";
-			return -1;
-		}
-		whose->Set(author);
-		cmd->SetItemList(UIDList(story));
-		if (CmdUtils::ProcessCommand(cmd) != kSuccess)
-		{
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);		// the caller rolls the step back and says why
-			outWhy = "InDesign would not accept the changes";
-			return -1;
-		}
-		std::set<uint64> timesAfter;
-		(void)CountSignedRecords(story, false, &timesAfter);
-		outLeft += static_cast<int32>(timesAfter.size());
-		// the times this accept took away - a row carrying one was accepted
-		for (std::set<uint64>::const_iterator t = timesBefore.begin(); t != timesBefore.end(); ++t)
-		{
-			if (timesAfter.count(*t) != 0)
-				continue;
-			++total;
-			if (outAcceptedTimes != nil)
-				outAcceptedTimes->insert(*t);
-		}
-	}
-	return total;
-}
-
 // ======================================================================================================
 // THE READ SIDE: a row's records are the ones carrying its time - KFC hands every row a time no other
 // record can carry (StampForRow, the head of KFCTrackChange.h). Not its texts and the nearest place, and
@@ -525,8 +438,15 @@ void KFCTrackChange::CollectSignedRows(const UIDRef& story, std::vector<SignedRo
 	std::stable_sort(out.begin(), out.end(), [](const SignedRow& a, const SignedRow& b) { return a.at < b.at; });
 }
 
+
+// BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS. Not IsDocStillOpen of the docRef the
+// results hold: a chapter closed and opened again sits at a new address (it would read "not open" - its
+// replaced rows could not be taken back until a click on one rebound it), and a closed chapter's address
+// taken by a document opened later would answer for THAT one. One question for every door, rather than
+// each asking it with a test for no database in front (IsDocStillOpen answers false for that itself).
 namespace
 {
+
 // Are `part`'s characters those of `whole` with some left out, in their order? What a GREP $n's
 // kept characters are of the match they came from (FindRowChangeForHit).
 bool IsInOrderPartOf(const PMString& part, const PMString& whole)
@@ -539,55 +459,8 @@ bool IsInOrderPartOf(const PMString& part, const PMString& whole)
 	return pi == p.end();
 }
 
-// Take back (accept = false) or accept the ONE record standing at `at` of that kind and of exactly that
-// time - RejectRecord's walk, which AcceptRecord shares.
-bool ProcessRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete, bool accept)
-{
-	InterfacePtr<IRedlineDataStrand> redline(QueryRedline(story));
-	if (redline == nil)
-		return false;
-	RedlineIterator* it = redline->NewRedlineIterator(at);
-	if (it == nil)
-		return false;
-	bool found = false;
-	for (bool16 more = kTrue; more && it->GetCurrentPosition() <= at; more = it->Increment(kFalse))
-	{
-		if (it->GetCurrentPosition() != at)
-			continue;
-		const VOSRedlineChange* record = it->GetCurrentChangeRecord();
-		if (record == nil)
-			continue;
-		const bool del = (record->GetChangeType() == VOSRedlineChange::kDelete);
-		const uint64 t = record->GetTimeStamp();
-		delete record;		// the caller owns it (redlineiterator.h:137-138)
-		if (del == isDelete && t == time)
-		{
-			found = true;
-			break;
-		}
-	}
-	const bool ok = found && (accept ? it->ProcessAccept(nil, kFalse, kFalse) : it->ProcessReject(nil, kFalse, kFalse));
-	delete it;
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	return ok;
-}
 }	// anonymous namespace
 
-bool KFCTrackChange::RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
-{
-	return ProcessRecord(story, at, time, isDelete, false);
-}
-
-bool KFCTrackChange::AcceptRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete)
-{
-	return ProcessRecord(story, at, time, isDelete, true);
-}
-
-// BY THE CHAPTER'S FILE, AND THE MODEL REBOUND TO WHAT IT FINDS. Not IsDocStillOpen of the docRef the
-// results hold: a chapter closed and opened again sits at a new address (it would read "not open" - its
-// replaced rows could not be taken back until a click on one rebound it), and a closed chapter's address
-// taken by a document opened later would answer for THAT one. One question for every door, rather than
-// each asking it with a test for no database in front (IsDocStillOpen answers false for that itself).
 bool KFCTrackChange::ChapterDocIfOpen(int32 chapterIdx, UIDRef& outDocRef)
 {
 	IDFile file;
@@ -719,35 +592,6 @@ bool KFCTrackChange::FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef&
 	return false;
 }
 
-bool KFCTrackChange::RowChangeIsHidden(int32 chapterIdx, int32 hitIdx)
-{
-	bool checked = false, replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced
-		|| KFCResultModel::GetHitInFootnote(chapterIdx, hitIdx))
-		return false;
-	UIDRef docRef;
-	if (!ChapterDocIfOpen(chapterIdx, docRef))
-		return false;
-	UID story = kInvalidUID;
-	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	uint64 hash = 0;
-	const uint64 rowTime = KFCResultModel::GetHitRecordTime(chapterIdx, hitIdx);
-	if (rowTime == 0 || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
-		return false;
-	// The row's records, by its time (FindRowChangeForHit's walk); its first insertion says where its text is.
-	const UIDRef storyRef(docRef.GetDataBase(), story);
-	std::set<uint64> own;
-	own.insert(rowTime);
-	std::vector<Record> recs;
-	CollectRecordsOfTimes(storyRef, own, recs);
-	for (size_t k = 0; k < recs.size(); ++k)
-	{
-		if (!recs[k].isDelete && recs[k].len > 0)
-			return IsInHiddenText(storyRef, recs[k].at);
-	}
-	return false;
-}
-
 void KFCTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
 {
 	outRows.clear();
@@ -759,77 +603,6 @@ void KFCTrackChange::ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::
 		if (KFCResultModel::GetHitFlags(chapterIdx, group[k], checked, replaced, locked) && replaced
 			&& !KFCResultModel::GetHitInFootnote(chapterIdx, group[k]))
 			outRows.push_back(group[k]);
-	}
-}
-
-void KFCTrackChange::CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows,
-	bool& outRefreshed)
-{
-	outRows.clear();
-	outRefreshed = false;
-	bool checked = false, replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, checked, replaced, locked) || !replaced)
-		return;
-	outRows.push_back(hitIdx);
-
-	// Where a row stands NOW: put where its tracked change is first, when it has one of its own (a footnote's
-	// row and an accepted one have none - they keep the range they were given, as the jump does).
-	auto rangeNow = [&](int32 row, TextIndex& outStart, TextIndex& outEnd) -> bool
-	{
-		if (row != hitIdx && RefreshRowFromRecords(chapterIdx, row))
-			outRefreshed = true;
-		UIDRef docRef;
-		IDFile file;
-		UID story = kInvalidUID;
-		return KFCResultModel::GetHitLocation(chapterIdx, row, docRef, file, story, outStart, outEnd)
-			&& outStart != kInvalidTextIndex && outEnd != kInvalidTextIndex;
-	};
-	auto isReplaced = [&](int32 row) -> bool
-	{
-		bool c = false, r = false, l = false;
-		return KFCResultModel::GetHitFlags(chapterIdx, row, c, r, l) && r;
-	};
-
-	TextIndex groupStart = kInvalidTextIndex, groupEnd = kInvalidTextIndex;
-	if (!rangeNow(hitIdx, groupStart, groupEnd))
-		return;
-
-	// OUTWARD FROM THE ROW, IN THE LIST'S ORDER - NOT BY THE STORED RANGES. A stored range is where the
-	// row stood when it was last read, and an edit moves the text under every row of the story at once while
-	// only the row clicked is read again (the jump). Measured with a grouping by the stored ranges
-	// (KFCResultModel::GetTouchingGroup): "catcat dog" replaced, "ZZ" typed in front, row 2 clicked - row 2
-	// stood at its new place and row 1 at its old one, they no longer met, and the box read
-	// "ZZkitten[catcat] dog" where the text had been "ZZcatcat dog" (case before-group-after-edit-mixed).
-	// The list's ORDER is what no edit changes (KFCResultModel::GetStoryRowsInOrder), so the neighbours are
-	// taken from it, each one read again from its records before it is asked whether it meets the group -
-	// the group and one row either side are read, not the story's every row.
-	std::vector<int32> story;
-	KFCResultModel::GetStoryRowsInOrder(chapterIdx, hitIdx, story);
-	size_t me = 0;
-	while (me < story.size() && story[me] != hitIdx)
-		++me;
-	if (me == story.size())
-		return;
-
-	// Backward: a row whose text ends where the group starts (or past it - the rule GetTouchingGroup keeps).
-	for (size_t k = me; k-- > 0; )
-	{
-		const int32 row = story[k];
-		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
-		if (!isReplaced(row) || !rangeNow(row, s, e) || e < groupStart || s > groupStart)
-			break;		// not written, or not meeting it: nothing before it can meet it either
-		outRows.insert(outRows.begin(), row);
-		groupStart = s;
-	}
-	// Forward, the mirror.
-	for (size_t k = me + 1; k < story.size(); ++k)
-	{
-		const int32 row = story[k];
-		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
-		if (!isReplaced(row) || !rangeNow(row, s, e) || s > groupEnd || e < groupEnd)
-			break;
-		outRows.push_back(row);
-		groupEnd = e;
 	}
 }
 

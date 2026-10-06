@@ -77,13 +77,6 @@ namespace KFCJa
 	// What Edit > Undo calls a Change Checked run (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
 	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
-	// ...and a Reject Change and an Accept All Changes by KohakuFindChange. InDesign's own Track
-	// Changes words, the change's author named as the Track Changes panel shows it (the plug-in
-	// author's call: the name says only KohakuFindChange's changes are accepted).
-	const wchar_t kRejectStep[]             = L"変更を却下";
-	const wchar_t kAcceptAllStep[]          = L"KohakuFindChange によるすべての変更を承認";
-	// ...and an Accept Change by KohakuFindChange on a row, a story or a run (Show Changes).
-	const wchar_t kAcceptStep[]             = L"変更を承認";
 	// (No closing "please search again" line, on purpose: the alert states the outcome and the status
 	//  line carries what to do next - the plug-in author's call.)
 }

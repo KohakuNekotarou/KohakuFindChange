@@ -4,19 +4,16 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  NodeID class for the result tree. A node is (chapter index, run, font group, hit index):
+//  NodeID class for the result tree. A node is (chapter index, font group, hit index):
 //
-//    (-2, -1, -1, -1)        the hidden root
-//    (-1, -1, -1, -1)        the BOOK row       -> present only while the results came from a book search
-//    (chap, -1, -1, -1)      a document row     -> index into KFCResultModel's chapters
-//    (chap, run, -1, -1)     a RUN row          -> 'run' indexes the chapter's runs (only a list rebuilt
-//                                                  from the records has them - Show Changes)
-//    (chap, run, font, -1)   a STORY row        -> 'font' indexes the chapter's fontGroups (one per story;
-//                                                  per run and story under a run)
-//    (chap, run, font, hit)  a hit row          -> hit indexes that CHAPTER's hits
+//    (-2, -1, -1)        the hidden root
+//    (-1, -1, -1)        the BOOK row       -> present only while the results came from a book search
+//    (chap, -1, -1)      a document row     -> index into KFCResultModel's chapters
+//    (chap, font, -1)    a STORY row        -> 'font' indexes the chapter's fontGroups (one per story)
+//    (chap, font, hit)   a hit row          -> hit indexes that CHAPTER's hits
 //
-//  run is -1 on every other list. Like the font group, the run of a story or hit row is DERIVED from
-//  the model, never passed in (see Create(chapter, hit)).
+//  (Until 2026-10-06 a list rebuilt from the Track Changes records - Show Changes - had a RUN level between the
+//  document and the story; it went with Track Changes, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F2.)
 //
 //  The book row is what tells the user WHICH book was searched, permanently and in the panel
 //  itself rather than in a status line that the next message overwrites. A document-scope search
@@ -25,7 +22,7 @@
 //  The level under a document holds STORIES - a Find/Change result is grouped by story, the way KCM's
 //  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find
 //  Missing Glyphs scan, since removed); the names were kept. A story row has its own menu (Replace /
-//  Reject Change / Accept Change / Replace Again / Check All / Uncheck All - KFCResultNodeEH::RButtonDn).
+//  Check All / Uncheck All - KFCResultNodeEH::RButtonDn).
 //
 //  hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
@@ -51,8 +48,8 @@
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 
-/** One node of the result tree: (chapter index, run, font group, hit index). See the file comment for
-    the six shapes a node can take. */
+/** One node of the result tree: (chapter index, font group, hit index). See the file comment for
+    the five shapes a node can take. */
 class KFCResultNodeID : public NodeIDClass
 {
 public:
@@ -62,23 +59,16 @@ public:
 	static NodeID_rv Create() { return new KFCResultNodeID(); }
 
 	/** The hidden root. Use this rather than Create(-1), which now names the book row. */
-	static NodeID_rv CreateRoot() { return new KFCResultNodeID(-2, -1, -1, -1); }
+	static NodeID_rv CreateRoot() { return new KFCResultNodeID(-2, -1, -1); }
 
 	/** The book row. Only ever asked for while KFCResultModel::IsFromBook() is true. */
-	static NodeID_rv CreateBook() { return new KFCResultNodeID(-1, -1, -1, -1); }
+	static NodeID_rv CreateBook() { return new KFCResultNodeID(-1, -1, -1); }
 
 	/** A document row ('chapter' = 0-based chapter index). */
-	static NodeID_rv Create(int32 chapter) { return new KFCResultNodeID(chapter, -1, -1, -1); }
+	static NodeID_rv Create(int32 chapter) { return new KFCResultNodeID(chapter, -1, -1); }
 
-	/** A RUN row under chapter 'chapter' ('run' indexes that chapter's runs - Show Changes). */
-	static NodeID_rv CreateRun(int32 chapter, int32 run) { return new KFCResultNodeID(chapter, run, -1, -1); }
-
-	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). Its run is the
-	    group's own (-1 on a list with no runs) - derived here for the reason Create(chapter, hit) gives. */
-	static NodeID_rv CreateFont(int32 chapter, int32 font)
-	{
-		return new KFCResultNodeID(chapter, KFCResults()->GetGroupRun(chapter, font), font, -1);
-	}
+	/** A FONT row under chapter 'chapter' ('font' indexes that chapter's fontGroups). */
+	static NodeID_rv CreateFont(int32 chapter, int32 font) { return new KFCResultNodeID(chapter, font, -1); }
 
 	/** A hit row under chapter 'chapter' ('hit' is the index into that CHAPTER's hits).
 
@@ -95,7 +85,7 @@ public:
 	static NodeID_rv Create(int32 chapter, int32 hit)
 	{
 		const int32 font = KFCResults()->GetHitFontGroup(chapter, hit);
-		return new KFCResultNodeID(chapter, KFCResults()->GetGroupRun(chapter, font), font, hit);
+		return new KFCResultNodeID(chapter, font, hit);
 	}
 
 	virtual ~KFCResultNodeID() {}
@@ -117,8 +107,6 @@ public:
 			return 1;
 		if (fChapter < other->fChapter)	return -1;
 		if (fChapter > other->fChapter)	return 1;
-		if (fRun < other->fRun)	return -1;
-		if (fRun > other->fRun)	return 1;
 		if (fFont < other->fFont)	return -1;
 		if (fFont > other->fFont)	return 1;
 		if (fHit < other->fHit)	return -1;
@@ -126,12 +114,11 @@ public:
 		return 0;
 	}
 
-	virtual NodeIDClass* Clone() const { return new KFCResultNodeID(fChapter, fRun, fFont, fHit); }
+	virtual NodeIDClass* Clone() const { return new KFCResultNodeID(fChapter, fFont, fHit); }
 
 	virtual void Read(IPMStream* stream)
 	{
 		stream->XferInt32(fChapter);
-		stream->XferInt32(fRun);
 		stream->XferInt32(fFont);
 		stream->XferInt32(fHit);
 	}
@@ -139,16 +126,12 @@ public:
 	virtual void Write(IPMStream* stream) const
 	{
 		stream->XferInt32(const_cast<KFCResultNodeID*>(this)->fChapter);
-		stream->XferInt32(const_cast<KFCResultNodeID*>(this)->fRun);
 		stream->XferInt32(const_cast<KFCResultNodeID*>(this)->fFont);
 		stream->XferInt32(const_cast<KFCResultNodeID*>(this)->fHit);
 	}
 
 	/** The chapter's 0-based index into KFCResultModel (negative = root or book row). */
 	int32 GetChapter() const { return fChapter; }
-
-	/** The run this row belongs to, or -1 on a list with no run level. */
-	int32 GetRun() const { return fRun; }
 
 	/** The font (story) group this row belongs to, or -1 on a row above the story level (and on a hit
 	    the model could not resolve). */
@@ -163,9 +146,6 @@ public:
 	/** Is this a FONT row - the STORY row (the level's old name - see the file comment)? */
 	bool16 IsFontRow() const { return fChapter >= 0 && fFont >= 0 && fHit < 0; }
 
-	/** Is this a RUN row - one replace's rows on a list rebuilt from the records? */
-	bool16 IsRunRow() const { return fChapter >= 0 && fRun >= 0 && fFont < 0 && fHit < 0; }
-
 	/** Is this the book row - the one that names the book the results came from? */
 	bool16 IsBookRow() const { return fChapter == -1 && fHit < 0; }
 
@@ -177,11 +157,6 @@ public:
 	{
 		PMString s("KFCResultRow ");
 		s.AppendNumber(fChapter);
-		if (fRun >= 0)
-		{
-			s.Append("/r");
-			s.AppendNumber(fRun);
-		}
 		if (fFont >= 0)
 		{
 			s.Append("/f");
@@ -198,12 +173,11 @@ public:
 
 private:
 	// Private constructors force the factory methods, PnlTrvFileNodeID-style.
-	KFCResultNodeID() : fChapter(-2), fRun(-1), fFont(-1), fHit(-1) {}
-	KFCResultNodeID(int32 chapter, int32 run, int32 font, int32 hit)
-		: fChapter(chapter), fRun(run), fFont(font), fHit(hit) {}
+	KFCResultNodeID() : fChapter(-2), fFont(-1), fHit(-1) {}
+	KFCResultNodeID(int32 chapter, int32 font, int32 hit)
+		: fChapter(chapter), fFont(font), fHit(hit) {}
 
 	int32 fChapter;
-	int32 fRun;
 	int32 fFont;
 	int32 fHit;
 };

@@ -177,11 +177,6 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 // KFCJa::kReplaceStep). See the sequence in KFCReplaceEngine::ReplaceChecked for why it is named.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
-// ...and what it calls a Reject Change and an Accept All Changes by KohakuFindChange.
-#define kKFCRejectStepKey			kKFCStringPrefix "kKFCRejectStepKey"
-#define kKFCAcceptAllStepKey		kKFCStringPrefix "kKFCAcceptAllStepKey"
-// ...and an Accept Change by KohakuFindChange on a row, a story or a run (Show Changes).
-#define kKFCAcceptStepKey			kKFCStringPrefix "kKFCAcceptStepKey"
 // (No "Please search again." tail, on purpose: the alert states the outcome in one sentence and the
 //  status line carries what to do next - the author's call.)
 

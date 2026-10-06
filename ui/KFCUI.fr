@@ -465,21 +465,9 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Show Changes by KohakuFindChange (the author's place): the list rebuilt from the Track
-		// Changes records KFC signed - under Change Checked, a rule between them.
-		kKFCSeparator6ActionID,
-		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
-		kKFCSeparator6MenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCShowChangesActionID,
-		kKFCTargetMenuPath
-		kKFCShowChangesMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// (Block 2 - Find Missing Glyphs and Find Overset - is gone: the Book panel's preflight reports both.)
 
-		// Separator between Show Changes and the toggles.
+		// Separator between Change Checked and the toggles.
 		kKFCSeparator3ActionID,
 		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKFCSeparator3MenuItemPosition,
@@ -587,19 +575,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCChapterReplaceMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Reject Change: every replaced row of that document with a tracked change left.
-		kKFCChapterRejectActionID,
-		kKFCResultRowMenuName
-		kKFCChapterRejectMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Replace Again (Current Find/Change Settings) - the code's "Redo": that document's rows taken
-		// back, replaced again with what Find/Change holds now.
-		kKFCChapterRedoActionID,
-		kKFCResultRowMenuName
-		kKFCChapterRedoMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		kKFCCheckAllActionID,
 		kKFCResultRowMenuName
 		kKFCCheckAllMenuItemPosition,
@@ -610,33 +585,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCUncheckAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Accept All Changes by KohakuFindChange in This Document: the changes signed "KohakuFindChange"
-		// in the document of the row the menu was popped over, and no one else's.
-		kKFCAcceptAllChangesActionID,
-		kKFCResultRowMenuName
-		kKFCAcceptAllChangesMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// ----- A hit row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row alone with no
-		// prompt, Reject Change takes that row's replace back through its tracked change. (No Redo here:
-		// a row taken back is replaced again with Replace.)
+		// prompt.
 		kKFCReplaceHitActionID,
 		kKFCResultHitMenuName
 		kKFCReplaceHitMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCRejectChangeActionID,
-		kKFCResultHitMenuName
-		kKFCRejectChangeMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// Accept Change by KohakuFindChange: the row's tracked change accepted.
-		kKFCAcceptChangeActionID,
-		kKFCResultHitMenuName
-		kKFCAcceptChangeMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 
 		// ----- A STORY row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a story row: each command over that story's rows.
@@ -644,22 +599,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCResultStoryMenuName
 		kKFCStoryReplaceMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCStoryRejectActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryRejectMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCStoryAcceptActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryAcceptMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCStoryRedoActionID,
-		kKFCResultStoryMenuName
-		kKFCStoryRedoMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 
 		kKFCStoryCheckAllActionID,
 		kKFCResultStoryMenuName
@@ -669,19 +608,6 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCStoryUncheckAllActionID,
 		kKFCResultStoryMenuName
 		kKFCStoryUncheckAllMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		// ----- A RUN row's right-click menu (Show Changes by KohakuFindChange) -----
-		// Popped by KFCResultNodeEH::RButtonDn over a run row: the run's rows in that document, taken back
-		// or accepted.
-		kKFCRunRejectActionID,
-		kKFCResultRunMenuName
-		kKFCRunRejectMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
-		kKFCRunAcceptActionID,
-		kKFCResultRunMenuName
-		kKFCRunAcceptMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 	}
@@ -890,8 +816,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Replace / Reject Change - a hit row's right-click menu.
-		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys them by the row the
+		// Replace - a hit row's right-click menu.
+		// kCustomEnabling for the same reason as Check All: UpdateActionStates greys it by the row the
 		// menu is over.
 		kKFCActionComponentBoss,
 		kKFCReplaceHitActionID,
@@ -902,58 +828,10 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		kKFCActionComponentBoss,
-		kKFCRejectChangeActionID,
-		kKFCRejectChangeMenuKey,		// "Reject Change by KohakuFindChange"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Accept Change by KohakuFindChange - a hit row's, greyed like Reject Change by the row.
-		kKFCActionComponentBoss,
-		kKFCAcceptChangeActionID,
-		kKFCAcceptChangeMenuKey,		// "Accept Change by KohakuFindChange"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-
 		// A story row's right-click menu - the same names as the rows' own commands.
 		kKFCActionComponentBoss,
 		kKFCStoryReplaceActionID,
 		kKFCReplaceHitMenuKey,			// "Replace"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCStoryRejectActionID,
-		kKFCStoryRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Story"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCStoryAcceptActionID,
-		kKFCStoryAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Story"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-
-		kKFCActionComponentBoss,
-		kKFCStoryRedoActionID,
-		kKFCRedoMenuKey,				// "Replace Again (Current Find/Change Settings)" - the story row's
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -987,67 +865,6 @@ resource ActionDef (kSDKDefActionResourceID)
 		kCustomEnabling|kDisableIfLowMem,
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Reject Change - a document row's right-click menu.
-		kKFCActionComponentBoss,
-		kKFCChapterRejectActionID,
-		kKFCChapterRejectMenuKey,		// "Reject All Changes by KohakuFindChange in This Document"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Replace Again (Current Find/Change Settings) - a document row's right-click menu.
-		kKFCActionComponentBoss,
-		kKFCChapterRedoActionID,
-		kKFCRedoMenuKey,				// "Replace Again (Current Find/Change Settings)"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Accept All Changes by KohakuFindChange in This Document - a document row's right-click menu.
-		kKFCActionComponentBoss,
-		kKFCAcceptAllChangesActionID,
-		kKFCAcceptAllChangesMenuKey,	// "Accept All Changes by KohakuFindChange in This Document"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// A run row's right-click menu (Show Changes by KohakuFindChange).
-		kKFCActionComponentBoss,
-		kKFCRunRejectActionID,
-		kKFCRunRejectMenuKey,			// "Reject Changes by KohakuFindChange in This Run"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		kKFCActionComponentBoss,
-		kKFCRunAcceptActionID,
-		kKFCRunAcceptMenuKey,			// "Accept Changes by KohakuFindChange in This Run"
-		kOtherActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefInvisibleInKBSCEditorFlag,
-
-		// Show Changes by KohakuFindChange: the flyout's, in the Keyboard Shortcuts editor like
-		// the search and Change Checked (kKFCPanelMenuActionArea). kCustomEnabling so UpdateActionStates greys
-		// it with nothing to read (KFCBookScope::HasScopeTarget) or while a run is up.
-		kKFCActionComponentBoss,
-		kKFCShowChangesActionID,
-		kKFCShowChangesMenuKey,			// "Show Changes by KohakuFindChange"
-		kKFCPanelMenuActionArea,
-		kNormalAction,
-		kCustomEnabling|kDisableIfLowMem,
-		kInvalidInterfaceID,
-		kSDKDefVisibleInKBSCEditorFlag,
 
 		// "How to Use...". NO kCustomEnabling: this one has nothing to be enabled against. It reads a
 		// text - no document, no result set, no selection - so it stays live with nothing loaded, which

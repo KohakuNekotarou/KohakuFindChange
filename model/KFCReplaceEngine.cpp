@@ -68,22 +68,6 @@
 namespace
 {
 
-// A QUERY RUN'S LIST IS TAKEN BACK WHOLE (2026-10-05 - docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md,
-// D5): the whole run is one undo step, not a row at a time, so every Reject and Accept below refuses on that list
-// (KFCResultModel::IsFromQueryRun) - the Can... ones answer false, the rest say why.
-const char* const kQueryRunRefusal = "This list is a query run's - undo the whole run with Ctrl+Z (Edit > Undo Run Queries).";
-
-// True = refused, outStatus says why.
-bool RefusedOnQueryRun(PMString& outStatus)
-{
-	if (!KFCResultModel::IsFromQueryRun())
-		return false;
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	outStatus.Append(kQueryRunRefusal);
-	return true;
-}
-
 // Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
 // on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
 // which is the header's own contract (IFindChangeService.h:46-49) rather than a convention here:
@@ -2959,9 +2943,9 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 // A status line of ReplaceRowsNow begun with the name of the menu item that asked (the author's call):
 // Replace Again (Current Find/Change Settings) writes through ReplaceRowsNow too, and its refusals must
 // not read "Replace:".
-static void StartStatus(PMString& out, bool again)
+static void StartStatus(PMString& out)
 {
-	out = again ? "Replace Again: " : "Replace: ";
+	out = "Replace: ";
 }
 
 // THE ROW MENUS' SEQUENCE - ONE UNDO STEP, ROLLED BACK WHOLE ON A FAILURE. A PLAIN
@@ -3005,10 +2989,9 @@ static bool DocIsModified(IDataBase* db)
 }
 
 // The rows of one chapter replaced now, in ONE undo step - the right-click Replace of a row (one row) or
-// of a story (its ticked rows), and Replace Again (`again`, RedoRowsNowIn - the rows taken back). The
-// callers have asked CanReplaceHit of every row.
+// of a story or a document (its ticked rows). The callers have asked CanReplaceHit of every row.
 static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplace, PMString& outStatus,
-	const char* unit = "story", bool again = false)
+	const char* unit = "story")
 {
 	const int32 hitIdx = rowsToReplace.empty() ? -1 : *rowsToReplace.begin();	// the one row, for a row's Replace
 	// (A list rebuilt from the records - Show Changes - never reaches here: all three callers take their rows
@@ -3022,13 +3005,13 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	PMString refusal;
 	if (KFCReplaceEngine::RefuseChangedQuery(refusal))
 	{
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		outStatus.Append(refusal);
 		return false;
 	}
 	if (!KFCSearchEngine::CommitReplaceSide())
 	{
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		outStatus.Append("the Change To in Find/Change could not be stated - nothing was changed.");
 		return false;
 	}
@@ -3038,13 +3021,13 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	IDFile file;
 	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file))
 	{
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		outStatus.Append("the document of this row could not be found.");
 		return false;
 	}
 	if (!KFCBookScope::ReachChapterDoc(file, docRef))
 	{
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		outStatus.Append("the document of this row could not be opened.");
 		return false;
 	}
@@ -3097,7 +3080,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	MovedWhy movedWhy = kMovedRow;
 	if (ChapterMovedUnderRows(chapterIdx, docRef, scopeOptions, &rowsToReplace, &movedWhy))
 	{
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		const bool oneRow = (rowsToReplace.size() == 1);
 		if (movedWhy == kMovedStory)
 		{
@@ -3147,7 +3130,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		const KFCBackwardSearchScope writeDirection(WriteBackward());
 
 		ICommandSequence* sequence = BeginPlainSequence(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep),
-			again ? "Replace Again: " : "Replace: ", outStatus);
+			"Replace: ", outStatus);
 		if (sequence == nil)
 			return false;
 		// (the row backup was started by the recorder, above)
@@ -3164,7 +3147,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
-		StartStatus(outStatus, again);
+		StartStatus(outStatus);
 		// The reason a row was not written, in that row's words, and how many rows it stopped.
 		const char* why = nil;
 		int32 stopping = 0;
@@ -3210,12 +3193,10 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			outStatus.AppendNumber(stopping);
 			outStatus.Append(" of these ");
 			outStatus.AppendNumber(static_cast<int32>(rowsToReplace.size()));
-			outStatus.Append(again ? " row(s) " : " checked row(s) ");
+			outStatus.Append(" checked row(s) ");
 			outStatus.Append(why);
 			if (searchAgain)
 				outStatus.Append(" - search again.");
-			else if (again)
-				outStatus.Append(".");
 			else
 				outStatus.Append(stopping == 1 ? ". Untick it and Replace again." : ". Untick them and Replace again.");
 		}
@@ -3223,7 +3204,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	}
 	NoteStoryVersions(chapterIdx, db, writtenStories);	// the next Replace / Reject finds them as KFC left them
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
-	recorder.Keep(again ? KFCUndoFollow::kStepReplaceAgain : KFCUndoFollow::kStepReplace);
+	recorder.Keep(KFCUndoFollow::kStepReplace);
 	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
 	// (Each row's two texts - Hit::originalText / replacedText - are taken by the walk that writes it,
 	//  WalkStoryReplacing.)
@@ -3232,33 +3213,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// Change To) are said, not promised to Reject Change - no "with Track Changes on - Reject Change ...
 	// takes it back" of them (measured, case xs5-b-format-only).
 	const char* const untracked = "inside a footnote, or no character changed - formatting only";
-	if (again)
-	{
-		// Replace Again's own wording - not "Redone N row(s)" written over this line by RedoRowsNowIn, which
-		// would also drop the "accepted first" note below.
-		outStatus = "Replaced ";
-		outStatus.AppendNumber(replaced);
-		outStatus.Append(" row(s) of this ");
-		outStatus.Append(unit);
-		outStatus.Append(" again with the current Find/Change settings");
-		if (unrecorded == 0)
-			outStatus.Append(" (Track Changes on).");
-		else if (unrecorded < replaced)
-		{
-			outStatus.Append(" (Track Changes on - not for the ");
-			outStatus.AppendNumber(unrecorded);
-			outStatus.Append(" marked \"no track\": ");
-			outStatus.Append(untracked);
-			outStatus.Append(").");
-		}
-		else
-		{
-			outStatus.Append(" - Track Changes recorded nothing for them (");
-			outStatus.Append(untracked);
-			outStatus.Append("), so Reject Change cannot take them back.");
-		}
-	}
-	else if (rowsToReplace.size() == 1)
+	if (rowsToReplace.size() == 1)
 		outStatus = KFCResultModel::GetHitInFootnote(chapterIdx, hitIdx)
 			? "Replaced (inside a footnote - Track Changes records nothing there, so it cannot be taken back with Reject Change)."
 			: KFCResultModel::GetHitTextUnchanged(chapterIdx, hitIdx)
@@ -3356,77 +3311,10 @@ static bool RowsToReplace(int32 chapterIdx, int32 groupIdx, std::set<int32>& out
 	return !out.empty();
 }
 
-// Of these rows, the ones Reject Change - and Accept Change - act on: replaced, with their
-// tracked change still there. Over a story, a document (RowsToReject) or a run (its rows, KFCResultModel::
-// GetRunHits).
-static bool RowsWithChangeOf(int32 chapterIdx, const std::vector<int32>& rows, std::vector<int32>& out,
-	bool firstOnly)
-{
-	out.clear();
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		bool checked = false, replaced = false, locked = false;
-		UIDRef storyRef;
-		KFCTrackChange::Change change;
-		if (KFCResultModel::GetHitFlags(chapterIdx, rows[k], checked, replaced, locked) && replaced
-			&& KFCTrackChange::FindRowChangeForHit(chapterIdx, rows[k], storyRef, change))
-		{
-			out.push_back(rows[k]);
-			if (firstOnly)
-				break;
-		}
-	}
-	return !out.empty();
-}
-
-// WHY A ROW'S CHANGE CANNOT BE FOUND, WHEN THE REASON IS A HIDDEN CONDITION (the author's call). Text put under a
-// condition that is then hidden moves - with its tracked insertion - out of the main text
-// (KFCTrackChange::RowChangeIsHidden), so Reject Change and Accept Change refuse it until the condition is shown -
-// and say so, not "no tracked change is left" (case reject-hidden-condition): the records are there all along.
-// These rows' count under a hidden condition - and the sentence every such refusal ends on, `verb` = "reject" /
-// "accept".
-static int32 RowsUnderHiddenCondition(int32 chapterIdx, const std::vector<int32>& rows)
-{
-	int32 n = 0;
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (KFCTrackChange::RowChangeIsHidden(chapterIdx, rows[k]))
-			++n;
-	return n;
-}
-
-static void AppendShowConditionToRetry(PMString& outStatus, const char* verb)
-{
-	outStatus.Append(" - show the condition and ");
-	outStatus.Append(verb);
-	outStatus.Append(" again.");
-}
-
-bool KFCReplaceEngine::StoryChangesHidden(int32 chapterIdx, int32 groupIdx)
-{
-	std::vector<int32> scope;
-	ScopeRows(chapterIdx, groupIdx, scope);
-	return RowsUnderHiddenCondition(chapterIdx, scope) > 0;
-}
-
-static bool RowsToReject(int32 chapterIdx, int32 groupIdx, std::vector<int32>& out, bool firstOnly = false)
-{
-	std::vector<int32> rows;
-	ScopeRows(chapterIdx, groupIdx, rows);
-	return RowsWithChangeOf(chapterIdx, rows, out, firstOnly);
-}
-
 bool KFCReplaceEngine::CanReplaceStory(int32 chapterIdx, int32 groupIdx)
 {
 	std::set<int32> rows;
 	return RowsToReplace(chapterIdx, groupIdx, rows, true);
-}
-
-bool KFCReplaceEngine::CanRejectStory(int32 chapterIdx, int32 groupIdx)
-{
-	if (KFCResultModel::IsFromQueryRun())
-		return false;
-	std::vector<int32> rows;
-	return RowsToReject(chapterIdx, groupIdx, rows, true);
 }
 
 // THE DOOR ACCEPT CHANGE ASKS OF ONE STORY'S ROWS - RejectRowsNow's, run by run. `rows` = where each row's
@@ -3442,793 +3330,6 @@ struct RowSpan
 	int32		len;
 	PMString	original;
 };
-static bool RecordsGiveBackOriginals(const UIDRef& story, std::vector<RowSpan> rows,
-	const std::vector<KFCTrackChange::Record>& recs)
-{
-	std::stable_sort(rows.begin(), rows.end(), [](const RowSpan& a, const RowSpan& b) { return a.at < b.at; });
-	struct Run
-	{
-		TextIndex	at;
-		TextIndex	end;
-		PMString	original;
-		std::vector<KFCTrackChange::Record>	recs;
-	};
-	std::vector<Run> runs;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		if (runs.empty() || rows[k].at > runs.back().end)
-		{
-			Run fresh;
-			fresh.at = rows[k].at;
-			fresh.end = rows[k].at;
-			fresh.original.SetTranslatable(kFalse);
-			runs.push_back(fresh);
-		}
-		Run& run = runs.back();
-		if (rows[k].at + rows[k].len > run.end)
-			run.end = rows[k].at + rows[k].len;
-		run.original.Append(rows[k].original);
-	}
-	for (size_t r = 0; r < recs.size(); ++r)
-	{
-		const KFCTrackChange::Record& rec = recs[r];
-		size_t home = runs.size();
-		for (size_t k = 0; k < runs.size() && home == runs.size(); ++k)
-		{
-			const bool in = rec.isDelete ? (rec.at >= runs[k].at && rec.at <= runs[k].end)
-				: (rec.at >= runs[k].at && rec.at + rec.len <= runs[k].end);
-			if (in)
-				home = k;
-		}
-		if (home == runs.size())
-			return false;
-		runs[home].recs.push_back(rec);
-	}
-	for (size_t k = 0; k < runs.size(); ++k)
-	{
-		bool inside = false;
-		if (KFCTrackChange::OriginalFromRecords(story, runs[k].at, runs[k].end - runs[k].at, runs[k].recs, inside)
-				!= runs[k].original || !inside)
-			return false;
-	}
-	return true;
-}
-
-// TAKE A SET OF REPLACED ROWS BACK, IN ONE UNDO STEP (the row's touching group, or a story's replaced rows).
-// The rows are split into runs of touching rows. `rows` = replaced rows
-// outside a footnote (a footnote's row has nothing recorded), in any order. Any failure rolls all of it back.
-// EACH RUN BY ITS ROWS' TIMES. Every record KFC writes carries the time of the row
-// that wrote it (KFCTrackChange.h), so a run's records are exactly the ones carrying one of its rows' times -
-// whatever InDesign did to them: touching replaces written front to back leave one insertion per row but ONE
-// deletion, carrying the LAST row's time; written back to front (a GREP query holding ^) they leave one
-// deletion per row and the later row's insertion split around the earlier row's deletion (both measured,
-// cases touching-reject-first and touching-caret-back). Every row must still have its change
-// (FindRowChangeForHit - its insertion must read as what it wrote); a row without one refuses the whole
-// reject before a thing is written, so a group is never half taken back (case
-// touching-accept-one-then-reject). Inside a run the DELETIONS go first, then the insertions, each time the
-// one furthest on (measured: taking back a later replace's insertion drops an earlier one's deletion anchored
-// on its first character), and the run's original text must then read back where the run starts. (Not by
-// texts and the nearest place, nor each row alone.)
-// EVERY CHANGE FOUND FIRST, THEN THE RUNS TAKEN BACK FROM THE LAST. Every change is
-// looked up while nothing has moved. The RUNS are taken back from the last in text order: a run is
-// separated from the next by text, and taking one back moves only what lies after it - all done by then -
-// so each change found is still where it was found when its turn comes. (Front to back, looking each one up
-// just before its turn, cancels a reject of 1200 alike rows every time: case reject-many-alike.) The rows
-// follow the text as "this far into this thread" (RowNow, carried past each change as it is made -
-// CarryPastChange), which also carries the rows in cells and footnotes behind a body change and past the
-// threads a taken-back deletion takes with it; their stored places are written once, at the end.
-static bool RejectRowsNow(int32 chapterIdx, std::vector<int32> rows, const UIDRef& docRef, PMString& outStatus)
-{
-	IDataBase* const db = docRef.GetDataBase();
-	// each row where its change stands now, then text order - (story, start, row), each carrying its end
-	// (read once, for the sort and the split alike)
-	for (size_t k = 0; k < rows.size(); ++k)
-		KFCTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);
-	std::vector<std::pair<std::pair<std::pair<UID, TextIndex>, int32>, TextIndex> > order;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		UID story = kInvalidUID;
-		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
-		uint64 h = 0;
-		KFCResultModel::GetHitMatchIdentity(chapterIdx, rows[k], story, a, b, h);
-		order.push_back(std::make_pair(std::make_pair(std::make_pair(story, a), rows[k]), b));
-	}
-	std::sort(order.begin(), order.end());
-	std::vector<std::vector<int32> > runs;	// touching rows together
-	UID lastStory = kInvalidUID;
-	TextIndex lastEnd = kInvalidTextIndex;
-	for (size_t k = 0; k < order.size(); ++k)
-	{
-		const UID story = order[k].first.first.first;
-		const TextIndex a = order[k].first.first.second;
-		if (runs.empty() || story != lastStory || a > lastEnd)
-			runs.push_back(std::vector<int32>());
-		runs.back().push_back(order[k].first.second);
-		lastStory = story;
-		lastEnd = order[k].second;
-	}
-
-	// What each run takes back: the records carrying its rows' times. Found now, before anything moves; a
-	// row with no change of its own refuses the whole reject before a thing is written.
-	struct Plan
-	{
-		std::vector<int32>	rows;		// text order
-		UIDRef				story;
-		std::set<uint64>	times;		// the run's rows' times - every record of the run carries one
-		TextIndex			at;			// where the run's new text starts now
-		int32				insLen;		// how long the run's new text is now
-		PMString			allOriginal;
-		std::vector<int32>	lengths;	// each row's original length, in text order
-		std::vector<KFCTrackChange::Record>	recs;	// the records as the door read them - the reject starts from these
-		Plan() : at(kInvalidTextIndex), insLen(0) {}
-	};
-	std::vector<Plan> plans(runs.size());
-	std::set<std::pair<UID, TextIndex> > claimed;			// no change taken back twice
-	for (size_t r = 0; r < runs.size(); ++r)
-	{
-		Plan& p = plans[r];
-		p.rows = runs[r];
-		p.allOriginal.SetTranslatable(kFalse);
-		for (size_t k = 0; k < p.rows.size(); ++k)
-		{
-			KFCTrackChange::Change change;
-			PMString originalText, replacedText;
-			if (!KFCTrackChange::FindRowChangeForHit(chapterIdx, p.rows[k], p.story, change)
-				|| !KFCResultModel::GetHitChangeTexts(chapterIdx, p.rows[k], originalText, replacedText))
-			{
-				if (KFCTrackChange::RowChangeIsHidden(chapterIdx, p.rows[k]))
-				{
-					outStatus = "Reject Change: nothing was changed - a row's replaced text is under a hidden condition";
-					AppendShowConditionToRetry(outStatus, "reject");
-				}
-				else
-					outStatus = "Reject Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote or a replace that changed no character, where nothing is recorded) - nothing was changed.";
-				return false;
-			}
-			const uint64 t = KFCResultModel::GetHitRecordTime(chapterIdx, p.rows[k]);
-			if (t != 0)
-				p.times.insert(t);
-			if (p.at == kInvalidTextIndex || change.at < p.at)
-				p.at = change.at;
-			p.insLen += change.insLen;
-			p.allOriginal.Append(originalText);
-			p.lengths.push_back(WideString(originalText).CharCount());
-		}
-		// THE RUN'S DELETIONS MUST HOLD EXACTLY ITS ROWS' ORIGINAL TEXT (case touching-accept-one-then-reject).
-		// InDesign joins a deletion to the one it touches, whoever made
-		// either, so a deletion of this run can also hold a neighbour's original text - a neighbour whose own
-		// change is gone (accepted in the Track Changes panel) and so is not in the run. Taking it back would
-		// put that neighbour's text back beside the words it was accepted as, and the read-back below would not
-		// see it (it reads the run's own length only): refused before a thing is written.
-		// ASKED OF THE RUN'S TEXT WITH ITS RECORDS TAKEN BACK - not of the deletions alone, which a GREP Change To
-		// holding $n never passes: it keeps the matched characters $n names, and no deletion holds them
-		// (c(at) -> k$1 deletes "c" only). Taking every
-		// record of the run back in its text (KFCTrackChange::OriginalFromRecords) is the same question for a
-		// whole-match replace - nothing of its text is kept - and the right one for a $n.
-		{
-			KFCTrackChange::CollectRecordsOfTimes(p.story, p.times, p.recs);
-			bool inside = false;
-			if (KFCTrackChange::OriginalFromRecords(p.story, p.at, p.insLen, p.recs, inside) != p.allOriginal || !inside)
-			{
-				outStatus = "Reject Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
-				return false;
-			}
-		}
-		if (!claimed.insert(std::make_pair(p.story.GetUID(), p.at)).second)
-		{
-			outStatus = "Reject Change: two rows came to the same tracked change - nothing was changed. Search again.";
-			return false;
-		}
-	}
-
-	std::vector<RowNow> others;		// every row as "this far into its thread", carried past each change
-	SnapshotRows(chapterIdx, db, others);
-	// The stories taken back in that were as KFC left them take their new version afterwards. A reject finds
-	// its records by their time, whatever moved the text - but one that had moved without KFC keeps its old
-	// version, so the rows nobody has looked at since are not vouched for by this.
-	std::set<UID> asLeft;
-	{
-		std::set<UID> rejectedIn;
-		for (size_t r = 0; r < plans.size(); ++r)
-			rejectedIn.insert(plans[r].story.GetUID());
-		StoriesAsKFCLeftThem(chapterIdx, db, rejectedIn, asLeft);
-	}
-	// Recorded for the panel's following of Undo: the row a reject takes back is a replaced row
-	// again when the reject is undone, and offers Reject Change again. Kept below, once the rows show it.
-	KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (EndPlainSequence)
-	// (the step's name in the UI's language - KFCLoc)
-	ICommandSequence* sequence = BeginPlainSequence(KFCLoc::Text(kKFCRejectStepKey, KFCJa::kRejectStep),
-		"Reject Change: ", outStatus);
-	if (sequence == nil)
-		return false;
-	std::vector<int32> taken;		// every row taken back; others[row] follows where its original text stands
-	PMString why;
-	bool ok = true;
-	// the runs from the last: taking one back moves only what lies after it - all done by then
-	for (size_t r = plans.size(); r-- > 0 && ok; )
-	{
-		const Plan& p = plans[r];
-		// THE DELETIONS FIRST, THEN THE INSERTIONS - EACH TIME THE ONE FURTHEST ON (measured). Taking back a
-		// later replace's insertion drops an earlier one's deletion anchored on its first character - the
-		// header's own rule, found by measuring before it was read: "rejecting a nested insert will also reject
-		// the delete change" (redlineiterator.h:46-50). The records are read again after each one: taking one
-		// back moves the rest.
-		// THE FIRST READING IS THE DOOR'S. Nothing this plan's records stand on has moved since: the runs after
-		// it in the story took back text after it only. A record not found there all the same gets one fresh
-		// reading before the reject is called off.
-		std::vector<KFCTrackChange::Record> recs(p.recs);
-		bool fresh = false;
-		const size_t guard = recs.size() + 2;		// + the one fresh reading
-		for (size_t g = 0; g < guard && ok && !recs.empty(); ++g)
-		{
-			size_t pick = recs.size();
-			for (size_t k = 0; k < recs.size(); ++k)
-				if (recs[k].isDelete && (pick == recs.size() || recs[k].at >= recs[pick].at))
-					pick = k;
-			if (pick == recs.size())
-				for (size_t k = 0; k < recs.size(); ++k)
-					if (pick == recs.size() || recs[k].at >= recs[pick].at)
-						pick = k;
-			if (!KFCTrackChange::RejectRecord(p.story, recs[pick].at, recs[pick].time, recs[pick].isDelete))
-			{
-				if (!fresh)
-				{
-					KFCTrackChange::CollectRecordsOfTimes(p.story, p.times, recs);
-					fresh = true;
-					continue;
-				}
-				why = "InDesign would not take back a tracked change of this replace";
-				ok = false;
-				break;
-			}
-			KFCTrackChange::CollectRecordsOfTimes(p.story, p.times, recs);
-			fresh = true;
-		}
-		if (ok && !recs.empty())
-		{
-			why = "a tracked change of this replace was still there after taking it back";
-			ok = false;
-		}
-		const int32 allLen = WideString(p.allOriginal).CharCount();
-		if (ok && KFCTrackChange::ReadText(p.story, p.at, allLen) != p.allOriginal)
-		{
-			why = "the original text did not come all the way back";
-			ok = false;
-		}
-		if (ok)
-		{
-			CarryPastChange(db, others, p.story.GetUID(), p.at, p.insLen, allLen);
-			TextIndex at = p.at;
-			for (size_t k = 0; k < p.rows.size(); ++k)
-			{
-				SetRowAt(db, others[static_cast<size_t>(p.rows[k])], p.story.GetUID(), at, at + p.lengths[k]);
-				taken.push_back(p.rows[k]);
-				at += p.lengths[k];
-			}
-		}
-	}
-	if (ok)
-		KFCUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard
-	EndPlainSequence(sequence, ok, db, wasModified);
-	if (!ok)
-	{
-		outStatus = "Reject Change: ";
-		outStatus.Append(why);
-		outStatus.Append(" - the reject was cancelled and the document is as it was.");
-		return false;
-	}
-	NoteStoryVersions(chapterIdx, db, asLeft);
-
-	// every other row where the text has taken it, then the rows taken back where their original text stands
-	std::vector<bool> isTaken(others.size(), false);
-	for (size_t k = 0; k < taken.size(); ++k)
-		isTaken[static_cast<size_t>(taken[k])] = true;
-	WriteBackRows(chapterIdx, db, others, isTaken, kRangeAndText);
-	for (size_t k = 0; k < taken.size(); ++k)
-	{
-		const RowNow& row = others[static_cast<size_t>(taken[k])];
-		TextIndex at = kInvalidTextIndex;
-		if (!RowStartNow(db, row, at))
-			continue;
-		KFCResultModel::SetHitRejected(chapterIdx, taken[k], row.story, at, at + row.length);
-		KFCSearchEngine::RereadRowText(chapterIdx, taken[k], UIDRef(db, row.story), at, at + row.length);
-	}
-	// (No walk numbers the rest again: a Change Checked after this finds each row by its place and text,
-	//  which the lines above have just written.)
-	recorder.Keep(KFCUndoFollow::kStepReject);
-	return true;
-}
-
-// The row with every replaced row touching it (see RejectRowsNow on why a touching group goes together) -
-// what a row's Reject Change and Accept Change act on.
-//
-// ONLY THE NEIGHBOURS WHOSE CHANGE IS STILL THERE (case touching-group-redo-reject).
-// A neighbour's change can be gone while the row still reads as replaced: the replace of THIS row accepts
-// the pending changes it touches first (AcceptPendingAround), and a neighbour replaced a moment earlier
-// is exactly such a change. Taking that neighbour along finds nothing to reject for it, and the whole
-// reject is cancelled - so this row could never be taken back at all. A neighbour with no change of its
-// own left is not part of what can be taken back; the row itself always is (RejectRowsNow says why when
-// its own change is gone, and refuses when its deletion also holds such a neighbour's text).
-static void RowWithTouchingChanges(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows)
-{
-	std::vector<int32> group;
-	KFCTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
-	KFCTrackChange::ReplacedTouchingGroup(chapterIdx, hitIdx, group);	// the replaced rows outside a footnote
-	outRows.clear();
-	for (size_t k = 0; k < group.size(); ++k)
-	{
-		UIDRef storyRef;
-		KFCTrackChange::Change change;
-		if (group[k] == hitIdx || KFCTrackChange::FindRowChangeForHit(chapterIdx, group[k], storyRef, change))
-			outRows.push_back(group[k]);
-	}
-	if (outRows.empty())
-		outRows.push_back(hitIdx);
-}
-
-bool KFCReplaceEngine::RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		outStatus.Append("Reject Change: the document of this row is not open.");
-		return false;
-	}
-	std::vector<int32> rows;
-	RowWithTouchingChanges(chapterIdx, hitIdx, rows);
-	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	// On a list rebuilt from the records there is no box and no Replace: what to do next is to
-	// search again (the pre-flight finding of the Show Changes plan).
-	if (KFCResultModel::IsFromRecords())
-		outStatus = (rows.size() > 1)
-			? "Rejected - the row and the matches touching it are back to their original text. To replace again, search again."
-			: "Rejected - the row is back to its original text. To replace again, search again.";
-	else
-		outStatus = (rows.size() > 1)
-			? "Rejected - the row and the matches touching it are back to their original text. Tick them, or right-click for Replace, to replace them again."
-			: "Rejected - the row is back to its original text. Tick it, or right-click it for Replace, to replace it again.";
-	return true;
-}
-
-// Reject Change over `scope` - a story row's rows, a document row's, or a run row's: every row
-// of it RowsWithChangeOf names, in one undo step. `unit` = "story" / "document" / "run", for the status line.
-static bool RejectRowsOf(int32 chapterIdx, const std::vector<int32>& scope, const char* unit, PMString& outStatus)
-{
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		outStatus.Append("Reject Change: the document of this row is not open.");
-		return false;
-	}
-	std::vector<int32> rows;
-	// Rows whose replaced text is under a hidden condition are not among `rows` (their change is not found
-	// where they are) - said, whichever way this ends, rather than left out in silence.
-	const int32 hidden = RowsUnderHiddenCondition(chapterIdx, scope);
-	if (!RowsWithChangeOf(chapterIdx, scope, rows, false))
-	{
-		if (hidden > 0)
-		{
-			outStatus.Append("Reject Change: nothing was changed - the replaced text in this ");
-			outStatus.Append(unit);
-			outStatus.Append(" is under a hidden condition");
-			AppendShowConditionToRetry(outStatus, "reject");
-			return false;
-		}
-		outStatus.Append("Reject Change: no replaced row with a tracked change in this ");
-		outStatus.Append(unit);
-		outStatus.Append(".");
-		return false;
-	}
-	if (!RejectRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	outStatus = "Rejected ";
-	outStatus.AppendNumber(static_cast<int32>(rows.size()));
-	outStatus.Append(" row(s) of this ");
-	outStatus.Append(unit);
-	outStatus.Append(KFCResultModel::IsFromRecords()
-		? " - back to their original text. To replace again, search again."
-		: " - back to their original text. Tick them and Replace to replace them again.");
-	if (hidden > 0)
-	{
-		outStatus.Append(" ");
-		outStatus.AppendNumber(hidden);
-		outStatus.Append(" left - under a hidden condition");
-		AppendShowConditionToRetry(outStatus, "reject");
-	}
-	return true;
-}
-
-// Reject Change on a story row (groupIdx >= 0) or a document row (groupIdx < 0).
-static bool RejectRowsIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus)
-{
-	std::vector<int32> scope;
-	ScopeRows(chapterIdx, groupIdx, scope);
-	return RejectRowsOf(chapterIdx, scope, unit, outStatus);
-}
-
-// (No range check of chapterIdx in front of the scope: the model's own range check answers an empty
-//  scope for that already.)
-bool KFCReplaceEngine::CanRejectChapter(int32 chapterIdx)
-{
-	if (KFCResultModel::IsFromQueryRun())
-		return false;
-	std::vector<int32> rows;
-	return RowsToReject(chapterIdx, -1, rows, true);
-}
-
-bool KFCReplaceEngine::RejectChapter(int32 chapterIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	return RejectRowsIn(chapterIdx, -1, "document", outStatus);
-}
-
-bool KFCReplaceEngine::RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	return RejectRowsIn(chapterIdx, groupIdx, "story", outStatus);
-}
-
-// ======================================================================================================
-// Accept All Changes by KohakuFindChange in This Document (the signed records only) - see the header.
-// The same plain sequence and rollback as Reject Change above.
-// ======================================================================================================
-bool KFCReplaceEngine::CanAcceptAllInChapter(int32 chapterIdx)
-{
-	if (KFCResultModel::IsFromQueryRun())
-		return false;
-	UIDRef docRef;
-	return KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef) && KFCTrackChange::DocumentHasSignedRecords(docRef.GetDataBase());
-}
-
-bool KFCReplaceEngine::AcceptAllInChapter(int32 chapterIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		outStatus.Append("Accept All Changes by KohakuFindChange: the document is not open.");
-		return false;
-	}
-	// THE ROWS FOLLOW THE TEXT. Accepting a deletion takes its deleted-text thread away, and every thread
-	// behind it in the story - a table cell's, a footnote's - moves up. Left at their story indexes, a cell's
-	// row would stand where its text no longer is: its jump says "missing" and its Replace refuses as
-	// "changed since the search" (case accept-all-then-cell). Taken as
-	// "this far into this thread" before (SnapshotRows) and put back after (WriteBackRows), as a reject does;
-	// accepting changes no text, so nothing is carried within a thread - and no row's line or hash is read
-	// again, only its range moved (kRangeOnly).
-	IDataBase* const db = docRef.GetDataBase();
-	std::vector<RowNow> rows;
-	SnapshotRows(chapterIdx, db, rows);
-	// The row stories that were as KFC left them take their new version afterwards: accepting moves a
-	// story's version, and one that had moved without KFC keeps its old one.
-	std::set<UID> asLeft;
-	{
-		std::set<UID> rowStories;
-		KFCResultModel::GetChapterStories(chapterIdx, rowStories);
-		StoriesAsKFCLeftThem(chapterIdx, db, rowStories, asLeft);
-	}
-	// Recorded for the panel's following of Undo - Reject Change's reason.
-	KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (EndPlainSequence)
-	ICommandSequence* sequence = BeginPlainSequence(KFCLoc::Text(kKFCAcceptAllStepKey, KFCJa::kAcceptAllStep),
-		"Accept All Changes by KohakuFindChange: ", outStatus);
-	if (sequence == nil)
-		return false;
-	PMString why;
-	why.SetTranslatable(kFalse);
-	int32 left = 0;
-	std::set<uint64> acceptedTimes;		// the rows carrying one were accepted
-	const int32 accepted = KFCTrackChange::AcceptSignedInDocument(db, left, why, &acceptedTimes);
-	if (accepted >= 0)
-		KFCUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard
-	EndPlainSequence(sequence, accepted >= 0, db, wasModified);
-	if (accepted < 0)
-	{
-		outStatus = "Accept All Changes by KohakuFindChange: ";
-		outStatus.Append(why);
-		outStatus.Append(" - nothing was accepted and the document is as it was.");
-		return false;
-	}
-	WriteBackRows(chapterIdx, db, rows, std::vector<bool>(), kRangeOnly);
-	NoteStoryVersions(chapterIdx, db, asLeft);
-	// THE ROWS IT ACCEPTED SAY SO. A replaced row whose time the accept
-	// took away: "accepted", as Accept Change on a row, a story or a run leaves it. Rows left (hidden
-	// conditional text), a footnote's (nothing recorded) and rows whose change had gone already (the Track
-	// Changes panel) are left as they were. The times come from the accept's own counting walks - no
-	// walks of every story of its own.
-	{
-		const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
-		for (int32 i = 0; i < hitCount; ++i)
-		{
-			bool checked = false, replaced = false, locked = false;
-			const uint64 t = KFCResultModel::GetHitRecordTime(chapterIdx, i);
-			if (t != 0 && acceptedTimes.count(t) > 0
-				&& KFCResultModel::GetHitFlags(chapterIdx, i, checked, replaced, locked) && replaced)
-				KFCResultModel::SetHitAccepted(chapterIdx, i);
-		}
-	}
-	recorder.Keep(KFCUndoFollow::kStepAcceptAll);
-	// OURS ONLY, AND THE HIDDEN ONES SAID (the author's call). The records signed "KohakuFindChange" -
-	// everybody else's changes stay (not every change in the document, as InDesign's own Accept All). The
-	// numbers come first: a status line cut short cuts its end. They count REPLACES, one per row as Show
-	// Changes counts them - not records.
-	outStatus = "Accepted ";
-	outStatus.AppendNumber(accepted);
-	if (left > 0)
-	{
-		// The one cause measured: text under a hidden condition, which the accept leaves.
-		outStatus.Append(" change(s) by KohakuFindChange; ");
-		outStatus.AppendNumber(left);
-		outStatus.Append(" left unaccepted - text under a hidden condition is left: show the condition and accept again.");
-	}
-	else
-		outStatus.Append(" change(s) by KohakuFindChange in the document - other changes are left. They can no longer be rejected.");
-	return true;
-}
-
-// ======================================================================================================
-// ACCEPT CHANGE BY KohakuFindChange - A ROW, A STORY, A RUN (Show Changes). Reject
-// Change's twin, built the same way (RejectRowsNow): every row's change found first, while nothing has
-// moved - a row without one refuses the whole accept; the records carrying the rows' times accepted one at
-// a time (KFCTrackChange::AcceptRecord), the deletions first and each time the one furthest on, the records
-// read again after each; the rows put back where the text has taken them (accepting a deletion takes its
-// deleted-text thread away, and the threads behind it move up - AcceptAllInChapter's reason); one plain
-// sequence, rolled back whole on any failure. Accepting changes no text, so no row's line is read again.
-// ======================================================================================================
-static bool AcceptRowsNow(int32 chapterIdx, const std::vector<int32>& rows, const UIDRef& docRef, PMString& outStatus)
-{
-	IDataBase* const db = docRef.GetDataBase();
-	// Each row where its change stands now, then its change: the times to accept, story by story, and each
-	// story's rows' original texts in text order.
-	std::map<UID, std::set<uint64> > timesOfStory;
-	std::map<UID, std::vector<RowSpan> > spansOfStory;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		KFCTrackChange::RefreshRowFromRecords(chapterIdx, rows[k]);
-		UIDRef storyRef;
-		KFCTrackChange::Change change;
-		PMString originalText, replacedText;
-		if (!KFCTrackChange::FindRowChangeForHit(chapterIdx, rows[k], storyRef, change)
-			|| !KFCResultModel::GetHitChangeTexts(chapterIdx, rows[k], originalText, replacedText))
-		{
-			if (KFCTrackChange::RowChangeIsHidden(chapterIdx, rows[k]))
-			{
-				outStatus = "Accept Change: nothing was changed - a row's replaced text is under a hidden condition";
-				AppendShowConditionToRetry(outStatus, "accept");
-			}
-			else
-				outStatus = "Accept Change: no tracked change of this replace is left for a row (undone, accepted or rejected in the Track Changes panel, deleted, or in a footnote or a replace that changed no character, where nothing is recorded) - nothing was changed.";
-			return false;
-		}
-		const uint64 t = KFCResultModel::GetHitRecordTime(chapterIdx, rows[k]);
-		if (t != 0)
-			timesOfStory[storyRef.GetUID()].insert(t);
-		RowSpan span;
-		span.at = change.at;
-		span.len = change.insLen;
-		span.original = originalText;
-		spansOfStory[storyRef.GetUID()].push_back(span);
-	}
-	// THE RECORDS MUST GIVE BACK EXACTLY THESE ROWS' ORIGINAL TEXT - RejectRowsNow's door. InDesign joins a
-	// deletion to the one it touches, whoever made either: accepting such a deletion would make somebody
-	// else's deletion final too, or a neighbour's this accept was not asked about.
-	// (Asked of the rows' text with the records taken back - RecordsGiveBackOriginals; not of the deletions
-	// alone, which a GREP $n's row never passes.)
-	// The records read for it are the ones the accept below starts from: nothing moves in between.
-	std::map<UID, std::vector<KFCTrackChange::Record> > recsOfStory;
-	for (std::map<UID, std::set<uint64> >::const_iterator s = timesOfStory.begin(); s != timesOfStory.end(); ++s)
-	{
-		std::vector<KFCTrackChange::Record>& recs = recsOfStory[s->first];
-		KFCTrackChange::CollectRecordsOfTimes(UIDRef(db, s->first), s->second, recs);
-		if (!RecordsGiveBackOriginals(UIDRef(db, s->first), spansOfStory[s->first], recs))
-		{
-			outStatus = "Accept Change: the tracked deletion of this replace also holds text that is not these rows' (a touching neighbour's change was accepted, or somebody else's deletion joined it) - nothing was changed.";
-			return false;
-		}
-	}
-
-	std::vector<RowNow> others;		// every row as "this far into its thread", put back afterwards
-	SnapshotRows(chapterIdx, db, others);
-	// The stories that were as KFC left them take their new version afterwards.
-	std::set<UID> asLeft;
-	{
-		std::set<UID> acceptedIn;
-		for (std::map<UID, std::set<uint64> >::const_iterator s = timesOfStory.begin(); s != timesOfStory.end(); ++s)
-			acceptedIn.insert(s->first);
-		StoriesAsKFCLeftThem(chapterIdx, db, acceptedIn, asLeft);
-	}
-	// Recorded for the panel's following of Undo: an accept undone gives the row its time back, and with
-	// it Reject Change and Accept Change.
-	KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx), false);
-	const bool wasModified = DocIsModified(db);		// put back if the step is rolled back (EndPlainSequence)
-	ICommandSequence* sequence = BeginPlainSequence(KFCLoc::Text(kKFCAcceptStepKey, KFCJa::kAcceptStep),
-		"Accept Change: ", outStatus);
-	if (sequence == nil)
-		return false;
-	PMString why;
-	bool ok = true;
-	// ONE READING, THEN EVERY RECORD IN ORDER - not read again after every single accept, which walks a story n
-	// times for a run of n records. Unlike a reject, an accept drops no other record (accepting a nested
-	// insertion leaves the deletion - redlineiterator.h:49-50), so the order is kept from one reading: the
-	// deletions first, then the insertions, each time the one furthest on (the reject's order). A record not
-	// found where it was read (an accept before it moved it - a thread behind a deleted text's) ends the pass;
-	// the story is read again and the rest go the same way. Every pass accepts at least one record or the
-	// accept fails, and the last reading must find none left.
-	for (std::map<UID, std::set<uint64> >::const_iterator s = timesOfStory.begin(); s != timesOfStory.end() && ok; ++s)
-	{
-		const UIDRef storyRef(db, s->first);
-		std::vector<KFCTrackChange::Record>& recs = recsOfStory[s->first];		// the door's reading
-		// a bound: an accept said to have gone through while its record stays must not spin
-		size_t passesLeft = recs.size() + 1;
-		while (ok && !recs.empty())
-		{
-			if (passesLeft-- == 0)
-			{
-				why = "a tracked change of this replace was still there after accepting it";
-				ok = false;
-				break;
-			}
-			std::stable_sort(recs.begin(), recs.end(),
-				[](const KFCTrackChange::Record& a, const KFCTrackChange::Record& b)
-				{ return (a.isDelete != b.isDelete) ? a.isDelete : a.at > b.at; });
-			size_t done = 0;
-			while (done < recs.size()
-				&& KFCTrackChange::AcceptRecord(storyRef, recs[done].at, recs[done].time, recs[done].isDelete))
-				++done;
-			if (done == 0)
-			{
-				why = "InDesign would not accept a tracked change of this replace";
-				ok = false;
-				break;
-			}
-			KFCTrackChange::CollectRecordsOfTimes(storyRef, s->second, recs);	// what is left - normally none
-		}
-	}
-	if (ok)
-		KFCUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard
-	EndPlainSequence(sequence, ok, db, wasModified);
-	if (!ok)
-	{
-		outStatus = "Accept Change: ";
-		outStatus.Append(why);
-		outStatus.Append(" - the accept was cancelled and the document is as it was.");
-		return false;
-	}
-	NoteStoryVersions(chapterIdx, db, asLeft);
-	WriteBackRows(chapterIdx, db, others, std::vector<bool>(), kRangeOnly);
-	for (size_t k = 0; k < rows.size(); ++k)
-		KFCResultModel::SetHitAccepted(chapterIdx, rows[k]);
-	recorder.Keep(KFCUndoFollow::kStepAccept);
-	return true;
-}
-
-bool KFCReplaceEngine::CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx)
-{
-	if (KFCResultModel::IsFromQueryRun())
-		return false;
-	UIDRef storyRef;
-	KFCTrackChange::Change change;
-	return KFCTrackChange::FindRowChangeForHit(chapterIdx, hitIdx, storyRef, change);
-}
-
-bool KFCReplaceEngine::AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		outStatus.Append("Accept Change: the document of this row is not open.");
-		return false;
-	}
-	// RejectHit's group, for its reason: a touching group written front to back shares one deletion.
-	std::vector<int32> rows;
-	RowWithTouchingChanges(chapterIdx, hitIdx, rows);
-	if (!AcceptRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	outStatus = (rows.size() > 1)
-		? "Accepted - the changes by KohakuFindChange of the row and the matches touching it are final: they can no longer be rejected."
-		: "Accepted - the change by KohakuFindChange is final: it can no longer be rejected.";
-	return true;
-}
-
-// Accept Change over `scope` - a story row's rows or a run row's: every row of it with a change left, in one
-// undo step. `unit` = "story" / "run", for the status line.
-static bool AcceptRowsOf(int32 chapterIdx, const std::vector<int32>& scope, const char* unit, PMString& outStatus)
-{
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		outStatus.Append("Accept Change: the document of this row is not open.");
-		return false;
-	}
-	std::vector<int32> rows;
-	// RejectRowsOf's rule: rows under a hidden condition are said, not left out in silence.
-	const int32 hidden = RowsUnderHiddenCondition(chapterIdx, scope);
-	if (!RowsWithChangeOf(chapterIdx, scope, rows, false))
-	{
-		if (hidden > 0)
-		{
-			outStatus.Append("Accept Change: nothing was changed - the replaced text in this ");
-			outStatus.Append(unit);
-			outStatus.Append(" is under a hidden condition");
-			AppendShowConditionToRetry(outStatus, "accept");
-			return false;
-		}
-		outStatus.Append("Accept Change: no replaced row with a tracked change in this ");
-		outStatus.Append(unit);
-		outStatus.Append(".");
-		return false;
-	}
-	if (!AcceptRowsNow(chapterIdx, rows, docRef, outStatus))
-		return false;
-	outStatus = "Accepted ";
-	outStatus.AppendNumber(static_cast<int32>(rows.size()));
-	outStatus.Append(" row(s) of this ");
-	outStatus.Append(unit);
-	outStatus.Append(" - their changes by KohakuFindChange are final: they can no longer be rejected.");
-	if (hidden > 0)
-	{
-		outStatus.Append(" ");
-		outStatus.AppendNumber(hidden);
-		outStatus.Append(" left - under a hidden condition");
-		AppendShowConditionToRetry(outStatus, "accept");
-	}
-	return true;
-}
-
-bool KFCReplaceEngine::AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	std::vector<int32> scope;
-	ScopeRows(chapterIdx, groupIdx, scope);
-	return AcceptRowsOf(chapterIdx, scope, "story", outStatus);
-}
-
-bool KFCReplaceEngine::CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx)
-{
-	if (KFCResultModel::IsFromQueryRun())
-		return false;
-	std::vector<int32> scope, rows;
-	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
-	return RowsWithChangeOf(chapterIdx, scope, rows, true);
-}
-
-bool KFCReplaceEngine::RejectRun(int32 chapterIdx, int32 runIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	std::vector<int32> scope;
-	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
-	return RejectRowsOf(chapterIdx, scope, "run", outStatus);
-}
-
-bool KFCReplaceEngine::AcceptRun(int32 chapterIdx, int32 runIdx, PMString& outStatus)
-{
-	if (RefusedOnQueryRun(outStatus))
-		return false;
-	std::vector<int32> scope;
-	KFCResultModel::GetRunHits(chapterIdx, runIdx, scope);
-	return AcceptRowsOf(chapterIdx, scope, "run", outStatus);
-}
 
 // Replace on a story row (groupIdx >= 0) or a DOCUMENT row (groupIdx < 0) (the author's call):
 // the scope's TICKED rows, no prompt, one undo step. `unit` = "story" / "document", for the status line.
@@ -4262,106 +3363,6 @@ bool KFCReplaceEngine::ReplaceChapter(int32 chapterIdx, PMString& outStatus)
 bool KFCReplaceEngine::ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
 {
 	return ReplaceRowsIn(chapterIdx, groupIdx, "story", outStatus);
-}
-
-// Redo (Replace Again) on a story row (the author's call). The story's rows taken back with Reject Change,
-// replaced again - ticked or not, so they can all be done without ticking them one by one (Check All would
-// tick the rows never replaced as well). With what Find/Change holds NOW, like Replace (the row's own menu
-// has only Replace) - not "the Change To the replace used", which can only be compared as a description,
-// not as the replace itself. A row whose text is not its original any more (edited, or undone since) is
-// skipped and counted.
-static void RowsToRedo(int32 chapterIdx, const std::vector<int32>& rows, IDataBase* db, std::set<int32>& outFit,
-	int32& outSkipped, bool firstOnly)
-{
-	outFit.clear();
-	outSkipped = 0;
-	for (size_t k = 0; k < rows.size(); ++k)
-	{
-		if (KFCResultModel::GetHitOutcome(chapterIdx, rows[k]) != KFCResultModel::kOutcomeRejected
-			|| !KFCReplaceEngine::CanReplaceHit(chapterIdx, rows[k]))
-			continue;
-		// the match and its line (RowReadsAsFound - not the match's hash alone); the
-		// story's version is asked by the Replace this hands the rows to (ReplaceRowsNow)
-		if (db == nil || KFCSearchEngine::RowReadsAsFound(chapterIdx, rows[k], db))
-		{
-			outFit.insert(rows[k]);
-			if (firstOnly)
-				return;
-		}
-		else
-			++outSkipped;
-	}
-}
-
-static bool CanRedoRows(int32 chapterIdx, int32 groupIdx)
-{
-	std::vector<int32> scope;
-	ScopeRows(chapterIdx, groupIdx, scope);
-	std::set<int32> rows;
-	int32 skipped = 0;
-	RowsToRedo(chapterIdx, scope, nil, rows, skipped, true);	// nil = no text test for the greying
-	return !rows.empty();
-}
-
-// Redo over a story or a document: see RowsToRedo. `unit` = "story" / "document", for the status line.
-static bool RedoRowsNowIn(int32 chapterIdx, int32 groupIdx, const char* unit, PMString& outStatus)
-{
-	outStatus.Clear();
-	outStatus.SetTranslatable(kFalse);
-	// (Every line here says "Replace Again", the menu item's name - the author's call; the functions keep
-	//  Redo. ReplaceRowsNow writes the rest, `again` = true.)
-	UIDRef docRef;
-	if (!KFCTrackChange::ChapterDocIfOpen(chapterIdx, docRef))
-	{
-		StartStatus(outStatus, true);
-		outStatus.Append("the document of these rows is not open.");
-		return false;
-	}
-	IDataBase* const db = docRef.GetDataBase();
-	std::vector<int32> scope;
-	ScopeRows(chapterIdx, groupIdx, scope);
-	std::set<int32> rows;
-	int32 skipped = 0;
-	RowsToRedo(chapterIdx, scope, db, rows, skipped, false);
-	if (rows.empty())
-	{
-		StartStatus(outStatus, true);
-		outStatus.Append("no row of this ");
-		outStatus.Append(unit);
-		outStatus.Append(" taken back with Reject Change can be replaced again (its text has changed since).");
-		return false;
-	}
-	if (!ReplaceRowsNow(chapterIdx, rows, outStatus, unit, true))
-		return false;
-	if (skipped > 0)
-	{
-		outStatus.Append(" ");
-		outStatus.AppendNumber(skipped);
-		outStatus.Append(" taken back could not be replaced again (text changed since) and were left.");
-	}
-	return true;
-}
-
-bool KFCReplaceEngine::CanRedoStory(int32 chapterIdx, int32 groupIdx)
-{
-	return CanRedoRows(chapterIdx, groupIdx);
-}
-
-bool KFCReplaceEngine::CanRedoChapter(int32 chapterIdx)
-{
-	return CanRedoRows(chapterIdx, -1);
-}
-
-bool KFCReplaceEngine::RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
-{
-	return RedoRowsNowIn(chapterIdx, groupIdx, "story", outStatus);
-}
-
-// (An out-of-range index meets RedoRowsNowIn's "not open", the way RejectChapter and ReplaceChapter do -
-//  not a false with nothing in outStatus.)
-bool KFCReplaceEngine::RedoChapter(int32 chapterIdx, PMString& outStatus)
-{
-	return RedoRowsNowIn(chapterIdx, -1, "document", outStatus);
 }
 
 // End, KFCReplaceEngine.cpp.

@@ -27,7 +27,7 @@
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
 #include "KFCSearchEngine.h"
-#include "KFCShowChanges.h"
+
 #include "KFCTrackChange.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
@@ -48,20 +48,12 @@ public:
 	virtual int32 GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth) { return KFCResultModel::GetFontGroupHit(chapterIdx, fontIdx, nth); }
 	virtual int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitFontGroup(chapterIdx, hitIdx); }
 	virtual int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitFontGroupPos(chapterIdx, hitIdx); }
-	virtual int32 GetDisplayRunCount(int32 chapterIdx) { return KFCResultModel::GetDisplayRunCount(chapterIdx); }
-	virtual bool GetRunDisplay(int32 chapterIdx, int32 runIdx, PMString& outLabel, int32& outHitCount) { return KFCResultModel::GetRunDisplay(chapterIdx, runIdx, outLabel, outHitCount); }
-	virtual int32 GetDisplayRunGroupCount(int32 chapterIdx, int32 runIdx) { return KFCResultModel::GetDisplayRunGroupCount(chapterIdx, runIdx); }
-	virtual int32 GetRunGroup(int32 chapterIdx, int32 runIdx, int32 nth) { return KFCResultModel::GetRunGroup(chapterIdx, runIdx, nth); }
-	virtual int32 GetGroupRun(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::GetGroupRun(chapterIdx, groupIdx); }
-	virtual int32 GetGroupPosInRun(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::GetGroupPosInRun(chapterIdx, groupIdx); }
 	virtual bool IsStoryGroup(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::IsStoryGroup(chapterIdx, groupIdx); }
 	virtual int32 GetGroupCheckedCount(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::GetGroupCheckedCount(chapterIdx, groupIdx); }
 	virtual bool GetHitRow(int32 chapterIdx, int32 hitIdx, KFCResultModel::RowDisplay& out) { return KFCResultModel::GetHitRow(chapterIdx, hitIdx, out); }
 	virtual bool GetHitDisplay(int32 chapterIdx, int32 hitIdx, PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost) { return KFCResultModel::GetHitDisplay(chapterIdx, hitIdx, outLocator, outPre, outMatch, outPost); }
-	virtual bool GetRowsBefore(int32 chapterIdx, const std::vector<int32>& rows, PMString& outPre, PMString& outOriginal, PMString& outPost) { return KFCResultModel::GetRowsBefore(chapterIdx, rows, outPre, outOriginal, outPost); }
 	virtual void MarkUpBreaksForDisplay(PMString& s) { KFCResultModel::MarkUpBreaksForDisplay(s); }
 	virtual bool IsFromBook() { return KFCResultModel::IsFromBook(); }
-	virtual bool IsFromRecords() { return KFCResultModel::IsFromRecords(); }
 	virtual KFCResultModel::SearchScopeKind GetSearchScope() { return KFCResultModel::GetSearchScope(); }
 	virtual PMString GetBookName() { return KFCResultModel::GetBookName(); }
 	virtual bool HasRun() { return KFCResultModel::HasRun(); }
@@ -79,8 +71,6 @@ public:
 	virtual int32 GetContextMenuChapter() { return KFCResultModel::GetContextMenuChapter(); }
 	virtual void SetContextMenuGroup(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuGroup(chapterIdx, groupIdx); }
 	virtual bool GetContextMenuGroup(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuGroup(outChapterIdx, outGroupIdx); }
-	virtual void SetContextMenuRun(int32 chapterIdx, int32 runIdx) { KFCResultModel::SetContextMenuRun(chapterIdx, runIdx); }
-	virtual bool GetContextMenuRun(int32& outChapterIdx, int32& outRunIdx) { return KFCResultModel::GetContextMenuRun(outChapterIdx, outRunIdx); }
 	virtual void SetContextMenuHit(int32 chapterIdx, int32 hitIdx) { KFCResultModel::SetContextMenuHit(chapterIdx, hitIdx); }
 	virtual bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx) { return KFCResultModel::GetContextMenuHit(outChapterIdx, outHitIdx); }
 	virtual bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile) { return KFCResultModel::GetChapterLocation(chapterIdx, outDocRef, outFile); }
@@ -102,31 +92,13 @@ public:
 	KFCRunsSession(IPMUnknown* boss) : CPMUnknown<IKFCRuns>(boss) {}
 
 	virtual int32 SearchBook(PMString& outSummary) { return KFCSearchEngine::SearchBook(outSummary); }
-	virtual int32 ShowChanges(PMString& outSummary) { return KFCShowChanges::Run(outSummary); }
 	virtual int32 ReplaceChecked(PMString& outSummary) { return KFCReplaceEngine::ReplaceChecked(outSummary); }
 	virtual bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceHit(chapterIdx, hitIdx, outStatus); }
-	virtual bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCReplaceEngine::RejectHit(chapterIdx, hitIdx, outStatus); }
-	virtual bool AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCReplaceEngine::AcceptHit(chapterIdx, hitIdx, outStatus); }
 	virtual bool CanReplaceHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanReplaceHit(chapterIdx, hitIdx); }
-	virtual bool CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx) { return KFCReplaceEngine::CanAcceptOrRejectHit(chapterIdx, hitIdx); }
 	virtual bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceStory(chapterIdx, groupIdx, outStatus); }
-	virtual bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCReplaceEngine::RejectStory(chapterIdx, groupIdx, outStatus); }
-	virtual bool AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCReplaceEngine::AcceptStory(chapterIdx, groupIdx, outStatus); }
-	virtual bool RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCReplaceEngine::RedoStory(chapterIdx, groupIdx, outStatus); }
 	virtual bool CanReplaceStory(int32 chapterIdx, int32 groupIdx) { return KFCReplaceEngine::CanReplaceStory(chapterIdx, groupIdx); }
-	virtual bool CanRejectStory(int32 chapterIdx, int32 groupIdx) { return KFCReplaceEngine::CanRejectStory(chapterIdx, groupIdx); }
-	virtual bool CanRedoStory(int32 chapterIdx, int32 groupIdx) { return KFCReplaceEngine::CanRedoStory(chapterIdx, groupIdx); }
 	virtual bool ReplaceChapter(int32 chapterIdx, PMString& outStatus) { return KFCReplaceEngine::ReplaceChapter(chapterIdx, outStatus); }
-	virtual bool RejectChapter(int32 chapterIdx, PMString& outStatus) { return KFCReplaceEngine::RejectChapter(chapterIdx, outStatus); }
-	virtual bool RedoChapter(int32 chapterIdx, PMString& outStatus) { return KFCReplaceEngine::RedoChapter(chapterIdx, outStatus); }
-	virtual bool AcceptAllInChapter(int32 chapterIdx, PMString& outStatus) { return KFCReplaceEngine::AcceptAllInChapter(chapterIdx, outStatus); }
 	virtual bool CanReplaceChapter(int32 chapterIdx) { return KFCReplaceEngine::CanReplaceChapter(chapterIdx); }
-	virtual bool CanRejectChapter(int32 chapterIdx) { return KFCReplaceEngine::CanRejectChapter(chapterIdx); }
-	virtual bool CanRedoChapter(int32 chapterIdx) { return KFCReplaceEngine::CanRedoChapter(chapterIdx); }
-	virtual bool CanAcceptAllInChapter(int32 chapterIdx) { return KFCReplaceEngine::CanAcceptAllInChapter(chapterIdx); }
-	virtual bool RejectRun(int32 chapterIdx, int32 runIdx, PMString& outStatus) { return KFCReplaceEngine::RejectRun(chapterIdx, runIdx, outStatus); }
-	virtual bool AcceptRun(int32 chapterIdx, int32 runIdx, PMString& outStatus) { return KFCReplaceEngine::AcceptRun(chapterIdx, runIdx, outStatus); }
-	virtual bool CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx) { return KFCReplaceEngine::CanRejectOrAcceptRun(chapterIdx, runIdx); }
 	virtual bool IsAnyRunning() { return KFCRunGuard::IsAnyRunning(); }
 	virtual const char* BusyMessage() { return KFCRunGuard::BusyMessage(); }
 	virtual const char* FindCommandName(bool bookScopeOn) { return KFCSearchEngine::FindCommandName(bookScopeOn); }
@@ -142,11 +114,7 @@ public:
 	virtual bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db) { return KFCSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db); }
 	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd); }
 	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) { return KFCTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx); }
-	virtual void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed) { KFCTrackChange::CurrentReplacedGroup(chapterIdx, hitIdx, outRows, outRefreshed); }
-	virtual bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx) { return KFCTrackChange::RowChangeIsHidden(chapterIdx, hitIdx); }
-	virtual bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx) { return KFCReplaceEngine::StoryChangesHidden(chapterIdx, groupIdx); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KFCSearchEngine::SetQuery(text, mode); }
-	virtual TextIndex HiddenTextAnchor(const UIDRef& storyRef, TextIndex pos) { return KFCTrackChange::HiddenTextAnchor(storyRef, pos); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

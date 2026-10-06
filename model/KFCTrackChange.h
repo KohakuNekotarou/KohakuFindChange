@@ -120,6 +120,9 @@ namespace KFCTrackChange
 	    A footnote's thread IS its reference boss (KCMTextRead's test). */
 	bool IsInFootnote(const UIDRef& story, TextIndex at);
 
+
+
+
 	/** Is `at` inside text a HIDDEN condition holds (case reject-hidden-condition)? While its
 	    condition is hidden, conditional text - and the tracked changes in it - stand in a thread of their own
 	    past the main text, and showing the condition puts them back (measured: a row's insertion read at 14
@@ -127,23 +130,6 @@ namespace KFCTrackChange
 	    kHiddenTextBoss (customconditionaltext/CusCondTxtSuiteTextCSB.cpp:205 says so, and
 	    conditionaltextui/ConditionalTextTips.cpp:232 asks it this way) - IsInFootnote's test, with that class. */
 	bool IsInHiddenText(const UIDRef& story, TextIndex at);
-
-	/** WHERE HIDDEN TEXT COMES BACK TO. kInvalidTextIndex
-	    unless `at` is inside text a hidden condition holds; then the place that text goes back to when the
-	    condition is shown - the anchor of its kHiddenTextBoss, an owned item (IOwnedItem::GetTextIndex;
-	    kHiddenTextOwnedItemImpl in the 20.5 boss dump), climbed again while that place is hidden too. Such
-	    text sits in a thread no frame holds, so its page and its jump are asked at this place instead: a row
-	    of it - only a list rebuilt from the records has one, the search does not walk hidden conditional
-	    text - would otherwise read "P1(2) overset" and jump to the frame's "+" (measured). */
-	TextIndex HiddenTextAnchor(const UIDRef& story, TextIndex at);
-
-	/** Does this replaced row's insertion stand under a hidden condition right now? Then its change cannot be
-	    found where the row is - FindRowChangeForHit refuses it, the deletion having stayed in the main text -
-	    and Reject Change / Accept Change on it are refused until the condition is shown (the author's call:
-	    refused and SAID, not taken back while hidden). The one question every refusal asks to give
-	    the right reason. False for a row with no insertion (replaced with nothing), a footnote's, or a closed
-	    document's. */
-	bool RowChangeIsHidden(int32 chapterIdx, int32 hitIdx);
 
 	/** The story's text at [at, at+len), whole (not capped). Empty when it cannot be read. */
 	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
@@ -159,21 +145,6 @@ namespace KFCTrackChange
 	    All Changes by KohakuFindChange accepts. (Not any record.) */
 	bool DocumentHasSignedRecords(IDataBase* db);
 
-	/** ACCEPT ALL CHANGES BY KohakuFindChange - ONLY THE RECORDS SIGNED SO (the author's call: "only the
-	    ones named KohakuFindChange"). InDesign's own Accept All command (kAcceptAllRedlineCmdBoss) over
-	    each story holding such a record, told the author: everybody else's changes stay. A change in
-	    hidden conditional text is not accepted (the command's default, measured). Runs inside the
-	    caller's command sequence.
-	    COUNTED IN REPLACES, AS SHOW CHANGES COUNTS THEM. Returns how many replaces it accepted - the
-	    times every record of which it took away, one per row - or -1 when InDesign would not (outWhy
-	    says so - the caller rolls the sequence back). outLeft = the replaces with a record still
-	    standing after it, for the caller to say (hidden conditional text is the one cause measured).
-	    Not RECORDS, an insertion and a deletion apiece: a document Show Changes has just called "Found
-	    2 change(s)" would come out "Accepted 4 change(s)". Leaves the error state clear.
-	    outAcceptedTimes (optional) = those accepted times - a row carrying one was accepted. Gathered
-	    on the two walks each story is counted by anyway. */
-	int32 AcceptSignedInDocument(IDataBase* db, int32& outLeft, PMString& outWhy,
-		std::set<uint64>* outAcceptedTimes = nil);
 
 	/** ACCEPT THE PENDING CHANGES A MATCH ABOUT TO BE REPLACED SITS IN OR NEXT TO - ANYBODY'S (the
 	    author's call: "only that part" - not a refusal of the run). Every insertion overlapping or touching
@@ -292,16 +263,6 @@ namespace KFCTrackChange
 	/** Every row the story's signed records make, one per time, in position order (Show Changes). */
 	void CollectSignedRows(const UIDRef& story, std::vector<SignedRow>& out);
 
-	/** Take back the ONE record standing at `at` of that kind and of exactly that time - whole: no range
-	    is handed to InDesign (an insertion range with a deletion at its start brought it down,
-	    measured). True = it was. Leaves the global error state clear.
-	    ONE, AND OF THE KIND ASKED (case touching-mixed). Touching replaces put one
-	    row's deletion and the next row's insertion at the SAME position ("catcat" -> "kitten": deleted
-	    "cat"@6 and inserted "k"@6). */
-	bool RejectRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
-	/** RejectRecord's twin (Accept Change by KohakuFindChange): ACCEPT the one record standing at
-	    `at` of that kind and of exactly that time, whole. True = it was. Leaves the global error state clear. */
-	bool AcceptRecord(const UIDRef& story, TextIndex at, uint64 time, bool isDelete);
 
 	/** One row's change: the text its replace wrote, [at, at+insLen), and whether a deletion of its time stands.
 	    (Not its insertion pieces summed - the same thing for a replace that writes the whole match; for a
@@ -320,6 +281,11 @@ namespace KFCTrackChange
 	//  position or by its texts and the nearest place; and a row keeps the time it was handed out,
 	//  StampForRow, rather than reading one back off its records.)
 
+	/** The touching group of a replaced row: the replaced rows outside a footnote, in text order. A group
+	    is taken back as one (KFCReplaceEngine RejectRowsNow): touching replaces written front to back
+	    leave ONE deletion, carrying the LAST row's time (the head of this file). */
+	void ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
+
 	/** A REPLACED row put where its tracked change stands now - range, line and hash - so an edit
 	    made since the replace does not put it off (the record moves with the text). False = the row
 	    is not replaced, or no change of ours matches it (accepted or rejected in the Track Changes
@@ -327,18 +293,6 @@ namespace KFCTrackChange
 	    Reject Change and Replace Again (section 5 of the spec named at the head of this file). */
 	bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx);
 
-	/** THE REPLACED ROWS WRITTEN SIDE BY SIDE WITH THIS ONE, AS THE DOCUMENT HAS THEM NOW (the message
-	    area's "Source Text:", KFCJump::ActivateNode). Taken outward from the row
-	    in the list's order (KFCResultModel::GetStoryRowsInOrder), each neighbour put where its tracked
-	    change stands first (RefreshRowFromRecords) and taken in while its text meets the group's - so an
-	    edit made since the replace, which leaves the stored ranges of every row but the clicked one behind,
-	    does not split the group (the stored-range rule, GetTouchingGroup, does - measured). Reads the group
-	    and one row either side, not the whole story.
-	    The row itself is expected to have been put where it stands already (the jump does it).
-	    @param outRows the rows in text order, hitIdx included; EMPTY when the row holds no replace.
-	    @param outRefreshed true when a neighbour was read again - its line may read differently now, and
-	        the caller repaints the list. */
-	void CurrentReplacedGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, bool& outRefreshed);
 
 	/** The document of a chapter, if it is open - found BY THE CHAPTER'S FILE, and the model rebound to
 	    what it finds. The one question for everything that works on an open document only: a row's
@@ -358,10 +312,6 @@ namespace KFCTrackChange
 	    record of the row is left. */
 	bool FindRowChangeForHit(int32 chapterIdx, int32 hitIdx, UIDRef& outStory, Change& outChange);
 
-	/** The touching group of a replaced row: the replaced rows outside a footnote, in text order. A group
-	    is taken back as one (KFCReplaceEngine RejectRowsNow): touching replaces written front to back
-	    leave ONE deletion, carrying the LAST row's time (the head of this file). */
-	void ReplacedTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows);
 }
 
 #endif // __KFCTrackChange_h__

@@ -216,14 +216,6 @@ namespace KFCReplaceEngine
 	    nothing it can be unchanged from. */
 	bool QueryUnchangedSinceSearch();
 
-	/** Reject Change on a replaced hit row: its tracked change - found by
-	    KFCTrackChange::FindRowChangeForHit - is rejected, deletion and insertion, in ONE undo step, and
-	    the row shows its original text again (the word "rejected" only on a list rebuilt from the
-	    records, where no check box comes back to say it). All the way back or not at all: when the
-	    original text does not stand where the change stood afterwards, the step is rolled back.
-	    False = nothing changed; outStatus says why either way. */
-	bool RejectHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
-
 	/** Replace on a hit row's right-click menu (the author's call): that one row, ticked or
 	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
 	    list stays a work list: the row shows its new text and loses its box, every other row is moved to
@@ -239,69 +231,14 @@ namespace KFCReplaceEngine
 	/** A STORY ROW'S MENU. Replace = the story's TICKED rows (the author's call), no prompt, one undo
 	    step, the list stays a work list (as ReplaceHit) - and all or none: one row that cannot be
 	    written (an endnote's end, locked, missing) leaves every row as it was, and outStatus says so and
-	    how many (the author's call - Change Checked writes the rest). Reject Change = every replaced row of
-	    the story whose tracked change is still there, one undo step. Redo = the rows taken back, below
-	    (RedoStory - a hit row has no Redo of its own: a row taken back is replaced again with Replace).
-	    Each says what it did - or why nothing - in outStatus. */
+	    how many (the author's call - Change Checked writes the rest). It says what it did - or why
+	    nothing - in outStatus. */
 	bool ReplaceStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 	/** Replace on a DOCUMENT row: that document's ticked rows, as ReplaceStory. */
 	bool ReplaceChapter(int32 chapterIdx, PMString& outStatus);
 	bool CanReplaceChapter(int32 chapterIdx);
-	/** Reject Change on a DOCUMENT row: every replaced row of the document outside a footnote
-	    whose tracked change is still there, one undo step (as RejectStory, over the whole document). */
-	bool RejectChapter(int32 chapterIdx, PMString& outStatus);
-	bool CanRejectChapter(int32 chapterIdx);
-	/** Redo on a DOCUMENT row: as RedoStory, over the whole document. */
-	bool RedoChapter(int32 chapterIdx, PMString& outStatus);
-	bool CanRedoChapter(int32 chapterIdx);
-	bool RejectStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	/** Redo on a story row (the author's call): every row of the story taken back with Reject Change and
-	    still holding its original text, replaced again with what Find/Change holds now, ticked or not;
-	    the rest are skipped and counted. One undo step, the list stays as it is. The menu item and
-	    every status line it writes say "Replace Again (Current Find/Change Settings)" (the user's
-	    call); the function names keep Redo. */
-	bool RedoStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	bool CanRedoStory(int32 chapterIdx, int32 groupIdx);
-	/** Is there anything for the story row's Replace / Reject Change to do (the menu's greying). */
+	/** Is there anything for the story row's Replace to do (the menu's greying). */
 	bool CanReplaceStory(int32 chapterIdx, int32 groupIdx);
-	bool CanRejectStory(int32 chapterIdx, int32 groupIdx);
-	/** Is a replaced row of this story under a hidden condition right now (KFCTrackChange::RowChangeIsHidden) -
-	    the reason its Reject / Accept Changes are grey when nothing else is left to take back (case
-	    reject-hidden-condition-story). The story row's right-click says it: with every item grey the
-	    popup does not open at all. */
-	bool StoryChangesHidden(int32 chapterIdx, int32 groupIdx);
-
-	/** Accept All Changes by KohakuFindChange in This Document on a document row (the author's call):
-	    the tracked changes signed "KohakuFindChange" in that chapter's document are accepted and
-	    everybody else's are left (the author's call - not every change, as InDesign's own Accept All
-	    takes), in ONE undo step (KFCTrackChange::AcceptSignedInDocument). All or nothing - a
-	    story that will not go rolls the step back. Ours in hidden conditional text are left, and the
-	    status says how many. Rows keep what they show; a replaced row's Reject Change then greys out
-	    (its records are gone), as after an accept in the Track Changes panel. False = nothing changed;
-	    outStatus says why either way. */
-	bool AcceptAllInChapter(int32 chapterIdx, PMString& outStatus);
-
-	/** Is there anything for Accept All Changes by KohakuFindChange to do: the chapter's document open
-	    and holding at least one record signed "KohakuFindChange". */
-	bool CanAcceptAllInChapter(int32 chapterIdx);
-
-	/** ACCEPT CHANGE BY KohakuFindChange (Show Changes) - Reject Change's twin. The
-	    row's tracked change accepted - with every replaced row touching it whose change is still there, as a
-	    reject takes them (touching replaces written front to back share ONE deletion: accepting part of it
-	    would leave the rest unable to come back) - in ONE undo step ("Accept Change"). The row reads
-	    "accepted" and offers neither Reject nor Accept again. On any row of any list whose change is still
-	    there. All or nothing; false = nothing changed, outStatus says why either way. */
-	bool AcceptHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
-	/** Is the row's tracked change still there (the Reject / Accept items' greying)? */
-	bool CanAcceptOrRejectHit(int32 chapterIdx, int32 hitIdx);
-	/** Accept Change on a story row: every replaced row of the story with a change left, one undo step - the
-	    rows Reject Change takes there, so its greying is CanRejectStory's. */
-	bool AcceptStory(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
-	/** A RUN ROW'S MENU (a list rebuilt from the records only). The run's rows in
-	    that document with a change left - taken back (RejectRun) or accepted (AcceptRun), one undo step. */
-	bool RejectRun(int32 chapterIdx, int32 runIdx, PMString& outStatus);
-	bool AcceptRun(int32 chapterIdx, int32 runIdx, PMString& outStatus);
-	bool CanRejectOrAcceptRun(int32 chapterIdx, int32 runIdx);
 
 	/** Is a replace running right now? Its progress bar is modal but PUMPS EVENTS, so a menu
 	    command can be dispatched while the run is standing in ReplaceChecked - the same hazard the

@@ -7,8 +7,9 @@
 //  THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "after an Undo the row cannot be rejected again -
 //  the panel should come back with it, the way KCM's does").
 //
-//  Every write of KFC's own - Change Checked, a row's / story's / document's Replace and Replace Again,
-//  Reject Change, Accept Change, Accept All Changes by KohakuFindChange - is ONE undo step. What it did to
+//  Every write of KFC's own - Change Checked, a row's / story's / document's Replace - is ONE undo step.
+//  (Replace Again, Reject Change, Accept Change and Accept All Changes by KohakuFindChange were writes too until
+//  2026-10-06, when they went with Track Changes.) What it did to
 //  the panel's rows is kept beside it: the rows before it and after it (KFCResultModel::RowStep - or the
 //  whole result set, for Change Checked, which turns the list into its report), and the VERSION of every
 //  story it wrote to before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion).
@@ -24,10 +25,8 @@
 //    u1-false-redo-undo-other-type4) - so a Redo is asked the story's TEXT as well: each story's text right after
 //    the write is kept as one number, and only a story that reads that way again was redone (AllAt in the .cpp).
 //    An Undo needs no such question: a version comes back DOWN to "before" only by an Undo.
-//  The row a Reject Change took back and an Undo put back reads
-//  "replaced" again - and its Reject Change is offered again (the rows' own recorded versions come back
-//  with them, so the replace's story-version door - KFCReplaceEngine.cpp, "A STORY'S VERSION" - finds the
-//  story as KFC left it).
+//  The rows' own recorded versions come back with them, so the replace's story-version door -
+//  KFCReplaceEngine.cpp, "A STORY'S VERSION" - finds the story as KFC left it after an Undo or a Redo.
 //
 //  WHO TELLS US: THE MARK EACH WRITE LEAVES IN ITS UNDO STEP, HEARD ON THE DOCUMENT.
 //  Every write processes kKFCUndoMarkCmdBoss inside its own sequence (MarkWrite): a command that changes
@@ -71,10 +70,6 @@ namespace KFCUndoFollow
 	{
 		kStepChangeChecked = 0,
 		kStepReplace,
-		kStepReplaceAgain,
-		kStepReject,
-		kStepAccept,
-		kStepAcceptAll,
 		kStepRunQueries		// the query run (KFCQuerySequence) - RunRecorder's
 	};
 
