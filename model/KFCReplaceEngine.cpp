@@ -36,7 +36,7 @@
 #include "ITextModel.h"				// QueryStoryThread / FindStoryThread - a row kept as "this far into this thread" (RowNow)
 #include "ITextStoryThread.h"
 #include "textiterator.h"			// the character at an endnote's end (MatchEndsAnEndnote's fallback)
-#include "WideString.h"			// Reject Change: the original text's length in code points
+#include "WideString.h"			// GrepQueryHoldsLineStart: the query read as code points
 #include "PreferenceUtils.h"		// QuerySessionPreferences
 #include "KFCProgressBar.h"	// the replace's progress + cancel, as the search does it - the bar is the UI half's
 #include "StringUtils.h"			// ::ReplaceStringParameters - fills the ^1 in a translated string
@@ -57,7 +57,6 @@
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
-#include "KFCTrackChange.h"	// every replace under Track Changes, its records left
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
@@ -297,11 +296,10 @@ void KeepRowAt(IDataBase* db, std::vector<RowNow>& rowNow, std::vector<int32>& k
 }
 
 // ======================================================================================================
-// NOT InDesign's CHANGE ALL. A Change All over each story with a ticked row, under Track Changes, with the
-// rows NOT ticked taken back record by record afterwards (LineUpStory, AlignFootnoteRows,
-// CheckOnlyTickedChanged) was tried and dropped (the author's call): it writes the rows nobody ticked,
-// and a footnote (nothing recorded there) and a deletion shared by touching matches cannot be taken
-// back. If it is ever wanted again, it is in git history (c876bc7 and before).
+// NOT InDesign's CHANGE ALL. A row's Replace writes that row and nothing else; InDesign's Change All writes every
+// match of its scope and is KFCChangeAll's (Change All in Book (No List), and each query of a query run). A
+// Change All over each story with the rows NOT asked for taken back record by record afterwards was tried and
+// dropped (the author's call) - it is in git history (c876bc7 and before).
 // ======================================================================================================
 
 // A REPLACE THAT WOULD WRITE AT AN ENDNOTE'S END. InDesign's replace - Change All,
@@ -332,10 +330,10 @@ bool MatchEndsAnEndnote(const UIDRef& story, TextIndex matchEnd)
 }
 
 // ======================================================================================================
-// ONE MATCH AT A TIME, STORY BY STORY, UNDER TRACK CHANGES (the author's call). Only the ticked matches
-// are written, one at a time (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current),
-// a story at a time, with Track Changes on so a replaced row keeps its Reject Change. (Not Change All -
-// see above.)
+// ONE MATCH AT A TIME, STORY BY STORY (the author's call). Only the rows asked for are written, one at a time
+// (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current), a story at a time, with Track
+// Changes as each story has it - KFC records nothing of its own (2026-10-06, spec F1). (Not Change All - see
+// above.)
 //
 // WHICH WAY THE WALK GOES IS DECIDED BEFORE ANYTHING IS WRITTEN (the author's call). A walk that writes
 // as it goes reads text it has already rewritten, and each direction has one shape it cannot get right
@@ -484,14 +482,11 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 // in the same thread (CarryRowsPast); a written row is put where its new text stands. A row that would
 // write at an endnote's end is left, and said so (MatchEndsAnEndnote). What is still in `pending` at the
 // end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
-// ioUnrecorded = the rows written that Track Changes recorded nothing for (a footnote, or a replace that
-// changed no character): the status lines say those cannot be taken back.
 // (Cancel is not asked in here - between stories, by the caller: the author's call, story by story.)
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
-	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, int32& ioUnrecorded, bool& outWalkFailed,
-	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone,
-	bool& outSignFailed)
+	int32& ioReplaced, int32& ioRefused, int32& ioEndnoteLeft, bool& outWalkFailed,
+	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported, int32& ioDone)
 {
 	IDataBase* const db = storyRef.GetDataBase();
 	// The walker, and the shared walker's selection utilities the critical section is taken on
@@ -520,7 +515,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		// 3000-row stories took 23 minutes; each story was ONE paragraph, which every find recomposed whole - in short
 		// paragraphs a row costs about 7 ms, flat). Summed per phase over one story's walk and written once (WALKTIME); every
 		// 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does something pile up?).
-		double tFind = 0, tMatch = 0, tPre = 0, tReplace = 0, tSign = 0, tRecord = 0, tTexts = 0, tCarry = 0;
+		double tFind = 0, tMatch = 0, tReplace = 0, tTexts = 0, tCarry = 0;
 		double tFindStep = 0;
 		int32 timedRows = 0, finds = 0;
 		KFCDiagPerf stepPerf;		// InDesign's counters over the last 100 finds (KFCDiag.h)
@@ -611,24 +606,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			}
 			else
 			{
-				// The row's text as it stands the moment before it is written (Hit::originalText).
-				KFC_CLOCK(cPre);
-				const PMString original = KFCTrackChange::ReadText(story, start, end - start);
-				// A QUERY RUN'S CHAINED WRITE (2026-10-05): which characters of the match an earlier query of the run
-				// wrote, and the run's deletions around it, read now - once the row is written, the deletions that grew
-				// are masked where the run's own characters went into them (KFCTrackChange.h, RunOwnChars /
-				// SnapshotRunDeletions / NoteRunDeletions). Nothing outside a query run: no floor, no mask.
-				WideString runMatch;
-				std::vector<bool> runOwn;
-				std::vector<KFCTrackChange::RunDeletion> runBefore;
-				const bool inQueryRun = KFCTrackChange::RunOwnChars(story, start, end, runMatch, runOwn);
-				if (inQueryRun)
-					KFCTrackChange::SnapshotRunDeletions(story, start, end, runBefore);
-				KFC_SPENT(tPre, cPre);
 				UIDRef written;
 				TextIndex writtenStart = kInvalidTextIndex, writtenEnd = kInvalidTextIndex;
 				// (Fault switch replace-refuse, a test build's only - KFCDiag.h: InDesign's replace refuses every row,
-				// the one way a test reaches a chapter where nothing lands after its pending changes were accepted.)
+				// the one way a test reaches a chapter where nothing lands.)
 				bool refuseForTest = false;
 #ifdef KFC_DIAG
 				refuseForTest = KFC_DIAG_FAULT("replace-refuse");
@@ -643,60 +624,16 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 #ifdef KFC_DIAG
 					++timedRows;
 #endif
-					// SIGNED BEFORE THE NEXT ONE IS WRITTEN. "KohakuFindChange" at the
-					// row's time (KFCTrackChange.h) - a replace written next to this one has to meet records
-					// already signed, or InDesign joins its insertion to this one's.
-					KFC_CLOCK(cSign);
-					const uint64 stamp = KFCTrackChange::StampForRow(chapterIdx, hitIdx);
-					bool skipSignForTest = false;
-#ifdef KFC_DIAG
-					// (Fault switch perf-no-sign, a test build's only - KFCDiag.h: a measurement of what signing costs the next
-					// find; the rows are left unsigned. Never on a document anybody keeps.)
-					skipSignForTest = KFC_DIAG_FAULT("perf-no-sign");
-#endif
-					// A QUERY RUN SIGNS AT ITS END (the spec's D14 - KFCTrackChange::SignRunPlaces): nothing is signed here
-					// while one writes, so a later query deleting what this row writes deletes the user's own insertion.
-					const bool deferSign = KFCTrackChange::QueryRunWriting();
-					const bool signedHere = skipSignForTest || deferSign
-						|| KFCTrackChange::SignReplace(written, writtenStart, writtenEnd, stamp);
-					KFC_SPENT(tSign, cSign);
-					if (!signedHere)
-					{
-						outSignFailed = true;
-						break;
-					}
-					// The row's time only when a record carries it; 0 = none (a footnote records nothing, nor does a
-					// replace that changed no character - Change Format with an empty Change To) - set either way, so
-					// a row replaced once, taken back and replaced again where nothing is recorded does not keep the
-					// first replace's time. AND WHERE ITS FIRST RECORD STANDS IN WHAT IT WROTE: 0 for a
-					// whole-match replace; a GREP $n keeps the matched characters it names, and its records
-					// start past them (Hit::recordLead).
-					KFC_CLOCK(cRecord);
-					TextIndex firstRecord = kInvalidTextIndex;
-					const bool recorded = deferSign
-						? KFCTrackChange::HasRunRecordIn(written, writtenStart, writtenEnd)		// unsigned: no time to look for
-						: KFCTrackChange::FirstRecordOfTimeIn(written, writtenStart, writtenEnd, stamp, firstRecord);
-					if (deferSign && recorded)
-						firstRecord = writtenStart;		// (the query run's list is rebuilt from the records - this row's lead is not read)
-					KFCResultModel::SetHitRecord(chapterIdx, hitIdx, recorded ? stamp : 0,
-						recorded ? static_cast<int32>(firstRecord - writtenStart) : 0);
-					if (!recorded)
-						++ioUnrecorded;
-					if (inQueryRun)
-						KFCTrackChange::NoteRunDeletions(written, writtenStart, writtenEnd, runBefore, runMatch, runOwn);
-					KFC_SPENT(tRecord, cRecord);
 					lastStory = written.GetUID();
 					lastStart = writtenStart;
 					lastEnd = writtenEnd;
-					// ITS TWO TEXTS, TAKEN HERE - once, not read again for every row before and after the
-					// chapter. The text written now is the text the row holds at the end: no later replace of
-					// the run writes inside it, since every other row is carried outside it and a match there
-					// is none of theirs (stepped over, above).
-					// Set before MarkHitReplaced: the row's locator says "no track" at once when the replace
-					// changed no character (KFCResultModel::GetHitTextUnchanged), which asks them.
+					// WHAT IT WROTE, TAKEN HERE - once (Hit::replacedText): the jump looks for a moved row by it
+					// (KFCSearchEngine::RelocateStaleRow). The text written now is the text the row holds at the end: no
+					// later replace of the run writes inside it, since every other row is carried outside it and a match
+					// there is none of theirs (stepped over, above).
 					KFC_CLOCK(cTexts);
-					KFCResultModel::SetHitChangeTexts(chapterIdx, hitIdx, original,
-						KFCTrackChange::ReadText(written, writtenStart, writtenEnd - writtenStart));
+					KFCResultModel::SetHitWrittenText(chapterIdx, hitIdx,
+						KFCSearchEngine::ReadText(written, writtenStart, writtenEnd - writtenStart));
 					KFCResultModel::MarkHitReplaced(chapterIdx, hitIdx, written.GetUID(), writtenStart, writtenEnd);
 					KFC_SPENT(tTexts, cTexts);
 					KFC_CLOCK(cCarry);
@@ -750,9 +687,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + ioDone);
 		}
 #ifdef KFC_DIAG
-		KFC_DIAG_LOG("WALKTIME story=%u rows=%d finds=%d restarts=%d find=%.0f match=%.0f pre=%.0f replace=%.0f sign=%.0f record=%.0f texts=%.0f carry=%.0f ms",
-			storyRef.GetUID().Get(), (int)timedRows, (int)finds, (int)restarts, tFind, tMatch, tPre, tReplace, tSign, tRecord,
-			tTexts, tCarry);
+		KFC_DIAG_LOG("WALKTIME story=%u rows=%d finds=%d restarts=%d find=%.0f match=%.0f replace=%.0f texts=%.0f carry=%.0f ms",
+			storyRef.GetUID().Get(), (int)timedRows, (int)finds, (int)restarts, tFind, tMatch, tReplace, tTexts, tCarry);
 #endif
 	}
 	if (walker->IsWalking())
@@ -760,12 +696,12 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	return true;
 }
 
-// IS THE ROW'S STORED PLACE STILL ITS TEXT? A row is carried and read back only when it is: a replaced
-// row is first put where its tracked change stands (the record moves with the text -
-// RefreshRowFromRecords), any other row must still read as it was found (KFCSearchEngine::RowReadsAsFound
-// - the jump's own test). An edit made since can have moved the rest - reading such a row back at its old
-// place takes the line AND the hash from the wrong characters, so a click then selects them (measured,
-// case edit-then-reject: "ZZkitt"); left alone, it says "missing" when clicked, which is the truth.
+// IS THE ROW'S STORED PLACE STILL ITS TEXT? A row is carried and read back only when it is: a replaced row
+// must still hold what its replace wrote there (Hit::replacedText), any other row must still read as it was
+// found (KFCSearchEngine::RowReadsAsFound - the jump's own test). An edit made since can have moved the rest -
+// reading such a row back at its old place takes the line AND the hash from the wrong characters, so a click
+// then selects them (measured: "ZZkitt"); left alone, its jump looks for it again
+// (KFCSearchEngine::RelocateStaleRow) and says it is no longer here when no one place is found.
 bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 {
 	bool replaced = false, locked = false;
@@ -777,18 +713,12 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 	const bool haveIdentity = KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash);
 	if (replaced)
 	{
-		// THE CHEAP TEST FIRST. Matching a replaced row against every
-		// tracked change of its story costs a pass over the chapter's rows and the story's records, and
-		// this runs for every row of the chapter on every Reject / Redo / right-click Replace - squared
-		// in the rows. The ordinary case is a row whose stored place still holds the text its replace
-		// wrote: that is asked by reading those characters. Only a row that fails it (an edit since) is
-		// looked for through its records.
-		PMString originalText, replacedText;
-		if (haveIdentity && KFCResultModel::GetHitChangeTexts(chapterIdx, hitIdx, originalText, replacedText)
-			&& !replacedText.IsEmpty()
-			&& KFCTrackChange::ReadText(UIDRef(db, story), a, b - a) == replacedText)
-			return true;
-		return KFCTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx);
+		// A REPLACED ROW STANDS WHERE ITS STORED PLACE STILL HOLDS WHAT ITS REPLACE WROTE (Hit::replacedText). One
+		// that does not - an edit since, which KFC does not follow - is left as it is; its jump looks for it again
+		// (KFCSearchEngine::RelocateStaleRow).
+		PMString written;
+		return haveIdentity && KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, written) && !written.IsEmpty()
+			&& KFCSearchEngine::ReadText(UIDRef(db, story), a, b - a) == written;
 	}
 	// The match AND the line around it: a row an Undo left on another occurrence of its own text passes the
 	// match's hash alone, and would then be read back THERE - from then on describing that other
@@ -846,26 +776,22 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 	}
 }
 
-// THE CHAPTER'S REPLACE. Every ticked row is written by the walk of its story,
-// with Track Changes on for the stories written (TrackingScope) and the direction the caller set.
-// Refuses before anything is written - returns false, outWhyNot says why - only when the document, the
-// Find/Change options or a row cannot be read. The pending tracked changes the ticked matches sit in or
-// next to are accepted before the first write (outAcceptedFirst = how many) - except around a match at
-// an endnote's end, which the walk leaves. outCancelled / outFailed: the caller aborts the
-// whole run. outUnrecorded = the rows written that Track Changes recorded nothing for (WalkStoryReplacing).
+// THE CHAPTER'S REPLACE. Every row asked for is written by the walk of its story, in the direction the caller
+// set - Track Changes as each story has it (KFC records nothing of its own, 2026-10-06 -
+// docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1). Refuses before anything is written -
+// returns false, outWhyNot says why - only when the document, the Find/Change options or a row cannot be read.
+// outCancelled / outFailed: the caller aborts the whole run.
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,
 	KFCProgressBar* progressBar, int32 progressBase, int32& ioProgressReported,
 	int32& outReplaced, int32& outMissing, int32& outLocked, int32& outRefused, int32& outEndnoteLeft,
-	int32& outUnrecorded, int32& outAcceptedFirst, bool& outWalkFailed, bool& outCancelled, bool& outFailed,
+	bool& outWalkFailed, bool& outCancelled, bool& outFailed,
 	PMString& outWhyNot, const std::set<int32>* onlyHits = nil)
 {
-	outAcceptedFirst = 0;
 	outReplaced = 0;
 	outMissing = 0;
 	outLocked = 0;
 	outRefused = 0;
 	outEndnoteLeft = 0;
-	outUnrecorded = 0;
 	outWalkFailed = false;
 	outCancelled = false;
 	outFailed = false;
@@ -880,7 +806,7 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		return false;
 	}
 	// GLYPH AND TRANSLITERATE ARE WRITTEN TOO (the author's call). One match at a time is the walk those
-	// two tabs were built and measured on: ReplaceChecked has already stated the change glyph or the
+	// two tabs were built and measured on: the caller (ReplaceRowsNow) has already stated the change glyph or the
 	// character type the command writes (KFCSearchEngine::CommitReplaceSide), and the menu refuses the
 	// Object and Colour tabs before any of this.
 
@@ -908,13 +834,11 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		{
 			// a locked row the report keeps (it never had a box), a replaced row - and every row, for
 			// the one-row Replace: each has to stand where its text is afterwards. ONLY a row whose
-			// stored place is still its text (RowStillStands - a replaced row is put where its tracked
-			// change stands first): one an edit has moved is left as it is, never read back at a place
+			// stored place is still its text (RowStillStands - a replaced row must still hold what it
+			// wrote): one an edit has moved is left as it is, never read back at a place
 			// that is no longer its own.
-			// ...and a row with an outcome (taken back with Reject Change, above all): Change Checked's report
-			// keeps it (KFCResultModel::KeepCheckedRows) - left out, a row taken back and not ticked would stay
-			// at its old place in the report, and its Replace refuse as "changed since the search" (case
-			// rejected-row-after-change).
+			// ...and a row with an outcome (missing, refused, an endnote's end): the list keeps it, so it is carried
+			// like the rest.
 			// Its place is taken only here, after RowStillStands, which can move it: every other row not
 			// written stays unknown - neither carried nor read back.
 			if ((onlyHits != nil || locked || replaced
@@ -958,9 +882,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			keptRows.push_back(i);
 			continue;
 		}
-		// (A ticked match inside or next to the user's own pending insertion does not refuse the run -
-		//  replacing it would leave no record, so it could never be taken back: the pending changes around
-		//  the ticked matches are accepted before anything is written instead - below.)
+		// (A match inside or next to the user's own pending insertion is written as InDesign writes it - into the
+		//  insertion, as its own Change does (case nt-own-insertion): KFC accepts nothing, 2026-10-06 - spec F1.)
 		pendingByStory[story].insert(i);
 	}
 	// Nothing to write: every row kept was placed a moment ago from where it stands, and nothing has moved
@@ -969,80 +892,6 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		return true;
 
 	// ===== from here on things are WRITTEN. A cancel or a failure below leaves the caller to abort. =====
-	const int32 replacedBefore = outReplaced;
-
-	// THE PENDING CHANGES A TICKED MATCH SITS IN OR NEXT TO ARE ACCEPTED FIRST - ANYBODY'S, AND NOTHING
-	// ELSE (the author's call: "only that part"). A replace written inside or next to the user's own
-	// pending insertion leaves no record of its own (InDesign rewrites the insertion it has - VOSRedline.h
-	// CanApplyDeleteChange; case rereplace-ours), so it could never be taken back - and refusing the run
-	// for it is not the answer either. Not the whole document: the rest of it keeps its records - an
-	// earlier replace's rows keep their Reject Change. Inside the run's sequence, so the Undo and a cancel
-	// take it back with the replaces.
-	// ! Each row's place is asked NOW, from its thread offset (RowStartNow): an accepted deletion's
-	//   deleted-text thread goes, which moves the story indexes of the cells and footnotes behind it.
-	KFC_CLOCK(cAccept);
-	bool acceptAround = true;
-#ifdef KFC_DIAG
-	// (Fault switch no-accept-around, a test build's only - KFCDiag.h: the pending changes around the ticked matches are
-	// left as they are, so InDesign joins and rewrites them as it does for its own Change - the partial-reject experiment
-	// of 2026-10-06. Throwaway documents only.)
-	acceptAround = !KFC_DIAG_FAULT("no-accept-around");
-#endif
-	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); acceptAround && s != pendingByStory.end(); ++s)
-	{
-		const UIDRef storyRef(db, s->first);
-		if (!KFCTrackChange::StoryHasChanges(storyRef))
-			continue;
-		for (std::set<int32>::const_iterator p = s->second.begin(); p != s->second.end(); ++p)
-		{
-			const RowNow& row = rowNow[static_cast<size_t>(*p)];
-			TextIndex at = kInvalidTextIndex;
-			if (!RowStartNow(db, row, at))
-				continue;
-			// NOT AROUND A ROW THAT IS NOT WRITTEN. A match at an endnote's end is left by the walk below
-			// (MatchEndsAnEndnote, the same question), so nothing next to it is accepted either - an accept for a
-			// replace that never comes, and with nothing written in the chapter,
-			// HandBackChaptersWithNothingInThem would put its modified flag back over the accept (case
-			// endnote-end-pending-kept: the user's Z next to the endnote's last match).
-			if (MatchEndsAnEndnote(storyRef, at + row.length))
-				continue;
-			PMString why;
-			why.SetTranslatable(kFalse);
-			const int32 accepted = KFCTrackChange::AcceptPendingAround(storyRef, at, at + row.length, why);
-			if (accepted < 0)
-			{
-				outFailed = true;
-				outWhyNot = "a pending tracked change next to a ticked match could not be accepted - ";
-				outWhyNot.Append(why);
-				return true;
-			}
-			outAcceptedFirst += accepted;
-		}
-	}
-#ifdef KFC_DIAG
-	{
-		double tAccept = 0;
-		KFC_SPENT(tAccept, cAccept);
-		KFC_DIAG_LOG("ACCEPTTIME rows=%u accepted=%d %.0f ms", (unsigned)rowNow.size(), (int)outAcceptedFirst, tAccept);
-	}
-#endif
-
-	std::set<UID> targetStories;
-	for (std::map<UID, std::set<int32> >::const_iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
-		targetStories.insert(s->first);
-#ifdef KFC_DIAG
-	// (Fault switch perf-no-track, a test build's only - KFCDiag.h: a measurement of what Track Changes costs the
-	// walk; the stories are written untracked. Never on a document anybody keeps.)
-	if (KFC_DIAG_FAULT("perf-no-track"))
-		targetStories.clear();
-#endif
-	KFCTrackChange::TrackingScope tracking(db, targetStories);
-	if (!tracking.Ok())
-	{
-		outFailed = true;
-		outWhyNot = "Track Changes could not be switched on";
-		return true;
-	}
 
 	int32 done = 0;		// ticked rows accounted for, for the bar
 	for (std::map<UID, std::set<int32> >::iterator s = pendingByStory.begin(); s != pendingByStory.end(); ++s)
@@ -1059,20 +908,12 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		// A story an earlier story's replace deleted (an anchored object's): its rows never come up.
 		if (db->IsValidUID(s->first))
 		{
-			bool signFailed = false;
 			if (!WalkStoryReplacing(chapterIdx, UIDRef(db, s->first), scopeOptions, opts, rowNow, pending, keptRows,
-				outReplaced, outRefused, outEndnoteLeft, outUnrecorded, outWalkFailed, progressBar, progressBase,
-				ioProgressReported, done, signFailed))
+				outReplaced, outRefused, outEndnoteLeft, outWalkFailed, progressBar, progressBase,
+				ioProgressReported, done))
 			{
 				outFailed = true;
 				outWhyNot = "the text walker could not be started";
-				return true;
-			}
-			// a replace whose records could not be signed stops the whole run (the caller rolls it back)
-			if (signFailed)
-			{
-				outFailed = true;
-				outWhyNot = "the tracked changes could not be signed";
 				return true;
 			}
 		}
@@ -1096,16 +937,10 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		}
 		KFCAdvanceProgress(progressBar, ioProgressReported, progressBase + done);
 	}
-	// THE RECORDS JUST WRITTEN, IN AMBER (the author's call). Their author, KFC's
-	// name, given the UI colour Amber in this document (KFCTrackChange::ColourSignAuthor) - inside the run's
-	// sequence, so the Undo takes it back with the replace. Nothing stops the replace if it does not go in.
-	if (outReplaced > replacedBefore)
-		(void)KFCTrackChange::ColourSignAuthor(db);
-
 	// ----- every row the report keeps, where its text stands now: its range and its line. Read once the
 	// chapter has stopped changing: a line read as its own match was written would still show the later
-	// matches of its paragraph as they were. (A replaced row's time - what Reject Change and the jump find
-	// its records by - is set when it is written, WalkStoryReplacing, not read back off the records here.)
+	// matches of its paragraph as they were. (What a replaced row wrote - what its jump looks for it by
+	// once it has moved - is taken when it is written, WalkStoryReplacing.)
 	for (size_t k = 0; k < keptRows.size(); ++k)
 	{
 		const int32 hitIdx = keptRows[k];
@@ -1454,9 +1289,9 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 // REPLACE ONE ROW, FROM ITS RIGHT-CLICK MENU (the author's call) - since 2026-10-06 the one write from the list
 // (spec F16: Change Checked and the story / document rows' Replace are gone). No prompt. The list stays a WORK
 // LIST, so the row shows its new text and every other row is carried to where its text now stands, ready for
-// the next Replace. One undo step ("Replace"). Its doors: the query unchanged (RefuseChangedQuery), the verify
-// walk's three questions (ChapterMovedUnderRows), and only the pending changes the row sits in or next to
-// accepted first.
+// the next Replace. One undo step ("Replace"). Its doors: the query unchanged (RefuseChangedQuery) and the verify
+// walk's three questions (ChapterMovedUnderRows). Nothing is accepted, and nothing recorded of KFC's own
+// (2026-10-06, spec F1).
 // ======================================================================================================
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
@@ -1494,8 +1329,8 @@ static ICommandSequence* BeginPlainSequence(const PMString& stepName, const char
 // A STEP ROLLED BACK LEAVES THE DOCUMENT AS IT FOUND IT - ITS "UNSAVED" FLAG TOO (the author's call). The
 // rollback puts the TEXT back and leaves the database marked modified (measured: a saved document, a story's
 // Replace rolled back all or none - case story-replace-endnote-end - came out modified=true with not a
-// character changed, and asked to be saved on close). Change Checked's cancel puts the flag back
-// (ReplaceChecked); this is the row menus' steps' line for it. `wasModified` = the database's flag read
+// character changed, and asked to be saved on close). Change All's cancel puts the flag back
+// (KFCChangeAll); this is the row menu's step's line for it. `wasModified` = the database's flag read
 // before the step began: one the user had already changed is left changed.
 static void EndPlainSequence(ICommandSequence* sequence, bool ok, IDataBase* db, bool wasModified)
 {
@@ -1637,7 +1472,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 			writtenStories.insert(story);
 	}
 
-	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0, unrecorded = 0, accepted = 0;
+	int32 replaced = 0, missing = 0, locked = 0, refused = 0, endnoteLeft = 0;
 	bool walkFailed = false, cancelled = false, failed = false;
 	PMString whyNot;
 	bool ok = false;
@@ -1656,10 +1491,9 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 		if (sequence == nil)
 			return false;
 		// (the row backup was started by the recorder, above)
-		KFCTrackChange::BeginSignedRun();	// the run's time - every row it writes is stamped from it
 		int32 progressReported = 0;
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
-			replaced, missing, locked, refused, endnoteLeft, unrecorded, accepted, walkFailed, cancelled, failed, whyNot,
+			replaced, missing, locked, refused, endnoteLeft, walkFailed, cancelled, failed, whyNot,
 			&rowsToReplace);
 		ok = wrote && !failed && !cancelled && replaced == static_cast<int32>(rowsToReplace.size());
 		if (ok)
@@ -1728,17 +1562,10 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
-	// (Each row's two texts - Hit::originalText / replacedText - are taken by the walk that writes it,
-	//  WalkStoryReplacing.)
+	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
 	// WHAT IT DID (2026-10-06, spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step.
 	// The message says nothing of Ctrl+Z (the author's call); the Track Changes wording went with Reject Change.
 	outStatus = "Replaced.";
-	if (accepted > 0)
-	{
-		outStatus.Append(" ");
-		outStatus.AppendNumber(accepted);
-		outStatus.Append(" pending tracked change(s) next to it accepted first.");
-	}
 	return true;
 }
 
@@ -1755,19 +1582,5 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	one.insert(hitIdx);
 	return ReplaceRowsNow(chapterIdx, one, outStatus);
 }
-
-// THE DOOR ACCEPT CHANGE ASKS OF ONE STORY'S ROWS - RejectRowsNow's, run by run. `rows` = where each row's
-// written text starts, how long it is (KFCTrackChange::Change)
-// and its original text. The rows are split into runs of touching rows (RejectRowsNow's rule), every record goes
-// to the run whose text holds it, and each run's text with its records taken back
-// (KFCTrackChange::OriginalFromRecords) must read as its rows' originals joined. False = one does not, or a
-// record stands outside every run. (Not the records' deletions joined, compared with the originals: true of a
-// whole-match replace, never of a GREP Change To holding $n, whose kept characters no deletion holds.)
-struct RowSpan
-{
-	TextIndex	at;
-	int32		len;
-	PMString	original;
-};
 
 // End, KFCReplaceEngine.cpp.

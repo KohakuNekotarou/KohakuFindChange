@@ -73,8 +73,8 @@ namespace
 
 	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
 	// taken first is the row as the run found it, and it is the one a rollback has to put back. (A
-	// replaced row is written four or five times over - MarkHitReplaced, SetHitRecord, SetHitChangeTexts,
-	// SetHitRange, SetHitSegments - and a copy per change would only be overwritten unread.)
+	// replaced row is written four times over - MarkHitReplaced, SetHitWrittenText, SetHitRange,
+	// SetHitSegments - and a copy per change would only be overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KFCResultModel::Hit& row)
 	{
 		if (!gBackingUpRows || !gRowsBackedUp.insert(std::make_pair(chapterIdx, hitIdx)).second)
@@ -112,15 +112,6 @@ namespace
 	{
 		KFCResultModel::Chapter* c = ChapterAt(chapterIdx);
 		return (c != nil && hitIdx >= 0 && hitIdx < static_cast<int32>(c->hits.size())) ? &c->hits[hitIdx] : nil;
-	}
-
-	// A replaced row whose replace changed no character, so nothing was recorded for it - the one rule.
-	// See KFCResultModel::GetHitTextUnchanged. A row taken back, accepted
-	// or gone with its object has an outcome, and a footnote's row is said as such.
-	bool TextUnchanged(const KFCResultModel::Hit& h)
-	{
-		return h.replaced && !h.inFootnote && h.recordTime == 0 && h.outcome == KFCResultModel::kOutcomeNone
-			&& h.originalText == h.replacedText;
 	}
 
 	KFCResultModel::FontGroup* GroupAt(int32 chapterIdx, int32 groupIdx)
@@ -721,71 +712,6 @@ void KFCResultModel::GetChapterStories(int32 chapterIdx, std::set<UID>& outStori
 				outStories.insert(c->hits[hi].storyUID);
 }
 
-uint64 KFCResultModel::GetHitRecordTime(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return (h != nil) ? h->recordTime : 0;
-}
-
-int32 KFCResultModel::GetHitRecordLead(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return (h != nil) ? h->recordLead : 0;
-}
-
-void KFCResultModel::SetHitRecord(int32 chapterIdx, int32 hitIdx, uint64 time, int32 lead)
-{
-	Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil)
-		return;
-	BackUpRow(chapterIdx, hitIdx, *h);
-	h->recordTime = time;
-	h->recordLead = lead;
-}
-
-bool KFCResultModel::GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return h != nil && TextUnchanged(*h);
-}
-
-void KFCResultModel::GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
-{
-	outHits.clear();
-	const Hit* mep = HitAt(chapterIdx, hitIdx);
-	if (mep == nil)
-		return;
-	const std::vector<Hit>& hits = gChapters[chapterIdx].hits;
-	const Hit& me = *mep;
-	// the story's rows with a place, in text order
-	std::vector<std::pair<TextIndex, int32> > order;
-	for (size_t i = 0; i < hits.size(); ++i)
-		if (hits[i].storyUID == me.storyUID && hits[i].textStart != kInvalidTextIndex)
-			order.push_back(std::make_pair(hits[i].textStart, static_cast<int32>(i)));
-	std::sort(order.begin(), order.end());
-	size_t at = 0;
-	while (at < order.size() && order[at].second != hitIdx)
-		++at;
-	if (at == order.size())
-	{
-		outHits.push_back(hitIdx);
-		return;
-	}
-	size_t from = at, to = at;
-	while (from > 0 && hits[order[from - 1].second].textEnd >= hits[order[from].second].textStart)
-		--from;
-	while (to + 1 < order.size() && hits[order[to].second].textEnd >= hits[order[to + 1].second].textStart)
-		++to;
-	for (size_t k = from; k <= to; ++k)
-		outHits.push_back(order[k].second);
-}
-
-bool KFCResultModel::GetHitInFootnote(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return h != nil && h->inFootnote;
-}
-
 bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -823,25 +749,22 @@ KFCResultModel::ChangeOutcome KFCResultModel::GetHitOutcome(int32 chapterIdx, in
 	return (h != nil) ? h->outcome : kOutcomeNone;
 }
 
-void KFCResultModel::SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
-	const PMString& replacedText)
+void KFCResultModel::SetHitWrittenText(int32 chapterIdx, int32 hitIdx, const PMString& writtenText)
 {
 	Hit* h = HitAt(chapterIdx, hitIdx);
 	if (h == nil)
 		return;
 	BackUpRow(chapterIdx, hitIdx, *h);
-	h->originalText = originalText;	h->originalText.SetTranslatable(kFalse);
-	h->replacedText = replacedText;	h->replacedText.SetTranslatable(kFalse);
+	h->replacedText = writtenText;
+	h->replacedText.SetTranslatable(kFalse);
 }
 
-bool KFCResultModel::GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
-	PMString& outReplacedText)
+bool KFCResultModel::GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
 	if (h == nil || !h->replaced)
 		return false;
-	outOriginalText = h->originalText;
-	outReplacedText = h->replacedText;
+	outWrittenText = h->replacedText;
 	return true;
 }
 
@@ -906,12 +829,8 @@ void KFCResultModel::MarkHitReplaced(int32 chapterIdx, int32 hitIdx, UID newStor
 	h.textStart = newStart;
 	h.textEnd = newEnd;
 	h.replaced = true;
-	// The locator follows at once where the replace changes what it says: a footnote's row says "no track" - a
-	// row's Replace leaves a work list, which no pass numbers again afterwards. So does a row whose replace
-	// changed no character (TextUnchanged - the replace sets the row's record and texts before this, for it).
-	// Every other row's locator reads the same before and after, so it is not built again for nothing.
-	if (h.inFootnote || TextUnchanged(h))
-		BuildHitLocator(h);
+	// (The locator is not built again: nothing it says is changed by a replace - the page, the ordinal, overset,
+	// hidden and locked come from the search, and an outcome is set where the replace sets one.)
 }
 
 // (No getter hands a replaced row's range back to the replace pass: the range the model holds is
@@ -982,13 +901,12 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// two kinds of word, kept in two strings:
 	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
 	//     so the page will look empty on arrival), locked (no check box; the replace will not touch it),
-	//     and what has happened to it since: rejected (on a list rebuilt from the records only),
-	//     deleted, no track;
+	//     and what has happened to it since: deleted;
 	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
 	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
 	//     would not run there), not replaced.
-	// Only hidden and locked come from the search itself; the rest are put there later - by a replace,
-	// a jump that finds the text gone, or the records (a query run's list). They stack on
+	// Only hidden and locked come from the search itself; the rest are put there later - by a replace
+	// or a jump that finds the text gone. They stack on
 	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
@@ -1015,21 +933,9 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeEndnoteLeft)
 		hit.accentFlag.Append("not replaced");	// ticked and not written: the status line says why
-	// A rejected row says nothing (the author: "no 'rejected' when I take one back") - it reads its
-	// original text again, which is what the author asked for; the state is still there for the story
-	// and document rows' Replace Again (Redo in the code); a reader of the panel sees the row's check
-	// box come back.
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
 
-	// "no track" - REPLACED INSIDE A FOOTNOTE (the user's request). Track Changes records nothing in a
-	// footnote (measured), so the replace there left no change to take back or accept, and only the
-	// row can keep saying so (the status line says it once, when it is replaced).
-	// Normal colour, like "locked": a fact about the row, not a failure.
-	// ...and a replace that changed no character (TextUnchanged): formatting only, if anything, which
-	// Track Changes does not record either.
-	if ((hit.replaced && hit.inFootnote && hit.outcome == kOutcomeNone) || TextUnchanged(hit))
-		hit.locator.Append(" no track");
 }
 
 void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)

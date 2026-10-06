@@ -8,9 +8,8 @@
 //  (KFCResultListAdapter / KFCResultListWidgetMgr) displays. A tiny session-global store - the
 //  KFC analog of KESCL's KESCLBatchCheck, minus its filters / reverse mode / per-value rows,
 //  because the KFC tree is shallow: book -> document -> story -> hit for a book search, and
-//  document -> story -> hit for a document search, which has no book row at all. (A list rebuilt
-//  from the Track Changes records has a run level between a document and its stories -
-//  KFCResultNodeID.h draws every shape a node can take.)
+//  document -> story -> hit for a document search, which has no book row at all
+//  (KFCResultNodeID.h draws every shape a node can take).
 //
 //  Each hit already carries its display text pre-split into three PMString segments (the text
 //  before the match, the matched text, and the text after) so the colour cell just paints three
@@ -39,12 +38,8 @@ namespace KFCResultModel
 	    chapter, so no query or document can pile up an unbounded result set; the search says so in its
 	    summary rather than coming back quietly short. Counted in ROWS, the same unit the display cap uses.
 	    TEN THOUSAND, OVER A PANEL THAT DRAWS kKFCDisplayHitLimit (KFCModelTypes.h) - the author's call of
-	    2026-10-05 (the spec map's GEN-34 as changed: from 10-04 to that day the two were one number): Check All
-	    on a book or document row ticks the rows the panel does not draw, and Change Checked replaces them.
-	    Not more: a replaced row's signed time is its run's millisecond plus its row number in the four digits
-	    below it (KFCTrackChange::StampForRow), and Show Changes tells runs apart by that millisecond - a run of
-	    more rows would list as two. A search with more matches stops here and says "narrow your search"; a
-	    replace writes the rows it has, and searching again finds the rest. */
+	    2026-10-05 (the spec map's GEN-34 as changed: from 10-04 to that day the two were one number). A search with
+	    more matches stops here and says "narrow your search". */
 	const int32 kKFCCollectHitLimit = 10000;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
@@ -109,34 +104,15 @@ namespace KFCResultModel
 								// Kept OUT of locator so the cell can paint it separately; built by
 								// BuildHitLocator alongside it. Only "missing", "refused" and "not replaced" earn
 								// it - the other flags stay in locator and read in the normal colour.
-		// --- Track Changes ---
-		// The WHOLE text of the match before the replace and the whole text the replace wrote, taken
-		// as it was written (not capped for drawing like matchText). A replaced row's change is found by
-		// its time (recordTime); these are what that change must still read as - the text it wrote as
-		// replacedText (KFCTrackChange::FindRowChangeForHit), and its run's text with the records taken back
-		// as the originalTexts (KFCReplaceEngine RejectRowsNow / AcceptRowsNow - not the run's deletions
-		// alone, which a GREP $n's kept characters do not hold). Empty until the row is replaced.
-		PMString	originalText;
+		// --- what the replace wrote ---
+		// The WHOLE text a replace wrote at the row's place, taken as it was written (not capped for drawing like
+		// matchText): a replaced row that an edit has moved is looked for again by it
+		// (KFCSearchEngine::RelocateStaleRow). Empty until the row is replaced.
 		PMString	replacedText;
 		// The first characters of the match's STORY: what a story row of
 		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
 		// as it has walked it, so the story cannot be read again when the tree draws.
 		PMString	storyLead;
-		// The match sits inside a footnote. Track Changes records nothing there, so such
-		// a row cannot be taken back (GetHitInFootnote).
-		bool		inFootnote;
-		// The time stamp of the tracked changes the replace made for this row: its change
-		// is looked for among that run's records only. 0 = not replaced (or nothing recorded).
-		uint64		recordTime;
-		// WHERE THE ROW'S RECORDS START, INSIDE WHAT IT WROTE.
-		// How far into the row's replaced text its first record of recordTime stands - the first insertion
-		// piece, or the first deletion when it inserted nothing. 0 for every replace that writes the whole
-		// match; more for a GREP Change To holding $n, which InDesign's one-at-a-time replace writes by KEEPING
-		// the matched characters it names: c(at) -> $1og on "cat" records "og" and the deletion of "at" and
-		// leaves the "c" as it was (measured; Change All records the whole match). Taken when the row is written,
-		// so its change can be found again from its records alone (KFCTrackChange::FindRowChangeForHit). A row
-		// rebuilt from the records (Show Changes) starts at that record: 0.
-		int32		recordLead;
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
@@ -144,8 +120,7 @@ namespace KFCResultModel
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outcome(kOutcomeNone), inFootnote(false),
-				recordTime(0), recordLead(0), pageOrdinal(0) {}
+				replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -420,27 +395,6 @@ namespace KFCResultModel
 	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
 
 
-	/** The rows touching `hitIdx` in its chapter - same story, ranges meeting or overlapping, followed
-	    both ways - in TEXT order, `hitIdx` included. Reads the ranges as they stand (the search's
-	    before a replace, the replaced text's after one). */
-	void GetTouchingGroup(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
-
-	/** Is the row inside a footnote (Hit::inFootnote)? False for an out-of-range index. */
-	bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx);
-	/** The time stamp of the row's tracked changes (Hit::recordTime); 0 for none or out of range. */
-	uint64 GetHitRecordTime(int32 chapterIdx, int32 hitIdx);
-	/** How far into its replaced text the row's first record stands (Hit::recordLead); 0 out of range. */
-	int32 GetHitRecordLead(int32 chapterIdx, int32 hitIdx);
-	/** The row's records as the replace that wrote it left them: their time (0 = none) and where the first
-	    one stands inside the text it wrote (Hit::recordLead). */
-	void SetHitRecord(int32 chapterIdx, int32 hitIdx, uint64 time, int32 lead);
-	/** A REPLACE THAT CHANGED NO CHARACTER. The row is replaced, outside a footnote, and its replace left
-	    the text as it was - a Change Format with an empty Change To (formatting only), or a Change To equal
-	    to the match: Track Changes records text only, so nothing was recorded (recordTime 0) and Reject
-	    Change has nothing to take back. Said as such, the way a footnote's row is - not "Reject Change
-	    takes it back", nor "no tracked change is left (undone, accepted, rejected or deleted?)". False out
-	    of range. */
-	bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx);
 
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */
@@ -472,16 +426,12 @@ namespace KFCResultModel
 	/** A row's outcome (kOutcomeNone for an out-of-range index). */
 	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
 
-	/** The texts a replaced row's tracked change is found by (see Hit::originalText). The replace
-	    reads them from the document - the model reads no text - and hands them over here. */
-	void SetHitChangeTexts(int32 chapterIdx, int32 hitIdx, const PMString& originalText,
-		const PMString& replacedText);
-	/** False when the row was neither replaced nor taken back (a row taken back keeps the texts of
-	    the replace it undid), or the index is out of range. */
-	bool GetHitChangeTexts(int32 chapterIdx, int32 hitIdx, PMString& outOriginalText,
-		PMString& outReplacedText);
+	/** The whole text the replace wrote at the row's place (Hit::replacedText). The replace reads it from the
+	    document - the model reads no text - and hands it over here. */
+	void SetHitWrittenText(int32 chapterIdx, int32 hitIdx, const PMString& writtenText);
+	/** False when the row is not replaced, or the index is out of range. */
+	bool GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText);
 
-	// (A row taken back is replaced again like any other - MarkHitReplaced clears its "taken back".)
 	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
 
@@ -601,13 +551,9 @@ namespace KFCResultModel
 
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
 	    found changed. Only the words that come from the row's outcome exclude each other, being values
-	    of one field: missing, refused, not replaced, and on the locator rejected, deleted, accepted.
+	    of one field: missing, refused, not replaced, and on the locator deleted.
 
-	    The locator also says " deleted" (gone with the object another ticked row deleted),
-	    " rejected" (a row taken back, on a list rebuilt from the records only - it has no box to say
-	    it), " accepted" (its change accepted) and " no track" (replaced inside a footnote, where Track
-	    Changes records nothing - the user's request; also a replace that changed no character -
-	    GetHitTextUnchanged). */
+	    The locator also says " deleted" (gone with the object another replaced row deleted). */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
@@ -739,7 +685,7 @@ namespace KFCResultModel
 	    index the chapters that went). */
 	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
 
-	/** Which result set the rows are: a new number with every Clear (a search, Show Changes, a close) -
+	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
 	    a write kept for an Undo belongs to one, and means nothing to the next. */
 	uint32 GetResultSetId();
 

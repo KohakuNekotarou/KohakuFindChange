@@ -28,9 +28,6 @@ REGISTER_PMINTERFACE(KFCStartupShutdown, kKFCStartupShutdownImpl)
 REGISTER_PMINTERFACE(KFCCloseDocResponder, kKFCCloseDocResponderImpl)
 // Result invalidation: retire a book-scope result set when its book closes.
 REGISTER_PMINTERFACE(KFCBookWatch, kKFCBookWatchImpl)
-// The replace's signature: the command and its 64-bit data (KFCSignRecordsCmd.cpp).
-REGISTER_PMINTERFACE(KFCSignRecordsCmd, kKFCSignRecordsCmdImpl)
-REGISTER_PMINTERFACE(KFCInt64Data, kKFCInt64DataImpl)
 // The panel follows an Undo and a Redo (KFCUndoFollow.cpp): the mark a write leaves, and the lazy observer
 // AddIn'd on kDocBoss that hears it (not on kTextStoryBoss - KFCID.h, IID_IKFCSTORYUNDOOBSERVER, says why).
 REGISTER_PMINTERFACE(KFCUndoMarkCmd, kKFCUndoMarkCmdImpl)

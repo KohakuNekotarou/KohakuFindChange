@@ -28,7 +28,6 @@
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
 #include "KFCSearchEngine.h"
-#include "KFCTrackChange.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
 {
@@ -62,10 +61,8 @@ public:
 	virtual bool GetHitLocation(int32 chapterIdx, int32 hitIdx, UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd) { return KFCResultModel::GetHitLocation(chapterIdx, hitIdx, outDocRef, outFile, outStoryUID, outStart, outEnd); }
 	virtual bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked) { return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, outReplaced, outLocked); }
 	virtual bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden) { return KFCResultModel::GetHitReach(chapterIdx, hitIdx, outLocked, outHidden); }
-	virtual bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitInFootnote(chapterIdx, hitIdx); }
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) { KFCResultModel::RebindChapterDoc(chapterIdx, newDocRef); }
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) { KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, outcome); }
-	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitTextUnchanged(chapterIdx, hitIdx); }
 	virtual bool HasChangeAllWritten() { return KFCResultModel::HasChangeAllWritten(); }
 };
 
@@ -93,7 +90,6 @@ public:
 	virtual KFCOversetLoc FindOversetLocator(const UIDRef& storyRef, TextIndex pos) { return KFCFindOversetLocator(storyRef, pos); }
 	virtual bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db) { return KFCSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db); }
 	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd); }
-	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) { return KFCTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KFCSearchEngine::SetQuery(text, mode); }
 	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(outSummary); }
 	virtual bool ClearResults(PMString& outStatus) { return KFCChangeAll::ClearResults(outStatus); }

@@ -645,24 +645,9 @@ bool RowHasPlace(TextIndex start, TextIndex end)
 
 void SayRowHasNoPlace()
 {
-	PMString message("This match went with the footnote, table or object another ticked match deleted - there is nothing left to go to.");
+	PMString message("This match went with the footnote, table or object another replaced match deleted - there is nothing left to go to.");
 	message.SetTranslatable(kFalse);
 	KFCResultTree::ShowStatus(message);
-}
-
-// A REPLACED ROW IS FOUND BY ITS TRACKED CHANGE FIRST. The record moves with the text, so an edit made
-// since the replace does not put the jump off. Asked only once the chapter is reachable (a closed one has
-// just been reopened); no record of ours (accepted, rejected, a footnote's row) = the stored range and its
-// hash. The row's text is taken again as well (an edit since the replace moves what stands around it), so
-// the rows are repainted, or the panel goes on showing the old line (case jump-after-edit, read off the
-// panel itself - the model was right, the screen was not). Shared by JumpToHit and SelectHitText.
-void TakeRowFromRecords(int32 chapterIdx, int32 hitIdx, UIDRef& docRef, IDFile& file, UID& storyUID,
-	TextIndex& start, TextIndex& end)
-{
-	if (!KFCRuns()->RefreshRowFromRecords(chapterIdx, hitIdx))
-		return;
-	KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
-	KFCResultTree::RefreshRows();
 }
 
 // Is the text at the row's place still the text the row describes - and if not, can the row be found
@@ -672,8 +657,8 @@ void TakeRowFromRecords(int32 chapterIdx, int32 hitIdx, UIDRef& docRef, IDFile& 
 // not the row's drawn text, which is capped for drawing and so would compare only the first stretch of a
 // long GREP match - and the line around it: an Undo can leave a row's place on another occurrence of its
 // own text, which the hash passes. A row that
-// fails is looked for again (KFCSearchEngine::RelocateStaleRow - a row left behind by Undo / Redo),
-// which asks the same line of its candidates; when it is found, the rows are repainted.
+// fails is looked for again (KFCSearchEngine::RelocateStaleRow - a row left behind by Undo / Redo, and a
+// replaced row by what it wrote), which asks the same line of its candidates; when it is found, the rows are repainted.
 // Shared by JumpToHit, which still moves the view when it is not, and SelectHitText, which refuses.
 bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& start, TextIndex& end)
@@ -759,7 +744,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	}
 
 	// A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY. A "deleted" row - its text went with the
-	// footnote, table or anchored object another ticked row deleted (KFCResultModel::SetHitDeleted) -
+	// footnote, table or anchored object another replaced row deleted (KFCResultModel::SetHitDeleted) -
 	// keeps kInvalidTextIndex as its range. Nothing below asks about that: the overset test, the
 	// spread and the wax rectangle would all be handed -1.
 	if (!RowHasPlace(start, end))
@@ -776,8 +761,6 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		KFCHitMarkerView::Hide();	// it has already said why through the status line
 		return false;
 	}
-
-	TakeRowFromRecords(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)
@@ -1064,8 +1047,6 @@ bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 		LayoutOfDocIsFrontmost(docRef) ? 1 : 0);
 	if (!LayoutOfDocIsFrontmost(docRef))
 		return false;
-
-	TakeRowFromRecords(chapterIdx, hitIdx, docRef, file, storyUID, start, end);
 
 	IDataBase* db = docRef.GetDataBase();
 	if (db == nil)

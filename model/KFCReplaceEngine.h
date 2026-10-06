@@ -4,28 +4,26 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Replace engine: replaces the hits the user checked in the result panel, using the CHANGE
-//  string of the official Find/Change dialog. KFC never writes to IFindChangeOptions - it only
+//  Replace engine: replaces the row the user asks for in the result panel (its right-click menu), using
+//  the CHANGE string of the official Find/Change dialog. KFC never writes to IFindChangeOptions - it only
 //  reads - so GREP back-references and escapes are interpreted by InDesign's own engine and are
 //  never parsed here.
 //
-//  HOW IT WRITES: ONE TICKED MATCH AT A TIME, A STORY AT A TIME, UNDER TRACK CHANGES (the user's
-//  call). ReplaceInChapterOneByOne in the .cpp walks each story that holds a ticked row
-//  (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on the match it made current) and writes only the
-//  ticked rows, each recognised by its thread, its offset into it and its length - so a match a
-//  replacement made that the search never listed is stepped over, and its row is reported missing
-//  rather than written. A GREP query holding ^ is walked backward (the direction is set before
-//  anything is written, outside the sequence). The pending tracked changes a ticked match sits in or
-//  next to are accepted first - not around a match the walk leaves, one at an endnote's end; the
-//  replaces' own records are LEFT in the document, told apart by their time stamp: they are what
-//  Reject Change, Replace Again (Redo in the code) and the jump find a row by.
-//  (Not InDesign's Change All over each story with the rows NOT ticked taken back afterwards: that
-//  was tried and dropped - git history, c876bc7 and before.)
+//  HOW IT WRITES: ONE MATCH AT A TIME, A STORY AT A TIME (the user's call). ReplaceInChapterOneByOne in
+//  the .cpp walks each story that holds a row asked for (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on
+//  the match it made current) and writes only those rows, each recognised by its thread, its offset into
+//  it and its length - so a match a replacement made that the search never listed is stepped over, and
+//  its row is reported missing rather than written. A GREP query holding ^ is walked backward (the
+//  direction is set before anything is written, outside the sequence). Track Changes is left as each
+//  story has it: KFC records nothing of its own (2026-10-06 -
+//  docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1). (Not InDesign's Change All
+//  over each story with the rows NOT asked for taken back afterwards: that was tried and dropped - git
+//  history, c876bc7 and before. Change All itself is KFCChangeAll's.)
 //
 //  THE CHECK BEFORE THE RUN. What is left of the old chapter-by-chapter re-walk (measured,
 //  docs/superpowers/specs/_done/2026-07-25-kbs-replace-checked-design.md section 10.1) is the check
 //  it ran before anything was written (ChapterMovedUnderRows in the .cpp): each chapter is walked as
-//  the search walked it, and every ticked row must still begin where the search found it.
+//  the search walked it, and every row asked for must still begin where the search found it.
 //
 //========================================================================================
 
@@ -50,7 +48,7 @@ namespace KFCReplaceEngine
 	    (Not "is that tab one this panel walks at all": the tab on the results is one the search could
 	    state, so that would never answer no.)
 
-	    Why it has to be asked at all: the replace walks every story that holds a ticked row with the
+	    Why it has to be asked at all: the replace walks every story that holds a row it writes with the
 	    LIVE IFindChangeOptions and writes the matches it meets at the rows' places - so a query edited
 	    between the search and the replace walks a different set of matches from the one the rows
 	    list. The verify walk looks for the rows' matches the same way, and the reason is the same for
@@ -61,7 +59,7 @@ namespace KFCReplaceEngine
 	      - the QUERY changing between the search and the replace is caught HERE, before a chapter
 	        is even opened, and the run is refused;
 	      - the DOCUMENT moving between the two is caught by the verify walk in the resolve pass
-	        (see ReplaceChecked above), which is the only place the document itself can be asked.
+	        (ChapterMovedUnderRows in the .cpp), which is the only place the document itself can be asked.
 
 	    Both refuse before a character is written. This one is first because it is far cheaper - the
 	    dialog's own settings are readable and BuildWalkSignature turns them into something
@@ -87,20 +85,18 @@ namespace KFCReplaceEngine
 	    caller that only has to know: the jump's look for a row Undo moved
 	    (KFCSearchEngine::RelocateStaleRow), where RefuseChangedQuery would clear the whole result set
 	    in the middle of a jump on a changed query. Same rule as RefuseChangedQuery: outside any
-	    command sequence. False on a list rebuilt from the records: nothing was searched, so there is
-	    nothing it can be unchanged from. */
+	    command sequence. */
 	bool QueryUnchangedSinceSearch();
 
-	/** Replace on a hit row's right-click menu (the author's call): that one row, ticked or
-	    not, with no prompt, in ONE undo step ("Replace"); the Track Changes note goes in outStatus. The
-	    list stays a work list: the row shows its new text and loses its box, every other row is moved to
-	    where its text now stands. Refused - nothing changed, outStatus says why - when the query changed
-	    since the search, the row's text is not the one the search found, the chapter cannot be opened,
-	    or the row would not be replaced (locked since, missing, an endnote's end). */
+	/** Replace on a hit row's right-click menu (the author's call): that one row, with no prompt, in ONE
+	    undo step ("Replace"). The list stays a work list: the row shows its new text, every other row is
+	    moved to where its text now stands. Refused - nothing changed, outStatus says why - when the query
+	    changed since the search, the row's text is not the one the search found, the chapter cannot be
+	    opened, or the row would not be replaced (locked since, missing, an endnote's end). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
-	    outcome, and no replace running. */
+	    outcome. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
 

@@ -34,23 +34,16 @@
 //    jump-no-front (UI half) ui/KFCJump.cpp's EnsureDocFrontmost reports that the hit's window
 //                could not be brought forward (work\kbs-jump\j2-select-unfronted.ps1)
 //    replace-refuse KFCReplaceEngine.cpp's WalkStoryReplacing takes InDesign's replace command as having
-//                refused every row - a chapter where nothing lands after the pending changes next to its ticked
-//                rows were accepted (work\kbs-regress\cases\fault-replace-refuse-on.jsx / -off.jsx)
+//                refused every row - a chapter where nothing lands (work\kbs-regress\cases\fault-replace-refuse-on.jsx
+//                / -off.jsx)
 //    queries-run  the file holds one query path per line (UTF-8); the panel's Find runs the query run over them
 //                (KFCQuerySequence::RunFromDiagSwitch) - the way in until the panel of its own exists
 //                (work\kbs-regress\cases\qs-*.jsx write it, qs-off.jsx takes it off)
-//    perf-no-sign / perf-no-track  KFCReplaceEngine.cpp's write leaves its rows unsigned / writes untracked - to
-//                measure what each costs the next find (2026-10-05, WALKTIME; work\note-scripts\2026-10-05-kfc-query-run\
-//                t10_perf.ps1). Throwaway documents only.
 //    perf-fresh-walker  the file holds "<mode> <n>": WalkStoryReplacing starts its walk again after every n writes -
 //                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
 //                scope (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
 //                walk?). Throwaway documents only.
-//    perf-plain-seq  Change Checked writes inside a REGULAR command sequence instead of the abortable one
-//                (KFCReplaceEngine.cpp - ICommandSequence.h: abortable sequences "incur a heavy performance overhead").
-//                A cancel then rolls back through the error state, which does not carry across a book's documents
-//                (measured, the note at the sequence): one throwaway document only.
-//    perf-commands  every command InDesign processes is counted, by class, over a search, a Change Checked and a query
+//    perf-commands  every command InDesign processes is counted, by class, over a search, a row's Replace and a query
 //                run (KFCDiagCommands.h - "COMMANDS" lines, and cmds= on WALKSTEP). The count itself costs time:
 //                not on a timing run.
 //    perf-backward  KFCReplaceEngine.cpp's WriteBackward answers yes: every write walks backward (the same study:
@@ -60,10 +53,6 @@
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
 //    changeall-cancel  KFCChangeAll::Run takes Cancel as pressed after its first chapter - every chapter must come
 //                back as it was (case all-cancel-book, ca-cases.tsv). Throwaway documents only.
-//    no-accept-around  the replace leaves the pending changes around the ticked matches as they are (no
-//                AcceptPendingAround), so InDesign joins and rewrites them - the partial-reject experiment (2026-10-06:
-//                can a joined record's KFC part alone be taken back? KT's app.ktProbe "redline ... rejectrange").
-//                Throwaway documents only.
 //
 //  AND TIMERS (2026-10-05): KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

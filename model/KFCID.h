@@ -76,9 +76,9 @@ DECLARE_PMID(kClassIDSpace, kKFCCloseDocResponderBoss, kKFCPrefix + 9)
 // The jump marker: a global text adornment service - IID_IK2SERVICEPROVIDER =
 // kGlobalTextAdornmentServiceImpl + our IGlobalTextAdornment (KFCHitMarker.cpp). Replaces +5.
 DECLARE_PMID(kClassIDSpace, kKFCHitMarkerBoss, kKFCPrefix + 17)
-// Signs the tracked changes one replace made - "KohakuFindChange" at the row's time
-// (KFCSignRecordsCmd.cpp / KFCTrackChange.h).
-DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)
+// RETIRED (not reused): the command that signed the tracked changes one replace made (2026-10-06 - KFC records
+// nothing of its own, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1).
+//DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)	// retired 2026-10-06 (the signing command - never reuse)
 // The mark every write of KFC's own leaves in its undo step (KFCUndoFollow.cpp): a command that changes
 // nothing and raises a ModelChange on its document's subject, so the panel hears that step's Undo and
 // Redo through an observer on the document. (+ 22: + 19 ... + 21 went to the UI half at the split.)
@@ -137,9 +137,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultsImpl, kKFCPrefix + 24)
 DECLARE_PMID(kImplementationIDSpace, kKFCRunsImpl, kKFCPrefix + 25)
 DECLARE_PMID(kImplementationIDSpace, kKFCChaptersImpl, kKFCPrefix + 26)
 DECLARE_PMID(kImplementationIDSpace, kKFCHitMarkerAdornmentImpl, kKFCPrefix + 33)	// IGlobalTextAdornment: the jump marker (KFCHitMarker.cpp)
-// The replace's signature (KFCSignRecordsCmd.cpp). (+ 34 onwards: + 23 ... + 28 are the boundary's.)
-DECLARE_PMID(kImplementationIDSpace, kKFCSignRecordsCmdImpl, kKFCPrefix + 34)	// ICommand of kKFCSignRecordsCmdBoss
-DECLARE_PMID(kImplementationIDSpace, kKFCInt64DataImpl, kKFCPrefix + 35)		// IInt64Data, a command's plain one (the SDK ships only kPersistInt64DataImpl - KFCSignRecordsCmd.cpp)
+// RETIRED (not reused): the signing command's two (2026-10-06 - spec F1). (+ 34 onwards: + 23 ... + 28 are the boundary's.)
+//DECLARE_PMID(kImplementationIDSpace, kKFCSignRecordsCmdImpl, kKFCPrefix + 34)	// retired 2026-10-06 (the signing command - never reuse)
+//DECLARE_PMID(kImplementationIDSpace, kKFCInt64DataImpl, kKFCPrefix + 35)		// retired 2026-10-06 (the signing command's data - never reuse)
 // RETIRED (not reused): the lazy observer on each story a write of KFC's own moved - see
 // IID_IKFCSTORYUNDOOBSERVER above for why it went.
 //DECLARE_PMID(kImplementationIDSpace, kKFCStoryUndoObserverImpl, kKFCPrefix + 38)

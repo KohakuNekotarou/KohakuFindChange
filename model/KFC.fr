@@ -106,20 +106,6 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/** Signs the tracked changes one replace made: the insertion's pieces and the deletion
-		in the range become "KohakuFindChange" at the row's time. KFCSignRecordsCmd.cpp.
-		ItemList: the story. */
-	Class
-	{
-		kKFCSignRecordsCmdBoss,
-		kInvalidClass,
-		{
-			IID_ICOMMAND,		kKFCSignRecordsCmdImpl,
-			IID_IRANGEDATA,		kRangeDataImpl,			// the range the replace wrote [start, end]
-			IID_IINT64DATA,		kKFCInt64DataImpl,		// the row's time stamp (100 ns units since 1601)
-		}
-	},
-
 	/*
 	 * Startup/shutdown service boss - the MODEL half's: starts the book-close watcher and clears the
 	 * model's state during controlled shutdown.

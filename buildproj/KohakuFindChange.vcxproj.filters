@@ -66,13 +66,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSignRecordsCmd.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCStartupShutdown.cpp">
-         <Filter>Source Files</Filter>
-      </ClCompile>
-      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCTrackChange.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.cpp">
@@ -156,9 +150,6 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h">
-         <Filter>Header Files</Filter>
-      </ClInclude>
-      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTrackChange.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h">

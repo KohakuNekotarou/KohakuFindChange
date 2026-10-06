@@ -447,9 +447,7 @@ namespace KFCBookScope
 	/** ReachChapterDoc WITHOUT THE OPEN: the chapter's
 	    document if it is open now - by its file, the same lookup ReopenChapterDoc makes before it
 	    opens anything; a chapter with no file (a document-scope row) by IsDocStillOpen(ioDocRef).
-	    For everything that acts on an open document only - through KFCTrackChange::ChapterDocIfOpen,
-	    which rebinds the model as well (Reject Change, Accept Change, Accept All, Replace Again, a
-	    replaced row's record lookup) - and for KFCUndoFollow and a hit row's right-click.
+	    For everything that acts on an open document only - KFCUndoFollow and a hit row's right-click.
 	    Not IsDocStillOpen of the docRef the results hold: a chapter the user closed and opened again
 	    reads "not open" by it (a new address) - and one whose address a document opened later has
 	    taken reads as THAT document (the address-reuse fault above).

@@ -374,6 +374,11 @@ namespace KFCSearchEngine
 	            on the same nil, so the marker is cleared and the view stays put. */
 	bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos);
 
+	/** The story's text at [at, at+len), whole (not capped for drawing). Empty when it cannot be read; a range running
+	    past the story's end reads up to the end. The official one-call read (textiterator.h AppendToStringAndIncrement),
+	    as KCM (KCMTextWords.h WordsAt) and KESCL (KESCLFindInDoc.cpp MatchStillValid) read a range. */
+	PMString ReadText(const UIDRef& story, TextIndex at, int32 len);
+
 	/** Give a row what [start, end) reads NOW - the three segments it paints and the hash of the
 	    whole match - in one KFCResultModel::SetHitSegments. For the callers that have just moved a
 	    row: the replace pass rebuilding a replaced row from the range the command reports, and the

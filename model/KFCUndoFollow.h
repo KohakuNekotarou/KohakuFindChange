@@ -44,7 +44,7 @@
 //
 //  WHAT IS NOT FOLLOWED: anything that is not a write of KFC's own - typing, the Track Changes panel, a
 //  script. Those leave the rows as they are; the doors that are there for them (the story's version, the
-//  row's text, the records' times) still stand. KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer
+//  row's text) still stand. KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer
 //  it again. (Measured on a list Show Changes had rebuilt - a command gone since 2026-10-06: after a Ctrl+Z
 //  of the replace it listed, the list kept its rows and said nothing until a row was touched - its
 //  right-click greyed with the reason, its jump saying "undone, or edited since". Saying so on the status

@@ -75,6 +75,7 @@
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
 #include "WideString.h"
+#include "textiterator.h"			// ReadText - the official one-call read of a range
 
 #include <vector>
 #include <utility>					// std::move - a finished chapter is handed to the model, not copied
@@ -85,7 +86,6 @@
 
 // Project includes:
 #include "KFCSearchEngine.h"
-#include "KFCTrackChange.h"		// IsInFootnote (a footnote's row cannot be taken back)
 #include "KFCBookScope.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
@@ -1134,10 +1134,6 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	// through - nothing to untick here: a hit starts unticked.)
 	outHit.isLocked = facts->isLocked;
 	KFC_SPENT(gBuildHitTimes.place, cPlace);
-	// Inside a footnote? Such a row cannot be taken back - Track Changes records nothing there.
-	KFC_CLOCK(cFootnote);
-	outHit.inFootnote = KFCTrackChange::IsInFootnote(storyRef, start);
-	KFC_SPENT(gBuildHitTimes.threads, cFootnote);
 }
 
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
@@ -2095,6 +2091,23 @@ bool KFCSearchEngine::IsFrameEditable(const UIDRef& storyRef, UID frameUID)
 bool KFCSearchEngine::IsPositionOverset(const UIDRef& storyRef, TextIndex pos)
 {
 	return FrameUIDForPosition(storyRef, pos) == kInvalidUID;
+}
+
+PMString KFCSearchEngine::ReadText(const UIDRef& story, TextIndex at, int32 len)
+{
+	WideString w;
+	InterfacePtr<ITextModel> model(story, UseDefaultIID());
+	// After the same check KCM and KESCL make, that the range starts inside the story. A range running past the
+	// end reads up to the end.
+	if (model != nil && len > 0 && at >= 0 && at < model->TotalLength())
+	{
+		const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
+		TextIterator it(model, at);
+		it.AppendToStringAndIncrement(&w, n);
+	}
+	PMString s(w);
+	s.SetTranslatable(kFalse);
+	return s;
 }
 
 void KFCSearchEngine::RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef,
@@ -3325,6 +3338,89 @@ void KFCSearchEngine::ShutdownCleanup()
 	KFCSearchEngine::ForgetSearchedFindFormat();
 }
 
+namespace
+{
+// A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE (2026-10-06 -
+// docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
+// the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
+// way the search reads a hit (ReadHitText) and taken only with the row's own hash and line - both read again when
+// its replace was written. Exactly one, and no other row on it, or nothing moves: the rule the rows not replaced keep
+// (JMP-14) - a guess between two look-alikes would be worse than saying so. The story is read as code points, which
+// is what a TextIndex counts.
+bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart,
+	TextIndex& ioEnd)
+{
+	PMString written;
+	KFCResultModel::RowDisplay row;
+	UID story = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, written) || written.IsEmpty()
+		|| !KFCResultModel::GetHitRow(chapterIdx, hitIdx, row)
+		|| !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil || !db->IsValidUID(storyUID))
+		return false;
+	const UIDRef storyRef(db, storyUID);
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil)
+		return false;
+	std::vector<UTF32TextChar> key;
+	{
+		const WideString w(written);
+		for (WideString::const_iterator it = w.begin(); it != w.end(); ++it)
+			key.push_back(*it);
+	}
+	std::vector<UTF32TextChar> text;
+	{
+		const WideString w(KFCSearchEngine::ReadText(storyRef, 0, model->TotalLength()));
+		for (WideString::const_iterator it = w.begin(); it != w.end(); ++it)
+			text.push_back(*it);
+	}
+	if (key.empty() || text.size() < key.size())
+		return false;
+	const int32 len = static_cast<int32>(key.size());
+	const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
+	int32 count = 0;
+	TextIndex foundAt = kInvalidTextIndex;
+	KFCResultModel::Hit found;
+	for (size_t p = 0; p + key.size() <= text.size() && count < 2; ++p)
+	{
+		if (!std::equal(key.begin(), key.end(), text.begin() + static_cast<std::ptrdiff_t>(p)))
+			continue;
+		const TextIndex at = static_cast<TextIndex>(p);
+		KFCResultModel::Hit cand;
+		ReadHitText(storyRef, at, at + len, cand);
+		if (cand.matchHash != hash || cand.preText != row.preText || cand.postText != row.postText)
+			continue;
+		// a place another row already stands on is that row's
+		bool taken = false;
+		for (int32 i = 0; i < hitCount && !taken; ++i)
+		{
+			UID s2 = kInvalidUID;
+			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+			uint64 h2 = 0;
+			if (i != hitIdx && KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
+				&& s2 == storyUID && a2 == at && b2 == at + len)
+				taken = true;
+		}
+		if (taken)
+			continue;
+		foundAt = at;
+		found = cand;
+		++count;
+	}
+	if (count != 1)
+		return false;
+	KFCResultModel::SetHitRange(chapterIdx, hitIdx, storyUID, foundAt, foundAt + len);
+	KFCResultModel::SetHitSegments(chapterIdx, hitIdx, found.preText, found.matchText, found.postText, found.matchHash);
+	ioStart = foundAt;
+	ioEnd = foundAt + len;
+	return true;
+}
+}	// anonymous namespace
+
 // HERE, NOT IN THE JUMP (KFCJump.cpp): walking a story and putting a row right is the model half's work.
 // The jump asks it through IKFCRuns.
 // A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (the author's call).
@@ -3339,15 +3435,17 @@ void KFCSearchEngine::ShutdownCleanup()
 // So before a jump gives up on a row, the story is walked again under the same query, and the row moves
 // to the ONE match that is the same text with the same line around it (the three segments the row
 // drew) and that no other row stands on. None, or more than one, and it is missing as before - a guess
-// between two look-alikes would be worse than saying so. Rows not replaced only: a replaced row is found
-// by its tracked change (KFCTrackChange::RefreshRowFromRecords), before this is asked. True = the row was
-// moved; ioStart / ioEnd are its new place.
+// between two look-alikes would be worse than saying so. A replaced row is looked for by what it wrote
+// (RelocateReplacedRow, above): the query no longer finds it. True = the row was moved; ioStart / ioEnd are
+// its new place.
 bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& ioStart, TextIndex& ioEnd)
 {
 	bool replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked) || replaced)
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked))
 		return false;
+	if (replaced)
+		return RelocateReplacedRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd);
 	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
 	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,
 	// and clears nothing. (RefuseChangedQuery itself would, on a changed query, clear the whole result set

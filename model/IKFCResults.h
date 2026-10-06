@@ -96,14 +96,10 @@ public:
 	virtual bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked) = 0;
 	/** = KFCResultModel::GetHitReach. */
 	virtual bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden) = 0;
-	/** = KFCResultModel::GetHitInFootnote. */
-	virtual bool GetHitInFootnote(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KFCResultModel::RebindChapterDoc. */
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) = 0;
 	/** = KFCResultModel::SetHitOutcome. */
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) = 0;
-	/** = KFCResultModel::GetHitTextUnchanged (appended). */
-	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KFCResultModel::HasChangeAllWritten (appended 2026-10-06) - the panel's pencil cat. */
 	virtual bool HasChangeAllWritten() = 0;
 };

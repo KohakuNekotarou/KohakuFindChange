@@ -11,7 +11,7 @@
 //  running, the Find/Change settings they follow, and the questions the jump asks of a row's text.
 //  Each method forwards to the function named beside it in KFCModelServices.cpp; the contract is
 //  written there (KFCSearchEngine.h / KFCReplaceEngine.h / KFCRunGuard.h /
-//  KFCTrackChange.h / KFCOversetLocator.h).
+//  KFCOversetLocator.h).
 //
 //  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
 //  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
@@ -78,8 +78,6 @@ public:
 	virtual bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db) = 0;
 	/** = KFCSearchEngine::RelocateStaleRow. */
 	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) = 0;
-	/** = KFCTrackChange::RefreshRowFromRecords. */
-	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) = 0;
 	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
 	// promise to every built caller).
 	/** = KFCSearchEngine::SetQuery. */
