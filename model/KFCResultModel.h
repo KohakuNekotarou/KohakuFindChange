@@ -257,6 +257,13 @@ namespace KFCResultModel
 	void NoteRun();
 	bool HasRun();
 
+	/** DID THE LAST COMMAND WRITE WITH InDesign's CHANGE ALL - Change All in Book (No List), or a query run - AND CHANGE
+	    SOMETHING (2026-10-06, the author's call)? The panel's pencil cat says so (KFCPanelIcon). Set at the end of those
+	    runs - false for one that wrote nothing, was cancelled or failed; a row's Replace does not touch it. Clear() puts
+	    it down, so the next search, Clear Results or a closing document takes the picture back. */
+	void NoteChangeAllWrote(bool wrote);
+	bool HasChangeAllWritten();
+
 	// (No "the search stopped short" flag for the replace to ask: it writes the ticked rows only, one
 	//  match at a time, so results that stopped at the limit can be replaced - the author's call.)
 

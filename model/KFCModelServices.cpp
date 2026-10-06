@@ -66,6 +66,7 @@ public:
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) { KFCResultModel::RebindChapterDoc(chapterIdx, newDocRef); }
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) { KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, outcome); }
 	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitTextUnchanged(chapterIdx, hitIdx); }
+	virtual bool HasChangeAllWritten() { return KFCResultModel::HasChangeAllWritten(); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)

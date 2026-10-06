@@ -49,6 +49,9 @@ namespace
 	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
 	bool gHasRun = false;
 
+	// Did the last command write with InDesign's Change All and change something? See KFCResultModel::NoteChangeAllWrote.
+	bool gChangeAllWrote = false;
+
 	// The rows copied aside before a write of ours changed them - see KFCResultModel::BeginRowBackup.
 	// RowCopy, the same struct the panel's following of Undo hands out.
 	//
@@ -244,6 +247,7 @@ void KFCResultModel::Clear()
 	ForgetContextMenus();
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
+	gChangeAllWrote = false;
 	// A new result set, in its first layout: what KFCUndoFollow kept for the old one names
 	// rows that are gone.
 	gResultSetId = ++gIdCounter;
@@ -273,6 +277,16 @@ void KFCResultModel::NoteRun()
 bool KFCResultModel::HasRun()
 {
 	return gHasRun;
+}
+
+void KFCResultModel::NoteChangeAllWrote(bool wrote)
+{
+	gChangeAllWrote = wrote;
+}
+
+bool KFCResultModel::HasChangeAllWritten()
+{
+	return gChangeAllWrote;
 }
 
 bool KFCResultModel::IsFromBook()

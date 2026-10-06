@@ -35,17 +35,20 @@ const WidgetID kIcons[] =
 {
 	kKFCIconWidgetID,		// nothing has been run yet
 	kKFCIconFoundWidgetID,	// something has
-	kKFCIconChangedWidgetID	// ...and it was a replace
+	kKFCIconChangedWidgetID	// ...and it was a Change All that changed something
 };
 const int32 kIconCount = static_cast<int32>(sizeof(kIcons) / sizeof(kIcons[0]));
 
 /** Which picture belongs on screen right now. */
 WidgetID Choose()
 {
-	// (The "changed" picture - kKFCIconChangedWidgetID - was Change Checked's report's: the panel showing what a
-	// replace did. With that report gone (2026-10-06, spec F16) nothing chooses it; it is kept, and still hidden
-	// with the others, for the author's call - shown after a row's Replace or a Change All, or taken out.)
-	//
+	// THE PENCIL CAT (the author's call, 2026-10-06: "Change All only") - after a Change All in Book (No List) or a
+	// query run that changed something (KFCResultModel::HasChangeAllWritten). A row's Replace leaves the list a work
+	// list and the picture as it was. Asked FIRST: such a run has also been RUN, so HasRun ahead of it would answer
+	// the searching cat every time. (Until 2026-10-06 the pencil cat was Change Checked's report's.)
+	if (KFCResults()->HasChangeAllWritten())
+		return kKFCIconChangedWidgetID;
+
 	// One question, asked of the model rather than of the status line: the close responders put a
 	// message on that line ("Results cleared - the document was closed.") while throwing the
 	// results away, so an empty-or-not test on the text would leave the panel showing the wrong

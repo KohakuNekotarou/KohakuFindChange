@@ -407,6 +407,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	KFCResultModel::Clear();
 	KFCSearchEngine::ForgetSearchedFindFormat();
 	KFCResultModel::NoteRun();
+	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon): each query is a Change All
 	recorder.Keep();
 
 	// ===== THE MESSAGE (the spec's section 4).

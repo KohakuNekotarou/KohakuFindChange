@@ -104,6 +104,8 @@ public:
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) = 0;
 	/** = KFCResultModel::GetHitTextUnchanged (appended). */
 	virtual bool GetHitTextUnchanged(int32 chapterIdx, int32 hitIdx) = 0;
+	/** = KFCResultModel::HasChangeAllWritten (appended 2026-10-06) - the panel's pencil cat. */
+	virtual bool HasChangeAllWritten() = 0;
 };
 
 #endif // __IKFCResults_h__

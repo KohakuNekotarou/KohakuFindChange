@@ -305,6 +305,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 				db->SetModified(kFalse);
 		}
 		KFCBookScope::ReleaseHeldDocs();
+		KFCResultModel::NoteChangeAllWrote(false);		// the panel's pencil cat: nothing was written
 		if (cancelled)
 			outSummary.Append("Cancelled - nothing was changed.");
 		else
@@ -352,6 +353,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
+	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon)
 	return replaced;
 }
 
