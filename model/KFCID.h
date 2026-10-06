@@ -177,6 +177,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 // KFCJa::kReplaceStep). See the sequence in KFCReplaceEngine::ReplaceChecked for why it is named.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
+#define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
 // (No "Please search again." tail, on purpose: the alert states the outcome in one sentence and the
 //  status line carries what to do next - the author's call.)
 

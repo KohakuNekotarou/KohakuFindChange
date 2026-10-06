@@ -265,6 +265,10 @@ DECLARE_PMID(kActionIDSpace, kKFCOpenFindChangeActionID, kKFCUIPrefix + 44)
 // search field of InDesign's application bar shows Find/Change's query, and Return in it searches with
 // this panel. OFF by default. See KFCAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKFCAppBarSearchEnterActionID, kKFCUIPrefix + 45)
+// Change All in Book (No List) and Clear Results (2026-10-06 - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
+// F6 and F18): InDesign's own Change All over the book's chapters, no list; the list emptied so it can run.
+DECLARE_PMID(kActionIDSpace, kKFCChangeAllActionID, kKFCUIPrefix + 46)
+DECLARE_PMID(kActionIDSpace, kKFCClearResultsActionID, kKFCUIPrefix + 47)
 
 
 // WidgetIDs:
@@ -332,6 +336,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCAppBarSearchEnterMenuKey	kKFCStringPrefix "kKFCAppBarSearchEnterMenuKey"
 // "Save Panel Settings": write the settings above to a file of our own, read back at startup.
 #define kKFCSavePanelSettingsMenuKey	kKFCStringPrefix "kKFCSavePanelSettingsMenuKey"
+// Change All in Book (No List) and Clear Results (2026-10-06).
+#define kKFCChangeAllMenuKey			kKFCStringPrefix "kKFCChangeAllMenuKey"
+#define kKFCClearResultsMenuKey			kKFCStringPrefix "kKFCClearResultsMenuKey"
 // Replace feature menu item keys.
 #define kKFCReplaceCheckedMenuKey		kKFCStringPrefix "kKFCReplaceCheckedMenuKey"
 #define kKFCCheckAllMenuKey				kKFCStringPrefix "kKFCCheckAllMenuKey"
@@ -386,8 +393,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.2    Open Find/Change..., Find in <scope>, Change Checked (the one command that writes
-//                 to the DOCUMENTS)
+//    0.5 - 1.25   Open Find/Change..., Find in <scope>, Change All in Book (No List), Change Checked
+//                 (the two commands that write to the DOCUMENTS), Clear Results
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -397,12 +404,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // Positions that a new order allowed to stay were left where they were, so only the items that
 // actually moved carry new numbers.
 
-// Block 1 - the search, then Change Checked right under it with no rule between (the author's call),
-// then a rule. The scope both run on is set by Book Scope.
+// Block 1 - the search, then the two writes and Clear Results with no rule between (the author's call),
+// then a rule. The scope they run on is set by Book Scope (Change All runs on the book alone - F18).
 // Open Find/Change... leads the block: open the dialog, type the query, then search.
 #define kKFCOpenFindChangeMenuItemPosition	0.5
 #define kKFCSearchBookMenuItemPosition		1.0
+// Change All in Book (No List) under Find, Clear Results under Change Checked (2026-10-06, the spec's section 4).
+#define kKFCChangeAllMenuItemPosition		1.1
 #define kKFCReplaceCheckedMenuItemPosition	1.2
+#define kKFCClearResultsMenuItemPosition	1.25
 // (Block 2 - the two scans - is gone; so is Show Changes by KohakuFindChange, 2026-10-06.)
 #define kKFCSeparator3MenuItemPosition		2.0
 

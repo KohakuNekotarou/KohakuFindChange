@@ -58,6 +58,8 @@
 //    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
 //                ExpandNode with all its descendants per open document row, mode 2 every row opened before ChangeRoot
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
+//    changeall-cancel  KFCChangeAll::Run takes Cancel as pressed after its first chapter - every chapter must come
+//                back as it was (case all-cancel-book, ca-cases.tsv). Throwaway documents only.
 //    no-accept-around  the replace leaves the pending changes around the ticked matches as they are (no
 //                AcceptPendingAround), so InDesign joins and rewrites them - the partial-reject experiment (2026-10-06:
 //                can a joined record's KFC part alone be taken back? KT's app.ktProbe "redline ... rejectrange").

@@ -39,6 +39,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // What Edit > Undo calls a Change Checked run.
                 kKFCReplaceStepKey,				"Replace",
                 kKFCRunQueriesStepKey,			"Run Queries",
+                kKFCChangeAllStepKey,			"Change All",
         }
 
 };

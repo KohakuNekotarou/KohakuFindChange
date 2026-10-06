@@ -77,6 +77,7 @@ namespace KFCJa
 	// What Edit > Undo calls a Change Checked run (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
 	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
+	const wchar_t kChangeAllStep[]          = L"すべてを置換";		// InDesign's own word for its Change All
 	// (No closing "please search again" line, on purpose: the alert states the outcome and the status
 	//  line carries what to do next - the plug-in author's call.)
 }

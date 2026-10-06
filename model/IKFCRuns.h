@@ -94,6 +94,12 @@ public:
 	// promise to every built caller).
 	/** = KFCSearchEngine::SetQuery. */
 	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
+	/** = KFCChangeAll::Run (2026-10-06) - Change All in Book (No List). */
+	virtual int32 ChangeAll(PMString& outSummary) = 0;
+	/** = KFCChangeAll::ClearResults. */
+	virtual bool ClearResults(PMString& outStatus) = 0;
+	/** = KFCSearchEngine::HasFindQueryNow - Change All's greying. */
+	virtual bool HasFindQueryNow() = 0;
 };
 
 #endif // __IKFCRuns_h__

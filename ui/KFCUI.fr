@@ -457,6 +457,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchBookMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Change All in Book (No List): InDesign's own Change All over the book's chapters, no list (KFCChangeAll).
+		// Greyed with Book Scope off (F18 - a document's Change All is InDesign's own dialog's).
+		kKFCChangeAllActionID,
+		kKFCTargetMenuPath
+		kKFCChangeAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// (No rule between the search and Change Checked - the author's call.)
 
 		// Change Checked: replace every checked hit with the Find/Change dialog's change string.
@@ -465,9 +472,15 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCReplaceCheckedMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Clear Results: the list emptied, so Change All can run.
+		kKFCClearResultsActionID,
+		kKFCTargetMenuPath
+		kKFCClearResultsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// (Block 2 - Find Missing Glyphs and Find Overset - is gone: the Book panel's preflight reports both.)
 
-		// Separator between Change Checked and the toggles.
+		// Separator between Clear Results and the toggles.
 		kKFCSeparator3ActionID,
 		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKFCSeparator3MenuItemPosition,
@@ -789,6 +802,28 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCReplaceCheckedActionID,
 		kKFCReplaceCheckedMenuKey,		// "Change Checked"
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
+		// Change All in Book (No List). kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
+		// the panel, no book to run on, the Object and Colour tabs, nothing to find). In the Keyboard Shortcuts editor
+		// under Palette Menus, like Find and Change Checked.
+		kKFCActionComponentBoss,
+		kKFCChangeAllActionID,
+		kKFCChangeAllMenuKey,			// "Change All in Book (No List)"
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
+		// Clear Results. kCustomEnabling: grey with no list.
+		kKFCActionComponentBoss,
+		kKFCClearResultsActionID,
+		kKFCClearResultsMenuKey,		// "Clear Results"
 		kKFCPanelMenuActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

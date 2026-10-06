@@ -21,13 +21,13 @@
 #include "IKFCResults.h"
 #include "IKFCRuns.h"
 #include "KFCBookScope.h"
+#include "KFCChangeAll.h"
 #include "KFCHitMarker.h"
 #include "KFCOversetLocator.h"
 #include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
 #include "KFCSearchEngine.h"
-
 #include "KFCTrackChange.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
@@ -115,6 +115,9 @@ public:
 	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd); }
 	virtual bool RefreshRowFromRecords(int32 chapterIdx, int32 hitIdx) { return KFCTrackChange::RefreshRowFromRecords(chapterIdx, hitIdx); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KFCSearchEngine::SetQuery(text, mode); }
+	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(outSummary); }
+	virtual bool ClearResults(PMString& outStatus) { return KFCChangeAll::ClearResults(outStatus); }
+	virtual bool HasFindQueryNow() { return KFCSearchEngine::HasFindQueryNow(); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

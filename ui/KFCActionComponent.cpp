@@ -236,6 +236,29 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCChangeAllActionID:
+		{
+			// Change All in Book (No List) (the author's calls, 2026-10-06 - F6 and F18): InDesign's own Change All over
+			// the book's chapters, no list. The engine keeps its own doors and says why on a refusal (KFCChangeAll::Run).
+			KFCPanelTitle::Update();
+			PMString summary;
+			(void)KFCRuns()->ChangeAll(summary);
+			KFCResultTree::ShowStatus(summary);
+			break;
+		}
+
+		case kKFCClearResultsActionID:
+		{
+			// Clear Results: the list emptied, so Change All can run (the old design's C8). The documents are not touched.
+			if (RefusedWhileRunning())
+				break;
+			PMString status;
+			(void)KFCRuns()->ClearResults(status);
+			KFCResultTree::Rebuild();
+			KFCResultTree::ShowStatus(status);
+			break;
+		}
+
 		// (No Find Missing Glyphs / Find Overset: removed on the author's call - the Book panel's
 		//  preflight reports both over the whole book.)
 
@@ -593,6 +616,24 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			const bool canRun = haveTarget
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCChangeAllActionID)
+		{
+			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's),
+			// so the name stays the resource's - no scope to carry, unlike Find. Grey with Book Scope off, while the
+			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Object and
+			// Colour tabs, and with nothing to find - the spec's section 4; a run standing up greys everything above.
+			const bool canRun = KFCChapters()->IsBookScopeOn()
+				&& haveTarget
+				&& KFCResults()->GetTotalHitCount() <= 0
+				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
+				&& KFCRuns()->HasFindQueryNow();
+			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCClearResultsActionID)
+		{
+			// Clear Results: while the panel holds a list.
+			listToUpdate->SetNthActionState(i, (KFCResults()->GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCScopeBookActionID)
 		{

@@ -4,9 +4,9 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because three different things
-//  can be running - a search, a replace and a query run (2026-10-05, KFCQuerySequence) - and every guard
-//  has to know about all of them. (Show Changes by KohakuFindChange was a fourth until 2026-10-06.)
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
+//  can be running - a search, a replace, a Change All in Book (KFCChangeAll, 2026-10-06) and a query run
+//  (2026-10-05, KFCQuerySequence) - and every guard has to know about all of them.
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -46,7 +46,7 @@
 
 namespace KFCRunGuard
 {
-	/** Is a search, a replace or a query run running right now? */
+	/** Is a search, a replace, a Change All or a query run running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not
