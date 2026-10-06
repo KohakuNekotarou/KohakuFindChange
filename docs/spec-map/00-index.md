@@ -82,16 +82,16 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 |---|---|---|---|---|
 | 01 | [全体像](01-overview.md) | `GEN-` | 全体（0・2・3・5） | ✅ |
 | 02 | [検索 ― 何を探し、いつ断るか](02-search.md)（対応するタブ・断る順番と文言・前向き固定・タブの確定し直し・範囲ごとの歩き方・取り消し・メッセージ欄の文） | `FIND-` | 8 | ✅ |
-| 03 | [範囲 ― 文書とブック](03-scope.md)（Book Scope・対象のブックの決まり方・章を1つずつ開いて返す・開けなかった章・閉じるか残すか・All Documents・Show Changes の範囲） | `SCOPE-` | 11・8 | ✅ |
-| 04 | [結果の一覧](04-rows.md)（木の形と開き方・各行に書かれるもの・ページの位置と状態の語・50文字の行・チェックボックス・メッセージ欄の3層） | `ROW-` | 6・7 | ✅ |
+| 03 | [範囲 ― 文書とブック](03-scope.md)（Book Scope・対象のブックの決まり方・章を1つずつ開いて返す・開けなかった章・閉じるか残すか・All Documents） | `SCOPE-` | 11・8 | ✅ |
+| 04 | [結果の一覧](04-rows.md)（木の形と開き方・各行に書かれるもの・ページの位置と状態の語・50文字の行・右クリックのメニュー・メッセージ欄） | `ROW-` | 6・7 | ✅ |
 | 05 | [ジャンプと印](05-jump.md)（行ごとの行き先・ジャンプの順・一致がもう無いとき・ダブルクリックの選択・約1秒の印・矢印キー・Hide Previous Chapter） | `JMP-` | 12 | ✅ |
-| 06 | [置換 ― Change Checked と行のメニューの Replace](06-replace.md)（1件ずつ書く・断る順・条件と文書の照合・置換されない理由・報告への変わり方・取り消し1段・行のメニューと Replace Again） | `REP-` | 9 | ✅ |
-| 07 | [変更履歴 ― 署名・色・却下と承認](07-track-changes.md)（時刻つきの署名・Amber・記録の形・脚注・隠し条件・Reject・Accept・Accept All の数え方） | `TRK-` | 9b | ✅ |
-| 08 | [Show Changes by KohakuFindChange](08-show-changes.md)（記録から一覧を作り直す・範囲・読み方・run の行・メッセージ欄・できること／できないこと） | `SHOW-` | 9b | ✅ |
+| 06 | [置換 ― 行の Replace と Change All in Book (No List)](06-replace.md)（1件ずつ書く・断る順・条件と文書の照合・置換されない理由・取り消し1段・Return キー・Change All in Book・Clear Results） | `REP-` | 9 | ✅ |
+| 07 | [変更履歴 ― 利用者の設定のまま](07-track-changes.md)（KFC は記録を付けない・ON にもしない・それまでの記録は文書に残る。署名・色・却下と承認は 2026-10-06 に外した） | `TRK-` | 9 | ✅ |
+| 08 | [Show Changes by KohakuFindChange](08-show-changes.md)（2026-10-06 に外した） | `SHOW-` | ― | ― |
 | 09 | [Undo/Redo への追従](09-undo.md)（追いかける書き込み・追いかけないもの・知り方・順番・やめるとき・メッセージ欄） | `UNDO-` | 6b | ✅ |
 | 10 | [文書・ブックを閉じたとき](10-lifecycle.md)（文書の結果・All Documents・ブックの結果・復帰・ブックの別名保存・保存・起動と終了） | `LIFE-` | 11・13 | ✅ |
 | 11 | [パネルの見た目](11-panel.md)（開き方・タブ名・3枚の絵・メッセージ欄の高さ・大きさの下限と行の丸め・How to Use・About） | `PNL-` | 4・7・13 | ✅ |
-| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー・ショートカット・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5・3 | ✅ |
+| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（ヒットの行の Replace）・ショートカット・保存するもの／しないもの・JSON の置き場） | `SET-` | 4・5・3 | ✅ |
 | 13 | [窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change](13-windows.md)（薄さと戻り方・効く場所・影・浮いた組・ダイアログの見つけ方・最小化ボタンとタスクバー・後始末） | `WIN-` | 14・15 | ✅ |
 | 14 | [ブックパネルの位置を覚える（Remember Book Panel Placement）](14-book-panel.md)（測る瞬間・戻す瞬間・浮いているとき・ドックの隣で覚える・放り出されたとき・ホーム画面） | `BPP-` | 16 | ✅ |
 | 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・テキストと正規表現だけ・見えないとき） | `BAR-` | 17 | ✅ |

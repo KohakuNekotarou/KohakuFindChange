@@ -34,12 +34,14 @@
 ## 2. 絵
 
 - **PNL-07** メッセージ欄の横の絵は**3枚**で、状態で入れ替わる ――
-  何も実行していない＝猫（`Kohakuneko_OFF32.png`）／検索か Show Changes をした＝探している猫（`KohakuFind32.png`）／
-  **Change Checked で置換して報告が出ている**＝置換している猫（`KohakuChange32.png`）。
-  結果が消えると（文書を閉じた・新しい検索）、それに合った絵に戻る。
+  何も実行していない＝猫（`Kohakuneko_OFF32.png`）／検索をした＝探している猫（`KohakuFind32.png`）／
+  **Change All in Book (No List) かクエリ連続実行で何か置換した**＝鉛筆を持った猫（`KohakuChange32.png`）。
+  結果が消えると（文書を閉じた・新しい検索・Clear Results）、それに合った絵に戻る。
   - 訂正:
 
-- **PNL-08** ⚠「置換している猫」は **Change Checked の後だけ**。行のメニューの Replace では一覧が作業リストのままなので（REP-25）、探している猫のまま。
+- **PNL-08** ⚠鉛筆を持った猫は **Change All の後だけ**（2026-10-06 の作者の決定＝「ChangeAllのときだけにしましょう」「クエリでChangeAllのほうしたときも」）。
+  行の Replace では一覧が作業リストのままなので、探している猫のまま。何も書かなかった Change All（0件・キャンセル・失敗）でも変わらない。
+  （それまでは Change Checked の後の「置換の報告」で出ていた。）
   - 訂正:
 
 - **PNL-09** 絵に**マウスを乗せると KFC のホームページの URL**（`https://github.com/KohakuNekotarou/KohakuFindChange`）が出て、
@@ -84,7 +86,9 @@
   - 訂正:
 
 - **PNL-17** ★説明は、UI 言語が日本語なら日本語、それ以外は英語（2026-08-05 の決定＝featureSet ではなく UI 言語で決める）。
-  中身は8節 ―― 免責／検索（Find in …）／検索範囲（Book Scope）／結果の見方／置換（Change Checked）／Show Changes／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
+  中身は（英語）7つ ―― 免責／検索（Find in …）／検索範囲（Book Scope）／結果の見方／置換／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
+  （2026-10-06 に英語の置換の節を行の Replace・Return・Change All in Book (No List)・Clear Results・変更履歴の扱いに書き直し、300件の上限を検索の節に足した。）
+  ⚠**日本語は作者の確認待ち**（作者の文面そのままの節があるので、下書きを見てもらってから入れる）＝今は旧版の8つ（置換（Change Checked）と Show Changes の節が残る）。
   - 訂正:
 
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。

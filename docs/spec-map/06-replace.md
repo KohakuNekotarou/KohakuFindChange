@@ -1,14 +1,15 @@
-# 06. 置換 ― Change Checked と行のメニューの Replace
+# 06. 置換 ― 行の Replace と Change All in Book (No List)
 
-> コード地図での位置: ブロック **9**（`model/KFCReplaceEngine.*`）。
-> 変更履歴の署名・色・却下と承認は第7章、取り消し・やり直しへの追従は第9章。
+> コード地図での位置: ブロック **9**（`model/KFCReplaceEngine.*`＝行の Replace・`model/KFCChangeAll.*`＝Change All in Book と Clear Results）。
+> 2026-10-06 夜の作者の決定（docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md 第5版・F16）で、一覧から書くのは**行の Replace だけ**になった（Change Checked・チェックボックス・Check All／Uncheck All・ストーリーと文書の行の Replace はやめた）。番号は使い回さない。
+> 変更履歴は利用者の設定のまま（第7章）、取り消し・やり直しへの追従は第9章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
 ---
 
 ## 1. 何で、どう置換するか
 
-- **REP-01** 置換するのは**チェックを付けた行だけ**。書く文字は本体の「検索と置換」の置換側
+- **REP-01** 一覧から書くのは、**行の Replace（右クリックのメニュー／行を選んで Return キー）で選んだ1行だけ**。書く文字は本体の「検索と置換」の置換側
   （置換文字列／字形タブなら置換字形／文字種変換タブなら置換後の文字種）。
   置換文字列が**空なら一致を消す**（空でも灰色にしない＝空は「消して」という正しい頼み）。
   - 訂正:
@@ -16,9 +17,9 @@
 - **REP-02** GREP の後方参照（`$1` など）やエスケープは **KFC が読まず、本体の置換がそのまま解釈する**（KFC は検索と置換の設定を読むだけで、書き換えない）。
   - 訂正:
 
-- **REP-03** ★置換は**1件ずつ** ―― ストーリーごとに、本体の「次を検索」のコマンドで一致へ進み、それがチェックした行なら、本体の置換のコマンドでその一致を置換する。
-  ★この骨格は確定（2026-07-31・再設計を提案しない）。本体の「すべてを置換」は使えない
-  ＝「チェックした行だけ」を渡す口が無く、行ごとに置換後の範囲も返さないため。
+- **REP-03** ★行の Replace は**1件ずつ** ―― その行のストーリーを、本体の「次を検索」のコマンドで一致へ進み、それがその行の一致なら、本体の置換のコマンドでその一致を置換する。
+  ★この骨格は確定（2026-07-31・再設計を提案しない）。本体の「すべてを置換」は行の Replace には使わない＝その1行だけを渡す口が無く、置換後の範囲も返さないため。
+  ブックの一致を一度に書くのは Change All in Book (No List)（REP-33）で、こちらは本体の「すべてを置換」そのもの。
   - 訂正:
 
 - **REP-04** 行は「どのスレッドの、どこから、何文字」で見分ける。置換の途中で、置換そのものが新しく作った一致（検索では出なかったもの）は**飛ばす**。
@@ -27,31 +28,21 @@
 
 - **REP-05** 歩く向きは前向き。★ただし GREP の検索文字列に `^`（段落の頭）があるときだけ、**書くときの歩きは後ろ向き**（2026-09-27 の決定）。
   検索と、書く前の照合は前向きのまま。
+  ⚠1件ずつなので、`^` や前後読みのある GREP では、前の行を書くと後の行が同じ一致でなくなることがある＝その行の Replace は断る（何も書かない・`search again`）。
+  行を置換する順番を変えれば本体の「すべてを置換」と同じ結果になる（回帰 `same-start-longer`／`same-start-longer-order`）。
   - 訂正:
 
-- **REP-06** ★置換する一致に**重なる・接する「まだ承認していない変更」**は、誰のものでも**先に承認してから**置換する（2026-09-27 の決定＝その部分だけ）。
-  承認した数はメッセージ欄に ` N pending tracked change(s) accepted first.` と書く（変更履歴パネルから消えるので）。
-  理由＝作者がまだ承認していない挿入を置換すると、記録が残らず、却下で戻せなくなるため。
-  後注の終わりで置換しない一致の周りは承認しない（2026-10-02）。
+- **REP-06** （2026-10-06 に外した＝第7章 TRK-26。それまでは「一致の周りの未承認の変更を先に承認してから置換」だった）
   - 訂正:
 
 ---
 
-## 2. Change Checked の前の確かめ
+## 2. Change Checked の前の確かめ（2026-10-06 に外した）
 
-- **REP-07** 断る理由は次の順に調べる ――
-  ①ほかの実行中（`A replace is already running.`／`Another Kohaku Find/Change run is already in progress.`）
-  ②結果が無い（`No results to replace - run a search first.`）
-  ③記録から作り直した一覧（`Change Checked: these rows were rebuilt from Track Changes - search again to replace.`）
-  ④置換の報告（`This is the last replace's report - search again to replace more.`）
-  ⑤チェックが0（`Nothing checked.`）
-  ⑥検索の条件が変わった（§3）
-  ⑦置換側の設定が読めない（`Find/Change settings are unavailable - nothing was changed.`）
-  ⑧文書が変わった（§4）。
+- **REP-07** （2026-10-06 に外した＝Change Checked をやめた・F16。行の Replace の断りは §3・§4・REP-27）
   - 訂正:
 
-- **REP-08** メニューの Change Checked が灰色になるのは、**チェックした行が無い**か、**一覧にチェックボックスが1つも無い**とき（③④⑤）。
-  ★**確認のダイアログは出さない**（2026-09-27 の決定）＝全部が1回の取り消しで戻り、保存もしないため。
+- **REP-08** （2026-10-06 に外した＝Change Checked のメニューが無い）
   - 訂正:
 
 ---
@@ -77,17 +68,14 @@
 
 ## 4. 文書が変わっていたら ―― 書く前の照合
 
-- **REP-13** ★書く前に、チェックした行のある章を**全部開き**（閉じていれば開き直す）、**1文字も書く前に**照合する ――
+- **REP-13** ★行の Replace は、その行の章を開き（閉じていれば開き直す）、**1文字も書く前に**照合する ――
   ①そのストーリーの版（変更カウンタ）が、KFC が最後に知っている版のままか
   ②行の文字（一致と前後）が、検索したときのまま読めるか
   ③同じ条件で歩き直すと、行の位置に同じ長さの一致が立つか。
   （★2026-08-10 の決定＝「この章は触られていないように見えるか」ではなく、**一致そのものの位置**で確かめる）
   - 訂正:
 
-- **REP-14** ★1行でも合わなければ、**何も書かずに止め**、警告アラート `検索結果に変化を確認しましたので、置換を中止しました。`
-  （ブックの章なら `「章名」の検索結果に変化を…`・英語 UI は `The search results have changed, so the replace was stopped.`）を出し、**結果を消す**。
-  メッセージ欄は `Replace cancelled - nothing was changed. Results cleared - the document changed. Search again.`
-  ★「それでも続ける」の選択肢は無い（2026-08-10 の決定＝崩れた作業リストは、どう答えても安全に置換できない）。
+- **REP-14** （2026-10-06 に外した＝Change Checked の警告アラート「検索結果に変化を確認しましたので、置換を中止しました。」。行の Replace はアラートを出さずにメッセージ欄で断る＝REP-27）
   - 訂正:
 
 - **REP-15** ★版を照合に使う理由 ―― 利用者の入力・ほかの操作の Ctrl+Z・変更履歴パネル・スクリプトで動いたストーリーには、**推測で書かない**
@@ -98,80 +86,86 @@
 
 ## 5. 書き込みと、その後
 
-- **REP-16** Change Checked は**ブック全体でも1回の取り消しの段**（「編集 > 取り消し」の名前は日本語 UI で `置換`、英語 UI で `Replace`）。
-  どの章を前にして Ctrl+Z しても、全部の章が一緒に戻る（章ごとの段にすると、取り消した章以外の履歴だけが消えて戻せなくなった＝2026-07-28 実測）。
+- **REP-16** 行の Replace は**1回が取り消しの1段**（「編集 > 取り消し」の名前は日本語 UI で `置換`、英語 UI で `Replace`）。
+  Change All in Book (No List) は**ブック全体で1段**（`すべてを置換`／英語 UI は `Change All`）＝どの章を前にして Ctrl+Z しても、全部の章が一緒に戻る
+  （章ごとの段にすると、取り消した章以外の履歴だけが消えて戻せなくなった＝2026-07-28 実測）。
   - 訂正:
 
-- **REP-17** ★チェックした行のある章は**全部開いてから書く**（キャンセルでブック全体を戻せるように）。
-  一度に開いていられないほど大きいブックは、**チェックする章を絞って分けて**置換する（2026-08-05 の決定）。
+- **REP-17** （2026-10-06 に外した＝Change Checked が章を全部開いてから書く決まり。Change All in Book は章を全部開いて持ってから1段で書く＝REP-33）
   - 訂正:
 
-- **REP-18** ★進捗バーの**キャンセルは全部を元に戻す** ―― 本文も、一覧も、「変更あり」の印も、KFC が開いた章も。`Replace cancelled - nothing was changed.`
-  本体がエラーを出して止まったときも全部戻し、`Replace stopped - InDesign reported an error, so nothing was changed ("…").` と本体の言葉を添える。
+- **REP-18** ★Change All in Book の進捗バーの**キャンセルは全部を元に戻す** ―― 本文も、「変更あり」の印も、KFC が開いた章も。`Cancelled - nothing was changed.`
   - 訂正:
 
-- **REP-19** チェックした行が置換されなかったときは、**必ず数えて理由を言う**（合計が黙って減らないように）――
-  ロック＝` N hit(s) left alone - locked layer or story (those can be searched, not changed).`／
-  見つからない＝` ! N hit(s) missing - not found when the chapter was searched again.`（`!` で目立たせる・2026-08-04 の決定）／
-  後注の終わり＝` N hit(s) in endnotes not replaced - …`／本体が断った＝` N hit(s) could not be changed - InDesign refused the change there.`
-  行にもそれぞれの語が付く（ROW-13）。
+- **REP-19** （2026-10-06 に外した＝Change Checked の要約の数（ロック・missing・後注・本体が断った）。行の Replace は1行なので、書けなかったらその理由をメッセージ欄で言う＝REP-27）
   - 訂正:
 
-- **REP-20** ★**後注の終わりで終わる一致は置換しない**（本体の置換がそこで後注を壊すため＝2026-09-27 の決定）。
+- **REP-20** ★**後注の終わりで終わる一致も、本体と同じく書く**（2026-10-06・F12＝それまでは本体の置換が後注の範囲を壊すので書かなかった。本体の「すべてを置換」も同じく書く）。
   - 訂正:
 
-- **REP-21** ほかのチェックした行が脚注・表・アンカー付きオブジェクトを丸ごと消したとき、その中にあった行は**一緒に消え**、`deleted` が付く（行き先も無い）。
+- **REP-21** 行の Replace が脚注・表・アンカー付きオブジェクトを丸ごと消したとき、その中にあった行は**一緒に消え**、`deleted` が付く（行き先も無い）。
   - 訂正:
 
-- **REP-22** 終わったときの文 ―― `N replaced.`（ブックは `N replaced in M chapter(s).`）。
-  1つでも書いたら ` Not saved - check them and save yourself.` と、` Replaced with Track Changes on - Reject Change on a row's right-click menu takes it back.` が続く。
+- **REP-22** 終わったときの文 ―― 行の Replace＝`Replaced.`／Change All in Book＝`N replaced in M chapter(s).`（何も無ければ `No match - nothing was changed.`）。
+  ★Ctrl+Z で戻せることは書かない（2026-10-06 の決定・F20）。
   - 訂正:
 
-- **REP-23** 一覧は**置換の報告**に変わる（GEN-30 ②）―― チェックしなかった行は消え、関わった行と、ロックの行・すでに何か言うことのある行だけが残り、チェックボックスは消える。
+- **REP-23** （2026-10-06 に外した＝Change Checked の後の「置換の報告」。一覧はいつも作業リストのまま）
   - 訂正:
 
 - **REP-24** ★何も保存しない（GEN-17）。書いた章のうち **KFC が開いた章には窓を付け**、**何も書かなかった章は閉じて返す**。
-  利用者が窓なしで持っている文書は隠したまま（` N document(s) without a window were changed - still hidden.`）。
+  利用者が窓なしで持っている文書は隠したまま（` The document has no window - still hidden.`）。
   - 訂正:
 
 ---
 
-## 6. 行のメニューの Replace
+## 6. 行の Replace
 
-- **REP-25** **ヒットの行の Replace**＝その1行を、**チェックの有無にかかわらず、確認なしで**置換する（★2026-09-27 の決定）。1回が取り消しの1段。
-  一覧は**作業リストのまま**（報告にならない）。置換した行はチェックボックスを失い、ほかの行は文字の今の位置へ移る。
+- **REP-25** **ヒットの行の Replace**＝その1行を、**確認なしで**置換する（★2026-09-27 の決定）。1回が取り消しの1段。
+  一覧は**作業リストのまま**（報告にならない）。置換した行は書いた文字を見せ、ほかの行は文字の今の位置へ移る。
   置換できない行（置換済み・ロック・検索の一致でない）では灰色。
   - 訂正:
 
-- **REP-26** **ストーリーの行・文書の行の Replace**＝その中の**チェックした行**を置換する。
-  ★**全部か無し** ―― 1行でも書けなければ全部戻す（2026-10-02 の決定＝そう言う）：
-  `Replace: nothing was replaced - in 1 of these 2 checked row(s) the match ends an endnote, and InDesign's replace breaks an endnote there. Untick it and Replace again.`
-  チェックした行が無ければ `Replace: no checked row in this story to replace - tick the rows first.`（メニューも灰色）。
+- **REP-26** （2026-10-06 に外した＝ストーリーの行・文書の行の Replace。F16）
   - 訂正:
 
-- **REP-27** 行のメニューの Replace も、Change Checked と**同じ確かめ**をする（条件が変わった＝結果を消して断る・版・行の文字）。
-  違いは、文書が変わっていたとき**アラートを出さず、メッセージ欄で断る**こと ――
+- **REP-27** 行の Replace は**書く前に確かめる**（条件が変わった＝結果を消して断る・版・行の文字）。文書が変わっていたら**アラートを出さず、メッセージ欄で断る** ――
   `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again.`／
   `Replace: the text of this row has changed since the search (edited, or undone) - search again.`
+  書けなかった行は、理由を言って元のまま（`Replace: InDesign's replace command would not run there - left as it is.` など）。行の状態も元に戻る（語は付かない）。
   ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
   - 訂正:
 
-- **REP-28** 結果の文 ―― 1行＝`Replaced with Track Changes on - Reject Change on the row's right-click menu takes it back.`
-  （脚注の中なら `Replaced (inside a footnote - Track Changes records nothing there, so it cannot be taken back with Reject Change).`）／
-  複数＝`Replaced N checked row(s) of this story with Track Changes on - Reject Change on a row's (or its story's) right-click menu takes it back.`
+- **REP-28** 結果の文＝`Replaced.`（REP-22）。
   - 訂正:
 
-- **REP-29** ★**Replace Again (Current Find/Change Settings)**（ストーリー・文書の行）＝**却下（Reject）で戻した行**を、チェックの有無にかかわらず、
-  **今の**検索と置換の設定でもう一度置換する（名前は 2026-09-29 の決定＝それまでは Redo。「どの設定で書くか」を名前で言うため）。
-  文字が変わった行は飛ばして数える。成功の文は `Replaced N row(s) of this story again with the current Find/Change settings (Track Changes on).`
-  （断るときの文だけ頭に `Replace Again: ` が付く）。
+- **REP-29** （2026-10-06 に外した＝Replace Again (Current Find/Change Settings)。却下で戻す機能ごと外した＝第7章 TRK-28）
   - 訂正:
 
-- **REP-30** ★ヒットの行には Replace Again が無い（却下で戻した行はチェックボックスが戻るので、Replace か Change Checked で置換し直す＝2026-09-27 の決定）。
+- **REP-30** （2026-10-06 に外した＝REP-29 と一緒）
   - 訂正:
 
-- **REP-31** 行のメニューの書き込みも、**窓・閉じる・「変更あり」の印**の扱いは Change Checked と同じ ――
+- **REP-31** 行の Replace の書き込みの**窓・閉じる・「変更あり」の印**の扱い ――
   窓を付けるのは KFC が開いた章だけ／断られた・巻き戻った章は閉じて返す／巻き戻ったら印も入る前に戻す（2026-10-04 に直した＝GEN-16/17）。
+  - 訂正:
+
+- **REP-32** ★**行を選んで Return キー**（テンキーの Enter も）でも、その行を置換する（2026-10-06・F17＝矢印キーで行を歩き、合っている所で Return＝キーボードだけで置換できる）。
+  右クリックの Replace と同じ口（同じ確かめ・同じ文）。Shift などを押しながらの Return・ストーリー／文書／本の行の Return・置換済みの行の Return では何もしない。
+  ダブルクリックでキーボードが本文に移っているときの Return は本文に改行を打つ（KFC は何もしない）。章を開いて書いたときも、キーボードはツリーに戻る。
+  - 訂正:
+
+## 7. Change All in Book (No List) と Clear Results
+
+- **REP-33** ★**Change All in Book (No List)**（パネルのメニュー）＝ブックの全章の一致を、**本体の「すべてを置換」で**一度に書く（2026-10-06・F18）。一覧は作らない。
+  使えるのは **Book Scope が ON・対象のブックがある・パネルにヒットの行が無い・検索できるタブ・検索する文字か形式がある** とき（それ以外は灰色）。
+  ヒットの行があるときは先に Clear Results（REP-34）。スクリプトなどから押されたら `Change All: the panel holds a list - choose Clear Results first.` と断る。
+  （0件のブックの検索の後＝ブックの行だけのときは使える。）ブック以外（文書・ストーリー・選択範囲）は本体の「検索と置換」の「すべてを置換」を使う。
+  章を全部開いて持ってから、**ブック全体で取り消しの1段**として書く（REP-16）。キャンセル・失敗は全部戻す（REP-18）。
+  書いた章には窓を付け、何も書かなかった章は閉じて返す。何か書いたらパネルの絵が**鉛筆を持った猫**になる（次の検索で戻る）。
+  - 訂正:
+
+- **REP-34** **Clear Results**（パネルのメニュー）＝一覧を空にする（文書には触らない）。ヒットの行が無いときは灰色（0件のブックの行だけのときも）。文は `Results cleared.`
+  KFC が窓なしで持っている章があれば、予約で閉じて返す（SCOPE-21）。
   - 訂正:
 
 ---
@@ -182,4 +176,4 @@
 
 - REP-01：置換形式（Change Format）が書かれるか。本体の置換のコマンドに任せているので書かれるはずだが、この章のためには測っていない（GEN の未確認と同じ）。
 - REP-16：英語 UI の取り消しの名前 `Replace` は文字列表の値で、実機の「編集」メニューで見てはいない。
-- REP-26 の例文は、コードの組み立てから起こした文で、実機の表示を写したものではない（回帰の `story-replace-endnote-end` が実物を持っている）。
+- REP-32：矢印キーで行を歩いてから Return で置換する流れは、試験の道具（KIDMCP の `send_input`）が矢印を拡張キーとして送らないため、自動では回せていない（Return だけの流れは実機で確認済み＝回帰 `ret-*`）。

@@ -13,9 +13,8 @@
   ```
   Open Find/Change...
   Find in Document
-  Change Checked
-  ──────────
-  Show Changes by KohakuFindChange
+  Change All in Book (No List)
+  Clear Results
   ──────────
   Book Scope
   Hide Previous Chapter
@@ -33,9 +32,10 @@
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
   `Book Scope` から `Remember Book Panel Placement` までの7つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。）
   - 訂正:
 
-- **SET-02** ★`Find in …` と `Change Checked` の間に区切り線は無い（2026-09-27 の決定）。`Show Changes` は `Change Checked` の下で、区切り線の後（2026-09-29・作者が決めた場所）。
+- **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
   トグルの並びは、検索にかかわるもの（Book Scope・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
   - 訂正:
 
@@ -47,14 +47,15 @@
 
 ## 2. 灰色になるとき
 
-- **SET-04** 検索・置換・Show Changes が**走っている間は、灰色にできる項目はすべて灰色**（GEN-33）。
+- **SET-04** 検索・置換・Change All が**走っている間は、灰色にできる項目はすべて灰色**（GEN-33）。
   `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-in...` の4つはこの確かめを受けないが、
   走っている間は進捗バーがモーダルなので、フライアウトそのものが開けない（2026-08-03 実測）。
   - 訂正:
 
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Object／Colour のとき灰色（FIND-17）。
-  `Show Changes` ＝範囲に対象が無いとき灰色。`Change Checked` ＝チェックした行が無いか、一覧にチェックボックスが1つも無いとき灰色（REP-08）。
-  検索と置換に書いた文字は見ない（置換の文字が空でも「一致を消す」としてやれる）。
+  `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Object／Colour・検索する文字も形式も無いとき灰色（REP-33）。
+  `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。
+  置換の文字は見ない（空でも「一致を消す」としてやれる）。
   - 訂正:
 
 - **SET-06** `Hide Previous Chapter` ＝Book Scope が ON か、ブックの結果が出ているときだけ押せる。灰色でもチェックの印は見えたまま（JMP-27）。
@@ -79,28 +80,25 @@
 
 ## 3. 右クリックメニュー
 
-- **SET-10** 行の右クリックメニュー（上から）――
-  **ブックの行・文書の行**＝`Replace`／`Reject All Changes by KohakuFindChange in This Document`／`Replace Again (Current Find/Change Settings)`／
-  `Check All`／`Uncheck All`／`Accept All Changes by KohakuFindChange in This Document`（ブックの行では、文書1つのための項目は灰色。ブック全体の置換は Change Checked）。
-  **ストーリーの行**＝`Replace`／`Reject Changes by KohakuFindChange in This Story`／`Accept Changes by KohakuFindChange in This Story`／`Replace Again (Current Find/Change Settings)`／`Check All`／`Uncheck All`。
-  **ヒットの行**＝`Replace`／`Reject Change by KohakuFindChange`／`Accept Change by KohakuFindChange`。
-  **run の行**＝`Reject Changes by KohakuFindChange in This Run`／`Accept Changes by KohakuFindChange in This Run`。
-  どの項目も、右クリックした行で、やることがあるときだけ押せる。
+- **SET-10** 右クリックのメニューがあるのは**ヒットの行だけ**で、項目は `Replace` の1つ（ROW-32）。ブック・文書・ストーリーの行には無い。
+  （Reject／Accept の仲間・Replace Again・Check All／Uncheck All・本／文書／ストーリー／run の行のメニューは 2026-10-06 に外した。）
   - 訂正:
 
-- **SET-11** 右クリックメニューの項目が**すべて灰色**だと、メニューは開かない（本体の振る舞い＝2026-08-01 実測・作者がこのほうがよいと受け入れた）。そのときは、理由がメッセージ欄に出る（ROW-29）。
+- **SET-11** `Replace` が灰色のとき（置換済み・ロック・検索の一致でない）は、メニューが開かない（本体の振る舞い＝2026-08-01 実測・作者がこのほうがよいと受け入れた）。
+  理由は出さない（右クリックの理由の層は 2026-10-06 に外した＝ROW-29）。
   - 訂正:
 
-- **SET-12** Check All／Uncheck All は**フライアウトには無く、右クリックにだけ**ある（2026-08-01 から＝どこまで付けるかを、右クリックした行で決めるため・ROW-23）。
+- **SET-12** （2026-10-06 に外した＝Check All／Uncheck All。チェックボックスごと＝F16）
   - 訂正:
 
 ---
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**4つだけ** ―― `Open Find/Change...`・`Find in …`・`Change Checked`・`Show Changes by KohakuFindChange`
-  （2026-09-27 に検索と Change Checked、09-29 に Show Changes、10-01 に Open Find/Change＝どれも作者の決定）。
-  キーボードショートカットの設定の「パネルメニュー」に `Kohaku Find/Change: <名前>` として出る（KCM と同じ形）。ほかの項目は出ない。
+- **SET-13** ★ショートカットを割り当てられるのは**4つだけ** ―― `Open Find/Change...`・`Find in …`・`Change All in Book (No List)`・`Clear Results`
+  （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。
+  行の置換はショートカットでなく Return キー＝F17）。
+  キーボードショートカットの設定の「パネルメニュー」に `Kohaku Find/Change: <名前>` として出る（KCM と同じ形）。ほかの項目（行の `Replace` も）は出ない。
   ⚠`Find in …` は、設定の画面ではリソースの名前の `Search` で出る見込み（メニューで名前を範囲に変えるのは、表示する直前だけなので）。
   - 訂正:
 
@@ -159,4 +157,3 @@
 - SET-13：1.0.0 から更新するとショートカットが外れる（README）。1.2.0 の中で版を上げても外れないかは確かめていない（ActionID は変えない約束）。
 - SET-04：走っている間に、`Open Find/Change...` のショートカット（灰色の確かめを受けない）を押したらどうなるかは測っていない（進捗バーがモーダルなので届かない見込み）。
 - SET-18：`<言語>` のフォルダー名（例 `ja_JP`）と `Version XX.0` の数は、この章のためには実機のパスを見ていない。
-- SET-10：右クリックメニューの項目の並びは、リソースの位置の番号から読んだもので、この章のためには実機の表示を見ていない。

@@ -176,7 +176,8 @@
 - **FIND-34** 見つかったときのメッセージ ――
   ブック `N hit(s) in M of T chapter(s).`（M＝一致のあった章、T＝調べた章）／All Documents `N hit(s) in M of T document(s).`／
   それ以外 `N hit(s).`（Story・To End of Story・Selection は ` in the story` ` to the end of the story` ` in the selection` が付く）。
-  最後に ` Right-click the book or a document row for a menu.` を付ける。
+  最後に（章の注の後に）` Replace a row with its right-click menu, or select it and press Return.` を付ける（2026-10-06・F19＝置換のしかたを画面のどこも言っていなかったので）。
+  （それまでの ` Right-click the book or a document row for a menu.` は、ブック・文書の行のメニューと一緒に 2026-10-06 に外した。）
   ★**文書名・ブック名は書かない**（2026-08-03 の決定＝すぐ下の木の最初の行に出ているので、欄を食うだけ）。
   - 訂正:
 
@@ -189,8 +190,11 @@
   KFC が開いたのに閉じられなかった章。名前は3つまで、それ以上は `...`。
   - 訂正:
 
-- **FIND-37** 安全の上限（10,000 行・GEN-34）で止まったときは ` Stopped at the 10000 safety limit - narrow your search.` を、パネルに描く上限（1,000 行）を超えたときは ` Showing first 1000 in the panel. Check All on a book or document row ticks the rows not shown too.` を書き足す（両方付くことがある）。
-  上限で止まると、それより先の章・文書は歩かない。（2026-10-04〜05 は上限 5,000＝描く上限と同じで止まる文だけ、その前は上限 10,000 で ` Showing first 5000 in the panel.` も付いていた。）
+- **FIND-37** ★上限（**300 行**・GEN-34）で止まったときは ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.` を書き足す
+  （ブックの検索は `… or use Change All in Book (No List).`＝F9・F18）。上限で止まると、それより先の章・文書は歩かない。
+  集める＝描くなので、` Showing first … in the panel.` の文は無い（2026-10-06）。
+  （2026-10-05 夜〜10-06 は上限 10,000・描く 1,000 で、` Stopped at the 10000 safety limit - narrow your search.` と ` Showing first 1000 in the panel. …` の2つ、
+  2026-10-04〜05 は上限 5,000、その前は上限 10,000 で ` Showing first 5000 in the panel.` も付いていた。）
   - 訂正: ✅2026-10-05 夜（コードを変更・`0388c59`）→ GEN-34 の変更に合わせて書き直した（`display-cap`・`cap-1001`・`cap-10001` で実機確認）。
 
 ---
@@ -204,4 +208,4 @@
 - **ノート・パス上のテキスト・アンカー付きオブジェクトの中の文字**が一致に入るかも、この章では確かめていない（同じく本体まかせ）。
 - FIND-30：一致の無い長いストーリーで、Cancel がどれだけ待たされるかを測っていない。
 - FIND-24：All Documents の文書の順番は「開いている文書の一覧の順」（開いた順と見られる＝KCM の地図 OV-26 の実測）。KFC で順番そのものを測ったことはない。
-- FIND-37：上限で止まったときに先の章・文書を歩かないことは、コードで読んだだけ（実機で測ったのは文書1つ・5,100 件＝回帰 `display-cap`）。
+- FIND-37：上限で止まったときに先の章・文書を歩かないことは、コードで読んだだけ（実機で測ったのは文書1つ＝回帰 `cap-300`、ブック＝`cap-300-book`・2026-10-06）。
