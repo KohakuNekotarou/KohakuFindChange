@@ -33,8 +33,6 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
-#include <vector>
-
 namespace KFCReplaceEngine
 {
 
@@ -105,9 +103,6 @@ namespace KFCReplaceEngine
 	    changed since it, the row replaced / locked / not a work row, its document closed, its story changed, a run
 	    going - or the write did not land. The UI shows it on the message area when the row is selected. */
 	bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter);
-
-
-
 }
 
 #endif // __KFCReplaceEngine_h__

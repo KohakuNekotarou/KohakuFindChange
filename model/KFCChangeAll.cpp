@@ -57,11 +57,6 @@ struct RunningFlagGuard
 	~RunningFlagGuard()	{ gRunning = false; }
 };
 
-bool SameDoc(const UIDRef& a, const UIDRef& b)
-{
-	return a.GetDataBase() == b.GetDataBase();
-}
-
 /** "  By chapter: <name> (<n>), ... ." - how many each chapter got (2026-10-07, the author's addition: Change All in Book's
 	result broken down by chapter): the chapters written only, in the book's order, ten at most and then "and N more" - the
 	message line is four lines high (spec map PNL-10). It goes last, after the notes, so a chapter that could not be
@@ -270,7 +265,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
-	std::vector<UIDRef> touched;
+	std::vector<bool> wroteTo(targets.size(), false);		// by target: did its Change All write anything
 	std::vector<std::pair<PMString, int32> > written;		// the By chapter list: each chapter written, how many (book order)
 	bool cancelled = false, failed = false;
 	PMString why;
@@ -317,7 +312,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			if (count > 0)
 			{
 				replaced += count;
-				touched.push_back(targets[d].docRef);
+				wroteTo[d] = true;
 				written.push_back(std::make_pair(targets[d].shortName, count));
 			}
 		}
@@ -365,10 +360,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
-		bool wrote = false;
-		for (size_t k = 0; k < touched.size() && !wrote; ++k)
-			wrote = SameDoc(touched[k], targets[i].docRef);
-		if (wrote)
+		if (wroteTo[i])
 		{
 			if (KFCBookScope::IsHeldDoc(targets[i].docRef))
 				KFCBookScope::ShowChapterWindow(targets[i].docRef);
@@ -399,7 +391,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		// "N replaced in M of S selected document(s) (T in the book)": M written, S the Book panel's selected ones
 		outSummary.AppendNumber(replaced);
 		outSummary.Append(" replaced in ");
-		outSummary.AppendNumber(static_cast<int32>(touched.size()));
+		outSummary.AppendNumber(static_cast<int32>(written.size()));
 		outSummary.Append(" of ");
 		outSummary.AppendNumber(selection.selected);
 		outSummary.Append(" selected document(s) (");
@@ -410,7 +402,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	{
 		outSummary.AppendNumber(replaced);
 		outSummary.Append(" replaced in ");
-		outSummary.AppendNumber(static_cast<int32>(touched.size()));
+		outSummary.AppendNumber(static_cast<int32>(written.size()));
 		outSummary.Append(" chapter(s).");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
