@@ -62,6 +62,11 @@ namespace KFCQueryOrder
 	/** A right row's text: "<n>  <kind>  <name>", and " (not found)" after a query whose file is not there. Empty for an
 	    index the list does not hold. */
 	PMString OrderRowText(int32 index);
+
+	/** Empty both lists during the controlled shutdown (KFCUIStartupShutdown): each holds a PMString and an IDFile per
+	    row, the kind of static whose destructor must not be left for the DLL's unload (KFCResultTree::ShutdownCleanup's
+	    rule - the KESCL one). Safe to call twice. */
+	void ShutdownCleanup();
 }
 
 #endif // __KFCQueryOrder_h__

@@ -31,6 +31,7 @@
 #include "KFCPanelState.h"		// the saved settings, read back before anything else runs
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement": stop following at the end
 #include "KFCResultTree.h"		// the status line's static PMString
+#include "KFCQueryOrder.h"		// the query dialog's two lists - static vectors
 #include "KFCModelObserver.h"	// the UI half's ear on the model half
 
 /** Implements IStartupShutdownService for the UI half. */
@@ -97,6 +98,9 @@ public:
 		KFCMarkerExpiryIdleTask::Shutdown();
 		// ...and the line the panel last reported: a static PMString (see KFCResultTree::ShutdownCleanup).
 		KFCResultTree::ShutdownCleanup();
+		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles (2026-10-07 - the whole-branch
+		// review found them left for the unload).
+		KFCQueryOrder::ShutdownCleanup();
 	}
 };
 

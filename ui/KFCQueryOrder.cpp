@@ -19,6 +19,7 @@
 #include <vector>
 
 // Project includes:
+#include "KFCDiag.h"				// KFC_DIAG_LOG - the shutdown's line, test builds only
 #include "KFCModelAccess.h"		// KFCRuns - the saved queries, a file's description and the kinds' names are the model's
 #include "KFCPanelState.h"		// KFCReadOwnFile / KFCWriteOwnFile - KFC's one way to read and write a file of its own
 #include "KFCQueryOrder.h"
@@ -189,6 +190,15 @@ PMString KFCQueryOrder::OrderRowText(int32 index)
 	if (!gOrder[index].exists)
 		text.Append(" (not found)");
 	return text;
+}
+
+void KFCQueryOrder::ShutdownCleanup()
+{
+	// Swapped with empty ones, not just cleared: the rows' PMStrings and IDFiles are destroyed now, while InDesign stands,
+	// and the storage goes with them (clear() would keep the capacity for the unload to free).
+	KFC_DIAG_LOG("QUERYORDER shutdown emptied saved=%d order=%d", static_cast<int>(gSaved.size()), static_cast<int>(gOrder.size()));
+	std::vector<KFCSavedQuery>().swap(gSaved);
+	std::vector<KFCSavedQuery>().swap(gOrder);
 }
 
 // End, KFCQueryOrder.cpp.
