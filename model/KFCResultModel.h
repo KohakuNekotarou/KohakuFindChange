@@ -349,8 +349,6 @@ namespace KFCResultModel
 	/** Is this one of the chapter's story groups? Every group is one, so this is the
 	    index's range (the tree asks it of a node before using it). */
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
-	/** Every hit of the group, chapter-wide indexes in the chapter's order (empty when out of range). */
-	void GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits);
 
 	// (RowDisplay - everything a hit row needs to draw itself, see GetHitRow: KFCModelTypes.h.)
 
@@ -400,8 +398,6 @@ namespace KFCResultModel
 	    Empty for an index out of range. */
 	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
 
-
-
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */
 	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked);
@@ -416,13 +412,6 @@ namespace KFCResultModel
 	    before it selects (KFCJump::SelectHitText). isLocked appears in both because it is a fact
 	    that bears on both questions; the DECISIONS made from it stay one per place. */
 	bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden);
-
-
-
-
-
-
-
 
 	/** The hit row the right-click menu was popped over (its Replace acts on it). Cleared with the result set;
 	    false when no hit row is stashed or it is out of range. */
@@ -464,12 +453,10 @@ namespace KFCResultModel
 	// occurrences the user has never seen. See Hit's note, and the one on the SAME-OCCURRENCE TEST in
 	// KFCReplaceEngine.cpp.)
 
-
 	/** Is a row with this outcome still work - one its Replace can write? Only a row nothing was said about
 	    (kOutcomeNone): a row the replace found missing, locked, refused or deleted says
 	    why on its locator and is not offered again. */
 	bool IsWorkOutcome(ChangeOutcome outcome);
-
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
 	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced
@@ -597,7 +584,6 @@ namespace KFCResultModel
 	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
 	    longer the text the row describes. Ignored for a hit that WAS replaced. */
 	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
-
 
 	/** Start remembering every row a replace changes, so a run the user stops can be put back.
 	    Only the rows actually written to are copied - one copy each, taken just before the change -

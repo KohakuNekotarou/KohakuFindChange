@@ -1386,7 +1386,7 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO. The story versions are read and the row backup started
 	// here, outside the sequence; kept below once the rows show the replace - a failure puts them back
 	// (RollBackRows).
-	KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx));
+	KFCUndoFollow::StepRecorder recorder(chapterIdx);
 	{
 		// BACKWARDS FOR THE WRITE ONLY. A query holding ^ is written backwards (WriteBackward), inside this
 		// block and nowhere else - not to the end of the function, where a walk after the write would run
@@ -1524,7 +1524,7 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 	bool shown = false;
 	{
 		IDataBase::SaveRestoreModifiedState keepClean(db);		// goes after the abort below: clean again if it was
-		KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx));	// never kept: the rows roll back
+		KFCUndoFollow::StepRecorder recorder(chapterIdx);	// never kept: the rows roll back
 		{
 			const KFCBackwardSearchScope writeDirection(WriteBackward());
 			IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC Preview");

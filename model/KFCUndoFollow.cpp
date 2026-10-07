@@ -94,7 +94,6 @@ const size_t kMaxWholeSteps = 3;
 // The recorder standing now (at most one - the writes of KFC never nest): what it read at its start.
 bool gRecording = false;
 std::vector<StoryMoved> gPendingStories;
-bool gPendingWhole = false;
 uint32 gPendingResultSet = 0;
 uint32 gPendingLayout = 0;
 KFCResultModel::ModelSnapshot gPendingBefore;
@@ -217,6 +216,23 @@ uint64 StoryTextHash(IDataBase* db, UID story)
 	}
 	hash ^= static_cast<uint64>(total);		// the length too: a story cut short reads differently
 	return (hash != 0) ? hash : 1;
+}
+
+// The stories the recording read that the write has moved, each with its version and text after it, onto the step - the
+// rest cannot tell an Undo of it from anything else.
+void TakeMovedStories(Step& step)
+{
+	for (size_t k = 0; k < gPendingStories.size(); ++k)
+	{
+		StoryMoved s = gPendingStories[k];
+		s.now = DocOf(s);
+		uint32 version = 0;
+		if (s.now == nil || !KFCSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
+			continue;
+		s.after = version;
+		s.afterText = StoryTextHash(s.now, s.story);
+		step.stories.push_back(s);
+	}
 }
 
 // Is every story the write moved at its version before it (after = false) or after it (after = true)?
@@ -490,16 +506,14 @@ void KFCUndoFollow::MarkWrite(IDataBase* db)
 //========================================================================================
 // Recording.
 //========================================================================================
-KFCUndoFollow::StepRecorder::StepRecorder(const std::vector<int32>& chapters)
+KFCUndoFollow::StepRecorder::StepRecorder(int32 chapterIdx)
 	: fOpen(true)
 {
 	CloseRecording();
 	gRecording = true;
-	gPendingWhole = false;		// rows, not the whole set (RunRecorder's)
 	gPendingResultSet = KFCResultModel::GetResultSetId();
 	gPendingLayout = KFCResultModel::GetLayoutGeneration();
-	for (size_t i = 0; i < chapters.size(); ++i)
-		ReadChapterStories(chapters[i], gPendingStories);
+	ReadChapterStories(chapterIdx, gPendingStories);
 	KFCResultModel::BeginRowBackup();
 }
 
@@ -519,35 +533,13 @@ void KFCUndoFollow::StepRecorder::Keep(StepKind kind)
 		return;
 	fOpen = false;
 
-	Step step;		// done (the write stands)
+	Step step;		// done (the write stands) - a write of rows (whole = false)
 	step.kind = kind;
 	step.resultSet = gPendingResultSet;
-	step.whole = gPendingWhole;
 	step.layoutBefore = gPendingLayout;
-	// the stories the write moved - the rest cannot tell an Undo of it from anything else
-	for (size_t k = 0; k < gPendingStories.size(); ++k)
-	{
-		StoryMoved s = gPendingStories[k];
-		s.now = DocOf(s);
-		uint32 version = 0;
-		if (s.now == nil || !KFCSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
-			continue;
-		s.after = version;
-		s.afterText = StoryTextHash(s.now, s.story);
-		step.stories.push_back(s);
-	}
-	if (step.whole)
-	{
-		KFCResultModel::ForgetRowBackup();		// the whole set is copied instead
-		step.before = std::move(gPendingBefore);	// moved, not copied: a large search's set is not held twice
-		KFCResultModel::TakeModelSnapshot(step.after);
-		step.layoutAfter = KFCResultModel::GetLayoutGeneration();
-	}
-	else
-	{
-		KFCResultModel::TakeRowBackup(step.rows);
-		step.layoutAfter = step.layoutBefore;
-	}
+	TakeMovedStories(step);
+	KFCResultModel::TakeRowBackup(step.rows);
+	step.layoutAfter = step.layoutBefore;
 	CloseRecording();
 
 	KFC_DIAG_LOG("KEEP kind=%d whole=%d moved=%u set=%u/%u", (int)kind, step.whole ? 1 : 0,
@@ -564,7 +556,6 @@ KFCUndoFollow::RunRecorder::RunRecorder()
 {
 	CloseRecording();
 	gRecording = true;
-	gPendingWhole = true;
 	gPendingLayout = KFCResultModel::GetLayoutGeneration();
 	KFCResultModel::TakeModelSnapshot(gPendingBefore);
 }
@@ -611,19 +602,8 @@ void KFCUndoFollow::RunRecorder::Keep()
 	step.whole = true;
 	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
 	step.layoutBefore = gPendingLayout;
-	// the stories the run moved - the rest cannot tell an Undo of it from anything else
-	for (size_t k = 0; k < gPendingStories.size(); ++k)
-	{
-		StoryMoved s = gPendingStories[k];
-		s.now = DocOf(s);
-		uint32 version = 0;
-		if (s.now == nil || !KFCSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
-			continue;
-		s.after = version;
-		s.afterText = StoryTextHash(s.now, s.story);
-		step.stories.push_back(s);
-	}
-	step.before = std::move(gPendingBefore);	// the list before the run, header and all
+	TakeMovedStories(step);
+	step.before = std::move(gPendingBefore);	// the list before the run, header and all - moved, not copied
 	KFCResultModel::TakeModelSnapshot(step.after);
 	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
 	CloseRecording();

@@ -86,7 +86,6 @@ namespace
 		gRowBackup.push_back(saved);
 	}
 
-
 	// Which HIT row the result tree's right-click menu was popped over, for its menu (Replace) - KFCResultNodeEH
 	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu since 2026-10-06 - spec F16.)
 	int32 gContextMenuHitChapter = -1;
@@ -220,7 +219,6 @@ void KFCResultModel::AppendChapter(Chapter&& chapter)
 	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
-
 }
 
 void KFCResultModel::Clear()
@@ -516,14 +514,6 @@ bool KFCResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
 	return GroupAt(chapterIdx, groupIdx) != nil;
 }
 
-void KFCResultModel::GetGroupHits(int32 chapterIdx, int32 groupIdx, std::vector<int32>& outHits)
-{
-	outHits.clear();
-	if (const FontGroup* group = GroupAt(chapterIdx, groupIdx))
-		outHits = group->hitIndices;
-}
-
-
 bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
 {
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
@@ -683,7 +673,6 @@ void KFCResultModel::MarkUpBreaksForDisplay(PMString& s)
 	s = out;
 	s.SetTranslatable(kFalse);
 }
-
 
 bool KFCResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
 	PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost)
@@ -969,7 +958,6 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeDeleted)
 		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
-
 }
 
 void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
