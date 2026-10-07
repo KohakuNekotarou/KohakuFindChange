@@ -515,22 +515,22 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCChangeAllMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Run Saved Queries... (2026-10-07): the query dialog - saved queries put in an order and run with InDesign's own
-		// Change All, one after another (KFCQueryDialog.cpp).
-		kKFCRunSavedQueriesActionID,
-		kKFCTargetMenuPath
-		kKFCRunSavedQueriesMenuItemPosition,
-		kSDKDefIsNotDynamicMenuFlag,
-
 		// Clear Results: the list emptied, so Change All can run.
 		kKFCClearResultsActionID,
 		kKFCTargetMenuPath
 		kKFCClearResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Run Saved Queries... (2026-10-07): the query dialog - saved queries put in an order and run with InDesign's own
+		// Change All, one after another (KFCQueryDialog.cpp). Last in the block, under Clear Results (the author's call).
+		kKFCRunSavedQueriesActionID,
+		kKFCTargetMenuPath
+		kKFCRunSavedQueriesMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// (Block 2 - Find Missing Glyphs and Find Overset - is gone: the Book panel's preflight reports both.)
 
-		// Separator between Clear Results and the toggles.
+		// Separator between Run Saved Queries... and the toggles.
 		kKFCSeparator3ActionID,
 		kKFCInternalPopupMenuNameKey kSDKDefDelimiterAndSeparatorPath,	// :- to mark an item as a separator.
 		kKFCSeparator3MenuItemPosition,

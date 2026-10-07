@@ -439,8 +439,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.25   Open Find/Change..., Find in <scope>, Change All in Book (No List) (the one command that
-//                 writes to the DOCUMENTS here), Clear Results
+//    0.5 - 1.3    Open Find/Change..., Find in <scope>, Change All in Book (No List) and Run Saved Queries... (the
+//                 commands that write to the DOCUMENTS here), Clear Results between them
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0
@@ -458,10 +458,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 #define kKFCSearchBookMenuItemPosition		1.0
 // Change All in Book (No List) under Find, then Clear Results (2026-10-06, the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
-// Run Saved Queries... (2026-10-07) under Change All in Book: the other command that writes with InDesign's Change All
-// and leaves no list.
-#define kKFCRunSavedQueriesMenuItemPosition	1.2
 #define kKFCClearResultsMenuItemPosition	1.25
+// Run Saved Queries... (2026-10-07) last in the block, under Clear Results (the author moved it one down the same night;
+// it stood at 1.2, between Change All in Book and Clear Results): the other command that writes with InDesign's Change
+// All and leaves no list.
+#define kKFCRunSavedQueriesMenuItemPosition	1.3
 // (Block 2 - the two scans - is gone; so is Show Changes by KohakuFindChange, 2026-10-06.)
 #define kKFCSeparator3MenuItemPosition		2.0
 

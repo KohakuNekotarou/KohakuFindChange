@@ -14,8 +14,8 @@
   Open Find/Change...
   Find in Document
   Change All in Book (No List)
-  Run Saved Queries...
   Clear Results
+  Run Saved Queries...
   ──────────
   Book Scope
   Find/Change Selected Documents (Book)
@@ -34,10 +34,10 @@
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
   `Book Scope` から `Remember Book Panel Placement` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。）
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。）
   - 訂正:
 
-- **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
+- **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
   トグルの並びは、検索にかかわるもの（Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
   - 訂正:
 
