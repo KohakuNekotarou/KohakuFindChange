@@ -25,30 +25,9 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
-#include "KFCResultModel.h"		// Hit - CollectStoryHits fills them
-#ifdef KFC_DIAG
-#endif
 
-#include <vector>
-
-class KFCProgressBar;		// the run's bar (KFCProgressBar.h) - a RangeProgressBar the UI half holds
 class ITextWalker;			// AcquireWalker
 class ITextWalkerSelectionUtils;
-
-/** Move the run's progress bar to an absolute position. ioReported is the position already sent, so
-    that advances too small to be worth a repaint can be swallowed (see the .cpp); pass force = true
-    where the bar must land exactly, such as a chapter boundary.
-
-    NOTE: this does NOT make the run cancellable, and neither does any other way of moving the bar
-    (measured both ways). WasCancelled has to be ASKED, and asking it only inside the
-    chapter loop misses a cancel pressed during the last chapter. See the ask-once-more test that
-    follows the loop in SearchBook and ReplaceChecked. */
-void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force = false);
-
-/** Put "<noun> <index + 1> / <count> - <name>" on the run's bar ("Chapter 3 / 12 - ch03.indd") - the one
-    line the search and the replace write. Text only - the bar's position is
-    KFCAdvanceProgress's. */
-void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
 
 /** KFC SEARCHES AND REPLACES FORWARD ONLY (the author's call). The results are a list, so a direction
     means nothing to KFC - and a backward search lists matches a forward replace does not make (GREP
@@ -421,28 +400,6 @@ namespace KFCSearchEngine
 	    match. */
 	void RereadRowText(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end);
 
-	/** A HIT FROM A RANGE, BUILT THE WAY THE SEARCH BUILDS ITS OWN (a query run's list - KFCQuerySequence). The
-	    rows of a list rebuilt from the Track Changes records are made by the search's own BuildHit
-	    (kHitEverything: the line, the page, the flags, the story's first words), so they read exactly like
-	    a search's. One HitBuilder per document read: it keeps the frames' answers and the stories' first
-	    words for that read, as the search's walk does. */
-	class HitBuilder
-	{
-	public:
-		HitBuilder();
-		~HitBuilder();
-		/** False = nothing could be built (out of memory) - outHit is then untouched. */
-		bool Build(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end, KFCResultModel::Hit& outHit);
-	private:
-		HitBuilder(const HitBuilder&);
-		HitBuilder& operator=(const HitBuilder&);
-		void* fCache;		// the walk's cache (KFCSearchEngine.cpp, WalkCache)
-	};
-
-	/** A chapter's hits put in page order, each numbered within its page with its locator - the search's
-	    own finishing pass, and a query run's list's. */
-	void FinalizeHits(std::vector<KFCResultModel::Hit>& hits);
-
 	// (MatchIsSameOccurrence and HashMatchText are inside the .cpp, with their notes: every door asks
 	//  through RowReadsAsFound, below.)
 
@@ -503,11 +460,9 @@ namespace KFCSearchEngine
 	    alone - not the session's shared one (kTextWalkerServiceProviderBoss), which Edit > Find/Change and the spelling
 	    panel walk and watch. outSelUtils = what the walk's critical section is taken on: always the SHARED walker's -
 	    InDesign's own spelling Change All takes the same shape (spellpanel SpellChangeAllObserver.cpp:257 walks a
-	    kBasicTextWalkerBoss, :318-319 takes the section on the shared walker). outOwn = outWalker is KFC's own (always,
-	    when the call succeeds). False = no walker at all; outSelUtils can still be nil - each caller keeps its own gate
-	    on it. */
-	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils,
-		bool& outOwn);
+	    kBasicTextWalkerBoss, :318-319 takes the section on the shared walker). False = no walker at all; outSelUtils
+	    can still be nil - each caller keeps its own gate on it. */
+	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils);
 
 	/** Let go of the module's static storage during InDesign's controlled shutdown, so every static
 	    destructor at DLL unload finds nothing left to do.

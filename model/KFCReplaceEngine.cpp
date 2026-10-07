@@ -456,8 +456,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	// (KFCSearchEngine::AcquireWalker - KFC's own).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
-	bool ownWalker = false;
-	const bool haveWalker = KFCSearchEngine::AcquireWalker(walker, selUtils, ownWalker);
+	const bool haveWalker = KFCSearchEngine::AcquireWalker(walker, selUtils);
 	InterfacePtr<ITextWalkerScope> scope(Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(storyRef, scopeOptions));
 	InterfacePtr<ITextWalkerClient> client(static_cast<ITextWalkerClient*>(::CreateObject2<ITextWalkerClient>(kFindChangeClientBoss)));
 	if (db == nil || !haveWalker || walker == nil || scope == nil || client == nil)
@@ -1006,8 +1005,7 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 	// (KFCSearchEngine::AcquireWalker - KFC's own).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
-	bool ownWalker = false;
-	if (opts == nil || !KFCSearchEngine::AcquireWalker(walker, selUtils, ownWalker) || walker == nil)
+	if (opts == nil || !KFCSearchEngine::AcquireWalker(walker, selUtils) || walker == nil)
 		return false;
 
 	for (std::map<UID, std::map<std::pair<TextIndex, TextIndex>, int32> >::iterator s = waiting.begin(); s != waiting.end(); ++s)

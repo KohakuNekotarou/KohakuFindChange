@@ -82,7 +82,6 @@
 #include <algorithm>				// std::stable_sort (the matches' page order)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
-#include <new>						// std::nothrow - HitBuilder's cache
 
 // Project includes:
 #include "KFCSearchEngine.h"
@@ -101,6 +100,21 @@ namespace
 
 // (The limit is kKFCCollectHitLimit, in KFCResultModel.h - the number the panel draws, since 2026-10-06 (F9).
 // Read the contract there; this file uses it in SearchBook.)
+
+// THE SEARCH'S BAR (KFCProgressBar.h - the UI half's), defined below with the direction scopes. The search's alone
+// since 2026-10-06: the replace's bar went with Change Checked, and Change All and the query run move theirs
+// directly.
+//
+// Move the bar to an absolute position. ioReported is the position already sent, so advances too small to be worth
+// a repaint can be swallowed; force = true where the bar must land exactly, such as a chapter boundary.
+// NOTE: this does NOT make the run cancellable, and neither does any other way of moving the bar (measured both
+// ways). WasCancelled has to be ASKED, and asking it only inside the chapter loop misses a cancel pressed during
+// the last chapter - see the ask-once-more test that follows the loop in SearchBook.
+void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force = false);
+
+// Put "<noun> <index + 1> / <count> - <name>" on the bar ("Chapter 3 / 12 - ch03.indd"). Text only - the bar's
+// position is KFCAdvanceProgress's.
+void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
 
 // The smallest advance worth reporting to the progress bar. Moving the bar keeps Cancel answering (which
 // call on the bar takes the click is not measured - see KFCAdvanceProgress), but it is not free: doing it
@@ -1230,8 +1244,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// (KFCSearchEngine::AcquireWalker).
 	InterfacePtr<ITextWalker> walker;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils;
-	bool ownWalker = false;
-	if (!KFCSearchEngine::AcquireWalker(walker, selUtils, ownWalker) || walker == nil)
+	if (!KFCSearchEngine::AcquireWalker(walker, selUtils) || walker == nil)
 	{
 		outResult = kChapterNoWalker;
 		return;
@@ -1538,32 +1551,12 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 	return result == kChapterWalked;
 }
 
-} // anonymous namespace
-
-KFCSearchEngine::HitBuilder::HitBuilder() : fCache(new (std::nothrow) WalkCache)
-{
-}
-
-KFCSearchEngine::HitBuilder::~HitBuilder()
-{
-	delete static_cast<WalkCache*>(fCache);
-}
-
-bool KFCSearchEngine::HitBuilder::Build(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, TextIndex end,
-	KFCResultModel::Hit& outHit)
-{
-	if (fCache == nil)
-		return false;
-	BuildHit(docRef, storyRef, start, end, kHitEverything, *static_cast<WalkCache*>(fCache), outHit);
-	return true;
-}
-
 // Put a chapter's hits in PAGE order and give each its "P<page>(<n>)" locator (the KESCL convention:
 // page string, section-aware; a within-page ordinal in parens only when the page holds more than one
 // match; "overset" for an overset match, which has no page). The locator is a field of its own, drawn
 // ahead of the line in the normal colour. Pure string / index work - no recompose, so no dirty guard
-// needed here.
-void KFCSearchEngine::FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
+// needed here. The search's finishing pass (Show Changes' list, which shared it, went on 2026-10-06).
+void FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
 {
 	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
 	// same page keep their document (walk) order.
@@ -1580,8 +1573,6 @@ void KFCSearchEngine::FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
 	KFCResultModel::NumberHitsWithinPages(hits);
 }
 
-namespace
-{
 // The session's search direction for one tab, through the command the dialog's own radio button
 // stands for (the silent one: no panel is told to redraw).
 bool SetSessionSearchBackwards(bool16 backwards, IFindChangeOptions::SearchMode mode)
@@ -1635,6 +1626,8 @@ KFCBackwardSearchScope::~KFCBackwardSearchScope()
 		SetSessionSearchBackwards(kFalse, static_cast<IFindChangeOptions::SearchMode>(fMode));
 }
 
+namespace
+{
 void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force)
 {
 	if (bar == nil)
@@ -1654,7 +1647,7 @@ void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bo
 	//
 	// It WAS measured against DoTask, when a run had become impossible to cancel: it was not the
 	// culprit - the cancel works exactly the same through SetPosition. The fault was that nothing asked
-	// WasCancelled after the LAST chapter (see the ask-once-more test in SearchBook and ReplaceChecked).
+	// WasCancelled after the LAST chapter (see the ask-once-more test in SearchBook).
 	//
 	// Both forms are in the SDK, chosen by what the caller is counting: linksui advances a
 	// TaskProgressBar with DoTask because it processes a list of files, while textimportfilter drives
@@ -1692,6 +1685,7 @@ void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size
 	taskLine.Append(name);
 	bar.SetTaskText(taskLine);
 }
+}	// anonymous namespace
 
 bool KFCSearchEngine::CommitSearchMode()
 {
@@ -2351,7 +2345,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	auto fileChapter = [&](const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
 		std::map<UID, uint32>& storyVersions)
 	{
-		KFCSearchEngine::FinalizeHits(hits);
+		FinalizeHits(hits);
 		KFCResultModel::Chapter chapter;
 		chapter.name = target.shortName;
 		chapter.name.SetTranslatable(kFalse);
@@ -3252,10 +3246,8 @@ bool KFCSearchEngine::HasFindQueryNow()
 	return HasFindQuery();
 }
 
-bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils,
-	bool& outOwn)
+bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils)
 {
-	outOwn = false;
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	InterfacePtr<IK2ServiceProvider> provider(registry != nil
 		? registry->QueryServiceProviderByClassID(kTextWalkerService, kTextWalkerServiceProviderBoss) : nil);
@@ -3272,7 +3264,6 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 	if (mine == nil)
 		return false;
 	outWalker.reset(mine.forget());
-	outOwn = true;
 	return true;
 }
 

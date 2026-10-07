@@ -565,8 +565,8 @@ namespace KFCResultModel
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
 	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
 	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
-	    apart. THE one definition - the search's page ordering (KFCSearchEngine::FinalizeHits) and a
-	    replace's report (KeepCheckedRows) both call it. */
+	    apart. Called by the search's page ordering (FinalizeHits, KFCSearchEngine.cpp) - its one caller since
+	    Change Checked's report (KeepCheckedRows) went on 2026-10-06. */
 	void NumberHitsWithinPages(std::vector<Hit>& hits);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
