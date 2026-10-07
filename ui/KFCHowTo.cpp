@@ -62,6 +62,7 @@ const wchar_t* const kHowToEN =
 	L"\n"
 	L"[Reading the results]\n"
 	L"- A double-click selects the matched text.\n"
+	L"- The book, document and story rows say how many of their matches have been replaced: (1/3) = 1 of 3.\n"
 	L"- After a GREP search, selecting a match shows above the list what its Replace would write there (Preview Text) - nothing is written until you replace it.\n"
 	L"- The up and down arrow keys walk the whole tree, opening the rows they pass through.\n"
 	L"- Hide Previous Chapter: ON closes, after a jump, the document windows other than the one jumped to that have nothing to save. A document that has been edited, or has never been saved, is left open.\n"
