@@ -59,9 +59,9 @@ namespace KFCResultModel
 		bool		isOverset;	// match is overset -> the locator gets a trailing " overset"
 								// ("P<page>(<n>) overset")
 		bool		isLocked;	// match sits on a locked layer or in a locked story -> the locator
-								// gets " locked" and the row gets NO check box. InDesign can search
+								// gets " locked" and the row's Replace is greyed. InDesign can search
 								// locked content but offers no way to change it ("Search Only"), so
-								// the row is listed and jumpable but never selectable.
+								// the row is listed and jumpable but never replaced.
 		bool		isHidden;	// match sits on a switched-off layer -> the locator gets " hidden".
 								// Only reachable when the Find/Change dialog's "Include Hidden
 								// Layers" is on, and then the text is composed and jumpable but
@@ -131,8 +131,7 @@ namespace KFCResultModel
 		PMString			fontName;	// the story row's text ("P3  first words...")
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
-		// Story mode lists stories, and every group is one. A story row carries Replace / Check All /
-		// Uncheck All for its rows (KFCReplaceEngine::ReplaceStory and the rest).
+		// Story mode lists stories, and every group is one.
 		UID					story;
 		FontGroup() : story(kInvalidUID) {}
 	};
@@ -195,15 +194,14 @@ namespace KFCResultModel
 	SearchScopeKind GetSearchScope();
 
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST WAS CLOSED (the author's call: only its rows go).
-	    Its chapter is emptied - rows, groups, runs, story versions - and unbound (no docRef, no file), but
+	    Its chapter is emptied - rows, groups, story versions - and unbound (no docRef, no file), but
 	    it KEEPS ITS PLACE: KFCUndoFollow names rows by (chapter, row), and closing up the gap would renumber
 	    every chapter after it and cut those off from their Undo. A chapter with no rows is not shown
-	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there;
-	    the next KeepCheckedRows drops it with the other empty ones, under a layout of its own. */
+	    (GetShownChapter) and holds nothing to count or write, so nothing else has to know it is there. */
 	void CloseChapter(int32 chapterIdx);
 
 	/** CloseChapter's work on a chapter that is not in the model - one of a kept whole result set
-	    (KFCUndoFollow::ForgetDocument): its rows, groups, runs and versions gone, no docRef, no file. */
+	    (KFCUndoFollow::ForgetDocument): its rows, groups and versions gone, no docRef, no file. */
 	void EmptyChapter(Chapter& chapter);
 
 	/** The nth chapter the tree SHOWS - the chapters with rows, under the display cap - as a chapter index;
@@ -224,36 +222,35 @@ namespace KFCResultModel
 	    the results away - puts the panel back to the picture it started with. Set AFTER Clear(),
 	    like SetFromBook.
 
-	    It is its own flag rather than a second meaning hung on SetFromBook, for the reason stated
-	    over IsShowingReplaceOutcome: two statements behind one flag cannot be changed independently
-	    afterwards. */
+	    It is its own flag rather than a second meaning hung on SetFromBook - as NoteChangeAllWrote is: two
+	    statements behind one flag cannot be changed independently afterwards. */
 	void NoteRun();
 	bool HasRun();
 
 	/** DID THE LAST COMMAND WRITE WITH InDesign's CHANGE ALL - Change All in Book (No List), or a query run - AND CHANGE
-	    SOMETHING (2026-10-06, the author's call)? The panel's pencil cat says so (KFCPanelIcon). Set at the end of those
-	    runs - false for one that wrote nothing, was cancelled or failed; a row's Replace does not touch it. Clear() puts
-	    it down, so the next search, Clear Results or a closing document takes the picture back. */
+	    SOMETHING (the author's call)? The panel's pencil cat says so (KFCPanelIcon). Set at the end of those runs - false
+	    for one that wrote nothing, was cancelled or failed; a row's Replace does not touch it. Clear() puts it down, so
+	    the next search, Clear Results or a closing document takes the picture back; a query run's Undo puts back the one
+	    the list before it had (ModelSnapshot). */
 	void NoteChangeAllWrote(bool wrote);
 	bool HasChangeAllWritten();
 
-	// (No "the search stopped short" flag for the replace to ask: it writes the ticked rows only, one
-	//  match at a time, so results that stopped at the limit can be replaced - the author's call.)
-
+	// (No "the search stopped short" flag for the replace to ask: a row's Replace writes that row alone, so results
+	//  that stopped at the limit can be replaced - the author's call.)
 
 	/** The Find/Change TAB these results were searched with (an IFindChangeOptions::SearchMode value;
 	    -1 = nothing searched yet). Held as a plain int so this header needs no text includes.
 	    Recorded beside SetFromBook, and cleared by Clear().
 
-	    Why it has to be remembered: the replace pass RE-WALKS each chapter, and a walk runs in the
-	    mode that is current AT THAT MOMENT. Switching tabs between a search and Change Checked
+	    Why it has to be remembered: a row's Replace RE-WALKS the row's story, and a walk runs in the
+	    mode that is current AT THAT MOMENT. Switching tabs between a search and the Replace
 	    therefore re-walks with a different query and meets a different set of matches from the one
 	    the rows list.
 
 	    AND THAT WOULD BE WRITTEN. The replacing walk does not test each match against its row; the
-	    same-occurrence test stands before the run (ChapterMovedUnderRows) and at every door
+	    same-occurrence test stands before the write (ChapterMovedUnderRows) and at every door
 	    (KFCSearchEngine::RowReadsAsFound) - KFCReplaceEngine.h says where. So comparing this against the
-	    current mode is not about explaining a run that failed harmlessly: with
+	    current mode is not about explaining a write that failed harmlessly: with
 	    KFCSearchEngine::BuildWalkSignature it is what refuses a replace under a changed query before
 	    anything is written. */
 	void SetSearchMode(int32 mode);
@@ -265,8 +262,8 @@ namespace KFCResultModel
 
 	    A KEY, compared for equality and never shown.
 
-	    Why the replace needs it. Change Checked RE-WALKS each chapter and writes the matches it meets
-	    at the rows' places. That only holds while the walk meets the matches the rows list, which
+	    Why the replace needs it. A row's Replace RE-WALKS the row's story and writes the match it meets
+	    at the row's place. That only holds while the walk meets the matches the rows list, which
 	    needs the query AND its options to be what they were when the search ran - and the walker is
 	    handed the LIVE IFindChangeOptions (ITextWalker.h:58-61), so whatever the dialog holds at
 	    replace time is what it walks by.
@@ -357,13 +354,6 @@ namespace KFCResultModel
 	    display strings, the flags, the outcome and the accent word - each one walking to the same
 	    hit to hand back one part of it. Only the rows on screen are ever laid out, so that would
 	    not be expensive; it is simply four questions where the row has one.
-
-	    hasCheckBox IS THE MODEL'S ANSWER, NOT A HINT. It is RowHasCheckBox - the same function
-	    SetHitChecked, SetAllChecked and SetChapterChecked take their orders from - so the box the
-	    panel draws and the box the model will accept a tick from are one decision. Were the drawing
-	    side to spell the rule out itself (replaced || locked || outcome || the whole list has none),
-	    a new reason to withhold a box would have to be remembered in two files, and the one that
-	    forgot would draw a box whose click SetHitChecked then refuses in silence.
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 
@@ -380,9 +370,8 @@ namespace KFCResultModel
 	bool GetHitLocation(int32 chapterIdx, int32 hitIdx,
 		UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd);
 
-	/** Rebind a chapter's document reference: after a closed chapter is reopened - by a jump, a
-	    replace or Reject Change - later calls must use the live database, not the dead one from
-	    search time. */
+	/** Rebind a chapter's document reference: after a closed chapter is reopened - by a jump or a
+	    replace - later calls must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
 	/** A story's VERSION where KFC last knew the chapter's rows in it to stand:
@@ -427,7 +416,7 @@ namespace KFCResultModel
 	/** False when the row is not replaced, or the index is out of range. */
 	bool GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText);
 
-	/** The row's text went with an object another ticked row deleted: replaced, no range, "deleted". */
+	/** The row's text went with an object another replaced row deleted: replaced, no range, "deleted". */
 	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
 
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
@@ -442,7 +431,7 @@ namespace KFCResultModel
 	    characters and let a rewrite past that point through as "the same occurrence". The hash covers
 	    the match whole - see HashMatchText (KFCSearchEngine.cpp).
 
-	    Its own getter because it runs once per checked hit, and the other getters carry freight it
+	    Its own getter because it runs once per row a door asks about, and the other getters carry freight it
 	    does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies four
 	    PMStrings to hand back one. false = index out of range. */
 	bool GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
@@ -459,9 +448,8 @@ namespace KFCResultModel
 	bool IsWorkOutcome(ChangeOutcome outcome);
 
 	/** Record a completed replacement: the row keeps its page locator but takes the STORY AND RANGE
-	    the replace command reported writing, is marked replaced, and leaves the selection. A replaced
-	    hit can never be checked again - the text it matched is gone, so a second replace pass would
-	    have nothing to line it up with.
+	    the replace command reported writing, and is marked replaced. A replaced hit is never offered
+	    again - the text it matched is gone, so a second replace would have nothing to line it up with.
 
 	    THE STORY IS TAKEN FROM THE COMMAND, NOT LEFT AS THE ROW HAD IT. The walk does not read a
 	    match's text against its row before writing (KFCReplaceEngine.h), and when it lined the Nth match
@@ -490,8 +478,8 @@ namespace KFCResultModel
 	    carried forward past every later replacement in the same story. Nothing else on the row is
 	    touched; SetHitSegments follows it with the line read from that range.
 
-	    WHY A REPLACE HAS TO MOVE ROWS IT DID NOT WRITE TO. The report a replace leaves
-	    (KeepCheckedRows) keeps the rows it changed AND the ones it left alone - locked, refused - and
+	    WHY A REPLACE HAS TO MOVE ROWS IT DID NOT WRITE TO. The list a replace leaves is still a work list -
+	    the rows it changed AND the ones it left alone, locked or refused or not reached yet - and
 	    every one of them is jumped to by its stored range. A replacement that changes the length of
 	    the text earlier in the same story moves all of those, whether the row was written to or not;
 	    a row left at the range the search found it at was then jumped to off by that much, failed the
@@ -511,8 +499,8 @@ namespace KFCResultModel
 	/** Give a row what it now stands for: the three text segments it DISPLAYS, and the hash the
 	    same-occurrence test COMPARES. The other half of MarkHitReplaced: the replace pass calls it
 	    after the chapter's last replacement, when the paragraphs have stopped moving - for every
-	    replaced row, and for the rows the report keeps without writing to them
-	    (locked, refused), each straight after SetHitRange has moved it. Every other field is left
+	    replaced row, and for the rows the list keeps without writing to them, each straight after
+	    SetHitRange has moved it. Every other field is left
 	    alone.
 
 	    THE HASH GOES IN THE SAME CALL, AND IT HAS TO. The two describe one fact - what this row
@@ -532,7 +520,7 @@ namespace KFCResultModel
 		const PMString& newMatch, const PMString& newPost, uint64 newMatchHash);
 
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
-	    pass and the post-replace thinning both call it, so the two cannot drift apart.
+	    pass and the outcome setters (SetHitOutcome, SetHitDeleted) all call it, so they cannot drift apart.
 
 	        P<page>(<n>) overset hidden locked     -> hit.locator
 	        missing | refused                      -> hit.accentFlag, drawn after it in accent colour
@@ -552,8 +540,7 @@ namespace KFCResultModel
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
 	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
 	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
-	    apart. Called by the search's page ordering (FinalizeHits, KFCSearchEngine.cpp) - its one caller since
-	    Change Checked's report (KeepCheckedRows) went on 2026-10-06. */
+	    apart. Called by the search's page ordering (FinalizeHits, KFCSearchEngine.cpp), its one caller. */
 	void NumberHitsWithinPages(std::vector<Hit>& hits);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
@@ -562,7 +549,7 @@ namespace KFCResultModel
 
 	    THE one definition, called where the document's text is shown: the panel's cell
 	    (KFCColorTextView - where it draws, and where it measures), a story row's first words
-	    (BuildFontGroups) and the "Source Text:" line (KFCResultListWidgetMgr). A match is carried
+	    (BuildFontGroups) and the "Preview Text:" line (KFCResultListWidgetMgr). A match is carried
 	    WHOLE however many paragraphs it spans, and a raw break draws with no width - the paragraphs
 	    either side of it run together and read as one piece of text - so it has to be marked.
 
@@ -576,7 +563,7 @@ namespace KFCResultModel
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
 	    a table's per-row continuations, page number markers (the author's call: they drew as a box).
 	    A TABLE'S ANCHOR BECOMES U+25A6 - KCM's table sign, the user's request: `a<table>b` reads
-	    `a<sign>b` on a hit row, a story row and the "Source Text:" alike. */
+	    `a<sign>b` on a hit row, a story row and the "Preview Text:" alike. */
 	void MarkUpBreaksForDisplay(PMString& s);
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
@@ -589,17 +576,16 @@ namespace KFCResultModel
 	    Only the rows actually written to are copied - one copy each, taken just before the change -
 	    so the cost follows the work done rather than the size of the result set.
 
-	    A replace that is cancelled or fails rolls the TEXT back through its command sequence
-	    (Change Checked aborts its abortable sequence; a row menu's Replace ends its plain one with the
-	    error state raised). That leaves the panel describing replacements that no longer exist, so
-	    the two have to be put back together: this is the panel's half.
+	    A replace that fails rolls the TEXT back through its command sequence (a row's Replace ends its
+	    plain one with the error state raised; a preview aborts its abortable one). That leaves the panel
+	    describing replacements that no longer exist, so the two have to be put back together: this is
+	    the panel's half.
 
-	    Exactly one of RollBackRows (the run was cancelled) or ForgetRowBackup (it committed) must
+	    Exactly one of RollBackRows (the write was taken back) or ForgetRowBackup (it committed) must
 	    follow, or the copies stay alive until the next replace.
-	    EVERY WRITE OF KFC'S STARTS IT THROUGH KFCUndoFollow::StepRecorder -
-	    Reject Change and Accept Change too - and the one that commits hands the copies over with
-	    TakeRowBackup (the "before" of an Undo) instead of forgetting them. The story versions a write
-	    records (SetStoryVersion) are copied the same way. */
+	    EVERY WRITE OF ROWS STARTS IT THROUGH KFCUndoFollow::StepRecorder, and the one that commits hands
+	    the copies over with TakeRowBackup (the "before" of an Undo) instead of forgetting them. The story
+	    versions a write records (SetStoryVersion) are copied the same way. */
 	void BeginRowBackup();
 
 	/** Put every remembered row back the way it was and stop remembering. A row is remembered once, as
@@ -610,13 +596,12 @@ namespace KFCResultModel
 	    were given. */
 	void ForgetRowBackup();
 
-	// THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "after an Undo the row cannot be rejected again -
-	// the panel should come back with it, the way KCM's does"). A write of KFC's own is one undo step, and
-	// what it did to the rows is kept beside it (KFCUndoFollow): the rows as they were BEFORE it - the
-	// copies BeginRowBackup takes anyway - and as they are AFTER it, and the story versions it recorded
-	// (SetStoryVersion) the same way. An Undo puts the "before" copies back, a Redo the "after" ones.
-	// (Rows left as the write left them are wrong after an Undo: a row taken back and undone keeps saying
-	// "taken back", so its Reject Change is greyed.)
+	// THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "the panel should come back with it, the way KCM's
+	// does"). A write of KFC's own is one undo step, and what it did to the rows is kept beside it
+	// (KFCUndoFollow): the rows as they were BEFORE it - the copies BeginRowBackup takes anyway - and as they
+	// are AFTER it, and the story versions it recorded (SetStoryVersion) the same way. An Undo puts the
+	// "before" copies back, a Redo the "after" ones. (Rows left as the write left them are wrong after an
+	// Undo: a row replaced and undone keeps saying "Changed", and its Replace stays greyed.)
 
 	/** One row, copied. */
 	struct RowCopy
@@ -638,8 +623,8 @@ namespace KFCResultModel
 	};
 
 	/** What one write did to the rows: every row and recorded version it changed, before and after.
-	    THE INDICES ARE ONLY GOOD IN THE LAYOUT THEY WERE TAKEN IN (GetLayoutGeneration): a
-	    Change Checked turns the list into its report and numbers the rows again. */
+	    THE INDICES ARE ONLY GOOD IN THE LAYOUT THEY WERE TAKEN IN (GetLayoutGeneration): a query run's
+	    Undo or Redo puts another list in place (RestoreModelSnapshot). */
 	struct RowStep
 	{
 		std::vector<RowCopy>		before;
@@ -656,13 +641,12 @@ namespace KFCResultModel
 	    ones. A row whose index is out of range is passed over. */
 	void ApplyRowStep(const RowStep& step, bool after);
 
-	/** The whole result set - for the one write that reshapes it, Change Checked (KeepCheckedRows). */
+	/** The whole result set - for the one write that replaces it, the query run (KFCUndoFollow::RunRecorder). */
 	struct ModelSnapshot
 	{
 		std::vector<Chapter>	chapters;
 		uint32					layout;
-		// the list's header (2026-10-04, the query run: its Undo puts back a list of another kind - Change Checked's
-		// before and after share one, so nothing changes for it)
+		// the list's header: a query run's Undo puts back a list of another kind
 		bool					fromBook;
 		SearchScopeKind			searchScope;
 		PMString				bookName;
@@ -691,8 +675,8 @@ namespace KFCResultModel
 	    an Undo of a run that went through: its own step names the result set it left. */
 	void ReturnToResultSet(uint32 resultSetId);
 
-	/** Which layout of the result set the row indices name: a new number with every Clear and every
-	    KeepCheckedRows that reshaped the list; RestoreModelSnapshot brings its own back. */
+	/** Which layout of the result set the row indices name: a new number with every Clear;
+	    RestoreModelSnapshot brings its own back. */
 	uint32 GetLayoutGeneration();
 }
 

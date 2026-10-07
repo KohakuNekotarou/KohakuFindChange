@@ -84,10 +84,9 @@ std::vector<Step> gSteps;
 
 // HOW MANY ARE KEPT. InDesign's own history is longer, but a write older than this is rarely undone through
 // thirty of KFC's own; one that is simply stops being followed (its rows stay as they are). A whole result
-// set is heavy (a large search holds thousands of rows),
-// so only the last three of those are kept, with everything older than the oldest of them: a write older
-// than a Change Checked names the rows in the layout before it, and could only be reached by undoing that
-// Change Checked first.
+// set is heavy (a large search holds thousands of rows), so only the last three of those are kept, with
+// everything older than the oldest of them dropped too: a write older than a whole result set's names the
+// rows in the layout before it, and could only be reached by undoing that write first.
 const size_t kMaxSteps = 30;
 const size_t kMaxWholeSteps = 3;
 
@@ -163,7 +162,7 @@ void ResolveDocs()
 	}
 }
 
-// The writes kept for another result set name rows that are gone (a search, Show Changes, a close).
+// The writes kept for another result set name rows that are gone (a search, a query run, Clear Results, a close).
 void DropOtherResultSets()
 {
 	const uint32 current = KFCResultModel::GetResultSetId();
@@ -174,14 +173,13 @@ void DropOtherResultSets()
 
 // Do the two writes share a document? (InDesign keeps one history per document, so two that do are
 // taken back and done again in order; two that do not, in any order.)
-// A CHANGE CHECKED SHARES WITH EVERY WRITE. What it puts back is the WHOLE result set - every document's rows,
-// the ones it never wrote to as well (ModelSnapshot) - so following its Undo or Redo in one document, unordered,
-// takes back on the panel a Replace or a Reject made since in another: measured, the regression cases
-// uf-alldocs-cc-undo-other-replace-redo and uf-alldocs-replace-cc-reject-undo (work/kbs-regress). Ordered against
-// every write, it waits until the writes after it are undone, and a write made after its Undo throws its Redo
-// away (KeepStep). One InDesign takes back or does again out of that order is not followed: the rows stay as
-// they are, and the doors stand behind them as for any edit KFC did not make (the story's version, the
-// records' times).
+// A WRITE OF A WHOLE RESULT SET SHARES WITH EVERY WRITE. What a query run's step puts back is the WHOLE result
+// set - every document's rows, the ones it never wrote to as well (ModelSnapshot) - so following its Undo or Redo
+// in one document, unordered, would take back on the panel a Replace made since in another (measured with Change
+// Checked, the first whole-set write: work/kbs-regress, uf-alldocs-*). Ordered against every write, it waits until
+// the writes after it are undone, and a write made after its Undo throws its Redo away (KeepStep). One InDesign
+// takes back or does again out of that order is not followed: the rows stay as they are, and the doors stand
+// behind them as for any edit KFC did not make (the story's version, the row's text).
 bool ShareDoc(const Step& a, const Step& b)
 {
 	if (a.whole || b.whole)
@@ -379,9 +377,9 @@ void KeepStep(Step& step)
 	DropOtherResultSets();
 	ResolveDocs();
 	// A NEW STEP IN A DOCUMENT THROWS ITS REDO AWAY (InDesign's own rule): an undone write sharing a
-	// document with this one can never be done again. (An undone Change Checked shares with every write -
-	// ShareDoc - so any new write lets it go: InDesign may still do it again in its own document, and the panel
-	// then does not follow.)
+	// document with this one can never be done again. (An undone query run shares with every write - ShareDoc -
+	// so any new write lets it go: InDesign may still do it again in its own documents, and the panel then does
+	// not follow.)
 	for (size_t i = gSteps.size(); i-- > 0; )
 		if (!gSteps[i].done && ShareDoc(gSteps[i], step))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
@@ -632,8 +630,8 @@ bool KFCUndoFollow::Follow()
 {
 	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording ? 1 : 0, (unsigned)gSteps.size(),
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
-	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, a
-	// replace or Show Changes pumps events behind its bar - KFCRunGuard counts all three).
+	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, Change
+	// All in Book or a query run pumps events behind its bar - KFCRunGuard counts all three).
 	if (gRecording || gSteps.empty() || KFCRunGuard::IsAnyRunning())
 		return false;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
@@ -646,8 +644,8 @@ bool KFCUndoFollow::Follow()
 	// ONE WRITE AT A TIME, IN THE ORDER INDESIGN TAKES THEM. An Undo takes back the newest write
 	// of a document, a Redo does the oldest undone one again - so a write is followed only when no later
 	// standing write (for an Undo), or no earlier undone one (for a Redo), shares a document with it. The
-	// loop goes on until nothing more moves: one notification can stand for several steps (a Change Checked
-	// over three chapters, or a Redo that is not followed until the next notification).
+	// loop goes on until nothing more moves: one notification can stand for several steps (a query run over
+	// three chapters, or a Redo that is not followed until the next notification).
 	int32 undone = 0, redone = 0;
 	bool reshaped = false;
 	KFCUndoFollow::StepKind lastKind = kStepReplace;
@@ -766,15 +764,15 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 	for (size_t i = gSteps.size(); i-- > 0; )
 	{
 		Step& step = gSteps[i];
-		// Its chapter in the kept whole result sets - found by the document, not by the index: a Change
-		// Checked in between may have dropped chapters and renumbered the rest.
+		// Its chapter in the kept whole result sets - found by the document, not by the index: a set put back
+		// in between can number its chapters otherwise.
 		KFCResultModel::ModelSnapshot* const sets[2] = { &step.before, &step.after };
 		for (size_t s = 0; s < 2; ++s)
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 				if (sets[s]->chapters[c].docRef == docRef)
 					KFCResultModel::EmptyChapter(sets[s]->chapters[c]);
 		// Its stories. A write of rows is one document's, so one of this document goes whole (and its rows
-		// with it); a Change Checked keeps the stories of the documents still open.
+		// with it); a query run keeps the stories of the documents still open.
 		std::vector<StoryMoved>& stories = step.stories;
 		for (size_t k = stories.size(); k-- > 0; )
 			if (stories[k].doc == docRef)
@@ -808,8 +806,8 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	// then describe text its file may no longer hold (a write after it that goes now - its history goes with the
 	// chapter - no longer even stands in the way of its Undo). A chapter nothing since wrote reads in the set as it
 	// reads in its file, so it is put back with the set: frozen, it was EMPTIED whenever the list on screen had no
-	// rows for it - a chapter with nothing ticked, which a Change Checked's report drops - and its rows were lost on
-	// the Undo (measured - the regression case cb-book-close-unwritten-undo).
+	// rows for it, and its rows were lost on the Undo (measured with Change Checked's report, which dropped such a
+	// chapter).
 	// Found in the set by its file the same way: a set's docRef can be one the chapter had before it was closed and
 	// opened again.
 	bool laterWrote = false;

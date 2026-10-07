@@ -4,15 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "after an Undo the row cannot be rejected again -
-//  the panel should come back with it, the way KCM's does").
+//  THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "the panel should come back with it, the way KCM's does").
 //
-//  Every write of KFC's own - Change Checked, a row's / story's / document's Replace - is ONE undo step.
-//  (Replace Again, Reject Change, Accept Change and Accept All Changes by KohakuFindChange were writes too until
-//  2026-10-06, when they went with Track Changes.) What it did to
-//  the panel's rows is kept beside it: the rows before it and after it (KFCResultModel::RowStep - or the
-//  whole result set, for Change Checked, which turns the list into its report), and the VERSION of every
-//  story it wrote to before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion).
+//  Every write of KFC's own that leaves a list - a hit row's Replace, and the query run - is ONE undo step. What it
+//  did to the panel's rows is kept beside it: the rows before it and after it (KFCResultModel::RowStep - or the
+//  whole result set, for the query run, which replaces the list), and the VERSION of every story it wrote to
+//  before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion). (Change All in Book
+//  leaves no list, so it has nothing to follow.)
 //
 //  An Undo puts a story back at EXACTLY the version it had (measured - memory text-change-counters), a
 //  Redo at exactly the one after. So when every story a write moved is back at its "before", that write was
@@ -44,11 +42,8 @@
 //
 //  WHAT IS NOT FOLLOWED: anything that is not a write of KFC's own - typing, the Track Changes panel, a
 //  script. Those leave the rows as they are; the doors that are there for them (the story's version, the
-//  row's text) still stand. KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer
-//  it again. (Measured on a list Show Changes had rebuilt - a command gone since 2026-10-06: after a Ctrl+Z
-//  of the replace it listed, the list kept its rows and said nothing until a row was touched - its
-//  right-click greyed with the reason, its jump saying "undone, or edited since". Saying so on the status
-//  line, or reading the records again, were offered and not taken.)
+//  row's text) still stand. KEPT SO ON THE AUTHOR'S CALL ("A, as it is") - do not offer it again: saying so on
+//  the status line, or reading the document again to put the rows right, were offered and not taken.
 //
 //========================================================================================
 
@@ -79,8 +74,8 @@ namespace KFCUndoFollow
 	    of its own. The rows before and after are kept, not the whole result set (that is RunRecorder's, the
 	    query run's).
 
-	    Not kept - the write failed or was cancelled - the destructor puts back every row it changed
-	    (KFCResultModel::RollBackRows), which is what the replace's own rollback did, and records nothing.
+	    Not kept - the write failed, or was a preview - the destructor puts back every row it changed
+	    (KFCResultModel::RollBackRows), and records nothing.
 	    While one is standing, nothing is followed: the write's own notifications arrive as its sequence ends. */
 	class StepRecorder
 	{
@@ -98,13 +93,14 @@ namespace KFCUndoFollow
 		StepRecorder& operator=(const StepRecorder&);
 	};
 
-	/** A QUERY RUN, RECORDED (KFCQuerySequence, 2026-10-04) - not a StepRecorder: the stories it writes are known only
-	    once each query has run, and the list it leaves is a new one - an empty one since 2026-10-06 (F7: each query
-	    with InDesign's Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it
-	    is then is copied whole (what an Undo puts back). ReadStories = every text model's version in the run's
-	    documents, before a character is written. Keep = the run went through: kept as kStepRunQueries, in the result
-	    set the list is now. RestoreBefore = the run was undone (cancelled, failed): the list goes back as it was and
-	    nothing is kept. While one stands nothing is followed. */
+	/** A QUERY RUN, RECORDED (KFCQuerySequence) - not a StepRecorder: the stories it writes are known only once each
+	    query has run, and the list it leaves is a new one - an empty one (the spec's F7: each query with InDesign's
+	    Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it is then is
+	    copied whole (what an Undo puts back). ReadStories = every text model's version in the run's documents, before
+	    a character is written. Keep = the run went through: kept as kStepRunQueries, in the result set the list is
+	    now. RestoreBefore = the run was taken back (cancelled, failed): the list goes back as it was - as the same
+	    result set, so the writes kept for it are still followed - and nothing is kept. While one stands nothing is
+	    followed. */
 	class RunRecorder
 	{
 	public:
@@ -128,8 +124,8 @@ namespace KFCUndoFollow
 
 	/** THE WORK OF THE OBSERVER. Every kept write an Undo or a Redo has moved - the newest one first for an
 	    Undo, the oldest first for a Redo, never past a write in the same document that has not moved (a
-	    Change Checked, which puts every document's rows back, counts as in every document) - has its rows
-	    put back, and the panel is drawn again and says so on its message line.
+	    query run, which puts the whole list back, counts as in every document) - has its rows put back,
+	    and the panel is drawn again and says so on its message line.
 	    Called when a write's mark is heard (its Do, Undo or Redo) - the versions say which.
 	    @return true when anything was put back. */
 	bool Follow();
@@ -137,7 +133,7 @@ namespace KFCUndoFollow
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
 	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
 	    write - a write left with none is dropped, as one of a closed document always was - and its chapter is
-	    emptied in every kept whole result set, so an Undo of a Change Checked that also wrote it (it spans
+	    emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
 	    documents; every write of rows is one document's) puts back the other documents' rows and not this
 	    one's. Without it the whole write would be dropped at the next follow (a document of it no longer
 	    open), and an Undo in the documents still open would go unfollowed.
@@ -146,13 +142,13 @@ namespace KFCUndoFollow
 
 	/** A CHAPTER OF A BOOK'S LIST IS CLOSING. A book's rows stay when a chapter closes (KFCCloseDocResponder),
 	    so its chapter is not emptied as ForgetDocument's is: the writes of rows in it go (its history goes with
-	    it), its stories come off every Change Checked - which is then still followed in the chapters left open
-	    (an Undo there goes through: the same as All Documents, case sc-alldocs-close-undo) - and a kept whole
+	    it), its stories come off every write of a whole result set (a query run) - which is then still followed
+	    in the chapters left open (an Undo there goes through: the same as All Documents) - and a kept whole
 	    result set holding it marks it FROZEN where that write, or one after it, wrote the chapter: when that set
 	    is put back, the chapter keeps the rows the panel has for it at that moment, since nothing an Undo in
 	    another chapter does reaches its file. A chapter nothing wrote is put back with the set, as its file reads
-	    the same (case cb-book-close-unwritten-undo). Without this the whole Change Checked was dropped at the next
-	    follow and an Undo in the open chapters went unfollowed (measured - case cb-book-close-chapter-undo).
+	    the same. Without this the whole write was dropped at the next follow and an Undo in the open chapters
+	    went unfollowed (measured with Change Checked, which wrote whole result sets until it went).
 	    Called by KFCCloseDocResponder for every close while a book's list is up - a run's own hand-backs too. */
 	void ForgetBookChapter(const UIDRef& docRef);
 

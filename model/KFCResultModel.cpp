@@ -156,7 +156,7 @@ namespace
 	// fonts of Find Missing Glyphs, since removed; the level is the story's alone.)
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
-	// the hit held before - a search's new hits and the hits KeepCheckedRows carries over alike.
+	// the hit held before.
 	void BuildFontGroups(KFCResultModel::Chapter& chapter)
 	{
 		chapter.fontGroups.clear();
@@ -232,7 +232,7 @@ void KFCResultModel::Clear()
 	// (Nothing outside this model describes these rows to forget here: the replace checks the stored
 	//  positions against a fresh walk rather than fingerprinting each chapter.)
 	// The right-click target is an index into the chapters that just went away - keeping it would let
-	// the next search's Check All reach a chapter the user never right-clicked.
+	// the next list's Replace reach a row the user never right-clicked.
 	ForgetContextMenus();
 	// Discarding the results puts the panel back to the state it started in, illustration included.
 	gHasRun = false;
@@ -930,7 +930,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
 	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
-	//     so the page will look empty on arrival), locked (no check box; the replace will not touch it),
+	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it),
 	//     and what has happened to it since: deleted;
 	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
 	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
@@ -962,7 +962,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
 	else if (hit.outcome == kOutcomeDeleted)
-		hit.locator.Append(" deleted");		// gone with the object a ticked row deleted: what was asked for
+		hit.locator.Append(" deleted");		// gone with the object a replaced row deleted: what was asked for
 }
 
 void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
