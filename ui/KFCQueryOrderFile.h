@@ -47,7 +47,7 @@ std::string KFCOrderFileText(const std::vector<KFCOrderFileEntry>& entries);
 bool KFCOrderFileParse(const std::string& text, std::vector<KFCOrderFileEntry>& outEntries);
 
 /** Ask the person for the file to save the order to (forSave) or to load one from, through InDesign's own dialog: a type
-    "KFC Query Order (*.json)" (and all files, for Load); Save asks before replacing a file. false = cancelled, or the
+    "KFC Query Order (*.json)" and no other, for Save and Load alike; Save asks before replacing a file. false = cancelled, or the
     dialog could not be made. A test build's fault switch qd-order-file names the file instead (KFCDiag.h), since a
     test cannot press Windows' dialogs. */
 bool KFCChooseOrderFile(bool forSave, IDFile& outFile);

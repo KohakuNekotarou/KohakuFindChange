@@ -101,7 +101,7 @@
   書けなかったら `Save Order: the file could not be written (<open|write|replace>) - <フルパス>`（並びはそのまま）。右が空のときは灰色（QRY-13）。
   - 訂正:
 
-- **QRY-16** ★**`Load Order...`**＝InDesign の「開く」の画面（題名 `Load Query Order`・種類 `KFC Query Order` とすべてのファイル）で選んだファイルの並びに、**右の並びを置き換える**（出ていた並びは消える）。
+- **QRY-16** ★**`Load Order...`**＝InDesign の「開く」の画面（題名 `Load Query Order`・種類は `KFC Query Order`（`*.json`）だけ＝「すべてのファイル」は出さない＝2026-10-08 作者「全てのファイルでは無くて、Json形式だけにして欲しい」）で選んだファイルの並びに、**右の並びを置き換える**（出ていた並びは消える）。
   読めたらファイルのフルパスだけを両方の行に出す。読めない・KFC の並びのファイルでないときは
   `Load Order: <フルパス> could not be read.`／`Load Order: <フルパス> is not a KFC query order.`（どちらも並びはそのまま）。
   - 訂正:

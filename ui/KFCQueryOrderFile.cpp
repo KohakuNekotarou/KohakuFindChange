@@ -404,9 +404,12 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 	InterfacePtr<IOpenFileDialog> dialog(::CreateObject2<IOpenFileDialog>(kOpenFileDialogBoss));
 	if (dialog == nil)
 		return false;
+	// JSON ONLY (2026-10-08, the author: "not all files - only JSON can be loaded"): the one type, and no "All Files" -
+	// as KCM's Import Story Text offers Word's files only (KCMActionComponent.cpp). SetDefaultFilter is Windows-only
+	// (IOpenFileDialog.h); SetDefaultExtension is left out, as the header discourages it for an Open dialog.
 	dialog->AddExtension(&typeName, &extension);
 #ifdef WINDOWS
-	dialog->AppendAllFilesToFilterList();
+	dialog->SetDefaultFilter(typeName);
 #endif
 	PMString title(kKFCQueryLoadOrderTitleKey);		// "Load Query Order"
 	title.Translate();
