@@ -98,12 +98,11 @@
 namespace
 {
 
-// (The limit is kKFCCollectHitLimit, in KFCResultModel.h - the number the panel draws, since 2026-10-06 (F9).
-// Read the contract there; this file uses it in SearchBook.)
+// (The limit is kKFCCollectHitLimit, in KFCResultModel.h - the number the panel draws (spec F9). Read the contract
+// there; this file uses it in SearchBook.)
 
-// THE SEARCH'S BAR (KFCProgressBar.h - the UI half's), defined below with the direction scopes. The search's alone
-// since 2026-10-06: the replace's bar went with Change Checked, and Change All and the query run move theirs
-// directly.
+// THE SEARCH'S BAR (KFCProgressBar.h - the UI half's), defined below with the direction scopes. The search's alone:
+// a row's Replace has no bar, and Change All in Book and the query run move theirs directly.
 //
 // Move the bar to an absolute position. ioReported is the position already sent, so advances too small to be worth
 // a repaint can be swallowed; force = true where the bar must land exactly, such as a chapter boundary.
@@ -225,7 +224,7 @@ void AppendSearchErrorNote(PMString& outSummary, const std::vector<PMString>& na
 bool gSearching = false;
 
 // The FIND FORMAT the results on the panel were searched with - a shallow copy of the dialog's find
-// attribute list, taken when the search ran and compared before Change Checked re-walks. See
+// attribute list, taken when the search ran and compared before a row's Replace re-walks. See
 // KFCSearchEngine::RememberFindFormat for why the list is COPIED rather than described.
 //
 // WHY IT LIVES HERE AND NOT ON KFCResultModel, beside the walk signature it belongs with: that
@@ -719,7 +718,7 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// A single match can run over any number of paragraphs - a format-only search matches every
 	// unbroken run of text carrying the format, and a GREP can be written to cross a break on
 	// purpose. Cutting it here would make the row show ONE paragraph of what a replace rewrites in
-	// full, so a user who ticked that row would lose text that was never on screen (measured: two
+	// full, so a user who replaced that row would lose text that was never on screen (measured: two
 	// paragraphs and the break between them replaced by one word, joining what was left to the
 	// paragraph below). The breaks inside the match are drawn as marks - a pilcrow for CR, a return
 	// arrow for a forced line break (KFCResultModel::MarkUpBreaksForDisplay).
@@ -1139,10 +1138,8 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	outHit.isHidden = facts->isHidden;
 
 	// Locked content: found, listed, jumpable - and never replaceable, because InDesign gives no
-	// way to change it. Decided HERE, once, so the row can be built without a check box instead of
-	// offering one that would quietly do nothing.
-	// (A locked row's box is kept off by KFCResultModel's RowHasCheckBox, the one door every tick goes
-	// through - nothing to untick here: a hit starts unticked.)
+	// way to change it. Decided HERE, once, so the row's Replace is greyed (KFCReplaceEngine::CanReplaceHit)
+	// instead of offering a write that would quietly do nothing.
 	outHit.isLocked = facts->isLocked;
 	KFC_SPENT(gBuildHitTimes.place, cPlace);
 }
@@ -1551,7 +1548,7 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 // page string, section-aware; a within-page ordinal in parens only when the page holds more than one
 // match; "overset" for an overset match, which has no page). The locator is a field of its own, drawn
 // ahead of the line in the normal colour. Pure string / index work - no recompose, so no dirty guard
-// needed here. The search's finishing pass (Show Changes' list, which shared it, went on 2026-10-06).
+// needed here. The search's finishing pass.
 void FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
 {
 	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
@@ -1814,8 +1811,8 @@ bool KFCSearchEngine::CommitReplaceSide()
 // RealNumber / Boolean / ClassID) - takes an attribute answering none of the nine as its CLASS alone,
 // so "this condition was added or removed" is seen while "same condition, DIFFERENT VALUE" is not.
 // The other doors do not close that gap: a row's place and text say nothing of the format it was
-// found by, so the verify walk (KFCReplaceEngine's ChapterMovedUnderRows) refuses only a ticked row
-// that is no longer a match - a changed value that still matches the rows would let the run go ahead,
+// found by, so the verify walk (KFCReplaceEngine's ChapterMovedUnderRows) refuses only a row asked for
+// that is no longer a match - a changed value that still matches the rows would let the write go ahead,
 // in silence, under a query the panel was not searched with, which is what RefuseChangedQuery is there
 // to refuse. There is no generic value READ, but there is a generic COMPARE. (The operators are private - AttributeBossList.h:245-252 - which is a normal C++ way of
 // making callers say which comparison they mean: IsEqual, deep, beside Intersects and
@@ -2029,7 +2026,7 @@ void KFCSearchEngine::GetKFCWalkerScopeOptions(WalkerScopeOptions& outOptions)
 // The frame is resolved exactly as BuildHit resolves it: the frame the match is composed into, or -
 // for an overset match, composed but placed nowhere - the frame carrying the "+" indicator, which is
 // the frame the hit's own locator already names. Resolving it the same way on both sides is what
-// keeps "the row has no check box" and "the replace refuses" describing the same set of hits.
+// keeps "the row says locked" and "the replace refuses" describing the same set of hits.
 UID KFCSearchEngine::EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos)
 {
 	UID frameUID = FrameUIDForPosition(storyRef, pos);
@@ -2046,7 +2043,7 @@ UID KFCSearchEngine::EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos
 }
 
 // Every lock InDesign has that bears on the question, asked in ONE place so the SEARCH (which marks a
-// hit locked and withholds its check box) and the REPLACE (which refuses to write) can never disagree.
+// hit locked and greys its Replace) and the REPLACE (which refuses to write) can never disagree.
 //
 // A frame of kInvalidUID means "no page item to be locked" - not "cannot tell, refuse". See the
 // header on why an unresolvable position has to read as editable.
@@ -2598,8 +2595,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// CLOSED ON THE SPOT, not scheduled. A scheduled close does not run until the current tick
 		// has unwound, and this run IS that tick - so every chapter handed back here would stay open,
 		// and keep its .indd locked, until the whole search was over. Holding one chapter at a time
-		// is the entire point of this loop, so the close has to happen here. (Measured on the
-		// replace, which walks chapters the same way: four chapters, four .idlk files standing at
+		// is the entire point of this loop, so the close has to happen here. (Measured on Change
+		// Checked, which walked chapters the same way: four chapters, four .idlk files standing at
 		// once.) Safe at this point - the walk has halted, the dirty
 		// guard inside CollectHitsInDoc has already restored the flag, and everything read after
 		// this (FinalizeHits, the Chapter it fills in) is plain values, not database work.
@@ -2662,9 +2659,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
 	// pass, so a cancel pressed while the LAST chapter was being walked has no next pass to be seen
-	// in, and the search would finish as though the button had never been touched. Same rule as the
-	// replace engine's - see the matching comment there. (The walk asks it too, when it moves on to
-	// another story; a Cancel pressed during the LAST story walked is seen here.)
+	// in, and the search would finish as though the button had never been touched. Same rule as
+	// Change All in Book's and the query run's (KFCChangeAll.cpp, KFCQuerySequence.cpp). (The walk asks it
+	// too, when it moves on to another story; a Cancel pressed during the LAST story walked is seen here.)
 	if (!cancelled && progressBar.WasCancelled(kFalse))
 		cancelled = true;
 
@@ -2818,9 +2815,9 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	outSummary.SetTranslatable(kFalse);
 
 #ifdef KFC_DIAG
-	// THE QUERY RUN'S WAY IN UNTIL ITS PANEL EXISTS (plan A, 2026-10-05): while the fault switch queries-run is on,
-	// the Find action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch) - ahead of the re-entry
-	// stop below, because the run asks the same doors itself and sets its own flag.
+	// THE TEST BUILD'S WAY INTO THE QUERY RUN WITHOUT ITS DIALOG: while the fault switch queries-run is on, the Find
+	// action runs the queries its file lists (KFCQuerySequence::RunFromDiagSwitch - the regression cases qs-*, xq-*)
+	// - ahead of the re-entry stop below, because the run asks the same doors itself and sets its own flag.
 	if (KFC_DIAG_FAULT("queries-run"))
 		return KFCQuerySequence::RunFromDiagSwitch(outSummary);
 #endif
@@ -3055,8 +3052,8 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// one line, gets truncated, and is overwritten by the next message.
 	KFCResultModel::SetBookName(bookName);
 
-	// ...and WHICH TAB was searched. The replace pass re-walks each chapter, and a re-walk in another
-	// mode returns another set of matches - so Change Checked compares this against the tab in force
+	// ...and WHICH TAB was searched. A row's Replace re-walks the row's story, and a re-walk in another
+	// mode returns another set of matches - so the Replace compares this against the tab in force
 	// then and refuses rather than lining rows up with the wrong occurrences.
 	//
 	// Read again rather than reusing `tab` from the top of this function, and that is deliberate:
@@ -3066,7 +3063,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	KFCResultModel::SetSearchMode(KFCSearchEngine::CurrentSearchMode());
 
 	// ...and the whole of what this walk was DRIVEN BY - the query plus every switch that decides
-	// which matches come back. It is a key: Change Checked compares it before it re-walks. The tab
+	// which matches come back. It is a key: a row's Replace compares it before it re-walks. The tab
 	// alone is not enough: retyping the find string, or turning Include Footnotes off, changes the
 	// match set without changing the tab, and the re-walk would then meet other occurrences where the
 	// hits below stand. See KFCSearchEngine::BuildWalkSignature.
@@ -3248,10 +3245,11 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		return false;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(shared, UseDefaultIID());
 	outSelUtils.reset(selUtils.forget());
-	// KFC'S OWN WALKER (2026-10-05, the speed-up's S1 - taken: 20-35 % off Change Checked, the per-find composition
-	// gone, the answer unchanged; docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12). Nothing watches it and
-	// nobody else walks it, so the dialog's Find Next is left where it was (measured 2026-10-06, s1-findnext2.ps1: the
-	// shared walker sent Find Next back to the match it had just found; KFC's own let it go on to the next).
+	// KFC'S OWN WALKER (the speed-up's S1 - taken: 20-35 % off the writing walk, measured on Change Checked, the
+	// per-find composition gone, the answer unchanged; docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12).
+	// Nothing watches it and nobody else walks it, so the dialog's Find Next is left where it was (measured,
+	// s1-findnext2.ps1: the shared walker sent Find Next back to the match it had just found; KFC's own let it go on
+	// to the next). Change All (KFCChangeAll::WriteDocument) walks the shared one, as the dialog's own Change All does.
 	InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
 	if (mine == nil)
 		return false;
@@ -3494,10 +3492,9 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 // The rows keep their places themselves, and follow every change KFC makes - and an Edit > Undo / Redo
 // of a write of KFC's own (KFCUndoFollow). Not the edits that are not followed: typing, an Undo of
 // anything else, the Track Changes panel, a script - which move the text without telling them, so a
-// row's stored place can be off although its text has not been touched. (Measured, case
-// del-jump-undo-reject, before Undo was followed: delete the first of two matches, take it back with
-// Reject Change, press Ctrl+Z, click the second row - its place was one character off, and the jump
-// called it "missing".)
+// row's stored place can be off although its text has not been touched. (Measured before Undo was
+// followed: an edit before the second of two matches, taken back by Ctrl+Z - the row's place was one
+// character off, and the jump called it "missing".)
 //
 // So before a jump gives up on a row, the story is walked again under the same query, and the row moves
 // to the ONE match that is the same text with the same line around it (the three segments the row

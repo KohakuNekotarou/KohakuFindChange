@@ -239,7 +239,7 @@ namespace KFCSearchEngine
 	    the tab, the query itself, and every switch that decides WHICH matches come back -
 	    case / whole word / kana / width, and the five scope switches GetKFCWalkerScopeOptions reads.
 	    Recorded on the results at search time (KFCResultModel::SetWalkSignature) and compared before
-	    Change Checked re-walks.
+	    a row's Replace re-walks.
 
 	    Why it has to exist: the replace re-walks and writes the matches it meets at the rows' places,
 	    and the walker is handed the LIVE IFindChangeOptions (ITextWalker.h:58-61) - so a query edited
@@ -255,7 +255,7 @@ namespace KFCSearchEngine
 
 	    THE DIRECTION IS NOT IN IT. The walk would follow the dialog's "search backwards" (measured: the
 	    walker is handed the live options), but KFC searches and replaces FORWARD ONLY
-	    (KFCForwardSearchScope, round every search, replace and Redo): the dialog's direction changes
+	    (KFCForwardSearchScope, round every search and replace): the dialog's direction changes
 	    nothing KFC does.
 
 	    Everything on the CHANGE side stays out: it decides what gets written rather than what gets
@@ -301,7 +301,7 @@ namespace KFCSearchEngine
 	void DropResults();
 
 	/** The walker scope options EVERY KFC walk uses: the five switches read straight off the
-	    Find/Change dialog, exactly as the query itself is. The replace pass must re-walk a chapter
+	    Find/Change dialog, exactly as the query itself is. A row's Replace must re-walk a story
 	    with exactly the options the search that produced the hits used, or it meets other matches
 	    than the rows list - hence one definition, shared by both.
 
@@ -372,7 +372,7 @@ namespace KFCSearchEngine
 	/** Give a row what [start, end) reads NOW - the three segments it paints and the hash of the
 	    whole match - in one KFCResultModel::SetHitSegments. For the callers that have just moved a
 	    row: the replace pass rebuilding a replaced row from the range the command reports, and the
-	    rows carried past a Reject or a Redo. Call it after the row's range has been set.
+	    rows carried past a write. Call it after the row's range has been set.
 
 	    The segments are the line around the match: the text before it, the match, and the text
 	    after it - never reaching outside the paragraphs the match starts and ends in (a different
@@ -421,8 +421,8 @@ namespace KFCSearchEngine
 	    one-character query (the particle U+306E) lands on another match a few per cent of the time in
 	    running Japanese, and a zero-width row has no text for the hash at all. Worked through on paper
 	    (not measured): "catcatcatcat", row 1 replaced with "kitten" from its menu, Ctrl+Z - rows 2 and 3
-	    were left three characters on, standing on the third and fourth "cat", and a Change Checked of
-	    rows 2 and 3 wrote there. (The story's version - ReadStoryVersion - stops that run first; this
+	    were left three characters on, standing on the third and fourth "cat", and a Replace of
+	    rows 2 and 3 wrote there. (The story's version - ReadStoryVersion - stops that write first; this
 	    is the second guard, for a version that has come back to the same number. A Ctrl+Z of a write
 	    of KFC's own IS followed now, and the rows stand where their text is; the example stands for an
 	    edit that is not followed.)
