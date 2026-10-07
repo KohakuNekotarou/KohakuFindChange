@@ -1064,12 +1064,12 @@ enum HitDetail
 // units - see the note at the head of this file.
 #ifdef KFC_DIAG
 // TEST BUILDS ONLY (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): where BuildHit spends its time over one
-// walk - the line's text, the story's lead, the thread questions (hidden text, footnote), the place (frame, page,
-// overset). Reset and written by CollectHitsInDoc (SEARCHTIME).
+// walk - the line's text, the story's lead, the place (frame, page, overset). Reset and written by CollectHitsInDoc
+// (SEARCHTIME).
 struct BuildHitTimes
 {
-	double text, lead, threads, place;
-	BuildHitTimes() : text(0), lead(0), threads(0), place(0) {}
+	double text, lead, place;
+	BuildHitTimes() : text(0), lead(0), place(0) {}
 };
 BuildHitTimes gBuildHitTimes;
 #endif
@@ -1098,15 +1098,11 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 		lead = cache.storyLeads.insert(std::make_pair(outHit.storyUID, StoryLeadText(storyRef))).first;
 	outHit.storyLead = lead->second;
 	KFC_SPENT(gBuildHitTimes.lead, cLead);
-	KFC_CLOCK(cThreads);
-
-	const TextIndex placeAt = start;
-	KFC_SPENT(gBuildHitTimes.threads, cThreads);
 	KFC_CLOCK(cPlace);
 
 	// The frame this match composes into. A POSITION question, so it is asked per hit; everything
 	// that follows from the frame comes out of the cache.
-	const UID matchFrameUID = FrameUIDForPosition(storyRef, placeAt);
+	const UID matchFrameUID = FrameUIDForPosition(storyRef, start);
 	const FrameFacts* facts = &LookUpFrame(docRef, storyRef, matchFrameUID, cache.frames);
 
 	// No page for the match itself (it is overset - composed but placed nowhere - or its frame sits
@@ -1120,7 +1116,7 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	if (!facts->hasPage)
 	{
 		outHit.isOverset = true;
-		const KFCOversetLoc loc = KFCFindOversetLocator(storyRef, placeAt);
+		const KFCOversetLoc loc = KFCFindOversetLocator(storyRef, start);
 		if (loc.found)
 		{
 			const FrameFacts& oversetFacts = LookUpFrame(docRef, storyRef, loc.frameUID, cache.frames);
@@ -1524,9 +1520,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		KFC_SPENT(tWalk, cSearchWalk);
 		char counters[300] = { 0 };
 		searchPerf.Since(counters, sizeof(counters));
-		KFC_DIAG_LOG("SEARCHTIME hits=%d detail=%d walk=%.0f find=%.0f build=%.0f (text=%.0f lead=%.0f threads=%.0f place=%.0f) ms %s",
+		KFC_DIAG_LOG("SEARCHTIME hits=%d detail=%d walk=%.0f find=%.0f build=%.0f (text=%.0f lead=%.0f place=%.0f) ms %s",
 			(int)(outHits.size() - hitsBefore), (int)detail, tWalk, tSearchFind, tSearchBuild, gBuildHitTimes.text,
-			gBuildHitTimes.lead, gBuildHitTimes.threads, gBuildHitTimes.place, counters);
+			gBuildHitTimes.lead, gBuildHitTimes.place, counters);
 	}
 #endif
 }
@@ -2242,12 +2238,10 @@ struct CollectTally
 	CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
 };
 
-// SEARCHBOOK'S WALK OVER ITS TARGETS, FOR A SEARCH AND FOR A QUERY RUN (2026-10-04). Every target walked and
-// its hits appended to the model chapter by chapter, under one bar (barTitle; empty = the search's own title).
-// keepOpen = the targets are open and held by the caller (a query run, inside its command sequence): a book's
-// chapter is neither opened here nor handed back.
+// SEARCHBOOK'S WALK OVER ITS TARGETS. Every target walked and its hits appended to the model chapter by chapter,
+// under one bar. (A query run does not come here: it is Change All only - KFCQuerySequence.)
 void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
-	IWalkerScopeFactoryUtils::WalkScopeType selectionScope, bool keepOpen, const PMString& barTitle,
+	IWalkerScopeFactoryUtils::WalkScopeType selectionScope,
 	std::vector<KFCBookScope::SkippedChapter>& unopenable, CollectTally& out)
 {
 	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
@@ -2288,7 +2282,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 	// The title names the scope, because the bar does not imply it: "Searching book..." when it
 	// really is a book, plain "Searching..." for a single document.
-	PMString progressTitle(!barTitle.IsEmpty() ? barTitle : PMString(fromBook ? "Searching book..." : "Searching..."));
+	PMString progressTitle(fromBook ? "Searching book..." : "Searching...");
 	progressTitle.SetTranslatable(kFalse);
 	KFCProgressBar progressBar(progressTitle, 0, progressTotal, kTrue, kTrue);
 	progressBar.DisableChildProgressBars(kTrue);
@@ -2617,7 +2611,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		std::map<UID, uint32> storyVersions;
 		readStoryVersions(chapterDocRef, hits, storyVersions);
 
-		if (!keepOpen && !KFCBookScope::HandBackHeldDocNow(chapterDocRef))
+		if (!KFCBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
 
 		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, the
@@ -3090,7 +3084,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	KFCSearchEngine::RememberFindFormat();
 
 	CollectTally tally;
-	CollectTargets(targets, fromBook, allDocuments, selectionScope, false /*keepOpen*/, PMString(), unopenable, tally);
+	CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
 	const int32 total = tally.total;
 	const int32 chaptersWithHits = tally.chaptersWithHits;
 	const bool collectionTruncated = tally.truncated;
@@ -3191,12 +3185,10 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		// "in M of T chapter(s)": M chapters held a hit, T chapters were looked at. Without the T
 		// there is no way to tell a book whose other chapters simply had no matches from a book
 		// whose other chapters were never searched.
-		PMString chapStr;	chapStr.AppendNumber(chaptersWithHits);
-		PMString totalChapStr;	totalChapStr.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" in ");
-		outSummary.Append(chapStr);
+		outSummary.AppendNumber(chaptersWithHits);
 		outSummary.Append(" of ");
-		outSummary.Append(totalChapStr);
+		outSummary.AppendNumber(static_cast<int32>(targets.size()));
 		outSummary.Append(" chapter(s).");
 	}
 	else if (allDocuments)
@@ -3412,6 +3404,22 @@ void KFCSearchEngine::ShutdownCleanup()
 
 namespace
 {
+// A place another row of the chapter already stands on is that row's (both ways of looking a row up again).
+bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
+{
+	const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < hitCount; ++i)
+	{
+		UID s2 = kInvalidUID;
+		TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
+		uint64 h2 = 0;
+		if (i != hitIdx && KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
+			&& s2 == storyUID && a2 == start && b2 == end)
+			return true;
+	}
+	return false;
+}
+
 // A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE (2026-10-06 -
 // docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
 // the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
@@ -3453,7 +3461,6 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 	if (key.empty() || text.size() < key.size())
 		return false;
 	const int32 len = static_cast<int32>(key.size());
-	const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
 	int32 count = 0;
 	TextIndex foundAt = kInvalidTextIndex;
 	KFCResultModel::Hit found;
@@ -3464,20 +3471,8 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 		const TextIndex at = static_cast<TextIndex>(p);
 		KFCResultModel::Hit cand;
 		ReadHitText(storyRef, at, at + len, cand);
-		if (cand.matchHash != hash || cand.preText != row.preText || cand.postText != row.postText)
-			continue;
-		// a place another row already stands on is that row's
-		bool taken = false;
-		for (int32 i = 0; i < hitCount && !taken; ++i)
-		{
-			UID s2 = kInvalidUID;
-			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-			uint64 h2 = 0;
-			if (i != hitIdx && KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
-				&& s2 == storyUID && a2 == at && b2 == at + len)
-				taken = true;
-		}
-		if (taken)
+		if (cand.matchHash != hash || cand.preText != row.preText || cand.postText != row.postText
+			|| PlaceTakenByAnotherRow(chapterIdx, hitIdx, storyUID, at, at + len))
 			continue;
 		foundAt = at;
 		found = cand;
@@ -3547,7 +3542,6 @@ bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UID
 		if (!CollectStoryHits(UIDRef(db, storyUID), scopeOptions, hits))
 			return false;
 	}
-	const int32 hitCount = KFCResultModel::GetHitCount(chapterIdx);
 	int32 found = -1;
 	int32 count = 0;
 	for (size_t h = 0; h < hits.size() && count < 2; ++h)
@@ -3555,20 +3549,8 @@ bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UID
 		const KFCResultModel::Hit& cand = hits[h];
 		if (cand.storyUID != storyUID || cand.matchHash != hash
 			|| (cand.textEnd - cand.textStart) != (ioEnd - ioStart)
-			|| cand.preText != row.preText || cand.postText != row.postText)
-			continue;
-		// a place another row already stands on is that row's
-		bool taken = false;
-		for (int32 i = 0; i < hitCount && !taken; ++i)
-		{
-			UID s2 = kInvalidUID;
-			TextIndex a2 = kInvalidTextIndex, b2 = kInvalidTextIndex;
-			uint64 h2 = 0;
-			if (i != hitIdx && KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s2, a2, b2, h2)
-				&& s2 == cand.storyUID && a2 == cand.textStart && b2 == cand.textEnd)
-				taken = true;
-		}
-		if (taken)
+			|| cand.preText != row.preText || cand.postText != row.postText
+			|| PlaceTakenByAnotherRow(chapterIdx, hitIdx, cand.storyUID, cand.textStart, cand.textEnd))
 			continue;
 		found = static_cast<int32>(h);
 		++count;
