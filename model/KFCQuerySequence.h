@@ -38,6 +38,11 @@ namespace KFCQuerySequence
 	    the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). */
 	int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary);
 
+	/** THE QUERY DIALOG'S RUN (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+	    these query files, in this order, each named as the dialog names it (KFCSavedQueries::Describe - the file's
+	    name without .xml), then Run. A file that is not there is Run's to skip and name. */
+	int32 RunFiles(const std::vector<IDFile>& files, PMString& outSummary);
+
 	/** Is a run going on (KFCRunGuard counts it)? */
 	bool IsRunning();
 

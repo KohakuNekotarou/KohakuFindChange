@@ -94,6 +94,10 @@ public:
 	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) = 0;
 	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Transliterate" / "?". */
 	virtual const char* QueryKindName(int32 mode) = 0;
+	/** = KFCQuerySequence::RunFiles - the query dialog's Run: these query files, in this order. */
+	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) = 0;
+	/** = KFCSearchEngine::DescribeRunScope - the query dialog's Runs on: line (false = Cannot run: ...). */
+	virtual bool DescribeRunScope(PMString& outWords) = 0;
 };
 
 #endif // __IKFCRuns_h__

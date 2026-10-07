@@ -24,6 +24,7 @@
 #include "KFCChangeAll.h"
 #include "KFCHitMarker.h"
 #include "KFCOversetLocator.h"
+#include "KFCQuerySequence.h"
 #include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -98,6 +99,8 @@ public:
 	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) { KFCSavedQueries::List(out); }
 	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) { KFCSavedQueries::Describe(file, out); }
 	virtual const char* QueryKindName(int32 mode) { return KFCSavedQueries::KindName(mode); }
+	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) { return KFCQuerySequence::RunFiles(files, outSummary); }
+	virtual bool DescribeRunScope(PMString& outWords) { return KFCSearchEngine::DescribeRunScope(outWords); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

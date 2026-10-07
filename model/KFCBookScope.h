@@ -159,6 +159,23 @@ namespace KFCBookScope
 	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
 	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName);
 
+	/** How much of the target book a run takes (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	    section 4-4): total = the book's documents; selected = the documents picked in the Book panel, 0 = the whole book
+	    (no picking yet - the toggle Find/Change Selected Documents (Book) fills it). */
+	struct BookSelection
+	{
+		int32	selected;
+		int32	total;
+		BookSelection() : selected(0), total(0) {}
+	};
+
+	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (2026-10-07, the same section): its title and how many documents it
+	    holds - the book ListBookChapters would list (ResolveTargetBook), counted as GetTargetBook counts it. For the
+	    words that name a run before it starts (the query dialog's Runs on: line), so it may be asked at any time:
+	    unlike ListBookChapters it records nothing (GetSearchedBookPath), opens nothing and holds nothing.
+	    @return false when there is no target book (outBookName empty, outSelection zero). */
+	bool DescribeTargetBook(PMString& outBookName, BookSelection& outSelection);
+
 	/** Open ONE listed chapter: reuse the user's copy when they already have it open (and do not
 	    hold it), otherwise open it windowless + UI-suppressed and hold it, so ReleaseHeldDoc can
 	    close it again. Fills ioChapter.docRef.

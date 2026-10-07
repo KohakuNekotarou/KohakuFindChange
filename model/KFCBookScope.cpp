@@ -916,6 +916,24 @@ KFCBookScope::TargetBook KFCBookScope::GetTargetBook()
 	return (contentMgr != nil && contentMgr->GetContentCount() > 0) ? kTargetBookReady : kTargetBookEmpty;
 }
 
+bool KFCBookScope::DescribeTargetBook(PMString& outBookName, BookSelection& outSelection)
+{
+	outBookName.Clear();
+	outBookName.SetTranslatable(kFalse);
+	outSelection = BookSelection();
+
+	// The book a run would resolve, by the run's own resolver (GetTargetBook says why), and its title as the Book
+	// panel's tab shows it (IBook.h: "used for the title of book panel") - ListBookChapters' outBookName.
+	IBook* const book = ResolveTargetBook();		// non-owning - no release
+	if (book == nil)
+		return false;
+	outBookName = book->GetBookTitleName();
+	outBookName.SetTranslatable(kFalse);
+	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
+	outSelection.total = (contentMgr != nil) ? contentMgr->GetContentCount() : 0;
+	return true;
+}
+
 bool KFCBookScope::HasScopeTarget()
 {
 	// The same two questions the search asks when it resolves its scope (KFCSearchEngine.cpp, SearchBook),

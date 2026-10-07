@@ -47,6 +47,7 @@ namespace GoToURLUtils
 #include "KFCPanelAlpha.h"		// re-apply "Translucent Panel" when the panel is shown again
 #include "KFCPanelMetrics.h"	// how tall the message block has to be in this UI language
 #include "KFCPanelTitle.h"
+#include "KFCQueryDialog.h"		// KFCQueryDialogRefreshScope - the query dialog's Runs on: line follows the tab's scope
 #include "KFCResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
 #include "KFCDiag.h"			// a test build counts the recomputes (KFCDiagCounter)
 
@@ -162,6 +163,13 @@ void KFCPanelTitle::Update()
 	title.SetTranslatable(kFalse);
 
 	SetTabLabel(title);
+
+	// THE QUERY DIALOG'S Runs on: LINE (2026-10-07) follows from the same moments - Book Scope switched, Search: or the
+	// tab changed in Edit > Find/Change, the selection moved, the panel shown, a run started - so it is asked here
+	// rather than by observers of its own. (The selection and Edit > Find/Change reach here through the panel's
+	// observer, so only while the panel is shown; with it closed, the line is asked again when the dialog opens and
+	// when Run is pressed.)
+	KFCQueryDialogRefreshScope();
 }
 
 void KFCPanelTitle::Restore()

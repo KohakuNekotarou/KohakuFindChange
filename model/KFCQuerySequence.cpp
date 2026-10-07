@@ -42,6 +42,7 @@
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
+#include "KFCSavedQueries.h"	// Describe - a query file's name as the dialog shows it (RunFiles)
 #include "KFCSearchEngine.h"
 #include "KFCUndoFollow.h"
 
@@ -423,6 +424,21 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return replaced;
+}
+
+int32 KFCQuerySequence::RunFiles(const std::vector<IDFile>& files, PMString& outSummary)
+{
+	std::vector<QueryItem> queries;
+	for (size_t i = 0; i < files.size(); ++i)
+	{
+		KFCSavedQuery described;
+		KFCSavedQueries::Describe(files[i], described);
+		QueryItem item;
+		item.name = described.name;
+		item.file = files[i];
+		queries.push_back(item);
+	}
+	return Run(queries, outSummary);
 }
 
 #ifdef KFC_DIAG

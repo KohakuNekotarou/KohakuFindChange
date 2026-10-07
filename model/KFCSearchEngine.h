@@ -116,6 +116,14 @@ namespace KFCSearchEngine
 	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing. */
 	bool ResolveRunScope(RunScope& out, PMString& outRefusal);
 
+	/** WHAT A RUN WOULD RUN ON, IN WORDS (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	    section 4-4): the query dialog's Runs on: line, made from ResolveRunScope's answer so the line and the run
+	    cannot differ. true = "Runs on: the book "<title>" (<n> document(s))." / "Runs on: All Documents (Search: in
+	    Edit > Find/Change)." / "Runs on: Document "<name>" (...)." / "Runs on: Story in "<name>" (...)." (To End of
+	    Story and Selection alike); false = "Cannot run: " and ResolveRunScope's refusal. Touches nothing - the book
+	    is described by KFCBookScope::DescribeTargetBook, not listed - so it may be asked at any time. */
+	bool DescribeRunScope(PMString& outWords);
+
 	/** Is there anything to find on the tab Edit > Find/Change is on - a string, a glyph, a character type or a
 	    format? (HasFindQuery, which SearchBook asks before its commit point.) */
 	bool HasFindQueryNow();

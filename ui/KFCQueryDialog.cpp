@@ -23,6 +23,7 @@
 #include "IPanelControlData.h"
 #include "ISession.h"
 #include "ISubject.h"
+#include "ITextControlData.h"		// the Runs on: line
 #include "ITreeViewController.h"	// IID_ITREEVIEWCONTROLLER - the lists' selection, observed
 #include "IBooleanControlData.h"	// IID_IBOOLEANCONTROLDATA - a push button's press, observed (CDialogObserver.cpp's OK / Cancel)
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
@@ -37,9 +38,11 @@
 
 // Project includes:
 #include "KFCQueryDialog.h"
+#include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
+#include "KFCPanelTitle.h"
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
-#include "KFCResultTree.h"			// ShowStatus - a run order that could not be read or saved is said on the panel
+#include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
 
 #ifdef WINDOWS
@@ -51,7 +54,7 @@ namespace
 {
 	/** The open dialog's own panel, while it is open: set when its observer is attached (the dialog opening) and taken
 	    away when it is detached (the dialog closing) - not AddRef'd, so it never outlives the dialog it points into.
-	    What lets a change made elsewhere reach the dialog that is open (KFCQueryDialogRefresh). */
+	    What lets a change made elsewhere reach the dialog that is open (KFCQueryDialogRefreshScope). */
 	IPanelControlData* gOpenPanel = nil;
 
 	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
@@ -101,8 +104,28 @@ namespace
 		KFCResultTree::ShowStatus(say);
 	}
 
+	/** The Runs on: line: what Run would run on now, or why it cannot - the model's words (DescribeRunScope), made from the
+	    very answer the run asks (the spec's section 4-4). Written only when they read differently: KFCPanelTitle::Update
+	    asks on every caret step while the dialog is open. */
+	void ShowRunScope(IPanelControlData* panel)
+	{
+		if (panel == nil)
+			return;
+		IControlView* lineView = panel->FindWidget(kKFCQueryScopeTextWidgetID);
+		InterfacePtr<ITextControlData> line(lineView, UseDefaultIID());
+		if (line == nil)
+			return;
+		PMString words;
+		(void)KFCRuns()->DescribeRunScope(words);
+		words.SetTranslatable(kFalse);
+		if (line->GetString().IsEqual(words))
+			return;
+		line->SetString(words);
+	}
+
 	/** Fill the dialog from what is true now: both lists read again - the saved queries from their folders, the run
-	    order from its file - and drawn, and the buttons greyed to match (nothing is picked after a fill). */
+	    order from its file - and drawn, the buttons greyed to match (nothing is picked after a fill), and the Runs on:
+	    line. */
 	void Repaint(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -114,6 +137,22 @@ namespace
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);
+		ShowRunScope(panel);
+	}
+
+	/** Run (G5 as changed by the author: "Run can always be pressed - with results on the panel too, pressing it runs"):
+	    the run order as the dialog shows it, run by the model - InDesign's Change All, query by query, all of it one undo
+	    step - and the panel told as Find tells it (KFCActionComponent). The dialog stays open for the next run. A run
+	    that cannot go - no queries, no query's file, a scope it cannot run on, another run going - says why on the
+	    panel's message line (the model's refusals); nothing is greyed for it. */
+	void PressRun(IPanelControlData* panel)
+	{
+		KFCPanelTitle::Update();	// the tab's scope written before the run, as Find writes it (this line with it)
+		PMString summary;
+		(void)KFCRuns()->RunQueries(KFCQueryOrder::OrderFiles(), summary);
+		KFCResultTree::Rebuild();
+		KFCResultTree::ShowStatus(summary);
+		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
 	}
 
 	/** One of the five buttons pressed: change the order, write it to its file at once (G2), draw it, and pick the row
@@ -216,7 +255,10 @@ protected:
 CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
 
 /** The dialog's observer. It stands in for the stock CDialogObserver kDialogBoss carries, and calls it FIRST in each
-    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver). It hears
+    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver) - except
+    for Run (the OK button, Enter), which it takes itself and does not hand on: the base's OK closes the dialog, and
+    runs ApplyDialog inside a command sequence of its own (CDialogObserver.cpp) that the query run's abortable sequence
+    would nest in. It hears
     the five buttons that change the run order (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
     CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
     MEASURED 2026-10-07: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
@@ -257,6 +299,17 @@ public:
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy)
 	{
+		// Run - ahead of the base, and not handed to it (above). The base attached the OK button, on this protocol.
+		if (protocol == IID_IBOOLEANCONTROLDATA && theChange == kTrueStateMessage)
+		{
+			InterfacePtr<IControlView> pressed(theSubject, UseDefaultIID());
+			if (pressed != nil && pressed->GetWidgetID() == kOKButtonWidgetID)
+			{
+				InterfacePtr<IPanelControlData> runPanel(this, UseDefaultIID());
+				PressRun(runPanel);
+				return;
+			}
+		}
 		CDialogObserver::Update(theChange, theSubject, protocol, changedBy);
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 		if (panel == nil)
@@ -324,6 +377,11 @@ void KFCQueryDialogOpen()
 	// since) is not given InitializeDialogFields. The panel is the dialog boss's own (KCMBookDialog.cpp reaches it so).
 	InterfacePtr<IPanelControlData> panel(dialog, UseDefaultIID());
 	Repaint(panel);
+}
+
+void KFCQueryDialogRefreshScope()
+{
+	ShowRunScope(gOpenPanel);		// nil while no dialog is open - nothing then
 }
 
 // End, KFCQueryDialog.cpp.

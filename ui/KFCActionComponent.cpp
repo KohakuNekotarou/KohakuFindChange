@@ -210,7 +210,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		case kKFCRunSavedQueriesActionID:
 		{
 			// Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
-			// the query dialog, modal - this returns once it has closed.
+			// the query dialog, modeless - this returns as soon as it stands. Its Run runs from inside it (KFCQueryDialog.cpp).
 			KFCQueryDialogOpen();
 			break;
 		}

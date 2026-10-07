@@ -19,6 +19,10 @@
     brings that one forward (back from the taskbar if minimized) and fills it again. */
 void KFCQueryDialogOpen();
 
+/** The open dialog's Runs on: line asked again (nothing when it is not open) - KFCPanelTitle::Update calls it, so the line
+    follows Book Scope, Search: and the selection as the panel's tab does (the spec's section 8, item 8). */
+void KFCQueryDialogRefreshScope();
+
 #endif // __KFCQueryDialog_h__
 
 // End, KFCQueryDialog.h.

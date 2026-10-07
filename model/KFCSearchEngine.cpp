@@ -2772,6 +2772,49 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
 	return true;
 }
 
+bool KFCSearchEngine::DescribeRunScope(PMString& outWords)
+{
+	outWords.Clear();
+	outWords.SetTranslatable(kFalse);
+	RunScope scope;
+	PMString refusal;
+	if (!ResolveRunScope(scope, refusal))
+	{
+		outWords.Append("Cannot run: ");
+		outWords.Append(refusal);
+		return false;
+	}
+	outWords.Append("Runs on: ");
+	if (scope.fromBook)
+	{
+		PMString bookName;
+		KFCBookScope::BookSelection selection;
+		(void)KFCBookScope::DescribeTargetBook(bookName, selection);	// ResolveRunScope has just found it
+		outWords.Append("the book \"");
+		outWords.Append(bookName);
+		outWords.Append("\" (");
+		outWords.AppendNumber(selection.total);
+		outWords.Append(" document(s)).");
+		return true;
+	}
+	if (scope.allDocuments)
+	{
+		outWords.Append("All Documents (Search: in Edit > Find/Change).");
+		return true;
+	}
+	// Document, or a part of the active document - the Search: as ResolveRunScope settled it (a Story the selection
+	// does not offer is Document there, as Edit > Find/Change shows it).
+	PMString docName;
+	IDocument* const doc = KFCBookScope::ActiveDocument();		// non-owning; ResolveRunScope refused when there is none
+	if (doc != nil)
+		doc->GetName(docName);
+	outWords.Append(KFCSearchEngine::SearchScopeName(scope.selectionScope));
+	outWords.Append(scope.selectionScope == IWalkerScopeFactoryUtils::kDocumentScope ? " \"" : " in \"");
+	outWords.Append(docName);
+	outWords.Append("\" (Search: in Edit > Find/Change).");
+	return true;
+}
+
 int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 {
 	outSummary.Clear();
