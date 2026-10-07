@@ -42,10 +42,10 @@ const int32 kIconCount = static_cast<int32>(sizeof(kIcons) / sizeof(kIcons[0]));
 /** Which picture belongs on screen right now. */
 WidgetID Choose()
 {
-	// THE PENCIL CAT (the author's call, 2026-10-06: "Change All only") - after a Change All in Book (No List) or a
+	// THE PENCIL CAT (the author's call: "Change All only") - after a Change All in Book (No List) or a
 	// query run that changed something (KFCResultModel::HasChangeAllWritten). A row's Replace leaves the list a work
 	// list and the picture as it was. Asked FIRST: such a run has also been RUN, so HasRun ahead of it would answer
-	// the searching cat every time. (Until 2026-10-06 the pencil cat was Change Checked's report's.)
+	// the searching cat every time.
 	if (KFCResults()->HasChangeAllWritten())
 		return kKFCIconChangedWidgetID;
 

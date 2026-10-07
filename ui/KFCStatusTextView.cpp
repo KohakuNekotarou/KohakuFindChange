@@ -6,9 +6,8 @@
 //
 //  The panel's MESSAGE AREA, drawn by hand so that it can show more than one colour: when a GREP search's
 //  row is selected, this box shows what its Replace would write - "Preview Text:", the written characters at
-//  the theme's text colour and the words around them faded, the treatment a hit row already has (the author,
-//  2026-10-07: like the source text KCM shows on its panel). The same shape carried a
-//  replaced row's "Source Text:" until 2026-10-06 (it went with Track Changes) and came back for this.
+//  the theme's text colour and the words around them faded, the treatment a hit row already has (the author's
+//  call: like the source text KCM shows on its panel).
 //
 //  BROUGHT OVER FROM KCM's KCMStatusTextView.cpp, which replaced the same stock widget for the same
 //  reason. What came across: the wrapping, the line count taken from the box's

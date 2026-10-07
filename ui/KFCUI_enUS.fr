@@ -60,7 +60,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
 
                 // ----- Panel/dialog strings
                 kKFCPanelTitleKey,				kKFCDisplayName,
-                // The query dialog (2026-10-07, Run Saved Queries...): its title (the spec's D11 name), the lists'
+                // The query dialog (Run Saved Queries...): its title (the spec's D11 name), the lists'
                 // headings, the buttons between them, Run and Close.
                 kKFCQueryDialogTitleKey,		"Kohaku Find/Change Queries",
                 kKFCQuerySavedLabelKey,			"Saved Queries:",
@@ -72,7 +72,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQueryClearKey,				"Clear",
                 kKFCQueryRunKey,				"Run",
                 kKFCQueryCloseKey,				"Close",
-                // Save Order... / Load Order... (2026-10-07 night): the buttons, InDesign's Save / Open dialogs' titles,
+                // Save Order... / Load Order...: the buttons, InDesign's Save / Open dialogs' titles,
                 // and the file type's name in them.
                 kKFCQuerySaveOrderKey,			"Save Order...",
                 kKFCQueryLoadOrderKey,			"Load Order...",

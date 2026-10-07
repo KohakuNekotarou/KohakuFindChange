@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE QUERY DIALOG'S TWO LISTS, AS WIDGETS (2026-10-07): flat tree-view lists of what KFCQueryOrder holds - the saved
+//  THE QUERY DIALOG'S TWO LISTS, AS WIDGETS: flat tree-view lists of what KFCQueryOrder holds - the saved
 //  queries (kKFCQuerySavedListWidgetID) and the run order (kKFCQueryOrderListWidgetID). One adapter and one row maker
 //  serve both; each asks its own widget id which list it is. Drawing them, and the selection - the dialog's controller
 //  and observer (KFCQueryDialog.cpp) use these three.

@@ -12,20 +12,17 @@
 //    (chap, font, -1)    a STORY row        -> 'font' indexes the chapter's fontGroups (one per story)
 //    (chap, font, hit)   a hit row          -> hit indexes that CHAPTER's hits
 //
-//  (Until 2026-10-06 a list rebuilt from the Track Changes records - Show Changes - had a RUN level between the
-//  document and the story; it went with Track Changes, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F2.)
-//
 //  The book row is what tells the user WHICH book was searched, permanently and in the panel
 //  itself rather than in a status line that the next message overwrites. A document-scope search
 //  has no book row, so its tree is one level shallower.
 //
 //  The level under a document holds STORIES - a Find/Change result is grouped by story, the way KCM's
 //  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find
-//  Missing Glyphs scan, since removed); the names were kept. A story row has its own menu (Replace /
-//  Check All / Uncheck All - KFCResultNodeEH::RButtonDn).
+//  Missing Glyphs scan, since removed); the names were kept. A story row has no menu of its own - only a
+//  hit row has one (KFCResultNodeEH::RButtonDn).
 //
 //  hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
-//  the model about a hit - the row's drawing, the jump, the check box, the replace - names it that
+//  the model about a hit - the row's drawing, the jump, the replace - names it that
 //  way, and this level is a way of DISPLAYING those hits, not a renumbering of them.
 //
 //  The root sits at -2 rather than -1 precisely so the book row can have -1: anything that means

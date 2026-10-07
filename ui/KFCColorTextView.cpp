@@ -283,8 +283,8 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// and the wide one read as a mistake (the author's call, from the running panel).
 	//
 	// So: one gap, always. The column that matters is the locator's left edge, and the row widget
-	// keeps that fixed for every row (see KFCResultListWidgetMgr - the check box sits in the margin
-	// rather than pushing its row's text right).
+	// keeps that fixed for every row (see KFCResultListWidgetMgr - kHitExtraIndent and kHitCellStep are
+	// one number for every hit row).
 	// Every call below spells out both flags instead of letting the defaults apply - the defaults in
 	// DrawStringUtils.h DISAGREE with each other (KFCPanelTextDraw.h says how, and why '&' survives).
 	const bool16 kDontConvertAmpersand = kKFCDontConvertAmpersand;

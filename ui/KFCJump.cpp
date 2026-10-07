@@ -865,7 +865,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		}
 	}
 
-	// A row whose text has changed underneath says so from here on, and loses its check box, so
+	// A row whose text has changed underneath says so from here on, and its Replace goes grey, so
 	// the panel stops offering a replacement that would be refused anyway. The tree's SHAPE is
 	// untouched - same chapters, same rows - so the rows are repainted rather than rebuilt.
 	if (!sameOccurrence)
@@ -1197,8 +1197,8 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
-	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview,
-	// 2026-10-07). Any other landing - a jump refused (its reason stands), a branch row - takes a previous row's preview
+	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview).
+	// Any other landing - a jump refused (its reason stands), a branch row - takes a previous row's preview
 	// away, so it never stands beside a row it does not belong to.
 	if (hitIdx >= 0)
 	{

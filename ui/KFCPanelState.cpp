@@ -566,7 +566,7 @@ void KFCSavePanelState()
 	pairs.push_back(KFCJsonPair("minimizableFindChange", KFCBoolLiteral(KFCGetFindChangeMinimizable())));
 	pairs.push_back(KFCJsonPair("appBarSearchEnter",     KFCBoolLiteral(KFCGetAppBarSearchEnter())));
 	pairs.push_back(KFCJsonPair("hidePreviousChapter",   KFCBoolLiteral(KFCJump::IsHidePreviousChapterOn())));
-	// Find/Change Selected Documents (Book) (2026-10-07 - the spec 1's G10: kept, the author's call - unlike Book Scope).
+	// Find/Change Selected Documents (Book) (the query dialog's spec, G10: kept, the author's call - unlike Book Scope).
 	{
 		InterfacePtr<IKFCChapters> chapters(KFCChapters());
 		pairs.push_back(KFCJsonPair("selectedDocuments",
@@ -656,7 +656,7 @@ void KFCLoadPanelStateIfPresent()
 	// (KFCJump speaks bool, so the bool reader.)
 	KFCJump::SetHidePreviousChapter(KFCPanelStateReadBool(text, "hidePreviousChapter", KFCJump::IsHidePreviousChapterOn()));
 
-	// Find/Change Selected Documents (Book) (2026-10-07): the flag alone. It narrows only a Book Scope run, and Book
+	// Find/Change Selected Documents (Book): the flag alone. It narrows only a Book Scope run, and Book
 	// Scope is not kept (above), so a restored ON changes nothing until Book Scope is turned on - the menu shows it
 	// ticked and grey till then. The model half's flag; nil here would be no model half - nothing is set then.
 	{
@@ -671,7 +671,7 @@ void KFCLoadPanelStateIfPresent()
 	KFCBookPanelPlacement::LoadFromSettings(text);
 }
 
-// A FILE OF OURS AT A PATH THE PERSON CHOSE (2026-10-07 night - the query dialog's Save Order... / Load Order...,
+// A FILE OF OURS AT A PATH THE PERSON CHOSE (the query dialog's Save Order... / Load Order...,
 // KFCQueryOrderFile.cpp): read and written the way the settings file is (KFCReadWholeFile / KFCWriteWholeFile above), so
 // a file of KFC's is written one way. The side file is "<the file's path>.tmp", beside it.
 bool KFCReadFileWhole(const IDFile& file, std::string& out)

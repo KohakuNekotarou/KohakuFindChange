@@ -7,9 +7,8 @@
 //  What the panel's MESSAGE AREA draws: the last message. The box is drawn by hand (KFCStatusTextView.cpp) so that
 //  the text is the text - a lone '&' in a file name is not taken as an accelerator (the spec map's ROW-31) - and so
 //  that it can show more than one colour: a heading on a line of its own, and the characters that matter at full
-//  colour between two faded pieces of context (KCM's IKCMStatusTextData shape). Until 2026-10-06 that carried a
-//  replaced row's "Source Text:" (gone with Track Changes - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
-//  F5); since 2026-10-07 a selected GREP row's "Preview Text:" (SetSegments, appended).
+//  colour between two faded pieces of context (KCM's IKCMStatusTextData shape) - a selected GREP row's
+//  "Preview Text:" (SetSegments, appended).
 //
 //  NOT PERSISTENT. This is the message raised last in this session; what outlives the panel
 //  is kept on the tree's side (KFCResultListWidgetMgr.cpp) and written back when the panel is shown.

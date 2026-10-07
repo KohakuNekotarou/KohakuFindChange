@@ -32,7 +32,7 @@
 //      restored ON cannot act on its own: the jump asks ShouldHidePreviousChapter, which ALSO
 //      requires the results to have come from a book. In document scope the toggle is greyed out
 //      and the sweep never runs.
-//    - Find/Change Selected Documents (Book) (key "selectedDocuments", 2026-10-07 - the author's call: kept). The flag
+//    - Find/Change Selected Documents (Book) (key "selectedDocuments" - the author's call: kept). The flag
 //      alone, the model half's (KFCBookScope): it narrows only a Book Scope run, and Book Scope is not kept, so a
 //      restored ON shows ticked and grey until Book Scope is turned on.
 //    - Remember Book Panel Placement, and the placement itself - where InDesign's OWN
@@ -106,7 +106,7 @@ bool	KFCPanelStateFilePath(PMString& outPath);
 bool	KFCPanelStateReadInt(const std::string& text, const char* key, int32& out);
 bool	KFCPanelStateReadBool(const std::string& text, const char* key, bool defVal);
 
-// A FILE OF OURS AT A PATH THE PERSON CHOSE (2026-10-07 night - the query dialog's Save Order... / Load Order...,
+// A FILE OF OURS AT A PATH THE PERSON CHOSE (the query dialog's Save Order... / Load Order...,
 // KFCQueryOrderFile.cpp), read and written exactly as the settings file is: the whole file or nothing, and every write
 // through a side file beside it ("<path>.tmp") that is read back before MoveFileEx puts it in place.
 // KFCReadFileWhole: false when the file is not there or could not be read whole.

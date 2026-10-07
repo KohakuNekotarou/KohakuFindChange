@@ -4,12 +4,12 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Result tree rebuild entry point. Called after KFCResultModel has been filled by a search or by Show
-//  Changes: reloads the panel's tree widget from the model. What it opens depends on the scope - a
+//  Result tree rebuild entry point. Called after KFCResultModel has been filled by a search (or its
+//  shape changed by an Undo): reloads the panel's tree widget from the model. What it opens depends on the scope - a
 //  BOOK result opens the book row and leaves the chapters closed (a book-wide run can fill the
 //  panel with one chapter's hits and bury the fact that others matched), All Documents leaves its
 //  document rows closed for the same reason, a single document opens its one chapter - and the story
-//  and run rows always come up open. No priming is needed to get the expander arrows drawn: this
+//  rows always come up open. No priming is needed to get the expander arrows drawn: this
 //  panel draws them itself, from the hierarchy adapter's child count. No-op when the panel is closed.
 //  Implemented in KFCResultListWidgetMgr.cpp (it lives with the tree).
 //
@@ -28,17 +28,17 @@ namespace KFCResultTree
 {
 	/** (Re)load the panel's result tree from KFCResultModel. A book result comes up with the book
 	    row open and its chapters closed; an All Documents result with its document rows closed; a
-	    document result with its one chapter open. Story and run rows come up open in every case. Safe
+	    document result with its one chapter open. Story rows come up open in every case. Safe
 	    to call when the panel is closed (does nothing then). */
 	void Rebuild();
 
 	/** Repaint the existing rows from the model WITHOUT rebuilding the tree. For changes that touch
-	    only what a row DRAWS - the check boxes behind Check All / Uncheck All - where the tree's
-	    shape (which chapters, how many hits) is untouched.
+	    only what a row DRAWS - a row's text, place or word after a replace, an Undo or a jump - where the
+	    tree's shape (which chapters, how many hits) is untouched.
 
 	    Costs one notification per BRANCH row, not per hit: NodeChanged carries childrenChangedAlso,
 	    so the framework refreshes a node's children itself. That is the book row (when there is
-	    one), each chapter, its run rows and its story rows - the hit rows under a story are
+	    one), each chapter and its story rows - the hit rows under a story are
 	    grandchildren (or deeper), so the chapter's own call does not reach them. A chapter has a
 	    handful of those, not a few thousand, so it stays a handful of calls. Rebuild() by contrast
 	    tears the whole tree down and re-expands it, which is what made a large result set expensive.
@@ -60,7 +60,7 @@ namespace KFCResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
-	/** A selected GREP row's AFTER-TEXT on the message area (2026-10-07): "Preview Text:", the row's context faded and
+	/** A selected GREP row's AFTER-TEXT on the message area: "Preview Text:", the row's context faded and
 	    what its Replace would write at full colour (KFCReplaceEngine::PreviewHit - written in a step thrown away).
 	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
 	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report. */
@@ -70,21 +70,21 @@ namespace KFCResultTree
 	    previous row's does not stand beside it. Nothing when it shows anything else. */
 	void DropRowPreview();
 
-	/** REPLACE ONE ROW (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
+	/** REPLACE ONE ROW (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
 	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
 	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the
 	    row menu greys Replace by); then the row's one replace (KFCRuns()->ReplaceHit, no prompt - one undo step, the
 	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx);
 
-	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE (2026-10-07): IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
+	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
 	    land it. For the arrows' walk and a Return's replace (KFCResultTreeEH), after a document window has come forward.
 	    Does nothing while the panel is closed. True = the list holds the keyboard. */
 	bool TakeKeyboard();
 
 	/** The result list's Return filter off the application's event dispatcher and released, for good - the UI half's
-	    shutdown (through ShutdownCleanup). Defined in KFCResultTreeEH.cpp, where the filter lives (2026-10-07). */
+	    shutdown (through ShutdownCleanup). Defined in KFCResultTreeEH.cpp, where the filter lives. */
 	void ShutdownReturnFilter();
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
@@ -113,7 +113,7 @@ namespace KFCResultTree
 
 #ifdef KFC_DIAG
 	/** (Test builds only.) Who holds the keyboard, in a few words for the trace: "tree" (this list), "nobody", or the
-	    holder's boss and widget. 2026-10-07: a Return that replaced a row let the keyboard go to the document, and the
+	    holder's boss and widget. Made when a Return that replaced a row let the keyboard go to the document: the
 	    trace says where in the Return it went (KFCResultTreeEH::KeyDown, ReplaceRow). */
 	std::string DiagKeyFocus();
 #endif

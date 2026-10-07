@@ -27,8 +27,8 @@
     Set by the widget manager on every apply, read by KFCColorTextView::Draw. Non-persistent.
 
     A replaced row draws exactly like a found one: the new text is what the user wants to read, so it
-    gets the same emphasis a match does. (Its right-click Replace is greyed instead. The rows carried a
-    check box beside this cell until 2026-10-06 - spec F16.) */
+    gets the same emphasis a match does. (Its right-click Replace is greyed instead, and its locator
+    starts with "Changed".) */
 class IKFCRowData : public IPMUnknown
 {
 public:

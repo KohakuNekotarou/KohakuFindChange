@@ -34,7 +34,7 @@
 #include "IControlViewDefs.h"
 #include "SysControlIDs.h"
 #include "Widgets.fh"	// for PalettePanelWidget or DialogBoss
-#include "EveInfo.fh"	// EVE widget types and layout flags - the query dialog (2026-10-07), laid out by EVE as KCM's book dialog
+#include "EveInfo.fh"	// EVE widget types and layout flags - the query dialog, laid out by EVE as KCM's book dialog
 #include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the query dialog's "Runs on:" line
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
@@ -281,7 +281,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * The result list's Return, taken before the widget layer gets it (2026-10-07, KFCResultTreeEH.cpp). A Return the
+	 * The result list's Return, taken before the widget layer gets it (KFCResultTreeEH.cpp). A Return the
 	 * list handled was followed by InDesign's own DVEventHandler::RestoreFocusOnDocument, which handed the keyboard to
 	 * the document - and the down arrow then moved a page item. This handler is pushed on the application's
 	 * IEventDispatcher (whose stack sees an event before anything below it) while the list holds the keyboard, and
@@ -415,9 +415,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
-	 * the query dialog. Our controller fills it on every open (the list it shows is read from KFCQueryOrder.txt each
-	 * time); our observer hears the four buttons and the two lists' selections. The observer REPLACES the stock
+	 * Run Saved Queries... (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+	 * the query dialog. Our controller fills it on every open (the run order it shows is the session's - KFCQueryOrder);
+	 * our observer hears the buttons (the four between the lists, Clear, Save Order... and Load Order...) and the two
+	 * lists' selections. The observer REPLACES the stock
 	 * CDialogObserver that kDialogBoss carries, and calls it first, so OK (Run), Cancel (Close) and the close box keep
 	 * working - basicdialog's BscDlgDialogObserver is the same shape.
 	 */
@@ -521,7 +522,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCClearResultsMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Run Saved Queries... (2026-10-07): the query dialog - saved queries put in an order and run with InDesign's own
+		// Run Saved Queries...: the query dialog - saved queries put in an order and run with InDesign's own
 		// Change All, one after another (KFCQueryDialog.cpp). Last in the block, under Clear Results (the author's call).
 		kKFCRunSavedQueriesActionID,
 		kKFCTargetMenuPath
@@ -545,7 +546,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCBookScopeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// Find/Change Selected Documents (Book): toggle (check mark, 2026-10-07). With Book Scope on, a run takes only the
+		// Find/Change Selected Documents (Book): toggle (check mark). With Book Scope on, a run takes only the
 		// Book panel's selected documents; grey with Book Scope off - so it stands right under it.
 		kKFCSelectedDocumentsActionID,
 		kKFCTargetMenuPath
@@ -718,7 +719,7 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		kKFCActionComponentBoss,
 		kKFCSelectedDocumentsActionID,
-		kKFCSelectedDocumentsMenuKey,	// "Find/Change Selected Documents (Book)" (toggle, check mark - 2026-10-07)
+		kKFCSelectedDocumentsMenuKey,	// "Find/Change Selected Documents (Book)" (toggle, check mark)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,
@@ -824,7 +825,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// Run Saved Queries... (2026-10-07). kCustomEnabling for the blanket grey while a run stands (UpdateActionStates'
+		// Run Saved Queries...: kCustomEnabling for the blanket grey while a run stands (UpdateActionStates'
 		// first lines); otherwise always on - putting queries in an order needs no document, and what Run would run on is
 		// said in the dialog itself. In the Keyboard Shortcuts editor under Palette Menus, like Find and Change All.
 		kKFCActionComponentBoss,
@@ -846,7 +847,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
-		// Replace - a hit row's right-click menu (since 2026-10-06 the one write from the list - spec F16).
+		// Replace - a hit row's right-click menu (the one write from the list - spec F16).
 		// kCustomEnabling: UpdateActionStates greys it by the row the menu is over.
 		kKFCActionComponentBoss,
 		kKFCReplaceHitActionID,
@@ -989,7 +990,7 @@ type KFCIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKFCIconW
 };
 
 /*
- * The query dialog (2026-10-07). "DialogBoss" is the widget type every SDK dialog is written with (basicdialog, KCM's
+ * The query dialog. "DialogBoss" is the widget type every SDK dialog is written with (basicdialog, KCM's
  * book dialog); WidgetEveInfo is required - EVE lays the dialog out. The lists carry WidgetEveInfo too: they sit among
  * EVE children (KCM's KCMBookTreeWidget, and the product's EVETreeViewWidget in LinksUIViews.fr). The row has none - it
  * is built by the list's row maker, outside EVE. The "Runs on:" line is an EVEStaticTextWidget on our fixed-size boss.
@@ -1290,7 +1291,7 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 };
 
 /*
- * THE QUERY DIALOG (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+ * THE QUERY DIALOG (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
  * section 2-2). One wild locale row each for the dialog and its lists' row: every word comes from the string table.
  */
 resource LocaleIndex (kKFCQueryDialogRsrcID)
@@ -1468,7 +1469,7 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 							kKFCQueryDownKey,				// "Move Down"
 							kEVELargeSpaceAfter,
 						),
-						// Clear (the author's addition, 2026-10-07): the whole run order out - set apart from the four
+						// Clear (the author's addition): the whole run order out - set apart from the four
 						// that move one row.
 						EVEButtonWidget
 						(
@@ -1523,7 +1524,7 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 							},
 							kEVEAlignFill | kEVERegularSpaceAfter,
 						),
-						// Save Order... / Load Order... (2026-10-07 night, the author's choice of two): the run order to a
+						// Save Order... / Load Order... (the author's call, of two offered): the run order to a
 						// file of its own and back (KFCQueryOrderFile.h) - under the list they act on, at its right.
 						EVEGenericPanelWidget
 						(
@@ -1570,7 +1571,7 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 			kEVEAlignFill | kEVERegularSpaceAfter,
 		),
 
-		// ----- what the last Run said - the panel's message line, here too (2026-10-07, the author's choice): the dialog
+		// ----- what the last Run said - the panel's message line, here too (the author's call): the dialog
 		//       is modeless and stands with the KFC panel closed, and a run's result was then shown nowhere -----
 		KFCQueryFixedTextWidget
 		(

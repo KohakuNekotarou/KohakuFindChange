@@ -25,7 +25,8 @@
 namespace
 {
 	// A string as JSON writes it: " and \ escaped, the controls as \b \f \n \r \t or \u00XX, everything else - the
-	// UTF-8 of any script - as it is (the panel's settings file writes its strings the same way).
+	// UTF-8 of any script - as it is. (KFC's one JSON string writer: the panel's settings file holds only true / false
+	// and numbers.)
 	void AppendJsonString(std::string& out, const std::string& utf8)
 	{
 		out += '"';
@@ -385,7 +386,7 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 		outFile = WithJsonExtension(chooser.GetIDFile());
 		return true;
 	}
-	// JSON ONLY (2026-10-08, the author: "not all files - only JSON can be loaded"): one type and no All Files - the
+	// JSON ONLY (the author's call: "not all files - only JSON can be loaded"): one type and no All Files - the
 	// chooser's own one-type road (SDKFileOpenChooser::ShowDialog: AddExtension alone), as KCM's Import Story Text offers
 	// Word's files only.
 	SDKFileOpenChooser chooser;

@@ -15,12 +15,7 @@
 //  Every chapter's hits are grouped; the branches below that hang hits off the document directly are the
 //  safe answer for a node that names no group, not a shape any list has now.
 //
-//  A RUN LEVEL between the document and its stories (Show Changes by KohakuFindChange).
-//  A list rebuilt from the Track Changes records groups a document's rows by the replace that wrote them
-//  first: document -> run -> story -> row. Decided per chapter again, from its own runs (none on every
-//  other list).
-//
-//  See KFCResultNodeID.h for the six node shapes and for why the root sits at -2. Ported from
+//  See KFCResultNodeID.h for the five node shapes and for why the root sits at -2. Ported from
 //  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KFC shows every chapter
 //  that has hits, no filters) - itself modelled on paneltreeview's adapter.
 //
@@ -40,8 +35,8 @@
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 
 /** The hierarchy over KFCResultModel: hidden root -> the BOOK row when the results came from a book
-    -> one document node per chapter with hits -> (a RUN node per replace, on a list rebuilt from the
-    records) -> a STORY ("font") node per group -> one hit node per match. Without a book the document
+    -> one document node per chapter with hits -> a STORY ("font") node per group -> one hit node per
+    match. Without a book the document
     nodes hang off the root itself. */
 class KFCResultListAdapter : public CPMUnknown<ITreeViewHierarchyAdapter>
 {

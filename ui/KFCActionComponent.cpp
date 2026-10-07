@@ -45,7 +45,7 @@
 #include "KFCAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel"
 #include "KFCPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
-#include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog (2026-10-07)
+#include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
 #include "KFCDiag.h"				// a test build's UIOBS line (KFCDiagCounter)
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -194,7 +194,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCChangeAllActionID:
 		{
-			// Change All in Book (No List) (the author's calls, 2026-10-06 - F6 and F18): InDesign's own Change All over
+			// Change All in Book (No List) (the author's calls - F6 and F18): InDesign's own Change All over
 			// the book's chapters, no list. The engine keeps its own doors and says why on a refusal (KFCChangeAll::Run).
 			KFCPanelTitle::Update();
 			PMString summary;
@@ -205,7 +205,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCRunSavedQueriesActionID:
 		{
-			// Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+			// Run Saved Queries... (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 			// the query dialog, modeless - this returns as soon as it stands. Its Run runs from inside it (KFCQueryDialog.cpp).
 			KFCQueryDialogOpen();
 			break;
@@ -240,7 +240,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCSelectedDocumentsActionID:
 		{
-			// Find/Change Selected Documents (Book) (2026-10-07 - the spec 1's G9): just the flag, like Book Scope - which
+			// Find/Change Selected Documents (Book) (the query dialog's spec, G9): just the flag, like Book Scope - which
 			// documents a run takes is read when it starts, from the Book panel's selection at that moment. Its check mark
 			// and its grey (Book Scope off) are drawn in UpdateActionStates; the query dialog's Runs on: line follows
 			// through KFCPanelTitle::Update.
@@ -428,7 +428,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
 			// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
-			// Documents (No List)" (2026-10-07, the spec 1's section 4-4) - from the model, as Find's is. Grey with Book Scope off, while the
+			// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with Book Scope off, while the
 			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Object and
 			// Colour tabs, and with nothing to find - the spec's section 4; a run standing up greys everything above.
 			const bool canRun = KFCChapters()->IsBookScopeOn()
@@ -443,7 +443,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCRunSavedQueriesActionID)
 		{
-			// Run Saved Queries... (2026-10-07): always - putting queries in an order needs no document, and the dialog
+			// Run Saved Queries...: always - putting queries in an order needs no document, and the dialog
 			// itself says what Run would run on. (A run standing greys it with everything else, above.)
 			listToUpdate->SetNthActionState(i, kEnabledAction);
 		}
@@ -461,7 +461,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCSelectedDocumentsActionID)
 		{
-			// Find/Change Selected Documents (Book) (2026-10-07): it narrows Book Scope, so it is offered only with Book Scope
+			// Find/Change Selected Documents (Book): it narrows Book Scope, so it is offered only with Book Scope
 			// on (the author: it takes effect only then). Its check mark stays visible while it is grey, as Hide Previous
 			// Chapter's does, so a setting kept for the next book run is not hidden.
 			int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;

@@ -7,8 +7,8 @@
 //  ITreeViewWidgetMgr for the result tree. Two ROW SHAPES for the node kinds KFCResultNodeID.h names:
 //
 //    * BRANCH rows (from kKFCResultChapterNodeWidgetRsrcID): an expander arrow and a label. The
-//      BOOK row, the DOCUMENT rows ("<name>  (N)"), the RUN rows and the STORY rows (the code's FONT
-//      rows - "P3  first words...  (N)") are all this one shape at different indents, so no level
+//      BOOK row, the DOCUMENT rows ("<name>  (R/N)") and the STORY rows (the code's FONT
+//      rows - "P3  first words...  (R/N)") are all this one shape at different indents, so no level
 //      needed a resource of its own.
 //      The expander is hidden on a row with no children, which DOES happen: a book search that
 //      finds nothing still draws its book row (the adapter gives the root one child whenever the
@@ -21,14 +21,10 @@
 //  The STORY rows group each chapter's hits by story. (The code calls them FONT rows: the level once
 //  held the fonts of the Find Missing Glyphs scan, since removed.)
 //
-//  A fifth kind, the RUN row (Show Changes by KohakuFindChange): on a list rebuilt from the
-//  Track Changes records, one replace's rows sit under a branch row between the document and its
-//  stories - "<date> <time>  (N)", the branch shape again, one step right of the document row.
-//
 //  The visual indent is drawn by explicit frame offsets in ApplyDataToWidget, applied on top of
 //  the framework's own indent rather than instead of it (see GetIndentForNode), as in KESCL. This
 //  file also hosts KFCResultTree::Rebuild (the tree lives here). Ported from KESCL's
-//  KESCLResultListWidgetMgr - two levels then (document and hit; the book, story and run levels
+//  KESCLResultListWidgetMgr - two levels then (document and hit; the book and story levels
 //  came later) - itself modelled on the paneltreeview sample's PnlTrvTVWidgetMgr.
 //
 //========================================================================================
@@ -88,20 +84,19 @@ namespace
 	const PMReal kExpanderZone = 16.0;
 	// How much further right than its chapter row a hit row's content starts. ZERO: it begins exactly where
 	// the chapter row's expander arrow ends, so the two line up down the left edge (the author's call, from
-	// a screen shot - "put the check where the arrow is"; the check box went on 2026-10-06, spec F16).
+	// a screen shot - "put the check where the arrow is").
 	const PMReal kHitExtraIndent = 0.0;
 	// The hit row's colour cell starts this far right of the row's content: 8px, the step the book and story
 	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
-	// staircase"). Until 2026-10-06 a check box took 16px here (spec F16 took it away); this half zone was what
-	// the lists with no boxes used.
+	// staircase").
 	const PMReal kHitCellStep = 8.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
 	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
 	// the hierarchy. A document search has no book row and no shift, so its tree is unchanged.
 	const PMReal kBookLevelIndent = 8.0;
-	// A STORY ("font") row sits between a document and its hits, and a RUN row above it on a list rebuilt
-	// from the records; the children of each step right by this much. The same 8px the book level uses,
+	// A STORY ("font") row sits between a document and its hits; its children step right by this much.
+	// The same 8px the book level uses,
 	// and for the same reason: half an expander zone is enough to read the hierarchy, and this panel's
 	// width has been fought over once already (see kHitExtraIndent).
 	const PMReal kFontLevelIndent = 8.0;
@@ -143,7 +138,7 @@ namespace
 			tcd->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	}
 
-	// A branch row's count: "  (R/N)" - R of its N hits replaced by this list (2026-10-07, the author: the search's
+	// A branch row's count: "  (R/N)" - R of its N hits replaced by this list (the author's call: the search's
 	// count with the replaced one beside it, "1/3"). One shape for the book, document and story rows, so they read alike.
 	void AppendCounts(PMString& label, int32 replaced, int32 hits)
 	{
@@ -354,7 +349,7 @@ private:
 		IPanelControlData* rowData) const
 	{
 		// "<book>  (R/N)" - how many of the hits the book's search holds this list has replaced, of how many (every one
-		// drawn - one limit since 2026-10-06, F9; the R since 2026-10-07 - AppendCounts). Drawn even when the search found
+		// drawn - one limit, F9; the R - AppendCounts). Drawn even when the search found
 		// nothing - the hierarchy adapter gives the root one child whenever the results came from a book, which is how
 		// the panel goes on naming the book it just searched - and then it reads "(0/0)", which is also how KFCBookWatch
 		// describes it (the user's own measurement, of the "(0)" before the R); keep the two together.
@@ -449,8 +444,8 @@ private:
 			InterfacePtr<IKFCRowData> data(cell, UseDefaultIID());
 			if (data != nil)
 			{
-				// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (2026-10-07, the author: the check boxes used to tell a
-				// written row from one still as the search found it; without them a replaced row looked like the rest).
+				// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (the author's call: nothing else on the row tells a
+				// written row from one still as the search found it - without it a replaced row looks like the rest).
 				// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
 				// replace puts the row back as it was (UNDO-03, the row's copy has replaced == false), and the word goes.
 				PMString locator(row.locator);
@@ -497,7 +492,7 @@ void KFCResultTree::Rebuild()
 		return;
 
 #ifdef KFC_DIAG
-	// TEST BUILDS ONLY (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): how long the rebuild takes and how
+	// TEST BUILDS ONLY (docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): how long the rebuild takes and how
 	// many rows it opens one by one (TREETIME) - and, with the fault switch tree-expand, the same rows opened another way:
 	// mode 1 = one ExpandNode with all its descendants for a document row that opens; mode 2 = every row opened BEFORE
 	// ChangeRoot (ITreeViewMgr.h: expansion is kept across ChangeRoot while the root is the same).
@@ -580,7 +575,7 @@ void KFCResultTree::Rebuild()
 		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms %s", (int)KFCResults()->GetTotalHitCount(),
 			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
-	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds, 2026-10-05). GetDisplayFontCount finds
+	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds). GetDisplayFontCount finds
 	// the shown groups by halving now; here every group is counted one by one, as they were before, after the timing
 	// above. A difference is logged as DISPCOUNT MISMATCH - the regression runs grep for it.
 	for (int32 n = 0; n < chapters; ++n)
@@ -668,7 +663,7 @@ void KFCResultTree::ShutdownCleanup()
 	// added here too.
 	gLastStatus.Clear();
 	// ...and the Return filter the list pushes on the application's event dispatcher (KFCResultTreeEH.cpp): off the
-	// stack and released before the .pln goes (2026-10-07).
+	// stack and released before the .pln goes.
 	ShutdownReturnFilter();
 }
 
@@ -787,7 +782,7 @@ static const char* const kPreviewLabel = "Preview Text:";
 
 bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
 {
-	// What Return would write at this row (2026-10-07, the author: an ordinary GREP search's row shows its after-text
+	// What Return would write at this row (the author's call: an ordinary GREP search's row shows its after-text
 	// when selected) - the model writes it inside a step it throws away (KFCReplaceEngine::PreviewHit) and says false
 	// wherever Return would not write it now.
 	PMString after;
@@ -801,10 +796,10 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
 		return false;
-	// KCM's "Source Text:" shape (the author's choice): the heading on its own line, the row's own context faded, and
+	// KCM's "Source Text:" shape (the author's call): the heading on its own line, the row's own context faded, and
 	// what would be written at full colour; nothing written at all is a PLACE, drawn as the bar.
 	PMString shown(after);
-	// CUT LONG BEFORE THE BOX HAS TO MEASURE IT (the removed Source Text's rule, for its reason): what a GREP replace
+	// CUT LONG BEFORE THE BOX HAS TO MEASURE IT: what a GREP replace
 	// writes can be a story's worth ($0 over a match across paragraphs), where a row's own text is capped at 50
 	// characters for drawing - and the box lays its text out by measuring prefixes, again for every width it tries
 	// (KFCStatusTextView.cpp), on every repaint. It holds four lines, about 120 characters on a Japanese UI; past that
@@ -884,8 +879,8 @@ std::string KFCResultTree::DiagKeyFocus()
 
 bool KFCResultTree::TakeKeyboard()
 {
-	// THE PANEL MADE THE ACTIVE ONE AND ITS LIST GIVEN THE KEYBOARD, BY THE PANEL SYSTEM'S OWN DOORS (2026-10-07, the
-	// author's call: make the panel active and focus it, not an idle task or a timer). The arrows' walk fronts a document window
+	// THE PANEL MADE THE ACTIVE ONE AND ITS LIST GIVEN THE KEYBOARD, BY THE PANEL SYSTEM'S OWN DOORS (the author's
+	// call: make the panel active and focus it, not an idle task or a timer). The arrows' walk fronts a document window
 	// (KFCJump), and a Return pressed after it found the keyboard handed to the document by a second road the Return's
 	// hold could refuse but not stop (KFCResultTreeEH, gHolding) - the list had kept InDesign's keyboard, not the
 	// active panel. So, in order:

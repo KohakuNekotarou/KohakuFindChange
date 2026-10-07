@@ -98,8 +98,8 @@ public:
 		KFCMarkerExpiryIdleTask::Shutdown();
 		// ...and the line the panel last reported: a static PMString (see KFCResultTree::ShutdownCleanup).
 		KFCResultTree::ShutdownCleanup();
-		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles (2026-10-07 - the whole-branch
-		// review found them left for the unload).
+		// ...and the query dialog's two lists: static vectors of PMStrings and IDFiles (a review found them left for
+		// the unload).
 		KFCQueryOrder::ShutdownCleanup();
 	}
 };

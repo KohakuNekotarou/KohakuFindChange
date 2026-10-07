@@ -5,7 +5,8 @@
 //  KohakuFindChange (KFC)
 //
 //  Event handler for the result list ITSELF (the tree-view boss, not a row). It adds two things
-//  to the stock up / down arrows, Return to a hit row, and leaves everything else alone:
+//  to the stock up / down arrows and one key of its own - Return on a hit row - and leaves
+//  everything else alone:
 //
 //    1. A row that is CLOSED opens when the arrows land on it. The stock keys walk the VISIBLE
 //       rows only, and a book search deliberately comes up with every chapter closed
@@ -16,7 +17,7 @@
 //       row would do: a hit row jumps, a chapter row shows its document, a STORY ("font") row
 //       shows the document it sits in (it names no hit, so it takes the chapter's arm), the book
 //       row activates its book.
-//    3. RETURN / ENTER ON A HIT ROW REPLACES IT (2026-10-06, spec F17) - see KeyDown. With the arrows,
+//    3. RETURN / ENTER ON A HIT ROW REPLACES IT (spec F17) - see KeyDown. With the arrows,
 //       the keyboard alone walks the rows and replaces where the match is right.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
@@ -91,7 +92,7 @@ public:
 	~WalkGuard() { gWalking = false; }
 };
 
-// THE KEYBOARD KEPT THROUGH A RETURN (2026-10-07). A Return on a hit row replaces it (KeyDown) and the list must keep the
+// THE KEYBOARD KEPT THROUGH A RETURN. A Return on a hit row replaces it (KeyDown) and the list must keep the
 // keyboard, so the arrows walk on - but InDesign gives it away the moment KeyDown returns: the widget layer's own event
 // dispatch, with no code of ours on the stack, asks the holder to let go and hands the keyboard to the document - a
 // panel's Return going back to the layout, the convention for a palette. The arrows then moved the page item selected
@@ -165,7 +166,7 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	return kTrue;
 }
 
-// THE RETURN FILTER (2026-10-07). Its own boss (kKFCReturnFilterBoss, KFCUI.fr), created once and released at shutdown,
+// THE RETURN FILTER. Its own boss (kKFCReturnFilterBoss, KFCUI.fr), created once and released at shutdown,
 // pushed on the application's IEventDispatcher while the list holds the keyboard - the stack the dispatcher offers an
 // event to from the top down before anything below it (IEventDispatcher.h). Adobe's Layers panel pushes a handler the
 // same way for the length of a drag (open/components/layerpanel/LayerProxyDragDropSourceEH.cpp).
@@ -191,8 +192,8 @@ void PushReturnFilter()
 	if (gFilterShutDown || gFilterPushed)
 		return;
 #ifdef KFC_DIAG
-	// (Test builds only, 2026-10-07) Fault switch no-return-filter: never pushed - to tell what the filter's being on the
-	// stack changes from what the rest of the Return work does (a jumped-to replaced row drew hilited from 02d7057 on).
+	// (Test builds only) Fault switch no-return-filter: never pushed - to tell what the filter's being on the
+	// stack changes from what the rest of the Return work does (a jumped-to replaced row drew hilited).
 	if (KFC_DIAG_FAULT("no-return-filter"))
 	{
 		KFC_DIAG_LOG("RETFOCUS filter NOT pushed (fault switch no-return-filter)");
@@ -238,7 +239,7 @@ public:
 	virtual void PostGiveUpKeyFocus();				// takes it off again
 
 #ifdef KFC_DIAG
-	// (Test builds only, 2026-10-07) The trace of where a Return-replace let the keyboard go: the key events that reach
+	// (Test builds only) The trace of where a Return-replace let the keyboard go: the key events that reach
 	// the list after the KeyDown, and the moments the list's keyboard is suspended and resumed. Each passes on to the
 	// stock one.
 	virtual bool16 KeyCmd(IEvent* e);
@@ -253,7 +254,7 @@ CREATE_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
 namespace
 {
 // The callers above this point as "module+offset < module+offset ...", nearest first - which plug-in asked the list to
-// let the keyboard go (2026-10-07). Module and offset only: the names need symbols this build does not have.
+// let the keyboard go. Module and offset only: the names need symbols this build does not have.
 std::string DiagCallers()
 {
 	void* frames[20];
@@ -397,15 +398,15 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 
 	// That action activated a document window - or, on a book row, the Book panel - which took the
 	// key focus with it. Take it back, or the NEXT arrow press lands in the document instead of
-	// walking on - and take it back with the panel made the active one again (KFCResultTree::TakeKeyboard,
-	// 2026-10-07): a list holding InDesign's keyboard inside a panel that is no longer active lost it to the next
+	// walking on - and take it back with the panel made the active one again (KFCResultTree::TakeKeyboard):
+	// a list holding InDesign's keyboard inside a panel that is no longer active lost it to the next
 	// Return by a road the Return's hold could not stop.
 	(void)KFCResultTree::TakeKeyboard();
 	return kTrue;
 }
 
-// RETURN REPLACES THE SELECTED ROW (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F17 - the
-// author: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
+// RETURN REPLACES THE SELECTED ROW (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F17 - the
+// author's call: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
 // the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the right-click Replace's own door
 // (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced). Any other key, a modified Return, or
 // Return on a story / document / book row goes to the stock handler. Only while the TREE holds the keyboard - typing
@@ -413,7 +414,7 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 bool16 KFCResultTreeEH::KeyDown(IEvent* e)
 {
 	gHolding = false;		// any key ends a previous Return's hold; this one may start a new one (TakeReturn)
-	// THE RETURN, WHEN THE FILTER DID NOT GET IT FIRST (2026-10-07 - found by the author: after a Return had replaced a
+	// THE RETURN, WHEN THE FILTER DID NOT GET IT FIRST (found by the author: after a Return had replaced a
 	// row, the down arrow moved the page item selected in the layout instead of walking the list, while the right-click
 	// Replace, which runs the same ReplaceRow, left the arrows walking). Normally the Return filter on the dispatcher's
 	// stack takes it before it gets here (gReturnFilter); this is the same Return through the same door for when it

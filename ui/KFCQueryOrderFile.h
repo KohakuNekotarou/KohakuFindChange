@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  A RUN ORDER AS A FILE OF ITS OWN (2026-10-07 night, the author: the query dialog's run order is kept only while
+//  A RUN ORDER AS A FILE OF ITS OWN (the author's call: the query dialog's run order is kept only while
 //  InDesign runs - empty after a restart - and an order is saved to a file and loaded from one, with Save Order... and
 //  Load Order...). JSON, as the panel's settings file is (KBSPanelState.json), one entry a query - its kind, its name
 //  and its file - so that a query can be found again by its kind and name when its file has moved (InDesign keeps the

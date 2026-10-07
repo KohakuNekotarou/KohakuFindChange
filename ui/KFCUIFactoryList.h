@@ -33,11 +33,10 @@ REGISTER_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 // The result LIST's own handler: up / down arrows that open the row they land on. A boss in the
 // .fr naming an implementation that is not registered here takes InDesign down at load time.
 REGISTER_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
-// ...and its Return, taken on the application's event dispatcher before the widget layer gets it (2026-10-07).
+// ...and its Return, taken on the application's event dispatcher before the widget layer gets it.
 REGISTER_PMINTERFACE(KFCReturnFilterEH, kKFCReturnFilterEHImpl)
 // The UI half's own startup/shutdown service.
 REGISTER_PMINTERFACE(KFCUIStartupShutdown, kKFCUIStartupShutdownImpl)
-// Replace feature: the hit row check box's observer.
 // The panel's observer (KFCPanelTitle.cpp): the tab's name, the layout, the picture and the message as the panel
 // appears, the picture's click, and the tab's name following the Find/Change settings and the selection.
 REGISTER_PMINTERFACE(KFCPanelObserver, kKFCPanelObserverImpl)

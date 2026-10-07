@@ -4,15 +4,15 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE QUERY DIALOG'S TWO LISTS (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+//  THE QUERY DIALOG'S TWO LISTS (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 //  sections 2-2 and 3): the saved queries the dialog offers (the left list, asked of the model at every open -
 //  KFCSavedQueries) and the run order (the right list). What the dialog draws comes from here, and only from here: the
 //  lists' row maker (KFCQueryList.cpp) reads these vectors by index.
-//  THE RUN ORDER IS THE SESSION'S (2026-10-07 night, the author): kept here while InDesign runs - the dialog closed and
+//  THE RUN ORDER IS THE SESSION'S (the author's call): kept here while InDesign runs - the dialog closed and
 //  opened again shows it as it was left - and empty after a restart. An order is kept beyond that only as a file the
-//  person saves and loads (SaveOrderTo / LoadOrderFrom - KFCQueryOrderFile.h). (Until then its one source of truth was
-//  KFCQueryOrder.txt in InDesign's roaming folder, read at every open and written at every change - no longer read or
-//  written; a file left there by an earlier build is left alone.)
+//  person saves and loads (SaveOrderTo / LoadOrderFrom - KFCQueryOrderFile.h). (No build that shipped wrote a run order
+//  of its own anywhere: KFCQueryOrder.txt, which test builds kept in InDesign's roaming folder, is neither read nor
+//  written.)
 //  Main thread only, one dialog at a time - the state is this file's.
 //
 //========================================================================================

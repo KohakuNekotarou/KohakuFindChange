@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The query dialog - see KFCQueryDialog.h. A MODELESS dialog with a minimize box (the author's call, 2026-10-07: "other
+//  The query dialog - see KFCQueryDialog.h. A MODELESS dialog with a minimize box (the author's call: "other
 //  work can go on while it is open, with a minimize button" - the spec's G4 as changed), made the way KCM's book
 //  comparison dialog is (KCMBookDialog.cpp): Open(nil, kFalse), and the minimize box put on the platform window by hand.
 //  Its controller fills it when the framework builds it; KFCQueryDialogOpen fills it again on every open, because a
@@ -63,7 +63,7 @@ namespace
 	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
 	const WidgetID kOrderButtons[] = { kKFCQueryAddButtonWidgetID, kKFCQueryRemoveButtonWidgetID, kKFCQueryUpButtonWidgetID,
 		kKFCQueryDownButtonWidgetID, kKFCQueryClearButtonWidgetID };
-	// ...and the two that take the run order to a file of its own and back (2026-10-07 night - KFCQueryOrderFile.h).
+	// ...and the two that take the run order to a file of its own and back (KFCQueryOrderFile.h).
 	const WidgetID kFileButtons[] = { kKFCQuerySaveOrderButtonWidgetID, kKFCQueryLoadOrderButtonWidgetID };
 	const WidgetID kLists[] = { kKFCQuerySavedListWidgetID, kKFCQueryOrderListWidgetID };
 
@@ -97,7 +97,7 @@ namespace
 		EnableButton(panel, kKFCQueryLoadOrderButtonWidgetID, true);
 	}
 
-	/** The dialog's own message line (2026-10-07, the author's choice): the words the panel's message line is given, here
+	/** The dialog's own message line (the author's call): the words the panel's message line is given, here
 	    too. The dialog is modeless and stands while the KFC panel is closed, and a Run's result - or why it could not
 	    run - was then shown nowhere; the panel still gets the same line (KFCResultTree::ShowStatus keeps it for its next
 	    show). Empty at every open (Repaint). */
@@ -234,7 +234,7 @@ namespace
 		UpdateButtons(panel);
 	}
 
-	/** Save Order... (2026-10-07 night, the author): the run order to a file the person names, through InDesign's own Save
+	/** Save Order... (the author's call): the run order to a file the person names, through InDesign's own Save
 	    dialog (KFCChooseOrderFile). Written: the file's full path and nothing else on both lines - Save Panel Settings'
 	    way (the author's call: "show where it was saved"). Cancelled: nothing changes, nothing is said. */
 	void PressSaveOrder(IPanelControlData* panel)
@@ -341,7 +341,7 @@ CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
     would nest in. It hears
     the five buttons that change the run order, Save Order... and Load Order... (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
     CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
-    MEASURED 2026-10-07: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
+    MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
     and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
     the paneltreeview sample's PnlTrvTreeObserver), and says, through gOpenPanel, whether the dialog is open. */
 class KFCQueryDialogObserver : public CDialogObserver
@@ -448,7 +448,7 @@ void KFCQueryDialogOpen()
 	);
 
 	// kModeless (G4 as changed): other work goes on while it is open. One copy, and kCacheDialog FOR THAT: MEASURED
-	// 2026-10-07 with kDontCacheDialog - the dialog minimized, Run Saved Queries... made a SECOND dialog beside it (two
+	// with kDontCacheDialog - the dialog minimized, Run Saved Queries... made a SECOND dialog beside it (two
 	// windows), whatever IDialogMgr.h says of a modeless dialog being single-copy. With kCacheDialog the open one comes
 	// back - KCM's book dialog relies on the same. What it shows is not the cache's: Repaint below reads the lists anew
 	// on every open. Fixed size. The pointer is not held: the dialog destroys itself when it closes.

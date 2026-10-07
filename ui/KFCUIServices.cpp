@@ -140,8 +140,9 @@ public:
 	}
 
 	/** CAlert::WarningAlert - THE OFFICIAL CALL FOR EXACTLY THIS: a message and a warning icon
-	    (CAlert.h:75-79). The replace's "the results went stale" alert, worded by the model half
-	    (KFCReplaceEngine.cpp, TellResultsWentStale - its notes say why this call and not another). */
+	    (CAlert.h:75-79). Its one caller was the replace's "the results went stale" alert, which went with
+	    Change Checked - no caller now; removing the door waits for the author's call (docs/ai-notes/kfc-v13-review.md,
+	    P-2). */
 	virtual void WarningAlert(const PMString& message)
 	{
 		CAlert::WarningAlert(message);
