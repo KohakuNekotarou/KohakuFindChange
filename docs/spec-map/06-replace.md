@@ -97,7 +97,7 @@
 - **REP-18** ★Change All in Book の進捗バーの**キャンセルは全部を元に戻す** ―― 本文も、「変更あり」の印も、KFC が開いた章も。`Cancelled - nothing was changed.`
   - 訂正:
 
-- **REP-19** （2026-10-06 に外した＝Change Checked の要約の数（ロック・missing・後注・本体が断った）。行の Replace は1行なので、書けなかったらその理由をメッセージ欄で言う＝REP-27）
+- **REP-19** （2026-10-06 に外した＝Change Checked の要約の数（ロック・`missing`・後注・本体が断った）。行の Replace は1行なので、書けなかったらその理由をメッセージ欄で言う＝REP-27）
   - 訂正:
 
 - **REP-20** ★**後注の終わりで終わる一致も、本体と同じく書く**（2026-10-06・F12＝それまでは本体の置換が後注の範囲を壊すので書かなかった。本体の「すべてを置換」も同じく書く）。
@@ -108,6 +108,13 @@
 
 - **REP-22** 終わったときの文 ―― 行の Replace＝`Replaced.`／Change All in Book＝`N replaced in M chapter(s).`（何も無ければ `No match - nothing was changed.`）。
   ★Ctrl+Z で戻せることは書かない（2026-10-06 の決定・F20）。
+  ★Change All in Book は、文と注（開けなかった章・窓なしで残った章）の**後ろ**に、**章ごとの内訳** `  By chapter: <章> (<数>), ….` を付ける
+  （2026-10-07 の作者の追加「Change All in Book の結果に章ごとの内訳」）。書いた章だけ・ブックの順・**10章まで**、それより多ければ ` and <残り> more`。
+  例 `3 replaced in 2 chapter(s).  By chapter: ch1.indd (1), ch3.indd (2).`
+  最後に置くのは、メッセージ欄が4行（PNL-10）で、注を内訳で押し出さないため。何も書かなかったとき・キャンセル・失敗では付けない。
+  - 訂正:
+
+- **REP-22b** 選んだ文書だけのとき（SCOPE-26〜）の Change All の文は `N replaced in M of S selected document(s) (T in the book).`（何も無ければ `No match in the S selected document(s) - nothing was changed.`）。内訳は同じく後ろに付く。
   - 訂正:
 
 - **REP-23** （2026-10-06 に外した＝Change Checked の後の「置換の報告」。一覧はいつも作業リストのまま）
@@ -162,6 +169,7 @@
   （0件のブックの検索の後＝ブックの行だけのときは使える。）ブック以外（文書・ストーリー・選択範囲）は本体の「検索と置換」の「すべてを置換」を使う。
   章を全部開いて持ってから、**ブック全体で取り消しの1段**として書く（REP-16）。キャンセル・失敗は全部戻す（REP-18）。
   書いた章には窓を付け、何も書かなかった章は閉じて返す。何か書いたらパネルの絵が**鉛筆を持った猫**になる（次の検索で戻る）。
+  Find/Change Selected Documents (Book) でブックパネルの一部の文書を選んでいる間は、その文書だけを書き、名前は `Change All in Selected Documents (No List)`（SCOPE-26〜・2026-10-07）。
   - 訂正:
 
 - **REP-34** **Clear Results**（パネルのメニュー）＝一覧を空にする（文書には触らない）。ヒットの行が無いときは灰色（0件のブックの行だけのときも）。文は `Results cleared.`

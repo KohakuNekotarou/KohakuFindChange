@@ -145,6 +145,48 @@
 
 ---
 
+## 8. 選んだ文書だけ（Find/Change Selected Documents (Book)）
+
+- **SCOPE-26** ★フライアウトのトグル **`Find/Change Selected Documents (Book)`**（`Book Scope` のすぐ下）が ON で、**Book Scope も ON** のとき、
+  対象のブック（SCOPE-04 のブック）を出している**ブックパネルで一部の文書を選んでいる**なら、その文書だけを相手にする
+  （2026-10-07 の作者の依頼「選択されたドキュメントを検索置換（ブック）というトグルメニュー」）。
+  - 訂正:
+
+- **SCOPE-27** ★**何も選んでいない・全部選んでいる**ときは、ブックの全部の文書（今までと同じ・作者「選択０なら全てのドキュメント」）。
+  InDesign 自身の「選択した文書」のコマンドと同じ決まり。
+  ブックパネルが見つからない（アイコンに畳まれている・閉じている）・UI が無い（裏のスレッド・InDesign Server）ときも、ブックの全部。
+  - 訂正:
+
+- **SCOPE-28** トグルが OFF、または Book Scope が OFF なら、ブックパネルの選択は見ない（今までと同じ）。
+  Book Scope が OFF の間、トグルは灰色で、チェックの印は見えたまま（SET-06 の Hide Previous Chapter と同じ）。
+  - 訂正:
+
+- **SCOPE-29** 選んだ文書に従うのは **Find・Change All in Book (No List)・保存したクエリの Run（第16章）の3つとも**。
+  3つとも同じ1か所の判断に聞くので、食い違わない。メニューの名前・結果の文・ダイアログの `Runs on:` の行も、同じ判断から作る。
+  - 訂正:
+
+- **SCOPE-30** 選択は**その操作が走る瞬間**に読む。検索の後に選択を変えても、出ている行は変わらない。
+  - 訂正:
+
+- **SCOPE-31** 一部を選んでいる間は、**メニューの名前も変わる**＝`Find in Selected Documents`／`Change All in Selected Documents (No List)`。灰色の規則は名前が変わっても同じ。
+  - 訂正:
+
+- **SCOPE-32** 結果の文も選んだ文書の形になる（M＝一致のあった・書いた文書の数、S＝選んだ数、T＝ブックの文書の数）――
+  検索＝`<N> hit(s) in <M> of <S> selected document(s) (<T> in the book).`（0件なら `No matches in the <S> selected document(s) of book "<ブック>".`）／
+  Change All＝`<N> replaced in <M> of <S> selected document(s) (<T> in the book).`（0件なら `No match in the <S> selected document(s) - nothing was changed.`）／
+  クエリの Run＝`Ran … replaced (…) in <S> selected document(s) of <T>.`／ダイアログの行＝`Runs on: <S> selected document(s) of the book "<ブック>".`（QRY-17）。
+  - 訂正:
+
+- **SCOPE-33** 選んだ文書が閉じていれば、今までと同じく窓を出さずに開き、検索なら返す・Change All なら書いた章に窓を付ける（SCOPE-10・SCOPE-20）。
+  選ばなかった文書は開かない。
+  - 訂正:
+
+- **SCOPE-34** トグルは Save Panel Settings で保存する（キー `selectedDocuments`＝SET-16）。Book Scope は保存しないので（SET-17）、
+  ON のまま保存して次に起動すると、Book Scope を ON にするまで灰色でチェックの印だけ見える。
+  - 訂正:
+
+---
+
 ## ⬜ この章で未確認
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
@@ -156,3 +198,4 @@
 - SCOPE-20：置換の後の Ctrl+Z（取り消し）で保持中の章がどうなるかは、この章では確かめていない。→ 第9章
 - SCOPE-21：Clear Results の予約の閉じ方で、閉じる前に（スクリプトから続けて）All Documents の検索をしたとき、2026-10-02 の取り違えが起きないかは測っていない
   （ふつう検索の後に保持中の章は残っていない＝閉じるか窓を付けて渡す・SCOPE-10）。
+- SCOPE-26：選択を読むのは「対象のブックを出しているブックパネル」で、前面のタブかどうかは問わない作り。対象のブックはふつう前面のタブのブック（SCOPE-04）なので、前面でないパネルを読むのは、ブックパネルを別々のパレットに引き離したとき（BPP-07）くらい＝実機では測っていない。測ったのは、別のブックで選んでも対象のブックは全体になること（回帰 `sd-other-book`・テスト用ビルドの故障スイッチで選択を差し込んだもの）と、前面のパネルでの実クリック（`sd-real-click`）。

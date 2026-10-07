@@ -14,9 +14,11 @@
   Open Find/Change...
   Find in Document
   Change All in Book (No List)
+  Run Saved Queries...
   Clear Results
   ──────────
   Book Scope
+  Find/Change Selected Documents (Book)
   Hide Previous Chapter
   Link the Application Bar's Search Field to This Panel
   Translucent Find/Change
@@ -31,15 +33,16 @@
   ```
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
-  `Book Scope` から `Remember Book Panel Placement` までの7つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
-  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。）
+  `Book Scope` から `Remember Book Panel Placement` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
+  （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。）
   - 訂正:
 
-- **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
-  トグルの並びは、検索にかかわるもの（Book Scope・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
+- **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
+  トグルの並びは、検索にかかわるもの（Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
   - 訂正:
 
-- **SET-03** 項目の名前は**どの UI 言語でも英語**（GEN-35）。名前が変わるのは `Find in …` だけ（範囲によって `Find in Book`／`Find in Document`／`Find in Story` など＝GEN-28）。
+- **SET-03** 項目の名前は**どの UI 言語でも英語**（GEN-35）。名前が変わるのは2つ ―― `Find in …`（範囲によって `Find in Book`／`Find in Document`／`Find in Story` など＝GEN-28）と、
+  Find/Change Selected Documents (Book) でブックの一部を選んでいる間の `Find in Selected Documents`／`Change All in Selected Documents (No List)`（SCOPE-31・2026-10-07）。
   灰色のときも、範囲つきの名前は出る。
   - 訂正:
 
@@ -56,6 +59,11 @@
   `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Object／Colour・検索する文字も形式も無いとき灰色（REP-33）。
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。
   置換の文字は見ない（空でも「一致を消す」としてやれる）。
+  `Run Saved Queries...` ＝走っている間（SET-04）のほかは灰色にならない（文書が無くても・結果が出ていても押せる＝QRY-02）。
+  - 訂正:
+
+- **SET-05b** `Find/Change Selected Documents (Book)` ＝Book Scope が ON のときだけ押せる。灰色でもチェックの印は見えたまま（SET-06 と同じ扱い・SCOPE-28）。
+  押すと ON／OFF が入れ替わるだけで、メッセージ欄には何も書かない（どの文書を相手にするかは、検索・置換・Run が走る瞬間に決まる＝SCOPE-30）。
   - 訂正:
 
 - **SET-06** `Hide Previous Chapter` ＝Book Scope が ON か、ブックの結果が出ているときだけ押せる。灰色でもチェックの印は見えたまま（JMP-27）。
@@ -95,8 +103,9 @@
 
 ## 4. キーボードショートカット
 
-- **SET-13** ★ショートカットを割り当てられるのは**4つだけ** ―― `Open Find/Change...`・`Find in …`・`Change All in Book (No List)`・`Clear Results`
+- **SET-13** ★ショートカットを割り当てられるのは**5つだけ** ―― `Open Find/Change...`・`Find in …`・`Change All in Book (No List)`・`Run Saved Queries...`・`Clear Results`
   （2026-09-27 に検索、10-01 に Open Find/Change＝作者の決定。10-06 の設計（第5版）で Change All in Book と Clear Results を足し、Change Checked と Show Changes を外した。
+  10-07 に Run Saved Queries... を足した（作者の依頼）。`Find/Change Selected Documents (Book)` は Book Scope と同じく割り当てない。
   行の置換はショートカットでなく Return キー＝F17）。
   キーボードショートカットの設定の「パネルメニュー」に `Kohaku Find/Change: <名前>` として出る（KCM と同じ形）。ほかの項目（行の `Replace` も）は出ない。
   ⚠`Find in …` は、設定の画面ではリソースの名前の `Search` で出る見込み（メニューで名前を範囲に変えるのは、表示する直前だけなので）。
@@ -114,7 +123,8 @@
   - 訂正:
 
 - **SET-16** 保存するもの ―― Translucent Panel／Translucent Find/Change／Minimizable Find/Change／Link the Application Bar's Search Field／
-  Hide Previous Chapter／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
+  Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
+  （保存したクエリの並びは、このファイルでなく別のファイル `KFCQueryOrder.txt` に、ボタンを押すたびに書く＝QRY-14・QRY-15。）
   - 訂正:
 
 - **SET-17** ★**保存しないもの＝Book Scope**（GEN-26・「次に何を探すか」は設定ではなく今の作業）。起動のたびに OFF から。
