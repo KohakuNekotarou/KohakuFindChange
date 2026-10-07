@@ -26,6 +26,10 @@
 #include "KFCQueryOrderFile.h"
 #include "KFCUIID.h"			// the dialogs' titles and the type's name
 
+// HAND-WRITTEN, NOT THE SDK'S CLASS JSON (IJsonUtils.h) - measured: its AddValue(key, JSONArray) writes no list, two
+// entries came out as ONE object under "queries", the last one. Nothing in the SDK or the product writes a list with
+// that class (JSONArray is only read, through GetListAt), so there is no official way to follow for this file's
+// "queries". (A Japanese name would have been safe there: the SDK's boost 1.74 writes UTF-8 as it is.)
 namespace
 {
 	// A string as JSON writes it: " and \ escaped, the controls as \b \f \n \r \t or \u00XX, everything else - the
