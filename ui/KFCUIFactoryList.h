@@ -68,3 +68,7 @@ REGISTER_PMINTERFACE(KFCStatusTextData, kKFCStatusTextDataImpl)
 REGISTER_PMINTERFACE(KFCModelObserver, kKFCModelObserverImpl)
 // ...and the UI services the model half asks for (the bar, the windows, the Book panel, the alert).
 REGISTER_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)
+REGISTER_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
+REGISTER_PMINTERFACE(KFCQueryDialogObserver, kKFCQueryDialogObserverImpl)
+REGISTER_PMINTERFACE(KFCQueryListAdapter, kKFCQueryListAdapterImpl)
+REGISTER_PMINTERFACE(KFCQueryListWidgetMgr, kKFCQueryListWidgetMgrImpl)

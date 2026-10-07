@@ -27,6 +27,7 @@
 #include "KFCReplaceEngine.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
+#include "KFCSavedQueries.h"
 #include "KFCSearchEngine.h"
 
 class KFCResultsSession : public CPMUnknown<IKFCResults>
@@ -94,6 +95,9 @@ public:
 	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(outSummary); }
 	virtual bool ClearResults(PMString& outStatus) { return KFCChangeAll::ClearResults(outStatus); }
 	virtual bool HasFindQueryNow() { return KFCSearchEngine::HasFindQueryNow(); }
+	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) { KFCSavedQueries::List(out); }
+	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) { KFCSavedQueries::Describe(file, out); }
+	virtual const char* QueryKindName(int32 mode) { return KFCSavedQueries::KindName(mode); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

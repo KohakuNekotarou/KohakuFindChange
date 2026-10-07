@@ -34,6 +34,8 @@
 #include "IControlViewDefs.h"
 #include "SysControlIDs.h"
 #include "Widgets.fh"	// for PalettePanelWidget or DialogBoss
+#include "EveInfo.fh"	// EVE widget types and layout flags - the query dialog (2026-10-07), laid out by EVE as KCM's book dialog
+#include "DialogLayoutID.h"	// IID_IEVEINFO / kFixedSizeEVEInfoImpl - the query dialog's "Runs on:" line
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
@@ -395,6 +397,53 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
+	/*
+	 * Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+	 * the query dialog. Our controller fills it on every open (the list it shows is read from KFCQueryOrder.txt each
+	 * time); our observer hears the four buttons and the two lists' selections. The observer REPLACES the stock
+	 * CDialogObserver that kDialogBoss carries, and calls it first, so OK (Run), Cancel (Close) and the close box keep
+	 * working - basicdialog's BscDlgDialogObserver is the same shape.
+	 */
+	Class
+	{
+		kKFCQueryDialogBoss,
+		kDialogBoss,
+		{
+			IID_IDIALOGCONTROLLER, kKFCQueryDialogControllerImpl,
+			IID_IOBSERVER, kKFCQueryDialogObserverImpl,
+		}
+	},
+
+	/*
+	 * The query dialog's two lists - the saved queries and the run order. A flat list says what its rows are and how they
+	 * are drawn, and kTreeViewWidgetBoss brings the rest (selection, scrolling, keys) - KCM's book dialog list is the same.
+	 * One adapter and one row maker serve both: each asks its own widget id which list it is.
+	 */
+	Class
+	{
+		kKFCQueryListWidgetBoss,
+		kTreeViewWidgetBoss,
+		{
+			IID_ITREEVIEWHIERARCHYADAPTER, kKFCQueryListAdapterImpl,
+			IID_ITREEVIEWWIDGETMGR, kKFCQueryListWidgetMgrImpl,
+		}
+	},
+
+	/*
+	 * The query dialog's "Runs on:" line. EVE treats a static text's .fr width as a MINIMUM and grows the widget - and
+	 * the dialog - to fit its words; this line names a book, so it would. IID_IEVEINFO answers EVE's size question with
+	 * the resource's frame instead (kFixedSizeEVEInfoImpl), and the widget's own ellipsis shortens what does not fit.
+	 * KCM's kKCMBookPathTextWidgetBoss, which measured the effect, is the same two lines.
+	 */
+	Class
+	{
+		kKFCQueryFixedTextWidgetBoss,
+		kStaticTextWidgetBoss,
+		{
+			IID_IEVEINFO, kFixedSizeEVEInfoImpl,
+		}
+	},
+
 }}};
 
 /*  
@@ -447,6 +496,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCChangeAllActionID,
 		kKFCTargetMenuPath
 		kKFCChangeAllMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		// Run Saved Queries... (2026-10-07): the query dialog - saved queries put in an order and run with InDesign's own
+		// Change All, one after another (KFCQueryDialog.cpp).
+		kKFCRunSavedQueriesActionID,
+		kKFCTargetMenuPath
+		kKFCRunSavedQueriesMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// Clear Results: the list emptied, so Change All can run.
@@ -735,6 +791,18 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefVisibleInKBSCEditorFlag,
 
+		// Run Saved Queries... (2026-10-07). kCustomEnabling for the blanket grey while a run stands (UpdateActionStates'
+		// first lines); otherwise always on - putting queries in an order needs no document, and what Run would run on is
+		// said in the dialog itself. In the Keyboard Shortcuts editor under Palette Menus, like Find and Change All.
+		kKFCActionComponentBoss,
+		kKFCRunSavedQueriesActionID,
+		kKFCRunSavedQueriesMenuKey,		// "Run Saved Queries..."
+		kKFCPanelMenuActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefVisibleInKBSCEditorFlag,
+
 		// Clear Results. kCustomEnabling: grey with no list.
 		kKFCActionComponentBoss,
 		kKFCClearResultsActionID,
@@ -886,6 +954,23 @@ type KFCStatusTextWidget(kViewRsrcType) : GenericPanelWidget(ClassID = kKFCStatu
 type KFCIconWidget(kViewRsrcType) : RollOverIconButtonWidget(ClassID = kKFCIconWidgetBoss)
 {
 };
+
+/*
+ * The query dialog (2026-10-07). "DialogBoss" is the widget type every SDK dialog is written with (basicdialog, KCM's
+ * book dialog); WidgetEveInfo is required - EVE lays the dialog out. The lists carry WidgetEveInfo too: they sit among
+ * EVE children (KCM's KCMBookTreeWidget, and the product's EVETreeViewWidget in LinksUIViews.fr). The row has none - it
+ * is built by the list's row maker, outside EVE. The "Runs on:" line is an EVEStaticTextWidget on our fixed-size boss.
+ */
+type KFCQueryDialogWidget(kViewRsrcType) : DialogBoss(ClassID = kKFCQueryDialogBoss)
+{
+	WidgetEveInfo;
+};
+type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListWidgetBoss)
+{
+	WidgetEveInfo;
+};
+type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kTreeNodeWidgetBoss) { };
+type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
 
 /*
  * The illustration's artwork, compiled into the plug-in. The same image is given to the normal
@@ -1169,6 +1254,285 @@ resource KFCResultNodeWidget(kKFCResultHitNodeWidgetRsrcID + index_enUS)
 			}
 		),
 	}
+};
+
+/*
+ * THE QUERY DIALOG (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+ * section 2-2). One wild locale row each for the dialog and its lists' row: every word comes from the string table.
+ */
+resource LocaleIndex (kKFCQueryDialogRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCQueryDialogRsrcID + index_enUS
+	}
+};
+
+resource LocaleIndex (kKFCQueryRowRsrcID)
+{
+	kViewRsrcType,
+	{
+		kWildFS, k_Wild, kKFCQueryRowRsrcID + index_enUS
+	}
+};
+
+/*
+ * One row of either list, made by KFCQueryListWidgetMgr: one cell, its text written on every apply ("<kind>  <name>" on
+ * the left, "<n>  <kind>  <name>" on the right). The cell is bound on both sides and the row maker's ApplyIndentToWidget
+ * is empty (a flat list), so its left edge stands as written here (KCM's KCMBookTreeWidgetMgr, which measured the
+ * framework's indent throwing it away). Convert ampersands kFalse: a query named "A&B" would otherwise read "AB".
+ */
+resource KFCQueryRowWidget(kKFCQueryRowRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCQueryRowWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+	kBindLeft | kBindRight,					// Frame binding: follow the list's width
+	Frame(0, 0, 260, kKFCQueryRowHeight),	// Frame - stretched to the list it is in
+	kTrue, kTrue,							// Visible, Enabled
+	"",										// Panel name
+	{
+		InfoStaticTextWidget
+		(
+			kKFCQueryRowTextWidgetID,		// WidgetId
+			kPMRsrcID_None,					// RsrcId
+			kBindLeft | kBindRight,			// Frame binding
+			Frame(6, 1, 254, kKFCQueryRowHeight - 2),	// Frame
+			kTrue, kTrue,					// Visible, Enabled
+			kAlignLeft,						// Alignment
+			kEllipsizeEnd, kFalse,			// Ellipsize style, Convert ampersands
+			"",								// Text Control Data
+			0,								// WidgetId for associated control for shortcut focus
+			kDialogWindowSystemScriptFontId, kDialogWindowSystemScriptFontId,
+		),
+	}
+};
+
+/*
+ * The dialog: [ Saved Queries: + list | Add >, < Remove, Move Up, Move Down | Run Order: + list ], the "Runs on:" line,
+ * then Run and Close at the right. A movable modal (KFCQueryDialog.cpp). EVE lays it out; the root frame is NOT the
+ * window's size - EVE sizes the window from the children's frames (KCM's book dialog measured this over eight builds).
+ * Run is the dialog's default button (Enter) and Close its cancel button (Escape) - the framework's own OK and Cancel ids.
+ */
+resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
+{
+	__FILE__, __LINE__,
+	kKFCQueryDialogWidgetID,		// WidgetID
+	kPMRsrcID_None,					// RsrcID
+	kBindNone,						// Binding
+	Frame(0, 0, 660, 420),			// Frame (l,t,r,b) - not the window's size; see above
+	kTrue, kTrue,					// Visible, Enabled
+	kKFCQueryDialogTitleKey,		// Dialog name
+	{
+		// ----- the two lists, the buttons between them -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+			kBindNone,							// Frame binding
+			Frame(0, 0, 640, 340)				// Frame
+			kTrue, kTrue,						// Visible, Enabled
+			kEVEAlignLeft | kEVERegularSpaceAfter | kEVEArrangeChildrenInRow,
+			{
+				// --- left: the saved queries ---
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,
+					kBindNone,
+					Frame(0, 0, 260, 340)
+					kTrue, kTrue,
+					kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID,			// WidgetId
+							kSysStaticTextPMRsrcId,		// RsrcId
+							kBindNone,					// Frame binding
+							Frame(0, 0, 260, 20)		// Frame
+							kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+							kDontEllipsize, kTrue,		// Ellipsize style, Convert ampersands
+							kKFCQuerySavedLabelKey,		// "Saved Queries:"
+							kInvalidWidgetID			// Associated control (none)
+							kEVEVerySmallSpaceAfter,
+						),
+						// Single selection; kDrawBorder makes it read as a list box (basicselectabledialog's tree, KCM's).
+						KFCQueryListWidget
+						(
+							kKFCQuerySavedListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
+							kBindNone,						// Frame binding (EVE places it)
+							Frame(0, 0, 260, kKFCQueryRowHeight * 13)	// Frame - thirteen rows at a glance
+							kTrue, kTrue,					// Visible, Enabled
+							kTrue,							// EraseBeforeDraw
+							kInterfacePaletteFill,			// InterfaceColor
+							"",								// Panel name
+							kHideRootNode | kDrawBorder,	// Options: the root is not a row
+							kFalse,							// Use H scroll bar
+							kTrue,							// Use V scroll bar
+							kKFCQueryRowHeight,				// fVScrollButtonIncrement (one row)
+							kKFCQueryRowHeight,				// fVThumbScrollIncrement
+							kKFCQueryRowHeight,				// fHScrollButtonIncrement (unused, no H bar)
+							kKFCQueryRowHeight,				// fHThumbScrollIncrement
+							1,								// Items selectable: 1 = single selection
+							kFalse,							// Allow children from multiple parents to be selected
+							kFalse,							// Allow discontiguous selection
+							{
+							},
+							kEVEAlignFill | kEVENoSpaceAfter,
+						),
+					}
+				),
+
+				// --- middle: the four buttons, under a blank line the height of the lists' headings ---
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,
+					kBindNone,
+					Frame(0, 0, 100, 340)
+					kTrue, kTrue,
+					kEVEAlignLeft | kEVELargeSpaceAfter | kEVEArrangeChildrenInColumn,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 100, 20)
+							kTrue, kTrue, kAlignLeft,
+							kDontEllipsize, kTrue,
+							"",
+							kInvalidWidgetID
+							kEVEVerySmallSpaceAfter,
+						),
+						EVEButtonWidget
+						(
+							kKFCQueryAddButtonWidgetID,		// widget ID
+							kSysButtonPMRsrcId,				// PMRsrc ID
+							kBindNone,						// frame binding
+							Frame(0, 0, 100, 20)			// a floor: EVE widens a button to its label
+							kTrue,							// visible
+							kTrue,							// enabled
+							kKFCQueryAddKey,				// "Add >"
+							kEVERegularSpaceAfter,
+						),
+						EVEButtonWidget
+						(
+							kKFCQueryRemoveButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+							Frame(0, 0, 100, 20)
+							kTrue, kTrue,
+							kKFCQueryRemoveKey,				// "< Remove"
+							kEVELargeSpaceAfter,
+						),
+						EVEButtonWidget
+						(
+							kKFCQueryUpButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+							Frame(0, 0, 100, 20)
+							kTrue, kTrue,
+							kKFCQueryUpKey,					// "Move Up"
+							kEVERegularSpaceAfter,
+						),
+						EVEButtonWidget
+						(
+							kKFCQueryDownButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+							Frame(0, 0, 100, 20)
+							kTrue, kTrue,
+							kKFCQueryDownKey,				// "Move Down"
+							kEVENoSpaceAfter,
+						),
+					}
+				),
+
+				// --- right: the run order ---
+				EVEGenericPanelWidget
+				(
+					kInvalidWidgetID, kPMRsrcID_None,
+					kBindNone,
+					Frame(0, 0, 260, 340)
+					kTrue, kTrue,
+					kEVEAlignLeft | kEVENoSpaceAfter | kEVEArrangeChildrenInColumn,
+					{
+						EVEStaticTextWidget
+						(
+							kInvalidWidgetID, kSysStaticTextPMRsrcId, kBindNone,
+							Frame(0, 0, 260, 20)
+							kTrue, kTrue, kAlignLeft,
+							kDontEllipsize, kTrue,
+							kKFCQueryOrderLabelKey,			// "Run Order:"
+							kInvalidWidgetID
+							kEVEVerySmallSpaceAfter,
+						),
+						KFCQueryListWidget
+						(
+							kKFCQueryOrderListWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 260, kKFCQueryRowHeight * 13)
+							kTrue, kTrue,
+							kTrue,
+							kInterfacePaletteFill,
+							"",
+							kHideRootNode | kDrawBorder,
+							kFalse,
+							kTrue,
+							kKFCQueryRowHeight,
+							kKFCQueryRowHeight,
+							kKFCQueryRowHeight,
+							kKFCQueryRowHeight,
+							1,
+							kFalse,
+							kFalse,
+							{
+							},
+							kEVEAlignFill | kEVENoSpaceAfter,
+						),
+					}
+				),
+			}
+		),
+
+		// ----- what Run would run on, or why it cannot run (KFCQueryDialogController fills it) -----
+		KFCQueryFixedTextWidget
+		(
+			kKFCQueryScopeTextWidgetID,	// WidgetId
+			kSysStaticTextPMRsrcId,		// RsrcId
+			kBindNone,					// Frame binding
+			Frame(0, 0, 640, 20)		// Frame - the width it gets, not a floor (kKFCQueryFixedTextWidgetBoss)
+			kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+			kEllipsizeEnd, kFalse,		// Ellipsize style (a sentence is read from the front), Convert ampersands
+			"",							// Text (the controller fills it)
+			kInvalidWidgetID			// Associated control (none)
+			kEVEAlignFill | kEVERegularSpaceAfter,
+		),
+
+		// ----- Run and Close, at the right -----
+		EVEGenericPanelWidget
+		(
+			kInvalidWidgetID, kPMRsrcID_None,
+			kBindNone,
+			Frame(0, 0, 200, 24)
+			kTrue, kTrue,
+			kEVEAlignRight | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+			{
+				EVEDefaultButtonWidget
+				(
+					kOKButtonWidgetID,		// WidgetID - the dialog's default button: Enter
+					kSysButtonPMRsrcId,		// RsrcID
+					kBindNone,				// Binding
+					Frame(0, 0, 90, 20)		// Frame (l,t,r,b)
+					kTrue, kTrue,			// Visible, Enabled
+					kKFCQueryRunKey,		// "Run"
+					kEVERegularSpaceAfter,
+				),
+				EVECancelButtonWidget
+				(
+					kCancelButton_WidgetID,	// WidgetID - the dialog's cancel button: Escape
+					kSysButtonPMRsrcId,		// RsrcID
+					kBindNone,				// Binding
+					Frame(0, 0, 90, 20)		// Frame (l,t,r,b)
+					kTrue, kTrue,			// Visible, Enabled
+					kKFCQueryCloseKey,		// "Close"
+					kFalse,					// NOT turned into "Reset" by Alt: the order is kept as it is changed, so there is nothing to reset
+					kEVENoSpaceAfter,
+				),
+			}
+		),
+	},
+
+	kEVEArrangeChildrenInColumn | kEVERegularMargin,
 };
 #endif // __ODFRC__
 

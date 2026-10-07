@@ -45,6 +45,7 @@
 #include "KFCAppBarSearchEnter.h"	// "Link the Application Bar's Search Field to This Panel"
 #include "KFCPanelState.h"		// "Save Panel Settings" - write the settings toggles to our own file
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
+#include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog (2026-10-07)
 #include "KFCDiag.h"				// a test build's UIOBS line (KFCDiagCounter)
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
@@ -203,6 +204,14 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString summary;
 			(void)KFCRuns()->ChangeAll(summary);
 			KFCResultTree::ShowStatus(summary);
+			break;
+		}
+
+		case kKFCRunSavedQueriesActionID:
+		{
+			// Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+			// the query dialog, modal - this returns once it has closed.
+			KFCQueryDialogOpen();
 			break;
 		}
 
@@ -420,6 +429,12 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
 				&& KFCRuns()->HasFindQueryNow();
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCRunSavedQueriesActionID)
+		{
+			// Run Saved Queries... (2026-10-07): always - putting queries in an order needs no document, and the dialog
+			// itself says what Run would run on. (A run standing greys it with everything else, above.)
+			listToUpdate->SetNthActionState(i, kEnabledAction);
 		}
 		else if (action == kKFCClearResultsActionID)
 		{

@@ -52,12 +52,24 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",
+                kKFCRunSavedQueriesMenuKey,		"Run Saved Queries...",
                 // The Keyboard Shortcuts editor's area (kKFCPanelMenuActionArea): files the
                 // shortcut-assignable actions under "Palette Menus" as "Kohaku Find/Change: <name>".
                 kKFCPanelMenuActionArea,		kKFCPanelMenuActionAreaValue,
 
                 // ----- Panel/dialog strings
                 kKFCPanelTitleKey,				kKFCDisplayName,
+                // The query dialog (2026-10-07, Run Saved Queries...): its title (the spec's D11 name), the lists'
+                // headings, the buttons between them, Run and Close.
+                kKFCQueryDialogTitleKey,		"Kohaku Find/Change Queries",
+                kKFCQuerySavedLabelKey,			"Saved Queries:",
+                kKFCQueryOrderLabelKey,			"Run Order:",
+                kKFCQueryAddKey,				"Add >",
+                kKFCQueryRemoveKey,				"< Remove",
+                kKFCQueryUpKey,					"Move Up",
+                kKFCQueryDownKey,				"Move Down",
+                kKFCQueryRunKey,				"Run",
+                kKFCQueryCloseKey,				"Close",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls

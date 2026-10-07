@@ -88,6 +88,12 @@ public:
 	virtual bool ClearResults(PMString& outStatus) = 0;
 	/** = KFCSearchEngine::HasFindQueryNow - Change All's greying. */
 	virtual bool HasFindQueryNow() = 0;
+	/** = KFCSavedQueries::List (2026-10-07) - the query dialog's left list. */
+	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) = 0;
+	/** = KFCSavedQueries::Describe - one query file of the dialog's run order: its name, kind and whether it is there. */
+	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) = 0;
+	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Transliterate" / "?". */
+	virtual const char* QueryKindName(int32 mode) = 0;
 };
 
 #endif // __IKFCRuns_h__

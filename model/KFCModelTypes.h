@@ -18,6 +18,7 @@
 #define __KFCModelTypes_h__
 
 #include "BaseType.h"
+#include "IDFile.h"			// KFCSavedQuery
 #include "PMPoint.h"		// PBPMPoint - KFCOversetLoc
 #include "PMString.h"
 #include "UIDRef.h"
@@ -101,6 +102,19 @@ struct KFCNotifyPayload
 	const PMString*		text;
 
 	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
+};
+
+/** One saved Find/Change query as the query dialog shows it (2026-10-07 - KFCSavedQueries; the spec 1's section 2-2):
+    the file, its name, its kind, InDesign's own or the user's, and whether the file is there now. */
+struct KFCSavedQuery
+{
+	IDFile		file;
+	PMString	name;		// the file's name without ".xml" - what the dialog shows
+	int32		mode;		// IFindChangeOptions::SearchMode: kTextSearch, kGrepSearch, kGlyphSearch, kTransliterateSearch; -1 = no kind's folder
+	bool		bundled;	// InDesign's own (Presets\Find-Change Queries), not the user's
+	bool		exists;		// the file is there now
+
+	KFCSavedQuery() : mode(-1), bundled(false), exists(false) {}
 };
 
 #endif // __KFCModelTypes_h__

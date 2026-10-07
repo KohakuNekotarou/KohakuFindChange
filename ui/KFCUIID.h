@@ -77,6 +77,15 @@ DECLARE_PMID(kClassIDSpace, kKFCUIStartupShutdownBoss, kKFCUIPrefix + 20)
 // Edit > Find/Change, so the menu and Ctrl+F worked with no document open. The author's call: KFC
 // leaves InDesign's menu alone - the panel's Open Find/Change... opens the dialog instead.
 //DECLARE_PMID(kClassIDSpace, kKFCFindChangeAnywhereBoss, kKFCUIPrefix + 21)
+// Run Saved Queries... (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+// the query dialog (a kDialogBoss with our controller and observer) and its two lists (a tree-view widget with our
+// flat-list adapter and row maker - the saved queries on the left, the run order on the right). KFCQueryDialog.cpp,
+// KFCQueryList.cpp.
+DECLARE_PMID(kClassIDSpace, kKFCQueryDialogBoss, kKFCUIPrefix + 22)
+DECLARE_PMID(kClassIDSpace, kKFCQueryListWidgetBoss, kKFCUIPrefix + 23)
+// ...and the dialog's "Runs on:" line: a static text that EVE may not widen to fit its words (kFixedSizeEVEInfoImpl -
+// KCM's kKCMBookPathTextWidgetBoss, which measured a path line growing the whole dialog to 593px).
+DECLARE_PMID(kClassIDSpace, kKFCQueryFixedTextWidgetBoss, kKFCUIPrefix + 24)
 
 
 // InterfaceIDs:
@@ -156,6 +165,12 @@ DECLARE_PMID(kImplementationIDSpace, kKFCStatusTextDataImpl, kKFCUIPrefix + 37)
 // The application bar's search field following Find/Change (KFCAppBarSearchEnter.cpp). (+ 40: + 39 is
 // retired.)
 DECLARE_PMID(kImplementationIDSpace, kKFCAppBarMirrorObserverImpl, kKFCUIPrefix + 40)
+// The query dialog (2026-10-07): its controller and observer (KFCQueryDialog.cpp), and its two lists' adapter and row
+// maker (KFCQueryList.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryDialogControllerImpl, kKFCUIPrefix + 41)
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryDialogObserverImpl, kKFCUIPrefix + 42)
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryListAdapterImpl, kKFCUIPrefix + 43)
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryListWidgetMgrImpl, kKFCUIPrefix + 44)
 
 
 // ActionIDs:
@@ -264,6 +279,9 @@ DECLARE_PMID(kActionIDSpace, kKFCAppBarSearchEnterActionID, kKFCUIPrefix + 45)
 // F6 and F18): InDesign's own Change All over the book's chapters, no list; the list emptied so it can run.
 DECLARE_PMID(kActionIDSpace, kKFCChangeAllActionID, kKFCUIPrefix + 46)
 DECLARE_PMID(kActionIDSpace, kKFCClearResultsActionID, kKFCUIPrefix + 47)
+// Run Saved Queries... (2026-10-07, the spec 1's G1): the query dialog - the saved Find/Change queries put in an order and
+// run with InDesign's own Change All, one after another (KFCQueryDialog.cpp). Shortcut-assignable.
+DECLARE_PMID(kActionIDSpace, kKFCRunSavedQueriesActionID, kKFCUIPrefix + 48)
 
 
 // WidgetIDs:
@@ -306,6 +324,20 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 //DECLARE_PMID(kWidgetIDSpace, kKFCGlyphConfirmArrowWidgetID, kKFCPrefix + 28)
 //DECLARE_PMID(kWidgetIDSpace, kKFCGlyphConfirmChangeLabelWidgetID, kKFCPrefix + 29)
 //DECLARE_PMID(kWidgetIDSpace, kKFCWidgetID, kKFCPrefix + 30)
+// The query dialog (2026-10-07): the dialog, its two lists, the row both lists are made of and the row's text, the four
+// buttons between the lists, and the line under them that says what Run would run on. (+ 31 onwards: none of these
+// numbers was ever used at either prefix.) Run and Close are the stock kOKButtonWidgetID / kCancelButton_WidgetID - the
+// dialog framework's own OK and Cancel, so Enter and Escape reach them.
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryDialogWidgetID, kKFCUIPrefix + 31)
+DECLARE_PMID(kWidgetIDSpace, kKFCQuerySavedListWidgetID, kKFCUIPrefix + 32)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryOrderListWidgetID, kKFCUIPrefix + 33)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryRowWidgetID, kKFCUIPrefix + 34)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryRowTextWidgetID, kKFCUIPrefix + 35)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryAddButtonWidgetID, kKFCUIPrefix + 36)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryRemoveButtonWidgetID, kKFCUIPrefix + 37)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryUpButtonWidgetID, kKFCUIPrefix + 38)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryDownButtonWidgetID, kKFCUIPrefix + 39)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryScopeTextWidgetID, kKFCUIPrefix + 40)
 
 
 // "About Plug-ins" sub-menu:
@@ -343,6 +375,18 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCHowToMenuKey				kKFCStringPrefix "kKFCHowToMenuKey"
 // "Open Find/Change...".
 #define kKFCOpenFindChangeMenuKey		kKFCStringPrefix "kKFCOpenFindChangeMenuKey"
+// "Run Saved Queries..." (2026-10-07) - and the query dialog's own words: its title, the two lists' headings, the four
+// buttons between them, Run and Close. English in every UI language, like the rest of the flyout.
+#define kKFCRunSavedQueriesMenuKey		kKFCStringPrefix "kKFCRunSavedQueriesMenuKey"
+#define kKFCQueryDialogTitleKey			kKFCStringPrefix "kKFCQueryDialogTitleKey"
+#define kKFCQuerySavedLabelKey			kKFCStringPrefix "kKFCQuerySavedLabelKey"
+#define kKFCQueryOrderLabelKey			kKFCStringPrefix "kKFCQueryOrderLabelKey"
+#define kKFCQueryAddKey					kKFCStringPrefix "kKFCQueryAddKey"
+#define kKFCQueryRemoveKey				kKFCStringPrefix "kKFCQueryRemoveKey"
+#define kKFCQueryUpKey					kKFCStringPrefix "kKFCQueryUpKey"
+#define kKFCQueryDownKey				kKFCStringPrefix "kKFCQueryDownKey"
+#define kKFCQueryRunKey					kKFCStringPrefix "kKFCQueryRunKey"
+#define kKFCQueryCloseKey				kKFCStringPrefix "kKFCQueryCloseKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -398,6 +442,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 #define kKFCSearchBookMenuItemPosition		1.0
 // Change All in Book (No List) under Find, then Clear Results (2026-10-06, the spec's section 4).
 #define kKFCChangeAllMenuItemPosition		1.1
+// Run Saved Queries... (2026-10-07) under Change All in Book: the other command that writes with InDesign's Change All
+// and leaves no list.
+#define kKFCRunSavedQueriesMenuItemPosition	1.2
 #define kKFCClearResultsMenuItemPosition	1.25
 // (Block 2 - the two scans - is gone; so is Show Changes by KohakuFindChange, 2026-10-06.)
 #define kKFCSeparator3MenuItemPosition		2.0
@@ -436,6 +483,14 @@ DECLARE_PMID(kWidgetIDSpace, kKFCIconChangedWidgetID, kKFCUIPrefix + 20)	// ...a
 // resource ID (kSDKDefPanelResourceID), like the KESCL report panel's row resources.
 #define kKFCResultChapterNodeWidgetRsrcID	(kSDKDefPanelResourceID + 20)
 #define kKFCResultHitNodeWidgetRsrcID		(kSDKDefPanelResourceID + 21)
+// The query dialog (2026-10-07): its view - the SDK's place for a plug-in's dialog, which KFC had not used - and the
+// row its two lists are made of (next to the result tree's rows).
+#define kKFCQueryDialogRsrcID				kSDKDefDialogResourceID
+#define kKFCQueryRowRsrcID					(kSDKDefPanelResourceID + 22)
+// One row of the query dialog's lists: KCM's book comparison dialog's row height (kKCMBookRowHeight), the one other
+// list the Kohaku plug-ins draw in a dialog's font. Read by the row resource, the lists' scroll increments
+// and KFCQueryListWidgetMgr::GetNodeWidgetHeight - one number.
+#define kKFCQueryRowHeight					22
 
 // HOW TALL ONE ROW OF THE RESULT TREE IS.
 //

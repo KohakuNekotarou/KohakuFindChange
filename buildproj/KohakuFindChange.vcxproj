@@ -232,6 +232,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCStartupShutdown.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\TriggerResourceDeps.cpp"/>
@@ -267,6 +268,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h"/>
    </ItemGroup>
    <ItemGroup>
