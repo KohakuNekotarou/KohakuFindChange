@@ -556,6 +556,7 @@ KFCUndoFollow::RunRecorder::RunRecorder()
 {
 	CloseRecording();
 	gRecording = true;
+	gPendingResultSet = KFCResultModel::GetResultSetId();		// the list as it stands - RestoreBefore goes back to it
 	gPendingLayout = KFCResultModel::GetLayoutGeneration();
 	KFCResultModel::TakeModelSnapshot(gPendingBefore);
 }
@@ -619,6 +620,8 @@ void KFCUndoFollow::RunRecorder::RestoreBefore()
 		return;
 	fOpen = false;
 	KFCResultModel::RestoreModelSnapshot(gPendingBefore);
+	// ...and as the same result set: the writes kept for the list are followed again (KFCResultModel::ReturnToResultSet).
+	KFCResultModel::ReturnToResultSet(gPendingResultSet);
 	CloseRecording();
 }
 

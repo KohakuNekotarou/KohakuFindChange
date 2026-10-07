@@ -277,6 +277,12 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		const int32 units = static_cast<int32>(queries.size() * targets.size());
 		KFCProgressBar runBar(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep), 0, units, kTrue, kTrue);
 		int32 unit = 0;
+#ifdef KFC_DIAG
+		// (Fault switch queries-cancel, a test build's only - KFCDiag.h: Cancel taken as pressed while step <n> was being
+		// written, heard where the bar is asked next.)
+		const int diagCancelStep = KFCDiagFaultValue("queries-cancel", 0, 0);
+		bool diagCancelPressed = false;
+#endif
 		for (size_t q = 0; q < queries.size() && !cancelled && !failed; ++q)
 		{
 			const QueryItem& query = queries[q];
@@ -335,7 +341,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				}
 				runBar.SetPosition(unit++);
 				runBar.SetTaskText(title);
-				if (runBar.WasCancelled(kFalse))
+				bool cancelPressed = runBar.WasCancelled(kFalse) != kFalse;
+#ifdef KFC_DIAG
+				cancelPressed = cancelPressed || diagCancelPressed;
+#endif
+				if (cancelPressed)
 				{
 					cancelled = true;
 					break;
@@ -358,7 +368,26 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				replaced += count;
 				if (count > 0)
 					wroteTo[d] = true;
+#ifdef KFC_DIAG
+				if (diagCancelStep > 0 && unit == diagCancelStep)		// unit = this step's number (1-based), counted above
+				{
+					diagCancelPressed = true;
+					KFC_DIAG_LOG("FAULT queries-cancel: Cancel pressed in step %d", unit);
+				}
+#endif
 			}
+		}
+		// ASK ONCE MORE, NOW THAT THE LOOP IS OVER. The bar is asked at the head of each step, so a Cancel pressed while the
+		// LAST step was written has no next step to be heard at, and the run went through as though the button had never
+		// been touched (measured - case xq-cancel-last). SearchBook's and Change All in Book's rule (KFCChangeAll.cpp).
+		if (!cancelled && !failed)
+		{
+			bool cancelPressed = runBar.WasCancelled(kFalse) != kFalse;
+#ifdef KFC_DIAG
+			cancelPressed = cancelPressed || diagCancelPressed;
+#endif
+			if (cancelPressed)
+				cancelled = true;
 		}
 	}
 

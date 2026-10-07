@@ -669,8 +669,11 @@ namespace KFCResultModel
 		int32					searchMode;
 		PMString				walkSignature;
 		bool					hasRun;
+		// ...and the pencil cat's fact (NoteChangeAllWrote): an Undo of a query run puts the list before it back, and the
+		// picture with it (measured - case xq-icon-undo: the pencil cat stayed over the list the Undo brought back).
+		bool					changeAllWrote;
 		ModelSnapshot() : layout(0), fromBook(false), searchScope(kScopeDocument),
-			searchMode(-1), hasRun(false) {}
+			searchMode(-1), hasRun(false), changeAllWrote(false) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);
 	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they
@@ -680,6 +683,13 @@ namespace KFCResultModel
 	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
 	    a write kept for an Undo belongs to one, and means nothing to the next. */
 	uint32 GetResultSetId();
+
+	/** A RUN THAT DID NOT HAPPEN LEAVES THE RESULT SET IT FOUND. A query run clears the list at its commit point (a new
+	    number); cancelled or refused after it, the list is put back (KFCUndoFollow::RunRecorder::RestoreBefore) - and with
+	    this the number too, so the writes kept for that list are followed again (measured - case xq-cancel-undo: a
+	    Ctrl+Z of a row's Replace made before a cancelled run went unfollowed, the row still reading "Changed"). Not for
+	    an Undo of a run that went through: its own step names the result set it left. */
+	void ReturnToResultSet(uint32 resultSetId);
 
 	/** Which layout of the result set the row indices name: a new number with every Clear and every
 	    KeepCheckedRows that reshaped the list; RestoreModelSnapshot brings its own back. */

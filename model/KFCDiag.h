@@ -53,6 +53,10 @@
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
 //    changeall-cancel  KFCChangeAll::Run takes Cancel as pressed after its first chapter - every chapter must come
 //                back as it was (case all-cancel-book, ca-cases.tsv). Throwaway documents only.
+//    queries-cancel  the file holds "<n>": KFCQuerySequence::Run takes Cancel as pressed while its step n (1-based, a
+//                query x document) was being written - heard where the run asks the bar next, so a test can press it
+//                in the run's last step, which only the ask after the loop hears (work\kbs-regress\xq-cases.tsv).
+//                Throwaway documents only.
 //    book-selection  (UI half, 2026-10-07) the file's first line "book=<a book's file name>", then one chapter's short
 //                name a line: ui/KFCBookPanelLookup.cpp's GetPanelBookSelection answers with those chapters as the Book
 //                panel's selection for that book (nothing selected for any other), judged by the same rule as a real

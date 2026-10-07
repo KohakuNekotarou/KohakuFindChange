@@ -248,6 +248,11 @@ uint32 KFCResultModel::GetResultSetId()
 	return gResultSetId;
 }
 
+void KFCResultModel::ReturnToResultSet(uint32 resultSetId)
+{
+	gResultSetId = resultSetId;
+}
+
 uint32 KFCResultModel::GetLayoutGeneration()
 {
 	return gLayoutGeneration;
@@ -1081,6 +1086,7 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 	out.searchMode = gSearchMode;
 	out.walkSignature = gWalkSignature;
 	out.hasRun = gHasRun;
+	out.changeAllWrote = gChangeAllWrote;
 }
 
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
@@ -1093,6 +1099,7 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	gSearchMode = snapshot.searchMode;
 	gWalkSignature = snapshot.walkSignature;
 	gHasRun = snapshot.hasRun;
+	gChangeAllWrote = snapshot.changeAllWrote;
 	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
 	ForgetContextMenus();
 	ForgetRowBackup();
