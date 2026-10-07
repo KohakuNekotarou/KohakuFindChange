@@ -10,10 +10,14 @@
 
 #include "VCPlugInHeaders.h"
 
+// Interface includes:
+#include "ISaveFileDialog.h"	// (and DocumentID.h - kSaveFileDialogBoss) Save Order...'s dialog, one level below the chooser
+
 // General includes:
+#include "CreateObject.h"
 #include "FileUtils.h"
 #include "PMString.h"
-#include "SDKFileHelper.h"		// SDKFileSaveChooser / SDKFileOpenChooser - Save Order... / Load Order...'s file
+#include "SDKFileHelper.h"		// SDKFileOpenChooser - Load Order...'s file
 
 #include <cstdio>
 
@@ -261,19 +265,6 @@ namespace
 		}
 	}
 
-	// A path that names no extension gets ".json" - the type the dialog was asked for (a name typed as "proofing").
-	IDFile WithJsonExtension(const IDFile& file)
-	{
-		PMString path(FileUtils::SysFileToPMString(file));
-		path.SetTranslatable(kFalse);
-		const std::string utf8 = path.GetUTF8String();
-		const size_t slash = utf8.find_last_of("\\/");
-		const size_t dot = utf8.find_last_of('.');
-		if (dot != std::string::npos && (slash == std::string::npos || dot > slash))
-			return file;
-		path.Append(".json");
-		return FileUtils::PMStringToSysFile(path);
-	}
 }
 
 std::string KFCOrderFileText(const std::vector<KFCOrderFileEntry>& entries)
@@ -368,27 +359,45 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 		}
 	}
 #endif
-	// THE SDK'S OWN CHOOSERS (sdksamples/common/SDKFileHelper.h - SnpChooseFile.cpp; KESCL's and KCM's reports save
-	// through the same). The type's name and the titles go in as string-table keys: the choosers translate them. The Mac
-	// type and creator ('TEXT' / 'CWIE', as the SDK's text-writing snippets pass) mean nothing on Windows.
 	const PMString typeName(kKFCQueryOrderFileTypeKey);		// "KFC Query Order"
 	if (forSave)
 	{
-		SDKFileSaveChooser chooser;
-		chooser.SetTitle(PMString(kKFCQuerySaveOrderTitleKey));		// "Save Query Order"
-		chooser.AddFilter('CWIE', 'TEXT', PMString("json"), typeName);
-		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h). The chooser asks
-		// before replacing a file (FOS_OVERWRITEPROMPT).
-		chooser.SetFilename(PMString("Query Order.json"));
-		chooser.ShowDialog();
-		if (!chooser.IsChosen())
+		// THE NAME ALWAYS ENDS IN .json - THE DIALOG SEES TO IT (the author: "Test.A" saves as "Test.A.indd" in
+		// InDesign, so it should here). Without help it does not: Windows' Save dialog adds the type's extension only to
+		// a name whose own extension Windows does not know - "Test.aaa" -> "Test.aaa.json", but "Test.A" stayed
+		// "Test.A" on a PC where .a is registered (measured), and Load Order... lists .json alone. FOS_STRICTFILETYPES
+		// is Windows' own flag for exactly this ("only allow ... one of the file name extensions" of the types), so the
+		// overwrite question is asked about the name that is written - adding ".json" after the dialog would replace an
+		// existing "Test.A.json" unasked.
+		// So kSaveFileDialogBoss itself, the SDK chooser's steps one level down (SDKFileSaveChooser::ShowDialog): the
+		// chooser fixes its flags at FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN. KCM's Task Start takes the same level
+		// for its own reason (KCMTaskStartSave.cpp).
+		// kDefaultIID is missing on ISaveFileDialog - named, as the chooser does.
+		InterfacePtr<ISaveFileDialog> dialog(static_cast<ISaveFileDialog*>(::CreateObject(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG)));
+		if (dialog == nil)
 			return false;
-		outFile = WithJsonExtension(chooser.GetIDFile());
-		return true;
+		// The type's name TRANSLATED first, as the chooser's Filter does (SDKFileHelper.cpp) - AddFileTypeInfo shows
+		// what it is given: handed the key, the dialog read "0x1EA600kKFCQueryOrderFileTypeKey (*.json)" (measured).
+		PMString shownType(typeName);
+		shownType.Translate();
+		dialog->AddFileTypeInfo(shownType, PMString("json"));
+#ifdef WINDOWS
+		dialog->SetAdditionalFOSFlags(FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN | FOS_STRICTFILETYPES);
+#endif
+		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h).
+		IDFile defaultFile;
+		defaultFile.SetString(PMString("Query Order.json"));
+		PMString title(kKFCQuerySaveOrderTitleKey);		// "Save Query Order"
+		title.Translate();
+		int32 selectedIndex = 0;
+		return dialog->DoDialog(&defaultFile, &outFile, &selectedIndex, kTrue /*the last used folder*/,
+			kTrue /*the type menu*/, &title) != kFalse;
 	}
-	// JSON ONLY (the author's call: "not all files - only JSON can be loaded"): one type and no All Files - the
-	// chooser's own one-type road (SDKFileOpenChooser::ShowDialog: AddExtension alone), as KCM's Import Story Text offers
-	// Word's files only.
+	// THE SDK'S OWN CHOOSER (sdksamples/common/SDKFileHelper.h - SnpChooseFile.cpp). JSON ONLY (the author's call: "not
+	// all files - only JSON can be loaded"): one type and no All Files - the chooser's own one-type road
+	// (SDKFileOpenChooser::ShowDialog: AddExtension alone), as KCM's Import Story Text offers Word's files only. The
+	// type's name and the title go in as string-table keys: the chooser translates them. The Mac type ('TEXT', as the
+	// SDK's text-writing snippets pass) means nothing on Windows.
 	SDKFileOpenChooser chooser;
 	chooser.SetTitle(PMString(kKFCQueryLoadOrderTitleKey));		// "Load Query Order"
 	chooser.AddFilter('TEXT', PMString("json"), typeName);

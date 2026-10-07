@@ -17,8 +17,9 @@
 //    	]
 //    }
 //
-//  Where it goes is the person's choice, through InDesign's own Save / Open dialogs (the SDK's SDKFileSaveChooser /
-//  SDKFileOpenChooser - SnpChooseFile.cpp), which start where Windows last saved / opened one:
+//  Where it goes is the person's choice, through InDesign's own Save / Open dialogs (kSaveFileDialogBoss as the SDK's
+//  SDKFileSaveChooser drives it, with one more flag - the .cpp says why; the SDK's SDKFileOpenChooser -
+//  SnpChooseFile.cpp), which start where Windows last saved / opened one:
 //  KFC makes no folder of its own in InDesign's roaming folder (the author's rule - KFCPanelState.h).
 //
 //========================================================================================
@@ -47,7 +48,8 @@ std::string KFCOrderFileText(const std::vector<KFCOrderFileEntry>& entries);
 bool KFCOrderFileParse(const std::string& text, std::vector<KFCOrderFileEntry>& outEntries);
 
 /** Ask the person for the file to save the order to (forSave) or to load one from, through InDesign's own dialog: a type
-    "KFC Query Order (*.json)" and no other, for Save and Load alike; Save asks before replacing a file. false = cancelled, or the
+    "KFC Query Order (*.json)" and no other, for Save and Load alike; Save's name always ends in ".json" (Windows'
+    FOS_STRICTFILETYPES - "Test.A" is saved as "Test.A.json") and Save asks before replacing a file. false = cancelled, or the
     dialog could not be made. A test build's fault switch qd-order-file names the file instead (KFCDiag.h), since a
     test cannot press Windows' dialogs. */
 bool KFCChooseOrderFile(bool forSave, IDFile& outFile);

@@ -96,7 +96,7 @@
 - **QRY-15** ★**`Save Order...`**（作者の依頼「連続したクエリの並びを個別に保存して、それをユーザーがよみこめるようにしたい」・作者の選んだ形＝ボタン2つ＋ファイル選択）＝
   InDesign の「名前を付けて保存」の画面（題名 `Save Query Order`・種類 `KFC Query Order`）で、右の並びを**好きな場所の1つのファイル**に保存する。
   最初に開く場所は Windows が覚えている前回の場所（KFC は InDesign の設定フォルダーにフォルダーを作らない＝SET-18 の決まり）。名前の候補は `Query Order.json`。
-  同じ名前があれば置き換えてよいか聞く。名前に拡張子が無ければ `.json` を付ける。
+  同じ名前があれば置き換えてよいか聞く。**名前は必ず `.json` で終わる**＝`.json` で終わらない名前には付ける（`Test.A`→`Test.A.json`・`order.txt`→`order.txt.json`＝InDesign の `.indd` と同じ・2026-10-08 作者「Test.A で保存すると Test.A.indd と保存されてきちんと開ける」）。付けるのは保存の画面そのもの（Windows の `FOS_STRICTFILETYPES`）なので、置き換えの確認も付けた後の名前で出る。（Windows の画面は、何もしなければ Windows の知らない拡張子にしか付けない＝`Test.aaa`→`Test.aaa.json` だが、`.a` が登録されている PC では `Test.A` のまま＝2026-10-08 作者と私が実測。）
   保存したら、**ファイルのフルパスだけ**をパネルのメッセージ欄とダイアログのメッセージ行に出す（Save Panel Settings と同じ＝作者「保存した時、パネル設定と同じように、どこに保存したか表示して欲しい」）。
   書けなかったら `Save Order: the file could not be written (<open|write|replace>) - <フルパス>`（並びはそのまま）。右が空のときは灰色（QRY-13）。
   - 訂正:
