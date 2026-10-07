@@ -65,6 +65,8 @@
 #include "KFCResultNodeID.h"
 #include "KFCJump.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
+#include "KFCDiag.h"			// KFC_DIAG_LOG - the CLICKFOCUS trace, test builds only
+#include "KFCResultTree.h"		// DiagKeyFocus - who holds the keyboard, for that trace
 
 namespace
 {
@@ -122,7 +124,9 @@ CREATE_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 {
 	gSelectOnNextButtonUp = false;
-	return TreeNodeEventHandler::LButtonDn(e);
+	const bool16 handled = TreeNodeEventHandler::LButtonDn(e);
+	KFC_DIAG_LOG("CLICKFOCUS row LButtonDn handled=%d focus=%s", static_cast<int>(handled), KFCResultTree::DiagKeyFocus().c_str());
+	return handled;
 }
 
 // The second click of a double click. Only a HIT row has anything extra to offer: a chapter or book
@@ -151,6 +155,8 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 
 	// Let the stock handler finish the click (selection, expand / collapse, the end of a drag).
 	const bool16 result = TreeNodeEventHandler::LButtonUp(e);
+	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp stock=%d shift=%d cmd=%d focus=%s", static_cast<int>(result),
+		static_cast<int>(e->ShiftKeyDown()), static_cast<int>(e->CmdKeyDown()), KFCResultTree::DiagKeyFocus().c_str());
 	if (result || e->ShiftKeyDown() || e->CmdKeyDown())
 		return result;
 
@@ -170,7 +176,10 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	InterfacePtr<ITreeViewController> treeController(
 		static_cast<ITreeViewController*>(widgetParent->QueryParentFor(ITreeViewController::kDefaultIID)));
 	if (treeController == nil || !treeController->IsSelected(node))
+	{
+		KFC_DIAG_LOG("CLICKFOCUS row LButtonUp: the row is not selected - no jump, no hand-off");
 		return result;
+	}
 
 	// The second click of a double click SELECTS instead of jumping again.
 	// The first click already did the jump (fronted the document, centred the match, raised the
@@ -241,6 +250,7 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
 	if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() != treeEH)
 		keyBoard->AcquireKeyFocus(treeEH);
+	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp handed the keyboard to the list focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 	return result;
 }
 

@@ -1529,7 +1529,30 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
 	// WHAT IT DID (2026-10-06, spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step.
 	// The message says nothing of Ctrl+Z (the author's call); the Track Changes wording went with Reject Change.
+	// ★WHICH ROW, IN THE MESSAGE (2026-10-07, the author: replacing row after row with Return, every message read the
+	// same "Replaced." and which one had just happened could not be told). The author's choice: the story's UID and the
+	// hit's place among that story's results - "Replaced ID:262 #3." (the author's spelling) - the story row and its third hit row
+	// in the list (the tree's middle level is one group per story, BuildFontGroups; GetHitFontGroupPos is the hit's
+	// place under it, from 0), and the UID a script reaches the story by (stories.itemByID). A story UID is the
+	// document's own number: in a book the chapter row above says which document.
 	outStatus = "Replaced.";
+	if (rowsToReplace.size() == 1)
+	{
+		const int32 hitIdx = *rowsToReplace.begin();
+		UID story = kInvalidUID;
+		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+		uint64 hash = 0;
+		const int32 place = KFCResultModel::GetHitFontGroupPos(chapterIdx, hitIdx);
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) && story != kInvalidUID && place >= 0)
+		{
+			outStatus = "Replaced ID:";
+			outStatus.AppendNumber(static_cast<int32>(story.Get()));
+			outStatus.Append(" #");
+			outStatus.AppendNumber(place + 1);
+			outStatus.Append(".");
+		}
+	}
+	outStatus.SetTranslatable(kFalse);
 	return true;
 }
 

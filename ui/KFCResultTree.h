@@ -19,6 +19,9 @@
 #define __KFCResultTree_h__
 
 #include "PMString.h"
+#ifdef KFC_DIAG
+#include <string>
+#endif
 
 
 namespace KFCResultTree
@@ -64,6 +67,16 @@ namespace KFCResultTree
 	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx);
 
+	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE (2026-10-07): IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
+	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
+	    land it. For the arrows' walk and a Return's replace (KFCResultTreeEH), after a document window has come forward.
+	    Does nothing while the panel is closed. True = the list holds the keyboard. */
+	bool TakeKeyboard();
+
+	/** The result list's Return filter off the application's event dispatcher and released, for good - the UI half's
+	    shutdown (through ShutdownCleanup). Defined in KFCResultTreeEH.cpp, where the filter lives (2026-10-07). */
+	void ShutdownReturnFilter();
+
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
 	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRow -
 	    the row's Replace and Return - and Clear Results). */
@@ -87,6 +100,13 @@ namespace KFCResultTree
 	    status line - a PMString, exactly the kind of static the rule was written for
 	    (KFCResultModel::ShutdownCleanup). */
 	void ShutdownCleanup();
+
+#ifdef KFC_DIAG
+	/** (Test builds only.) Who holds the keyboard, in a few words for the trace: "tree" (this list), "nobody", or the
+	    holder's boss and widget. 2026-10-07: a Return that replaced a row let the keyboard go to the document, and the
+	    trace says where in the Return it went (KFCResultTreeEH::KeyDown, ReplaceRow). */
+	std::string DiagKeyFocus();
+#endif
 }
 
 #endif // __KFCResultTree_h__

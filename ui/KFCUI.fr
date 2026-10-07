@@ -281,6 +281,23 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * The result list's Return, taken before the widget layer gets it (2026-10-07, KFCResultTreeEH.cpp). A Return the
+	 * list handled was followed by InDesign's own DVEventHandler::RestoreFocusOnDocument, which handed the keyboard to
+	 * the document - and the down arrow then moved a page item. This handler is pushed on the application's
+	 * IEventDispatcher (whose stack sees an event before anything below it) while the list holds the keyboard, and
+	 * takes a Return on a selected hit row there. A boss of its own, created once and released at shutdown, so its life
+	 * is not a widget's.
+	 */
+	Class
+	{
+		kKFCReturnFilterBoss,
+		kInvalidClass,
+		{
+			IID_IEVENTHANDLER, kKFCReturnFilterEHImpl,
+		}
+	},
+
+	/*
 	 * The UI half's ear on the model half: the observer that draws what KFCModelNotify.h sends on the
 	 * session's subject. Attached by the startup (KFCModelObserver.cpp); this line only puts our IID, and
 	 * so the implementation, onto the session. An AddIn that points at UI code, in this half's resource.
@@ -1520,6 +1537,21 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 			kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
 			kEllipsizeEnd, kFalse,		// Ellipsize style (a sentence is read from the front), Convert ampersands
 			"",							// Text (the controller fills it)
+			kInvalidWidgetID			// Associated control (none)
+			kEVEAlignFill | kEVERegularSpaceAfter,
+		),
+
+		// ----- what the last Run said - the panel's message line, here too (2026-10-07, the author's choice): the dialog
+		//       is modeless and stands with the KFC panel closed, and a run's result was then shown nowhere -----
+		KFCQueryFixedTextWidget
+		(
+			kKFCQueryMessageTextWidgetID,	// WidgetId
+			kSysStaticTextPMRsrcId,		// RsrcId
+			kBindNone,					// Frame binding
+			Frame(0, 0, 640, 20)		// Frame - the width it gets, not a floor (kKFCQueryFixedTextWidgetBoss)
+			kTrue, kTrue, kAlignLeft,	// Visible, Enabled, Alignment
+			kEllipsizeEnd, kFalse,		// Ellipsize style (a sentence is read from the front), Convert ampersands
+			"",							// Text (the controller fills it; empty at every open)
 			kInvalidWidgetID			// Associated control (none)
 			kEVEAlignFill | kEVERegularSpaceAfter,
 		),

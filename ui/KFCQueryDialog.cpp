@@ -90,9 +90,25 @@ namespace
 		EnableButton(panel, kKFCQueryClearButtonWidgetID, rows > 0);
 	}
 
-	/** Say on the panel's message line that the run order file could not be read or written - the dialog stays open,
-	    and what it shows is then not what the file holds. */
-	void SayOrderFileFailed(const char* what, const PMString& why)
+	/** The dialog's own message line (2026-10-07, the author's choice): the words the panel's message line is given, here
+	    too. The dialog is modeless and stands while the KFC panel is closed, and a Run's result - or why it could not
+	    run - was then shown nowhere; the panel still gets the same line (KFCResultTree::ShowStatus keeps it for its next
+	    show). Empty at every open (Repaint). */
+	void ShowDialogMessage(IPanelControlData* panel, const PMString& message)
+	{
+		if (panel == nil)
+			return;
+		InterfacePtr<ITextControlData> line(panel->FindWidget(kKFCQueryMessageTextWidgetID), UseDefaultIID());
+		if (line == nil)
+			return;
+		PMString words(message);
+		words.SetTranslatable(kFalse);
+		line->SetString(words);
+	}
+
+	/** Say on the panel's message line - and the dialog's - that the run order file could not be read or written: the
+	    dialog stays open, and what it shows is then not what the file holds. */
+	void SayOrderFileFailed(IPanelControlData* panel, const char* what, const PMString& why)
 	{
 		PMString say;
 		say.SetTranslatable(kFalse);
@@ -102,6 +118,7 @@ namespace
 		say.Append(why);
 		say.Append(").");
 		KFCResultTree::ShowStatus(say);
+		ShowDialogMessage(panel, say);
 	}
 
 	/** The Runs on: line: what Run would run on now, or why it cannot - the model's words (DescribeRunScope), made from the
@@ -130,10 +147,11 @@ namespace
 	{
 		if (panel == nil)
 			return;
+		ShowDialogMessage(panel, PMString());		// a fresh open says nothing of an earlier run
 		KFCQueryOrder::LoadSaved();
 		PMString why;
 		if (!KFCQueryOrder::LoadOrder(why))
-			SayOrderFileFailed("read", why);
+			SayOrderFileFailed(panel, "read", why);
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);
@@ -152,6 +170,7 @@ namespace
 		(void)KFCRuns()->RunQueries(KFCQueryOrder::OrderFiles(), summary);
 		KFCResultTree::Rebuild();
 		KFCResultTree::ShowStatus(summary);
+		ShowDialogMessage(panel, summary);	// and in the dialog: the panel may be closed (2026-10-07)
 		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
 	}
 
@@ -202,7 +221,7 @@ namespace
 
 		PMString why;
 		if (!KFCQueryOrder::SaveOrder(why))
-			SayOrderFileFailed("saved", why);
+			SayOrderFileFailed(panel, "saved", why);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, pick);
 		UpdateButtons(panel);

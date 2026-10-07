@@ -67,6 +67,17 @@
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
 #include "KFCDiag.h"			// TREETIME and the tree-expand fault switch - test builds only
+#include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
+#include "IApplication.h"
+#include "IEventHandler.h"		// the list's handler - the keyboard's holder (TakeKeyboard)
+#include "IKeyBoard.h"			// GetKeyFocus / AcquireKeyFocus (TakeKeyboard)
+#include "IPanelMgr.h"			// ShowPanelByWidgetID with giveKeyFocus (TakeKeyboard)
+#include "ISession.h"
+#include "IWidgetParent.h"		// the panel that holds the list (TakeKeyboard)
+#ifdef KFC_DIAG
+#include "PersistUtils.h"		// ::GetClass
+#include <cstdio>
+#endif
 
 namespace
 {
@@ -637,6 +648,9 @@ void KFCResultTree::ShutdownCleanup()
 	// already torn itself down (the KESCL ShutdownCleanup rule). When a static is added above, it is
 	// added here too.
 	gLastStatus.Clear();
+	// ...and the Return filter the list pushes on the application's event dispatcher (KFCResultTreeEH.cpp): off the
+	// stack and released before the .pln goes (2026-10-07).
+	ShutdownReturnFilter();
 }
 
 namespace
@@ -750,6 +764,67 @@ bool KFCResultTree::RefusedWhileRunning()
 	return true;
 }
 
+#ifdef KFC_DIAG
+std::string KFCResultTree::DiagKeyFocus()
+{
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+	if (keyBoard == nil)
+		return "no-keyboard";
+	IEventHandler* const focus = keyBoard->GetKeyFocus();		// not counted (IKeyBoard.h) - used here only
+	if (focus == nil)
+		return "nobody";
+	InterfacePtr<ITreeViewMgr> treeMgr(QueryResultTreeMgr());
+	InterfacePtr<IEventHandler> treeEH(treeMgr, UseDefaultIID());
+	if (treeEH != nil && treeEH.get() == focus)
+		return "tree";
+	InterfacePtr<IControlView> view(focus, UseDefaultIID());
+	char text[96];
+	::sprintf_s(text, sizeof(text), "class=0x%x widget=0x%x", static_cast<unsigned>(::GetClass(focus).Get()),
+		view != nil ? static_cast<unsigned>(view->GetWidgetID().Get()) : 0u);
+	return text;
+}
+#endif
+
+bool KFCResultTree::TakeKeyboard()
+{
+	// THE PANEL MADE THE ACTIVE ONE AND ITS LIST GIVEN THE KEYBOARD, BY THE PANEL SYSTEM'S OWN DOORS (2026-10-07, the
+	// author's call: make the panel active and focus it, not an idle task or a timer). The arrows' walk fronts a document window
+	// (KFCJump), and a Return pressed after it found the keyboard handed to the document by a second road the Return's
+	// hold could refuse but not stop (KFCResultTreeEH, gHolding) - the list had kept InDesign's keyboard, not the
+	// active panel. So, in order:
+	//  1. IPanelMgr::ShowPanelByWidgetID with giveKeyFocus - "give key focus to panel" (IPanelMgr.h). A panel that is
+	//     closed is not opened for this: the user closed it.
+	//  2. the panel holding the list gives it the keyboard - IPanelControlData::SetKeyboardFocus, which wants "one of
+	//     its children" (IPanelControlData.h), so the list's own parent panel; Adobe's Links panel hands its caption
+	//     rows the keyboard the same way (open/components/linksui/AddDeleteCaptionRowButtonObserver.cpp).
+	//  3. checked - and taken by IKeyBoard::AcquireKeyFocus, as before, if the panel's doors did not land it there.
+	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
+	if (panelMgr == nil || !panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
+		return false;
+	panelMgr->ShowPanelByWidgetID(kKFCPanelWidgetID, kTrue);
+
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
+	IControlView* listView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+	if (listView == nil)
+		return false;
+	InterfacePtr<const IWidgetParent> listParent(listView, UseDefaultIID());
+	InterfacePtr<IPanelControlData> holder(listParent != nil
+		? static_cast<IPanelControlData*>(listParent->QueryParentFor(IID_IPANELCONTROLDATA)) : nil);
+	if (holder != nil)
+		holder->SetKeyboardFocus(listView);
+
+	InterfacePtr<IEventHandler> listEH(listView, UseDefaultIID());
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+	if (listEH == nil || keyBoard == nil)
+		return false;
+	KFC_DIAG_LOG("RETFOCUS TakeKeyboard after the panel's doors focus=%s", DiagKeyFocus().c_str());
+	if (keyBoard->GetKeyFocus() != listEH)
+		keyBoard->AcquireKeyFocus(listEH);
+	return keyBoard->GetKeyFocus() == listEH;
+}
+
 bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
 {
 	if (RefusedWhileRunning())
@@ -757,7 +832,9 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
 	if (!KFCRuns()->CanReplaceHit(chapterIdx, hitIdx))
 		return false;
 	PMString status;
+	KFC_DIAG_LOG("RETFOCUS ReplaceRow begin focus=%s", DiagKeyFocus().c_str());
 	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, status);	// no prompt (the author's call)
+	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
 	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
 	// write is over (a book chapter the Replace reopened has been given its window by then).
@@ -773,7 +850,9 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
 		RefreshRows();
 	else
 		Rebuild();
+	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the repaint focus=%s", DiagKeyFocus().c_str());
 	ShowStatus(status);
+	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the status focus=%s", DiagKeyFocus().c_str());
 	return wrote;
 }
 

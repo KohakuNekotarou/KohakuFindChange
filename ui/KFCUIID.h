@@ -86,6 +86,9 @@ DECLARE_PMID(kClassIDSpace, kKFCQueryListWidgetBoss, kKFCUIPrefix + 23)
 // ...and the dialog's "Runs on:" line: a static text that EVE may not widen to fit its words (kFixedSizeEVEInfoImpl -
 // KCM's kKCMBookPathTextWidgetBoss, which measured a path line growing the whole dialog to 593px).
 DECLARE_PMID(kClassIDSpace, kKFCQueryFixedTextWidgetBoss, kKFCUIPrefix + 24)
+// The result list's Return, taken before the widget layer gets it (2026-10-07 - KFCResultTreeEH.cpp): an event handler
+// pushed on the application's IEventDispatcher while the list holds the keyboard.
+DECLARE_PMID(kClassIDSpace, kKFCReturnFilterBoss, kKFCUIPrefix + 25)
 
 
 // InterfaceIDs:
@@ -171,6 +174,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryDialogControllerImpl, kKFCUIPrefix
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryDialogObserverImpl, kKFCUIPrefix + 42)
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryListAdapterImpl, kKFCUIPrefix + 43)
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryListWidgetMgrImpl, kKFCUIPrefix + 44)
+// The result list's Return filter (2026-10-07): its event handler (KFCResultTreeEH.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKFCReturnFilterEHImpl, kKFCUIPrefix + 45)
 
 
 // ActionIDs:
@@ -343,6 +348,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryDownButtonWidgetID, kKFCUIPrefix + 39)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryScopeTextWidgetID, kKFCUIPrefix + 40)
 // ...and Clear under the four (the author's addition the same day): the run order emptied.
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryClearButtonWidgetID, kKFCUIPrefix + 41)
+// ...and the dialog's own message line under Runs on: (2026-10-07, the author's choice of three): what the last Run (or
+// the run order's file) said, the panel's message line in the dialog too - the dialog stands with the panel closed.
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 
 
 // "About Plug-ins" sub-menu:

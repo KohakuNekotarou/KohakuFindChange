@@ -74,7 +74,7 @@ const wchar_t* const kHowToEN =
 	L"\n"
 	L"[Saved queries (Run Saved Queries...)]\n"
 	L"- Run Saved Queries... on the panel menu opens a dialog that can stay open while you work (it has a minimize button). Left: the queries saved in Find/Change - Text, GREP, Glyph and Transliterate, yours and InDesign's own. Right: the order to run them in, set with Add >, < Remove, Move Up, Move Down and Clear. The order is kept after the dialog is closed and after InDesign quits.\n"
-	L"- The line at the bottom (Runs on:) says what Run will write: the book with Book Scope on, otherwise what Find/Change's Search: names. Run (or Enter) runs the queries in that order, each with InDesign's own Change All, and the panel says how many each query replaced. One Ctrl+Z undoes the whole run.\n"
+	L"- The line at the bottom (Runs on:) says what Run will write: the book with Book Scope on, otherwise what Find/Change's Search: names. Run (or Enter) runs the queries in that order, each with InDesign's own Change All, and the panel and the dialog's own message line say how many each query replaced. One Ctrl+Z undoes the whole run.\n"
 	L"\n"
 	L"[The Book panel (Remember Book Panel Placement)]\n"
 	L"- ON: InDesign's own Book panel opens where it was and at the size it was (collapsed to icons, if it was) when it was last closed. This is recorded when a book is closed and when InDesign quits.\n"

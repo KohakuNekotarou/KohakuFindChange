@@ -106,7 +106,7 @@
 - **REP-21** 行の Replace が脚注・表・アンカー付きオブジェクトを丸ごと消したとき、その中にあった行は**一緒に消え**、`deleted` が付く（行き先も無い）。
   - 訂正:
 
-- **REP-22** 終わったときの文 ―― 行の Replace＝`Replaced.`／Change All in Book＝`N replaced in M chapter(s).`（何も無ければ `No match - nothing was changed.`）。
+- **REP-22** 終わったときの文 ―― 行の Replace＝`Replaced ID:<Story の UID> #<その Story の中で何番目の結果か>.`（例 `Replaced ID:262 #3.`＝一覧の Story の行と、その下の3つ目のヒット行。UID はスクリプトの `stories.itemByID` と同じ番号・ブックでは文書ごとの番号＝どの文書かは上の章の行。2026-10-07 作者の依頼「Return で次々に置換すると同じ `Replaced.` で分からなくなる」→作者の案「Story の UID＋何番目の検索結果」・表記は作者の「ID:262 #3」。それまでは `Replaced.`）／Change All in Book＝`N replaced in M chapter(s).`（何も無ければ `No match - nothing was changed.`）。
   ★Ctrl+Z で戻せることは書かない（2026-10-06 の決定・F20）。
   ★Change All in Book は、文と注（開けなかった章・窓なしで残った章）の**後ろ**に、**章ごとの内訳** `  By chapter: <章> (<数>), ….` を付ける
   （2026-10-07 の作者の追加「Change All in Book の結果に章ごとの内訳」）。書いた章だけ・ブックの順・**10章まで**、それより多ければ ` and <残り> more`。
@@ -143,7 +143,7 @@
   ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
   - 訂正:
 
-- **REP-28** 結果の文＝`Replaced.`（REP-22）。
+- **REP-28** 結果の文＝`Replaced ID:<UID> #<n>.`（REP-22）。
   - 訂正:
 
 - **REP-29** （2026-10-06 に外した＝Replace Again (Current Find/Change Settings)。却下で戻す機能ごと外した＝第7章 TRK-28）
@@ -159,6 +159,7 @@
 - **REP-32** ★**行を選んで Return キー**（テンキーの Enter も）でも、その行を置換する（2026-10-06・F17＝矢印キーで行を歩き、合っている所で Return＝キーボードだけで置換できる）。
   右クリックの Replace と同じ口（同じ確かめ・同じ文）。Shift などを押しながらの Return・ストーリー／文書／本の行の Return・置換済みの行の Return では何もしない。
   ダブルクリックでキーボードが本文に移っているときの Return は本文に改行を打つ（KFC は何もしない）。章を開いて書いたときも、キーボードはツリーに戻る。
+  ★**Return で置換した後もキーボードはツリーに残る**＝続けて矢印で歩き、また Return で置換できる（2026-10-07・作者が見つけた不具合の直し＝それまでは Return の後に InDesign 自身がキーボードを文書へ返し、次の矢印が**レイアウトで選んでいるページアイテムを動かしていた**。右クリックの Replace では起きなかった）。KFC がツリーにキーボードがある間だけ Return を先に受け取り、InDesign のパネルの「Return で文書へ戻る」まで届かせない（`IEventDispatcher` に載せる小さな受け手）。
   - 訂正:
 
 ## 7. Change All in Book (No List) と Clear Results
