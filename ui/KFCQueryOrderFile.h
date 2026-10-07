@@ -17,8 +17,8 @@
 //    	]
 //    }
 //
-//  Where it goes is the person's choice, through InDesign's own Save / Open dialogs (ISaveFileDialog / IOpenFileDialog,
-//  the shape of the SDK's SDKFileSaveChooser - SnpChooseFile.cpp), which start where Windows last saved / opened one:
+//  Where it goes is the person's choice, through InDesign's own Save / Open dialogs (the SDK's SDKFileSaveChooser /
+//  SDKFileOpenChooser - SnpChooseFile.cpp), which start where Windows last saved / opened one:
 //  KFC makes no folder of its own in InDesign's roaming folder (the author's rule - KFCPanelState.h).
 //
 //========================================================================================

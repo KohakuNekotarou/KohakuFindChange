@@ -10,15 +10,10 @@
 
 #include "VCPlugInHeaders.h"
 
-// Interface includes:
-#include "IOpenFileDialog.h"
-#include "ISaveFileDialog.h"		// (and DocumentID.h - kOpenFileDialogBoss / kSaveFileDialogBoss)
-
 // General includes:
-#include "CreateObject.h"
 #include "FileUtils.h"
 #include "PMString.h"
-#include "SysFileList.h"
+#include "SDKFileHelper.h"		// SDKFileSaveChooser / SDKFileOpenChooser - Save Order... / Load Order...'s file
 
 #include <cstdio>
 
@@ -372,54 +367,34 @@ bool KFCChooseOrderFile(bool forSave, IDFile& outFile)
 		}
 	}
 #endif
-	PMString typeName(kKFCQueryOrderFileTypeKey);		// "KFC Query Order"
-	typeName.Translate();
-	typeName.SetTranslatable(kFalse);
-	PMString extension("json");
-	extension.SetTranslatable(kFalse);
+	// THE SDK'S OWN CHOOSERS (sdksamples/common/SDKFileHelper.h - SnpChooseFile.cpp; KESCL's and KCM's reports save
+	// through the same). The type's name and the titles go in as string-table keys: the choosers translate them. The Mac
+	// type and creator ('TEXT' / 'CWIE', as the SDK's text-writing snippets pass) mean nothing on Windows.
+	const PMString typeName(kKFCQueryOrderFileTypeKey);		// "KFC Query Order"
 	if (forSave)
 	{
-		// kDefaultIID is missing on ISaveFileDialog - named, as SDKFileSaveChooser does.
-		InterfacePtr<ISaveFileDialog> dialog(static_cast<ISaveFileDialog*>(::CreateObject(kSaveFileDialogBoss, IID_ISAVEFILEDIALOG)));
-		if (dialog == nil)
+		SDKFileSaveChooser chooser;
+		chooser.SetTitle(PMString(kKFCQuerySaveOrderTitleKey));		// "Save Query Order"
+		chooser.AddFilter('CWIE', 'TEXT', PMString("json"), typeName);
+		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h). The chooser asks
+		// before replacing a file (FOS_OVERWRITEPROMPT).
+		chooser.SetFilename(PMString("Query Order.json"));
+		chooser.ShowDialog();
+		if (!chooser.IsChosen())
 			return false;
-		dialog->AddFileTypeInfo(typeName, extension);
-#ifdef WINDOWS
-		dialog->SetAdditionalFOSFlags(FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN);	// ask before replacing a file
-#endif
-		// A name without a folder: the dialog starts where Windows last saved (ISaveFileDialog.h).
-		PMString defaultName("Query Order.json");
-		defaultName.SetTranslatable(kFalse);
-		IDFile defaultFile;
-		defaultFile.SetString(defaultName);		// as SDKFileSaveChooser::ShowDialog sets its default
-		PMString title(kKFCQuerySaveOrderTitleKey);		// "Save Query Order"
-		title.Translate();
-		title.SetTranslatable(kFalse);
-		IDFile chosen;
-		if (!dialog->DoDialog(&defaultFile, &chosen, nil, kFalse /*the folder in defaultFile - none*/, kTrue, &title))
-			return false;
-		outFile = WithJsonExtension(chosen);
+		outFile = WithJsonExtension(chooser.GetIDFile());
 		return true;
 	}
-	InterfacePtr<IOpenFileDialog> dialog(::CreateObject2<IOpenFileDialog>(kOpenFileDialogBoss));
-	if (dialog == nil)
+	// JSON ONLY (2026-10-08, the author: "not all files - only JSON can be loaded"): one type and no All Files - the
+	// chooser's own one-type road (SDKFileOpenChooser::ShowDialog: AddExtension alone), as KCM's Import Story Text offers
+	// Word's files only.
+	SDKFileOpenChooser chooser;
+	chooser.SetTitle(PMString(kKFCQueryLoadOrderTitleKey));		// "Load Query Order"
+	chooser.AddFilter('TEXT', PMString("json"), typeName);
+	chooser.ShowDialog();		// where Windows last opened one; one file
+	if (!chooser.IsChosen())
 		return false;
-	// JSON ONLY (2026-10-08, the author: "not all files - only JSON can be loaded"): the one type, and no "All Files" -
-	// as KCM's Import Story Text offers Word's files only (KCMActionComponent.cpp). SetDefaultFilter is Windows-only
-	// (IOpenFileDialog.h); SetDefaultExtension is left out, as the header discourages it for an Open dialog.
-	dialog->AddExtension(&typeName, &extension);
-#ifdef WINDOWS
-	dialog->SetDefaultFilter(typeName);
-#endif
-	PMString title(kKFCQueryLoadOrderTitleKey);		// "Load Query Order"
-	title.Translate();
-	title.SetTranslatable(kFalse);
-	SysFileList files;
-	if (!dialog->DoDialog(nil /*where Windows last opened one*/, files, kFalse /*one file*/, &title))
-		return false;
-	if (files.GetFileCount() < 1 || files.GetNthFile(0) == nil)
-		return false;
-	outFile = *files.GetNthFile(0);
+	outFile = chooser.GetIDFile();
 	return true;
 }
 

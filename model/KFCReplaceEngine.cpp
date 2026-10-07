@@ -1233,7 +1233,8 @@ static void StartStatus(PMString& out)
 // nil = InDesign would not start one, and outStatus then says so.
 static ICommandSequence* BeginPlainSequence(const PMString& stepName, PMString& outStatus)
 {
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence();
+	// The caller's name, as the run's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it).
+	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KFC Replace");
 	if (sequence == nil)
 	{
 		StartStatus(outStatus);
