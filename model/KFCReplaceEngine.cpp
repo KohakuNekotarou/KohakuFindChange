@@ -1605,6 +1605,10 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 		|| !StoryAsKFCLeftIt(chapterIdx, db, story))
 		return false;
 
+	// TEST BUILDS ONLY: what one preview costs - it runs on every row landed on, the arrow keys' walk included
+	// ("PHASE preview end <ms> <InDesign's counters>", KFCDiag.h).
+	KFC_DIAG_PHASE(previewPhase, "preview");
+
 	// The Replace's own directions: forward, as the search was, and a GREP query holding ^ written backwards.
 	KFCForwardSearchScope forward;
 	WalkerScopeOptions scopeOptions;

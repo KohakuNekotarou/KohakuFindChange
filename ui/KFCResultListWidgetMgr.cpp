@@ -55,6 +55,7 @@
 #include "LocaleSetting.h"
 #include "PMString.h"
 #include "RsrcSpec.h"
+#include "TextChar.h"		// kTextChar_Ellipse - the mark on a cut "Preview Text:"
 #include "Utils.h"
 #include "widgetid.h"		// kTreeNodeExpanderWidgetID
 
@@ -808,13 +809,34 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
 	if (textData == nil)
 		return false;
 	// KCM's "Source Text:" shape (the author's choice): the heading on its own line, the row's own context faded, and
-	// what would be written at full colour - a return or a tab in it shown as the rows show them; nothing written at
-	// all is a PLACE, drawn as the bar.
+	// what would be written at full colour; nothing written at all is a PLACE, drawn as the bar.
 	PMString shown(after);
+	// CUT LONG BEFORE THE BOX HAS TO MEASURE IT (the removed Source Text's rule, for its reason): what a GREP replace
+	// writes can be a story's worth ($0 over a match across paragraphs), where a row's own text is capped at 50
+	// characters for drawing - and the box lays its text out by measuring prefixes, again for every width it tries
+	// (KFCStatusTextView.cpp), on every repaint. It holds four lines, about 120 characters on a Japanese UI; past that
+	// the view ends it in an ellipsis anyway, so the tail is cut here, marked the same way.
+	const int32 kPreviewMaxChars = 300;
+	if (shown.CharCount() > kPreviewMaxChars)
+	{
+		// Not through the middle of a surrogate pair (the doubt KFCStatusTextView's KFCSafeCut carries).
+		int32 keep = kPreviewMaxChars;
+		const uint32 at = shown.GetChar(keep).GetValue();
+		if (at >= 0xDC00 && at <= 0xDFFF)
+			--keep;
+		shown.Truncate(shown.CharCount() - keep);
+		shown.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
+	}
+	// The breaks as marks in ALL THREE pieces - the pilcrow and the return arrow the row itself draws (the same
+	// function; the model keeps a row's context raw and the row marks it up as it draws). A raw CR here would be
+	// taken by the box as a line break: the row's "sat" + pilcrow would come out as "sat" and an empty line.
+	PMString pre(row.preText), post(row.postText);
+	KFCResults()->MarkUpBreaksForDisplay(pre);
 	KFCResults()->MarkUpBreaksForDisplay(shown);
+	KFCResults()->MarkUpBreaksForDisplay(post);
 	PMString label(kPreviewLabel);
 	label.SetTranslatable(kFalse);
-	textData->SetSegments(label, row.preText, shown, row.postText, shown.IsEmpty() ? kTrue : kFalse);
+	textData->SetSegments(label, pre, shown, post, shown.IsEmpty() ? kTrue : kFalse);
 	textView->ForceRedraw();
 	return true;
 }
