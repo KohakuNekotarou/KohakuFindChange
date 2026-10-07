@@ -6,7 +6,7 @@
 //
 //  Result invalidation on document close. A result set names documents, and a result row that
 //  names a document nobody has open any more is worse than no row at all: it still jumps, and
-//  Change Checked still replaces - by silently reopening the very document the user just closed.
+//  its Replace still writes - by silently reopening the very document the user just closed.
 //  So the results go when their document does.
 //
 //  The rule this implements, for the DOCUMENT scope only:
@@ -133,18 +133,18 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// exit (KFCUndoFollow::DocumentClosing): what was attached is detached.
 	KFCUndoFollow::DocumentClosing(closingDocRef);
 
-	// ...and a chapter of a book's list leaves the kept writes, so that a Change Checked that wrote it is still followed
+	// ...and a chapter of a book's list leaves the kept writes, so that a query run that wrote it is still followed
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - All
 	// Documents' ForgetDocument below empties the chapter instead, its rows leaving the list). Ahead of the run guard
-	// below: a Change Checked hands back the chapters it left nothing in, closing them inside its own run, and a
-	// write kept from before it may have written one of them (saved since, so it closes).
+	// below: a run hands back the chapters it left nothing in, closing them inside itself, and a write kept from
+	// before it may have written one of them (saved since, so it closes).
 	if (KFCResultModel::IsFromBook())
 		KFCUndoFollow::ForgetBookChapter(closingDocRef);
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
 	// that model chapter by chapter - and the closes a run makes ON THE SPOT land here from inside it:
 	// each chapter it hands back as it goes (KFCBookScope::HandBackHeldDocNow) and the held chapters the
-	// search and Show Changes close at their commit point (ReleaseHeldDocs(true)). (A SCHEDULED close lands
+	// search and the query run close at their commit point (ReleaseHeldDocs(true)). (A SCHEDULED close lands
 	// only once the current tick has unwound - ReleaseHeldDocs from DropResults after the run, and the Hide
 	// Previous Chapter sweep, which is a jump's and never inside a run at all.) The run
 	// puts its own results up when it finishes, so nothing stale survives being skipped here. Same rule as
@@ -190,7 +190,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	}
 
 	// ALL DOCUMENTS: ONLY THAT DOCUMENT'S ROWS GO (the author's call). The list is the
-	// open documents', and the others are still open - their rows, their ticks, their Undo stay. The chapter
+	// open documents', and the others are still open - their rows and their Undo stay. The chapter
 	// keeps its place in the model (KFCResultModel::CloseChapter says why) and the kept writes let the
 	// document go too (KFCUndoFollow::ForgetDocument). When it was the last document with rows, the list
 	// goes the way a Document list always has, below.
@@ -203,9 +203,9 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KFCUndoFollow::ForgetDocument(closingDocRef);
 		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
-		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit since
-		// 2026-10-06, F9: the panel draws every row a list holds, so this rebuild is not reached now - kept for a cap
-		// that ever differs again.)
+		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit - spec
+		// F9: the panel draws every row a list holds, so this rebuild is not reached now - kept for a cap that ever
+		// differs again.)
 		const bool overCap = KFCResultModel::GetTotalHitCount() > KFCResultModel::kKFCDisplayHitLimit;
 		if (!overCap)
 			KFCNotifyChapterRowGoes(closingChapter);

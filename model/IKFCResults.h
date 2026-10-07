@@ -100,9 +100,9 @@ public:
 	virtual void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef) = 0;
 	/** = KFCResultModel::SetHitOutcome. */
 	virtual void SetHitOutcome(int32 chapterIdx, int32 hitIdx, KFCResultModel::ChangeOutcome outcome) = 0;
-	/** = KFCResultModel::HasChangeAllWritten (appended 2026-10-06) - the panel's pencil cat. */
+	/** = KFCResultModel::HasChangeAllWritten (appended) - the panel's pencil cat. */
 	virtual bool HasChangeAllWritten() = 0;
-	/** = KFCResultModel::GetChapterReplacedCount / GetFontReplacedCount / GetTotalReplacedCount (appended 2026-10-07) -
+	/** = KFCResultModel::GetChapterReplacedCount / GetFontReplacedCount / GetTotalReplacedCount (appended) -
 	    the R of the branch rows' "(R/M)". */
 	virtual int32 GetChapterReplacedCount(int32 chapterIdx) = 0;
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) = 0;

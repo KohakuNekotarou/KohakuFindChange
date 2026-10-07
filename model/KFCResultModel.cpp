@@ -87,7 +87,7 @@ namespace
 	}
 
 	// Which HIT row the result tree's right-click menu was popped over, for its menu (Replace) - KFCResultNodeEH
-	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu since 2026-10-06 - spec F16.)
+	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu - spec F16.)
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
 
@@ -161,7 +161,7 @@ namespace
 	{
 		chapter.fontGroups.clear();
 		// Each story's group, looked up rather than searched for: a chapter of 5000 hits in as many stories
-		// would otherwise compare every hit with every group made before it (2026-10-05, the speed-up study). The
+		// would otherwise compare every hit with every group made before it (the speed-up study). The
 		// groups are still made in first-appearance order - the map only finds them.
 		std::map<UID, int32> groupOf;
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
@@ -498,7 +498,7 @@ int32 KFCResultModel::GetDisplayFontCount(int32 chapterIdx)
 	if (c == nil)
 		return 0;
 
-	// FOUND BY HALVING, NOT GROUP BY GROUP (2026-10-05, the speed-up study). The tree asks this for EVERY child of a
+	// FOUND BY HALVING, NOT GROUP BY GROUP (the speed-up study). The tree asks this for EVERY child of a
 	// document row (KFCResultListAdapter::GetNthChild) and for every story row the rebuild opens, so counting group by
 	// group cost the groups squared per rebuild - 25 million group counts for a document of 5000 one-hit stories.
 	//

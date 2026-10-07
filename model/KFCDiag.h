@@ -37,11 +37,11 @@
 //                refused every row - a chapter where nothing lands (work\kbs-regress\cases\fault-replace-refuse-on.jsx
 //                / -off.jsx)
 //    queries-run  the file holds one query path per line (UTF-8); the panel's Find runs the query run over them
-//                (KFCQuerySequence::RunFromDiagSwitch) - the way in until the panel of its own exists
+//                (KFCQuerySequence::RunFromDiagSwitch) - the way in without the query dialog
 //                (work\kbs-regress\cases\qs-*.jsx write it, qs-off.jsx takes it off)
 //    perf-fresh-walker  the file holds "<mode> <n>": WalkStoryReplacing starts its walk again after every n writes -
 //                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
-//                scope (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
+//                scope (docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
 //                walk?). Throwaway documents only.
 //    perf-commands  every command InDesign processes is counted, by class, over a search, a row's Replace and a query
 //                run (KFCDiagCommands.h - "COMMANDS" lines, and cmds= on WALKSTEP). The count itself costs time:
@@ -63,16 +63,16 @@
 //                query x document) was being written - heard where the run asks the bar next, so a test can press it
 //                in the run's last step, which only the ask after the loop hears (work\kbs-regress\xq-cases.tsv).
 //                Throwaway documents only.
-//    book-selection  (UI half, 2026-10-07) the file's first line "book=<a book's file name>", then one chapter's short
+//    book-selection  (UI half) the file's first line "book=<a book's file name>", then one chapter's short
 //                name a line: ui/KFCBookPanelLookup.cpp's GetPanelBookSelection answers with those chapters as the Book
 //                panel's selection for that book (nothing selected for any other), judged by the same rule as a real
 //                one - Find/Change Selected Documents (Book) tested apart from the panel (work\kbs-regress\sd-cases.tsv;
 //                the make scripts' selectChapters writes it, qd-off.jsx takes it off)
-//    no-return-filter  (UI half, 2026-10-07) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
+//    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
-//                (a jumped-to replaced row drawn hilited, the run of 2026-10-07 18:00)
+//                (a jumped-to replaced row drawn hilited)
 //
-//  AND TIMERS (2026-10-05): KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
+//  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
 //
 //========================================================================================
@@ -95,7 +95,7 @@
 // Appends one line: "<ms since the epoch> <the formatted text>". Opened and closed per line, so a crash
 // right after it still leaves the line on disk.
 //
-// ONE WRITER AT A TIME (2026-10-05 - guide vol1-07: a file a plug-in writes is synchronised like a global). The model
+// ONE WRITER AT A TIME (guide vol1-07: a file a plug-in writes is synchronised like a global). The model
 // half's code is called on a background task's thread too (an export's - KFCUndoFollow writes its line before its own
 // main-thread gate), and fopen_s opens for this caller alone: a second append while the file is open fails, and its
 // line was lost without a word. The lock puts this half's threads in a queue; the other half (the UI plug-in, main
@@ -167,7 +167,7 @@ inline void KFCDiagFaultOff(const char* name)
 }
 
 // The fault switch <name>'s file as text (UTF-8, its first line - a CR or LF ends it, a BOM is passed over) - false when
-// the switch is off or its file is empty. (2026-10-07 night: qd-order-file names the file the query dialog's Save Order...
+// the switch is off or its file is empty. (qd-order-file names the file the query dialog's Save Order...
 // and Load Order... use instead of asking through Windows' dialogs, which a test cannot press.)
 inline bool KFCDiagFaultText(const char* name, std::string& out)
 {
@@ -234,7 +234,7 @@ inline double KFCDiagNowMs()
 #define KFC_CLOCK(var) const double var = KFCDiagNowMs()
 #define KFC_SPENT(slot, var) ((slot) += KFCDiagNowMs() - (var))
 
-// WHAT A STRETCH OF KFC MADE INDESIGN DO (2026-10-05, the speed-up study - guide vol2-16, Performance Metrics API):
+// WHAT A STRETCH OF KFC MADE INDESIGN DO (the speed-up study - guide vol2-16, Performance Metrics API):
 // InDesign's own counters (PerformanceMetricsID.h), read with PerformanceStats::GetValue when this is made and again
 // when Since is asked - composition in the layout and in galley (count, time), the change manager's Update calls (the
 // observers notified: count, time), undo snapshots (count, time to make), new UIDs and instantiations, and drawing.
@@ -303,7 +303,7 @@ private:
 
 #define KFC_DIAG_PHASE(var, name) const KFCDiagPhase var(name)
 
-// Counters a test build bumps where something may run more often than it should (2026-10-05, guide vol2-15 "do not
+// Counters a test build bumps where something may run more often than it should (guide vol2-15 "do not
 // update the user interface from an observer"): 0 = the panel's tab name recomputed (KFCPanelTitle::Update), 1 = the
 // app bar's mirror of the Find/Change field (KFCAppBarSearchEnter). One set per plug-in (both are the UI half's).
 inline int& KFCDiagCounter(int which)

@@ -90,12 +90,12 @@ namespace KFCSearchEngine
 		RunScope() : fromBook(false), allDocuments(false), selectionScope(0) { fellBackNote.SetTranslatable(kFalse); }
 	};
 
-	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (2026-10-04, so the query run asks the same):
+	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an
 	    empty one, no active document. false = refused, outRefusal holds SearchBook's own sentence. Touches nothing. */
 	bool ResolveRunScope(RunScope& out, PMString& outRefusal);
 
-	/** WHAT A RUN WOULD RUN ON, IN WORDS (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	/** WHAT A RUN WOULD RUN ON, IN WORDS (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): the query dialog's Runs on: line, made from ResolveRunScope's answer so the line and the run
 	    cannot differ. true = "Runs on: the book "<title>" (<n> document(s))." / "Runs on: <n> selected document(s) of the
 	    book "<title>"." (Find/Change Selected Documents (Book)) / "Runs on: All Documents (Search: in
@@ -155,7 +155,7 @@ namespace KFCSearchEngine
 	    @note Call it OUTSIDE any command sequence. It processes a command, and a session-setting
 	          command inside the replace sequence would become part of that undo step.
 	          ! ONE CALLER DOES NOT, BY DESIGN: the query run (KFCQuerySequence) states each query's tab
-	          inside its one sequence, between queries, and loads the query there too. Measured 2026-10-05
+	          inside its one sequence, between queries, and loads the query there too. Measured
 	          (the spec's M3, case qs-undo): a Ctrl+Z of the run brought no Find/Change setting back - the
 	          strings stayed empty. */
 	bool CommitSearchMode();
@@ -214,7 +214,7 @@ namespace KFCSearchEngine
 
 	/** The Find command's name for the scope it would search NOW: "Find in Book" while Book
 	    Scope is on - "Find in Selected Documents" when the run would take only the Book panel's selected documents
-	    (Find/Change Selected Documents (Book), 2026-10-07 - KFCBookScope::DescribeTargetBook); with it off, Search:'s -
+	    (Find/Change Selected Documents (Book) - KFCBookScope::DescribeTargetBook); with it off, Search:'s -
 	    "Find in Document", "Find in All Documents", "Find in Story",
 	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
@@ -454,8 +454,8 @@ namespace KFCSearchEngine
 	    False when the story cannot be read (no database, a UID that is not valid, no text model). */
 	bool ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion);
 
-	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's (2026-10-05, the speed-up's S1:
-	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3, taken 2026-10-06).
+	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's (the speed-up's S1:
+	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3).
 	    outWalker = the walker to Initialize and drive: a kBasicTextWalkerBoss of KFC's own, which carries IID_ITEXTWALKER
 	    alone - not the session's shared one (kTextWalkerServiceProviderBoss), which Edit > Find/Change and the spelling
 	    panel walk and watch. outSelUtils = what the walk's critical section is taken on: always the SHARED walker's -

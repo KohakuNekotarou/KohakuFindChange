@@ -93,9 +93,9 @@ public:
 	/** A modal alert, the message plus a warning icon (CAlert::WarningAlert). The message is finished
 	    text, already marked untranslatable by the caller. */
 	virtual void				WarningAlert(const PMString& message) = 0;
-	// Added by hand from here on (2026-10-07) - a new method goes below the last one, never between (a vtable slot is a
+	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
 	// promise to every built caller).
-	/** The documents selected in the Book panel that shows this book (2026-10-07 - Find/Change Selected Documents
+	/** The documents selected in the Book panel that shows this book (Find/Change Selected Documents
 	    (Book)). true only for a PART of the book - none or all selected answers false, the product's rule
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
 	    selected BookContent UIDs (the book's database); outTotal = the panel's rows. */

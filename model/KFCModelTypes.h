@@ -25,7 +25,7 @@
 
 namespace KFCResultModel
 {
-	/** THE LIMIT, ONE NUMBER (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F9 - the
+	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F9 - the
 	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit,
 	    KFCResultModel.h, is this number). More than this is not a list to walk and replace row by row - a Change All
 	    writes any number without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's
@@ -40,8 +40,9 @@ namespace KFCResultModel
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
 		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeDeleted		// ticked, and gone WITH the footnote / table / anchored object another
-							// ticked row deleted - counted as done; no place to jump to
+		kOutcomeDeleted		// asked for, and gone WITH the footnote / table / anchored object another
+							// replaced row deleted - counted as done; no place to jump to (the review's P-1:
+							// with one row written at a time, nothing reaches it now)
 	};
 
 	enum SearchScopeKind
@@ -104,7 +105,7 @@ struct KFCNotifyPayload
 	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
 };
 
-/** One saved Find/Change query as the query dialog shows it (2026-10-07 - KFCSavedQueries; the spec 1's section 2-2):
+/** One saved Find/Change query as the query dialog shows it (KFCSavedQueries; the query dialog's spec, section 2-2):
     the file, its name, its kind, InDesign's own or the user's, and whether the file is there now. */
 struct KFCSavedQuery
 {

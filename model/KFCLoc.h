@@ -67,19 +67,13 @@ namespace KFCLoc
 // enUS table (KFC_enUS.fr) - they ARE the English path.
 namespace KFCJa
 {
-	// ----- The replace's own alert, shown INSTEAD of running. -----
-	// The run stopped before writing anything: the verify walk found a ticked match that no longer
-	// begins where the search left it (KFCReplaceEngine::TellResultsWentStale). An opening that
-	// names the chapter where there is one to name, then what it means for the user.
-	// See KFCID.h for why this is a statement rather than a question.
+	// ----- The replace's STOPPED alert - shown by nothing now (KFCID.h says why; the review's P-3). -----
 	const wchar_t kStaleResultsDoc[]        = L"検索結果に変化を確認しましたので、置換を中止しました。";
 	const wchar_t kStaleResultsOne[]        = L"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
-	// What Edit > Undo calls a Change Checked run (the plug-in author's call).
+	// What Edit > Undo calls a row's Replace (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
 	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
 	const wchar_t kChangeAllStep[]          = L"すべてを置換";		// InDesign's own word for its Change All
-	// (No closing "please search again" line, on purpose: the alert states the outcome and the status
-	//  line carries what to do next - the plug-in author's call.)
 }
 
 #endif // __KFCLoc_h__

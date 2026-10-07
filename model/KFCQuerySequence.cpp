@@ -58,7 +58,7 @@ struct RunningFlagGuard
 };
 
 // ONE SAVED QUERY INTO EDIT > FIND/CHANGE. kFCQueryXMLReaderCmdBoss (TextWalkerServiceProviderID.h:135), measured
-// 2026-10-04 (docs/ai-notes/kfc-fcquery-reader-spike-2026-10-04.md): the query's own <QueryType> picks the tab and
+// (docs/ai-notes/kfc-fcquery-reader-spike-2026-10-04.md): the query's own <QueryType> picks the tab and
 // fills it whole - strings, switches and formats. A file that is not there answers kSuccess and changes nothing, so
 // the run asks for the file first (FileUtils::DoesFileExist). False = the command could not be made or reported a
 // failure; the error state is left clear.
@@ -78,9 +78,10 @@ bool LoadQuery(const IDFile& file)
 }
 
 // EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the spec's D7 - FindChangeByList.jsx empties the strings and the formats
-// after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - what it reaches is measured
-// on the first live run (plan A, Task 9 - M2), and this is where that answer is written. Outside the run's sequence:
-// a Ctrl+Z of the run must not bring the last query back.
+// after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on a live run
+// (docs/ai-notes/kfc-query-sequence-engine-2026-10-04.md, M2): the four strings (Text and GREP, find and change) come
+// back empty, and the dialog's Query box reads [Custom]. Outside the run's sequence: a Ctrl+Z of the run must not
+// bring the last query back.
 void ClearFindChange()
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kClearFindChangeOptionsCmdBoss));
@@ -176,9 +177,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		outSummary.Append("No queries in the run order.");
 		return 0;
 	}
-	// EVERY QUERY'S FILE, OR NO RUN (2026-10-07 night, the author: when a query cannot be found, the query run is not
-	// done at all - an order made in the dialog or loaded from a file alike). Until then a query whose file was gone was
-	// skipped and named, and the rest ran.
+	// EVERY QUERY'S FILE, OR NO RUN (the author's call: when a query cannot be found, the query run is not done at all -
+	// an order made in the dialog or loaded from a file alike - rather than skipping it and running the rest).
 	std::vector<PMString> notFound;
 	for (size_t q = 0; q < queries.size(); ++q)
 		if (!FileUtils::DoesFileExist(queries[q].file))
@@ -270,7 +270,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	}
 	seq->SetName(KFCLoc::Text(kKFCRunQueriesStepKey, KFCJa::kRunQueriesStep));
 
-	// ONE BAR FOR THE WHOLE RUN (2026-10-05, the deferred minor of the re-check): a query x document a step, its Cancel
+	// ONE BAR FOR THE WHOLE RUN: a query x document a step, its Cancel
 	// asked between steps - one document's Change All does not stop half way (the dialog's own rule). It comes down
 	// before the sequence ends: the chapters are handed back with no bar up.
 	{
@@ -391,7 +391,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		}
 	}
 
-	// A standing error is a failure nothing reported (ReplaceChecked's rule): taken back, and said.
+	// A standing error is a failure nothing reported (Change All in Book's rule too, KFCChangeAll.cpp): taken back, and said.
 	if (!cancelled && !failed && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 	{
 		failed = true;
@@ -466,7 +466,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	outSummary.Append(")");
 	if (selection.selected > 0)
 	{
-		// the Book panel's selected documents alone (2026-10-07 - the spec 1's section 4-4): "in S selected document(s) of T"
+		// the Book panel's selected documents alone (the query dialog's spec, section 4-4 - KFCQuerySequence.h names it):
+		// "in S selected document(s) of T"
 		outSummary.Append(" in ");
 		outSummary.AppendNumber(selection.selected);
 		outSummary.Append(" selected document(s) of ");

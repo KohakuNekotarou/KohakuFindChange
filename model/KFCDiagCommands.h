@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  WHICH COMMANDS A STRETCH OF KFC MADE INDESIGN RUN, AND HOW MANY (2026-10-05, the speed-up study -
+//  WHICH COMMANDS A STRETCH OF KFC MADE INDESIGN RUN, AND HOW MANY (the speed-up study -
 //  docs/ai-notes/kfc-speedup-ideas-2026-10-05.md; guide vol2-17's "Trace All Commands", and vol2-15: "commands
 //  should operate on lists" - each command stores undo information and notifies). A TEST BUILD'S instrument
 //  (the author: "put it on KFC, not borrowed from outside; it is off for the Exchange").
@@ -31,8 +31,8 @@ namespace KFCDiagCommands
 	/** Write "COMMANDS <what> total=<n> <class name>=<count> ..." (the most frequent first) and stop counting. */
 	void DisarmAndLog(const char* what);
 
-	/** Counting for the life of the object, whichever way the scope is left. ONE per run (a search, a Change Checked,
-	    a query run): an inner one would end the outer one's count. Nothing without KFC_DIAG. */
+	/** Counting for the life of the object, whichever way the scope is left. ONE per run (a search, a query run):
+	    an inner one would end the outer one's count. Nothing without KFC_DIAG. */
 	class Scope
 	{
 	public:

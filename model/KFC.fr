@@ -25,11 +25,10 @@
 #include "VCPlugInHeaders.h"
 
 // THE MODEL HALF'S RESOURCES.
-// The search and replace engines, the results, the tracked-change signature, the jump marker's
-// adornment and the observers that keep the results true are declared here; everything the panel
-// needs - its bosses, menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's
-// resource. The strings this half writes itself (the replace's own alert and what Edit > Undo
-// calls a KFC write) stay in KFC_enUS.fr.
+// The search and replace engines, the results, the undo mark, the jump marker's adornment and the
+// observers that keep the results true are declared here; everything the panel needs - its bosses,
+// menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's resource. The
+// strings this half writes itself (what Edit > Undo calls a KFC write) stay in KFC_enUS.fr.
 
 // General includes:
 #include "LocaleIndex.h"
@@ -163,8 +162,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * The panel follows an Undo and a Redo of KFC's own writes (the author: "after an Undo the row cannot
-	 * be rejected again - the panel should come back with it, the way KCM's does").
+	 * The panel follows an Undo and a Redo of KFC's own writes (the author: "the panel should come back
+	 * with it, the way KCM's does").
 	 * ON THE DOCUMENT, NOT THE STORY. Every write leaves a mark in its undo step (kKFCUndoMarkCmdBoss,
 	 * below): a ModelChange on its document's subject, under IID_IKFCUNDOMARK. This LAZY observer hears it
 	 * on the Do, the Undo and the Redo alike - lazy because that is the only notification an Undo and a
@@ -197,7 +196,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-	/** The test build's command counter (KFCDiagCommands.h, 2026-10-05): which commands a search or a write made
+	/** The test build's command counter (KFCDiagCommands.h): which commands a search or a write made
 		InDesign run, and how many. Created by name and handed to ICommandProcessor::InstallInterceptor - only in a build
 		with KFC_DIAG, only while the fault switch perf-commands is on. Declared in every build because a resource
 		cannot follow that define, and a boss named here with no implementation behind it would not load; in a build
@@ -213,7 +212,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * Close-document responder boss: retires a DOCUMENT-scope result set when the searched document
-	 * is closed - a row naming a closed document would still jump, and Change Checked would still
+	 * is closed - a row naming a closed document would still jump, and its Replace would still
 	 * reopen it to replace in it. Book results are left to the book-side responder.
 	 *
 	 * A boss that answers ONE signal does not need a ServiceProvider of its own: naming the API's

@@ -57,7 +57,7 @@ struct RunningFlagGuard
 	~RunningFlagGuard()	{ gRunning = false; }
 };
 
-/** "  By chapter: <name> (<n>), ... ." - how many each chapter got (2026-10-07, the author's addition: Change All in Book's
+/** "  By chapter: <name> (<n>), ... ." - how many each chapter got (the author's addition: Change All in Book's
 	result broken down by chapter): the chapters written only, in the book's order, ten at most and then "and N more" - the
 	message line is four lines high (spec map PNL-10). It goes last, after the notes, so a chapter that could not be
 	opened or was left open is never pushed out of sight by it. Two spaces before it, as before every note
@@ -98,7 +98,7 @@ const char* KFCChangeAll::CommandName()
 {
 	// One name (F18): a document's Change All is InDesign's own dialog's, so this command is the book's alone - said
 	// as the selected documents' when Find/Change Selected Documents (Book) narrows it to the Book panel's selection
-	// (2026-10-07 - asked of the one place that narrows the run, KFCBookScope's, as Find's name is).
+	// (asked of the one place that narrows the run, KFCBookScope's, as Find's name is).
 	if (KFCBookScope::IsBookScopeOn())
 	{
 		PMString bookName;
@@ -381,7 +381,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			unclosed.push_back(targets[i].shortName);
 	}
 
-	// ===== THE MESSAGE (the spec's section 4; the selected documents' form - 2026-10-07, spec 1 section 4-4).
+	// ===== THE MESSAGE (the spec's section 4; the selected documents' form - the query dialog's spec, section 4-4).
 	if (replaced == 0 && selection.selected > 0)
 	{
 		outSummary.Append("No match in the ");

@@ -325,7 +325,7 @@ namespace KFCResultModel
 	    false = index out of range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
 
-	/** HOW MANY OF THEM THIS LIST HAS REPLACED (Hit::replaced) - the R of a branch row's "(R/M)" (2026-10-07, the author:
+	/** HOW MANY OF THEM THIS LIST HAS REPLACED (Hit::replaced) - the R of a branch row's "(R/M)" (the author's call:
 	    a document row and a story row say how many of their hits have been replaced, "1/3"). Uncapped like M: every hit
 	    the row holds. An Undo of a replace puts the hit back as found, so the count follows it. 0 out of range. */
 	int32 GetChapterReplacedCount(int32 chapterIdx);

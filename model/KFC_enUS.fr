@@ -32,11 +32,10 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         {
                 // The model half's strings: what the model writes itself. Every other string is the UI
                 // half's (ui/KFCUI_enUS.fr). The Japanese for these is KFCLoc.h's.
-                // The replace's own alert, shown INSTEAD of running: the verify walk found a ticked
-                // match that no longer begins where the search left it, and nothing was written.
+                // The replace's STOPPED alert - shown by nothing now (KFCID.h says why; the review's P-3).
                 kKFCStaleResultsDocKey,			"The search results have changed, so the replace was stopped.",
                 kKFCStaleResultsOneKey,			"The search results for ^1 have changed, so the replace was stopped.",
-                // What Edit > Undo calls a Change Checked run.
+                // What Edit > Undo calls a row's Replace.
                 kKFCReplaceStepKey,				"Replace",
                 kKFCRunQueriesStepKey,			"Run Queries",
                 kKFCChangeAllStepKey,			"Change All",

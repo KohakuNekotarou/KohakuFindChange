@@ -82,13 +82,13 @@ public:
 	// promise to every built caller).
 	/** = KFCSearchEngine::SetQuery. */
 	virtual bool SetQuery(const PMString& text, int32 mode) = 0;
-	/** = KFCChangeAll::Run (2026-10-06) - Change All in Book (No List). */
+	/** = KFCChangeAll::Run - Change All in Book (No List). */
 	virtual int32 ChangeAll(PMString& outSummary) = 0;
 	/** = KFCChangeAll::ClearResults. */
 	virtual bool ClearResults(PMString& outStatus) = 0;
 	/** = KFCSearchEngine::HasFindQueryNow - Change All's greying. */
 	virtual bool HasFindQueryNow() = 0;
-	/** = KFCSavedQueries::List (2026-10-07) - the query dialog's left list. */
+	/** = KFCSavedQueries::List - the query dialog's left list. */
 	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) = 0;
 	/** = KFCSavedQueries::Describe - one query file of the dialog's run order: its name, kind and whether it is there. */
 	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) = 0;
@@ -100,7 +100,7 @@ public:
 	virtual bool DescribeRunScope(PMString& outWords) = 0;
 	/** = KFCChangeAll::CommandName - "Change All in Book (No List)" / "Change All in Selected Documents (No List)". */
 	virtual const char* ChangeAllCommandName() = 0;
-	/** = KFCReplaceEngine::PreviewHit (appended 2026-10-07) - a GREP row's after-text, written and thrown away. */
+	/** = KFCReplaceEngine::PreviewHit (appended) - a GREP row's after-text, written and thrown away. */
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) = 0;
 };
 

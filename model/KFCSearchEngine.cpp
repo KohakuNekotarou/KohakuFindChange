@@ -1062,7 +1062,7 @@ enum HitDetail
 // then the page, the flags and the story's first words. The offsets are CODE POINTS, not UTF-16
 // units - see the note at the head of this file.
 #ifdef KFC_DIAG
-// TEST BUILDS ONLY (2026-10-05, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): where BuildHit spends its time over one
+// TEST BUILDS ONLY (docs/ai-notes/kfc-speedup-ideas-2026-10-05.md): where BuildHit spends its time over one
 // walk - the line's text, the story's lead, the place (frame, page, overset). Reset and written by CollectHitsInDoc
 // (SEARCHTIME).
 struct BuildHitTimes
@@ -1250,7 +1250,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// time and wants to carry on the walk it already has. This panel lists a whole document in one
 	// run, so it always wants a walk of its own from the top.
 	//
-	// (Since 2026-10-06 the walker is KFC's own - AcquireWalker - so a search started from this panel leaves a Find
+	// (The walker is KFC's own - AcquireWalker - so a search started from this panel leaves a Find
 	// Next sequence the user had going in the Find/Change dialog where it was: measured, s1-findnext2.ps1.)
 	if (walker->IsWalking())
 		walker->Halt();
@@ -2963,7 +2963,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	std::vector<KFCBookScope::ChapterDoc> targets;
 	PMString bookName;
-	// How much of the book the run takes (2026-10-07 - Find/Change Selected Documents (Book)): selected 0 = all of it.
+	// How much of the book the run takes (Find/Change Selected Documents (Book)): selected 0 = all of it.
 	KFCBookScope::BookSelection selection;
 	// Chapters the book could not hand over at all. Declared out here so the summary can name them
 	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
@@ -3167,7 +3167,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	outSummary.Append(" hit(s)");
 	if (fromBook && selection.selected > 0)
 	{
-		// "in M of S selected document(s) (T in the book)" (2026-10-07 - the spec 1's section 4-4): M held a hit, S were
+		// "in M of S selected document(s) (T in the book)" (the query dialog's spec, section 4-4): M held a hit, S were
 		// the Book panel's selected documents - all that was looked at - and T is the book, so the narrowing is said.
 		outSummary.Append(" in ");
 		outSummary.AppendNumber(chaptersWithHits);
@@ -3204,7 +3204,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(fellBackNote);	// a Search: the selection did not offer (empty otherwise)
 	}
 
-	// One limit since 2026-10-06 (F9): collected = drawn.
+	// One limit (F9): collected = drawn.
 	if (collectionTruncated)
 	{
 		// THE LIMIT (F9): the rows are a list to walk and replace one at a time - more than this is a Change All's
@@ -3221,7 +3221,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	outSummary.Append(chapterNotes);
 
-	// How to replace (2026-10-06, spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
+	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
 	// (F17) - is the one write from the list, and nothing else on screen says so (the user's request).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
@@ -3343,8 +3343,8 @@ const char* KFCSearchEngine::FindCommandName(bool bookScopeOn)
 {
 	if (bookScopeOn)
 	{
-		// a part of the book selected in the Book panel, with the toggle on: the run takes those alone (2026-10-07 -
-		// asked of the one place that narrows the run, KFCBookScope's, so the name and the run cannot differ)
+		// a part of the book selected in the Book panel, with the toggle on: the run takes those alone (asked of the
+		// one place that narrows the run, KFCBookScope's, so the name and the run cannot differ)
 		PMString bookName;
 		KFCBookScope::BookSelection selection;
 		if (KFCBookScope::DescribeTargetBook(bookName, selection) && selection.selected > 0)
@@ -3418,8 +3418,8 @@ bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIn
 	return false;
 }
 
-// A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE (2026-10-06 -
-// docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
+// A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE
+// (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
 // the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
 // way the search reads a hit (ReadHitText) and taken only with the row's own hash and line - both read again when
 // its replace was written. Exactly one, and no other row on it, or nothing moves: the rule the rows not replaced keep

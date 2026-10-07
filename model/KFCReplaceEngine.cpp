@@ -445,7 +445,7 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 // One story's walk: every pending row the walk meets is written, one at a time, in the direction the
 // session is set to (the caller's KFCBackwardSearchScope). What the walk writes moves every row after it
 // in the same thread (CarryRowsPast); a written row is put where its new text stands - an endnote's
-// last match too, written as InDesign writes it (2026-10-06, spec F12). What is still in `pending` at the
+// last match too, written as InDesign writes it (spec F12). What is still in `pending` at the
 // end never came up. False = the walk could not start at all; outWalkFailed = it started and broke off.
 bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	IFindChangeOptions* opts, std::vector<RowNow>& rowNow, std::set<int32>& pending, std::vector<int32>& keptRows,
@@ -473,8 +473,8 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	{
 		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 #ifdef KFC_DIAG
-		// TEST BUILDS ONLY: where a story's walk spends its time (2026-10-05 - a query run that wrote 6000 rows in two
-		// 3000-row stories took 23 minutes; each story was ONE paragraph, which every find recomposed whole - in short
+		// TEST BUILDS ONLY: where a story's walk spends its time (measured when the query run still wrote through this
+		// walk: 6000 rows in two 3000-row stories took 23 minutes; each story was ONE paragraph, which every find recomposed whole - in short
 		// paragraphs a row costs about 7 ms, flat). Summed per phase over one story's walk and written once (WALKTIME); every
 		// 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does something pile up?).
 		double tFind = 0, tMatch = 0, tReplace = 0, tTexts = 0, tCarry = 0;
@@ -682,7 +682,7 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 		// carried to while its story is at the version KFC left it at: every write of KFC's carries every row past it
 		// (CarryRowsPast), so the place is exact until something else edits the story. Asked by reading, it was never
 		// carried - its line kept the text of the moment it was written, and a write before it left its place behind
-		// (cases adjacent-delete, jump-replaced-empty; until 2026-10-06 its tracked change found it).
+		// (cases adjacent-delete, jump-replaced-empty).
 		if (written.IsEmpty())
 			return a == b && StoryAsKFCLeftIt(chapterIdx, db, story);
 		return KFCSearchEngine::ReadText(UIDRef(db, story), a, b - a) == written;
@@ -1492,7 +1492,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 }
 
 // ======================================================================================================
-// A GREP ROW'S AFTER-TEXT - WRITTEN, READ, AND THROWN AWAY (2026-10-07, the author: an ordinary search's row shows what
+// A GREP ROW'S AFTER-TEXT - WRITTEN, READ, AND THROWN AWAY (the author's call: an ordinary search's row shows what
 // it would become, as an ordinary search's after-text - GREP only, the row selected, that row alone). The row's own
 // Replace (ReplaceInChapterOneByOne, as ReplaceRowNow writes it), inside an ABORTABLE sequence that is then aborted -
 // measured in KT first (docs/ai-notes/kfc-preview-spike-2026-10-07.md):

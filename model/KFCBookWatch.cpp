@@ -45,7 +45,7 @@
 //  chapters back in the same breath. So when this gate is false, what is left open is only what
 //  REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
 //  unsaved work or when its close is refused, and those two outlive the path that named their book.
-//  Nothing is stranded by it: the next search or Show Changes calls ReleaseSearchedBook on its way in
+//  Nothing is stranded by it: the next search or query run calls ReleaseSearchedBook on its way in
 //  (KFCSearchEngine::DropResults) and tries them again, and a chapter kept for unsaved work is one a
 //  replace has already reported to the user.
 //
@@ -222,7 +222,7 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// KFCPanelAlpha's re-apply chain rests on the same inference.)
 	//
 	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's
-	// chapters are not handed back HERE - but the next search or Show Changes calls ReleaseSearchedBook
+	// chapters are not handed back HERE - but the next search or query run calls ReleaseSearchedBook
 	// on its way in and hands them back then (KFCSearchEngine::DropResults, at its commit point). A
 	// REPLACE does not: it keeps the searched book on purpose, its results being still on the panel. So
 	// the worst case is a book's results left on the panel, and any chapter that refused to close left

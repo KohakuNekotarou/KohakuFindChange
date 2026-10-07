@@ -81,7 +81,7 @@ namespace
 	// Find/Change's Search: names.
 	bool gBookScopeOn = false;
 
-	// Find/Change Selected Documents (Book) (2026-10-07): narrows a Book Scope run to the Book panel's selected
+	// Find/Change Selected Documents (Book): narrows a Book Scope run to the Book panel's selected
 	// documents. OFF at launch unless Save Panel Settings restored it (KFCPanelState.cpp, key "selectedDocuments").
 	bool gSelectedDocumentsOn = false;
 
@@ -277,7 +277,7 @@ namespace
 		return (activeBook != nil && activeBook->IsOpen()) ? activeBook : nil;
 	}
 
-	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (2026-10-07 - Find/Change Selected Documents
+	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (Find/Change Selected Documents
 	    (Book), docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
 	    book's own BookContent UIDs the Book panel showing it has selected, in the book's order - EMPTY for the whole
 	    book: the toggle off, no UI half (a background thread, InDesign Server), no panel showing this book, none or all
@@ -321,7 +321,7 @@ void KFCBookScope::SetBookScopeOn(bool on)
 {
 	// Just the flag. Nothing is closed and nothing is cleared here: KESCL's first shape closed the
 	// held chapters right inside the toggle and crashed (see KESCLBookScope::SetBookSearchOn). The
-	// held chapters are released by the next search (either scope) or Show Changes at its commit
+	// held chapters are released by the next search (either scope) or query run at its commit
 	// point, or when their book closes - not at shutdown, which only forgets them (ShutdownCleanup) -
 	// and a jump into a chapter the user closed meanwhile goes through ReopenChapterDoc anyway.
 	gBookScopeOn = on;
@@ -727,7 +727,7 @@ bool KFCBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	//   conversion open - the user's, in a window, or one this
 	//   module holds windowless - it names the same document as the walk. With TWO open it does not: the walk
 	//   took the copy opened first (the one the results were already bound to), the call the copy opened
-	//   later - so a jump or a Reject Change would have moved to the copy that holds none of this plug-in's
+	//   later - so a jump or a replace would have moved to the copy that holds none of this plug-in's
 	//   writes. So the walk stays, on purpose. (Which of two copies is "the" chapter is not something
 	//   either answer decides; the walk only kept the results where they were in that measurement.)
 	//
@@ -1142,7 +1142,7 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// Selecting a book's tab switches the panel but does NOT make that book active - only touching
 	// a chapter inside it does (measured). So asked for the active book, a user who picks a tab and
 	// runs a search gets whatever book was active before, silently. For a search that is confusing;
-	// for Change Checked it would rewrite the wrong book, which is unacceptable. Adobe splits the two
+	// for Change All in Book it would rewrite the wrong book, which is unacceptable. Adobe splits the two
 	// ideas in IBookUIUtils itself (GetBookFileFromBookPanel vs "the active book"), so the panel's own
 	// book is the right thing to ask for. It falls back to the active book when the panel cannot be
 	// reached, rather than failing outright.
@@ -1176,7 +1176,7 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	}
 
 	const int32 contentCount = contentMgr->GetContentCount();
-	// FIND/CHANGE SELECTED DOCUMENTS (BOOK) (2026-10-07): the Book panel's selection, read as the run starts - only
+	// FIND/CHANGE SELECTED DOCUMENTS (BOOK): the Book panel's selection, read as the run starts - only
 	// those chapters, when it is a part of the book (empty = the whole book). SelectedChapterContents says when.
 	const std::vector<UID> taken = SelectedChapterContents(book);
 	if (outSelection != nil)

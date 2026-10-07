@@ -76,14 +76,14 @@ DECLARE_PMID(kClassIDSpace, kKFCCloseDocResponderBoss, kKFCPrefix + 9)
 // The jump marker: a global text adornment service - IID_IK2SERVICEPROVIDER =
 // kGlobalTextAdornmentServiceImpl + our IGlobalTextAdornment (KFCHitMarker.cpp). Replaces +5.
 DECLARE_PMID(kClassIDSpace, kKFCHitMarkerBoss, kKFCPrefix + 17)
-// RETIRED (not reused): the command that signed the tracked changes one replace made (2026-10-06 - KFC records
-// nothing of its own, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1).
-//DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)	// retired 2026-10-06 (the signing command - never reuse)
+// RETIRED (not reused): the command that signed the tracked changes one replace made (KFC records nothing of its
+// own now - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1).
+//DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)
 // The mark every write of KFC's own leaves in its undo step (KFCUndoFollow.cpp): a command that changes
 // nothing and raises a ModelChange on its document's subject, so the panel hears that step's Undo and
 // Redo through an observer on the document. (+ 22: + 19 ... + 21 went to the UI half at the split.)
 DECLARE_PMID(kClassIDSpace, kKFCUndoMarkCmdBoss, kKFCPrefix + 22)
-// The test build's command counter (KFCDiagCommands.h, 2026-10-05): an ICommandInterceptor, created and installed only
+// The test build's command counter (KFCDiagCommands.h): an ICommandInterceptor, created and installed only
 // in a build with KFC_DIAG while the fault switch perf-commands is on - in every other build it is never created.
 DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 
@@ -137,9 +137,10 @@ DECLARE_PMID(kImplementationIDSpace, kKFCResultsImpl, kKFCPrefix + 24)
 DECLARE_PMID(kImplementationIDSpace, kKFCRunsImpl, kKFCPrefix + 25)
 DECLARE_PMID(kImplementationIDSpace, kKFCChaptersImpl, kKFCPrefix + 26)
 DECLARE_PMID(kImplementationIDSpace, kKFCHitMarkerAdornmentImpl, kKFCPrefix + 33)	// IGlobalTextAdornment: the jump marker (KFCHitMarker.cpp)
-// RETIRED (not reused): the signing command's two (2026-10-06 - spec F1). (+ 34 onwards: + 23 ... + 28 are the boundary's.)
-//DECLARE_PMID(kImplementationIDSpace, kKFCSignRecordsCmdImpl, kKFCPrefix + 34)	// retired 2026-10-06 (the signing command - never reuse)
-//DECLARE_PMID(kImplementationIDSpace, kKFCInt64DataImpl, kKFCPrefix + 35)		// retired 2026-10-06 (the signing command's data - never reuse)
+// RETIRED (not reused): the signing command's two - the command and its data (spec F1). (+ 34 onwards: + 23 ... + 28
+// are the boundary's.)
+//DECLARE_PMID(kImplementationIDSpace, kKFCSignRecordsCmdImpl, kKFCPrefix + 34)
+//DECLARE_PMID(kImplementationIDSpace, kKFCInt64DataImpl, kKFCPrefix + 35)
 // RETIRED (not reused): the lazy observer on each story a write of KFC's own moved - see
 // IID_IKFCSTORYUNDOOBSERVER above for why it went.
 //DECLARE_PMID(kImplementationIDSpace, kKFCStoryUndoObserverImpl, kKFCPrefix + 38)
@@ -151,35 +152,19 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDocUndoObserverImpl, kKFCPrefix + 41)
 DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 
 
-// StringKeys - the model half's (KFC_enUS.fr): the replace's own alert and what Edit > Undo calls a
-// KFC write. Every other key is the UI half's (KFCUIID.h, KFCUI_enUS.fr). The English lives in
-// KFC_enUS.fr; the Japanese in KFCLoc.h.
-// The replace's own alert, shown INSTEAD of running.
-//
-// A replace writes the match standing at each ticked row's place, so the rows only mean what they
-// say while the matches are where the search left them, holding the text it found. The run makes
-// sure of that before it writes anything (the verify walk in KFCReplaceEngine's resolve pass, by place
-// and text) and stops if they are not.
-//
-// A STATEMENT, NOT A QUESTION: a work list that has come apart cannot be replaced safely whatever
-// anyone answers, so there is nothing to ask. (A per-chapter "the text has been edited - carry on /
-// cancel?" alert stood here once and was dropped for exactly that reason.)
-//
-// Translated, because it is about the user's own text. The status line that reports the outcome
-// stays English.
-// The run STOPPED because the results no longer describe the document: the verify walk found a
-// ticked match that no longer begins where the search left it, and nothing has been written
-// (KFCReplaceEngine::TellResultsWentStale). One wording names the chapter, one does not - a
-// document-scope run has no chapter to name.
+// StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI
+// half's (KFCUIID.h, KFCUI_enUS.fr). The English lives in KFC_enUS.fr; the Japanese in KFCLoc.h.
+// The replace's STOPPED alert ("the search results have changed, so the replace was stopped") - shown by
+// nothing since Change Checked's verify alert (KFCReplaceEngine::TellResultsWentStale) went: a row's Replace
+// says why on the status line. The two keys, their English and their Japanese (KFCLoc.h) wait for the author's
+// call to remove them (docs/ai-notes/kfc-v13-review.md, P-3).
 #define kKFCStaleResultsDocKey		kKFCStringPrefix "kKFCStaleResultsDocKey"
 #define kKFCStaleResultsOneKey		kKFCStringPrefix "kKFCStaleResultsOneKey"
-// What Edit > Undo calls a Change Checked run ("Replace" - the author's call; the Japanese UI's is
-// KFCJa::kReplaceStep). See the sequence in KFCReplaceEngine::ReplaceChecked for why it is named.
+// What Edit > Undo calls a row's Replace ("Replace" - the author's call; the Japanese UI's is
+// KFCJa::kReplaceStep). See BeginPlainSequence in KFCReplaceEngine.cpp.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"
 #define kKFCRunQueriesStepKey		kKFCStringPrefix "kKFCRunQueriesStepKey"	// the query run's undo step (KFCQuerySequence)
 #define kKFCChangeAllStepKey		kKFCStringPrefix "kKFCChangeAllStepKey"	// Change All in Book (No List)'s undo step (KFCChangeAll)
-// (No "Please search again." tail, on purpose: the alert states the outcome in one sentence and the
-//  status line carries what to do next - the author's call.)
 
 // RETIRED (not reused): the script element IDs of app.kfcStatus / app.kfcResults, and
 // with them the four-character ScriptIDs 'pKBs' / 'pKBr' (docs/ai-notes/kes-scriptid-registry.md).

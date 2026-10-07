@@ -16,7 +16,7 @@
 //  opened it and whatever is in it: the user can see it, so it is theirs. What stays held BETWEEN
 //  runs is therefore only what was reopened windowless and never shown - a jump whose window could
 //  not be raised, a replace whose chapter took none - which ReleaseHeldDocs hands back when the
-//  results are let go (ReleaseSearchedBook - the next search, of any scope, or Show Changes at its
+//  results are let go (ReleaseSearchedBook - the next search, of any scope, or query run at its
 //  commit point), when the book is closed (KFCBookWatch), and when a replace is cancelled. Those
 //  closes are UI-suppressed, so a chapter with unsaved work in it is kept as well (see
 //  ReleaseHeldDocs). At application quit nothing is handed back: ShutdownCleanup only forgets the
@@ -70,12 +70,12 @@ namespace KFCBookScope
 
 	/** Flip the scope. JUST THE FLAG: nothing is closed and no result is cleared here (KESCL
 	    learned this the hard way - closing the held chapters inside the toggle crashed). The held
-	    windowless chapters are released by the next search (of either scope) or Show Changes at its
+	    windowless chapters are released by the next search (of either scope) or query run at its
 	    commit point, or when their book is closed, and a jump into a chapter the user closed since
 	    reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
-	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    G9, G10): while it is ON and Book Scope is on, a run takes only the documents selected in the Book panel - none
 	    or all selected is the whole book. It does nothing with Book Scope off (the menu greys it then). A session flag
 	    like Book Scope's, but kept by Save Panel Settings (the author's call), so OFF at launch unless that restored it. */
@@ -90,7 +90,7 @@ namespace KFCBookScope
 	    IBookContentMgr::GetContentCount - the list ListBookChapters walks).
 
 	    The one answer to "would a book run have something to run on", asked by the menu gate
-	    (HasScopeTarget) and by the front doors of the search and Show Changes - through the run's own
+	    (HasScopeTarget) and by the front doors of the search and the book's runs - through the run's own
 	    resolver (ResolveTargetBook in the .cpp), not a copy of it. Doors that asked only whether a
 	    book is ACTIVE, while the run resolves the PANEL's book, would answer the same question two
 	    ways - a book on show in the panel with no active book behind it turned away at every door the
@@ -113,8 +113,8 @@ namespace KFCBookScope
 
 	/** Is there anything for the CURRENT scope to run on - a target book with chapters while Book
 	    Scope is ON (GetTargetBook), an active document while it is OFF? Asked by the menu's
-	    enablement (KFCActionComponent's UpdateActionStates) so the two commands that start a run -
-	    Find and Show Changes - go grey when there is nothing to run them against, rather
+	    enablement (KFCActionComponent's UpdateActionStates) so the two commands that start a run on it -
+	    Find and Change All in Book - go grey when there is nothing to run them against, rather
 	    than starting and reporting "No open document to search."
 
 	    It asks exactly what the engines ask when they resolve their own scope - GetTargetBook() and
@@ -157,7 +157,7 @@ namespace KFCBookScope
 		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
 	};
 
-	/** How much of the target book a run takes (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	/** How much of the target book a run takes (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): total = the book's documents; selected = how many of them a run takes when it is narrowed to the
 	    Book panel's selection (Find/Change Selected Documents (Book)), 0 = the whole book. */
 	struct BookSelection
@@ -173,7 +173,7 @@ namespace KFCBookScope
 	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
 	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
 	    the last run left held, and this does not.
-	    NARROWED (2026-10-07): with Find/Change Selected Documents (Book) on and a PART of the book selected in the
+	    NARROWED: with Find/Change Selected Documents (Book) on and a PART of the book selected in the
 	    Book panel that shows it, only those chapters are listed - read now, as the run starts (section 4-2).
 	    outSelection, when given, says how many were taken and of how many (selected 0 = the whole book).
 
@@ -181,7 +181,7 @@ namespace KFCBookScope
 	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
 	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection = nil);
 
-	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (2026-10-07, the same section): its title, how many documents it
+	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (the same section): its title, how many documents it
 	    holds and how many a run would take (the same narrowing as ListBookChapters, from the same place) - the book
 	    ListBookChapters would list (ResolveTargetBook). For the words that name a run before it starts (the menu's
 	    names, the query dialog's Runs on: line), so it may be asked at any time: unlike ListBookChapters it records
@@ -217,7 +217,7 @@ namespace KFCBookScope
 
 	    Names are appended RAW, ampersands and all: the message area is drawn by hand and takes '&' as
 	    it is (the note at the definition says what doubling them looked like). Every chapter note is
-	    built on it - AppendUnopenableNote, AppendUnclosedNote, the search's two and Show Changes' one. */
+	    built on it - AppendUnopenableNote, AppendUnclosedNote and the search's two. */
 	void AppendChapterNote(PMString& outSummary, const char* what, const std::vector<PMString>& names,
 		const char* tail);
 
@@ -319,7 +319,7 @@ namespace KFCBookScope
 	    command sequence, with no walk standing). The search asks for it at its commit point: a SCHEDULED
 	    close leaves the chapter open, and no longer held, until the run is over - so an All Documents walk
 	    would meet it, list it as a document of the user's, and lose its rows when the close went through
-	    after the search. Show Changes asks for it at its own commit point as well (one rule for both). */
+	    after the search. The query run asks for it at its own commit point as well (one rule for both). */
 	void ReleaseHeldDocs(bool closeNow = false);
 
 	/** Close THIS chapter, if KFC is the one who opened it AND it has nothing unsaved in it. A
@@ -354,7 +354,7 @@ namespace KFCBookScope
 	bool ReleaseHeldDoc(const UIDRef& docRef, bool closeNow = false);
 
 	/** A RUN HANDS A CHAPTER BACK ON THE SPOT - AND SAYS WHETHER ONE OF OURS IS LEFT STANDING - one
-	    answer for the search, Show Changes and the replace. ReleaseHeldDoc(docRef, closeNow = true),
+	    answer for the search, Change All in Book and the query run. ReleaseHeldDoc(docRef, closeNow = true),
 	    its false read with the two questions it cannot answer alone: was the chapter ours (IsHeldDoc,
 	    BEFORE - one the user had open is never ours to close), and is it still open (IsDocStillOpen,
 	    AFTER - one the user closed under the run is not left behind). False ONLY for a chapter of

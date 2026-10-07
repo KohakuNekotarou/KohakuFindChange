@@ -15,7 +15,7 @@
 //      "P<page>(n) overset" and sorts into that page instead of being pushed to the end.
 //    * KFCSearchEngine::EditableFrameForMatch - answers WHICH FRAME speaks for an overset match, so
 //      the editable / locked-layer test asks about the frame carrying the "+" - and with it whether
-//      the row gets a check box and whether the replace refuses it.
+//      the row's Replace is greyed and whether the replace refuses it.
 //
 //  When the position's own thread has nothing placed (a table or one of its rows is pushed out of
 //  its frame, so the cell itself is gone; a footnote whose reference character is overset, so it was
