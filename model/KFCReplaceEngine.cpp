@@ -508,6 +508,15 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				damagedBefore = (damageFrames != nil) ? damageFrames->GetFirstDamagedFrameIndex() : -3;
 			}
 #endif
+#ifdef KFC_DIAG
+			// (Fault switch replace-walk-fail, a test build's only - KFCDiag.h: InDesign's find breaks off with an error at
+			// once, the one way a test reaches a walk that stops before the row.)
+			if (KFC_DIAG_FAULT("replace-walk-fail"))
+			{
+				outWalkFailed = true;
+				break;
+			}
+#endif
 			KFC_CLOCK(cFind);
 			const IFindChangeService::FindChangeResult found = RunWalkerCmd(kFindTextCmdBoss, walker, story, start, end);
 			KFC_SPENT(tFind, cFind);
@@ -1414,6 +1423,13 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 		bool searchAgain = false;
 		if (locked > 0)
 			why = "the match is locked now (a locked layer or story)";
+		else if (walkFailed)
+		{
+			// The walk broke off before it reached the row: the row is "not found" only because nobody looked (the
+			// search's own "stopped with a search error" - measured, case xq-walkfail).
+			why = "InDesign's search stopped with an error before it reached the match";
+			searchAgain = true;
+		}
 		else if (missing > 0)
 		{
 			why = "the match was not found where the search found it";
