@@ -62,7 +62,7 @@
 
 - **JMP-12** ジャンプできないときは、メッセージ欄に理由を出す ――
   章に届かない＝`Cannot open that chapter - moved, deleted, or in use?`／窓を前に出せない＝`Cannot bring that chapter's window to the front.`／
-  一緒に消えた行（`deleted`）＝`This match went with the footnote, table or object another replaced match deleted - there is nothing left to go to.`
+  行に場所が無い（守り＝検索が作る行にはいつも場所があり、KFC が場所を消すことも無い）＝`This row has no place in its story to go to. Search again.`（2026-10-08 に `deleted` の行の文から改めた）
   どの場合も、前のジャンプの印は消す（動かなかった画面の上に古い印を残さない）。
   - 訂正:
 

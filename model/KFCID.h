@@ -154,12 +154,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI
 // half's (KFCUIID.h, KFCUI_enUS.fr). The English lives in KFC_enUS.fr; the Japanese in KFCLoc.h.
-// The replace's STOPPED alert ("the search results have changed, so the replace was stopped") - shown by
-// nothing since Change Checked's verify alert (KFCReplaceEngine::TellResultsWentStale) went: a row's Replace
-// says why on the status line. The two keys, their English and their Japanese (KFCLoc.h) wait for the author's
-// call to remove them (docs/ai-notes/kfc-v13-review.md, P-3).
-#define kKFCStaleResultsDocKey		kKFCStringPrefix "kKFCStaleResultsDocKey"
-#define kKFCStaleResultsOneKey		kKFCStringPrefix "kKFCStaleResultsOneKey"
+// (No alert of its own: a row's Replace says why it did not write on the status line.)
 // What Edit > Undo calls a row's Replace ("Replace" - the author's call; the Japanese UI's is
 // KFCJa::kReplaceStep). See BeginPlainSequence in KFCReplaceEngine.cpp.
 #define kKFCReplaceStepKey			kKFCStringPrefix "kKFCReplaceStepKey"

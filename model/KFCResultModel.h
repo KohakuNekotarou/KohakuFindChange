@@ -360,11 +360,6 @@ namespace KFCResultModel
 	// (No script property hands the result set out as text: the regression suite reads the panel
 	//  through KIDMCP.)
 
-	/** A hit node's display: the page locator and the three line segments to paint. false = index
-	    out of range. @see GetHitRow when the flags are wanted as well. */
-	bool GetHitDisplay(int32 chapterIdx, int32 hitIdx,
-		PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost);
-
 	/** A hit's jump anchors: the chapter's document / file and the match's story + text range.
 	    false = index out of range. */
 	bool GetHitLocation(int32 chapterIdx, int32 hitIdx,
@@ -416,9 +411,6 @@ namespace KFCResultModel
 	/** False when the row is not replaced, or the index is out of range. */
 	bool GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText);
 
-	/** The row's text went with an object another replaced row deleted: replaced, no range, "deleted". */
-	void SetHitDeleted(int32 chapterIdx, int32 hitIdx);
-
 	/** A chapter's document binding and file. The replace pass works chapter at a time, so it
 	    needs this without going through a hit. false = index out of range. */
 	bool GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile);
@@ -432,8 +424,8 @@ namespace KFCResultModel
 	    the match whole - see HashMatchText (KFCSearchEngine.cpp).
 
 	    Its own getter because it runs once per row a door asks about, and the other getters carry freight it
-	    does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitDisplay copies four
-	    PMStrings to hand back one. false = index out of range. */
+	    does not want: GetHitLocation copies a UIDRef and an IDFile, GetHitRow copies every
+	    string the row draws. false = index out of range. */
 	bool GetHitMatchIdentity(int32 chapterIdx, int32 hitIdx, UID& outStoryUID, TextIndex& outStart,
 		TextIndex& outEnd, uint64& outHash);
 
@@ -520,7 +512,7 @@ namespace KFCResultModel
 		const PMString& newMatch, const PMString& newPost, uint64 newMatchHash);
 
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
-	    pass and the outcome setters (SetHitOutcome, SetHitDeleted) all call it, so they cannot drift apart.
+	    pass and the outcome setter (SetHitOutcome) both call it, so they cannot drift apart.
 
 	        P<page>(<n>) overset hidden locked     -> hit.locator
 	        missing | refused                      -> hit.accentFlag, drawn after it in accent colour

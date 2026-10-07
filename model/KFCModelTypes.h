@@ -39,10 +39,7 @@ namespace KFCResultModel
 		kOutcomeNone = 0,	// replaced, or never reached
 		kOutcomeMissing,	// the text could not be found where the search left it (moved or deleted)
 		kOutcomeLocked,		// it became locked between the search and the replace
-		kOutcomeRefused,	// InDesign's own replace command would not run there
-		kOutcomeDeleted		// asked for, and gone WITH the footnote / table / anchored object another
-							// replaced row deleted - counted as done; no place to jump to (the review's P-1:
-							// with one row written at a time, nothing reaches it now)
+		kOutcomeRefused		// InDesign's own replace command would not run there
 	};
 
 	enum SearchScopeKind

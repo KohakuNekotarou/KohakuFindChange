@@ -636,8 +636,8 @@ public:
 	~ActivationGuard() { gActivating = false; }
 };
 
-// Does a row name a place in its story? False for a "deleted" row (KFCResultModel::SetHitDeleted),
-// whose range is kInvalidTextIndex on purpose - there is no text left for it to point at.
+// Does a row name a place in its story? Every row the search makes does, and nothing in KFC takes one away -
+// asked anyway, because what follows (the overset test, the spread, the wax rectangle) must never be handed -1.
 bool RowHasPlace(TextIndex start, TextIndex end)
 {
 	return start != kInvalidTextIndex && end != kInvalidTextIndex && start >= 0 && end >= start;
@@ -645,7 +645,7 @@ bool RowHasPlace(TextIndex start, TextIndex end)
 
 void SayRowHasNoPlace()
 {
-	PMString message("This match went with the footnote, table or object another replaced match deleted - there is nothing left to go to.");
+	PMString message("This row has no place in its story to go to. Search again.");
 	message.SetTranslatable(kFalse);
 	KFCResultTree::ShowStatus(message);
 }
@@ -743,10 +743,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
-	// A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY. A "deleted" row - its text went with the
-	// footnote, table or anchored object another replaced row deleted (KFCResultModel::SetHitDeleted) -
-	// keeps kInvalidTextIndex as its range. Nothing below asks about that: the overset test, the
-	// spread and the wax rectangle would all be handed -1.
+	// A ROW WITH NO PLACE GOES NOWHERE, AND SAYS WHY (RowHasPlace). Nothing below asks about that: the
+	// overset test, the spread and the wax rectangle would all be handed -1.
 	if (!RowHasPlace(start, end))
 	{
 		KFCHitMarkerView::Hide();
@@ -981,8 +979,8 @@ bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
 		return false;
 
-	// A "deleted" row has no range at all (see JumpToHit) - said before the zero-width test below,
-	// which would otherwise answer it with the wrong reason.
+	// A row with no range at all (see JumpToHit) - said before the zero-width test below, which would
+	// otherwise answer it with the wrong reason.
 	if (!RowHasPlace(start, end))
 	{
 		SayRowHasNoPlace();

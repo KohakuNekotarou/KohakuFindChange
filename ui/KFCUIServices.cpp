@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The UI half's side of IKFCUIServices.h (the model/UI split): the progress bar, the windows, the Book
-//  panel and the alert the model half asks for. AddIn'd on kSessionBoss from the UI half's resource, so a
+//  The UI half's side of IKFCUIServices.h (the model/UI split): the progress bar, the windows and the Book
+//  panel the model half asks for. AddIn'd on kSessionBoss from the UI half's resource, so a
 //  background thread - which loads no UI plug-in - finds nothing there and the model does without. Each
 //  answer is what KFCBookScope / the engines did themselves before the split, carried over unchanged; the
 //  notes are theirs.
@@ -22,7 +22,6 @@
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
 
 // General includes:
-#include "CAlert.h"
 #include "CmdUtils.h"
 #include "CPMUnknown.h"
 #include "DocumentPresFindCriteria.h"	// FindPresCriteria::accept_all (WidgetBin - this is the UI half)
@@ -137,15 +136,6 @@ public:
 	virtual bool GetPanelBookFile(IDFile& outFile)
 	{
 		return KFCBookPanelLookup::GetPanelBookFile(outFile);
-	}
-
-	/** CAlert::WarningAlert - THE OFFICIAL CALL FOR EXACTLY THIS: a message and a warning icon
-	    (CAlert.h:75-79). Its one caller was the replace's "the results went stale" alert, which went with
-	    Change Checked - no caller now; removing the door waits for the author's call (docs/ai-notes/kfc-v13-review.md,
-	    P-2). */
-	virtual void WarningAlert(const PMString& message)
-	{
-		CAlert::WarningAlert(message);
 	}
 
 	virtual bool GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)

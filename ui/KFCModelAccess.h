@@ -8,7 +8,7 @@
 //  puts on kSessionBoss, one line each. The UI half includes THIS and the shared types - never a model
 //  header that declares the model's functions, which another plug-in cannot link to.
 //
-//      KFCResults()->GetChapterCount()        // = KFCResultModel::GetChapterCount() in the model
+//      KFCResults()->GetTotalHitCount()        // = KFCResultModel::GetTotalHitCount() in the model
 //      KFCRuns()->SearchBook(summary)          // = KFCSearchEngine::SearchBook(summary)
 //      KFCChapters()->IsBookScopeOn()          // = KFCBookScope::IsBookScopeOn()
 //

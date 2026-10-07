@@ -679,19 +679,6 @@ void KFCResultModel::MarkUpBreaksForDisplay(PMString& s)
 	s.SetTranslatable(kFalse);
 }
 
-bool KFCResultModel::GetHitDisplay(int32 chapterIdx, int32 hitIdx,
-	PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	if (h == nil)
-		return false;
-	outLocator = h->locator;
-	outPre = h->preText;
-	outMatch = h->matchText;
-	outPost = h->postText;
-	return true;
-}
-
 bool KFCResultModel::GetHitLocation(int32 chapterIdx, int32 hitIdx,
 	UIDRef& outDocRef, IDFile& outFile, UID& outStoryUID, TextIndex& outStart, TextIndex& outEnd)
 {
@@ -796,20 +783,6 @@ bool KFCResultModel::GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString&
 		return false;
 	outWrittenText = h->replacedText;
 	return true;
-}
-
-void KFCResultModel::SetHitDeleted(int32 chapterIdx, int32 hitIdx)
-{
-	Hit* hp = HitAt(chapterIdx, hitIdx);
-	if (hp == nil)
-		return;
-	Hit& h = *hp;
-	BackUpRow(chapterIdx, hitIdx, h);
-	h.textStart = kInvalidTextIndex;
-	h.textEnd = kInvalidTextIndex;
-	h.replaced = true;
-	h.outcome = kOutcomeDeleted;
-	BuildHitLocator(h);
 }
 
 bool KFCResultModel::GetChapterLocation(int32 chapterIdx, UIDRef& outDocRef, IDFile& outFile)
@@ -930,8 +903,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
 	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
-	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it),
-	//     and what has happened to it since: deleted;
+	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it);
 	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
 	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
 	//     would not run there).
@@ -961,8 +933,6 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("missing");	// its own run, in the accent colour
 	else if (hit.outcome == kOutcomeRefused)
 		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
-	else if (hit.outcome == kOutcomeDeleted)
-		hit.locator.Append(" deleted");		// gone with the object a replaced row deleted: what was asked for
 }
 
 void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)

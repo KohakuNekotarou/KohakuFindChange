@@ -36,7 +36,6 @@ class KFCResultsSession : public CPMUnknown<IKFCResults>
 public:
 	KFCResultsSession(IPMUnknown* boss) : CPMUnknown<IKFCResults>(boss) {}
 
-	virtual int32 GetChapterCount() { return KFCResultModel::GetChapterCount(); }
 	virtual int32 GetTotalHitCount() { return KFCResultModel::GetTotalHitCount(); }
 	virtual int32 GetDisplayChapterCount() { return KFCResultModel::GetDisplayChapterCount(); }
 	virtual int32 GetDisplayHitCount(int32 chapterIdx) { return KFCResultModel::GetDisplayHitCount(chapterIdx); }
@@ -51,7 +50,6 @@ public:
 	virtual int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitFontGroupPos(chapterIdx, hitIdx); }
 	virtual bool IsStoryGroup(int32 chapterIdx, int32 groupIdx) { return KFCResultModel::IsStoryGroup(chapterIdx, groupIdx); }
 	virtual bool GetHitRow(int32 chapterIdx, int32 hitIdx, KFCResultModel::RowDisplay& out) { return KFCResultModel::GetHitRow(chapterIdx, hitIdx, out); }
-	virtual bool GetHitDisplay(int32 chapterIdx, int32 hitIdx, PMString& outLocator, PMString& outPre, PMString& outMatch, PMString& outPost) { return KFCResultModel::GetHitDisplay(chapterIdx, hitIdx, outLocator, outPre, outMatch, outPost); }
 	virtual void MarkUpBreaksForDisplay(PMString& s) { KFCResultModel::MarkUpBreaksForDisplay(s); }
 	virtual bool IsFromBook() { return KFCResultModel::IsFromBook(); }
 	virtual KFCResultModel::SearchScopeKind GetSearchScope() { return KFCResultModel::GetSearchScope(); }
@@ -122,7 +120,6 @@ public:
 	virtual bool HasWindow(const UIDRef& docRef) { return KFCBookScope::HasWindow(docRef); }
 	virtual void ForgetHeldDoc(const UIDRef& docRef) { KFCBookScope::ForgetHeldDoc(docRef); }
 	virtual bool ReachChapterDoc(const IDFile& file, UIDRef& ioDocRef) { return KFCBookScope::ReachChapterDoc(file, ioDocRef); }
-	virtual bool FindOpenChapterDoc(const IDFile& file, UIDRef& ioDocRef) { return KFCBookScope::FindOpenChapterDoc(file, ioDocRef); }
 	virtual void CloseDisplayedDocsIfClean(const UIDRef& exceptDoc) { KFCBookScope::CloseDisplayedDocsIfClean(exceptDoc); }
 	virtual bool GetSearchedBookPath(PMString& outPath) { return KFCBookScope::GetSearchedBookPath(outPath); }
 	virtual bool MakeBookActive(const PMString& bookPath) { return KFCBookScope::MakeBookActive(bookPath); }

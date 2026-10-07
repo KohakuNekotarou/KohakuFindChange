@@ -11,12 +11,12 @@
 //    - A WINDOW and the BOOK PANEL come from UI plug-ins - kOpenLayoutCmdBoss is LayoutUI's, and
 //      IDocumentUIUtils' predicates and PaletteRefUtils are WidgetBin's - and a model plug-in must not
 //      depend on those (vol1-06, "Problems when mixing model and UI").
-//    - The PROGRESS BAR and the ALERT do not: RangeProgressBar and CAlert are PUBLIC_DECL (ProgressBar.h,
-//      CAlert.h), in the library every plug-in links, and Adobe's own model plug-in incopyfileactions
-//      (InCopy's) calls CAlert itself (InCopyDocUtils.cpp). They are here because the guide lists
-//      DIALOGS as user-interface components (vol1-06, "UI component content") and KFC reads a modal bar
-//      and an alert as dialogs - the author's call (the design's section 0.3: follow the guide strictly).
-//  Yet a search has a bar to show, a replace an alert to raise and a chapter to give a window. So the
+//    - The PROGRESS BAR does not: RangeProgressBar is PUBLIC_DECL (ProgressBar.h), in the library every
+//      plug-in links, as CAlert is, and Adobe's own model plug-in incopyfileactions (InCopy's) calls CAlert
+//      itself (InCopyDocUtils.cpp). It is here because the guide lists DIALOGS as user-interface components
+//      (vol1-06, "UI component content") and KFC reads a modal bar as a dialog - the author's call (the
+//      design's section 0.3: follow the guide strictly).
+//  Yet a run has a bar to show and a chapter to give a window. So the
 //  model asks THIS interface - pure virtual, declared here on the model's side - and the UI half
 //  implements it (KFCUIServices.cpp) and puts it on kSessionBoss from its own resource (guide vol1-07,
 //  Object-Model Rule 2: a UI implementation reaches a model boss only through an AddIn in a UI plug-in's
@@ -36,7 +36,7 @@
 //  there and the Query comes back nil - "the system behaves as if the plug-in were missing and returns a
 //  nil pointer. It is critical that you write model code that expects to be able to receive nil pointers"
 //  (vol1-07, "Rules for thread safety"). Every caller in the model half reads nil as "no UI": no bar, no
-//  window, no Book panel, no alert.
+//  window, no Book panel.
 //
 //  What the model DECIDES stays in the model - the rules, the wording, the order. What crosses is only
 //  the showing.
@@ -89,12 +89,9 @@ public:
 	/** The file of the book whose tab is FRONTMOST in the Book panel. False when no book panel is
 	    frontmost (iconised, closed, no book open) - the caller then falls back to the active book. */
 	virtual bool				GetPanelBookFile(IDFile& outFile) = 0;
-
-	/** A modal alert, the message plus a warning icon (CAlert::WarningAlert). The message is finished
-	    text, already marked untranslatable by the caller. */
-	virtual void				WarningAlert(const PMString& message) = 0;
 	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
-	// promise to every built caller).
+	// promise to every built caller). One taken out moves every slot below it, so both halves are built
+	// together then (nothing outside KFC calls this door).
 	/** The documents selected in the Book panel that shows this book (Find/Change Selected Documents
 	    (Book)). true only for a PART of the book - none or all selected answers false, the product's rule
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the

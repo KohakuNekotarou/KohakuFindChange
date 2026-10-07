@@ -852,22 +852,12 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 				return true;
 			}
 		}
+		// A row asked for that the walk never came to is missing. (One row is written at a time - ReplaceRowNow,
+		// PreviewHit - so no other row asked for can have taken its thread away with a footnote or an object.)
 		for (std::set<int32>::const_iterator p = pending.begin(); p != pending.end(); ++p)
 		{
-			TextIndex at = kInvalidTextIndex;
-			if (!db->IsValidUID(s->first) || !RowStartNow(db, rowNow[static_cast<size_t>(*p)], at))
-			{
-				// Its thread went with the footnote, table or object another row's replace deleted (or its
-				// story with an anchored frame): asked for, and done - with its object. Counted as replaced
-				// and shown as "deleted" (SetHitDeleted).
-				++outReplaced;
-				KFCResultModel::SetHitDeleted(chapterIdx, *p);
-			}
-			else
-			{
-				++outMissing;
-				KFCResultModel::SetHitOutcome(chapterIdx, *p, KFCResultModel::kOutcomeMissing);
-			}
+			++outMissing;
+			KFCResultModel::SetHitOutcome(chapterIdx, *p, KFCResultModel::kOutcomeMissing);
 		}
 	}
 	// ----- every row the report keeps, where its text stands now: its range and its line. Read once the

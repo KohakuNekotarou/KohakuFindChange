@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  Runtime Japanese for the few strings KFC speaks in Japanese - the replace's own alert and what
-//  Edit > Undo calls KFC's writes - and JapaneseUI() for the How to Use page (KFCHowTo.cpp).
+//  Runtime Japanese for the few strings KFC speaks in Japanese - what Edit > Undo calls KFC's writes -
+//  and JapaneseUI() for the How to Use page (KFCHowTo.cpp).
 //
 //  There is no jaJP string TABLE (the plug-in author's call). Every locale reads the enUS table,
 //  and the Japanese is switched in HERE at run time instead, so no CP932 resource file has to be
@@ -56,8 +56,8 @@ namespace KFCLoc
 		PMString s(englishKey, PMString::kTranslateDuringCall);
 		// ...and the translation marked as finished. This one stays: the header's alternatives
 		// (WideString, a kNoTranslate constructor, SetCString with an encoding) cannot take a key to its
-		// translation, and an alert translates what it is given "unless the string has been translated
-		// already or isn't translatable" (CAlert.h:84).
+		// translation, and what shows a string next may translate it again - an alert does, "unless the
+		// string has been translated already or isn't translatable" (CAlert.h:84).
 		s.SetTranslatable(kFalse);
 		return s;
 	}
@@ -67,9 +67,6 @@ namespace KFCLoc
 // enUS table (KFC_enUS.fr) - they ARE the English path.
 namespace KFCJa
 {
-	// ----- The replace's STOPPED alert - shown by nothing now (KFCID.h says why; the review's P-3). -----
-	const wchar_t kStaleResultsDoc[]        = L"検索結果に変化を確認しましたので、置換を中止しました。";
-	const wchar_t kStaleResultsOne[]        = L"「^1」の検索結果に変化を確認しましたので、置換を中止しました。";
 	// What Edit > Undo calls a row's Replace (the plug-in author's call).
 	const wchar_t kReplaceStep[]            = L"置換";
 	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
