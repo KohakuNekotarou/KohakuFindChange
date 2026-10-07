@@ -1200,12 +1200,24 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
+	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview,
+	// 2026-10-07). Any other landing - a jump refused (its reason stands), a branch row - takes a previous row's preview
+	// away, so it never stands beside a row it does not belong to.
 	if (hitIdx >= 0)
-		(void)JumpToHit(chapterIdx, hitIdx);
-	else if (chapterIdx >= 0)
-		ShowChapter(chapterIdx);
-	else if (chapterIdx == -1)
-		ShowBook();
+	{
+		if (JumpToHit(chapterIdx, hitIdx))
+			(void)KFCResultTree::ShowRowPreview(chapterIdx, hitIdx);
+		else
+			KFCResultTree::DropRowPreview();
+	}
+	else
+	{
+		KFCResultTree::DropRowPreview();
+		if (chapterIdx >= 0)
+			ShowChapter(chapterIdx);
+		else if (chapterIdx == -1)
+			ShowBook();
+	}
 }
 
 // End, KFCJump.cpp.

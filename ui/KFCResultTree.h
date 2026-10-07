@@ -60,6 +60,16 @@ namespace KFCResultTree
 	    the panel exactly the way Rebuild does. */
 	void ShowStatus(const PMString& message);
 
+	/** A selected GREP row's AFTER-TEXT on the message area (2026-10-07): "Preview Text:", the row's context faded and
+	    what its Replace would write at full colour (KFCReplaceEngine::PreviewHit - written in a step thrown away).
+	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
+	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report. */
+	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx);
+
+	/** The message area showing a preview goes back to the last ordinary message - for a row that has none, so the
+	    previous row's does not stand beside it. Nothing when it shows anything else. */
+	void DropRowPreview();
+
 	/** REPLACE ONE ROW (2026-10-06, docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
 	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
 	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the

@@ -4,10 +4,11 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The panel's MESSAGE AREA, drawn by hand so that it can show more than one colour: when a replaced
-//  row is selected, this box shows the text as it was BEFORE the replace, with the characters the
-//  replace took at the theme's text colour and the words around them faded - the treatment a hit row
-//  already has (the author's request: "show it in the panel's top part, the way KCM does").
+//  The panel's MESSAGE AREA, drawn by hand so that it can show more than one colour: when a GREP search's
+//  row is selected, this box shows what its Replace would write - "Preview Text:", the written characters at
+//  the theme's text colour and the words around them faded, the treatment a hit row already has (the author,
+//  2026-10-07: like the source text KCM shows on its panel). The same shape carried a
+//  replaced row's "Source Text:" until 2026-10-06 (it went with Track Changes) and came back for this.
 //
 //  BROUGHT OVER FROM KCM's KCMStatusTextView.cpp, which replaced the same stock widget for the same
 //  reason. What came across: the wrapping, the line count taken from the box's
@@ -45,7 +46,7 @@
 //    On a Japanese UI the two answer the same 18px line (KCM measured ascent 12.7 + descent 5.3 for
 //    this font). A Roman UI has not been measured.
 //
-//  WHEN IT DOES NOT FIT, THE CONTEXT GIVES WAY. The replaced text itself is cut only when it
+//  WHEN IT DOES NOT FIT, THE CONTEXT GIVES WAY. The written text itself is cut only when it
 //  alone overflows the box, and then an ellipsis says so.
 //  ! An ordinary message has no context, so a long one ends in an ellipsis. That is a CHANGE from the
 //    stock widget, which cut silently at the last line it had room for. Truncation that shows is
@@ -211,7 +212,8 @@ bool16 KFCAnythingLeft(const std::vector<KFCRun>& runs, size_t atRun, const PMSt
    @return kTrue when everything was placed; kFalse when the box ran out of lines first.
 
    Breaking rules, in order:
-     1. a line break in the text is always honoured;
+     1. a line break in the text is always honoured (only the heading's own - the pieces of a
+        "Preview Text:" arrive with their breaks already turned into marks, KFCResultModel::MarkUpBreaksForDisplay);
      2. a line is broken at a SPACE when there is one to break at - otherwise between characters, which
         is the only thing Japanese offers and the only thing a long file name offers;
      3. a wrapped line never starts with the space it was broken at (a line the TEXT broke keeps its
@@ -335,13 +337,54 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 	return kTrue;
 }
 
-/* The message as the one run the layout takes - at the theme's full text colour. */
-std::vector<KFCRun> KFCMakeRuns(const PMString& message)
+/* The pieces as runs, with the heading on a line of its own.
+   @param wantCaret draw the change as a BAR rather than as characters - only while mid is empty. */
+std::vector<KFCRun> KFCMakeRuns(const PMString& label, const PMString& pre,
+								const PMString& mid, const PMString& post, bool16 wantCaret)
 {
 	std::vector<KFCRun> runs;
-	if (!message.IsEmpty())
-		runs.push_back(KFCRun(message, kFalse));
+	if (!label.IsEmpty())
+	{
+		PMString heading(label);
+		heading.Append("\n");		// the heading owns its break: nothing may share its line
+		// NOT faded: faded means context, and the heading is not context - it says what the words
+		// below are (KCM's author made the same call there).
+		runs.push_back(KFCRun(heading, kFalse));
+	}
+	if (!pre.IsEmpty())
+		runs.push_back(KFCRun(pre, kTrue));
+	if (!mid.IsEmpty())
+		runs.push_back(KFCRun(mid, kFalse));
+	else if (wantCaret)
+		runs.push_back(KFCRun(KFCCaretPlaceholder(), kFalse, kTrue /*a place, drawn as a bar*/));
+	if (!post.IsEmpty())
+		runs.push_back(KFCRun(post, kTrue));
 	return runs;
+}
+
+/* The leading context cut down to its last `keep` characters, with an ellipsis for what went. It loses
+   its HEAD - the end facing AWAY from the change. */
+PMString KFCTrimLeadingContext(const PMString& pre, int32 keep)
+{
+	const int32 total = pre.CharCount();
+	if (pre.IsEmpty() || keep >= total)
+		return pre;
+	PMString out = KFCEllipsis();
+	out.Append(KFCTail(pre, KFCSafeCut(pre, total - keep)));
+	out.SetTranslatable(kFalse);
+	return out;
+}
+
+/* The trailing context cut down to its first `keep` characters. It loses its TAIL. */
+PMString KFCTrimTrailingContext(const PMString& post, int32 keep)
+{
+	const int32 total = post.CharCount();
+	if (post.IsEmpty() || keep >= total)
+		return post;
+	PMString out = KFCHead(post, KFCSafeCut(post, keep));
+	out.Append(KFCEllipsis());
+	out.SetTranslatable(kFalse);
+	return out;
 }
 
 }	// anonymous namespace
@@ -351,35 +394,87 @@ std::vector<KFCRun> KFCMakeRuns(const PMString& message)
 //----------------------------------------------------------------------------------------
 
 /** Non-persistent holder for the current message, aggregated on the widget's boss beside the view.
-    Written by KFCResultTree (ShowStatus), read by Draw. */
+    Written by KFCResultTree (ShowStatus, and the "Preview Text:" of a selected GREP row - ShowRowPreview), read by
+    Draw. */
 class KFCStatusTextData : public CPMUnknown<IKFCStatusTextData>
 {
 public:
-	KFCStatusTextData(IPMUnknown* boss) : CPMUnknown<IKFCStatusTextData>(boss) {}
+	KFCStatusTextData(IPMUnknown* boss) : CPMUnknown<IKFCStatusTextData>(boss), fWantCaret(kFalse) {}
 	virtual ~KFCStatusTextData() {}
 
+	// An ordinary message: the sentence alone, at full colour - the pieces' shape with the others empty.
 	virtual void SetText(const PMString& message)
 	{
-		// Not a translation key: messages are assembled sentences and document text, and a short common word left
-		// translatable can come back from the string tables as something else.
-		fText = message;
-		fText.SetTranslatable(kFalse);
-		// The same message on this boss's ITextControlData, where a reader that walks the widgets looks for a label
-		// (KIDMCP's inspect_ui; the regression suite's PSTATUS). THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss -
-		// do not aggregate another (a non-persistent one of our own on the hit row's cell crashed InDesign the first
-		// time a row was built - KFCColorTextView.cpp). Not doubled for '&': this box draws with convertAmpersand kFalse.
-		InterfacePtr<ITextControlData> plain(this, UseDefaultIID());
-		if (plain != nil)
-			plain->SetString(fText, kFalse /*invalidate: the view draws from fText*/, kFalse /*notify: nothing observes it*/);
+		SetSegments(PMString(), PMString(), message, PMString(), kFalse);
 	}
 
+	// The message as one line - what the widget's own ITextControlData holds (SetSegments writes both).
 	virtual void GetText(PMString& outMessage) const
 	{
-		outMessage = fText;
+		outMessage = fLine;
+	}
+
+	virtual void SetSegments(const PMString& label, const PMString& pre, const PMString& mid,
+		const PMString& post, bool16 wantCaret)
+	{
+		// Not translation keys: messages are assembled sentences and document text, and a short common
+		// word left translatable can come back from the string tables as something else.
+		fLabel = label;	fLabel.SetTranslatable(kFalse);
+		fPre = pre;		fPre.SetTranslatable(kFalse);
+		fMid = mid;		fMid.SetTranslatable(kFalse);
+		fPost = post;	fPost.SetTranslatable(kFalse);
+		fWantCaret = wantCaret;
+
+		// The same message as one line of plain text on this boss's ITextControlData, where a reader
+		// that walks the widgets looks for a label (KIDMCP's inspect_ui; the regression suite's
+		// PSTATUS). Written here, the one place every message arrives, so the two cannot drift.
+		//
+		// THE STOCK ONE, INHERITED FROM kGenericPanelWidgetBoss - DO NOT AGGREGATE ANOTHER. It is
+		// persistent; a non-persistent one of our own on the hit row's cell crashed InDesign the first
+		// time a row was built (KFCColorTextView.cpp). Nothing draws it: this box paints itself.
+		// ! Not doubled for '&' any more: the stock widget took a lone '&' as an accelerator, so the
+		//   message was written "A&&B.indd" and a reader saw that. This box draws with
+		//   convertAmpersand kFalse, so the text is the text.
+		PMString line;
+		if (fLabel.IsEmpty() && fPre.IsEmpty() && fPost.IsEmpty() && !fWantCaret)
+			line = fMid;		// an ordinary message: the sentence itself
+		else
+		{
+			// the way a hit row reads (KFCRowData::SetSegments): the part that matters in [ ]
+			line = fLabel;
+			if (!line.IsEmpty())
+				line.Append("  ");
+			line.Append(fPre);
+			line.Append("[");
+			line.Append(fMid);
+			line.Append("]");
+			line.Append(fPost);
+		}
+		line.SetTranslatable(kFalse);
+		fLine = line;
+		InterfacePtr<ITextControlData> plain(this, UseDefaultIID());
+		if (plain != nil)
+			plain->SetString(line, kFalse /*invalidate: the view draws from the pieces*/,
+				kFalse /*notify: nothing observes it*/);
+	}
+
+	virtual void GetSegments(PMString& outLabel, PMString& outPre, PMString& outMid,
+		PMString& outPost, bool16& outWantCaret) const
+	{
+		outLabel = fLabel;
+		outPre = fPre;
+		outMid = fMid;
+		outPost = fPost;
+		outWantCaret = fWantCaret;
 	}
 
 private:
-	PMString	fText;
+	PMString	fLabel;
+	PMString	fPre;
+	PMString	fMid;
+	PMString	fPost;
+	bool16		fWantCaret;
+	PMString	fLine;		// the whole message as one line (GetText)
 };
 
 CREATE_PMINTERFACE(KFCStatusTextData, kKFCStatusTextDataImpl)
@@ -388,7 +483,7 @@ CREATE_PMINTERFACE(KFCStatusTextData, kKFCStatusTextDataImpl)
 // KFCStatusTextView - the self-drawing message area
 //----------------------------------------------------------------------------------------
 
-/** Implements IControlView: wraps the message into the box and draws it. */
+/** Implements IControlView: wraps the message into the box and draws it in up to two colours. */
 class KFCStatusTextView : public DVControlView
 {
 	typedef DVControlView inherited;
@@ -413,12 +508,15 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (data == nil)
 		return;
 
-	PMString message;
-	data->GetText(message);
+	PMString label, pre, mid, post;
+	bool16 wantCaret = kFalse;
+	data->GetSegments(label, pre, mid, post, wantCaret);
+	if (!mid.IsEmpty())
+		wantCaret = kFalse;		// a bar stands only where there are no characters
 
 	// NOTHING IS PAINTED BEHIND THE TEXT. The panel draws its own background; this box adds words on
 	// top of it, as the stock widget did. An empty message is therefore a no-op, not a blank rectangle.
-	if (message.IsEmpty())
+	if (label.IsEmpty() && pre.IsEmpty() && mid.IsEmpty() && post.IsEmpty() && !wantCaret)
 		return;
 
 	// The palette window's SYSTEM SCRIPT font - the hit rows' (KFCColorTextView.cpp says why: it is what
@@ -462,48 +560,85 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	if (maxLines < 1)
 		maxLines = 1;		// a box too short for even one line still shows the beginning of it
 
-	// The text colour, from the current theme. ! No selection pair, unlike the hit rows: a message
-	// area is never selected.
-	RealAGMColor fg(0.0, 0.0, 0.0);		// a sane fallback if the query fails
+	// Colours, entirely from the current theme. ! No selection pair, unlike the hit rows: a message
+	// area is never selected, so the panel's fill is always what stands behind it.
+	RealAGMColor bg(0.5, 0.5, 0.5), fg(0.0, 0.0, 0.0);		// sane fallbacks if the query fails
 	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
 	if (colors != nil)
+	{
+		colors->GetRealAGMColor(kInterfacePaletteFill, bg);
 		colors->GetRealAGMColor(kInterfaceTextColor, fg);
+	}
 	const RealAGMColor kStrongColor = fg;
+	const RealAGMColor kContextColor = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));
 
-	// ---- lay the message out, cutting its tail if it does not fit ---------------------------------
+	// ---- lay the message out, giving the context away first if it does not fit ------------------
 
 	std::vector<KFCFrag> frags;
-	if (!KFCLayoutRuns(&gc, fontInfo, KFCMakeRuns(message), availWidth, maxLines, frags))
+	if (!KFCLayoutRuns(&gc, fontInfo, KFCMakeRuns(label, pre, mid, post, wantCaret), availWidth, maxLines, frags))
 	{
-		// The message overflows the box: the most of its head that fits, with an ellipsis. frags already holds as much
-		// of the whole message as the box could take - kept as the last resort, so nothing here has to succeed.
-		// ! `keep` is "how much to KEEP", so bigger is better: a fit moves the search UP and overwrites `best`, which
-		// is why the answer is the LAST fit rather than the first.
+		// frags holds as much of the whole message as the box could take - kept as the last resort
+		// below, so nothing here has to succeed for something to be drawn.
+		const int32 preLen = pre.CharCount();
+		const int32 postLen = post.CharCount();
+		const int32 maxKeep = (preLen > postLen) ? preLen : postLen;
+
 		std::vector<KFCFrag> best;
 		bool16 found = kFalse;
-		int32 lo = 0, hi = message.CharCount();
-		while (lo <= hi)
+
+		// The search is written once; the two attempts below differ only in what they build out of
+		// `keep`. ! `keep` is "how much to KEEP", so bigger is better: a fit moves the search UP and
+		// overwrites `best`, which is why the answer is the LAST fit rather than the first.
+		auto largestFitting = [&](int32 hi, auto build) -> bool16
 		{
-			const int32 keep = lo + (hi - lo) / 2;
-			PMString cut;
-			if (keep >= message.CharCount())
-				cut = message;
-			else
+			bool16 any = kFalse;
+			int32 lo = 0;
+			while (lo <= hi)
 			{
-				cut = KFCHead(message, KFCSafeCut(message, keep));
-				cut.Append(KFCEllipsis());
-				cut.SetTranslatable(kFalse);
+				const int32 keep = lo + (hi - lo) / 2;
+				std::vector<KFCFrag> trial;
+				if (KFCLayoutRuns(&gc, fontInfo, build(keep), availWidth, maxLines, trial))
+				{
+					best.swap(trial);
+					any = kTrue;
+					lo = keep + 1;
+				}
+				else
+					hi = keep - 1;
 			}
-			std::vector<KFCFrag> trial;
-			if (KFCLayoutRuns(&gc, fontInfo, KFCMakeRuns(cut), availWidth, maxLines, trial))
+			return any;
+		};
+
+		// The largest amount of context that still fits, the same amount on each side.
+		if (maxKeep > 0)
+		{
+			found = largestFitting(maxKeep, [&](int32 keep)
 			{
-				best.swap(trial);
-				found = kTrue;
-				lo = keep + 1;
-			}
-			else
-				hi = keep - 1;
+				return KFCMakeRuns(label, KFCTrimLeadingContext(pre, keep), mid,
+								   KFCTrimTrailingContext(post, keep), wantCaret);
+			});
 		}
+
+		// Still no room: the change alone overflows the box. Cut its tail and say so. This is also the
+		// branch an ordinary long message takes - it is all "change" and has no context to give away.
+		if (!found)
+		{
+			const PMString kNothing;
+			found = largestFitting(mid.CharCount(), [&](int32 keep)
+			{
+				PMString midCut;
+				if (keep >= mid.CharCount())
+					midCut = mid;
+				else
+				{
+					midCut = KFCHead(mid, KFCSafeCut(mid, keep));
+					midCut.Append(KFCEllipsis());
+					midCut.SetTranslatable(kFalse);
+				}
+				return KFCMakeRuns(label, kNothing, midCut, kNothing, wantCaret);
+			});
+		}
+
 		if (found)
 			frags.swap(best);
 	}
@@ -520,7 +655,17 @@ void KFCStatusTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		const KFCFrag& f = frags[i];
 		const PMPoint at(frame.Left() + f.fX, baseline0 + lineHeight * PMReal(f.fLine));
 
-		StringUtils::PMDrawStringRGB(&gc, at, f.fText, fontInfo, kStrongColor,
+		// A PLACE WITH NOTHING IN IT IS DRAWN, NOT WRITTEN: the space reserved the room, the bar goes over
+		// it, and the space itself never is.
+		if (f.fIsCaret)
+		{
+			KFCDrawCaret(gPort, kStrongColor, at.X(), KFCWidth(&gc, f.fText, fontInfo),
+						 at.Y() - ascent, lineHeight);
+			continue;
+		}
+
+		StringUtils::PMDrawStringRGB(&gc, at, f.fText, fontInfo,
+									 f.fFaded ? kContextColor : kStrongColor,
 									 kKFCDontConvertAmpersand, kKFCNoUnderline);
 	}
 }

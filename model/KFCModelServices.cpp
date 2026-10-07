@@ -105,6 +105,7 @@ public:
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) { return KFCQuerySequence::RunFiles(files, outSummary); }
 	virtual bool DescribeRunScope(PMString& outWords) { return KFCSearchEngine::DescribeRunScope(outWords); }
 	virtual const char* ChangeAllCommandName() { return KFCChangeAll::CommandName(); }
+	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) { return KFCReplaceEngine::PreviewHit(chapterIdx, hitIdx, outAfter); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

@@ -99,6 +99,13 @@ namespace KFCReplaceEngine
 	    outcome. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
+	/** A GREP row's AFTER-TEXT (2026-10-07): what the row's Replace would write at its place, read from a write that is
+	    then thrown away (an aborted sequence - no undo step, the text, the story's version, the rows and the modified
+	    flag as they were). false (outAfter empty) wherever Return would not write it now - not a GREP search, the query
+	    changed since it, the row replaced / locked / not a work row, its document closed, its story changed, a run
+	    going - or the write did not land. The UI shows it on the message area when the row is selected. */
+	bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter);
+
 
 
 }

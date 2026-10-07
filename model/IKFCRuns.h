@@ -100,6 +100,8 @@ public:
 	virtual bool DescribeRunScope(PMString& outWords) = 0;
 	/** = KFCChangeAll::CommandName - "Change All in Book (No List)" / "Change All in Selected Documents (No List)". */
 	virtual const char* ChangeAllCommandName() = 0;
+	/** = KFCReplaceEngine::PreviewHit (appended 2026-10-07) - a GREP row's after-text, written and thrown away. */
+	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) = 0;
 };
 
 #endif // __IKFCRuns_h__

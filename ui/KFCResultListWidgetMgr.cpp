@@ -687,17 +687,28 @@ namespace
 
     @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
                        there is nothing on screen to force yet, and this runs mid-construction. */
-void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
+// The message area's data, and its view - nil while the panel is closed (an ordinary state; do nothing then). The
+// same reach Rebuild uses, which is why this lives here rather than in the action component.
+IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
 {
-	// Reach the box through the panel; nil when the panel is closed (do nothing then) - the same reach
-	// Rebuild uses, which is why this lives here rather than in the action component.
+	outView = nil;
 	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
 	if (panelData == nil)
-		return;
+		return nil;
 	IControlView* textView = panelData->FindWidget(kKFCStaticTextWidgetID);
 	if (textView == nil)
-		return;
+		return nil;
 	InterfacePtr<IKFCStatusTextData> textData(textView, UseDefaultIID());
+	if (textData == nil)
+		return nil;
+	outView = textView;
+	return textData.forget();
+}
+
+void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
+{
+	IControlView* textView = nil;
+	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
 		return;
 
@@ -771,6 +782,57 @@ void KFCResultTree::ShowStatus(const PMString& message)
 	// The panel is on screen and this is a report of something that just happened, so it is drawn
 	// immediately (the restore path above is the one that must not force a redraw).
 	WriteMessage(message, kTrue /*force the redraw*/);
+}
+
+//----------------------------------------------------------------------------------------
+// KFCResultTree::ShowRowPreview - a GREP row's after-text on the message area
+//----------------------------------------------------------------------------------------
+
+// The heading of a preview - and how the area is known to be showing one (DropRowPreview).
+static const char* const kPreviewLabel = "Preview Text:";
+
+bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
+{
+	// What Return would write at this row (2026-10-07, the author: an ordinary GREP search's row shows its after-text
+	// when selected) - the model writes it inside a step it throws away (KFCReplaceEngine::PreviewHit) and says false
+	// wherever Return would not write it now.
+	PMString after;
+	KFCResultModel::RowDisplay row;
+	if (!KFCRuns()->PreviewHit(chapterIdx, hitIdx, after) || !KFCResults()->GetHitRow(chapterIdx, hitIdx, row))
+	{
+		DropRowPreview();
+		return false;
+	}
+	IControlView* textView = nil;
+	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
+	if (textData == nil)
+		return false;
+	// KCM's "Source Text:" shape (the author's choice): the heading on its own line, the row's own context faded, and
+	// what would be written at full colour - a return or a tab in it shown as the rows show them; nothing written at
+	// all is a PLACE, drawn as the bar.
+	PMString shown(after);
+	KFCResults()->MarkUpBreaksForDisplay(shown);
+	PMString label(kPreviewLabel);
+	label.SetTranslatable(kFalse);
+	textData->SetSegments(label, row.preText, shown, row.postText, shown.IsEmpty() ? kTrue : kFalse);
+	textView->ForceRedraw();
+	return true;
+}
+
+void KFCResultTree::DropRowPreview()
+{
+	// A row with no preview (replaced, a Text search's, a branch row...) must not leave the last row's standing beside
+	// it: the area goes back to the last ordinary message (gLastStatus - a preview is never kept there).
+	IControlView* textView = nil;
+	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
+	if (textData == nil)
+		return;
+	PMString label, pre, mid, post;
+	bool16 wantCaret = kFalse;
+	textData->GetSegments(label, pre, mid, post, wantCaret);
+	if (label != PMString(kPreviewLabel))
+		return;
+	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
 }
 
 bool KFCResultTree::RefusedWhileRunning()

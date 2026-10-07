@@ -1570,4 +1570,74 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	return ReplaceRowsNow(chapterIdx, one, outStatus);
 }
 
+// ======================================================================================================
+// A GREP ROW'S AFTER-TEXT - WRITTEN, READ, AND THROWN AWAY (2026-10-07, the author: an ordinary search's row shows what
+// it would become, as an ordinary search's after-text - GREP only, the row selected, that row alone). The row's own
+// Replace (ReplaceInChapterOneByOne, as ReplaceRowsNow writes it), inside an ABORTABLE sequence that is then aborted -
+// measured in KT first (docs/ai-notes/kfc-preview-spike-2026-10-07.md):
+//  - no undo step, the text back, the caret where it was, no Track Changes record left;
+//  - the story's version (ITextModel::GetChangeCount) back where the search recorded it - so the Return that follows
+//    is not refused as "the story has changed";
+//  - the modified flag is NOT put back by the abort - IDataBase::SaveRestoreModifiedState does that;
+//  - the rows the walk touched (written text, place, outcome) are put back by the StepRecorder, never kept.
+// Shown only where Return would write it: a GREP search, the query unchanged since it (ASKED, not acted on -
+// RefuseChangedQuery would clear the results), a work row not replaced, its document open (a preview never opens one),
+// its story as KFC left it, nothing of KFC's running.
+// ======================================================================================================
+
+bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter)
+{
+	outAfter.Clear();
+	outAfter.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning() || !CanReplaceHit(chapterIdx, hitIdx))
+		return false;
+	if (KFCSearchEngine::CurrentSearchMode() != IFindChangeOptions::kGrepSearch || !QueryUnchangedSinceSearch())
+		return false;
+	UIDRef docRef;
+	IDFile file;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::IsDocStillOpen(docRef))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash)
+		|| !StoryAsKFCLeftIt(chapterIdx, db, story))
+		return false;
+
+	// The Replace's own directions: forward, as the search was, and a GREP query holding ^ written backwards.
+	KFCForwardSearchScope forward;
+	WalkerScopeOptions scopeOptions;
+	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+	std::set<int32> one;
+	one.insert(hitIdx);
+	bool shown = false;
+	{
+		IDataBase::SaveRestoreModifiedState keepClean(db);		// goes after the abort below: clean again if it was
+		KFCUndoFollow::StepRecorder recorder(std::vector<int32>(1, chapterIdx));	// never kept: the rows roll back
+		{
+			const KFCBackwardSearchScope writeDirection(WriteBackward());
+			IAbortableCmdSeq* seq = CmdUtils::BeginAbortableCmdSeq("KFC Preview");
+			if (seq == nil)
+				return false;
+			int32 progressReported = 0, replaced = 0, missing = 0, locked = 0, refused = 0;
+			bool walkFailed = false, cancelled = false, failed = false;
+			PMString whyNot;
+			const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions, nil, 0, progressReported,
+				replaced, missing, locked, refused, walkFailed, cancelled, failed, whyNot, &one);
+			// What the walk wrote at the row's place - read before the abort takes it away and the recorder puts the
+			// row back.
+			if (wrote && !failed && !cancelled && replaced == 1)
+				shown = KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, outAfter);
+			CmdUtils::AbortCommandSequence(seq);
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+		}
+	}
+	if (!shown)
+		outAfter.Clear();
+	outAfter.SetTranslatable(kFalse);
+	KFC_DIAG_LOG("PREVIEW chapter=%d hit=%d shown=%d", (int)chapterIdx, (int)hitIdx, shown ? 1 : 0);
+	return shown;
+}
+
 // End, KFCReplaceEngine.cpp.
