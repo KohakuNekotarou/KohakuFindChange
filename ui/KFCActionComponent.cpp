@@ -83,10 +83,6 @@ public:
 	private:
 		/** Encapsulates functionality for the about menu item. */
 		void DoAbout();
-
-		
-
-
 };
 
 /* CREATE_PMINTERFACE

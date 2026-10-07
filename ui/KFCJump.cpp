@@ -788,9 +788,6 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	if (!sameOccurrence)
 		ClampIntoStory(storyRef, start, end);	// a place the story no longer reaches - see ClampIntoStory
 
-	const TextIndex placeStart = start;
-	const TextIndex placeEnd = end;
-
 	// Asked of the search engine, which is where every hit's frame was resolved in the first place
 	// (KFCSearchEngine::IsPositionOverset -> the same position-to-parcel-to-frame walk BuildHit
 	// used; a copy of that walk here would have to fold the same failures into "no frame of its own").
@@ -803,7 +800,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			(start >= 0 && start < diagTotal) ? "inside" : "OUTSIDE");
 	}
 #endif
-	const bool overset = KFCRuns()->IsPositionOverset(storyRef, placeStart);
+	const bool overset = KFCRuns()->IsPositionOverset(storyRef, start);
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, the panel has said so and the view is left where it was. (With "Hide
@@ -823,7 +820,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// The window is the right one; make sure it is showing the right SPREAD before anything is
 	// scrolled - every pasteboard coordinate read below is taken AFTER this, deliberately. See
 	// EnsureSpreadInView, and the empty pasteboard a master-page row lands on without it.
-	EnsureSpreadInView(frontView, storyRef, placeStart);
+	EnsureSpreadInView(frontView, storyRef, start);
 
 	// A visible match scrolls to its first wax line AND gets the marker on its characters. An overset
 	// match has no wax line, so it scrolls to the red "+" overset locator (KFCFindOversetLocator,
@@ -836,7 +833,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	// whole range, and drawn on every line of it.
 	if (overset)
 	{
-		const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, placeStart);
+		const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, start);
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KFCHitMarkerView::Hide();
@@ -844,7 +841,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 	else
 	{
 		PMRect pbRect;
-		if (GetFirstChunkPasteboardRect(storyRef, placeStart, placeEnd, pbRect))
+		if (GetFirstChunkPasteboardRect(storyRef, start, end, pbRect))
 		{
 			ScrollViewToPoint(frontView, PBPMPoint(
 				(pbRect.Left() + pbRect.Right()) / PMReal(2.0),
@@ -860,7 +857,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// moved. A double click shows the marker for that moment and SelectHitText's
 			// KFCHitMarkerView::Hide takes it down when the selection is made - exactly what KCM does
 			// ("THE MARK COMES DOWN").
-			KFCHitMarkerView::Show(db, storyUID, placeStart, placeEnd);
+			KFCHitMarkerView::Show(db, storyUID, start, end);
 		}
 		else
 		{
