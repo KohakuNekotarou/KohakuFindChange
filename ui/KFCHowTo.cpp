@@ -67,7 +67,7 @@ const wchar_t* const kHowToEN =
 	L"\n"
 	L"[Replacing]\n"
 	L"- Follows InDesign's own Find/Change replace settings.\n"
-	L"- Replace one match at a time: right-click its row and choose Replace, or select the row and press Return. The arrow keys walk the rows, and each row shows its match in the document as you land on it. Ctrl+Z undoes a replace, and the panel follows Ctrl+Z and Redo.\n"
+	L"- Replace one match at a time: right-click its row and choose Replace, or select the row and press Return - a replaced row then starts with Changed. The arrow keys walk the rows, and each row shows its match in the document as you land on it. Ctrl+Z undoes a replace, and the panel follows Ctrl+Z and Redo.\n"
 	L"- Change All in Book (No List) writes every match in the book with InDesign's own Change All (Book Scope on), while the panel shows no list - choose Clear Results first. The message says how many were replaced in each chapter. For a document, use Change All in InDesign's Find/Change dialog.\n"
 	L"- Track Changes is left as each story has it: a replacement is recorded only in a story where Track Changes is on, under your user name, as InDesign's own Change does.\n"
 	L"- Before a row is replaced, its story is searched again to check that the match is still where it was found. If it has moved, nothing is replaced. Search again.\n"

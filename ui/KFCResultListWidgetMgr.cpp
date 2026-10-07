@@ -443,7 +443,21 @@ private:
 			// defaults to kTrue), and a recycled row would keep the picture of the row it used to be.
 			InterfacePtr<IKFCRowData> data(cell, UseDefaultIID());
 			if (data != nil)
-				data->SetSegments(row.locator, row.accentFlag, row.preText, row.matchText, row.postText);
+			{
+				// "Changed" FIRST ON A ROW THIS LIST HAS REPLACED (2026-10-07, the author: the check boxes used to tell a
+				// written row from one still as the search found it; without them a replaced row looked like the rest).
+				// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
+				// replace puts the row back as it was (UNDO-03, the row's copy has replaced == false), and the word goes.
+				PMString locator(row.locator);
+				if (row.replaced)
+				{
+					PMString changed("Changed ");
+					changed.SetTranslatable(kFalse);
+					changed.Append(locator);
+					locator = changed;
+				}
+				data->SetSegments(locator, row.accentFlag, row.preText, row.matchText, row.postText);
+			}
 			cell->Invalidate();
 		}
 	}

@@ -190,6 +190,15 @@ void PushReturnFilter()
 {
 	if (gFilterShutDown || gFilterPushed)
 		return;
+#ifdef KFC_DIAG
+	// (Test builds only, 2026-10-07) Fault switch no-return-filter: never pushed - to tell what the filter's being on the
+	// stack changes from what the rest of the Return work does (a jumped-to replaced row drew hilited from 02d7057 on).
+	if (KFC_DIAG_FAULT("no-return-filter"))
+	{
+		KFC_DIAG_LOG("RETFOCUS filter NOT pushed (fault switch no-return-filter)");
+		return;
+	}
+#endif
 	if (gReturnFilter == nil)
 		gReturnFilter = ::CreateObject2<IEventHandler>(kKFCReturnFilterBoss, IID_IEVENTHANDLER);
 	InterfacePtr<IEventDispatcher> dispatcher(QueryDispatcher());

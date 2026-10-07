@@ -58,6 +58,9 @@
 //                panel's selection for that book (nothing selected for any other), judged by the same rule as a real
 //                one - Find/Change Selected Documents (Book) tested apart from the panel (work\kbs-regress\sd-cases.tsv;
 //                the make scripts' selectChapters writes it, qd-off.jsx takes it off)
+//    no-return-filter  (UI half, 2026-10-07) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
+//                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
+//                (a jumped-to replaced row drawn hilited, the run of 2026-10-07 18:00)
 //
 //  AND TIMERS (2026-10-05): KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
