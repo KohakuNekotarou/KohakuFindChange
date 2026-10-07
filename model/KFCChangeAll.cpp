@@ -362,8 +362,12 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	{
 		if (wroteTo[i])
 		{
-			if (KFCBookScope::IsHeldDoc(targets[i].docRef))
-				KFCBookScope::ShowChapterWindow(targets[i].docRef);
+			// A WINDOW THAT COULD NOT BE OPENED IS SAID: the chapter stays held and windowless with what was written in it,
+			// which is "left open with no window" (measured with the fault switch no-window - case xq-ca-nowindow: it
+			// stood open in silence). Not a chapter closed since: that one is not left open.
+			if (KFCBookScope::IsHeldDoc(targets[i].docRef) && !KFCBookScope::ShowChapterWindow(targets[i].docRef)
+				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
+				unclosed.push_back(targets[i].shortName);
 			continue;
 		}
 		// nothing written: it comes out as it went in (a walk can mark a database modified without changing a character)

@@ -53,6 +53,9 @@
 //                (the same note: what opening the story rows one at a time costs). Throwaway documents only.
 //    changeall-cancel  KFCChangeAll::Run takes Cancel as pressed after its first chapter - every chapter must come
 //                back as it was (case all-cancel-book, ca-cases.tsv). Throwaway documents only.
+//    no-window   KFCBookScope::ShowChapterWindow answers that the window could not be opened - a written chapter stays
+//                held and windowless; Change All in Book and the query run must say "left open with no window"
+//                (work\kbs-regress\xq-cases.tsv). Throwaway documents only.
 //    replace-walk-fail  KFCReplaceEngine.cpp's WalkStoryReplacing takes InDesign's find as having stopped with an error
 //                before the first match - the row's Replace must say so, not "not found where the search found it"
 //                (work\kbs-regress\xq-cases.tsv). Throwaway documents only.

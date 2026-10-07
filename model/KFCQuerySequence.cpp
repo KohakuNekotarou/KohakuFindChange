@@ -439,8 +439,10 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	{
 		if (wroteTo[i])
 		{
-			if (KFCBookScope::IsHeldDoc(targets[i].docRef))
-				KFCBookScope::ShowChapterWindow(targets[i].docRef);
+			// a window that could not be opened is said, as Change All in Book says it (case xq-qs-nowindow)
+			if (KFCBookScope::IsHeldDoc(targets[i].docRef) && !KFCBookScope::ShowChapterWindow(targets[i].docRef)
+				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
+				unclosed.push_back(targets[i].shortName);
 		}
 		else if (!KFCBookScope::HandBackHeldDocNow(targets[i].docRef))
 			unclosed.push_back(targets[i].shortName);

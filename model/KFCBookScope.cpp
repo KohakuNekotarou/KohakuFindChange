@@ -846,6 +846,12 @@ bool KFCBookScope::ShowChapterWindow(const UIDRef& docRef)
 	// of the two cases the guide names for "crashes or corrupt documents" (vol1-06, "Problems when
 	// mixing model and UI"). IKFCUIServices::OpenLayoutWindow runs the command and asks for the window
 	// it produced; the notes on both are there. No UI = no window.
+#ifdef KFC_DIAG
+	// (Fault switch no-window, a test build's only - KFCDiag.h: the window could not be opened, the one way a test reaches
+	// a written chapter that stays windowless.)
+	if (KFC_DIAG_FAULT("no-window"))
+		return false;
+#endif
 	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
 	if (ui == nil || !ui->OpenLayoutWindow(docRef))
 		return false;
