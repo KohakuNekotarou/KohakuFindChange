@@ -328,6 +328,14 @@ namespace KFCResultModel
 	    false = index out of range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
 
+	/** HOW MANY OF THEM THIS LIST HAS REPLACED (Hit::replaced) - the R of a branch row's "(R/M)" (2026-10-07, the author:
+	    a document row and a story row say how many of their hits have been replaced, "1/3"). Uncapped like M: every hit
+	    the row holds. An Undo of a replace puts the hit back as found, so the count follows it. 0 out of range. */
+	int32 GetChapterReplacedCount(int32 chapterIdx);
+	int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx);
+	/** ...and of every chapter - the book row's. */
+	int32 GetTotalReplacedCount();
+
 	/** The 'nth' hit of one font group, as an index into the CHAPTER's hits - the translation the
 	    tree needs, since a node names its hit by the chapter-wide index throughout. -1 = out of
 	    range. */

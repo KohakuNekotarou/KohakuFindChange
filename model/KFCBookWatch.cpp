@@ -161,7 +161,7 @@ void RetireBookResultsIfGone()
 	//
 	// IsFromBook() ALONE - deliberately not "and it has at least one chapter". A book search that
 	// found NOTHING still leaves a row on the tree: the hierarchy adapter gives the root one child
-	// whenever the results came from a book, so the panel shows "book.indb  (0)". That row names a
+	// whenever the results came from a book, so the panel shows "book.indb  (0/0)". That row names a
 	// book, so once the book is gone it has to go too. (Measured by the user: with a
 	// chapter-count test in here, closing the book after a 0-hit search released the chapters but
 	// left that row sitting there and the panel said nothing at all - which also made it impossible

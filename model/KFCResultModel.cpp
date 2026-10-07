@@ -535,6 +535,42 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 	return true;
 }
 
+int32 KFCResultModel::GetChapterReplacedCount(int32 chapterIdx)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return 0;
+	int32 replaced = 0;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+		if (c->hits[i].replaced)
+			++replaced;
+	return replaced;
+}
+
+int32 KFCResultModel::GetFontReplacedCount(int32 chapterIdx, int32 fontIdx)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
+	if (c == nil || group == nil)
+		return 0;
+	int32 replaced = 0;
+	for (size_t i = 0; i < group->hitIndices.size(); ++i)
+	{
+		const int32 h = group->hitIndices[i];
+		if (h >= 0 && h < static_cast<int32>(c->hits.size()) && c->hits[static_cast<size_t>(h)].replaced)
+			++replaced;
+	}
+	return replaced;
+}
+
+int32 KFCResultModel::GetTotalReplacedCount()
+{
+	int32 replaced = 0;
+	for (size_t i = 0; i < gChapters.size(); ++i)
+		replaced += GetChapterReplacedCount(static_cast<int32>(i));
+	return replaced;
+}
+
 int32 KFCResultModel::GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth)
 {
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);

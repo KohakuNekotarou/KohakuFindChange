@@ -142,6 +142,17 @@ namespace
 		if (tcd != nil)
 			tcd->SetString(display, kTrue /*invalidate*/, kFalse /*don't notify*/);
 	}
+
+	// A branch row's count: "  (R/N)" - R of its N hits replaced by this list (2026-10-07, the author: the search's
+	// count with the replaced one beside it, "1/3"). One shape for the book, document and story rows, so they read alike.
+	void AppendCounts(PMString& label, int32 replaced, int32 hits)
+	{
+		label.Append("  (");
+		label.AppendNumber(replaced);
+		label.Append("/");
+		label.AppendNumber(hits);
+		label.Append(")");
+	}
 }
 
 /** Builds and fills the result tree's row widgets (chapter rows and hit rows). */
@@ -342,16 +353,14 @@ private:
 	void ApplyBookRow(const NodeID& node, IControlView* widget,
 		IPanelControlData* rowData) const
 	{
-		// "<book>  (N)" - how many hits the book's search holds (every one drawn - one limit since 2026-10-06, F9).
-		// Drawn even when the search found nothing - the hierarchy adapter gives the root one child whenever the
-		// results came from a book, which is how the panel goes on naming the book it just searched - and then
-		// it reads "(0)", which is also how KFCBookWatch describes it (the user's own measurement); keep the two
-		// together.
+		// "<book>  (R/N)" - how many of the hits the book's search holds this list has replaced, of how many (every one
+		// drawn - one limit since 2026-10-06, F9; the R since 2026-10-07 - AppendCounts). Drawn even when the search found
+		// nothing - the hierarchy adapter gives the root one child whenever the results came from a book, which is how
+		// the panel goes on naming the book it just searched - and then it reads "(0/0)", which is also how KFCBookWatch
+		// describes it (the user's own measurement, of the "(0)" before the R); keep the two together.
 		PMString label(KFCResults()->GetBookName());
 		label.SetTranslatable(kFalse);
-		label.Append("  (");
-		label.AppendNumber(KFCResults()->GetTotalHitCount());
-		label.Append(")");
+		AppendCounts(label, KFCResults()->GetTotalReplacedCount(), KFCResults()->GetTotalHitCount());
 		// No shift: the book row IS the outermost level.
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
@@ -365,8 +374,8 @@ private:
 		if (!KFCResults()->GetChapterDisplay(nodeID->GetChapter(), name, fullCount))
 			return;
 
-		// "<name>  (N)" - the chapter's hits, the same read-out the book row carries. About the work, not the
-		// drawing - never "(shown / total)".
+		// "<name>  (R/N)" - of the chapter's hits, how many this list has replaced, the same read-out the book row
+		// carries (AppendCounts). About the work, not the drawing - never "(shown / total)".
 		PMString label(name);
 		label.SetTranslatable(kFalse);
 		// A DOCUMENT WITH NO WINDOW. Search: = All Documents searches those too, as
@@ -381,9 +390,7 @@ private:
 				&& KFCChapters()->IsDocStillOpen(docRef) && !KFCChapters()->HasWindow(docRef))
 				label.Append(" (no window)");
 		}
-		label.Append("  (");
-		label.AppendNumber(fullCount);
-		label.Append(")");
+		AppendCounts(label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
 		// (No "cancelled" note: a cancel puts the WHOLE run back, so no chapter is left half-reached.)
 
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
@@ -400,14 +407,12 @@ private:
 		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
-		// "P3  first words...  (N)", the way a document row reads out its count, like the rows
+		// "P3  first words...  (R/N)", the way a document row reads out its count, like the rows
 		// above it: what the row holds, not what the panel drew of it. (A group that answered
 		// GetFontDisplay is in range - no further test needed.)
 		PMString label(name);
 		label.SetTranslatable(kFalse);
-		label.Append("  (");
-		label.AppendNumber(fullCount);
-		label.Append(")");
+		AppendCounts(label, KFCResults()->GetFontReplacedCount(nodeID->GetChapter(), nodeID->GetFont()), fullCount);
 		this->LayOutBranchRow(node, widget, rowData,
 			this->LevelShift() + kFontLevelIndent, label);
 	}
