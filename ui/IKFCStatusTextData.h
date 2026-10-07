@@ -39,12 +39,6 @@ public:
 	    (KIDMCP's inspect_ui; the regression suite's PSTATUS). */
 	virtual void SetText(const PMString& message) = 0;
 
-	/** Read back what was written, as one line (a message with pieces reads "<label>  <pre>[<mid>]<post>").
-	    Empty before the first message. */
-	virtual void GetText(PMString& outMessage) const = 0;
-
-	// APPENDED 2026-10-07 - a new method goes at the END (a vtable slot is a promise to every built caller).
-
 	/** Replace every piece - ALL OF THEM, ALWAYS: there is one message area and one message in it. SetText is this
 	    with label / pre / post empty. The one-line form goes to the widget's ITextControlData as SetText's does.
 	    @param label a heading on a line of its own ("Preview Text:") - full colour: it says what the words below are.

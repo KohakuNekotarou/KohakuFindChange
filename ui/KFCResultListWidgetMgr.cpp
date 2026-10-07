@@ -40,7 +40,6 @@
 #include "IPalettePanelUtils.h"			// QueryPanelByWidgetID (the rebuild reaches the tree)
 #include "IPanelControlData.h"
 #include "ITextControlData.h"
-#include "ITriStateControlData.h"		// the hit row's check box state
 #include "ITreeViewHierarchyAdapter.h"	// child count - decides the expander's visibility
 #include "ITreeViewMgr.h"				// ClearTree / ChangeRoot / ExpandNode (the rebuild)
 
@@ -676,18 +675,6 @@ void KFCResultTree::ShutdownCleanup()
 namespace
 {
 
-/** Put this message on the panel's message area (IKFCStatusTextData.h). Does nothing
-    when the panel is closed, which is an ordinary state. Shared by every writer below, so they all
-    reach the box the same way; they decide only WHAT it says.
-
-    NO '&' DOUBLING. The line names files the user chose; a stock StaticText takes a lone '&' as a
-    keyboard accelerator ("A&B.indd" draws as "AB.indd" with the B underlined) and needs every message
-    put through InsertAmpersandForDisplay. This box is drawn by hand, with convertAmpersand kFalse
-    (KFCStatusTextView.cpp), so the text is the text - and a reader of the widget (KIDMCP's inspect_ui)
-    reads "A&B.indd", not a doubled "A&&B.indd". !Do not double it again.
-
-    @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
-                       there is nothing on screen to force yet, and this runs mid-construction. */
 // The message area's data, and its view - nil while the panel is closed (an ordinary state; do nothing then). The
 // same reach Rebuild uses, which is why this lives here rather than in the action component.
 IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
@@ -706,7 +693,19 @@ IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
 	return textData.forget();
 }
 
-void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
+/** Put this message on the panel's message area (IKFCStatusTextData.h) - the sentence alone, in the theme's text
+    colour. Does nothing when the panel is closed, which is an ordinary state. Every writer below reaches the box
+    through here; they decide only WHAT it says.
+
+    NO '&' DOUBLING. The line names files the user chose; a stock StaticText takes a lone '&' as a
+    keyboard accelerator ("A&B.indd" draws as "AB.indd" with the B underlined) and needs every message
+    put through InsertAmpersandForDisplay. This box is drawn by hand, with convertAmpersand kFalse
+    (KFCStatusTextView.cpp), so the text is the text - and a reader of the widget (KIDMCP's inspect_ui)
+    reads "A&B.indd", not a doubled "A&&B.indd". !Do not double it again.
+
+    @param forceRedraw kFalse while the panel is still being built (see RestoreStatusOnPanelShow) -
+                       there is nothing on screen to force yet, and this runs mid-construction. */
+void WriteMessage(const PMString& message, bool16 forceRedraw)
 {
 	IControlView* textView = nil;
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
@@ -724,12 +723,6 @@ void WriteStatusWidget(const PMString& message, bool16 forceRedraw)
 		textView->ForceRedraw();
 	else
 		textView->Invalidate();
-}
-
-/** An ordinary message: the sentence alone, in the theme's text colour - what the stock widget drew. */
-void WriteMessage(const PMString& message, bool16 forceRedraw)
-{
-	WriteStatusWidget(message, forceRedraw);
 }
 
 /** What the box says when nothing has run since launch - the string table's, so it cannot drift from

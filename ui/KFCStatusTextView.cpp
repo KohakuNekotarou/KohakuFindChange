@@ -408,12 +408,6 @@ public:
 		SetSegments(PMString(), PMString(), message, PMString(), kFalse);
 	}
 
-	// The message as one line - what the widget's own ITextControlData holds (SetSegments writes both).
-	virtual void GetText(PMString& outMessage) const
-	{
-		outMessage = fLine;
-	}
-
 	virtual void SetSegments(const PMString& label, const PMString& pre, const PMString& mid,
 		const PMString& post, bool16 wantCaret)
 	{
@@ -451,7 +445,6 @@ public:
 			line.Append(fPost);
 		}
 		line.SetTranslatable(kFalse);
-		fLine = line;
 		InterfacePtr<ITextControlData> plain(this, UseDefaultIID());
 		if (plain != nil)
 			plain->SetString(line, kFalse /*invalidate: the view draws from the pieces*/,
@@ -474,7 +467,6 @@ private:
 	PMString	fMid;
 	PMString	fPost;
 	bool16		fWantCaret;
-	PMString	fLine;		// the whole message as one line (GetText)
 };
 
 CREATE_PMINTERFACE(KFCStatusTextData, kKFCStatusTextDataImpl)
