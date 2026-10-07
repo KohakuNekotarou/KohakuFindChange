@@ -1432,6 +1432,16 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 							Frame(0, 0, 100, 20)
 							kTrue, kTrue,
 							kKFCQueryDownKey,				// "Move Down"
+							kEVELargeSpaceAfter,
+						),
+						// Clear (the author's addition, 2026-10-07): the whole run order out - set apart from the four
+						// that move one row.
+						EVEButtonWidget
+						(
+							kKFCQueryClearButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+							Frame(0, 0, 100, 20)
+							kTrue, kTrue,
+							kKFCQueryClearKey,				// "Clear"
 							kEVENoSpaceAfter,
 						),
 					}

@@ -102,7 +102,7 @@
          <Command>merge_res.cmd "$(IntDir)"  KFCUI &amp; echo Deleting old resources... &amp; del /f /s "$(TargetDir)($(TargetName) Resources)\"*.idrc &gt; $(IntDir)prevDeletedResources.txt &amp;  xcopy /Q /E "$(IntDir)"*.idrc "$(TargetDir)($(TargetName) Resources)\" /Y</Command>
       </PreLinkEvent>
       <Link>
-         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);$(AFLLib);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\debug\sdk\KohakuFindChangeUI.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChangeUI/KohakuFindChangeUI.lib</ImportLibrary>
@@ -135,7 +135,7 @@
          <Command>merge_res.cmd "$(IntDir)"  KFCUI &amp; echo Deleting old resources... &amp; del /f /s "$(TargetDir)($(TargetName) Resources)\"*.idrc &gt; $(IntDir)prevDeletedResources.txt &amp;  xcopy /Q /E "$(IntDir)"*.idrc "$(TargetDir)($(TargetName) Resources)\" /Y</Command>
       </PreLinkEvent>
       <Link>
-         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);$(AFLLib);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\debugx64\sdk\KohakuFindChangeUI.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChangeUI/KohakuFindChangeUI.lib</ImportLibrary>
@@ -170,7 +170,7 @@
       </PreLinkEvent>
       <Link>
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
-         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);$(AFLLib);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\release\sdk\KohakuFindChangeUI.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChangeUI/KohakuFindChangeUI.lib</ImportLibrary>
@@ -205,7 +205,7 @@
       </PreLinkEvent>
       <Link>
          <AdditionalOptions>/IGNORE:4089 %(AdditionalOptions)</AdditionalOptions>
-         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+         <AdditionalDependencies>$(UI_PLUGIN_LINKLIST);$(AFLLib);user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
          <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
          <ProgramDatabaseFile>..\releasex64\sdk\KohakuFindChangeUI.pdb</ProgramDatabaseFile>
          <ImportLibrary>$(LIB_DIR)\KohakuFindChangeUI/KohakuFindChangeUI.lib</ImportLibrary>

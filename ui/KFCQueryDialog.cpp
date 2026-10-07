@@ -17,11 +17,16 @@
 
 // Interface includes:
 #include "IApplication.h"
+#include "IControlView.h"			// Enable / Disable - the buttons' grey; GetWidgetID - which one was pressed
 #include "IDialog.h"
 #include "IDialogMgr.h"
 #include "IPanelControlData.h"
 #include "ISession.h"
+#include "ISubject.h"
+#include "ITreeViewController.h"	// IID_ITREEVIEWCONTROLLER - the lists' selection, observed
+#include "IBooleanControlData.h"	// IID_IBOOLEANCONTROLDATA - a push button's press, observed (CDialogObserver.cpp's OK / Cancel)
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
+#include "widgetid.h"				// kTrueStateMessage / kListSelectionChangedMessage
 
 // General includes:
 #include "CDialogController.h"
@@ -34,6 +39,7 @@
 #include "KFCQueryDialog.h"
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
+#include "KFCResultTree.h"			// ShowStatus - a run order that could not be read or saved is said on the panel
 #include "KFCUIID.h"
 
 #ifdef WINDOWS
@@ -48,14 +54,119 @@ namespace
 	    What lets a change made elsewhere reach the dialog that is open (KFCQueryDialogRefresh). */
 	IPanelControlData* gOpenPanel = nil;
 
-	/** Fill the dialog from what is true now: both lists read again (the saved queries from their folders) and drawn. */
+	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
+	const WidgetID kOrderButtons[] = { kKFCQueryAddButtonWidgetID, kKFCQueryRemoveButtonWidgetID, kKFCQueryUpButtonWidgetID,
+		kKFCQueryDownButtonWidgetID, kKFCQueryClearButtonWidgetID };
+	const WidgetID kLists[] = { kKFCQuerySavedListWidgetID, kKFCQueryOrderListWidgetID };
+
+	void EnableButton(IPanelControlData* panel, const WidgetID& id, bool on)
+	{
+		IControlView* button = panel->FindWidget(id);
+		if (button == nil)
+			return;
+		if (on)
+			button->Enable();
+		else
+			button->Disable();
+	}
+
+	/** Grey the buttons that have nothing to act on (the spec's section 2-2): Add with no saved query picked; Remove with
+	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear with an empty order. Run is
+	    never grey (G5 as changed: a run that cannot go says why on the panel). */
+	void UpdateButtons(IPanelControlData* panel)
+	{
+		if (panel == nil)
+			return;
+		const int32 left = KFCQueryListSelectedIndex(panel, kKFCQuerySavedListWidgetID);
+		const int32 right = KFCQueryListSelectedIndex(panel, kKFCQueryOrderListWidgetID);
+		const int32 rows = static_cast<int32>(KFCQueryOrder::Order().size());
+		EnableButton(panel, kKFCQueryAddButtonWidgetID, left >= 0);
+		EnableButton(panel, kKFCQueryRemoveButtonWidgetID, right >= 0);
+		EnableButton(panel, kKFCQueryUpButtonWidgetID, right > 0);
+		EnableButton(panel, kKFCQueryDownButtonWidgetID, right >= 0 && right + 1 < rows);
+		EnableButton(panel, kKFCQueryClearButtonWidgetID, rows > 0);
+	}
+
+	/** Say on the panel's message line that the run order file could not be read or written - the dialog stays open,
+	    and what it shows is then not what the file holds. */
+	void SayOrderFileFailed(const char* what, const PMString& why)
+	{
+		PMString say;
+		say.SetTranslatable(kFalse);
+		say.Append("The run order could not be ");
+		say.Append(what);
+		say.Append(" (");
+		say.Append(why);
+		say.Append(").");
+		KFCResultTree::ShowStatus(say);
+	}
+
+	/** Fill the dialog from what is true now: both lists read again - the saved queries from their folders, the run
+	    order from its file - and drawn, and the buttons greyed to match (nothing is picked after a fill). */
 	void Repaint(IPanelControlData* panel)
 	{
 		if (panel == nil)
 			return;
 		KFCQueryOrder::LoadSaved();
+		PMString why;
+		if (!KFCQueryOrder::LoadOrder(why))
+			SayOrderFileFailed("read", why);
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
+		UpdateButtons(panel);
+	}
+
+	/** One of the five buttons pressed: change the order, write it to its file at once (G2), draw it, and pick the row
+	    the change leaves the eye on - the added row, the row that took a removed one's place, the moved row. */
+	void PressOrderButton(IPanelControlData* panel, const WidgetID& button)
+	{
+		const int32 left = KFCQueryListSelectedIndex(panel, kKFCQuerySavedListWidgetID);
+		const int32 right = KFCQueryListSelectedIndex(panel, kKFCQueryOrderListWidgetID);
+		int32 pick = -1;
+		if (button == kKFCQueryAddButtonWidgetID)
+		{
+			if (left < 0)
+				return;
+			KFCQueryOrder::Add(left);
+			pick = static_cast<int32>(KFCQueryOrder::Order().size()) - 1;
+		}
+		else if (button == kKFCQueryRemoveButtonWidgetID)
+		{
+			if (right < 0)
+				return;
+			KFCQueryOrder::Remove(right);
+			const int32 rows = static_cast<int32>(KFCQueryOrder::Order().size());
+			pick = right < rows ? right : rows - 1;
+		}
+		else if (button == kKFCQueryUpButtonWidgetID)
+		{
+			if (right <= 0)
+				return;
+			KFCQueryOrder::MoveUp(right);
+			pick = right - 1;
+		}
+		else if (button == kKFCQueryDownButtonWidgetID)
+		{
+			if (right < 0 || right + 1 >= static_cast<int32>(KFCQueryOrder::Order().size()))
+				return;
+			KFCQueryOrder::MoveDown(right);
+			pick = right + 1;
+		}
+		else if (button == kKFCQueryClearButtonWidgetID)
+		{
+			if (KFCQueryOrder::Order().empty())
+				return;
+			KFCQueryOrder::Clear();
+		}
+		else
+			return;
+
+		PMString why;
+		if (!KFCQueryOrder::SaveOrder(why))
+			SayOrderFileFailed("saved", why);
+		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
+		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, pick);
+		UpdateButtons(panel);
 	}
 
 	/** The dialog's platform window: a minimize box, and back from the taskbar if it sits minimized. The SDK cannot give
@@ -105,8 +216,12 @@ protected:
 CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
 
 /** The dialog's observer. It stands in for the stock CDialogObserver kDialogBoss carries, and calls it FIRST in each
-    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver). It also
-    says, through gOpenPanel, whether the dialog is open. */
+    method - that is what keeps Close (Cancel) and the close box working (basicdialog's BscDlgDialogObserver). It hears
+    the five buttons that change the run order (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
+    CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
+    MEASURED 2026-10-07: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
+    and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
+    the paneltreeview sample's PnlTrvTreeObserver), and says, through gOpenPanel, whether the dialog is open. */
 class KFCQueryDialogObserver : public CDialogObserver
 {
 public:
@@ -118,17 +233,53 @@ public:
 		CDialogObserver::AutoAttach();
 		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
 		gOpenPanel = panel;
+		if (panel == nil)
+			return;
+		for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
+			this->AttachToWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+		for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
+			this->AttachToWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 	}
 
 	virtual void AutoDetach()
 	{
 		gOpenPanel = nil;
+		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+		if (panel != nil)
+		{
+			for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
+				this->DetachFromWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+			for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
+				this->DetachFromWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
+		}
 		CDialogObserver::AutoDetach();
 	}
 
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy)
 	{
 		CDialogObserver::Update(theChange, theSubject, protocol, changedBy);
+		InterfacePtr<IPanelControlData> panel(this, UseDefaultIID());
+		if (panel == nil)
+			return;
+		if (protocol == IID_ITREEVIEWCONTROLLER && theChange == kListSelectionChangedMessage)
+		{
+			UpdateButtons(panel);
+			return;
+		}
+		if (protocol != IID_IBOOLEANCONTROLDATA || theChange != kTrueStateMessage)
+			return;
+		// One of OUR five, asked before anything else is touched: Close (Cancel) arrives here too, after the base above
+		// has begun closing the dialog, and its lists must not be read then.
+		InterfacePtr<IControlView> pressed(theSubject, UseDefaultIID());
+		if (pressed == nil)
+			return;
+		const WidgetID id = pressed->GetWidgetID();
+		for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
+			if (kOrderButtons[i] == id)
+			{
+				PressOrderButton(panel, id);
+				return;
+			}
 	}
 };
 

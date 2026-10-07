@@ -68,6 +68,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQueryRemoveKey,				"< Remove",
                 kKFCQueryUpKey,					"Move Up",
                 kKFCQueryDownKey,				"Move Down",
+                kKFCQueryClearKey,				"Clear",
                 kKFCQueryRunKey,				"Run",
                 kKFCQueryCloseKey,				"Close",
                 // The message line as a freshly opened panel shows it - the plug-in has no search

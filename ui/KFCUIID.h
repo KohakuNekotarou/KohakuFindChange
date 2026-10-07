@@ -338,6 +338,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryRemoveButtonWidgetID, kKFCUIPrefix + 37)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryUpButtonWidgetID, kKFCUIPrefix + 38)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryDownButtonWidgetID, kKFCUIPrefix + 39)
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryScopeTextWidgetID, kKFCUIPrefix + 40)
+// ...and Clear under the four (the author's addition the same day): the run order emptied.
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryClearButtonWidgetID, kKFCUIPrefix + 41)
 
 
 // "About Plug-ins" sub-menu:
@@ -385,6 +387,7 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryScopeTextWidgetID, kKFCUIPrefix + 40)
 #define kKFCQueryRemoveKey				kKFCStringPrefix "kKFCQueryRemoveKey"
 #define kKFCQueryUpKey					kKFCStringPrefix "kKFCQueryUpKey"
 #define kKFCQueryDownKey				kKFCStringPrefix "kKFCQueryDownKey"
+#define kKFCQueryClearKey				kKFCStringPrefix "kKFCQueryClearKey"
 #define kKFCQueryRunKey					kKFCStringPrefix "kKFCQueryRunKey"
 #define kKFCQueryCloseKey				kKFCStringPrefix "kKFCQueryCloseKey"
 

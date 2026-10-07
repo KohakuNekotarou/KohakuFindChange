@@ -448,10 +448,12 @@ static bool KFCReadWholeFile(const IDFile& file, std::string& out)
 // between the delete and the move leaves NO settings file, only the side file - the very gap the side
 // file exists to close. MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume (and
 // AFL's MoveFile is itself a wrapper around MoveFileExW).
-static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text)
+// sideFileName = the side file's name in the same folder (the settings file's is kKFCPanelStateSideFileName; another
+// file of ours names its own - KFCWriteOwnFile).
+static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const char* sideFileName)
 {
 	IDFile side;
-	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName)))
+	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(sideFileName)))
 		return "folder";
 	{
 		InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(side, kOpenOut | kOpenTrunc));
@@ -519,7 +521,7 @@ const char* KFCPanelStateWriteKeys(const KFCJsonPairs& keyValues, bool* outRepai
 			pairs.push_back(keyValues[u]);
 	}
 
-	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs));
+	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs), kKFCPanelStateSideFileName);
 }
 
 bool KFCPanelStateFilePath(PMString& outPath)
@@ -570,7 +572,7 @@ void KFCSavePanelState()
 	// *A partial write on a full disk must not be reported as a save, with a path that suggests the
 	// settings are safe: the byte count is checked, and the side file is read back before it is put in
 	// place. See KFCWriteWholeFile.
-	const char* failure = KFCWriteWholeFile(file, KFCJsonFlatText(pairs));
+	const char* failure = KFCWriteWholeFile(file, KFCJsonFlatText(pairs), kKFCPanelStateSideFileName);
 	if (failure != nil)
 	{
 		std::string say("Save failed (");
@@ -648,6 +650,27 @@ void KFCLoadPanelStateIfPresent()
 	// KFCBookPanelPlacement, which owns the keys; nothing is moved here - what puts the placement on
 	// a book panel is that file, when one appears.
 	KFCBookPanelPlacement::LoadFromSettings(text);
+}
+
+// ANOTHER FILE OF OURS IN THE SAME FOLDER (2026-10-07 - the query dialog's run order, KFCQueryOrder.cpp): read and
+// written the way the settings file is (KFCReadWholeFile / KFCWriteWholeFile above), so a file of KFC's is written one way.
+bool KFCReadOwnFile(const char* fileName, std::string& out)
+{
+	out.clear();
+	IDFile file;
+	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)))
+		return false;
+	if (FileUtils::DoesFileExist(file) == kFalse)
+		return true;		// no file yet: nothing in it
+	return KFCReadWholeFile(file, out);
+}
+
+const char* KFCWriteOwnFile(const char* fileName, const char* sideFileName, const std::string& text)
+{
+	IDFile file;
+	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)))
+		return "folder";
+	return KFCWriteWholeFile(file, text, sideFileName);
 }
 
 // End, KFCPanelState.cpp.
