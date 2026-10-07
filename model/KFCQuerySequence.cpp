@@ -145,11 +145,6 @@ void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& na
 	s.Append(").");
 }
 
-bool SameDoc(const UIDRef& a, const UIDRef& b)
-{
-	return a.GetDataBase() == b.GetDataBase();
-}
-
 }	// anonymous namespace
 
 bool KFCQuerySequence::IsRunning()
@@ -260,7 +255,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
 	std::vector<PMString> skippedNothing;
-	std::vector<UIDRef> touched;
+	std::vector<bool> wroteTo(targets.size(), false);		// by target: did any query's Change All write anything there
 	int32 replaced = 0;
 	bool cancelled = false, failed = false;
 	PMString why;
@@ -362,13 +357,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				perQuery[q] += count;
 				replaced += count;
 				if (count > 0)
-				{
-					bool known = false;
-					for (size_t k = 0; k < touched.size() && !known; ++k)
-						known = SameDoc(touched[k], targets[d].docRef);
-					if (!known)
-						touched.push_back(targets[d].docRef);
-				}
+					wroteTo[d] = true;
 			}
 		}
 	}
@@ -381,8 +370,9 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	}
 	// THE MARK - inside the sequence, so the run's Undo and Redo are heard (KFCUndoFollow::MarkWrite).
 	if (!cancelled && !failed)
-		for (size_t t = 0; t < touched.size(); ++t)
-			KFCUndoFollow::MarkWrite(touched[t].GetDataBase());
+		for (size_t t = 0; t < targets.size(); ++t)
+			if (wroteTo[t])
+				KFCUndoFollow::MarkWrite(targets[t].docRef.GetDataBase());
 	if (cancelled || failed)
 		CmdUtils::AbortCommandSequence(seq);
 	else
@@ -418,10 +408,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
-		bool wrote = false;
-		for (size_t k = 0; k < touched.size() && !wrote; ++k)
-			wrote = SameDoc(touched[k], targets[i].docRef);
-		if (wrote)
+		if (wroteTo[i])
 		{
 			if (KFCBookScope::IsHeldDoc(targets[i].docRef))
 				KFCBookScope::ShowChapterWindow(targets[i].docRef);
