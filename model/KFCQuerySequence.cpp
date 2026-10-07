@@ -183,10 +183,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	PMString bookName;
 	bookName.SetTranslatable(kFalse);
 	std::vector<KFCBookScope::SkippedChapter> unopenable;
+	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
 	if (scope.fromBook)
 	{
 		std::vector<KFCBookScope::ChapterDoc> listed;
-		if (!KFCBookScope::ListBookChapters(listed, bookName) || listed.empty())
+		if (!KFCBookScope::ListBookChapters(listed, bookName, &selection) || listed.empty())
 		{
 			recorder.RestoreBefore();		// the commit point has passed: the list goes back as it was
 			outSummary.Append("That book has no chapters.");
@@ -418,7 +419,16 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	outSummary.AppendNumber(replaced);
 	outSummary.Append(" replaced (");
 	AppendPerQuery(outSummary, perQuery);
-	outSummary.Append(").");		// one undo step; nothing said of Ctrl+Z (spec F20)
+	outSummary.Append(")");
+	if (selection.selected > 0)
+	{
+		// the Book panel's selected documents alone (2026-10-07 - the spec 1's section 4-4): "in S selected document(s) of T"
+		outSummary.Append(" in ");
+		outSummary.AppendNumber(selection.selected);
+		outSummary.Append(" selected document(s) of ");
+		outSummary.AppendNumber(selection.total);
+	}
+	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);

@@ -42,6 +42,8 @@
 #include "PMString.h"
 #include "WideString.h"
 
+#include <algorithm>			// std::find - is this chapter one of the Book panel's selected ones
+
 // Project includes:
 #include "KFCBookScope.h"
 #include "KFCDiag.h"			// KFC_DIAG_FAULT / KFC_DIAG_LOG - a test build's fault switch (compiled out of a shipping one)
@@ -273,6 +275,40 @@ namespace
 		// may be run against.
 		IBook* activeBook = bookMgr->GetCurrentActiveBook();
 		return (activeBook != nil && activeBook->IsOpen()) ? activeBook : nil;
+	}
+
+	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (2026-10-07 - Find/Change Selected Documents
+	    (Book), docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
+	    book's own BookContent UIDs the Book panel showing it has selected, in the book's order - EMPTY for the whole
+	    book: the toggle off, no UI half (a background thread, InDesign Server), no panel showing this book, none or all
+	    of it selected (the UI half's answer, by the product's rule - AcquireCurrentBook::AllOrNoneSelected), or a
+	    selection none of whose UIDs is one of this book's chapters. ListBookChapters (the run) and DescribeTargetBook
+	    (the names and the Runs on: line) both ask here, so what a run takes and what the words say cannot differ.
+	    Book Scope is the callers' to have asked: both are reached for a book run only. Nothing is recorded. */
+	std::vector<UID> SelectedChapterContents(IBook* book)
+	{
+		std::vector<UID> taken;
+		if (!gSelectedDocumentsOn || book == nil)
+			return taken;
+		InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		std::vector<UID> picked;
+		int32 rows = 0;
+		if (ui == nil || !ui->GetPanelBookSelection(book->GetBookFileSpec(), picked, rows))
+			return taken;
+		InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
+		if (contentMgr == nil)
+			return taken;
+		const int32 count = contentMgr->GetContentCount();
+		for (int32 i = 0; i < count; ++i)
+		{
+			const UID contentUID = contentMgr->GetNthContent(i);
+			if (contentUID != kInvalidUID && std::find(picked.begin(), picked.end(), contentUID) != picked.end())
+				taken.push_back(contentUID);
+		}
+		// every chapter of the book after all: that is the whole book, said as the whole book
+		if (static_cast<int32>(taken.size()) >= count)
+			taken.clear();
+		return taken;
 	}
 }
 
@@ -947,6 +983,8 @@ bool KFCBookScope::DescribeTargetBook(PMString& outBookName, BookSelection& outS
 	outBookName.SetTranslatable(kFalse);
 	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
 	outSelection.total = (contentMgr != nil) ? contentMgr->GetContentCount() : 0;
+	// how many a run would take now - ListBookChapters' own narrowing, from the same place
+	outSelection.selected = static_cast<int32>(SelectedChapterContents(book).size());
 	return true;
 }
 
@@ -1086,10 +1124,12 @@ bool KFCBookScope::MakeBookActive(const PMString& bookPath)
 	return true;
 }
 
-bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName)
+bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection)
 {
 	outDocs.clear();
 	outBookName.Clear();
+	if (outSelection != nil)
+		*outSelection = BookSelection();
 
 	// Which book to search: the one the BOOK PANEL is showing, not the "active" one.
 	//
@@ -1130,11 +1170,21 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	}
 
 	const int32 contentCount = contentMgr->GetContentCount();
+	// FIND/CHANGE SELECTED DOCUMENTS (BOOK) (2026-10-07): the Book panel's selection, read as the run starts - only
+	// those chapters, when it is a part of the book (empty = the whole book). SelectedChapterContents says when.
+	const std::vector<UID> taken = SelectedChapterContents(book);
+	if (outSelection != nil)
+	{
+		outSelection->selected = static_cast<int32>(taken.size());
+		outSelection->total = contentCount;
+	}
 	for (int32 i = 0; i < contentCount; ++i)
 	{
 		const UID contentUID = contentMgr->GetNthContent(i);
 		if (contentUID == kInvalidUID)
 			continue;
+		if (!taken.empty() && std::find(taken.begin(), taken.end(), contentUID) == taken.end())
+			continue;		// not one of the selected documents
 
 		InterfacePtr<IBookContent> content(bookDB, contentUID, UseDefaultIID());
 		if (content == nil)

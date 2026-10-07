@@ -101,6 +101,7 @@ public:
 	virtual const char* QueryKindName(int32 mode) { return KFCSavedQueries::KindName(mode); }
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) { return KFCQuerySequence::RunFiles(files, outSummary); }
 	virtual bool DescribeRunScope(PMString& outWords) { return KFCSearchEngine::DescribeRunScope(outWords); }
+	virtual const char* ChangeAllCommandName() { return KFCChangeAll::CommandName(); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

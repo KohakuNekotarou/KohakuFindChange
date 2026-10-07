@@ -98,6 +98,8 @@ public:
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) = 0;
 	/** = KFCSearchEngine::DescribeRunScope - the query dialog's Runs on: line (false = Cannot run: ...). */
 	virtual bool DescribeRunScope(PMString& outWords) = 0;
+	/** = KFCChangeAll::CommandName - "Change All in Book (No List)" / "Change All in Selected Documents (No List)". */
+	virtual const char* ChangeAllCommandName() = 0;
 };
 
 #endif // __IKFCRuns_h__

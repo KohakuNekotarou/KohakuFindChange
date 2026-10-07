@@ -69,7 +69,16 @@ bool KFCChangeAll::IsRunning()
 
 const char* KFCChangeAll::CommandName()
 {
-	// One name (F18): a document's Change All is InDesign's own dialog's, so this command is the book's alone.
+	// One name (F18): a document's Change All is InDesign's own dialog's, so this command is the book's alone - said
+	// as the selected documents' when Find/Change Selected Documents (Book) narrows it to the Book panel's selection
+	// (2026-10-07 - asked of the one place that narrows the run, KFCBookScope's, as Find's name is).
+	if (KFCBookScope::IsBookScopeOn())
+	{
+		PMString bookName;
+		KFCBookScope::BookSelection selection;
+		if (KFCBookScope::DescribeTargetBook(bookName, selection) && selection.selected > 0)
+			return "Change All in Selected Documents (No List)";
+	}
 	return "Change All in Book (No List)";
 }
 
@@ -202,7 +211,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	bookName.SetTranslatable(kFalse);
 	std::vector<KFCBookScope::SkippedChapter> unopenable;
 	std::vector<KFCBookScope::ChapterDoc> listed;
-	if (!KFCBookScope::ListBookChapters(listed, bookName) || listed.empty())
+	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
+	if (!KFCBookScope::ListBookChapters(listed, bookName, &selection) || listed.empty())
 	{
 		outSummary.Append("That book has no chapters.");
 		return 0;
@@ -341,9 +351,27 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			unclosed.push_back(targets[i].shortName);
 	}
 
-	// ===== THE MESSAGE (the spec's section 4).
-	if (replaced == 0)
+	// ===== THE MESSAGE (the spec's section 4; the selected documents' form - 2026-10-07, spec 1 section 4-4).
+	if (replaced == 0 && selection.selected > 0)
+	{
+		outSummary.Append("No match in the ");
+		outSummary.AppendNumber(selection.selected);
+		outSummary.Append(" selected document(s) - nothing was changed.");
+	}
+	else if (replaced == 0)
 		outSummary.Append("No match - nothing was changed.");
+	else if (selection.selected > 0)
+	{
+		// "N replaced in M of S selected document(s) (T in the book)": M written, S the Book panel's selected ones
+		outSummary.AppendNumber(replaced);
+		outSummary.Append(" replaced in ");
+		outSummary.AppendNumber(static_cast<int32>(touched.size()));
+		outSummary.Append(" of ");
+		outSummary.AppendNumber(selection.selected);
+		outSummary.Append(" selected document(s) (");
+		outSummary.AppendNumber(selection.total);
+		outSummary.Append(" in the book).");
+	}
 	else
 	{
 		outSummary.AppendNumber(replaced);

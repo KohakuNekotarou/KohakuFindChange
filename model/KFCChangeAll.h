@@ -27,7 +27,9 @@ namespace KFCChangeAll
 	    a caller that never went through the menu is told why). */
 	int32 Run(PMString& outSummary);
 
-	/** The command's name - "Change All in Book (No List)", the menu's and the one the search's 300 limit names. */
+	/** The command's name - "Change All in Book (No List)", or "Change All in Selected Documents (No List)" while
+	    Find/Change Selected Documents (Book) narrows it (2026-10-07): the menu's (IKFCRuns::ChangeAllCommandName) and
+	    the one the search's 300 limit names. */
 	const char* CommandName();
 
 	/** Is a Change All running (KFCRunGuard counts it)? */

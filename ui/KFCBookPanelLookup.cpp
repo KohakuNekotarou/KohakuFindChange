@@ -13,6 +13,8 @@
 // Interface includes:
 #include "IApplication.h"		// QueryPanelManager - the panel walk starts here
 #include "IBook.h"
+#include "IBookContent.h"		// GetShortName - the test build's selection names its chapters
+#include "IBookContentMgr.h"
 #include "IBookManager.h"
 #include "IBookUIUtils.h"		// GetBookFileFromBookPanel (panel vs active book)
 #include "IControlView.h"		// a panel IS a control view - what GetNthPanelInfo's UID resolves to
@@ -25,10 +27,18 @@
 #include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "PersistUtils.h"		// ::GetClass / ::GetDataBase
 #include "SDKFileHelper.h"
+#include "UIDList.h"			// GetSelectedBookContents' answer
 #include "Utils.h"
+#include "WideString.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 // Project includes:
 #include "KFCBookPanelLookup.h"
+#include "KFCDiag.h"			// KFC_DIAG_FAULT - the test build's book-selection (compiled out of a shipping one)
 
 namespace
 {
@@ -225,6 +235,144 @@ void KFCBookPanelLookup::BringBookTabForward(const PMString& bookPath)
 		panelMgr->ShowPanelByWidgetID(panelWidgetID, kFalse);
 		return true;
 	});
+}
+
+namespace
+{
+	/** The Book panel's own selection for this book, as it stands: the selected rows' BookContent UIDs and the panel's
+	    row count - AcquireCurrentBook's read, nothing judged yet. false = no panel shows this book, or it could not be
+	    read (the whole book, either way). */
+	bool ReadPanelSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
+	{
+		if (!Utils<IBookUIUtils>().Exists())
+			return false;
+		InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
+		bool read = false;
+		KFCBookPanelLookup::ForEachBookPanel(panelMgr, [&](IControlView* panelView, const WidgetID&) -> bool
+		{
+			// This book's panel - in front or not (the selection belongs to the panel, and the run to the book).
+			IDFile panelBookFile;
+			if (!GetBookFileFromPanelView(panelView, panelBookFile) || FileUtils::IsEqual(panelBookFile, bookFile) == kFalse)
+				return false;
+			InterfacePtr<IPanelControlData> panelData(Utils<IBookUIUtils>()->QueryBookPanelData(panelView));
+			if (panelData == nil)
+				return true;		// this book's panel, but not readable: the whole book
+			K2Vector<int32> rows;
+			UIDList* selected = nil;
+			(void)Utils<IBookUIUtils>()->GetSelectedBookContents(rows, selected, panelData);
+			outTotal = Utils<IBookUIUtils>()->GetListItems(panelData);
+			if (selected != nil)
+				for (int32 i = 0; i < selected->Length(); ++i)
+					outContents.push_back(selected->At(i));
+			delete selected;		// made by the callee, deleted by the caller (AcquireCurrentBook's destructor)
+			read = true;
+			return true;
+		});
+		return read;
+	}
+
+#ifdef KFC_DIAG
+	/** THE TEST BUILD'S SELECTION (the fault switch book-selection - KFCDiag.h): the file's first line
+	    "book=<the book's file name>", then one chapter's short name a line (IBookContent::GetShortName - "x-ch1.indd").
+	    For that book, the chapters named stand for the panel's selected rows; for any other book nothing is
+	    selected. Judged afterwards by the same rule as a real selection (GetPanelBookSelection). */
+	bool ReadDiagSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
+	{
+		std::vector<std::string> lines;
+		char* temp = nullptr;
+		size_t len = 0;
+		if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+			return false;
+		const std::string path = std::string(temp) + "\\kbs-diag-fault-book-selection";
+		free(temp);
+		FILE* f = nullptr;
+		if (fopen_s(&f, path.c_str(), "rb") != 0 || f == nullptr)
+			return false;
+		std::string text;
+		char buffer[512];
+		size_t got = 0;
+		while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 65536)
+			text.append(buffer, got);
+		fclose(f);
+		std::string line;
+		text.push_back('\n');
+		for (size_t i = 0; i < text.size(); ++i)
+		{
+			if (text[i] == '\r')
+				continue;
+			if (text[i] != '\n')
+			{
+				line += text[i];
+				continue;
+			}
+			if (!line.empty())
+				lines.push_back(line);
+			line.clear();
+		}
+		if (lines.empty() || lines[0].compare(0, 5, "book=") != 0)
+			return false;
+		PMString wantedBook;
+		wantedBook.SetUTF8String(lines[0].substr(5));
+		PMString bookName;
+		FileUtils::GetFileName(bookFile, bookName);
+		if (!bookName.IsEqual(wantedBook, kFalse))
+			return false;		// another book: nothing selected in it
+
+		InterfacePtr<IBookManager> bookMgr(GetExecutionContextSession(), UseDefaultIID());
+		IBook* book = (bookMgr != nil) ? bookMgr->FindOpenBookByName(bookFile) : nil;	// non-owning
+		InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
+		IDataBase* bookDB = (book != nil) ? ::GetDataBase(book) : nil;
+		if (contentMgr == nil || bookDB == nil)
+			return false;
+		outTotal = contentMgr->GetContentCount();
+		for (int32 i = 0; i < outTotal; ++i)
+		{
+			const UID contentUID = contentMgr->GetNthContent(i);
+			InterfacePtr<IBookContent> content(bookDB, contentUID, UseDefaultIID());
+			if (content == nil)
+				continue;
+			PMString shortName;
+			WideString wide = content->GetShortName();
+			const UTF16TextChar* buf = wide.GrabUTF16Buffer(nil);
+			if (buf != nil)
+				shortName.AppendW(buf);
+			for (size_t n = 1; n < lines.size(); ++n)
+			{
+				PMString wanted;
+				wanted.SetUTF8String(lines[n]);
+				if (shortName.IsEqual(wanted, kFalse))
+				{
+					outContents.push_back(contentUID);
+					break;
+				}
+			}
+		}
+		return true;
+	}
+#endif
+}
+
+bool KFCBookPanelLookup::GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
+{
+	outContents.clear();
+	outTotal = 0;
+	bool read = false;
+#ifdef KFC_DIAG
+	if (KFC_DIAG_FAULT("book-selection"))
+		read = ReadDiagSelection(bookFile, outContents, outTotal);
+	else
+#endif
+		read = ReadPanelSelection(bookFile, outContents, outTotal);
+
+	// THE PRODUCT'S RULE (AcquireCurrentBook::AllOrNoneSelected - the Book panel's own "selected documents" commands):
+	// none or all of it selected is the whole book.
+	const int32 selected = static_cast<int32>(outContents.size());
+	if (!read || selected == 0 || selected >= outTotal)
+	{
+		outContents.clear();
+		return false;
+	}
+	return true;
 }
 
 // End, KFCBookPanelLookup.cpp.

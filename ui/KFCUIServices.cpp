@@ -146,6 +146,11 @@ public:
 	{
 		CAlert::WarningAlert(message);
 	}
+
+	virtual bool GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
+	{
+		return KFCBookPanelLookup::GetPanelBookSelection(bookFile, outContents, outTotal);
+	}
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)

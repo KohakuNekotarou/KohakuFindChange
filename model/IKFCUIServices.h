@@ -51,6 +51,8 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
+#include <vector>
+
 #include "KFCBoundaryID.h"	// IID_IKFCUISERVICES
 
 /** One progress bar the UI half has put up for the model half - RangeProgressBar's four calls that the
@@ -91,6 +93,13 @@ public:
 	/** A modal alert, the message plus a warning icon (CAlert::WarningAlert). The message is finished
 	    text, already marked untranslatable by the caller. */
 	virtual void				WarningAlert(const PMString& message) = 0;
+	// Added by hand from here on (2026-10-07) - a new method goes below the last one, never between (a vtable slot is a
+	// promise to every built caller).
+	/** The documents selected in the Book panel that shows this book (2026-10-07 - Find/Change Selected Documents
+	    (Book)). true only for a PART of the book - none or all selected answers false, the product's rule
+	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
+	    selected BookContent UIDs (the book's database); outTotal = the panel's rows. */
+	virtual bool				GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal) = 0;
 };
 
 #endif // __IKFCUIServices_h__

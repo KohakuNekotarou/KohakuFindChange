@@ -430,8 +430,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCChangeAllActionID)
 		{
-			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's),
-			// so the name stays the resource's - no scope to carry, unlike Find. Grey with Book Scope off, while the
+			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
+			// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
+			// Documents (No List)" (2026-10-07, the spec 1's section 4-4) - from the model, as Find's is. Grey with Book Scope off, while the
 			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Object and
 			// Colour tabs, and with nothing to find - the spec's section 4; a run standing up greys everything above.
 			const bool canRun = KFCChapters()->IsBookScopeOn()
@@ -440,6 +441,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
 				&& KFCRuns()->HasFindQueryNow();
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+			PMString name(KFCRuns()->ChangeAllCommandName());
+			name.SetTranslatable(kFalse);
+			listToUpdate->SetNthActionName(i, name);
 		}
 		else if (action == kKFCRunSavedQueriesActionID)
 		{

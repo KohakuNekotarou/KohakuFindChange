@@ -2790,6 +2790,15 @@ bool KFCSearchEngine::DescribeRunScope(PMString& outWords)
 		PMString bookName;
 		KFCBookScope::BookSelection selection;
 		(void)KFCBookScope::DescribeTargetBook(bookName, selection);	// ResolveRunScope has just found it
+		if (selection.selected > 0)
+		{
+			// Find/Change Selected Documents (Book): the Book panel's selected documents alone
+			outWords.AppendNumber(selection.selected);
+			outWords.Append(" selected document(s) of the book \"");
+			outWords.Append(bookName);
+			outWords.Append("\".");
+			return true;
+		}
 		outWords.Append("the book \"");
 		outWords.Append(bookName);
 		outWords.Append("\" (");
@@ -2969,6 +2978,8 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	std::vector<KFCBookScope::ChapterDoc> targets;
 	PMString bookName;
+	// How much of the book the run takes (2026-10-07 - Find/Change Selected Documents (Book)): selected 0 = all of it.
+	KFCBookScope::BookSelection selection;
 	// Chapters the book could not hand over at all. Declared out here so the summary can name them
 	// whichever way this run ends - including the "no matches" and "nothing openable" exits, where
 	// they are the only thing that explains what happened.
@@ -2978,8 +2989,9 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		// Listed, not opened: each chapter is opened when its turn comes in the loop below and
 		// handed straight back once it has been walked, so a book search never holds more than one
 		// chapter of its own. Whether a chapter can actually be opened is not known yet - the
-		// summary reports the ones that could not, after the walk.
-		if (!KFCBookScope::ListBookChapters(targets, bookName) || targets.empty())
+		// summary reports the ones that could not, after the walk. (Only the Book panel's selected
+		// chapters, when the toggle narrows the run - ListBookChapters decides.)
+		if (!KFCBookScope::ListBookChapters(targets, bookName, &selection) || targets.empty())
 		{
 			// "That book", not "the active book": a run is against the book the BOOK PANEL is showing,
 			// and only falls back to the active one when no panel can be reached
@@ -3124,7 +3136,16 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	if (total == 0)
 	{
 		outSummary.Append("No matches");
-		if (fromBook)
+		if (fromBook && selection.selected > 0)
+		{
+			// the selected documents were all that was looked at (Find/Change Selected Documents (Book))
+			outSummary.Append(" in the ");
+			outSummary.AppendNumber(selection.selected);
+			outSummary.Append(" selected document(s) of book \"");
+			outSummary.Append(bookName);
+			outSummary.Append("\".");
+		}
+		else if (fromBook)
 		{
 			outSummary.Append(" in book \"");
 			outSummary.Append(bookName);
@@ -3159,7 +3180,19 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// still name what was searched - there is no tree under it to read.
 	outSummary.AppendNumber(total);
 	outSummary.Append(" hit(s)");
-	if (fromBook)
+	if (fromBook && selection.selected > 0)
+	{
+		// "in M of S selected document(s) (T in the book)" (2026-10-07 - the spec 1's section 4-4): M held a hit, S were
+		// the Book panel's selected documents - all that was looked at - and T is the book, so the narrowing is said.
+		outSummary.Append(" in ");
+		outSummary.AppendNumber(chaptersWithHits);
+		outSummary.Append(" of ");
+		outSummary.AppendNumber(static_cast<int32>(targets.size()));
+		outSummary.Append(" selected document(s) (");
+		outSummary.AppendNumber(selection.total);
+		outSummary.Append(" in the book).");
+	}
+	else if (fromBook)
 	{
 		// "in M of T chapter(s)": M chapters held a hit, T chapters were looked at. Without the T
 		// there is no way to tell a book whose other chapters simply had no matches from a book
@@ -3328,7 +3361,15 @@ const char* KFCSearchEngine::SearchScopeName(int32 scope)
 const char* KFCSearchEngine::FindCommandName(bool bookScopeOn)
 {
 	if (bookScopeOn)
+	{
+		// a part of the book selected in the Book panel, with the toggle on: the run takes those alone (2026-10-07 -
+		// asked of the one place that narrows the run, KFCBookScope's, so the name and the run cannot differ)
+		PMString bookName;
+		KFCBookScope::BookSelection selection;
+		if (KFCBookScope::DescribeTargetBook(bookName, selection) && selection.selected > 0)
+			return "Find in Selected Documents";
 		return "Find in Book";
+	}
 	// what the search will make of Search: with this selection - the dialog's own display
 	switch (SearchScopeForSelection(CurrentSearchScope()))
 	{

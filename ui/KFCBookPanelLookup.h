@@ -17,8 +17,10 @@
 
 #include "IDFile.h"
 #include "PMString.h"
+#include "UIDRef.h"				// UID
 
 #include <functional>
+#include <vector>
 
 class IControlView;
 class IPanelMgr;
@@ -59,6 +61,17 @@ namespace KFCBookPanelLookup
 	    (KFCBookScope::MakeBookActive): the active book and the front tab are separate states, and the
 	    user who clicks a book row asks for both. */
 	void BringBookTabForward(const PMString& bookPath);
+
+	/** THE DOCUMENTS SELECTED IN THE BOOK PANEL THAT SHOWS THIS BOOK (2026-10-07 - Find/Change Selected Documents (Book),
+	    docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-3), read the way the
+	    product's own AcquireCurrentBook reads them (source/open/includes/layout/AcquireCurrentBook.h): the panel's data
+	    (IBookUIUtils::QueryBookPanelData), its selected rows' BookContent UIDs (GetSelectedBookContents - the UIDList is
+	    the callee's to make and the caller's to delete) and its rows (GetListItems). The panel is found by the book it
+	    shows, compared as files - in front or not. true only for a PART of the book: none or all selected is the whole
+	    book, the product's rule (AcquireCurrentBook::AllOrNoneSelected), and so is no panel showing the book.
+	    outContents = the selected BookContent UIDs (the book's database); outTotal = the panel's rows.
+	    In a test build the fault switch book-selection stands in for the panel (KFCDiag.h). */
+	bool GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal);
 }
 
 #endif // __KFCBookPanelLookup_h__

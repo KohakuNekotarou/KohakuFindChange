@@ -118,7 +118,8 @@ namespace KFCSearchEngine
 
 	/** WHAT A RUN WOULD RUN ON, IN WORDS (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): the query dialog's Runs on: line, made from ResolveRunScope's answer so the line and the run
-	    cannot differ. true = "Runs on: the book "<title>" (<n> document(s))." / "Runs on: All Documents (Search: in
+	    cannot differ. true = "Runs on: the book "<title>" (<n> document(s))." / "Runs on: <n> selected document(s) of the
+	    book "<title>"." (Find/Change Selected Documents (Book)) / "Runs on: All Documents (Search: in
 	    Edit > Find/Change)." / "Runs on: Document "<name>" (...)." / "Runs on: Story in "<name>" (...)." (To End of
 	    Story and Selection alike); false = "Cannot run: " and ResolveRunScope's refusal. Touches nothing - the book
 	    is described by KFCBookScope::DescribeTargetBook, not listed - so it may be asked at any time. */
@@ -233,7 +234,9 @@ namespace KFCSearchEngine
 	const char* SearchScopeName(int32 scope);
 
 	/** The Find command's name for the scope it would search NOW: "Find in Book" while Book
-	    Scope is on; with it off, Search:'s - "Find in Document", "Find in All Documents", "Find in Story",
+	    Scope is on - "Find in Selected Documents" when the run would take only the Book panel's selected documents
+	    (Find/Change Selected Documents (Book), 2026-10-07 - KFCBookScope::DescribeTargetBook); with it off, Search:'s -
+	    "Find in Document", "Find in All Documents", "Find in Story",
 	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 

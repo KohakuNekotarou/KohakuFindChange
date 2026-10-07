@@ -157,20 +157,9 @@ namespace KFCBookScope
 		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
 	};
 
-	/** List the TARGET book's chapters WITHOUT opening anything - the book the BOOK PANEL is showing,
-	    or the active book when no panel can be reached (ResolveTargetBook). Each entry comes back with
-	    its file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
-	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
-	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
-	    the last run left held, and this does not.
-
-	    @return true when a book was resolved and it has at least one chapter. Note that this says
-	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
-	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName);
-
 	/** How much of the target book a run takes (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
-	    section 4-4): total = the book's documents; selected = the documents picked in the Book panel, 0 = the whole book
-	    (no picking yet - the toggle Find/Change Selected Documents (Book) fills it). */
+	    section 4-4): total = the book's documents; selected = how many of them a run takes when it is narrowed to the
+	    Book panel's selection (Find/Change Selected Documents (Book)), 0 = the whole book. */
 	struct BookSelection
 	{
 		int32	selected;
@@ -178,10 +167,25 @@ namespace KFCBookScope
 		BookSelection() : selected(0), total(0) {}
 	};
 
-	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (2026-10-07, the same section): its title and how many documents it
-	    holds - the book ListBookChapters would list (ResolveTargetBook), counted as GetTargetBook counts it. For the
-	    words that name a run before it starts (the query dialog's Runs on: line), so it may be asked at any time:
-	    unlike ListBookChapters it records nothing (GetSearchedBookPath), opens nothing and holds nothing.
+	/** List the TARGET book's chapters WITHOUT opening anything - the book the BOOK PANEL is showing,
+	    or the active book when no panel can be reached (ResolveTargetBook). Each entry comes back with
+	    its file, its short name and its content UID; docRef stays null until OpenChapterDoc fills it
+	    in. Also records WHICH book the run is against (see GetSearchedBookPath) - so call
+	    ReleaseSearchedBook first, as the search does at its commit point: that hands back whatever
+	    the last run left held, and this does not.
+	    NARROWED (2026-10-07): with Find/Change Selected Documents (Book) on and a PART of the book selected in the
+	    Book panel that shows it, only those chapters are listed - read now, as the run starts (section 4-2).
+	    outSelection, when given, says how many were taken and of how many (selected 0 = the whole book).
+
+	    @return true when a book was resolved and it has at least one chapter. Note that this says
+	            nothing about whether those chapters can be OPENED - only OpenChapterDoc knows. */
+	bool ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& outBookName, BookSelection* outSelection = nil);
+
+	/** THE TARGET BOOK, DESCRIBED WITHOUT A TRACE (2026-10-07, the same section): its title, how many documents it
+	    holds and how many a run would take (the same narrowing as ListBookChapters, from the same place) - the book
+	    ListBookChapters would list (ResolveTargetBook). For the words that name a run before it starts (the menu's
+	    names, the query dialog's Runs on: line), so it may be asked at any time: unlike ListBookChapters it records
+	    nothing (GetSearchedBookPath), opens nothing and holds nothing.
 	    @return false when there is no target book (outBookName empty, outSelection zero). */
 	bool DescribeTargetBook(PMString& outBookName, BookSelection& outSelection);
 
