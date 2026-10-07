@@ -122,7 +122,7 @@ IFindChangeService::FindChangeResult RunWalkerCmd(const ClassID& cmdBoss, ITextW
 	return result;
 }
 
-// THE SAME-OCCURRENCE TEST IS NOT IN THE WRITING WALK - IT STANDS BEFORE THE RUN, AND AT EVERY DOOR.
+// THE SAME-OCCURRENCE TEST IS NOT IN THE WRITING WALK - IT STANDS BEFORE THE WRITE, AND AT EVERY DOOR.
 //
 // Inside the walk - is the match the walk has landed on the one the row describes: same story, same
 // position (our own replacements cancelled out), same text - it cannot work across a BOOK, where a
@@ -1092,7 +1092,7 @@ enum QueryCompared
 QueryCompared CompareQueryWithSearch()
 {
 	// ----- (1) the TAB the results were searched with -----
-	// Every chapter is RE-WALKED, and a walk in another mode returns another set of matches - so the
+	// The row's story is RE-WALKED, and a walk in another mode returns another set of matches - so the
 	// rows would be lined up with occurrences the user never saw. Asked first because it is the most
 	// specific thing that can be said, and because it does NOT cost the results: a tab is one click to
 	// put back. Read through the call the results were stamped with (KFCSearchEngine::CurrentSearchMode).
@@ -1240,7 +1240,7 @@ static void StartStatus(PMString& out)
 // nil = InDesign would not start one, and outStatus then says so.
 static ICommandSequence* BeginPlainSequence(const PMString& stepName, PMString& outStatus)
 {
-	// The caller's name, as the run's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it).
+	// The caller's name, as KFC's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it).
 	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KFC Replace");
 	if (sequence == nil)
 	{
