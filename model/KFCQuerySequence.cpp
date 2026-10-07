@@ -105,7 +105,28 @@ void AppendPerQuery(PMString& s, const std::vector<int32>& perQuery)
 	}
 }
 
-// " Skipped 2 queries: file not found (A, B)." - nothing when `names` is empty.
+// "Nothing was run - a query in the run order cannot be found (A)." / "... 2 queries in the run order cannot be found
+// (A, B)." - the refusal for a run order holding a query whose file is gone.
+void AppendNotFound(PMString& s, const std::vector<PMString>& names)
+{
+	s.Append("Nothing was run - ");
+	if (names.size() == 1)
+		s.Append("a query in the run order cannot be found (");
+	else
+	{
+		s.AppendNumber(static_cast<int32>(names.size()));
+		s.Append(" queries in the run order cannot be found (");
+	}
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		if (i > 0)
+			s.Append(", ");
+		s.Append(names[i]);
+	}
+	s.Append(").");
+}
+
+// " Skipped 2 queries: nothing to find (A, B)." - nothing when `names` is empty.
 void AppendSkipped(PMString& s, const char* why, const std::vector<PMString>& names)
 {
 	if (names.empty())
@@ -160,13 +181,16 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		outSummary.Append("No queries in the run order.");
 		return 0;
 	}
-	bool anyFile = false;
+	// EVERY QUERY'S FILE, OR NO RUN (2026-10-07 night, the author: when a query cannot be found, the query run is not
+	// done at all - an order made in the dialog or loaded from a file alike). Until then a query whose file was gone was
+	// skipped and named, and the rest ran.
+	std::vector<PMString> notFound;
 	for (size_t q = 0; q < queries.size(); ++q)
-		if (FileUtils::DoesFileExist(queries[q].file))
-			anyFile = true;
-	if (!anyFile)
+		if (!FileUtils::DoesFileExist(queries[q].file))
+			notFound.push_back(queries[q].name);
+	if (!notFound.empty())
 	{
-		outSummary.Append("None of the queries' files was found - nothing was run.");
+		AppendNotFound(outSummary, notFound);
 		return 0;
 	}
 	KFCSearchEngine::RunScope scope;
@@ -235,7 +259,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
-	std::vector<PMString> skippedNoFile, skippedNothing;
+	std::vector<PMString> skippedNothing;
 	std::vector<UIDRef> touched;
 	int32 replaced = 0;
 	bool cancelled = false, failed = false;
@@ -261,12 +285,14 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		for (size_t q = 0; q < queries.size() && !cancelled && !failed; ++q)
 		{
 			const QueryItem& query = queries[q];
+			// Every file was there at the door; one gone since (deleted while the run went) stops the run like a failed
+			// write - the whole of it taken back - by the same rule.
 			if (!FileUtils::DoesFileExist(query.file))
 			{
-				skippedNoFile.push_back(query.name);
-				unit += static_cast<int32>(targets.size());
-				runBar.SetPosition(unit);
-				continue;
+				failed = true;
+				why = "the query cannot be found: ";
+				why.Append(query.name);
+				break;
 			}
 			if (!LoadQuery(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
 				|| !KFCSearchEngine::HasFindQueryNow())
@@ -429,7 +455,6 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		outSummary.AppendNumber(selection.total);
 	}
 	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
-	AppendSkipped(outSummary, "file not found", skippedNoFile);
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);

@@ -24,6 +24,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrder.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrderFile.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryList.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -126,6 +129,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrder.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryOrderFile.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryList.h">

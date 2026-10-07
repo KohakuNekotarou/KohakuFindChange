@@ -124,7 +124,7 @@
 
 - **SET-16** 保存するもの ―― Translucent Panel／Translucent Find/Change／Minimizable Find/Change／Link the Application Bar's Search Field／
   Hide Previous Chapter／Find/Change Selected Documents (Book)（2026-10-07・キー `selectedDocuments`＝SCOPE-34）／Remember Book Panel Placement と、ブックパネルの位置（開いていれば今の位置、無ければ最後に覚えた位置）。
-  （保存したクエリの並びは、このファイルでなく別のファイル `KFCQueryOrder.txt` に、ボタンを押すたびに書く＝QRY-14・QRY-15。）
+  （保存したクエリの並びは、このファイルに入れない ―― InDesign を起動している間だけ覚え、ファイルにするのは `Save Order...` で利用者が選んだ場所＝QRY-14〜16・QRY-26。2026-10-07 の昼の版が書いていた `KFCQueryOrder.txt` はもう使わない。）
   - 訂正:
 
 - **SET-17** ★**保存しないもの＝Book Scope**（GEN-26・「次に何を探すか」は設定ではなく今の作業）。起動のたびに OFF から。

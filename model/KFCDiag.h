@@ -77,6 +77,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <mutex>
+#include <string>						// KFCDiagFaultText
 #include <thread>
 #include "PerformanceStats.h"			// InDesign's own counters (KFCDiagPerf) - guide vol2-16
 #include "PerformanceMetricsID.h"
@@ -141,6 +142,49 @@ inline bool KFCDiagFault(const char* name)
 }
 
 #define KFC_DIAG_FAULT(name) KFCDiagFault(name)
+
+// Turn the fault switch <name> off - its file removed (a one-shot switch the code itself takes away once acted on).
+inline void KFCDiagFaultOff(const char* name)
+{
+	char* temp = nullptr;
+	size_t len = 0;
+	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+		return;
+	char path[600] = { 0 };
+	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
+	free(temp);
+	(void)remove(path);
+}
+
+// The fault switch <name>'s file as text (UTF-8, its first line - a CR or LF ends it, a BOM is passed over) - false when
+// the switch is off or its file is empty. (2026-10-07 night: qd-order-file names the file the query dialog's Save Order...
+// and Load Order... use instead of asking through Windows' dialogs, which a test cannot press.)
+inline bool KFCDiagFaultText(const char* name, std::string& out)
+{
+	out.clear();
+	char* temp = nullptr;
+	size_t len = 0;
+	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
+		return false;
+	char path[600] = { 0 };
+	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
+	free(temp);
+	FILE* f = nullptr;
+	if (fopen_s(&f, path, "rb") != 0 || f == nullptr)
+		return false;
+	char buffer[1024];
+	size_t got = 0;
+	while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0)
+		out.append(buffer, got);
+	fclose(f);
+	if (out.size() >= 3 && static_cast<unsigned char>(out[0]) == 0xEF && static_cast<unsigned char>(out[1]) == 0xBB
+		&& static_cast<unsigned char>(out[2]) == 0xBF)
+		out.erase(0, 3);
+	const size_t end = out.find_first_of("\r\n");
+	if (end != std::string::npos)
+		out.erase(end);
+	return !out.empty();
+}
 
 // The nth whole number (from 0) the fault switch <name>'s file holds, separated by white space - `fallback` when the
 // switch is off, or holds fewer numbers, or one that is not a number.

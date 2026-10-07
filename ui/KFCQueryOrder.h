@@ -8,10 +8,11 @@
 //  sections 2-2 and 3): the saved queries the dialog offers (the left list, asked of the model at every open -
 //  KFCSavedQueries) and the run order (the right list). What the dialog draws comes from here, and only from here: the
 //  lists' row maker (KFCQueryList.cpp) reads these vectors by index.
-//  THE RUN ORDER'S ONE SOURCE OF TRUTH IS ITS FILE, KFCQueryOrder.txt in InDesign's roaming folder: read at every open
-//  (LoadOrder) and written at every change (SaveOrder), so however the dialog is closed - and across a restart - it opens
-//  as it was left (G2, G3). One absolute path a line, UTF-8 without a BOM, CR LF; read with a BOM or LF too, a blank line
-//  or a "#" line skipped.
+//  THE RUN ORDER IS THE SESSION'S (2026-10-07 night, the author): kept here while InDesign runs - the dialog closed and
+//  opened again shows it as it was left - and empty after a restart. An order is kept beyond that only as a file the
+//  person saves and loads (SaveOrderTo / LoadOrderFrom - KFCQueryOrderFile.h). (Until then its one source of truth was
+//  KFCQueryOrder.txt in InDesign's roaming folder, read at every open and written at every change - no longer read or
+//  written; a file left there by an earlier build is left alone.)
 //  Main thread only, one dialog at a time - the state is this file's.
 //
 //========================================================================================
@@ -40,16 +41,22 @@ namespace KFCQueryOrder
 	/** The run order's files, in order - what Run hands the model. */
 	std::vector<IDFile> OrderFiles();
 
-	/** Read the run order from its file (every open). A file that is not there is an empty order. false = it is there
-	    and could not be read (outWhy); the order is then empty. Each line is described by the model
-	    (DescribeQueryFile): a line that is no query's file stays, "(not found)", and Run skips it. */
-	bool LoadOrder(PMString& outWhy);
+	/** Read each row's file again (every open): a query whose file has gone since reads "(not found)", one that is there
+	    reads as it is now. */
+	void RefreshOrder();
 
-	/** Write the run order to its file (every change), through a side file (KFCWriteOwnFile). false = outWhy says which
-	    step failed - "folder", "open", "write", "replace". */
-	bool SaveOrder(PMString& outWhy);
+	/** Write the run order to `file` as a KFC query order (KFCQueryOrderFile.h), through a side file beside it
+	    (KFCWriteFileSafely). false = outWhy says which step failed - "open", "write", "replace". */
+	bool SaveOrderTo(const IDFile& file, PMString& outWhy);
 
-	/** The four buttons' and Clear's changes. Indices outside the lists change nothing. */
+	/** Make the run order the one `file` holds. Each entry is its file when that is there; otherwise the saved query of
+	    the same kind and name (the user's own before InDesign's - a query's folder moves with InDesign's version);
+	    otherwise it stays, "(not found)", and Run refuses while it does (KFCQuerySequence). false = outWhy "read" (not
+	    there, or not read whole) or "format" (not a KFC query order); the run order is then left as it was. */
+	bool LoadOrderFrom(const IDFile& file, PMString& outWhy);
+
+	/** The four buttons' and Clear's changes - the session's order alone (nothing is written). Indices outside the lists
+	    change nothing. */
 	void Add(int32 savedIndex);			// Saved()[savedIndex] at the end of the order
 	void Remove(int32 orderIndex);
 	void MoveUp(int32 orderIndex);

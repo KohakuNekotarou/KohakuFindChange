@@ -1341,8 +1341,9 @@ resource KFCQueryRowWidget(kKFCQueryRowRsrcID + index_enUS)
 };
 
 /*
- * The dialog: [ Saved Queries: + list | Add >, < Remove, Move Up, Move Down | Run Order: + list ], the "Runs on:" line,
- * then Run and Close at the right. A movable modal (KFCQueryDialog.cpp). EVE lays it out; the root frame is NOT the
+ * The dialog: [ Saved Queries: + list | Add >, < Remove, Move Up, Move Down, Clear | Run Order: + list, and under it
+ * Save Order... and Load Order... ], the "Runs on:" line, the dialog's message line, then Run and Close at the right.
+ * Modeless, with a minimize box (KFCQueryDialog.cpp). EVE lays it out; the root frame is NOT the
  * window's size - EVE sizes the window from the children's frames (KCM's book dialog measured this over eight builds).
  * Run is the dialog's default button (Enter) and Close its cancel button (Escape) - the framework's own OK and Cancel ids.
  */
@@ -1520,7 +1521,35 @@ resource KFCQueryDialogWidget (kKFCQueryDialogRsrcID + index_enUS)
 							kFalse,
 							{
 							},
-							kEVEAlignFill | kEVENoSpaceAfter,
+							kEVEAlignFill | kEVERegularSpaceAfter,
+						),
+						// Save Order... / Load Order... (2026-10-07 night, the author's choice of two): the run order to a
+						// file of its own and back (KFCQueryOrderFile.h) - under the list they act on, at its right.
+						EVEGenericPanelWidget
+						(
+							kInvalidWidgetID, kPMRsrcID_None,
+							kBindNone,
+							Frame(0, 0, 260, 24)
+							kTrue, kTrue,
+							kEVEAlignRight | kEVENoSpaceAfter | kEVEArrangeChildrenInRow,
+							{
+								EVEButtonWidget
+								(
+									kKFCQuerySaveOrderButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+									Frame(0, 0, 110, 20)		// a floor: EVE widens a button to its label
+									kTrue, kTrue,
+									kKFCQuerySaveOrderKey,		// "Save Order..."
+									kEVERegularSpaceAfter,
+								),
+								EVEButtonWidget
+								(
+									kKFCQueryLoadOrderButtonWidgetID, kSysButtonPMRsrcId, kBindNone,
+									Frame(0, 0, 110, 20)
+									kTrue, kTrue,
+									kKFCQueryLoadOrderKey,		// "Load Order..."
+									kEVENoSpaceAfter,
+								),
+							}
 						),
 					}
 				),

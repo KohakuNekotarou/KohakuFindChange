@@ -56,6 +56,7 @@
 #ifndef __KFCPanelState_h__
 #define __KFCPanelState_h__
 
+#include "IDFile.h"		// KFCReadFileWhole / KFCWriteFileSafely
 #include "PMString.h"
 
 #include <string>
@@ -105,13 +106,13 @@ bool	KFCPanelStateFilePath(PMString& outPath);
 bool	KFCPanelStateReadInt(const std::string& text, const char* key, int32& out);
 bool	KFCPanelStateReadBool(const std::string& text, const char* key, bool defVal);
 
-// ANOTHER FILE OF OURS IN THE SAME FOLDER (2026-10-07 - the query dialog's run order, KFCQueryOrder.cpp), read and
-// written exactly as the settings file is: the whole file or nothing, and every write through a side file that is read
-// back before MoveFileEx puts it in place.
-// KFCReadOwnFile: true with out empty when there is no such file yet; false when it is there and could not be read whole.
-// KFCWriteOwnFile: nil when written; otherwise a short reason - "folder", "open", "write", "replace".
+// A FILE OF OURS AT A PATH THE PERSON CHOSE (2026-10-07 night - the query dialog's Save Order... / Load Order...,
+// KFCQueryOrderFile.cpp), read and written exactly as the settings file is: the whole file or nothing, and every write
+// through a side file beside it ("<path>.tmp") that is read back before MoveFileEx puts it in place.
+// KFCReadFileWhole: false when the file is not there or could not be read whole.
+// KFCWriteFileSafely: nil when written; otherwise a short reason - "open", "write", "replace".
 // Implemented in KFCPanelState.cpp.
-bool		KFCReadOwnFile(const char* fileName, std::string& out);
-const char*	KFCWriteOwnFile(const char* fileName, const char* sideFileName, const std::string& text);
+bool		KFCReadFileWhole(const IDFile& file, std::string& out);
+const char*	KFCWriteFileSafely(const IDFile& file, const std::string& text);
 
 #endif // __KFCPanelState_h__

@@ -72,6 +72,13 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCQueryClearKey,				"Clear",
                 kKFCQueryRunKey,				"Run",
                 kKFCQueryCloseKey,				"Close",
+                // Save Order... / Load Order... (2026-10-07 night): the buttons, InDesign's Save / Open dialogs' titles,
+                // and the file type's name in them.
+                kKFCQuerySaveOrderKey,			"Save Order...",
+                kKFCQueryLoadOrderKey,			"Load Order...",
+                kKFCQuerySaveOrderTitleKey,		"Save Query Order",
+                kKFCQueryLoadOrderTitleKey,		"Load Query Order",
+                kKFCQueryOrderFileTypeKey,		"KFC Query Order",
                 // The message line as a freshly opened panel shows it - the plug-in has no search
                 // box of its own, so the first thing to say is where the query is typed.
                 // Read through InitialMessage (KFCResultListWidgetMgr.cpp) whenever the message line falls

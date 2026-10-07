@@ -12,8 +12,8 @@
 //  run's documents opened and held from before it opens to after it ends (an open inside it throws the undo history of
 //  what was written away - the resolve pass in KFCReplaceEngine::ReplaceChecked). The panel's list is cleared at the
 //  start (a Ctrl+Z of the run puts it back - KFCUndoFollow::RunRecorder), and Edit > Find/Change is emptied at the end
-//  (the spec's D7). A query whose file is gone, or that has nothing to find, is skipped and named; a failed write or
-//  Cancel takes the whole run back.
+//  (the spec's D7). A query whose file is gone stops the whole run before anything is written (2026-10-07 night, the
+//  author); one with nothing to find is skipped and named; a failed write or Cancel takes the whole run back.
 //
 //========================================================================================
 
@@ -40,7 +40,7 @@ namespace KFCQuerySequence
 
 	/** THE QUERY DIALOG'S RUN (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 	    these query files, in this order, each named as the dialog names it (KFCSavedQueries::Describe - the file's
-	    name without .xml), then Run. A file that is not there is Run's to skip and name. */
+	    name without .xml), then Run. A file that is not there is Run's to refuse - nothing is run, and it is named. */
 	int32 RunFiles(const std::vector<IDFile>& files, PMString& outSummary);
 
 	/** Is a run going on (KFCRunGuard counts it)? */

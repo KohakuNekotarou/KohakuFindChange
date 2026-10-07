@@ -33,15 +33,18 @@
 #include "CDialogController.h"
 #include "CDialogObserver.h"
 #include "CoreResTypes.h"			// kViewRsrcType
+#include "FileUtils.h"				// SysFileToPMString - the saved / loaded file's path, said
 #include "LocaleSetting.h"
 #include "RsrcSpec.h"
 
 // Project includes:
 #include "KFCQueryDialog.h"
+#include "KFCDiag.h"				// the test build's qd-order-reset (Repaint)
 #include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
 #include "KFCPanelTitle.h"
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
+#include "KFCQueryOrderFile.h"		// KFCChooseOrderFile - Save Order... / Load Order...'s file
 #include "KFCResultTree.h"			// Rebuild / ShowStatus - the panel, told of a run as Find tells it
 #include "KFCUIID.h"
 
@@ -60,6 +63,8 @@ namespace
 	// The buttons the observer hears, and what each changes in the run order (Clear: the author's addition).
 	const WidgetID kOrderButtons[] = { kKFCQueryAddButtonWidgetID, kKFCQueryRemoveButtonWidgetID, kKFCQueryUpButtonWidgetID,
 		kKFCQueryDownButtonWidgetID, kKFCQueryClearButtonWidgetID };
+	// ...and the two that take the run order to a file of its own and back (2026-10-07 night - KFCQueryOrderFile.h).
+	const WidgetID kFileButtons[] = { kKFCQuerySaveOrderButtonWidgetID, kKFCQueryLoadOrderButtonWidgetID };
 	const WidgetID kLists[] = { kKFCQuerySavedListWidgetID, kKFCQueryOrderListWidgetID };
 
 	void EnableButton(IPanelControlData* panel, const WidgetID& id, bool on)
@@ -74,8 +79,8 @@ namespace
 	}
 
 	/** Grey the buttons that have nothing to act on (the spec's section 2-2): Add with no saved query picked; Remove with
-	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear with an empty order. Run is
-	    never grey (G5 as changed: a run that cannot go says why on the panel). */
+	    no row of the order picked; Move Up on the first row, Move Down on the last; Clear and Save Order... with an empty
+	    order. Load Order... and Run are never grey (G5 as changed: a run that cannot go says why on the panel). */
 	void UpdateButtons(IPanelControlData* panel)
 	{
 		if (panel == nil)
@@ -88,6 +93,8 @@ namespace
 		EnableButton(panel, kKFCQueryUpButtonWidgetID, right > 0);
 		EnableButton(panel, kKFCQueryDownButtonWidgetID, right >= 0 && right + 1 < rows);
 		EnableButton(panel, kKFCQueryClearButtonWidgetID, rows > 0);
+		EnableButton(panel, kKFCQuerySaveOrderButtonWidgetID, rows > 0);
+		EnableButton(panel, kKFCQueryLoadOrderButtonWidgetID, true);
 	}
 
 	/** The dialog's own message line (2026-10-07, the author's choice): the words the panel's message line is given, here
@@ -106,17 +113,12 @@ namespace
 		line->SetString(words);
 	}
 
-	/** Say on the panel's message line - and the dialog's - that the run order file could not be read or written: the
-	    dialog stays open, and what it shows is then not what the file holds. */
-	void SayOrderFileFailed(IPanelControlData* panel, const char* what, const PMString& why)
+	/** One message on both lines - the panel's and the dialog's (the dialog stands with the panel closed) - as Run's
+	    result goes to both. */
+	void SayOnBoth(IPanelControlData* panel, const PMString& message)
 	{
-		PMString say;
+		PMString say(message);
 		say.SetTranslatable(kFalse);
-		say.Append("The run order could not be ");
-		say.Append(what);
-		say.Append(" (");
-		say.Append(why);
-		say.Append(").");
 		KFCResultTree::ShowStatus(say);
 		ShowDialogMessage(panel, say);
 	}
@@ -140,18 +142,26 @@ namespace
 		line->SetString(words);
 	}
 
-	/** Fill the dialog from what is true now: both lists read again - the saved queries from their folders, the run
-	    order from its file - and drawn, the buttons greyed to match (nothing is picked after a fill), and the Runs on:
-	    line. */
+	/** Fill the dialog from what is true now: the saved queries read again from their folders, the session's run order
+	    with each row's file asked again (a query deleted since reads "(not found)"), both drawn, the buttons greyed to
+	    match (nothing is picked after a fill), and the Runs on: line. */
 	void Repaint(IPanelControlData* panel)
 	{
 		if (panel == nil)
 			return;
 		ShowDialogMessage(panel, PMString());		// a fresh open says nothing of an earlier run
+#ifdef KFC_DIAG
+		// TEST BUILDS ONLY: the fault switch qd-order-reset (KFCDiag.h) - a test case starts from an empty order, as a
+		// fresh session does (the order outlives a case otherwise: it is the session's). One-shot: taken away here, so the
+		// case's later opens keep the order it made.
+		if (KFC_DIAG_FAULT("qd-order-reset"))
+		{
+			KFCQueryOrder::Clear();
+			KFCDiagFaultOff("qd-order-reset");
+		}
+#endif
 		KFCQueryOrder::LoadSaved();
-		PMString why;
-		if (!KFCQueryOrder::LoadOrder(why))
-			SayOrderFileFailed(panel, "read", why);
+		KFCQueryOrder::RefreshOrder();
 		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		UpdateButtons(panel);
@@ -174,8 +184,9 @@ namespace
 		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
 	}
 
-	/** One of the five buttons pressed: change the order, write it to its file at once (G2), draw it, and pick the row
-	    the change leaves the eye on - the added row, the row that took a removed one's place, the moved row. */
+	/** One of the five buttons pressed: change the session's order (nothing is written - the order is kept as a file only
+	    by Save Order...), draw it, and pick the row the change leaves the eye on - the added row, the row that took a
+	    removed one's place, the moved row. */
 	void PressOrderButton(IPanelControlData* panel, const WidgetID& button)
 	{
 		const int32 left = KFCQueryListSelectedIndex(panel, kKFCQuerySavedListWidgetID);
@@ -219,12 +230,63 @@ namespace
 		else
 			return;
 
-		PMString why;
-		if (!KFCQueryOrder::SaveOrder(why))
-			SayOrderFileFailed(panel, "saved", why);
 		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
 		KFCQueryListSelect(panel, kKFCQueryOrderListWidgetID, pick);
 		UpdateButtons(panel);
+	}
+
+	/** Save Order... (2026-10-07 night, the author): the run order to a file the person names, through InDesign's own Save
+	    dialog (KFCChooseOrderFile). Written: the file's full path and nothing else on both lines - Save Panel Settings'
+	    way (the author's call: "show where it was saved"). Cancelled: nothing changes, nothing is said. */
+	void PressSaveOrder(IPanelControlData* panel)
+	{
+		if (KFCQueryOrder::Order().empty())
+		{
+			SayOnBoth(panel, PMString("Save Order: the run order is empty."));
+			return;
+		}
+		IDFile file;
+		if (!KFCChooseOrderFile(true, file))
+			return;
+		const PMString path(FileUtils::SysFileToPMString(file));
+		PMString why;
+		if (!KFCQueryOrder::SaveOrderTo(file, why))
+		{
+			PMString say("Save Order: the file could not be written (");
+			say.SetTranslatable(kFalse);
+			say.Append(why);
+			say.Append(") - ");
+			say.Append(path);
+			SayOnBoth(panel, say);
+			return;
+		}
+		SayOnBoth(panel, path);
+	}
+
+	/** Load Order...: the run order the file holds, through InDesign's own Open dialog, put in place of the one shown
+	    (KFCQueryOrder::LoadOrderFrom - a query found again by its kind and name when its file has moved, "(not found)"
+	    otherwise, and Run then refuses). Loaded: the file's full path on both lines, as Save says it. Not loaded - not
+	    there, or not a KFC query order: the order is left as it was, and the lines say why. */
+	void PressLoadOrder(IPanelControlData* panel)
+	{
+		IDFile file;
+		if (!KFCChooseOrderFile(false, file))
+			return;
+		const PMString path(FileUtils::SysFileToPMString(file));
+		PMString why;
+		if (!KFCQueryOrder::LoadOrderFrom(file, why))
+		{
+			PMString say("Load Order: ");
+			say.SetTranslatable(kFalse);
+			say.Append(path);
+			say.Append(why == PMString("format") ? " is not a KFC query order." : " could not be read.");
+			SayOnBoth(panel, say);
+			return;
+		}
+		KFCQueryListRebuild(panel, kKFCQuerySavedListWidgetID);		// read again on the way (LoadOrderFrom)
+		KFCQueryListRebuild(panel, kKFCQueryOrderListWidgetID);
+		UpdateButtons(panel);
+		SayOnBoth(panel, path);
 	}
 
 	/** The dialog's platform window: a minimize box, and back from the taskbar if it sits minimized. The SDK cannot give
@@ -278,7 +340,7 @@ CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
     for Run (the OK button, Enter), which it takes itself and does not hand on: the base's OK closes the dialog, and
     runs ApplyDialog inside a command sequence of its own (CDialogObserver.cpp) that the query run's abortable sequence
     would nest in. It hears
-    the five buttons that change the run order (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
+    the five buttons that change the run order, Save Order... and Load Order... (a PUSH button's press: kTrueStateMessage on IID_IBOOLEANCONTROLDATA - how
     CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
     MEASURED 2026-10-07: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
     and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
@@ -298,6 +360,8 @@ public:
 			return;
 		for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
 			this->AttachToWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+		for (size_t i = 0; i < sizeof(kFileButtons) / sizeof(kFileButtons[0]); ++i)
+			this->AttachToWidget(kFileButtons[i], IID_IBOOLEANCONTROLDATA, panel);
 		for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
 			this->AttachToWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 	}
@@ -310,6 +374,8 @@ public:
 		{
 			for (size_t i = 0; i < sizeof(kOrderButtons) / sizeof(kOrderButtons[0]); ++i)
 				this->DetachFromWidget(kOrderButtons[i], IID_IBOOLEANCONTROLDATA, panel);
+			for (size_t i = 0; i < sizeof(kFileButtons) / sizeof(kFileButtons[0]); ++i)
+				this->DetachFromWidget(kFileButtons[i], IID_IBOOLEANCONTROLDATA, panel);
 			for (size_t i = 0; i < sizeof(kLists) / sizeof(kLists[0]); ++i)
 				this->DetachFromWidget(kLists[i], IID_ITREEVIEWCONTROLLER, panel);
 		}
@@ -352,6 +418,10 @@ public:
 				PressOrderButton(panel, id);
 				return;
 			}
+		if (id == kKFCQuerySaveOrderButtonWidgetID)
+			PressSaveOrder(panel);
+		else if (id == kKFCQueryLoadOrderButtonWidgetID)
+			PressLoadOrder(panel);
 	}
 };
 

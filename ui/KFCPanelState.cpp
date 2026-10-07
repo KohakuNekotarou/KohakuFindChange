@@ -449,13 +449,11 @@ static bool KFCReadWholeFile(const IDFile& file, std::string& out)
 // between the delete and the move leaves NO settings file, only the side file - the very gap the side
 // file exists to close. MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume (and
 // AFL's MoveFile is itself a wrapper around MoveFileExW).
-// sideFileName = the side file's name in the same folder (the settings file's is kKFCPanelStateSideFileName; another
-// file of ours names its own - KFCWriteOwnFile).
-static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const char* sideFileName)
+// side = the side file, in the same folder as `file` (one volume: MoveFileEx's one-step replace) - the settings file's
+// is kKFCPanelStateSideFileName; a file of ours at a path the person chose has "<its path>.tmp" (KFCWriteFileSafely).
+static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const IDFile& sideFile)
 {
-	IDFile side;
-	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(sideFileName)))
-		return "folder";
+	IDFile side(sideFile);		// GrabTString is not const
 	{
 		InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(side, kOpenOut | kOpenTrunc));
 		if (stream == nil)
@@ -522,7 +520,10 @@ const char* KFCPanelStateWriteKeys(const KFCJsonPairs& keyValues, bool* outRepai
 			pairs.push_back(keyValues[u]);
 	}
 
-	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs), kKFCPanelStateSideFileName);
+	IDFile side;
+	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName)))
+		return "folder";
+	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs), side);
 }
 
 bool KFCPanelStateFilePath(PMString& outPath)
@@ -579,7 +580,9 @@ void KFCSavePanelState()
 	// *A partial write on a full disk must not be reported as a save, with a path that suggests the
 	// settings are safe: the byte count is checked, and the side file is read back before it is put in
 	// place. See KFCWriteWholeFile.
-	const char* failure = KFCWriteWholeFile(file, KFCJsonFlatText(pairs), kKFCPanelStateSideFileName);
+	IDFile side;
+	const char* failure = FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName))
+		? KFCWriteWholeFile(file, KFCJsonFlatText(pairs), side) : "folder";
 	if (failure != nil)
 	{
 		std::string say("Save failed (");
@@ -668,25 +671,30 @@ void KFCLoadPanelStateIfPresent()
 	KFCBookPanelPlacement::LoadFromSettings(text);
 }
 
-// ANOTHER FILE OF OURS IN THE SAME FOLDER (2026-10-07 - the query dialog's run order, KFCQueryOrder.cpp): read and
-// written the way the settings file is (KFCReadWholeFile / KFCWriteWholeFile above), so a file of KFC's is written one way.
-bool KFCReadOwnFile(const char* fileName, std::string& out)
+// A FILE OF OURS AT A PATH THE PERSON CHOSE (2026-10-07 night - the query dialog's Save Order... / Load Order...,
+// KFCQueryOrderFile.cpp): read and written the way the settings file is (KFCReadWholeFile / KFCWriteWholeFile above), so
+// a file of KFC's is written one way. The side file is "<the file's path>.tmp", beside it.
+bool KFCReadFileWhole(const IDFile& file, std::string& out)
 {
 	out.clear();
-	IDFile file;
-	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)))
-		return false;
 	if (FileUtils::DoesFileExist(file) == kFalse)
-		return true;		// no file yet: nothing in it
+		return false;
 	return KFCReadWholeFile(file, out);
 }
 
-const char* KFCWriteOwnFile(const char* fileName, const char* sideFileName, const std::string& text)
+const char* KFCWriteFileSafely(const IDFile& file, const std::string& text)
 {
-	IDFile file;
-	if (!FileUtils::GetAppRoamingDataFolder(&file, PMString(fileName)))
-		return "folder";
-	return KFCWriteWholeFile(file, text, sideFileName);
+	PMString sidePath(FileUtils::SysFileToPMString(file));
+	sidePath.Append(".tmp");
+	sidePath.SetTranslatable(kFalse);
+	IDFile side(FileUtils::PMStringToSysFile(sidePath));
+	const char* failure = KFCWriteWholeFile(file, text, side);
+	// A write that did not land leaves nothing beside the person's file: the side file goes. (The settings file's side
+	// file is in InDesign's folder and is simply written over by the next save; this one sits in a folder the person
+	// chose - a read-only file to replace leaves it standing otherwise.)
+	if (failure != nil && FileUtils::DoesFileExist(side))
+		(void)::DeleteFile(side.GrabTString());
+	return failure;
 }
 
 // End, KFCPanelState.cpp.

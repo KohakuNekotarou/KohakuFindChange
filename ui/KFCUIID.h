@@ -351,6 +351,10 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryClearButtonWidgetID, kKFCUIPrefix + 41)
 // ...and the dialog's own message line under Runs on: (2026-10-07, the author's choice of three): what the last Run (or
 // the run order's file) said, the panel's message line in the dialog too - the dialog stands with the panel closed.
 DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
+// ...and Save Order... / Load Order... under the run order (2026-10-07 night, the author: the order is the session's,
+// and kept as a file of its own - KFCQueryOrderFile.h).
+DECLARE_PMID(kWidgetIDSpace, kKFCQuerySaveOrderButtonWidgetID, kKFCUIPrefix + 43)
+DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44)
 
 
 // "About Plug-ins" sub-menu:
@@ -401,6 +405,13 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryMessageTextWidgetID, kKFCUIPrefix + 42)
 #define kKFCQueryClearKey				kKFCStringPrefix "kKFCQueryClearKey"
 #define kKFCQueryRunKey					kKFCStringPrefix "kKFCQueryRunKey"
 #define kKFCQueryCloseKey				kKFCStringPrefix "kKFCQueryCloseKey"
+// Save Order... / Load Order... (2026-10-07 night), the titles of InDesign's Save / Open dialogs they bring up, and the
+// file type's name in those dialogs (KFCQueryOrderFile.cpp).
+#define kKFCQuerySaveOrderKey			kKFCStringPrefix "kKFCQuerySaveOrderKey"
+#define kKFCQueryLoadOrderKey			kKFCStringPrefix "kKFCQueryLoadOrderKey"
+#define kKFCQuerySaveOrderTitleKey		kKFCStringPrefix "kKFCQuerySaveOrderTitleKey"
+#define kKFCQueryLoadOrderTitleKey		kKFCStringPrefix "kKFCQueryLoadOrderTitleKey"
+#define kKFCQueryOrderFileTypeKey		kKFCStringPrefix "kKFCQueryOrderFileTypeKey"
 // "Find/Change Selected Documents (Book)" (2026-10-07) - the toggle under Book Scope.
 #define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
 
