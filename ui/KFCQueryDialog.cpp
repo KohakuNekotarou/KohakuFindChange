@@ -179,8 +179,7 @@ namespace
 		PMString summary;
 		(void)KFCRuns()->RunQueries(KFCQueryOrder::OrderFiles(), summary);
 		KFCResultTree::Rebuild();
-		KFCResultTree::ShowStatus(summary);
-		ShowDialogMessage(panel, summary);	// and in the dialog: the panel may be closed (2026-10-07)
+		SayOnBoth(panel, summary);	// the panel's line and the dialog's: the panel may be closed
 		ShowRunScope(panel);		// a run can close what it opened, and a book can go: asked again
 	}
 
