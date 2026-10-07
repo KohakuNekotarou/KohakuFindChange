@@ -33,6 +33,7 @@
 #include "TextWalkerServiceProviderID.h"	// kReplaceAllTextCmdBoss / kFindChangeClientBoss / the walker service
 #include "Utils.h"
 
+#include <utility>		// std::pair - a chapter and how many it got
 #include <vector>
 
 // Project includes:
@@ -59,6 +60,37 @@ struct RunningFlagGuard
 bool SameDoc(const UIDRef& a, const UIDRef& b)
 {
 	return a.GetDataBase() == b.GetDataBase();
+}
+
+/** "  By chapter: <name> (<n>), ... ." - how many each chapter got (2026-10-07, the author's addition: Change All in Book's
+	result broken down by chapter): the chapters written only, in the book's order, ten at most and then "and N more" - the
+	message line is four lines high (spec map PNL-10). It goes last, after the notes, so a chapter that could not be
+	opened or was left open is never pushed out of sight by it. Two spaces before it, as before every note
+	(KFCBookScope::AppendChapterNote), and the names raw, as there (the line is drawn by hand). */
+void AppendByChapter(PMString& outSummary, const std::vector<std::pair<PMString, int32> >& written)
+{
+	if (written.empty())
+		return;
+	const size_t kShown = 10;
+	outSummary.Append("  By chapter: ");
+	for (size_t i = 0; i < written.size() && i < kShown; ++i)
+	{
+		if (i > 0)
+			outSummary.Append(", ");
+		PMString name(written[i].first);
+		name.SetTranslatable(kFalse);
+		outSummary.Append(name);
+		outSummary.Append(" (");
+		outSummary.AppendNumber(written[i].second);
+		outSummary.Append(")");
+	}
+	if (written.size() > kShown)
+	{
+		outSummary.Append(" and ");
+		outSummary.AppendNumber(static_cast<int32>(written.size() - kShown));
+		outSummary.Append(" more");
+	}
+	outSummary.Append(".");
 }
 }	// anonymous namespace
 
@@ -239,6 +271,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
 	std::vector<UIDRef> touched;
+	std::vector<std::pair<PMString, int32> > written;		// the By chapter list: each chapter written, how many (book order)
 	bool cancelled = false, failed = false;
 	PMString why;
 	why.SetTranslatable(kFalse);
@@ -285,6 +318,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			{
 				replaced += count;
 				touched.push_back(targets[d].docRef);
+				written.push_back(std::make_pair(targets[d].shortName, count));
 			}
 		}
 		// a Cancel pressed during the last chapter (KFCAdvanceProgress's note: it has to be ASKED)
@@ -381,6 +415,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
+	AppendByChapter(outSummary, written);		// last - see AppendByChapter
 	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon)
 	return replaced;
 }

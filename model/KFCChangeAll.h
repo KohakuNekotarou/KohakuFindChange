@@ -7,7 +7,8 @@
 //  CHANGE ALL IN BOOK (NO LIST) AND CLEAR RESULTS (2026-10-06 - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
 //  F6, F18 and section 4). InDesign's own Change All (kReplaceAllTextCmdBoss) over the book's chapters - Book Scope on
 //  only (F18: a document's Change All is InDesign's own dialog's) - once a chapter, in ONE undo step, with no list: the
-//  panel says how many were replaced. Track Changes is each story's own setting, left as it is (F1). Runs only while
+//  panel says how many were replaced, and how many in each chapter (2026-10-07). Track Changes is each story's own
+//  setting, left as it is (F1). Runs only while
 //  the panel holds no list (the old design's C4); Clear Results empties it (C8). The query run writes through
 //  WriteDocument too, in whatever scope Search: names.
 //
@@ -22,7 +23,9 @@
 
 namespace KFCChangeAll
 {
-	/** Change All in Book (No List). outSummary = the panel's message line. Returns how many were replaced (0 for a
+	/** Change All in Book (No List). outSummary = the panel's message line - "N replaced in M chapter(s)." (or the
+	    selected documents' form), the notes, and last "  By chapter: <name> (<n>), ..." for the chapters written, in
+	    the book's order, ten at most (2026-10-07, the author's addition). Returns how many were replaced (0 for a
 	    refusal, a cancel or a failure - outSummary says which). Refused with Book Scope off (the menu greys it then;
 	    a caller that never went through the menu is told why). */
 	int32 Run(PMString& outSummary);
