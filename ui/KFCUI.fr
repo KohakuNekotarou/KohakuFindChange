@@ -528,6 +528,13 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCBookScopeMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// Find/Change Selected Documents (Book): toggle (check mark, 2026-10-07). With Book Scope on, a run takes only the
+		// Book panel's selected documents; grey with Book Scope off - so it stands right under it.
+		kKFCSelectedDocumentsActionID,
+		kKFCTargetMenuPath
+		kKFCSelectedDocumentsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 		// Hide Previous Chapter: toggle (check mark). Closes the previous chapter window on jump.
 		kKFCHidePrevChapterActionID,
 		kKFCTargetMenuPath
@@ -686,6 +693,15 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCScopeBookActionID,
 		kKFCBookScopeMenuKey,			// "Book Scope" (toggle, check mark)
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		kKFCActionComponentBoss,
+		kKFCSelectedDocumentsActionID,
+		kKFCSelectedDocumentsMenuKey,	// "Find/Change Selected Documents (Book)" (toggle, check mark - 2026-10-07)
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

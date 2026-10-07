@@ -282,6 +282,9 @@ DECLARE_PMID(kActionIDSpace, kKFCClearResultsActionID, kKFCUIPrefix + 47)
 // Run Saved Queries... (2026-10-07, the spec 1's G1): the query dialog - the saved Find/Change queries put in an order and
 // run with InDesign's own Change All, one after another (KFCQueryDialog.cpp). Shortcut-assignable.
 DECLARE_PMID(kActionIDSpace, kKFCRunSavedQueriesActionID, kKFCUIPrefix + 48)
+// Find/Change Selected Documents (Book) (2026-10-07, the spec 1's G9): a toggle - with Book Scope on, a run takes only
+// the documents selected in the Book panel (KFCBookScope::IsSelectedDocumentsOn). Grey with Book Scope off.
+DECLARE_PMID(kActionIDSpace, kKFCSelectedDocumentsActionID, kKFCUIPrefix + 49)
 
 
 // WidgetIDs:
@@ -390,6 +393,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryClearButtonWidgetID, kKFCUIPrefix + 41)
 #define kKFCQueryClearKey				kKFCStringPrefix "kKFCQueryClearKey"
 #define kKFCQueryRunKey					kKFCStringPrefix "kKFCQueryRunKey"
 #define kKFCQueryCloseKey				kKFCStringPrefix "kKFCQueryCloseKey"
+// "Find/Change Selected Documents (Book)" (2026-10-07) - the toggle under Book Scope.
+#define kKFCSelectedDocumentsMenuKey	kKFCStringPrefix "kKFCSelectedDocumentsMenuKey"
 
 // Other StringKeys:
 #define kKFCAboutBoxStringKey	kKFCStringPrefix "kKFCAboutBoxStringKey"
@@ -453,13 +458,15 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryClearButtonWidgetID, kKFCUIPrefix + 41)
 #define kKFCSeparator3MenuItemPosition		2.0
 
 // Block 3 - the check-mark toggles, 2.2 to 2.9. Book Scope leads: it is the one that decides what the
-// commands in block 1 run on. Then Hide Previous Chapter; then Link the Application Bar's Search Field,
+// commands in block 1 run on, and Find/Change Selected Documents (Book) follows it - it narrows Book Scope, and works
+// only with it on (2026-10-07). Then Hide Previous Chapter; then Link the Application Bar's Search Field,
 // which is about the search as Book Scope is, so it stands before the window ones. The
 // next three are window appearance: the two that act on InDesign's OWN Find/Change dialog first
 // (translucency, then the minimize box), and this panel's own translucency. Remember Book Panel
 // Placement closes the block: it is about InDesign's own Book panel, the other window the plug-in looks
 // after.
 #define kKFCBookScopeMenuItemPosition		2.2
+#define kKFCSelectedDocumentsMenuItemPosition	2.3
 #define kKFCHidePrevChapterMenuItemPosition	2.4
 #define kKFCAppBarSearchEnterMenuItemPosition	2.5		// a search toggle, before the window toggles
 #define kKFCTranslucentFindChangeMenuItemPosition	2.6

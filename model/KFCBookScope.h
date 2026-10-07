@@ -75,6 +75,15 @@ namespace KFCBookScope
 	    reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
+	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (2026-10-07 - docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	    G9, G10): while it is ON and Book Scope is on, a run takes only the documents selected in the Book panel - none
+	    or all selected is the whole book. It does nothing with Book Scope off (the menu greys it then). A session flag
+	    like Book Scope's, but kept by Save Panel Settings (the author's call), so OFF at launch unless that restored it. */
+	bool IsSelectedDocumentsOn();
+
+	/** JUST THE FLAG, like SetBookScopeOn: nothing is closed and no result is cleared. */
+	void SetSelectedDocumentsOn(bool on);
+
 	/** The book a book-scope run would TARGET - the book panel's book (what ListBookChapters will
 	    actually search), or failing that the active book (its fallback) - and whether it has a chapter
 	    to run on. A cheap look: nothing is opened, listed or held (the chapters are COUNTED, through

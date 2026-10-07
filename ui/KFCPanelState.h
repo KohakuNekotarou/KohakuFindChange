@@ -32,6 +32,9 @@
 //      restored ON cannot act on its own: the jump asks ShouldHidePreviousChapter, which ALSO
 //      requires the results to have come from a book. In document scope the toggle is greyed out
 //      and the sweep never runs.
+//    - Find/Change Selected Documents (Book) (key "selectedDocuments", 2026-10-07 - the author's call: kept). The flag
+//      alone, the model half's (KFCBookScope): it narrows only a Book Scope run, and Book Scope is not kept, so a
+//      restored ON shows ticked and grey until Book Scope is turned on.
 //    - Remember Book Panel Placement, and the placement itself - where InDesign's OWN
 //      Book panel was when it was last closed (floating: place, size, icon state and width; docked:
 //      its neighbours). The keys are named in KFCBookPanelPlacement.cpp and ONLY there - this file

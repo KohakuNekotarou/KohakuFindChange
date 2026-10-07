@@ -39,6 +39,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // ----- Command strings
                 kKFCSearchBookMenuKey,			"Search",
                 kKFCBookScopeMenuKey,			"Book Scope",
+                kKFCSelectedDocumentsMenuKey,	"Find/Change Selected Documents (Book)",
                 kKFCHidePrevChapterMenuKey,		"Hide Previous Chapter",
                 kKFCTranslucentPanelMenuKey,	"Translucent Panel",
                 kKFCTranslucentFindChangeMenuKey,	"Translucent Find/Change",

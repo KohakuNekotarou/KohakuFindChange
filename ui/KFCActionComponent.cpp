@@ -242,6 +242,17 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCSelectedDocumentsActionID:
+		{
+			// Find/Change Selected Documents (Book) (2026-10-07 - the spec 1's G9): just the flag, like Book Scope - which
+			// documents a run takes is read when it starts, from the Book panel's selection at that moment. Its check mark
+			// and its grey (Book Scope off) are drawn in UpdateActionStates; the query dialog's Runs on: line follows
+			// through KFCPanelTitle::Update.
+			KFCChapters()->SetSelectedDocumentsOn(!KFCChapters()->IsSelectedDocumentsOn());
+			KFCPanelTitle::Update();
+			break;
+		}
+
 		case kKFCHidePrevChapterActionID:
 		{
 			// Toggle the session flag that JumpToHit reads. Its check mark is drawn in
@@ -446,6 +457,16 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			int16 actionState = kEnabledAction;
 			if (KFCChapters()->IsBookScopeOn())
 				actionState |= kSelectedAction;		// ON: show the check mark (OFF is the default)
+			listToUpdate->SetNthActionState(i, actionState);
+		}
+		else if (action == kKFCSelectedDocumentsActionID)
+		{
+			// Find/Change Selected Documents (Book) (2026-10-07): it narrows Book Scope, so it is offered only with Book Scope
+			// on (the author: it takes effect only then). Its check mark stays visible while it is grey, as Hide Previous
+			// Chapter's does, so a setting kept for the next book run is not hidden.
+			int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
+			if (KFCChapters()->IsSelectedDocumentsOn())
+				actionState |= kSelectedAction;
 			listToUpdate->SetNthActionState(i, actionState);
 		}
 		else if (action == kKFCHidePrevChapterActionID)

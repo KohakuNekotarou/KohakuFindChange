@@ -69,6 +69,12 @@ public:
 	virtual bool SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end, IDataBase*& outPreviousDB) = 0;
 	/** = KFCHitMarker::ClearMarker. */
 	virtual bool ClearMarker(IDataBase*& outDB) = 0;
+	// Added by hand from here on (2026-10-07) - a new method goes below the last one, never between (a vtable slot is a
+	// promise to every built caller).
+	/** = KFCBookScope::IsSelectedDocumentsOn - the toggle Find/Change Selected Documents (Book). */
+	virtual bool IsSelectedDocumentsOn() = 0;
+	/** = KFCBookScope::SetSelectedDocumentsOn - just the flag. */
+	virtual void SetSelectedDocumentsOn(bool on) = 0;
 };
 
 #endif // __IKFCChapters_h__

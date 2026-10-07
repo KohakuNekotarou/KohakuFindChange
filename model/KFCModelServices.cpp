@@ -123,6 +123,8 @@ public:
 	virtual bool MakeBookActive(const PMString& bookPath) { return KFCBookScope::MakeBookActive(bookPath); }
 	virtual bool SetMarker(IDataBase* db, UID storyUID, TextIndex start, TextIndex end, IDataBase*& outPreviousDB) { return KFCHitMarker::SetMarker(db, storyUID, start, end, outPreviousDB); }
 	virtual bool ClearMarker(IDataBase*& outDB) { return KFCHitMarker::ClearMarker(outDB); }
+	virtual bool IsSelectedDocumentsOn() { return KFCBookScope::IsSelectedDocumentsOn(); }
+	virtual void SetSelectedDocumentsOn(bool on) { KFCBookScope::SetSelectedDocumentsOn(on); }
 };
 
 CREATE_PMINTERFACE(KFCChaptersSession, kKFCChaptersImpl)

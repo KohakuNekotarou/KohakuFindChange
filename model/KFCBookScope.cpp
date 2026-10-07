@@ -79,6 +79,10 @@ namespace
 	// Find/Change's Search: names.
 	bool gBookScopeOn = false;
 
+	// Find/Change Selected Documents (Book) (2026-10-07): narrows a Book Scope run to the Book panel's selected
+	// documents. OFF at launch unless Save Panel Settings restored it (KFCPanelState.cpp, key "selectedDocuments").
+	bool gSelectedDocumentsOn = false;
+
 	/** The book's own word for a chapter's state, for the "could not be opened" report. Empty for
 	    a chapter the book considers fine - then the failure is something the book does not track
 	    (a lock file, permissions) and there is nothing honest to add. Not translatable: these are
@@ -285,6 +289,17 @@ void KFCBookScope::SetBookScopeOn(bool on)
 	// point, or when their book closes - not at shutdown, which only forgets them (ShutdownCleanup) -
 	// and a jump into a chapter the user closed meanwhile goes through ReopenChapterDoc anyway.
 	gBookScopeOn = on;
+}
+
+bool KFCBookScope::IsSelectedDocumentsOn()
+{
+	return gSelectedDocumentsOn;
+}
+
+void KFCBookScope::SetSelectedDocumentsOn(bool on)
+{
+	// Just the flag (SetBookScopeOn says why): which documents a run takes is decided when it starts.
+	gSelectedDocumentsOn = on;
 }
 
 IDocumentList* KFCBookScope::QueryOpenDocumentList()
@@ -522,6 +537,7 @@ void KFCBookScope::ShutdownCleanup()
 	gHeldDocs.clear();
 	gSearchedBookPath.Clear();
 	gBookScopeOn = false;
+	gSelectedDocumentsOn = false;
 }
 
 // Does this open document live in that file? Asked through IDataBase::GetSysFile - "the file
