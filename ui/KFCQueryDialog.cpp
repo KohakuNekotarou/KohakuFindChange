@@ -27,6 +27,9 @@
 #include "ITreeViewController.h"	// IID_ITREEVIEWCONTROLLER - the lists' selection, observed
 #include "IBooleanControlData.h"	// IID_IBOOLEANCONTROLDATA - a push button's press, observed (CDialogObserver.cpp's OK / Cancel)
 #include "IWindow.h"				// GetSysWindow - the platform window behind the dialog (the minimize box)
+#include "IDropDownListController.h"	// Select - a loaded query chosen in Find/Change's own Query menu
+#include "IStringListControlData.h"		// GetIndex - that menu's entries, found by name
+#include "FindChangeID.h"				// kFindQueryDropDownWidgetID - the Query menu
 #include "widgetid.h"				// kTrueStateMessage / kListSelectionChangedMessage
 
 // General includes:
@@ -41,6 +44,7 @@
 #include "KFCQueryDialog.h"
 #include "KFCDiag.h"				// the test build's qd-order-reset (Repaint)
 #include "KFCFindChangeMinimize.h"	// KFCShowFindChangeDialog - a double-clicked query, shown
+#include "KFCPanelAlpha.h"			// KFCQueryFindChangeWidget - Find/Change's Query menu, found as the dialog is
 #include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
 #include "KFCPanelTitle.h"
 #include "KFCQueryList.h"
@@ -475,6 +479,55 @@ void KFCQueryDialogRefreshScope()
 	ShowRunScope(gOpenPanel);		// nil while no dialog is open - nothing then
 }
 
+// THE LOADED QUERY CHOSEN IN FIND/CHANGE'S OWN QUERY MENU TOO (2026-10-08, the author: take the name and choose that
+// query in the official Find/Change dialog). Loaded through kFCQueryXMLReaderCmdBoss alone, the menu went on reading
+// [Custom] - the strings were the query's and the menu did not say so (measured, docs/ai-notes/kfc-full-test-2026-10-08.md
+// section 1). Returns whether the menu now names it; outWhy says why not, otherwise.
+// *BY NAME, the one handle the menu offers: its entries are strings (IStringListControlData). What it keeps beside them
+//  (IID_IFCINTLISTDATA, kFCIntListDataImpl) has no public interface, and KFC is on Exchange - no guessed vtable (the author
+//  also asked whether an ID would do; there is none to use).
+// *ONE MENU FOR EVERY KIND, so a name carried by two kinds is not chosen. Measured 2026-10-08 (work/kbs-regress case
+//  qd-dblclick-query-menu, FCMENU): the menu lists the Text queries, then the GREP ones, then the Object ones, the groups
+//  parted by "-" entries and [Custom] last - not refilled per tab - and each name as the file is named, bundled ones in
+//  English on a Japanese UI too. So a Text query and a GREP query of one name are two entries alike, and choosing the
+//  first could be the other kind's: then nothing is chosen, and the line says why.
+// *TOLD, AS A PERSON'S PICK IS (notifyOfChange = kTrue): the dialog loads it the way it loads a query picked in that menu
+//  (the same file the command above just read). Measured the same day with kFalse, a pick it was not told of: the menu
+//  named the query and its delete button stayed grey (FCWIDGET 0x497b, kFCQueryDeleteButtonWidgetID, 0/0).
+static bool16 ChooseInFindChangeQueryMenu(const KFCSavedQuery& query, PMString& outWhy)
+{
+	IControlView* menu = KFCQueryFindChangeWidget(kFindQueryDropDownWidgetID);
+	InterfacePtr<IStringListControlData> entries(menu, UseDefaultIID());
+	InterfacePtr<IDropDownListController> chooser(menu, UseDefaultIID());
+	if (entries == nil || chooser == nil)
+	{
+		outWhy.Append("Find/Change's Query menu could not be reached");
+		return kFalse;
+	}
+	int32 at = -1;
+	int32 carrying = 0;
+	for (int32 i = 0; i < entries->Length(); ++i)
+	{
+		if (entries->GetString(i) != query.name)
+			continue;
+		if (at < 0)
+			at = i;
+		++carrying;
+	}
+	if (carrying == 0)
+	{
+		outWhy.Append("its Query menu does not list it");
+		return kFalse;
+	}
+	if (carrying > 1)
+	{
+		outWhy.Append("its Query menu lists that name under more than one kind");
+		return kFalse;
+	}
+	chooser->Select(at, kTrue, kTrue);
+	return kTrue;
+}
+
 void KFCQueryDialogShowInFindChange(int32 savedIndex)
 {
 	const std::vector<KFCSavedQuery>& saved = KFCQueryOrder::Saved();
@@ -514,6 +567,13 @@ void KFCQueryDialogShowInFindChange(int32 savedIndex)
 	}
 	say.Append("Loaded into Find/Change: ");
 	say.Append(KFCQueryOrder::SavedRowText(savedIndex));		// "<kind>  <name>", as the row reads
+	PMString notChosen;
+	if (!ChooseInFindChangeQueryMenu(query, notChosen))
+	{
+		say.Append(" - ");
+		say.Append(notChosen);
+		say.Append(", so the menu reads [Custom].");
+	}
 	ShowDialogMessage(gOpenPanel, say);
 }
 

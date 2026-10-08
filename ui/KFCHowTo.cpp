@@ -76,7 +76,7 @@ const wchar_t* const kHowToEN =
 	L"\n"
 	L"[Saved queries (Run Saved Queries...)]\n"
 	L"- Run Saved Queries... on the panel menu opens a dialog that can stay open while you work (it has a minimize button). Left: the queries saved in Find/Change - Text, GREP, Glyph and Transliterate, yours and InDesign's own. Right: the order to run them in, set with Add >, < Remove, Move Up, Move Down and Clear. The order is kept while InDesign runs (the dialog closed and opened again shows it), and starts empty after InDesign quits.\n"
-	L"- Double-click a saved query on the left to see it in Find/Change: it is loaded there whole (its tab, strings and options), and Find/Change opens if it is closed.\n"
+	L"- Double-click a saved query on the left to see it in Find/Change: it is loaded there whole (its tab, strings and options) and chosen in Find/Change's Query menu, and Find/Change opens if it is closed.\n"
 	L"- Save Order... saves the order to a file you name, anywhere; the message line then shows the file's full path. Load Order... puts a saved order in place of the one shown. A query that has moved is found again by its kind and name.\n"
 	L"- The line at the bottom (Runs on:) says what Run will write: the book with Book Scope on, otherwise what Find/Change's Search: names. Run (or Enter) runs the queries in that order, each with InDesign's own Change All, and the panel and the dialog's own message line say how many each query replaced. One Ctrl+Z undoes the whole run. If a query of the order cannot be found (not found), nothing is run.\n"
 	L"\n"

@@ -71,6 +71,7 @@
 #include "IWindow.h"			// GetSysWindow - the platform window behind an IWindow
 #include "IDialog.h"			// GetDialogPanel - what says WHICH dialog this window is
 #include "IControlView.h"		// GetWidgetID on that panel; also what GetPanelFromWidgetID hands back
+#include "IPanelControlData.h"	// FindWidget - one of the dialog's widgets (KFCQueryFindChangeWidget)
 #include "FindChangeID.h"		// kFindChangeParentWidgetID - the panel the Find/Change dialog answers with
 
 // *For OUR OWN panel's window. PaletteRef carries the HWND: PaletteRef.h:47 says an OWLControlRef
@@ -624,6 +625,17 @@ static IWindow* KFCQueryFindChangeIWindow()
 	}
 	KFC_DIAG_LOG("FCLOOKUP walked: no Find/Change in %d windows (%d dialog(s) without a panel)", count, panelless);
 	return nil;
+}
+
+// See the declaration in the header. Walked afresh each time - asked once per double-click, so no cache.
+IControlView* KFCQueryFindChangeWidget(const WidgetID& widget)
+{
+	IWindow* win = KFCQueryFindChangeIWindow();
+	if (win == nil)
+		return nil;
+	InterfacePtr<IDialog> dlg(win, IID_IDIALOG);
+	InterfacePtr<IPanelControlData> panel((dlg != nil) ? dlg->GetDialogPanel() : nil, UseDefaultIID());
+	return (panel != nil) ? panel->FindWidget(widget) : nil;
 }
 
 // The HWND, cached. *The cache matters: the Win32 hook below asks on every mouse move (60-100 a
