@@ -138,7 +138,7 @@
   - 訂正:
 
 - **REP-27** 行の Replace は**書く前に確かめる**（条件が変わった＝結果を消して断る・版・行の文字）。文書が変わっていたら**アラートを出さず、メッセージ欄で断る** ――
-  `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again.`／
+  `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again, or right-click its story row and choose Search This Story Again.`（後半の案内は 2026-10-09 から＝REP-35）／
   `Replace: the text of this row has changed since the search (edited, or undone) - search again.`
   書けなかった行は、理由を言って元のまま（`Replace: InDesign's replace command would not run there - left as it is.` など）。行の状態も元に戻る（語は付かない）。
   ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
@@ -183,6 +183,12 @@
 
 - **REP-34** **Clear Results**（パネルのメニュー）＝一覧を空にする（文書には触らない）。ヒットの行が無いときは灰色（0件のブックの行だけのときも）。文は `Results cleared.`
   KFC が窓なしで持っている章があれば、予約で閉じて返す（SCOPE-21）。
+  - 訂正:
+
+- **REP-35** ★**Search This Story Again**（ストーリーの行の右クリック・2026-10-09 の作者の決定）＝**そのストーリーだけ**を、検索のときの条件でもう一度歩き、その行を作り直し、ストーリーの版を覚え直す ―― 検索の後で直したストーリーでも、その行の Replace がまた書ける（REP-13 ①が通る）。
+  そのストーリーの**置換済みの行は消える**（検索がもう見つけないため・作者「よいで」）。ほかのストーリー・章の行と、その状態はそのまま。行は、そのストーリーの前の行があった所に入り、章はページの順に並べ直す（検索と同じ並べ方）。一覧の行の数の上限（300）はそのまま（入りきらなければ文で言う）。
+  断る（一覧はそのまま・メッセージ欄で言う）＝実行中／検索の後で検索と置換の設定が変わった（`Search This Story Again: the Find/Change settings have changed since the search - search again.`）／検索が To End of Story・Selection だった（ストーリーの一部しか見ていないので、全体を歩くと検索が見ていない一致まで並ぶ）。
+  KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 
 ---
