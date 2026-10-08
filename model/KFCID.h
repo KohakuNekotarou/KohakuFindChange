@@ -86,6 +86,9 @@ DECLARE_PMID(kClassIDSpace, kKFCUndoMarkCmdBoss, kKFCPrefix + 22)
 // The test build's command counter (KFCDiagCommands.h): an ICommandInterceptor, created and installed only
 // in a build with KFC_DIAG while the fault switch perf-commands is on - in every other build it is never created.
 DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
+// The "a document has opened" responder (KFCOpenDocResponder.cpp): a chapter of the results the USER opens gets its
+// rows' text foci (spec T6 c). + 24: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
 
 
 // InterfaceIDs:
@@ -150,6 +153,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCUndoMarkCmdImpl, kKFCPrefix + 40)
 DECLARE_PMID(kImplementationIDSpace, kKFCDocUndoObserverImpl, kKFCPrefix + 41)
 // The test build's command counter (KFCDiagCommands.cpp) - see kKFCDiagCmdCountBoss.
 DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
+// The open-document responder's IResponder (KFCOpenDocResponder.cpp). + 43: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCOpenDocResponderImpl, kKFCPrefix + 43)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI

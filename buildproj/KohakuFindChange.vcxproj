@@ -218,6 +218,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCBookScope.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCBookWatch.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCCloseDocResponder.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCOpenDocResponder.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCHitMarker.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCID.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCModelNotify.cpp"/>

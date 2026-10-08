@@ -40,7 +40,7 @@
 #include "BuildNumber.h"
 #include "PlugInModel_UIAttributes.h"
 #include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
-#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl - the close-document responder
+#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl / kAfterOpenDocSignalRespServiceImpl - the close- and open-document responders
 
 // Project includes:
 #include "KFCID.h"
@@ -227,6 +227,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_IK2SERVICEPROVIDER, kBeforeCloseDocSignalRespServiceImpl,
 			IID_IRESPONDER,         kKFCCloseDocResponderImpl,
+		}
+	},
+
+	/*
+	 * Open-document responder boss: a chapter of the results the user opens (the Book panel, File > Open) gets its rows'
+	 * text foci (KFCOpenDocResponder.cpp). One signal, so the API's own provider implementation, as the close responder.
+	 */
+	Class
+	{
+		kKFCOpenDocResponderBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kAfterOpenDocSignalRespServiceImpl,
+			IID_IRESPONDER,         kKFCOpenDocResponderImpl,
 		}
 	},
 
