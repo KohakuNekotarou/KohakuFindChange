@@ -126,9 +126,10 @@ bool KFCPanelMetrics::MessageLineMetrics(PMReal& outLineAdvance, PMReal& outAsce
 	const InterfaceFontInfo* const font = MessageFont();
 	if (font == nil)
 		return false;
-	// The product's way of asking a widget's font for its line
-	// (dynamicdocumentsui/TimingPanelTreeDDTarget.cpp:582-585). ! The SIZE is no answer: it stays 12.0 on
-	// a Japanese UI, where the line is 18 (measured in KCM) - the line is ascent + descent + leading.
+	// The product's way of measuring a widget's font (dynamicdocumentsui/TimingPanelTreeDDTarget.cpp:
+	// 582-589 - the product keeps only the descent there, to place a baseline; the line below is ours).
+	// ! The SIZE is no answer: it stays 12.0 on a Japanese UI, where the line is 18 (measured in KCM) -
+	// the line is ascent + descent + leading.
 	float size = 0.0f, ascent = 0.0f, descent = 0.0f, leading = 0.0f;
 	if (!dv_utils::FontInfoGetDVAFontMetrics(*font, &size, &ascent, &descent, &leading))
 		return false;

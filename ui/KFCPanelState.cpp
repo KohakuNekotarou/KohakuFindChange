@@ -73,8 +73,9 @@ static bool16 KFCPanelStateFile(IDFile& outFile)
 // A minimal JSON (written by hand, read leniently)
 //
 //   WHY NOT THE SDK'S JSON CLASS. The official one is `class PUBLIC_DECL JSON` in
-//   public/interfaces/utils/IJsonUtils.h, a wrapper around boost::property_tree; the product reads with
-//   it (linksui's ChromiumImportHelperAEMLinks.cpp, read_json in a try/catch) and writes with it
+//   public/interfaces/utils/IJsonUtils.h, a wrapper around boost::property_tree; the product's own
+//   source reads with it (linksui/aem/ChromiumImportHelperAEMLinks.cpp, read_json in a try/catch - a
+//   folder 21.0 does not build into Links UI) and writes with it
 //   (publiclib's HTTPAssetLinkResourceStateUpdater.cpp, addValue -> write_json). The dependency is not
 //   the obstacle: KCM measured that it compiles and links with no build change. Two things here would
 //   be lost:
