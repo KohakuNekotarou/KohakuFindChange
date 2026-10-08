@@ -2167,15 +2167,18 @@ bool MatchIsSameOccurrence(const UIDRef& storyRef, TextIndex start, TextIndex en
 }
 }	// anonymous namespace
 
-bool KFCSearchEngine::RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db)
+// THE ROW READ AT A PLACE (spec T1): the test a row's stored place has always had to pass, at any place of the row's
+// own story - the whole match by its hash (MatchIsSameOccurrence), and the line around it read the way the search
+// read it (ReadHitText). The jump asks it of the stored place and of the row's text focus (LocateRow).
+static bool RowReadsAsFoundAt(int32 chapterIdx, int32 hitIdx, IDataBase* db, UID story, TextIndex start, TextIndex end)
 {
-	UID story = kInvalidUID;
-	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	UID rowStory = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
 	uint64 hash = 0;
 	KFCResultModel::RowDisplay row;
-	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash)
+	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, rowStory, a, b, hash)
 		|| !KFCResultModel::GetHitRow(chapterIdx, hitIdx, row)
-		|| story == kInvalidUID || !db->IsValidUID(story))
+		|| story == kInvalidUID || story != rowStory || !db->IsValidUID(story))
 		return false;
 	const UIDRef storyRef(db, story);
 	// INSIDE THE STORY, before anything reads it. The line's reading asks the scanner for the
@@ -2195,6 +2198,16 @@ bool KFCSearchEngine::RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase*
 	KFCResultModel::Hit read;
 	ReadHitText(storyRef, start, end, read);
 	return read.preText == row.preText && read.matchText == row.matchText && read.postText == row.postText;
+}
+
+bool KFCSearchEngine::RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db)
+{
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		return false;
+	return RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, start, end);
 }
 
 bool KFCSearchEngine::ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion)
@@ -3407,6 +3420,8 @@ void KFCSearchEngine::ShutdownCleanup()
 
 namespace
 {
+typedef std::vector<std::pair<TextIndex, TextIndex> > Places;	// [start, end), in position order
+
 // A place another row of the chapter already stands on is that row's (both ways of looking a row up again).
 bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIndex start, TextIndex end)
 {
@@ -3427,12 +3442,11 @@ bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIn
 // (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
 // the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
 // way the search reads a hit (ReadHitText) and taken only with the row's own hash and line - both read again when
-// its replace was written. Exactly one, and no other row on it, or nothing moves: the rule the rows not replaced keep
-// (JMP-14) - a guess between two look-alikes would be worse than saying so. The story is read as code points, which
-// is what a TextIndex counts.
-bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart,
-	TextIndex& ioEnd)
+// its replace was written. The story is read as code points, which is what a TextIndex counts. Every candidate, in
+// position order - which of them the row is, is the caller's question (OneFreePlace, PickByOrder).
+bool ReplacedRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, Places& outPlaces)
 {
+	outPlaces.clear();
 	PMString written;
 	KFCResultModel::RowDisplay row;
 	UID story = kInvalidUID;
@@ -3442,10 +3456,6 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 		|| !KFCResultModel::GetHitRow(chapterIdx, hitIdx, row)
 		|| !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
 		return false;
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil || !db->IsValidUID(storyUID))
-		return false;
-	const UIDRef storyRef(db, storyUID);
 	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
 	if (model == nil)
 		return false;
@@ -3464,29 +3474,155 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 	if (key.empty() || text.size() < key.size())
 		return false;
 	const int32 len = static_cast<int32>(key.size());
-	int32 count = 0;
-	TextIndex foundAt = kInvalidTextIndex;
-	KFCResultModel::Hit found;
-	for (size_t p = 0; p + key.size() <= text.size() && count < 2; ++p)
+	for (size_t p = 0; p + key.size() <= text.size(); ++p)
 	{
 		if (!std::equal(key.begin(), key.end(), text.begin() + static_cast<std::ptrdiff_t>(p)))
 			continue;
 		const TextIndex at = static_cast<TextIndex>(p);
 		KFCResultModel::Hit cand;
 		ReadHitText(storyRef, at, at + len, cand);
-		if (cand.matchHash != hash || cand.preText != row.preText || cand.postText != row.postText
-			|| PlaceTakenByAnotherRow(chapterIdx, hitIdx, storyUID, at, at + len))
+		if (cand.matchHash == hash && cand.preText == row.preText && cand.postText == row.postText)
+			outPlaces.push_back(std::make_pair(at, at + len));
+	}
+	return true;
+}
+
+// A ROW NOT REPLACED IS LOOKED FOR AGAIN UNDER ITS QUERY: the row's own story walked again (forward, as the search
+// was, with the scope switches), each match given its line and hash, and taken only with the row's own - the same
+// text, the same length, the same line. Every candidate, in position order (the walk meets a table's cells in reading
+// order - memory walker-scope-options-and-hidden-layers). False when the story cannot be walked: another query would
+// find other matches, nothing to compare with - ASKED, NOT REFUSED: QueryUnchangedSinceSearch is RefuseChangedQuery's
+// question without its consequences - it states the tab the walk runs in, and clears nothing. (RefuseChangedQuery
+// itself would, on a changed query, clear the whole result set and hand the chapters back in the middle of a jump,
+// the tree left drawing rows the model no longer held.)
+bool StaleRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, Places& outPlaces)
+{
+	outPlaces.clear();
+	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
+		return false;
+	KFCResultModel::RowDisplay row;
+	UID story = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+	uint64 hash = 0;
+	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, row)
+		|| !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+		return false;
+	std::vector<KFCResultModel::Hit> hits;
+	{
+		KFCForwardSearchScope forward;
+		WalkerScopeOptions scopeOptions;
+		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+		if (!CollectStoryHits(storyRef, scopeOptions, hits))
+			return false;
+	}
+	for (size_t h = 0; h < hits.size(); ++h)
+	{
+		const KFCResultModel::Hit& cand = hits[h];
+		if (cand.storyUID == storyRef.GetUID() && cand.matchHash == hash && (cand.textEnd - cand.textStart) == (b - a)
+			&& cand.preText == row.preText && cand.postText == row.postText)
+			outPlaces.push_back(std::make_pair(cand.textStart, cand.textEnd));
+	}
+	std::sort(outPlaces.begin(), outPlaces.end());
+	return true;
+}
+
+// Every place that reads as the row now, whichever kind of row it is. False = nothing could be collected (the story
+// is gone, a replaced row wrote nothing, or the query changed since the search).
+bool LookAlikePlacesNow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID story, Places& outPlaces)
+{
+	outPlaces.clear();
+	IDataBase* const db = docRef.GetDataBase();
+	bool replaced = false, locked = false;
+	if (db == nil || story == kInvalidUID || !db->IsValidUID(story)
+		|| !KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked))
+		return false;
+	const UIDRef storyRef(db, story);
+	return replaced ? ReplacedRowPlaces(chapterIdx, hitIdx, storyRef, outPlaces)
+		: StaleRowPlaces(chapterIdx, hitIdx, storyRef, outPlaces);
+}
+
+// TODAY'S RULE FOR MOVING A ROW (JMP-14): exactly one candidate that no other row stands on - a guess between two
+// look-alikes would be worse than saying so. The one rule that writes a found place into the row (MoveRowTo); a
+// look-alike chosen by order is the jump's only (PickByOrder, spec T3).
+bool OneFreePlace(int32 chapterIdx, int32 hitIdx, UID story, const Places& places, TextIndex& outStart, TextIndex& outEnd)
+{
+	int32 count = 0;
+	for (size_t i = 0; i < places.size() && count < 2; ++i)
+	{
+		if (PlaceTakenByAnotherRow(chapterIdx, hitIdx, story, places[i].first, places[i].second))
 			continue;
-		foundAt = at;
-		found = cand;
+		outStart = places[i].first;
+		outEnd = places[i].second;
 		++count;
 	}
-	if (count != 1)
-		return false;
-	KFCResultModel::SetHitRange(chapterIdx, hitIdx, storyUID, foundAt, foundAt + len);
+	return count == 1;
+}
+
+// The row moved to [start, end): its place, its line read again there (so it draws what stands there), a Missing word
+// taken off (found after all - SetHitOutcome turns a replaced row away, which never had one), and its focus with it
+// (spec T4).
+void MoveRowTo(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end)
+{
+	KFCResultModel::Hit found;
+	ReadHitText(storyRef, start, end, found);
+	KFCResultModel::SetHitRange(chapterIdx, hitIdx, storyRef.GetUID(), start, end);
 	KFCResultModel::SetHitSegments(chapterIdx, hitIdx, found.preText, found.matchText, found.postText, found.matchHash);
-	ioStart = foundAt;
-	ioEnd = foundAt + len;
+	if (KFCResultModel::GetHitOutcome(chapterIdx, hitIdx) == KFCResultModel::kOutcomeMissing)
+		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeNone);
+	KFCRowFoci::Reanchor(chapterIdx, hitIdx);
+}
+
+// A ROW'S LOOK-ALIKE ROWS (spec T14): the rows of its chapter and story that read the same - the whole match (its hash
+// and length), the line around it, replaced or not - itself included, in the order the search found them in the
+// story (Hit::storyOrdinal). outRank = this row's place among them; -1 = not resolvable.
+void LookAlikeRows(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, int32& outRank)
+{
+	outRows.clear();
+	outRank = -1;
+	UID story = kInvalidUID;
+	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+	uint64 hash = 0;
+	KFCResultModel::RowDisplay me;
+	if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash) || !KFCResultModel::GetHitRow(chapterIdx, hitIdx, me))
+		return;
+	std::vector<std::pair<int32, int32> > byOrder;	// (storyOrdinal, hit)
+	const int32 n = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < n; ++i)
+	{
+		UID s = kInvalidUID;
+		TextIndex x = kInvalidTextIndex, y = kInvalidTextIndex;
+		uint64 h = 0;
+		KFCResultModel::RowDisplay r;
+		if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, x, y, h) || s != story || h != hash || (y - x) != (b - a)
+			|| !KFCResultModel::GetHitRow(chapterIdx, i, r) || r.preText != me.preText || r.postText != me.postText
+			|| r.replaced != me.replaced)
+			continue;
+		byOrder.push_back(std::make_pair(KFCResultModel::GetHitStoryOrdinal(chapterIdx, i), i));
+	}
+	std::sort(byOrder.begin(), byOrder.end());
+	for (size_t k = 0; k < byOrder.size(); ++k)
+	{
+		outRows.push_back(byOrder[k].second);
+		if (byOrder[k].second == hitIdx)
+			outRank = static_cast<int32>(k);
+	}
+}
+
+// ONE OF SEVERAL LOOK-ALIKES, BY ORDER (spec T14 - the author's call of 2026-10-09). `places` = every place in the row's
+// story that reads as the row now, in position order. When there are as many as the row has look-alike rows, the
+// row's place is the one at its rank among them (Hit::storyOrdinal - the order the search found them in, which no
+// insert or delete changes); when the counts differ, a look-alike came or went and which one cannot be told - none.
+// No "another row stands there" test: the other rows' stored places are the search's, stale after the very edit this
+// answers (spec T2, 3rd edition), and the ranks are distinct, so two rows are never sent to one place.
+bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex& outStart, TextIndex& outEnd)
+{
+	std::vector<int32> rows;
+	int32 rank = -1;
+	LookAlikeRows(chapterIdx, hitIdx, rows, rank);
+	if (rank < 0 || places.size() != rows.size() || static_cast<size_t>(rank) >= places.size())
+		return false;
+	outStart = places[static_cast<size_t>(rank)].first;
+	outEnd = places[static_cast<size_t>(rank)].second;
 	return true;
 }
 }	// anonymous namespace
@@ -3503,70 +3639,102 @@ bool RelocateReplacedRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, U
 //
 // So before a jump gives up on a row, the story is walked again under the same query, and the row moves
 // to the ONE match that is the same text with the same line around it (the three segments the row
-// drew) and that no other row stands on. None, or more than one, and it is missing as before - a guess
-// between two look-alikes would be worse than saying so. A replaced row is looked for by what it wrote
-// (RelocateReplacedRow, above): the query no longer finds it. True = the row was moved; ioStart / ioEnd are
-// its new place.
+// drew) and that no other row stands on - OneFreePlace; MoveRowTo moves its focus with it. None, or more
+// than one, and it is not moved: more than one is the jump's to decide by order (LocateRow - spec T14),
+// for that jump only. A replaced row is looked for by what it wrote (ReplacedRowPlaces): the query no
+// longer finds it. True = the row was moved; ioStart / ioEnd are its new place.
 bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& ioStart, TextIndex& ioEnd)
 {
-	bool replaced = false, locked = false;
-	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked))
+	Places places;
+	TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
+	if (!LookAlikePlacesNow(chapterIdx, hitIdx, docRef, storyUID, places)
+		|| !OneFreePlace(chapterIdx, hitIdx, storyUID, places, s, e))
 		return false;
-	if (replaced)
-		return RelocateReplacedRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd);
-	// Another query would find other matches - nothing to compare with. ASKED, NOT REFUSED: this is
-	// RefuseChangedQuery's question without its consequences - it states the tab the walk below runs in,
-	// and clears nothing. (RefuseChangedQuery itself would, on a changed query, clear the whole result set
-	// and hand the chapters back in the middle of a jump, the tree left drawing rows the model no longer
-	// held.)
-	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
-		return false;
-	KFCResultModel::RowDisplay row;
+	MoveRowTo(chapterIdx, hitIdx, UIDRef(docRef.GetDataBase(), storyUID), s, e);
+	ioStart = s;
+	ioEnd = e;
+	return true;
+}
+
+// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the double-click's selection. The row's stored place
+// and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them: that one. Both, at
+// different places (look-alikes - one reached by a focus an Undo left behind, or a stored place another look-alike
+// slid under): the look-alikes now are counted against the rows - the same count, by order (an Undo left the focus
+// behind); not the same, the focus (one came or went before the row, and the focus followed that edit). Neither: the
+// story looked through again - one free candidate moves the row there (today's relocation), else the order rule.
+//
+// A PLACE FOUND THROUGH THE FOCUS OR BY ORDER IS THE JUMP'S ONLY (spec T3, 3rd edition): the row's stored place stays.
+// The Replace trusts that place whenever the story is at the version KFC recorded, and an Undo of the user's edit
+// brings the version back - a stored place moved onto a look-alike in between would be written there (case
+// tf-undo-replace-right-dup). Whatever decides, the row's focus goes to the place found (T4).
+KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef,
+	TextIndex& ioStart, TextIndex& ioEnd)
+{
+	IDataBase* const db = docRef.GetDataBase();
 	UID story = kInvalidUID;
 	TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
 	uint64 hash = 0;
-	if (!KFCResultModel::GetHitRow(chapterIdx, hitIdx, row)
-		|| !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
-		return false;
-	// The row's own story, and only that one - not the whole document, every match in it given its line
-	// and hash, to look in one story.
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil || !db->IsValidUID(storyUID))
-		return false;
-	std::vector<KFCResultModel::Hit> hits;
+	if (db == nil || !KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, a, b, hash))
+		return KFCResultModel::kRowNotFound;
+	const bool atStored = RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, a, b);
+	TextIndex fs = kInvalidTextIndex, fe = kInvalidTextIndex;
+	const bool atFocus = KFCRowFoci::Current(chapterIdx, hitIdx, db, fs, fe) && !(fs == a && fe == b)
+		&& RowReadsAsFoundAt(chapterIdx, hitIdx, db, story, fs, fe);
+	if (atStored && !atFocus)
 	{
-		// forward, as the search was
-		KFCForwardSearchScope forward;
-		WalkerScopeOptions scopeOptions;
-		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-		// the places and the line: a candidate is compared by its text and the line around it
-		if (!CollectStoryHits(UIDRef(db, storyUID), scopeOptions, hits))
-			return false;
+		KFCRowFoci::Reanchor(chapterIdx, hitIdx);	// a focus an Undo left behind is put right here
+		return KFCResultModel::kRowAtPlace;
 	}
-	int32 found = -1;
-	int32 count = 0;
-	for (size_t h = 0; h < hits.size() && count < 2; ++h)
+	TextIndex toStart = kInvalidTextIndex, toEnd = kInvalidTextIndex;
+	if (atFocus && !atStored)
 	{
-		const KFCResultModel::Hit& cand = hits[h];
-		if (cand.storyUID != storyUID || cand.matchHash != hash
-			|| (cand.textEnd - cand.textStart) != (ioEnd - ioStart)
-			|| cand.preText != row.preText || cand.postText != row.postText
-			|| PlaceTakenByAnotherRow(chapterIdx, hitIdx, cand.storyUID, cand.textStart, cand.textEnd))
-			continue;
-		found = static_cast<int32>(h);
-		++count;
+		toStart = fs;
+		toEnd = fe;
 	}
-	if (count != 1)
-		return false;
-	const KFCResultModel::Hit& to = hits[static_cast<size_t>(found)];
-	KFCResultModel::SetHitRange(chapterIdx, hitIdx, to.storyUID, to.textStart, to.textEnd);
-	KFCResultModel::SetHitSegments(chapterIdx, hitIdx, to.preText, to.matchText, to.postText, to.matchHash);
+	else if (atStored && atFocus)
+	{
+		Places places;
+		if (!LookAlikePlacesNow(chapterIdx, hitIdx, docRef, story, places))
+		{
+			// Nothing to count - the query changed since the search: the stored place, today's answer.
+			KFCRowFoci::Reanchor(chapterIdx, hitIdx);
+			return KFCResultModel::kRowAtPlace;
+		}
+		if (!PickByOrder(chapterIdx, hitIdx, places, toStart, toEnd))
+		{
+			toStart = fs;	// the count changed: the focus followed the edit that changed it
+			toEnd = fe;
+		}
+		if (toStart == a && toEnd == b)
+		{
+			KFCRowFoci::Reanchor(chapterIdx, hitIdx);
+			return KFCResultModel::kRowAtPlace;
+		}
+	}
+	else
+	{
+		Places places;
+		if (!LookAlikePlacesNow(chapterIdx, hitIdx, docRef, story, places))
+			return KFCResultModel::kRowNotFound;
+		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
+		if (OneFreePlace(chapterIdx, hitIdx, story, places, s, e))
+		{
+			MoveRowTo(chapterIdx, hitIdx, UIDRef(db, story), s, e);		// today's relocation - the row moves
+			ioStart = s;
+			ioEnd = e;
+			return KFCResultModel::kRowMoved;
+		}
+		if (!PickByOrder(chapterIdx, hitIdx, places, toStart, toEnd))
+			return KFCResultModel::kRowNotFound;
+	}
+	// Found elsewhere - for this jump only (T3): the stored place stays, the focus goes there, a Missing word goes.
 	if (KFCResultModel::GetHitOutcome(chapterIdx, hitIdx) == KFCResultModel::kOutcomeMissing)
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeNone);	// found after all
-	ioStart = to.textStart;
-	ioEnd = to.textEnd;
-	return true;
+	KFCRowFoci::MoveTo(chapterIdx, hitIdx, toStart, toEnd);
+	ioStart = toStart;
+	ioEnd = toEnd;
+	return KFCResultModel::kRowElsewhere;
 }
 
 // End, KFCSearchEngine.cpp.

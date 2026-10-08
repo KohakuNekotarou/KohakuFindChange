@@ -25,6 +25,7 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
+#include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
 class ITextWalker;			// AcquireWalker
 class ITextWalkerSelectionUtils;
@@ -440,6 +441,12 @@ namespace KFCSearchEngine
 	    and ioStart / ioEnd are its new place. */
 	bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 		TextIndex& ioStart, TextIndex& ioEnd);
+
+	/** Where the row is now (spec T2 / T3 / T14) - its stored place, its text focus, the story looked through again.
+	    kRowMoved = the row was moved (RelocateStaleRow's rule); kRowElsewhere = found for this jump only - the row's
+	    stored place is unchanged. ioStart / ioEnd = the place to go to (unchanged for kRowAtPlace / kRowNotFound). */
+	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
+		TextIndex& ioEnd);
 
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo

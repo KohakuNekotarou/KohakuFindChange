@@ -105,6 +105,7 @@ public:
 	virtual const char* ChangeAllCommandName() { return KFCChangeAll::CommandName(); }
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) { return KFCReplaceEngine::PreviewHit(chapterIdx, hitIdx, outAfter); }
 	virtual bool LoadSavedQuery(const IDFile& file) { return KFCSavedQueries::LoadIntoFindChange(file); }
+	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::LocateRow(chapterIdx, hitIdx, docRef, ioStart, ioEnd); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

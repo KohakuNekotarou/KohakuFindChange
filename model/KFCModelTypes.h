@@ -43,6 +43,16 @@ namespace KFCResultModel
 		kOutcomeRefused		// InDesign's own replace command would not run there
 	};
 
+	/** Where a row is now - KFCSearchEngine::LocateRow's answer (IKFCRuns::LocateRow), for the jump and the double
+	    click (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2 / T3). */
+	enum RowLocation
+	{
+		kRowNotFound = 0,	// nowhere that can be told - the jump says "Not found"
+		kRowAtPlace,		// at its stored place
+		kRowMoved,			// moved to the one free candidate (today's relocation) - the row stands there now
+		kRowElsewhere		// found through its text focus or by order - for this jump only (spec T3)
+	};
+
 	enum SearchScopeKind
 	{
 		kScopeDocument = 0,

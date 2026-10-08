@@ -650,25 +650,23 @@ void SayRowHasNoPlace()
 	KFCResultTree::ShowStatus(message);
 }
 
-// Is the text at the row's place still the text the row describes - and if not, can the row be found
-// again? The stored position is an offset into the story, so ANY edit earlier in that story moves it,
-// and that is exactly the case where marking or selecting there would frame text the user never
-// searched for. Asked of the engine (KFCSearchEngine::RowReadsAsFound): the stored HASH of the match -
-// not the row's drawn text, which is capped for drawing and so would compare only the first stretch of a
-// long GREP match - and the line around it: an Undo can leave a row's place on another occurrence of its
-// own text, which the hash passes. A row that
-// fails is looked for again (KFCSearchEngine::RelocateStaleRow - a row left behind by Undo / Redo, and a
-// replaced row by what it wrote), which asks the same line of its candidates; when it is found, the rows are repainted.
-// Shared by JumpToHit, which still moves the view when it is not, and SelectHitText, which refuses.
+// Is the text at this position still the text this row describes - and if not, where is the row now? The stored
+// position is an offset into the story, so ANY edit earlier in that story moves it, and that is exactly the case
+// where marking or selecting there would frame text the user never searched for. ONE QUESTION TO THE MODEL
+// (KFCSearchEngine::LocateRow - docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2): the row's stored
+// place and its text focus - the place InDesign has carried through the user's typing - are both read against the
+// row (the stored HASH of the whole match, and the line around it), look-alikes are told apart by their count and
+// order, and a row found nowhere is looked for again. A row found elsewhere is gone to for this jump only (T3); when
+// a row moved or a Missing word went, the rows are repainted.
+// Shared by JumpToHit, which still moves the view when it is not found, and SelectHitText, which refuses.
 bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& start, TextIndex& end)
 {
-	if (KFCRuns()->RowReadsAsFound(chapterIdx, hitIdx, docRef.GetDataBase()))
-		return true;
-	if (!KFCRuns()->RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, start, end))
-		return false;
-	KFCResultTree::RefreshRows();
-	return true;
+	(void)storyUID;		// the model reads the row's own story
+	const KFCResultModel::RowLocation found = KFCRuns()->LocateRow(chapterIdx, hitIdx, docRef, start, end);
+	if (found == KFCResultModel::kRowMoved || found == KFCResultModel::kRowElsewhere)
+		KFCResultTree::RefreshRows();
+	return found != KFCResultModel::kRowNotFound;
 }
 
 // A PLACE PAST THE END OF ITS STORY IS BROUGHT BACK INSIDE IT.

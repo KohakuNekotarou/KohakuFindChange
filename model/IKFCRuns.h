@@ -104,6 +104,9 @@ public:
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) = 0;
 	/** = KFCSavedQueries::LoadIntoFindChange (appended) - a query double-clicked in the query dialog, into Find/Change. */
 	virtual bool LoadSavedQuery(const IDFile& file) = 0;
+	/** = KFCSearchEngine::LocateRow (appended) - where a row is now: at its place, moved, found for this jump only, or
+	    not found. */
+	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) = 0;
 };
 
 #endif // __IKFCRuns_h__
