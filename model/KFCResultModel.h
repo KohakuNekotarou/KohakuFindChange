@@ -435,7 +435,7 @@ namespace KFCResultModel
 	// KFCReplaceEngine.cpp.)
 
 	/** Is a row with this outcome still work - one its Replace can write? Only a row nothing was said about
-	    (kOutcomeNone): a row the replace found missing, locked, refused or deleted says
+	    (kOutcomeNone): a row the replace found missing, locked or refused says
 	    why on its locator and is not offered again. */
 	bool IsWorkOutcome(ChangeOutcome outcome);
 
@@ -524,9 +524,7 @@ namespace KFCResultModel
 
 	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
 	    found changed. Only the words that come from the row's outcome exclude each other, being values
-	    of one field: missing, refused, and on the locator deleted.
-
-	    The locator also says " deleted" (gone with the object another replaced row deleted). */
+	    of one field: missing and refused. */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
