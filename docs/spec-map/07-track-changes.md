@@ -1,6 +1,6 @@
 # 07. 変更履歴 ― 利用者の設定のまま
 
-> 2026-10-06 夜の作者の決定（docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1・F2）で、それまでの「署名・色・却下と承認」（TRK-01〜25）と Show Changes（第8章）は外した。番号は使い回さない。
+> 2026-10-06 夜の作者の決定（docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F1・F2）で、それまでの「署名・色・却下と承認」（TRK-01〜25）と Show Changes（第8章）は外した。番号は使い回さない。
 > コード地図での位置: 置換は第6章（`model/KFCReplaceEngine.cpp`・`model/KFCChangeAll.cpp`・`model/KFCQuerySequence.cpp`）。KFC の中に変更履歴を扱うコードは無い。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

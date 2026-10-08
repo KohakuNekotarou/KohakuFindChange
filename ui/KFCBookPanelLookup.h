@@ -63,7 +63,7 @@ namespace KFCBookPanelLookup
 	void BringBookTabForward(const PMString& bookPath);
 
 	/** THE DOCUMENTS SELECTED IN THE BOOK PANEL THAT SHOWS THIS BOOK (Find/Change Selected Documents (Book),
-	    docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-3), read the way the
+	    docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-3), read the way the
 	    product's own AcquireCurrentBook reads them (source/open/includes/layout/AcquireCurrentBook.h): the panel's data
 	    (IBookUIUtils::QueryBookPanelData), its selected rows' BookContent UIDs (GetSelectedBookContents - the UIDList is
 	    the callee's to make and the caller's to delete) and its rows (GetListItems). The panel is found by the book it

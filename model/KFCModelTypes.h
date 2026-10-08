@@ -25,7 +25,7 @@
 
 namespace KFCResultModel
 {
-	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F9 - the
+	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9 - the
 	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit,
 	    KFCResultModel.h, is this number). More than this is not a list to walk and replace row by row - a Change All
 	    writes any number without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's

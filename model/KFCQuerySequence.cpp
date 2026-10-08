@@ -329,7 +329,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 					break;
 				}
 
-				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
+				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 				// section 5): no rows collected, no limit. A book or All Documents writes each document whole; Story / To End
 				// of Story / Selection write that part of the front document (the one target).
 				const int32 writeScope = (scope.fromBook || scope.allDocuments)

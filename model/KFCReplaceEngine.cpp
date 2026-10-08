@@ -734,7 +734,7 @@ void NoteStoryVersions(int32 chapterIdx, IDataBase* db, const std::set<UID>& sto
 
 // THE CHAPTER'S REPLACE. Every row asked for is written by the walk of its story, in the direction the caller
 // set - Track Changes as each story has it (KFC records nothing of its own -
-// docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1). Refuses before anything is written -
+// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F1). Refuses before anything is written -
 // returns false, outWhyNot says why - only when the document, the Find/Change options or a row cannot be read.
 // outFailed: the walk could not be started - the caller rolls the step back. `onlyHits` = the rows to write.
 bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const WalkerScopeOptions& scopeOptions,

@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  RUN SAVED QUERIES... - THE QUERY DIALOG (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+//  RUN SAVED QUERIES... - THE QUERY DIALOG (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 //  section 2). Modeless, with a minimize box (G4 as the author changed it): the saved queries on the left,
 //  the run order on the right, the buttons between them, a line saying what Run would run on, and Run / Close. The
 //  order is the session's (KFCQueryOrder - kept while InDesign runs; a file of its own only through Save Order... /

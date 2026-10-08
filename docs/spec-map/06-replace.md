@@ -1,7 +1,7 @@
 # 06. 置換 ― 行の Replace と Change All in Book (No List)
 
 > コード地図での位置: ブロック **9**（`model/KFCReplaceEngine.*`＝行の Replace・`model/KFCChangeAll.*`＝Change All in Book と Clear Results）。
-> 2026-10-06 夜の作者の決定（docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md 第5版・F16）で、一覧から書くのは**行の Replace だけ**になった（Change Checked・チェックボックス・Check All／Uncheck All・ストーリーと文書の行の Replace はやめた）。番号は使い回さない。
+> 2026-10-06 夜の作者の決定（docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md 第5版・F16）で、一覧から書くのは**行の Replace だけ**になった（Change Checked・チェックボックス・Check All／Uncheck All・ストーリーと文書の行の Replace はやめた）。番号は使い回さない。
 > 変更履歴は利用者の設定のまま（第7章）、取り消し・やり直しへの追従は第9章。
 > 訂正の書き方は [00-index.md](00-index.md)。
 

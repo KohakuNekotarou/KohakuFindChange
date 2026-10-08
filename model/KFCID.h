@@ -77,7 +77,7 @@ DECLARE_PMID(kClassIDSpace, kKFCCloseDocResponderBoss, kKFCPrefix + 9)
 // kGlobalTextAdornmentServiceImpl + our IGlobalTextAdornment (KFCHitMarker.cpp). Replaces +5.
 DECLARE_PMID(kClassIDSpace, kKFCHitMarkerBoss, kKFCPrefix + 17)
 // RETIRED (not reused): the command that signed the tracked changes one replace made (KFC records nothing of its
-// own now - docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1).
+// own now - docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F1).
 //DECLARE_PMID(kClassIDSpace, kKFCSignRecordsCmdBoss, kKFCPrefix + 18)
 // The mark every write of KFC's own leaves in its undo step (KFCUndoFollow.cpp): a command that changes
 // nothing and raises a ModelChange on its document's subject, so the panel hears that step's Undo and

@@ -5,7 +5,7 @@
 //  KohakuFindChange (KFC)
 //
 //  THE QUERY RUN (docs/superpowers/specs/2026-10-04-kfc-query-sequence-design.md, then
-//  docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F7 and section 5). The saved Find/Change
+//  docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F7 and section 5). The saved Find/Change
 //  queries a user lined up, run in that order: each one loaded into Edit > Find/Change (kFCQueryXMLReaderCmdBoss) and
 //  written with InDesign's own Change All, a document at a time (KFCChangeAll::WriteDocument) - no rows collected, no
 //  list, no limit - ALL OF IT ONE UNDO STEP ("Run Queries"): one abortable command sequence around every query, the
@@ -39,7 +39,7 @@ namespace KFCQuerySequence
 	    the panel's message line. Returns how many were replaced (0 for a refusal, a cancel or a failure). */
 	int32 Run(const std::vector<QueryItem>& queries, PMString& outSummary);
 
-	/** THE QUERY DIALOG'S RUN (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+	/** THE QUERY DIALOG'S RUN (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 	    these query files, in this order, each named as the dialog names it (KFCSavedQueries::Describe - the file's
 	    name without .xml), then Run. A file that is not there is Run's to refuse - nothing is run, and it is named. */
 	int32 RunFiles(const std::vector<IDFile>& files, PMString& outSummary);

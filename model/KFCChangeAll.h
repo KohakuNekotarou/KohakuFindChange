@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  CHANGE ALL IN BOOK (NO LIST) AND CLEAR RESULTS (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
+//  CHANGE ALL IN BOOK (NO LIST) AND CLEAR RESULTS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 //  F6, F18 and section 4). InDesign's own Change All (kReplaceAllTextCmdBoss) over the book's chapters - Book Scope on
 //  only (F18: a document's Change All is InDesign's own dialog's) - once a chapter, in ONE undo step, with no list: the
 //  panel says how many were replaced, and how many in each chapter. Track Changes is each story's own

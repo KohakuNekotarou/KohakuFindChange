@@ -278,7 +278,7 @@ namespace
 	}
 
 	/** THE ONE PLACE A BOOK RUN IS NARROWED TO THE BOOK PANEL'S SELECTION (Find/Change Selected Documents
-	    (Book), docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
+	    (Book), docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 4-4): the
 	    book's own BookContent UIDs the Book panel showing it has selected, in the book's order - EMPTY for the whole
 	    book: the toggle off, no UI half (a background thread, InDesign Server), no panel showing this book, none or all
 	    of it selected (the UI half's answer, by the product's rule - AcquireCurrentBook::AllOrNoneSelected), or a

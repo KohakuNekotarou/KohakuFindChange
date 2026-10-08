@@ -3419,7 +3419,7 @@ bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIn
 }
 
 // A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE
-// (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
+// (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
 // the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
 // way the search reads a hit (ReadHitText) and taken only with the row's own hash and line - both read again when
 // its replace was written. Exactly one, and no other row on it, or nothing moves: the rule the rows not replaced keep

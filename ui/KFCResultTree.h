@@ -70,7 +70,7 @@ namespace KFCResultTree
 	    previous row's does not stand beside it. Nothing when it shows anything else. */
 	void DropRowPreview();
 
-	/** REPLACE ONE ROW (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
+	/** REPLACE ONE ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
 	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
 	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the
 	    row menu greys Replace by); then the row's one replace (KFCRuns()->ReplaceHit, no prompt - one undo step, the

@@ -405,7 +405,7 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	return kTrue;
 }
 
-// RETURN REPLACES THE SELECTED ROW (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F17 - the
+// RETURN REPLACES THE SELECTED ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F17 - the
 // author's call: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
 // the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the right-click Replace's own door
 // (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced). Any other key, a modified Return, or

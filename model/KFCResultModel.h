@@ -35,7 +35,7 @@
 namespace KFCResultModel
 {
 	/** THE WHOLE-RUN CEILING - the same number the panel draws (kKFCDisplayHitLimit, KFCModelTypes.h - F9 of
-	    docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md): a search stops collecting there and
+	    docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): a search stops collecting there and
 	    says so ("Stopped at the 300 limit - narrow the search, or use ..."), so no query can pile up rows nobody
 	    will replace one by one. Counted in ROWS. */
 	const int32 kKFCCollectHitLimit = kKFCDisplayHitLimit;

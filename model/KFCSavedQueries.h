@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE SAVED FIND/CHANGE QUERIES (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+//  THE SAVED FIND/CHANGE QUERIES (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 //  section 2-2). What the query dialog's left list offers, and what a path in its run order is called: the user's
 //  queries (FileUtils::GetAppRoamingDataFolder(.., "Find-Change Queries")\<kind>\*.xml) and InDesign's own
 //  (FileUtils::GetPresetsFolder(.., "Find-Change Queries\<kind>", the UI language)\*.xml - InDesign's put the language's

@@ -77,7 +77,7 @@ DECLARE_PMID(kClassIDSpace, kKFCUIStartupShutdownBoss, kKFCUIPrefix + 20)
 // Edit > Find/Change, so the menu and Ctrl+F worked with no document open. The author's call: KFC
 // leaves InDesign's menu alone - the panel's Open Find/Change... opens the dialog instead.
 //DECLARE_PMID(kClassIDSpace, kKFCFindChangeAnywhereBoss, kKFCUIPrefix + 21)
-// Run Saved Queries... (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
+// Run Saved Queries... (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md):
 // the query dialog (a kDialogBoss with our controller and observer) and its two lists (a tree-view widget with our
 // flat-list adapter and row maker - the saved queries on the left, the run order on the right). KFCQueryDialog.cpp,
 // KFCQueryList.cpp.
@@ -249,7 +249,7 @@ DECLARE_PMID(kActionIDSpace, kKFCMinimizableFindChangeActionID, kKFCUIPrefix + 2
 DECLARE_PMID(kActionIDSpace, kKFCRememberBookPanelActionID, kKFCUIPrefix + 24)
 // RETIRED (never reuse - a keyboard shortcut is recorded against the ActionID): the items that took
 // back or accepted KFC's tracked changes, Show Changes by KohakuFindChange and Replace Again, gone with Track
-// Changes (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F2 - KCM handles the records):
+// Changes (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F2 - KCM handles the records):
 // + 25 Reject Change (hit row), + 27 Accept All Changes by KohakuFindChange in This Document, + 31 / + 32 the
 // story row's Reject and Replace Again, + 36 / + 37 the document row's, + 38 Show Changes, + 39 its rule,
 // + 40 / + 41 Accept Change (hit row, story row), + 42 / + 43 the run row's Reject and Accept.
@@ -285,7 +285,7 @@ DECLARE_PMID(kActionIDSpace, kKFCOpenFindChangeActionID, kKFCUIPrefix + 44)
 // search field of InDesign's application bar shows Find/Change's query, and Return in it searches with
 // this panel. OFF by default. See KFCAppBarSearchEnter.h.
 DECLARE_PMID(kActionIDSpace, kKFCAppBarSearchEnterActionID, kKFCUIPrefix + 45)
-// Change All in Book (No List) and Clear Results (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md
+// Change All in Book (No List) and Clear Results (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 // F6 and F18): InDesign's own Change All over the book's chapters, no list; the list emptied so it can run.
 DECLARE_PMID(kActionIDSpace, kKFCChangeAllActionID, kKFCUIPrefix + 46)
 DECLARE_PMID(kActionIDSpace, kKFCClearResultsActionID, kKFCUIPrefix + 47)

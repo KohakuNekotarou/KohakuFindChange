@@ -16,7 +16,7 @@
 //  its row is reported missing rather than written. A GREP query holding ^ is walked backward (the
 //  direction is set before anything is written, outside the sequence). Track Changes is left as each
 //  story has it: KFC records nothing of its own
-//  (docs/superpowers/specs/2026-10-06-kfc-no-track-change-all-design.md F1). (Not InDesign's Change All
+//  (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F1). (Not InDesign's Change All
 //  over each story with the rows NOT asked for taken back afterwards: that was tried and dropped - git
 //  history, c876bc7 and before. Change All itself is KFCChangeAll's.)
 //

@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE QUERY DIALOG'S TWO LISTS (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+//  THE QUERY DIALOG'S TWO LISTS (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 //  sections 2-2 and 3): the saved queries the dialog offers (the left list, asked of the model at every open -
 //  KFCSavedQueries) and the run order (the right list). What the dialog draws comes from here, and only from here: the
 //  lists' row maker (KFCQueryList.cpp) reads these vectors by index.

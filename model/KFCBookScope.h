@@ -75,7 +75,7 @@ namespace KFCBookScope
 	    reopens it through ReopenChapterDoc. */
 	void SetBookScopeOn(bool on);
 
-	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	/** FIND/CHANGE SELECTED DOCUMENTS (BOOK) (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    G9, G10): while it is ON and Book Scope is on, a run takes only the documents selected in the Book panel - none
 	    or all selected is the whole book. It does nothing with Book Scope off (the menu greys it then). A session flag
 	    like Book Scope's, but kept by Save Panel Settings (the author's call), so OFF at launch unless that restored it. */
@@ -157,7 +157,7 @@ namespace KFCBookScope
 		PMString	reason;		// what the book says about it - see IBookUtils::GetBookContentStatus
 	};
 
-	/** How much of the target book a run takes (docs/superpowers/specs/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
+	/** How much of the target book a run takes (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): total = the book's documents; selected = how many of them a run takes when it is narrowed to the
 	    Book panel's selection (Find/Change Selected Documents (Book)), 0 = the whole book. */
 	struct BookSelection
