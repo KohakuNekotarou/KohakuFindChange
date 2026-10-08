@@ -197,6 +197,21 @@ namespace
 		}
 	}
 
+	// Each story's hits numbered in the order their text stands (spec T14): a group's hits sorted by where they
+	// started when the search found them. Not the hits' own order - that is page order, and the walk's order inside
+	// a table is reading order (memory walker-scope-options-and-hidden-layers), neither of which is the text's.
+	void NumberHitsWithinStories(KFCResultModel::Chapter& chapter)
+	{
+		for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
+		{
+			std::vector<int32> order(chapter.fontGroups[g].hitIndices);
+			std::stable_sort(order.begin(), order.end(), [&chapter](int32 a, int32 b)
+				{ return chapter.hits[static_cast<size_t>(a)].textStart < chapter.hits[static_cast<size_t>(b)].textStart; });
+			for (size_t k = 0; k < order.size(); ++k)
+				chapter.hits[static_cast<size_t>(order[k])].storyOrdinal = static_cast<int32>(k);
+		}
+	}
+
 	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
 	// book order, and every chapter before the boundary chapter is shown in full, so counting full
 	// hits here is the budget consumed before this chapter.
@@ -219,6 +234,7 @@ void KFCResultModel::AppendChapter(Chapter&& chapter)
 	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
 	// built from, so they have to be built where those hits are going to live.
 	BuildFontGroups(gChapters.back());
+	NumberHitsWithinStories(gChapters.back());
 }
 
 void KFCResultModel::Clear()
@@ -735,6 +751,12 @@ bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplac
 	outReplaced = h != nil && h->replaced;
 	outLocked = h != nil && h->isLocked;
 	return h != nil;
+}
+
+int32 KFCResultModel::GetHitStoryOrdinal(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->storyOrdinal : -1;
 }
 
 bool KFCResultModel::GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden)

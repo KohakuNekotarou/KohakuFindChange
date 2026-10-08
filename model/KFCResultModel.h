@@ -115,11 +115,14 @@ namespace KFCResultModel
 		int32		pageOrdinal;// this hit's place among the matches on its page, or 0 for "do not
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
+		int32		storyOrdinal;	// this hit's place among its STORY's hits as the search found them - ordered by
+								// textStart then (the spec's T14: a row among look-alikes is found again by its
+								// order). Set by AppendChapter; never changed after (a row that moves keeps it).
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outcome(kOutcomeNone), pageOrdinal(0) {}
+				replaced(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -386,6 +389,9 @@ namespace KFCResultModel
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */
 	bool GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked);
+
+	/** A row's place among its story's rows as the search found them (Hit::storyOrdinal); -1 = no such row. */
+	int32 GetHitStoryOrdinal(int32 chapterIdx, int32 hitIdx);
 
 	/** The two flags that say the match IS in the document but is out of the user's reach there:
 	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no
