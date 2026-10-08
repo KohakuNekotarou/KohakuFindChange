@@ -7,8 +7,9 @@
 //  The panel's illustration - which of the stacked pictures is showing. They occupy ONE frame in
 //  KFCUI.fr, and exactly one of them is visible and enabled at a time.
 //
-//  There are three: before anything has been run, once something HAS been run, and once a replace
-//  has written something. Adding a fourth: a widget id and a PNG resource id in KFCUIID.h, the widget
+//  There are three: before anything has been run, once something HAS been run, and once a Change All
+//  has written something - Change All in Book (No List), or a query run (a row's Replace leaves the
+//  picture as it was - Choose() in KFCPanelIcon.cpp). Adding a fourth: a widget id and a PNG resource id in KFCUIID.h, the widget
 //  and its PNGA / PNGR lines in KFCUI.fr, and a row in kIcons (KFCPanelIcon.cpp) - plus the test that
 //  picks it, which goes in Choose() with the more specific state FIRST. Nothing else in the plug-in
 //  names the pictures: the panel's observer asks IsIconWidget rather than testing an id of its own.

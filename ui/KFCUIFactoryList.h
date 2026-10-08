@@ -69,7 +69,7 @@ REGISTER_PMINTERFACE(KFCStatusTextView, kKFCStatusTextViewImpl)
 REGISTER_PMINTERFACE(KFCStatusTextData, kKFCStatusTextDataImpl)
 // The model/UI split's boundary: the UI half's observer of the model half's notifications.
 REGISTER_PMINTERFACE(KFCModelObserver, kKFCModelObserverImpl)
-// ...and the UI services the model half asks for (the bar, the windows, the Book panel, the alert).
+// ...and the UI services the model half asks for (the bar, the windows, the Book panel).
 REGISTER_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)
 REGISTER_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
 REGISTER_PMINTERFACE(KFCQueryDialogObserver, kKFCQueryDialogObserverImpl)

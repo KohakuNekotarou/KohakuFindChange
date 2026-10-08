@@ -143,8 +143,8 @@ namespace KFCBookScope
 	    made active. */
 	class IDocument* ActiveDocument();
 
-	/** An open document as a run's target - the one builder the search's non-book scopes and Show
-	    Changes share: docRef and its name set, no file and no book entry - which is what
+	/** An open document as a run's target - the one builder the search's non-book scopes and the
+	    query run's share: docRef and its name set, no file and no book entry - which is what
 	    tells the engines it is not a book's chapter (see ChapterDoc). */
 	ChapterDoc DocAsChapter(class IDocument* doc);
 

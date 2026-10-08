@@ -335,7 +335,7 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	// very end"). Do not hold it back when the line has no other text: that is exactly what the LAST
 	// paragraph of a story looks like once its only word is replaced with nothing - a paragraph in the
 	// middle keeps its pilcrow in the trailing context, the last one has none - so the bar would go
-	// missing there alone. (A "deleted" row keeps the match it was found with. A match whose story had no text model to
+	// missing there alone. (A match whose story had no text model to
 	// read comes with three empty segments and now draws the bar alone - a place with nothing to show,
 	// which is what the bar says.)
 	// ! The label a reader walks still says "[]" (KFCRowData::SetSegments): the bar is drawn, never

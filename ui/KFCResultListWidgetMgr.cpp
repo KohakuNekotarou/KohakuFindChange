@@ -360,7 +360,7 @@ private:
 		this->LayOutBranchRow(node, widget, rowData, PMReal(0.0), label);
 	}
 
-	// A document row: its expander and "<name>  (N)" after the zone.
+	// A document row: its expander and "<name>  (R/N)" after the zone.
 	void ApplyChapterRow(const TreeNodePtr<KFCResultNodeID>& nodeID, const NodeID& node,
 		IControlView* widget, IPanelControlData* rowData) const
 	{

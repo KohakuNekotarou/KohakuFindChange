@@ -56,8 +56,8 @@ public:
 		KFCHitMarker::ShutdownCleanup();
 		KFCBookScope::ShutdownCleanup();
 		KFCResultModel::ShutdownCleanup();
-		// ...and the writes kept so that the panel can follow an Undo: each holds rows, and Change
-		// Checked's the whole result set - PMStrings, the kind this list exists for.
+		// ...and the writes kept so that the panel can follow an Undo: each holds rows, and a query
+		// run's the whole result set (KFCUndoFollow::RunRecorder) - PMStrings, the kind this list exists for.
 		KFCUndoFollow::ShutdownCleanup();
 		// (Every clean-up is a line of its own here, never nested inside another one: a nested one
 		//  cannot be found by READING this list, which is the only way anyone ever checks.)

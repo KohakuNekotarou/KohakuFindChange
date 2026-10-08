@@ -313,7 +313,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * What the model half asks the UI half for (IKFCUIServices.h): the progress bar, the windows, the
-	 * Book panel's front tab and the alert. A UI implementation on a model boss, which the guide allows
+	 * Book panel's front tab and the chapters selected in it. A UI implementation on a model boss, which the guide allows
 	 * only through an AddIn in the UI plug-in's resource (vol1-07, Object-Model Rule 2) - and which a
 	 * background thread does not see, where the model does without.
 	 */

@@ -51,7 +51,8 @@ namespace KFCJump
 	    window again. On success it TAKES THE JUMP'S MARKER BACK DOWN - the inverted rectangle and the
 	    selection say the same thing, and together they make the text unreadable.
 
-	    Refuses when there is nothing honest to select - a row with no place left ("deleted"), a LOCKED
+	    Refuses when there is nothing honest to select - a row with no place in its story (RowHasPlace: none the
+	    search makes is one, asked anyway), a LOCKED
 	    or HIDDEN match, a zero-width one, an OVERSET one, and one whose text is no longer what the
 	    search recorded (a stale range would highlight text the user never searched for). Each says why
 	    on the status line, except the stale one: the jump has already said it. The tests in

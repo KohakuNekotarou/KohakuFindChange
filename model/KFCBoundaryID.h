@@ -35,7 +35,7 @@
 													// Developer Console id, NOT a prefix (0x205698 was once used here by mistake, never registered).
 													// Every id is kKFCPrefix + N, so the prefix can move without moving an offset.
 													// Procedure: memory id-prefix-256-slot-budget.
-#define kKFCRepoURL		"https://github.com/KohakuNekotarou/KohakuFindChange"	// Where this plug-in is published. Shown as the panel icon's tooltip (KFCIconTip.cpp) and opened by the panel title (KFCPanelTitle.cpp). If the repo is ever renamed again, this line has to follow it - nothing else in the build does.
+#define kKFCRepoURL		"https://github.com/KohakuNekotarou/KohakuFindChange"	// Where this plug-in is published. Shown as the panel icon's tooltip (KFCIconTip.cpp) and opened when that icon is clicked (the panel's observer, KFCPanelTitle.cpp). If the repo is ever renamed again, this line has to follow it - nothing else in the build does.
 #define kKFCVersion		"1.3.0"						// Version of BOTH halves (one number). Every place it shows up takes it from this line: the About box (KFCUI_enUS.fr), the FileVersion of KFC.rc and of KFCUI.rc, and the PluginVersion resource of KFC.fr and of KFCUI.fr. The Adobe Exchange listing (https://exchange.adobe.com/apps/cc/205698/kohakufindchange) is 1.0.0 = THE 2026-07-30 BUILD: everything after f0a6f48 is NOT in it. 1.1.0 was never submitted - the store goes from 1.0.0 straight to 1.2.0. 1.2.0 = tag v1.2.0 (8cfa9b8), submitted 2026-10-04 (in review then; the .pln hashes are in README.md). *1.3.0 has NOT been submitted; this line says what the next submission will be called, not what the store has. (KCM learned this the expensive way: "the version number in a history comment does not describe what was submitted" - memory kescm-cpp-panel.)
 
 // Plug-in Prefix: (please change kKFCPrefixNumber above to modify the prefix.)
@@ -63,7 +63,7 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCRESULTS, kKFCPrefix + 4)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCRUNS, kKFCPrefix + 5)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCCHAPTERS, kKFCPrefix + 6)
 // The UI services the model half asks for and does without when they are not there (IKFCUIServices.h,
-// implemented by the UI half on kSessionBoss: the progress bar, the windows, the Book panel, the alert).
+// implemented by the UI half on kSessionBoss: the progress bar, the windows, the Book panel).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUISERVICES, kKFCPrefix + 7)
 
 #endif // __KFCBoundaryID_h__
