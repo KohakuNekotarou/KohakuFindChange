@@ -82,7 +82,7 @@
   - 訂正:
 
 - **JMP-15** 探し直しても見つからなければ ―― 画面は**それでも元の位置へ動かし**（一致があった場所を見せる）、印はそこに今ある文字の上に出す。
-  行には `missing` が付き、メッセージ欄は `Not found - the text is no longer where the search left it. Search again.`
+  行の頭に `Missing` が付き（ROW-13）、メッセージ欄は `Not found - the text is no longer where the search left it. Search again.`
   置換した行なら行はそのままで、`The replacement is no longer here - undone, or edited since.` と言う。
   ストーリーが短くなって元の位置が無ければ、ストーリーの最後の文字へ行く（2026-10-03）。
   - 訂正:

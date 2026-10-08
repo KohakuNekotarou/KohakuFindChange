@@ -450,6 +450,8 @@ private:
 				// written row from one still as the search found it - without it a replaced row looks like the rest).
 				// Part of the locator run - its colour, and the label a reader walks starts with it. An Undo of the
 				// replace puts the row back as it was (UNDO-03, the row's copy has replaced == false), and the word goes.
+				// (A row whose text is gone starts with "Missing" in the same place - the model's BuildHitLocator puts
+				// that one on the locator itself; the two never meet.)
 				PMString locator(row.locator);
 				if (row.replaced)
 				{

@@ -903,13 +903,13 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
 	//   on the locator, in the row's own colour = facts about the row: hidden (on a switched-off layer,
-	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it);
-	//   on accentFlag, drawn as a run of its own in the accent colour = why a row could not be acted
-	//     on: missing (the text is not where the search left it), refused (InDesign's own replace
+	//     so the page will look empty on arrival), locked (its Replace is greyed; the replace will not touch it) -
+	//     and, FIRST, Missing (the text is not where the search left it - see below);
+	//   on accentFlag, drawn as a run of its own in the accent colour = refused (InDesign's own replace
 	//     would not run there).
 	// Only hidden and locked come from the search itself; the rest are put there later - by a replace
 	// or a jump that finds the text gone. They stack on
-	// either shape: "P1(2) overset hidden locked", "overset missing", "P7 hidden".
+	// either shape: "P1(2) overset hidden locked", "Missing overset", "P7 hidden".
 	//
 	// A space, not a "+": InDesign's own overset marker IS a "+", so "P5+locked" reads as "page 5,
 	// overset". EVERY word is spelled out in full (the author's call): these are what explain
@@ -922,17 +922,25 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.locator.Append(" locked");
 
 	// NOT chained onto the test above. A locked row can be jumped to and found changed, and then it
-	// has both things to say - "P4(1) locked missing" - where an else would leave it saying only that
+	// has both things to say - "Missing P4(1) locked" - where an else would leave it saying only that
 	// it was locked, which is not why the jump landed on different text. Missing and refused do exclude
 	// each other: outcome holds one value.
 	//
-	// These two go into their own string rather than onto the locator because the cell draws them
-	// as a separate run in the theme's accent colour; the space in front of them belongs to that
-	// run and is put there when it is drawn (KFCColorTextView).
+	// "Missing" FIRST, IN THE ROW'S OWN COLOUR (the author's call of 2026-10-08 - it was the last word, in the
+	// accent colour): it stands where "Changed" stands on a replaced row (the UI half's ApplyHitRow puts that one
+	// there), so a row's state is the first thing read on it, and the label a reader walks starts with it. The two
+	// never meet: SetHitOutcome turns a replaced row away.
+	// "refused" stays a run of its own in the theme's accent colour; the space in front of it belongs to that run
+	// and is put there when it is drawn (KFCColorTextView).
 	if (hit.outcome == kOutcomeMissing)
-		hit.accentFlag.Append("missing");	// its own run, in the accent colour
+	{
+		PMString lead("Missing ");
+		lead.SetTranslatable(kFalse);
+		lead.Append(hit.locator);
+		hit.locator = lead;
+	}
 	else if (hit.outcome == kOutcomeRefused)
-		hit.accentFlag.Append("refused");	// same run, same colour: same kind of reason
+		hit.accentFlag.Append("refused");	// its own run, in the accent colour
 }
 
 void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)

@@ -33,7 +33,8 @@ namespace KFCResultModel
 	const int32 kKFCDisplayHitLimit = 300;
 
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
-	    reached; everything else stays kOutcomeNone. Drawn as a word on the end of the locator. */
+	    reached; everything else stays kOutcomeNone. Drawn as a word on the locator - "Missing" first,
+	    the others after it (KFCResultModel::BuildHitLocator). */
 	enum ChangeOutcome
 	{
 		kOutcomeNone = 0,	// replaced, or never reached
@@ -55,8 +56,8 @@ namespace KFCResultModel
 	/** Everything a hit row needs to lay itself out and paint itself. @see GetHitRow. */
 	struct RowDisplay
 	{
-		PMString		locator;	// "P1(2) overset hidden locked" - drawn at the full text colour
-		PMString		accentFlag;	// "missing" / "refused", or empty - drawn in the accent
+		PMString		locator;	// "[Missing ]P1(2) overset hidden locked" - drawn at the full text colour
+		PMString		accentFlag;	// "refused", or empty - drawn in the accent
 									// colour (BuildHitLocator's tests are the list of both strings)
 		PMString		preText;	// the line, split around the match
 		PMString		matchText;

@@ -100,8 +100,9 @@ namespace KFCResultModel
 		// storyVersions are a door BESIDE that test, not instead of it.)
 		PMString	accentFlag;	// the one word on this row drawn in the theme accent colour, or empty.
 								// Kept OUT of locator so the cell can paint it separately; built by
-								// BuildHitLocator alongside it. Only "missing" and "refused" earn
-								// it - the other flags stay in locator and read in the normal colour.
+								// BuildHitLocator alongside it. Only "refused" earns it - the other
+								// flags stay in locator and read in the normal colour ("Missing" too,
+								// first on the locator since 2026-10-08 - the author's call).
 		// --- what the replace wrote ---
 		// The WHOLE text a replace wrote at the row's place, taken as it was written (not capped for drawing like
 		// matchText): a replaced row that an edit has moved is looked for again by it
@@ -514,8 +515,8 @@ namespace KFCResultModel
 	/** Build hit.locator from the hit's own fields. THE one definition - the search's page-ordering
 	    pass and the outcome setter (SetHitOutcome) both call it, so they cannot drift apart.
 
-	        P<page>(<n>) overset hidden locked     -> hit.locator
-	        missing | refused                      -> hit.accentFlag, drawn after it in accent colour
+	        [Missing ]P<page>(<n>) overset hidden locked     -> hit.locator
+	        refused                                        -> hit.accentFlag, drawn after it in accent colour
 
 	    The page ordinal comes from hit.pageOrdinal (0 = leave it out). The flags are separated by
 	    spaces and spelled out IN FULL rather than clipped, because each one explains a row the user
