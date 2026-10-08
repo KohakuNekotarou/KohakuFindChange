@@ -98,7 +98,8 @@ bool16	KFCApplyFindChangeTranslucency();
 //  dialog" is decided in ONE place. It is not a trivial question - the window class is generic and
 //  the title is translated - and the answer walks the SDK's window list for the dialog whose panel
 //  answers kFindChangeParentWidgetID, a NUMBER. See the block comment over KFCQueryFindChangeIWindow
-//  in the .cpp. (KFCQueryFindChangeIWindow itself stays private: nothing outside needs the IWindow.)
+//  in the .cpp. (KFCQueryFindChangeIWindow itself stays private: nothing outside needs the IWindow - a widget of the
+//  dialog is handed out by KFCQueryFindChangeWidget below.)
 // The contract:
 //   . the result is CACHED, and the cache is dropped by the window-list observer whenever a window
 //     is added or removed - so ask again rather than keeping the handle
@@ -114,6 +115,14 @@ struct HWND__;
 typedef struct HWND__* HWND;
 
 HWND	KFCQueryFindChangeWindow();
+
+// (2026-10-08) One of the Find/Change dialog's own widgets, by its WidgetID - its Query menu
+// (kFindQueryDropDownWidgetID), which KFCQueryDialog.cpp chooses a loaded query in. Found the way the window is (the
+// dialog whose panel answers kFindChangeParentWidgetID), then IPanelControlData::FindWidget on that panel - so the
+// IWindow still stays private. nil when the dialog is not open, or is open with no panel yet.
+// Borrowed: FindWidget does not addref.
+class IControlView;
+IControlView*	KFCQueryFindChangeWidget(const WidgetID& widget);
 
 // Could 'h' still be the Find/Change dialog's window - a live, top-level "DroverLord - Window Class"
 // window of THIS process? Win32 only, so shutdown can ask it.
