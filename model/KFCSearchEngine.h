@@ -448,6 +448,11 @@ namespace KFCSearchEngine
 	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
 		TextIndex& ioEnd);
 
+	/** Search This Story Again (a story row's right-click menu): that story alone walked again with the search's query,
+	    its rows put back as the walk finds them and its version recorded (KFCResultModel::ReplaceStoryRows). False =
+	    refused or failed, the list unchanged; outStatus says what happened either way. */
+	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
+
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo
 	    to exactly the value it had (measured - docs/ai-notes/text-change-counters-2026-08-08.md). The

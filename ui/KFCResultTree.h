@@ -79,6 +79,11 @@ namespace KFCResultTree
 	    (KFCResultTreeEH). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus = nil);
 
+	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call of 2026-10-09): nothing while a run of
+	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt
+	    when its rows were put back (their places in the list moved) and the status line set either way. True = done. */
+	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx);
+
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
 	    land it. For the arrows' walk and a Return's replace (KFCResultTreeEH), after a document window has come forward.
@@ -91,7 +96,7 @@ namespace KFCResultTree
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
 	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRow -
-	    the row's Replace and Return - and Clear Results). */
+	    the row's Replace and Return -, SearchStoryAgain and Clear Results). */
 	bool RefusedWhileRunning();
 
 	/** Put the status read-out back to what THIS session last had on it - the last message - or, when

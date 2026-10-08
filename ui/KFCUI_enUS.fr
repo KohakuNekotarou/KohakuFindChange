@@ -50,6 +50,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCChangeAllMenuKey,			"Change All in Book (No List)",
                 kKFCClearResultsMenuKey,		"Clear Results",
                 kKFCReplaceHitMenuKey,			"Replace",
+                kKFCSearchStoryAgainMenuKey,	"Search This Story Again",
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",

@@ -67,6 +67,8 @@ public:
 	virtual int32 GetChapterReplacedCount(int32 chapterIdx) { return KFCResultModel::GetChapterReplacedCount(chapterIdx); }
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) { return KFCResultModel::GetFontReplacedCount(chapterIdx, fontIdx); }
 	virtual int32 GetTotalReplacedCount() { return KFCResultModel::GetTotalReplacedCount(); }
+	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuStory(chapterIdx, groupIdx); }
+	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuStory(outChapterIdx, outGroupIdx); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -106,6 +108,7 @@ public:
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) { return KFCReplaceEngine::PreviewHit(chapterIdx, hitIdx, outAfter); }
 	virtual bool LoadSavedQuery(const IDFile& file) { return KFCSavedQueries::LoadIntoFindChange(file); }
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::LocateRow(chapterIdx, hitIdx, docRef, ioStart, ioEnd); }
+	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

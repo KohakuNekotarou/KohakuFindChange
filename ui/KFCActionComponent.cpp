@@ -333,6 +333,15 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			break;
 		}
 
+		case kKFCSearchStoryAgainActionID:
+		{
+			// A story row's right-click menu. Nothing stashed = nobody right-clicked a story row: do nothing.
+			int32 chapter = -1, group = -1;
+			if (KFCResults()->GetContextMenuStory(chapter, group))
+				(void)KFCResultTree::SearchStoryAgain(chapter, group);
+			break;
+		}
+
 		default:
 		{
 			break;
@@ -539,6 +548,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			bool enable = KFCResults()->GetContextMenuHit(chapter, hit);
 			if (enable)
 				enable = KFCRuns()->CanReplaceHit(chapter, hit);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCSearchStoryAgainActionID)
+		{
+			// A story row's menu: Search This Story Again while a story row is stashed and no run is up. What the engine
+			// refuses (a changed query, a search over part of a story) it says on the status line rather than greying
+			// the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
+			int32 chapter = -1, group = -1;
+			const bool enable = KFCResults()->GetContextMenuStory(chapter, group) && !KFCRuns()->IsAnyRunning();
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}

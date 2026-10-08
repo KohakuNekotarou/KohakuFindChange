@@ -18,6 +18,7 @@
 
 #include <algorithm>	// std::lower_bound - where the display cap falls inside one font group; std::partition_point - the groups it leaves shown; std::sort
 #include <set>			// the rows already copied aside - see BackUpRow
+#include <iterator>		// std::make_move_iterator - ReplaceStoryRows hands the walked story's hits over
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
 // Project includes:
@@ -91,13 +92,18 @@ namespace
 	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu - spec F16.)
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
+	// ...and which STORY row it was popped over, for its menu (Search This Story Again). -1 = none.
+	int32 gContextMenuStoryChapter = -1;
+	int32 gContextMenuStoryGroup = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
-	// RestoreModelSnapshot).
+	// RestoreModelSnapshot, ReplaceStoryRows).
 	void ForgetContextMenus()
 	{
 		gContextMenuHitChapter = -1;
 		gContextMenuHit = -1;
+		gContextMenuStoryChapter = -1;
+		gContextMenuStoryGroup = -1;
 	}
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
@@ -331,6 +337,11 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 		gContextMenuHitChapter = -1;
 		gContextMenuHit = -1;
 	}
+	if (gContextMenuStoryChapter == chapterIdx)
+	{
+		gContextMenuStoryChapter = -1;
+		gContextMenuStoryGroup = -1;
+	}
 }
 
 void KFCResultModel::EmptyChapter(Chapter& chapter)
@@ -540,6 +551,12 @@ bool KFCResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
 {
 	// Every group is a story group - so this is the index's range.
 	return GroupAt(chapterIdx, groupIdx) != nil;
+}
+
+UID KFCResultModel::GetGroupStory(int32 chapterIdx, int32 groupIdx)
+{
+	const FontGroup* group = GroupAt(chapterIdx, groupIdx);
+	return (group != nil) ? group->story : kInvalidUID;
 }
 
 bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount)
@@ -794,6 +811,21 @@ bool KFCResultModel::GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx)
 	return true;
 }
 
+void KFCResultModel::SetContextMenuStory(int32 chapterIdx, int32 groupIdx)
+{
+	gContextMenuStoryChapter = chapterIdx;
+	gContextMenuStoryGroup = groupIdx;
+}
+
+bool KFCResultModel::GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx)
+{
+	if (GroupAt(gContextMenuStoryChapter, gContextMenuStoryGroup) == nil)
+		return false;
+	outChapterIdx = gContextMenuStoryChapter;
+	outGroupIdx = gContextMenuStoryGroup;
+	return true;
+}
+
 KFCResultModel::ChangeOutcome KFCResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -993,6 +1025,68 @@ void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
 		}
 		runStart = runEnd;
 	}
+}
+
+void KFCResultModel::OrderHitsByPage(std::vector<Hit>& hits)
+{
+	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
+	// same page keep their document (walk) order.
+	std::stable_sort(hits.begin(), hits.end(),
+		[](const Hit& a, const Hit& b)
+		{
+			const int32 pa = (a.pageIndex < 0) ? kMaxInt32 : a.pageIndex;
+			const int32 pb = (b.pageIndex < 0) ? kMaxInt32 : b.pageIndex;
+			return pa < pb;
+		});
+	// The within-page ordinals and the locators, numbered the way a replace's report numbers what it
+	// keeps - one definition for both.
+	NumberHitsWithinPages(hits);
+}
+
+int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion)
+{
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return -1;
+	// The chapter's foci name its rows by their index, which is about to change (attached again at the foot).
+	KFCRowFoci::DetachChapter(chapterIdx);
+	// The story's rows out and the walk's in, where its first row stood - the other rows keep their order, so a
+	// page the story shares with others reads as a whole search would list it.
+	std::vector<Hit> hits;
+	hits.reserve(c->hits.size() + storyHits.size());
+	size_t at = c->hits.size() + 1;		// "not seen yet"
+	for (size_t i = 0; i < c->hits.size(); ++i)
+	{
+		if (c->hits[i].storyUID == story)
+		{
+			if (at > c->hits.size())
+				at = hits.size();
+			continue;
+		}
+		hits.push_back(std::move(c->hits[i]));
+	}
+	if (at > hits.size())
+		at = hits.size();
+	hits.insert(hits.begin() + static_cast<std::ptrdiff_t>(at), std::make_move_iterator(storyHits.begin()),
+		std::make_move_iterator(storyHits.end()));
+	storyHits.clear();
+	OrderHitsByPage(hits);
+	c->hits.swap(hits);
+	BuildFontGroups(*c);
+	NumberHitsWithinStories(*c);
+	c->storyVersions[story] = storyVersion;
+	// THE ROWS' PLACES IN THE LIST CHANGED, so whatever names them by index goes: a kept write (a new layout generation -
+	// KFCUndoFollow drops a write whose layout is not the list's, UNDO-14), the right-click targets and the row backup
+	// (Clear's reasons). The chapter's foci come back on the rows as they stand now.
+	gLayoutGeneration = ++gIdCounter;
+	ForgetContextMenus();
+	ForgetRowBackup();
+	KFCRowFoci::AttachChapter(chapterIdx);
+	int32 count = 0;
+	for (size_t i = 0; i < c->hits.size(); ++i)
+		if (c->hits[i].storyUID == story)
+			++count;
+	return count;
 }
 
 void KFCResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)

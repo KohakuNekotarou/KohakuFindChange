@@ -107,6 +107,8 @@ public:
 	/** = KFCSearchEngine::LocateRow (appended) - where a row is now: at its place, moved, found for this jump only, or
 	    not found. */
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) = 0;
+	/** = KFCSearchEngine::SearchStoryAgain (appended) - a story row's Search This Story Again. */
+	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

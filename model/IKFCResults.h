@@ -104,6 +104,10 @@ public:
 	virtual int32 GetChapterReplacedCount(int32 chapterIdx) = 0;
 	virtual int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx) = 0;
 	virtual int32 GetTotalReplacedCount() = 0;
+	/** = KFCResultModel::SetContextMenuStory / GetContextMenuStory (appended) - the story row a right-click menu was
+	    popped over, for its Search This Story Again. */
+	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) = 0;
+	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) = 0;
 };
 
 #endif // __IKFCResults_h__

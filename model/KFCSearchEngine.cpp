@@ -1552,19 +1552,8 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 // needed here. The search's finishing pass.
 void FinalizeHits(std::vector<KFCResultModel::Hit>& hits)
 {
-	// Page order, overset matches to the end (their pageIndex is -1). Stable, so hits on the
-	// same page keep their document (walk) order.
-	std::stable_sort(hits.begin(), hits.end(),
-		[](const KFCResultModel::Hit& a, const KFCResultModel::Hit& b)
-		{
-			const int32 pa = (a.pageIndex < 0) ? kMaxInt32 : a.pageIndex;
-			const int32 pb = (b.pageIndex < 0) ? kMaxInt32 : b.pageIndex;
-			return pa < pb;
-		});
-
-	// The within-page ordinals and the locators, numbered the way a replace's report numbers what it
-	// keeps - one definition for both.
-	KFCResultModel::NumberHitsWithinPages(hits);
+	// The model's one page ordering - Search This Story Again orders a chapter it changes with it too.
+	KFCResultModel::OrderHitsByPage(hits);
 }
 
 // The session's search direction for one tab, through the command the dialog's own radio button
@@ -3735,6 +3724,110 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 	ioStart = toStart;
 	ioEnd = toEnd;
 	return KFCResultModel::kRowElsewhere;
+}
+
+// SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call of 2026-10-09). A story edited since the
+// search refuses its rows' Replace (REP-13 1: its version is not the one KFC recorded); this takes the edit in without
+// searching the whole list again: the story alone is walked with the search's own query and switches - the search's
+// own walk, over one story, with everything a row needs (kHitEverything) - its rows are put in the list as that walk
+// finds them, and its version is recorded (KFCResultModel::ReplaceStoryRows), so they can be replaced. Rows already
+// replaced in it go (the query no longer finds what they wrote - the author's call); the other stories' rows and
+// their state stay.
+// REFUSED when the query changed since the search (the story's rows would be another query's beside the others'), and
+// when the search covered only part of a story (Search: To End of Story / Selection - walking the whole story would
+// list matches the search never looked at). A chapter the search handed back is reopened windowless for the walk and
+// handed back after it, before the rows are put in (its foci then wait for its next open). The list keeps its limit
+// (F9): the story gets the room the other rows leave it.
+bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	outStatus.Append("Search This Story Again: ");
+	const UID story = KFCResultModel::GetGroupStory(chapterIdx, groupIdx);
+	if (story == kInvalidUID)
+	{
+		outStatus.Append("that story row is no longer on the list.");
+		return false;
+	}
+	const KFCResultModel::SearchScopeKind scope = KFCResultModel::GetSearchScope();
+	if (scope == KFCResultModel::kScopeToEndOfStory || scope == KFCResultModel::kScopeSelection)
+	{
+		outStatus.Append("the search covered part of the story (Search: To End of Story or Selection) - search again.");
+		return false;
+	}
+	// Asked, not refused (QueryUnchangedSinceSearch - RelocateStaleRow's note): nothing is cleared, and the tab the walk
+	// below runs in is stated.
+	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
+	{
+		outStatus.Append("the Find/Change settings have changed since the search - search again.");
+		return false;
+	}
+	// The chapter's document, by its file first (a UIDRef can outlive its document - KFCBookScope::ReachChapterDoc).
+	UIDRef docRef;
+	IDFile file;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCBookScope::ReachChapterDoc(file, docRef))
+	{
+		outStatus.Append("the document of this story could not be opened.");
+		return false;
+	}
+	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
+	IDataBase* const db = docRef.GetDataBase();
+	const bool ours = KFCBookScope::IsHeldDoc(docRef);
+	if (db == nil || !db->IsValidUID(story))
+	{
+		if (ours)
+			(void)KFCBookScope::HandBackHeldDocNow(docRef);
+		outStatus.Append("the story is no longer in its document - search again.");
+		return false;
+	}
+	// The room the list leaves: its limit less every row that is not this story's.
+	int32 storyRows = 0;
+	const int32 chapterRows = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 i = 0; i < chapterRows; ++i)
+	{
+		UID s = kInvalidUID;
+		TextIndex a = kInvalidTextIndex, b = kInvalidTextIndex;
+		uint64 h = 0;
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, a, b, h) && s == story)
+			++storyRows;
+	}
+	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - storyRows);
+	std::vector<KFCResultModel::Hit> hits;
+	bool capped = false;
+	ChapterWalkResult walked = kChapterWalked;
+	{
+		// forward, as the search was
+		KFCForwardSearchScope forward;
+		WalkerScopeOptions scopeOptions;
+		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+		int32 reported = 0;
+		CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(room > 0 ? room : 0), scopeOptions,
+			kHitEverything, hits, capped, walked, nil, 0, 0, 1, reported, UIDRef(db, story));
+	}
+	uint32 version = 0;
+	const bool versionRead = KFCSearchEngine::ReadStoryVersion(db, story, version);
+	// A chapter of ours goes back now - outside any sequence, with the walk over (HandBackHeldDocNow's rule) - and before
+	// the rows go in, so they do not get foci on a document about to close.
+	if (ours)
+		(void)KFCBookScope::HandBackHeldDocNow(docRef);
+	if (walked != kChapterWalked || !versionRead)
+	{
+		outStatus.Append("InDesign's search stopped with an error - the story's rows are left as they were.");
+		return false;
+	}
+	const int32 now = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version);
+	outStatus.Clear();
+	outStatus.Append("Searched this story again: ");
+	outStatus.AppendNumber(now > 0 ? now : 0);
+	outStatus.Append(" match(es).");
+	if (capped)
+		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+	return true;
 }
 
 // End, KFCSearchEngine.cpp.

@@ -351,6 +351,9 @@ namespace KFCResultModel
 	    index's range (the tree asks it of a node before using it). */
 	bool IsStoryGroup(int32 chapterIdx, int32 groupIdx);
 
+	/** The story a story group stands for (FontGroup::story); kInvalidUID for an index out of range. */
+	UID GetGroupStory(int32 chapterIdx, int32 groupIdx);
+
 	// (RowDisplay - everything a hit row needs to draw itself, see GetHitRow: KFCModelTypes.h.)
 
 	/** One row's worth of everything, in a single call.
@@ -408,6 +411,11 @@ namespace KFCResultModel
 	    false when no hit row is stashed or it is out of range. */
 	void SetContextMenuHit(int32 chapterIdx, int32 hitIdx);
 	bool GetContextMenuHit(int32& outChapterIdx, int32& outHitIdx);
+
+	/** The STORY row the right-click menu was popped over (its Search This Story Again acts on it). Cleared with the
+	    result set and by a right-click on any other row; false when no story row is stashed or it is out of range. */
+	void SetContextMenuStory(int32 chapterIdx, int32 groupIdx);
+	bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx);
 
 	/** A row's outcome (kOutcomeNone for an out-of-range index). */
 	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
@@ -537,8 +545,22 @@ namespace KFCResultModel
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
 	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
 	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
-	    apart. Called by the search's page ordering (FinalizeHits, KFCSearchEngine.cpp), its one caller. */
+	    apart. Called by OrderHitsByPage, its one caller. */
 	void NumberHitsWithinPages(std::vector<Hit>& hits);
+
+	/** One chapter's hits put in PAGE order - overset matches (pageIndex -1) to the end, a stable sort, so the hits on
+	    one page keep the order they stand in - and numbered within their pages (NumberHitsWithinPages). The search's
+	    finishing pass (FinalizeHits, KFCSearchEngine.cpp) and ReplaceStoryRows' - one ordering for both. */
+	void OrderHitsByPage(std::vector<Hit>& hits);
+
+	/** SEARCH THIS STORY AGAIN's change to the list (KFCSearchEngine::SearchStoryAgain): the chapter's rows in that story
+	    are replaced by storyHits - the story walked again, in walk order, taken (swapped out) - which stand where the
+	    story's first row stood; the chapter is put in page order again, its story groups and their numbers rebuilt
+	    (BuildFontGroups, Hit::storyOrdinal), and the story's version recorded (storyVersion - the story as KFC knows it
+	    now). The rows' places in the list change, so whatever indexes them is let go: a kept write's rows (the layout
+	    generation moves - KFCUndoFollow drops it, UNDO-14), the right-click targets, the row backup, the chapter's text
+	    foci (attached again, KFCRowFoci). Returns the story's row count now; -1 = no such chapter. */
+	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break

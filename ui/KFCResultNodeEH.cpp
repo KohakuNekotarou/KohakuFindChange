@@ -38,7 +38,8 @@
 //  the user asked for it. (Booked for the double-click interval instead, so that a double click never
 //  flashes one, every single click's marker arrives about half a second after the view has moved.)
 //
-//  RIGHT-click on a hit row pops its menu (Replace); on any other row it does nothing (spec F16). See RButtonDn
+//  RIGHT-click on a hit row pops its menu (Replace), on a story row its menu (Search This Story Again); on any other
+//  row it does nothing (spec F16). See RButtonDn
 //  at the foot of this file.
 //
 //========================================================================================
@@ -261,7 +262,9 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 // component. The clicked row is stashed FIRST - the action is handed no widget context of its own, so the
 // model's context-menu row (KFCResultModel::GetContextMenuHit) is how it learns what the menu was about.
 //
-// The book, document and story rows have no menu (spec F16) - their right-click is taken and does nothing.
+// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call of 2026-10-09), stashed the same
+// way (KFCResultModel::GetContextMenuStory). The book and document rows have no menu (spec F16) - their right-click is
+// taken and does nothing.
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -277,10 +280,19 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		return TreeNodeEventHandler::RButtonDn(e);
 
 	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
+	// The story it names is cleared first, so a story menu item fired later (a script, a shortcut) cannot act on a
+	// story nobody right-clicked this time.
+	KFCResults()->SetContextMenuStory(-1, -1);
 	if (nodeID->IsHitRow())
 	{
 		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
 		PopRowMenu(kKFCResultHitMenuName, e, this);
+	}
+	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
+	{
+		// A STORY row: its own menu (Search This Story Again - the author's call of 2026-10-09).
+		KFCResults()->SetContextMenuStory(nodeID->GetChapter(), nodeID->GetFont());
+		PopRowMenu(kKFCResultStoryMenuName, e, this);
 	}
 	return kTrue;
 }

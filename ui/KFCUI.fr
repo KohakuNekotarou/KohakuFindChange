@@ -655,6 +655,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCReplaceHitMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- A story row's right-click menu -----
+		// Popped by KFCResultNodeEH::RButtonDn over a story row: Search This Story Again walks that story alone with
+		// the search's query and puts its rows back (KFCSearchEngine::SearchStoryAgain).
+		kKFCSearchStoryAgainActionID,
+		kKFCResultStoryMenuName
+		kKFCSearchStoryAgainMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -866,6 +874,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCReplaceHitActionID,
 		kKFCReplaceHitMenuKey,			// "Replace"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Search This Story Again - a story row's right-click menu (the author's call of 2026-10-09).
+		// kCustomEnabling: UpdateActionStates greys it while no story row is stashed or a run is up.
+		kKFCActionComponentBoss,
+		kKFCSearchStoryAgainActionID,
+		kKFCSearchStoryAgainMenuKey,	// "Search This Story Again"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

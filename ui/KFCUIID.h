@@ -295,6 +295,11 @@ DECLARE_PMID(kActionIDSpace, kKFCRunSavedQueriesActionID, kKFCUIPrefix + 48)
 // Find/Change Selected Documents (Book) (the query dialog's spec, G9): a toggle - with Book Scope on, a run takes only
 // the documents selected in the Book panel (KFCBookScope::IsSelectedDocumentsOn). Grey with Book Scope off.
 DECLARE_PMID(kActionIDSpace, kKFCSelectedDocumentsActionID, kKFCUIPrefix + 49)
+// "Search This Story Again" on a STORY row's right-click menu (the author's call of 2026-10-09): that story alone walked
+// again with the search's query, its rows put back and its version recorded, so a story edited since the search can be
+// replaced in again (KFCSearchEngine::SearchStoryAgain). + 50: the next after the highest spent (+ 30 ... + 34, the
+// story row's earlier items, are retired and never reused).
+DECLARE_PMID(kActionIDSpace, kKFCSearchStoryAgainActionID, kKFCUIPrefix + 50)
 
 
 // WidgetIDs:
@@ -394,6 +399,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCClearResultsMenuKey			kKFCStringPrefix "kKFCClearResultsMenuKey"
 // The hit row's own right-click menu.
 #define kKFCReplaceHitMenuKey			kKFCStringPrefix "kKFCReplaceHitMenuKey"
+// The story row's own right-click menu.
+#define kKFCSearchStoryAgainMenuKey		kKFCStringPrefix "kKFCSearchStoryAgainMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
 // half's Undo names (kKFCReplaceStepKey and friends, KFCID.h) and this page's body.
@@ -453,9 +460,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // KFCResultNodeEH::RButtonDn pops the MenuDef subtree of this name at the cursor with
 // IMenuManager::HandlePopupMenu - the same machinery as the real Links / Layers panel row menus, and
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a
-// plain literal rather than a translated key. (The book / document rows' "KFCRtMenuResultRow" and the
-// story rows' "KFCRtMenuResultStory" went with Change Checked - spec F16.)
+// plain literal rather than a translated key. (The book / document rows' "KFCRtMenuResultRow" went with Change
+// Checked - spec F16 - and so did the story rows' first menu, Replace / Check All / Uncheck All.)
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
+// The STORY rows' right-click menu (Search This Story Again - the author's call of 2026-10-09), popped the same way.
+#define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
 
 // Menu item positions:
 //
@@ -516,6 +525,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 
 // The hit row's menu: Replace.
 #define kKFCReplaceHitMenuItemPosition		0.5
+// The story row's menu: Search This Story Again.
+#define kKFCSearchStoryAgainMenuItemPosition	0.5
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

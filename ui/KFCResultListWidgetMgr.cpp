@@ -953,4 +953,17 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStat
 	return wrote;
 }
 
+bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
+{
+	if (RefusedWhileRunning())
+		return false;
+	PMString status;
+	const bool done = KFCRuns()->SearchStoryAgain(chapterIdx, groupIdx, status);
+	// Rebuilt, not repainted: the story's rows were put back, and every row after them in the chapter has another place.
+	if (done)
+		Rebuild();
+	ShowStatus(status);
+	return done;
+}
+
 // End, KFCResultListWidgetMgr.cpp.
