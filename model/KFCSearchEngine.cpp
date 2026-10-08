@@ -39,6 +39,8 @@
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
 #include "IWalkerScopeFactoryUtils.h"
+#include "ITextFocusList.h"			// a searched part walked again: a focus is its own focus list (QueryPartScope)
+#include "ITextFocusManager.h"		// the focus that walk is given (TempFocus)
 #include "ISession.h"				// GetExecutionContextSession
 #include "IStoryList.h"				// GetUserAccessibleStoryCount - how many stories a walk will visit
 // For naming the page a match sits on (the "P<page>(<n>)" hit-row locator):
@@ -1145,6 +1147,271 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 	KFC_SPENT(gBuildHitTimes.place, cPlace);
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// THE PART OF A STORY A SEARCH OVER PART OF A STORY WALKS (Search: To End of Story / Selection) - kept for Search This
+// Story Again (the author's idea of 2026-10-09: "keep where the search started with a text focus").
+//
+// MEASURED FIRST (2026-10-09, a test build's walks - docs/ai-notes/kfc-story-search-again-part-2026-10-09.md): the scope
+// InDesign builds for these holds the part as STRETCHES OF TEXT, IN THE ORDER ITS WALKER TAKES THEM - one for plain text
+// ([7,31) from a text cursor to the story's end, [7,20) a selection), and around a table one up to its anchor, one for
+// its cells, one after it ([7,16) [33,52) [16,33)); table cells selected over two rows are two stretches with a cell
+// between them ([22,33) [42,53)). The factory's own forms build the same stretches from the part's start (and end) -
+// QueryPartScope - which is what lets the part be walked again on its own; whether they do for this search is checked
+// against InDesign's stretches when it ends (MakeSearchedRange).
+
+// One stretch of a walk scope.
+struct ScopePiece
+{
+	IDataBase*	db;
+	UID			story;
+	TextIndex	start;
+	TextIndex	end;
+	ScopePiece() : db(nil), story(kInvalidUID), start(kInvalidTextIndex), end(kInvalidTextIndex) {}
+};
+const int32 kMaxScopePieces = 10000;
+
+// THE STRETCHES A WALK SCOPE HOLDS, in its walker's order: a cursor of the scope's own stepped through it
+// (ITextWalkerScope::GetNewCursor, MoveToNextRange / MoveToNextStory / MoveToNextDoc; each stretch read as spellpanel
+// reads its walker's, GetCursorRange - SpellWordObserver.cpp:318). The stepping has no example in the SDK: the order is
+// the spike's measurement, the walker meeting the same stretches match by match. false = a stretch with no range, or
+// more than kMaxScopePieces - out is emptied, and nothing is built on it.
+bool ListScopePieces(ITextWalkerScope* scope, std::vector<ScopePiece>& out)
+{
+	out.clear();
+	if (scope == nil)
+		return false;
+	if (scope->IsEmpty())
+		return true;
+	void* const cursor = scope->GetNewCursor(nil);
+	if (cursor == nil)
+		return false;
+	bool read = true;
+	while (true)
+	{
+		ITextFocus* const range = scope->GetCursorRange(cursor, nil, nil);		// the scope's own - not AddRef'd
+		if (range == nil || static_cast<int32>(out.size()) >= kMaxScopePieces)
+		{
+			read = false;
+			break;
+		}
+		ScopePiece piece;
+		piece.db = scope->GetCursorDoc(cursor).GetDataBase();
+		piece.story = scope->GetCursorStory(cursor);
+		const RangeData r = range->GetCurrentRange();
+		piece.start = r.Start(nil);
+		piece.end = r.End();
+		out.push_back(piece);
+		if (!scope->MoveToNextRange(cursor) && !scope->MoveToNextStory(cursor) && !scope->MoveToNextDoc(cursor))
+			break;
+	}
+	scope->ReleaseCursor(cursor);
+	if (!read)
+		out.clear();
+	return read;
+}
+
+bool SameStretches(const std::vector<ScopePiece>& a, const std::vector<ScopePiece>& b)
+{
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); ++i)
+		if (a[i].story != b[i].story || a[i].start != b[i].start || a[i].end != b[i].end)
+			return false;
+	return true;
+}
+
+// A FOCUS OF KFC'S OWN FOR AS LONG AS A WALK NEEDS IT (QueryPartScope's Selection form): made on the story's manager the
+// way SnpManipulateTextModel.cpp:475 makes one (ITextFocusManager::NewFocus - AddRef'd), let go with this object
+// (RemoveFocus, then Release). It does not dirty the document or add an undo step (spike row 1).
+class TempFocus
+{
+public:
+	TempFocus() : fFocus(nil) {}
+	~TempFocus() { Let(); }
+	ITextFocus* Make(ITextModel* model, TextIndex start, TextIndex end)
+	{
+		Let();
+		InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
+		if (mgr == nil || start < 0 || end < start || end > model->TotalLength())
+			return nil;
+		// a caret for an empty stretch (RangeData.h: a two-index range is not to be empty)
+		fFocus = mgr->NewFocus((start == end) ? RangeData(start, RangeData::kLeanForward)
+			: RangeData(start, end, RangeData::kLeanForward), kInvalidClass);
+		if (fFocus != nil)
+			fManager.reset(mgr.forget());
+		return fFocus;
+	}
+private:
+	void Let()
+	{
+		if (fFocus != nil)
+		{
+			if (fManager != nil)
+				fManager->RemoveFocus(fFocus);
+			fFocus->Release();
+			fFocus = nil;
+		}
+		fManager.reset(nil);
+	}
+	ITextFocus*						fFocus;
+	InterfacePtr<ITextFocusManager>	fManager;
+	TempFocus(const TempFocus&);
+	TempFocus& operator=(const TempFocus&);
+};
+
+// THE WALK SCOPE OF A SEARCHED PART, built the way InDesign builds its own (above): To End of Story = the factory's To End
+// form from a caret at the part's start (IWalkerScopeFactoryUtils::QueryToEndOfStoryWalkerScope - what a text cursor
+// gives the dialog's scope); Selection = its focus-list form over a focus on [start, end), asked to take in the tables
+// and footnotes inside it as InDesign's Selection walk does (collectStoryRanges, IWalkerScopeFactoryUtils.h:125 - a
+// kTextFocusBoss is its own ITextFocusList). focus keeps that focus for as long as the scope is walked. nil = not built.
+ITextWalkerScope* QueryPartScope(const UIDRef& storyRef, KFCResultModel::SearchScopeKind kind, TextIndex start,
+	TextIndex end, const WalkerScopeOptions& options, TempFocus& focus)
+{
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (model == nil || start < 0 || start > model->TotalLength())
+		return nil;
+	if (kind == KFCResultModel::kScopeToEndOfStory)
+	{
+		Text::StoryRangeList from;
+		from.push_back(Text::StoryRange(RangeData(start, RangeData::kLeanForward)));
+		return Utils<IWalkerScopeFactoryUtils>()->QueryToEndOfStoryWalkerScope(storyRef, from, options);
+	}
+	InterfacePtr<ITextFocusList> list(focus.Make(model, start, end), UseDefaultIID());
+	if (list == nil)
+		return nil;
+	return Utils<IWalkerScopeFactoryUtils>()->QueryFocusListWalkerScope(list, options, kTrue);
+}
+
+// THE SEARCHED PART OF ONE STORY, recorded when the search ends (KFCResultModel::SearchedRange): InDesign's stretches in
+// that story (pieces - read from its scope before the walk) made a start, and for Selection an end - the first
+// stretch's start and the last one's end, a table's cells coming between the text around its anchor in the walker's
+// order - then built again the factory's way (QueryPartScope): walkable only when that gives InDesign's stretches back
+// exactly (not table cells selected over two rows: [first, last) would take in the cells between). With the text just
+// outside each edge.
+KFCResultModel::SearchedRange MakeSearchedRange(IDataBase* db, UID story, KFCResultModel::SearchScopeKind kind,
+	const std::vector<ScopePiece>& pieces, const WalkerScopeOptions& options)
+{
+	KFCResultModel::SearchedRange part;
+	std::vector<ScopePiece> own;
+	for (size_t i = 0; i < pieces.size(); ++i)
+		if (pieces[i].db == db && pieces[i].story == story)
+			own.push_back(pieces[i]);
+	const UIDRef storyRef(db, story);
+	InterfacePtr<ITextModel> model(storyRef, UseDefaultIID());
+	if (own.empty() || model == nil || !KFCSearchEngine::ReadStoryVersion(db, story, part.version))
+		return part;
+	part.start = own.front().start;
+	part.end = (kind == KFCResultModel::kScopeToEndOfStory) ? part.start : own.back().end;	// To End: its focus is a caret
+	if (part.start < 0 || part.end < part.start)
+		return part;
+	TempFocus focus;
+	InterfacePtr<ITextWalkerScope> again(QueryPartScope(storyRef, kind, part.start, part.end, options, focus));
+	std::vector<ScopePiece> againPieces;
+	part.walkable = (again != nil) && ListScopePieces(again, againPieces) && SameStretches(againPieces, own);
+	const TextIndex from = (part.start > KFCResultModel::kSearchedEdgeChars) ? part.start - KFCResultModel::kSearchedEdgeChars : 0;
+	part.before = KFCSearchEngine::ReadText(storyRef, from, part.start - from);
+	if (kind == KFCResultModel::kScopeSelection)
+		part.after = KFCSearchEngine::ReadText(storyRef, part.end, KFCResultModel::kSearchedEdgeChars);
+	KFC_DIAG_LOG("PARTRECORDED story=%u stretches=%d start=%d end=%d walkable=%d version=%u", story.Get(), (int)own.size(),
+		(int)part.start, (int)part.end, part.walkable ? 1 : 0, part.version);
+	return part;
+}
+
+// A stretch of a story's text as code points - one per TextIndex (memory textindex-counts-code-points).
+std::vector<uint32> CodePointsAt(ITextModel* model, TextIndex at, int32 len)
+{
+	std::vector<uint32> out;
+	if (model == nil || len <= 0 || at < 0 || at >= model->TotalLength())
+		return out;
+	const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
+	WideString w;
+	TextIterator it(model, at);
+	it.AppendToStringAndIncrement(&w, n);
+	out.reserve(n);
+	for (WideString::const_iterator c = w.begin(); c != w.end(); ++c)
+		out.push_back(static_cast<uint32>(*c));
+	return out;
+}
+
+std::vector<uint32> CodePointsOf(const PMString& s)
+{
+	std::vector<uint32> out;
+	const WideString w(s);
+	for (WideString::const_iterator c = w.begin(); c != w.end(); ++c)
+		out.push_back(static_cast<uint32>(*c));
+	return out;
+}
+
+// WHERE ONE EDGE OF A SEARCHED PART IS NOW: the place nearest `from` - kSearchedEdgeSlack characters either way at most -
+// where the text just outside the edge reads `outside`: before the place for a start, after it for an end. An empty
+// `outside` is the story's start (a start) or its end (an end). -1 = nowhere that near, or two places as near.
+const int32 kSearchedEdgeSlack = 4096;
+TextIndex EdgeAt(ITextModel* model, TextIndex from, const PMString& outside, bool isStart)
+{
+	const TextIndex total = model->TotalLength();
+	if (outside.IsEmpty())
+		return isStart ? 0 : total;
+	const std::vector<uint32> want = CodePointsOf(outside);
+	const int32 n = static_cast<int32>(want.size());
+	if (from < 0)
+		from = 0;
+	if (from > total)
+		from = total;
+	const TextIndex lo = (from > kSearchedEdgeSlack + n) ? from - kSearchedEdgeSlack - n : 0;
+	const TextIndex hi = (total - from > kSearchedEdgeSlack + n) ? from + kSearchedEdgeSlack + n : total;
+	const std::vector<uint32> text = CodePointsAt(model, lo, hi - lo);
+	TextIndex best = -1;
+	int32 bestDistance = kSearchedEdgeSlack + 1;
+	bool tie = false;
+	for (int32 i = 0; i + n <= static_cast<int32>(text.size()); ++i)
+	{
+		int32 k = 0;
+		while (k < n && text[i + k] == want[k])
+			++k;
+		if (k < n)
+			continue;
+		const TextIndex edge = lo + i + (isStart ? n : 0);
+		const int32 distance = (edge > from) ? edge - from : from - edge;
+		if (distance < bestDistance)
+		{
+			best = edge;
+			bestDistance = distance;
+			tie = false;
+		}
+		else if (distance == bestDistance && edge != best)
+			tie = true;
+	}
+	return tie ? -1 : best;
+}
+
+// WHERE A STORY'S SEARCHED PART IS NOW (Search This Story Again over part of a story) - from where it is believed to be:
+// its recorded place while the story is at the version that place was taken at (an Undo back to it included, which a
+// focus does not follow - spike row 8), its focus otherwise (it follows the edits since, KFC's own writes among them),
+// the recorded place when it has none; each edge then put where the text just outside it still reads as it did, the
+// nearest such place (EdgeAt) - so a focus an Undo left behind lands back on its edge, and text typed right at an edge
+// joins the part. false = an edge cannot be told (the text just outside it was rewritten).
+bool FindSearchedPartAgain(int32 chapterIdx, IDataBase* db, UID story, KFCResultModel::SearchScopeKind kind,
+	const KFCResultModel::SearchedRange& part, TextIndex& outStart, TextIndex& outEnd)
+{
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	uint32 now = 0;
+	if (model == nil || !KFCSearchEngine::ReadStoryVersion(db, story, now))
+		return false;
+	TextIndex fromStart = part.start, fromEnd = part.end;
+	TextIndex focusStart = kInvalidTextIndex, focusEnd = kInvalidTextIndex;
+	const bool byFocus = (now != part.version) && KFCRowFoci::CurrentSearchedRange(chapterIdx, story, db, focusStart, focusEnd);
+	if (byFocus)
+	{
+		fromStart = focusStart;
+		fromEnd = focusEnd;
+	}
+	outStart = EdgeAt(model, fromStart, part.before, true);
+	outEnd = (kind == KFCResultModel::kScopeSelection) ? EdgeAt(model, fromEnd, part.after, false) : outStart;
+	KFC_DIAG_LOG("PARTFOUND story=%u from=[%d,%d) by=%s found=[%d,%d)", story.Get(), (int)fromStart, (int)fromEnd,
+		byFocus ? "focus" : ((now == part.version) ? "record" : "record-no-focus"), (int)outStart, (int)outEnd);
+	return outStart >= 0 && outEnd >= outStart;
+}
+
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
 // Read-only: the whole walk sits inside a SaveRestoreModifiedState dirty guard, so a windowless
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
@@ -1181,13 +1448,18 @@ void BuildHit(const UIDRef& docRef, const UIDRef& storyRef, TextIndex start, Tex
 // the caret's order).
 // kEmptyScope (the default) = docRef / onlyStory: a document, a book's chapter, or one story - from the top.
 // outHitDBs is filled on either path.
+//
+// outPieces (a Search: walk only): the stretches InDesign's scope holds (ListScopePieces) - what a search over part of a
+// story records (MakeSearchedRange). givenScope: walk this scope instead (a story's searched part, Search This Story
+// Again - QueryPartScope), docRef being the document it is in.
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KFCResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
 	KFCProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
 	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull,
 	IWalkerScopeFactoryUtils::WalkScopeType searchScope = IWalkerScopeFactoryUtils::kEmptyScope,
-	std::vector<IDataBase*>* outHitDBs = nil)
+	std::vector<IDataBase*>* outHitDBs = nil, std::vector<ScopePiece>* outPieces = nil,
+	ITextWalkerScope* givenScope = nil)
 {
 	outResult = kChapterWalked;
 	const bool bySearchScope = (searchScope != IWalkerScopeFactoryUtils::kEmptyScope);
@@ -1268,11 +1540,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// IWalkerScopeFactoryUtils.h:102-109 documents for it (one story by the story form beside it) - what
 	// stands behind those two is the header's contract, not a worked example. (Grepped: the only callers in
 	// the SDK tree are ours - this file, KFCReplaceEngine and KESCL.)
-	InterfacePtr<ITextWalkerScope> scope(bySearchScope
+	// (A given scope - a searched part's, QueryPartScope - is the caller's: the reference the InterfacePtr gives back is
+	// taken here.)
+	if (givenScope != nil)
+		givenScope->AddRef();
+	InterfacePtr<ITextWalkerScope> scope((givenScope != nil) ? givenScope : (bySearchScope
 		? Utils<IWalkerScopeFactoryUtils>()->QueryWalkerScope_UsingSelections(searchScope, scopeOptions)
 		: (onlyStory == UIDRef::gNull
 			? Utils<IWalkerScopeFactoryUtils>()->QueryDocumentWalkerScope(docRef, scopeOptions)
-			: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions)));
+			: Utils<IWalkerScopeFactoryUtils>()->QueryStoryWalkerScope(onlyStory, scopeOptions))));
 	if (scope == nil)
 	{
 		outResult = kChapterNoScope;
@@ -1335,6 +1611,15 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// there is no window in which anything could move. (Not an oversight - checked, so the next reader
 	// does not have to work it out.)
 	const TextWalkerSelections_CriticalSection criticalSection(selUtils);
+
+	// The stretches InDesign's scope holds, read before the walk moves it (a search over part of a story records them -
+	// MakeSearchedRange): where the spike read them.
+	if (outPieces != nil)
+	{
+		(void)ListScopePieces(scope, *outPieces);
+		KFC_DIAG_LOG("PARTPIECES stretches=%d first=[%d,%d)", (int)outPieces->size(),
+			outPieces->empty() ? -1 : (int)outPieces->front().start, outPieces->empty() ? -1 : (int)outPieces->front().end);
+	}
 
 	// What each document's frames and stories answer about the hits inside them - see WalkCache. One per
 	// document: a Search: walk of All Documents meets several, and UIDs mean nothing across them.
@@ -2337,7 +2622,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// nobody sees. Handed over rather than copied: the model takes the hits and leaves the Chapter empty
 	// (the count is taken before the handover).
 	auto fileChapter = [&](const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
-		std::map<UID, uint32>& storyVersions)
+		std::map<UID, uint32>& storyVersions, std::map<UID, KFCResultModel::SearchedRange>* parts)
 	{
 		FinalizeHits(hits);
 		KFCResultModel::Chapter chapter;
@@ -2347,6 +2632,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		chapter.file = target.file;
 		chapter.hits.swap(hits);
 		chapter.storyVersions.swap(storyVersions);
+		if (parts != nil)
+			chapter.searchedRanges.swap(*parts);
 		total += static_cast<int32>(chapter.hits.size());
 		++chaptersWithHits;
 		KFCResultModel::AppendChapter(std::move(chapter));
@@ -2411,6 +2698,12 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		std::vector<KFCResultModel::Hit> hits;
 		std::vector<IDataBase*> hitDBs;
 		const size_t limit = static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit);
+		// A search over part of a story (To End of Story, Selection): the stretches InDesign's scope holds.
+		const bool overPart = !allDocuments && (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope
+			|| selectionScope == IWalkerScopeFactoryUtils::kSelectionScope);
+		const KFCResultModel::SearchScopeKind partKind = (selectionScope == IWalkerScopeFactoryUtils::kToEndOfStoryScope)
+			? KFCResultModel::kScopeToEndOfStory : KFCResultModel::kScopeSelection;
+		std::vector<ScopePiece> partPieces;
 		if (progressBar.WasCancelled(kFalse))
 			cancelled = true;
 		else if (allDocuments)
@@ -2479,9 +2772,11 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			}
 			else
 			{
+				// To End of Story, Selection: InDesign's stretches too - the part each story's rows came from, kept for
+				// Search This Story Again (MakeSearchedRange, below).
 				CollectHitsInDoc(UIDRef::gNull, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
 					&progressBar, 0, progressTotal, storiesTotal, progressReported, UIDRef::gNull, selectionScope,
-					&hitDBs);
+					&hitDBs, overPart ? &partPieces : nil);
 			}
 			if (capped)
 				collectionTruncated = true;
@@ -2518,7 +2813,16 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 					continue;
 				std::map<UID, uint32> storyVersions;
 				readStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
-				fileChapter(targets[t], perTarget[t], storyVersions);
+				// The searched part of each story holding a row (a search over part of a story).
+				std::map<UID, KFCResultModel::SearchedRange> parts;
+				for (size_t h = 0; overPart && h < perTarget[t].size(); ++h)
+				{
+					const UID story = perTarget[t][h].storyUID;
+					if (story != kInvalidUID && parts.count(story) == 0)
+						parts[story] = MakeSearchedRange(targets[t].docRef.GetDataBase(), story, partKind, partPieces,
+							scopeOptions);
+				}
+				fileChapter(targets[t], perTarget[t], storyVersions, &parts);
 			}
 		}
 	}
@@ -2657,7 +2961,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		if (hits.empty())
 			continue;
 
-		fileChapter(targets[i], hits, storyVersions);
+		fileChapter(targets[i], hits, storyVersions, nil);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
@@ -3733,9 +4037,13 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 // finds them, and its version is recorded (KFCResultModel::ReplaceStoryRows), so they can be replaced. Rows already
 // replaced in it go (the query no longer finds what they wrote - the author's call); the other stories' rows and
 // their state stay.
-// REFUSED when the query changed since the search (the story's rows would be another query's beside the others'), and
-// when the search covered only part of a story (Search: To End of Story / Selection - walking the whole story would
-// list matches the search never looked at). A chapter the search handed back is reopened windowless for the walk and
+// REFUSED when the query changed since the search (the story's rows would be another query's beside the others').
+// A SEARCH OVER PART OF A STORY (Search: To End of Story / Selection - the author's idea of 2026-10-09: "keep where the
+// search started with a text focus") walks that part again, not the whole story - the part the search recorded
+// (KFCResultModel::SearchedRange), found again where the story stands now (FindSearchedPartAgain) and walked the way
+// InDesign walks its own (QueryPartScope); then recorded again where it was found. Refused when the part cannot be
+// walked on its own (InDesign walked it as separate stretches - MakeSearchedRange) or its edges cannot be told (the
+// text just outside one was rewritten). A chapter the search handed back is reopened windowless for the walk and
 // handed back after it, before the rows are put in (its foci then wait for its next open). The list keeps its limit
 // (F9): the story gets the room the other rows leave it.
 bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus)
@@ -3755,9 +4063,12 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		return false;
 	}
 	const KFCResultModel::SearchScopeKind scope = KFCResultModel::GetSearchScope();
-	if (scope == KFCResultModel::kScopeToEndOfStory || scope == KFCResultModel::kScopeSelection)
+	const bool overPart = (scope == KFCResultModel::kScopeToEndOfStory || scope == KFCResultModel::kScopeSelection);
+	KFCResultModel::SearchedRange part;
+	if (overPart && (!KFCResultModel::GetSearchedRange(chapterIdx, story, part) || !part.walkable))
 	{
-		outStatus.Append("the search covered part of the story (Search: To End of Story or Selection) - search again.");
+		outStatus.Append("the part of this story the search covered cannot be searched again on its own (separate stretches, "
+			"such as table cells selected over more than one row) - search again.");
 		return false;
 	}
 	// Asked, not refused (QueryUnchangedSinceSearch - RelocateStaleRow's note): nothing is cleared, and the tab the walk
@@ -3797,6 +4108,15 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 			++storyRows;
 	}
 	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - storyRows);
+	// The searched part, where it stands now.
+	TextIndex partStart = kInvalidTextIndex, partEnd = kInvalidTextIndex;
+	if (overPart && !FindSearchedPartAgain(chapterIdx, db, story, scope, part, partStart, partEnd))
+	{
+		if (ours)
+			(void)KFCBookScope::HandBackHeldDocNow(docRef);
+		outStatus.Append("the text at the edge of the searched part of this story has changed - search again.");
+		return false;
+	}
 	std::vector<KFCResultModel::Hit> hits;
 	bool capped = false;
 	ChapterWalkResult walked = kChapterWalked;
@@ -3806,8 +4126,16 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 		int32 reported = 0;
-		CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(room > 0 ? room : 0), scopeOptions,
-			kHitEverything, hits, capped, walked, nil, 0, 0, 1, reported, UIDRef(db, story));
+		// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
+		TempFocus partFocus;
+		InterfacePtr<ITextWalkerScope> partScope(overPart
+			? QueryPartScope(UIDRef(db, story), scope, partStart, partEnd, scopeOptions, partFocus) : nil);
+		if (overPart && partScope == nil)
+			walked = kChapterNoScope;
+		else
+			CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(room > 0 ? room : 0), scopeOptions,
+				kHitEverything, hits, capped, walked, nil, 0, 0, 1, reported, UIDRef(db, story),
+				IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, partScope);
 	}
 	uint32 version = 0;
 	const bool versionRead = KFCSearchEngine::ReadStoryVersion(db, story, version);
@@ -3819,6 +4147,15 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	{
 		outStatus.Append("InDesign's search stopped with an error - the story's rows are left as they were.");
 		return false;
+	}
+	// The part recorded where it was found, at the version it was walked at - before the rows go in, whose foci come
+	// back with it (ReplaceStoryRows - KFCRowFoci::AttachChapter).
+	if (overPart)
+	{
+		part.start = partStart;
+		part.end = partEnd;
+		part.version = version;
+		KFCResultModel::SetSearchedRange(chapterIdx, story, part);
 	}
 	const int32 now = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version);
 	outStatus.Clear();

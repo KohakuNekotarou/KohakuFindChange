@@ -774,6 +774,32 @@ void KFCResultModel::GetChapterStories(int32 chapterIdx, std::set<UID>& outStori
 				outStories.insert(c->hits[hi].storyUID);
 }
 
+bool KFCResultModel::GetSearchedRange(int32 chapterIdx, UID story, SearchedRange& outRange)
+{
+	const Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return false;
+	const std::map<UID, SearchedRange>::const_iterator it = c->searchedRanges.find(story);
+	if (it == c->searchedRanges.end())
+		return false;
+	outRange = it->second;
+	return true;
+}
+
+void KFCResultModel::SetSearchedRange(int32 chapterIdx, UID story, const SearchedRange& range)
+{
+	if (Chapter* c = ChapterAt(chapterIdx))
+		c->searchedRanges[story] = range;
+}
+
+void KFCResultModel::GetSearchedRangeStories(int32 chapterIdx, std::vector<UID>& outStories)
+{
+	outStories.clear();
+	if (const Chapter* c = ChapterAt(chapterIdx))
+		for (std::map<UID, SearchedRange>::const_iterator it = c->searchedRanges.begin(); it != c->searchedRanges.end(); ++it)
+			outStories.push_back(it->first);
+}
+
 bool KFCResultModel::GetHitFlags(int32 chapterIdx, int32 hitIdx, bool& outReplaced, bool& outLocked)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);

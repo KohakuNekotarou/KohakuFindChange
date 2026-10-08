@@ -42,8 +42,20 @@ namespace KFCRowFoci
 	/** The row's focus put on [start, end) - a place a jump found it at, which is not stored in the row (spec T3). */
 	void MoveTo(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end);
 
-	/** Reanchor for every row of that chapter and story that has a focus. */
+	/** Reanchor for every row of that chapter and story that has a focus - and the story's searched part
+	    (PlaceSearchedRange). */
 	void ReanchorStory(int32 chapterIdx, UID story);
+
+	// THE SEARCHED PART'S FOCUS (a search over part of a story - KFCResultModel::SearchedRange): one per story holding a
+	// row, made and let go with the rows' foci (AttachChapter, DetachChapter, DetachDocument, DetachAll). A hint the same
+	// way: Search This Story Again reads the text just outside it before believing it (KFCSearchEngine).
+
+	/** The part's focus range now - false when it has none in that database, or it is not usable any more. */
+	bool CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db, TextIndex& outStart, TextIndex& outEnd);
+
+	/** The part's focus made, or put back, on its recorded place - when the chapter's document is open and the story is
+	    at the version that place was taken at; nothing otherwise. */
+	void PlaceSearchedRange(int32 chapterIdx, UID story);
 
 	/** The chapter's foci let go (RemoveFocus, Release). */
 	void DetachChapter(int32 chapterIdx);

@@ -40,6 +40,8 @@ struct Kept
 };
 typedef std::pair<int32, int32> RowKey;		// (chapter, hit)
 std::map<RowKey, Kept> gKept;
+typedef std::pair<int32, UID> PartKey;		// (chapter, story) - a story's searched part (KFCResultModel::SearchedRange)
+std::map<PartKey, Kept> gParts;
 
 // Is this database an open document's? The document list's own lookup by database: the pointer is compared, never
 // read through (KFCBookScope::IsDocStillOpen asks the same for a UIDRef).
@@ -94,10 +96,9 @@ bool StoredPlace(int32 chapterIdx, int32 hitIdx, UID& outStory, TextIndex& outSt
 }
 
 // The kept focus, still usable: its document open, its story there, the focus in its story's manager and on that
-// story's model. Anything else lets it go and answers nil.
-ITextFocus* Usable(std::map<RowKey, Kept>::iterator it)
+// story's model. Anything else lets it go (the caller drops it from its map) and answers nil.
+ITextFocus* StillUsable(Kept& k)
 {
-	Kept& k = it->second;
 	if (k.focus != nil && DocOpen(k.db) && k.db->IsValidUID(k.story))
 	{
 		InterfacePtr<ITextModel> model(k.db, k.story, UseDefaultIID());
@@ -107,8 +108,75 @@ ITextFocus* Usable(std::map<RowKey, Kept>::iterator it)
 			return k.focus;
 	}
 	Let(k);
-	gKept.erase(it);
 	return nil;
+}
+
+ITextFocus* Usable(std::map<RowKey, Kept>::iterator it)
+{
+	ITextFocus* f = StillUsable(it->second);
+	if (f == nil)
+		gKept.erase(it);
+	return f;
+}
+
+// A focus's range: a caret where the part is empty (RangeData.h: a two-index range must not be empty).
+RangeData FocusRange(TextIndex start, TextIndex end)
+{
+	return (start == end) ? RangeData(start, RangeData::kLeanForward) : RangeData(start, end, RangeData::kLeanForward);
+}
+
+// The story's searched part given its focus in db, on its recorded place (PlaceSearchedRange) - made, moved, or left
+// as it is.
+void PlacePart(int32 chapterIdx, UID story, IDataBase* db)
+{
+	KFCResultModel::SearchedRange part;
+	if (db == nil || !KFCResultModel::GetSearchedRange(chapterIdx, story, part) || !part.walkable || !db->IsValidUID(story))
+		return;
+	uint32 now = 0;
+	if (!KFCSearchEngine::ReadStoryVersion(db, story, now) || now != part.version)
+		return;		// the recorded place is not exact for the story as it stands (T5's rule for the rows)
+	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());
+	InterfacePtr<ITextFocusManager> mgr(model, UseDefaultIID());
+	if (model == nil || mgr == nil || part.start < 0 || part.end < part.start || part.end > model->TotalLength())
+		return;
+	const PartKey key(chapterIdx, story);
+	std::map<PartKey, Kept>::iterator had = gParts.find(key);
+	if (had != gParts.end())
+	{
+		ITextFocus* f = (had->second.db == db) ? StillUsable(had->second) : nil;
+		if (f != nil)
+		{
+			const RangeData r = f->GetCurrentRange();
+			if (r.Start(nil) != part.start || r.End() != part.end)
+				f->SetRange(kFalse, FocusRange(part.start, part.end));
+			return;
+		}
+		Let(had->second);		// one from another database, or no longer usable
+		gParts.erase(had);
+	}
+	ITextFocus* f = mgr->NewFocus(FocusRange(part.start, part.end), kInvalidClass);	// AddRef'd
+	if (f == nil)
+		return;
+	Kept k;
+	k.focus = f;
+	k.db = db;
+	k.story = story;
+	gParts[key] = k;
+}
+
+// Every part focus of that chapter let go (DetachChapter), or of that database (DetachDocument), or all (-1 / nil).
+void LetParts(int32 chapterIdx, IDataBase* db, bool all)
+{
+	for (std::map<PartKey, Kept>::iterator it = gParts.begin(); it != gParts.end(); )
+	{
+		if (all || (db != nil && it->second.db == db) || (db == nil && it->first.first == chapterIdx))
+		{
+			Let(it->second);
+			it = gParts.erase(it);
+		}
+		else
+			++it;
+	}
 }
 }	// anonymous namespace
 
@@ -167,6 +235,11 @@ void KFCRowFoci::AttachChapter(int32 chapterIdx)
 		k.story = story;
 		gKept[key] = k;
 	}
+	// The searched part of each story, after a search over part of a story - on the same terms.
+	std::vector<UID> parts;
+	KFCResultModel::GetSearchedRangeStories(chapterIdx, parts);
+	for (size_t i = 0; i < parts.size(); ++i)
+		PlacePart(chapterIdx, parts[i], db);
 }
 
 void KFCRowFoci::AttachOpenChapters()
@@ -231,6 +304,37 @@ void KFCRowFoci::ReanchorStory(int32 chapterIdx, UID story)
 			rows.push_back(it->first.second);
 	for (size_t i = 0; i < rows.size(); ++i)
 		Reanchor(chapterIdx, rows[i]);
+	PlaceSearchedRange(chapterIdx, story);
+}
+
+bool KFCRowFoci::CurrentSearchedRange(int32 chapterIdx, UID story, IDataBase* db, TextIndex& outStart, TextIndex& outEnd)
+{
+	if (!IDThreading::IsMainThreadDomain())
+		return false;
+	std::map<PartKey, Kept>::iterator it = gParts.find(PartKey(chapterIdx, story));
+	if (it == gParts.end() || it->second.db != db)
+		return false;
+	ITextFocus* f = StillUsable(it->second);
+	if (f == nil)
+	{
+		gParts.erase(it);
+		return false;
+	}
+	const RangeData r = f->GetCurrentRange();
+	outStart = r.Start(nil);
+	outEnd = r.End();
+	return true;
+}
+
+void KFCRowFoci::PlaceSearchedRange(int32 chapterIdx, UID story)
+{
+	if (!IDThreading::IsMainThreadDomain())
+		return;
+	// The chapter's document by its file, as AttachChapter finds it.
+	UIDRef docRef;
+	IDFile file;
+	if (KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) && KFCBookScope::FindOpenChapterDoc(file, docRef))
+		PlacePart(chapterIdx, story, docRef.GetDataBase());
 }
 
 void KFCRowFoci::DetachChapter(int32 chapterIdx)
@@ -247,6 +351,7 @@ void KFCRowFoci::DetachChapter(int32 chapterIdx)
 		else
 			++it;
 	}
+	LetParts(chapterIdx, nil, false);
 }
 
 void KFCRowFoci::DetachDocument(IDataBase* db)
@@ -263,6 +368,7 @@ void KFCRowFoci::DetachDocument(IDataBase* db)
 		else
 			++it;
 	}
+	LetParts(-1, db, false);
 }
 
 void KFCRowFoci::DetachAll()
@@ -272,6 +378,7 @@ void KFCRowFoci::DetachAll()
 	for (std::map<RowKey, Kept>::iterator it = gKept.begin(); it != gKept.end(); ++it)
 		Let(it->second);
 	gKept.clear();
+	LetParts(-1, nil, true);
 }
 
 // End, KFCRowFoci.cpp.

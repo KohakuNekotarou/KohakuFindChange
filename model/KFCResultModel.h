@@ -140,6 +140,26 @@ namespace KFCResultModel
 		FontGroup() : story(kInvalidUID) {}
 	};
 
+	/** THE PART OF ONE STORY A SEARCH OVER PART OF A STORY WALKED (Search: To End of Story / Selection - the author's
+	    idea of 2026-10-09: "keep where the search started with a text focus"), for Search This Story Again
+	    (KFCSearchEngine::SearchStoryAgain): to the story's end from `start` (To End of Story), or [start, end)
+	    (Selection) - the stretch InDesign's own scope walked, with the tables and footnotes inside it. With the text
+	    just outside it: what finds its edges again after the story is edited. `start` and `end` are exact while the
+	    story is at `version` (ITextModel::GetChangeCount - an Undo back to it included); the part's text focus
+	    (KFCRowFoci) follows the edits made since. */
+	struct SearchedRange
+	{
+		bool		walkable;	// false: InDesign's walk could not be taken again as one stretch (table cells
+								// selected over more than one row) - the story is not searched again on its own
+		TextIndex	start;
+		TextIndex	end;		// Selection: the part's end; To End of Story: the story's end when it was taken
+		uint32		version;
+		PMString	before;		// up to kSearchedEdgeChars characters just before start; "" = start is the story's start
+		PMString	after;		// Selection: as many just after end; "" = end is the story's end
+		SearchedRange() : walkable(false), start(kInvalidTextIndex), end(kInvalidTextIndex), version(0) {}
+	};
+	enum { kSearchedEdgeChars = 8 };
+
 	/** One chapter that holds at least one hit. */
 	struct Chapter
 	{
@@ -151,6 +171,8 @@ namespace KFCResultModel
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
 		// - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
+		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise.
+		std::map<UID, SearchedRange>	searchedRanges;
 
 		// (No "not reached" mark per chapter for a cancelled replace: a cancel aborts the single sequence
 		// the whole run is wrapped in, so either every chapter was replaced or none was.)
@@ -388,6 +410,14 @@ namespace KFCResultModel
 	/** The stories holding a row of the chapter - one answer for the replace and KFCUndoFollow alike.
 	    Empty for an index out of range. */
 	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
+
+	/** The part of the story a search over part of a story walked (SearchedRange) - false when none is recorded (a
+	    search of whole stories, or an index out of range). */
+	bool GetSearchedRange(int32 chapterIdx, UID story, SearchedRange& outRange);
+	/** Recorded again by Search This Story Again, where it found the part and the version it walked it at. */
+	void SetSearchedRange(int32 chapterIdx, UID story, const SearchedRange& range);
+	/** The stories of the chapter with a searched part - KFCRowFoci gives each part its focus. */
+	void GetSearchedRangeStories(int32 chapterIdx, std::vector<UID>& outStories);
 
 	/** A hit's row flags: already replaced, and locked - both mean "this row's Replace is greyed", for different
 	    reasons. false = index out of range. */
