@@ -87,6 +87,7 @@
 #include "KFCSearchEngine.h"
 #include "KFCBookScope.h"
 #include "KFCResultModel.h"
+#include "KFCRowFoci.h"			// the rows' text foci - attached when a search ends, read and put back by LocateRow
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
 #include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - RelocateStaleRow looks again only under its own query
@@ -3101,6 +3102,10 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append("Search cancelled.");
 		return 0;
 	}
+
+	// THE ROWS' FOCI (spec T6 a): every chapter whose document is still open - the documents of a document-scope search,
+	// a book's chapters the user has open. The chapters a book search opened itself were handed back in the loop.
+	KFCRowFoci::AttachOpenChapters();
 
 	// Every chapter KFC opened has already been handed back inside the loop - a book search leaves
 	// nothing of its own open, and no .indd locked. The rows carry their chapter's file, so a jump

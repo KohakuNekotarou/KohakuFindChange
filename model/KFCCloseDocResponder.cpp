@@ -64,6 +64,7 @@
 #include "KFCHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KFCID.h"
 #include "KFCResultModel.h"
+#include "KFCRowFoci.h"			// DetachDocument - the rows' text foci let go of a closing document
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
 #include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together
@@ -128,6 +129,10 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// for the same reason as the held list: its address can be handed to the next document opened.
 	// State only - the document is on its way out, so nothing is repainted (KFCHitMarker::ForgetDoc).
 	KFCHitMarker::ForgetDoc(closingDocRef.GetDataBase());
+
+	// ...and the rows' text foci on the closing document are let go, for every close and ahead of every exit below: the
+	// document is still alive here (kBeforeCloseDoc) and is not after (KFCRowFoci::DetachDocument).
+	KFCRowFoci::DetachDocument(closingDocRef.GetDataBase());
 
 	// ...and the Undo follow takes its observer off the closing document, for every close and ahead of every
 	// exit (KFCUndoFollow::DocumentClosing): what was attached is detached.

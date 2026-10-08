@@ -23,6 +23,7 @@
 // Project includes:
 #include "KFCDiag.h"	// KFC_DIAG_LOG - a row's outcome as it is set, in a test build (compiled out of a shipping one)
 #include "KFCResultModel.h"
+#include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
 
 namespace
 {
@@ -245,8 +246,9 @@ void KFCResultModel::Clear()
 	gBookName.Clear();
 	gSearchMode = -1;
 	gWalkSignature.Clear();
-	// (Nothing outside this model describes these rows to forget here: the replace checks the stored
-	//  positions against a fresh walk rather than fingerprinting each chapter.)
+	// The rows' text foci go with them (KFCRowFoci - the one thing outside this model that describes these rows; the
+	// replace still checks the stored positions against a fresh walk rather than fingerprinting each chapter).
+	KFCRowFoci::DetachAll();
 	// The right-click target is an index into the chapters that just went away - keeping it would let
 	// the next list's Replace reach a row the user never right-clicked.
 	ForgetContextMenus();
@@ -319,6 +321,8 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 	Chapter* c = ChapterAt(chapterIdx);
 	if (c == nil)
 		return;
+	// Its rows' text foci go first - their document is still open here (All Documents' close responder).
+	KFCRowFoci::DetachChapter(chapterIdx);
 	// Emptied and unbound, in place (see the header for why the place is kept).
 	EmptyChapter(*c);
 	// A right-click target inside it names rows that are gone.
@@ -416,6 +420,9 @@ PMString KFCResultModel::GetBookName()
 
 void KFCResultModel::ShutdownCleanup()
 {
+	// The rows' text foci first - nothing of ours may still hold a reference into a document at unload.
+	KFCRowFoci::DetachAll();
+
 	// Assigning a fresh vector releases the storage too, not just the contents, so the static
 	// destructor at DLL unload finds nothing left to do (the KESCL ShutdownCleanup rule).
 	gChapters = std::vector<Chapter>();
@@ -713,7 +720,12 @@ bool KFCResultModel::GetHitLocation(int32 chapterIdx, int32 hitIdx,
 void KFCResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 {
 	if (Chapter* c = ChapterAt(chapterIdx))
+	{
 		c->docRef = newDocRef;
+		// THE ONE PLACE A CHAPTER'S ROWS GET THEIR FOCI AFTER A (RE)OPEN (spec T6): every road that binds a chapter
+		// to an open document comes here - a jump's or a replace's reopen, and the user's own open (KFCOpenDocResponder).
+		KFCRowFoci::AttachChapter(chapterIdx);
+	}
 }
 
 bool KFCResultModel::GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion)
@@ -1074,6 +1086,10 @@ void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
 	for (size_t i = 0; i < versions.size(); ++i)
 		PutVersionBack(versions[i]);
+	// The foci of the rows put back go back on their places (spec T7): an Undo or a Redo moves text without moving a
+	// focus, and these rows' stored places are exact now - the step is followed only when the story is at its version.
+	for (size_t i = 0; i < rows.size(); ++i)
+		KFCRowFoci::Reanchor(rows[i].chapter, rows[i].hit);
 }
 
 void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
@@ -1091,6 +1107,8 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 {
+	// The rows going away take their foci (the rows put back get theirs at the foot - spec T7).
+	KFCRowFoci::DetachAll();
 	gChapters = snapshot.chapters;
 	gLayoutGeneration = snapshot.layout;
 	gFromBook = snapshot.fromBook;
@@ -1103,6 +1121,8 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	// The right-click targets index the chapters and rows that were just replaced (Clear's reason).
 	ForgetContextMenus();
 	ForgetRowBackup();
+	// The list put back - its rows' foci where KFC knows the stories as they stand (spec T7).
+	KFCRowFoci::AttachOpenChapters();
 }
 
 // End, KFCResultModel.cpp.
