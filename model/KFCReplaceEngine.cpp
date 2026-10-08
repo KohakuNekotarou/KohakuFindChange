@@ -46,6 +46,7 @@
 #include "KFCID.h"				// the string keys the stale-results alert and the Undo step are worded from
 #include "KFCLoc.h"				// runtime Japanese - there is no jaJP string table
 #include "KFCResultModel.h"
+#include "KFCRowFoci.h"			// ReanchorStory - the rows' text foci put back after a write, its rollback and a preview
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
@@ -1405,6 +1406,10 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
+		// A write that went in and was rolled back moved the foci of the story without moving them back (spec T13): the
+		// story is as KFC knew it before the write (the check above refuses any other), so the rows' places are exact.
+		for (std::set<UID>::const_iterator ws = writtenStories.begin(); ws != writtenStories.end(); ++ws)
+			KFCRowFoci::ReanchorStory(chapterIdx, *ws);
 		StartStatus(outStatus);
 		// The reason the row was not written, in its words.
 		const char* why = nil;
@@ -1438,6 +1443,9 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 		return false;
 	}
 	NoteStoryVersions(chapterIdx, db, writtenStories);	// the next Replace finds it as KFC left it
+	// The written stories' foci on the rows' places now (spec T13 - InDesign moved them with the write; this states it).
+	for (std::set<UID>::const_iterator ws = writtenStories.begin(); ws != writtenStories.end(); ++ws)
+		KFCRowFoci::ReanchorStory(chapterIdx, *ws);
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	chapterAfter.wrote = true;		// written to: a chapter of ours has to be seen and saved (ChapterAfter)
@@ -1548,6 +1556,9 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		}
 	}
+	// The preview wrote and took it back: the foci of the story moved with the write and not back with the abort
+	// (spec T13). The story was as KFC knew it (StoryAsKFCLeftIt above), so the rows' stored places are exact.
+	KFCRowFoci::ReanchorStory(chapterIdx, story);
 	if (!shown)
 		outAfter.Clear();
 	outAfter.SetTranslatable(kFalse);
