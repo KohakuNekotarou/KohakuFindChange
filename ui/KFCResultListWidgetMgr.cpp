@@ -918,7 +918,7 @@ bool KFCResultTree::TakeKeyboard()
 	return keyBoard->GetKeyFocus() == listEH;
 }
 
-bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
+bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus)
 {
 	if (RefusedWhileRunning())
 		return false;
@@ -946,6 +946,8 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx)
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the repaint focus=%s", DiagKeyFocus().c_str());
 	ShowStatus(status);
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the status focus=%s", DiagKeyFocus().c_str());
+	if (outStatus != nil)
+		*outStatus = status;
 	return wrote;
 }
 

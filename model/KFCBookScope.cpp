@@ -37,6 +37,7 @@
 #include "K2Vector.h"			// the held-chapter list
 #include "FileUtils.h"		// IsEqual - is this open document that chapter's file
 #include "SDKFileHelper.h"
+#include "SysFileList.h"		// the searched book's chapter files - the Hide Previous Chapter sweep
 #include "UIDList.h"
 #include "Utils.h"
 #include "PMString.h"
@@ -878,10 +879,51 @@ void KFCBookScope::ForgetHeldDoc(const UIDRef& docRef)
 	}
 }
 
+// The files of the chapters of the book the results came from (gSearchedBookPath), asked of the book itself - its
+// contents, the list ListBookChapters walks, whole: a chapter is the book's whether or not this run took it. false when no
+// OPEN book has that path (the results did not come from a book, or it is closing). A content that names no file is left
+// out: it cannot be told from a document outside the book (ChapterHasFile, and the note at ListBookChapters).
+// The files go in a SysFileList, the SDK's own list of files, which keeps a copy of each it is given - InDesign's own
+// code hands it a loop's local IDFile the same way (open/components/incopyfileactions/utils/InCopyDocUtils.cpp,
+// GetLinkedStories). (A std::vector<IDFile> did not link in this plug-in: its copies call into AFile, whose code the
+// model half does not link against.)
+static bool KFCSearchedBookChapterFiles(SysFileList& outFiles)
+{
+	IBook* book = FindOpenBookByPath(gSearchedBookPath);	// non-owning
+	if (book == nil)
+		return false;
+	IDataBase* bookDB = ::GetDataBase(book);
+	InterfacePtr<IBookContentMgr> contentMgr(book, UseDefaultIID());
+	if (bookDB == nil || contentMgr == nil)
+		return false;
+	const int32 count = contentMgr->GetContentCount();
+	for (int32 i = 0; i < count; ++i)
+	{
+		const UID contentUID = contentMgr->GetNthContent(i);
+		if (contentUID == kInvalidUID)
+			continue;
+		InterfacePtr<IBookContent> content(bookDB, contentUID, UseDefaultIID());
+		IDFile file;
+		if (content != nil && content->GetIDFile(file) != kFalse && KFCBookScope::ChapterHasFile(file))
+			outFiles.AddFile(&file);
+	}
+	return true;
+}
+
 void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 {
 	InterfacePtr<IDocumentList> docList(KFCBookScope::QueryOpenDocumentList());
 	if (docList == nil)
+		return;
+
+	// THE SEARCHED BOOK'S CHAPTERS ONLY (the author's call of 2026-10-08 - until then every clean window went, the 09-26
+	// decision R-2). A document outside that book - the reference the user keeps open beside it, a chapter saved under
+	// another name - is no previous chapter, whatever the jump. A chapter the user opened is one (the 2026-07-18 decision
+	// stands). Each document is matched to the chapters as a FILE (KFCDocumentLivesInFile - a conversion of an older
+	// InDesign's chapter included, the same match a run reuses an open chapter by). No book open by that path: nothing is
+	// a previous chapter, and nothing is closed.
+	SysFileList chapterFiles;
+	if (!KFCSearchedBookChapterFiles(chapterFiles) || chapterFiles.GetFileCount() == 0)
 		return;
 
 	// Collect first, then close (closing mutates the document list).
@@ -896,15 +938,24 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (ref == exceptDoc)
 			continue;	// the document the jump just landed in stays
 
+		bool isChapter = false;
+		for (int32 c = 0; c < chapterFiles.GetFileCount() && !isChapter; ++c)
+		{
+			const IDFile* chapterFile = chapterFiles.GetNthFile(c);
+			isChapter = chapterFile != nil && KFCDocumentLivesInFile(doc, *chapterFile);
+		}
+		if (!isChapter)
+			continue;	// not one of the searched book's chapters - it stays (see above)
+
 		// A document with something to save would want saving - leave it to the user. Asked
 		// through the same question the held-chapter releases ask.
 		//
-		// THIS LOOP IS THE ONE THAT MEETS AN UNTITLED DOCUMENT. Unlike the two held-chapter releases
-		// - whose documents were all opened from a chapter file - this walks EVERY open document, so
-		// it meets the one kind that has never been saved at all: the untitled document the user just
-		// made. IsModified() reads that as clean, and asked that way this would close it without a
-		// prompt (measured) - hence the shared question is IDocFileHandler::CanSave, "modified OR
-		// unsaved" - see HasUnsavedChanges.
+		// THE UNTITLED DOCUMENT. This loop walks EVERY open document, so it meets the one kind that has never
+		// been saved at all: the untitled document the user just made. Since the sweep took the book's chapters
+		// only (2026-10-08) it stops at the chapter test above - it has no file to be a chapter by - but this test
+		// was the one that kept it until then, and stays the one that says so: IsModified() reads it as clean,
+		// and asked that way this would close it without a prompt (measured) - hence the shared question is
+		// IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
 		//
 		// ASKED THROUGH HasUnsavedWork, like the two releases. CanSave calls every conversion of an
 		// older InDesign's chapter "unsaved", so by CanSave alone a converted chapter a jump had opened

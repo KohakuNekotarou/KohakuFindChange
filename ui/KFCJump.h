@@ -16,7 +16,8 @@
 //  KCM's Story-mode jump, which raises its flash straight away) - not booked for the double-click
 //  interval; a double click's selection takes it back down (SelectHitText ends by taking the
 //  marker down). With "Hide Previous Chapter" ON, every other
-//  displayed clean document is closed as the jump lands. Ported from KESCL's jump machinery (KESCL
+//  displayed clean chapter of the searched book is closed as the jump lands (a document outside the
+//  book stays - 2026-10-08). Ported from KESCL's jump machinery (KESCL
 //  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
 //  reverse mode).
 //

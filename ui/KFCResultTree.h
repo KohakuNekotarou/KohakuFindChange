@@ -74,8 +74,10 @@ namespace KFCResultTree
 	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
 	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the
 	    row menu greys Replace by); then the row's one replace (KFCRuns()->ReplaceHit, no prompt - one undo step, the
-	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. */
-	bool ReplaceRow(int32 chapterIdx, int32 hitIdx);
+	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. outStatus, when
+	    given, gets the status line it set - Shift+Return adds to it when there is no row below to go on to
+	    (KFCResultTreeEH). */
+	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus = nil);
 
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not

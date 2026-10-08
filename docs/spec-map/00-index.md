@@ -114,4 +114,5 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 
 **基準**: branch `fix/2026-10-03-book-lifecycle-recheck` `1829c99` の作業ツリー（main `cc0d503` の上に、検査と直しの枝を全部積んだ先頭・未取り込み）。版数 `1.2.0`。
 **2026-10-07 の追記の基準**: branch `feat/2026-10-07-query-dialog-selected-docs` `bab0cae`（10-06 の計画＝Track を使わない置換の Task 12 の途中の上に、クエリのダイアログ・選んだ文書・Change All の章ごとの内訳）。版数 `1.3.0`。第16章と、第3・6・12・14章の 2026-10-07 の項目はこの基準で書いた。
+**2026-10-08 の追記の基準**: branch `feat/2026-10-08-kfc-replace-next-book-hide`（main `f37b128` の上に、Shift+Return＝置換して次へ・Hide Previous Chapter をブックの章だけに）。GEN-02・GEN-11・SCOPE-17・JMP-26・JMP-28・REP-32・REP-32b はこの基準で書いた。
 ソースのクラス名・ファイル名・フォルダー名も **KFC**（2026-10-04 に旧名 KBS から改名・`chore/2026-10-04-kfc-rename`）。古いノート・memory の `KBS` は `KFC` と読み替える。

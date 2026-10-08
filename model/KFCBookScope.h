@@ -496,11 +496,13 @@ namespace KFCBookScope
 	            with. */
 	bool ShowChapterWindow(const UIDRef& docRef);
 
-	/** The "Hide Previous Chapter" sweep: close every OTHER document that HAS a window and needs no
-	    save, on schedule - whoever opened it. The exception document (the one a jump just landed in)
-	    and any windowless held chapter survive. (Runs close each chapter as they finish with it, so a
-	    windowless held chapter is left only by a failure - a jump or a replace whose window did not
-	    appear.)
+	/** The "Hide Previous Chapter" sweep: close every OTHER CHAPTER OF THE SEARCHED BOOK that HAS a
+	    window and needs no save, on schedule - whoever opened it. A document outside that book stays
+	    (the author's call of 2026-10-08 - until then every clean window went), matched to the book's
+	    chapters as a file; with no book open by the searched path nothing goes. The exception document
+	    (the one a jump just landed in) and any windowless held chapter survive. (Runs close each chapter
+	    as they finish with it, so a windowless held chapter is left only by a failure - a jump or a
+	    replace whose window did not appear.)
 
 	    "Needs no save" is IDocFileHandler::CanSave, "modified OR UNSAVED" - so what stays is not
 	    only a dirty document but also one that has never been saved at all: the untitled document

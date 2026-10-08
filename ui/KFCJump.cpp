@@ -699,8 +699,9 @@ void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 
 // Bring the chapter's window to the front - saying so when it cannot be done, because a click that
 // moves nothing must not appear to do nothing - and then, with "Hide Previous Chapter" ON, close every
-// other displayed clean document (scheduled; the landed-in document is the exception; book results
-// only - see ShouldHidePreviousChapter). Shared by JumpToHit and ShowChapter.
+// other displayed clean chapter of the searched book (scheduled; the landed-in document is the exception;
+// a document outside the book stays; book results only - see ShouldHidePreviousChapter). Shared by
+// JumpToHit and ShowChapter.
 bool FrontChapter(const UIDRef& docRef)
 {
 	if (!EnsureDocFrontmost(docRef))
@@ -802,7 +803,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 
 	// A match in another document needs that document's window in front before any scrolling; if no
 	// window can be produced, the panel has said so and the view is left where it was. (With "Hide
-	// Previous Chapter" ON the tour has moved, and every other displayed clean document is closed.)
+	// Previous Chapter" ON the tour has moved, and every other displayed clean chapter of the book is closed.)
 	if (!FrontChapter(docRef))
 	{
 		KFCHitMarkerView::Hide();

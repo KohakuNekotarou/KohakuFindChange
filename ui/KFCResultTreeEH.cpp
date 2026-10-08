@@ -18,7 +18,9 @@
 //       shows the document it sits in (it names no hit, so it takes the chapter's arm), the book
 //       row activates its book.
 //    3. RETURN / ENTER ON A HIT ROW REPLACES IT (spec F17) - see KeyDown. With the arrows,
-//       the keyboard alone walks the rows and replaces where the match is right.
+//       the keyboard alone walks the rows and replaces where the match is right. SHIFT+RETURN
+//       replaces it and goes on to the next row below that can be replaced (the author's call of
+//       2026-10-08 - InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
@@ -31,6 +33,10 @@
 //  TreeViewEventHandler is the stock base (source/open/includes/widgets; on the CPP.rsp path) and
 //  HandleUpDownKey is virtual precisely for this. Home / End / PageUp / PageDown and the left /
 //  right expand / collapse keys stay stock.
+//
+//  Shift+Return has no stock move to lean on - it skips rows - so it walks, but through the tree's
+//  OWN hierarchy adapter (KFCResultListAdapter, what the tree view builds its rows from), never the
+//  model's counts: it can only reach a row the tree has.
 //
 //  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on
 //  first QueryInterface, so naming it in KFCUI.fr is not enough - KFCResultNodeEH's key-focus
@@ -53,6 +59,7 @@
 #include "IPanelControlData.h"
 #include "ISession.h"
 #include "ITreeViewController.h"
+#include "ITreeViewHierarchyAdapter.h"	// the tree's own order - the row Shift+Return goes on to
 #include "ITreeViewMgr.h"
 
 // General includes:
@@ -63,12 +70,14 @@
 #include "Utils.h"					// Utils<IEventUtils>
 
 #include <chrono>					// a Return's hold on the keyboard - how long at most (gHolding)
+#include <vector>					// the rows above the one Shift+Return goes on to, opened top down
 
 // Project includes:
 #include "KFCUIID.h"
 #include "KFCResultNodeID.h"
 #include "KFCJump.h"
 #include "KFCResultTree.h"		// ReplaceRow - Return on a hit row
+#include "KFCModelAccess.h"		// KFCRuns()->CanReplaceHit - which row Shift+Return goes on to
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the RETFOCUS trace, test builds only
 #ifdef KFC_DIAG
 #include <windows.h>			// CaptureStackBackTrace - who takes the keyboard (DiagCallers), test builds only
@@ -119,10 +128,94 @@ bool StillHolding()
 	return gHolding;
 }
 
+// The row after `from` in the order the rows are drawn, top to bottom - asked of the tree's own hierarchy adapter (see the
+// head of the file): a row's first child, else its next sibling, else the next sibling of the nearest row above it that has
+// one. An invalid NodeID after the last row. Kept in a NodeID before anything reads it: TreeNodePtr reads a NodeID_rv's
+// class without asking whether there is one (NodeID.h), and the adapter answers kInvalidNodeID at the ends.
+NodeID NextRowInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID& from)
+{
+	if (adapter->GetNumChildren(from) > 0)
+		return NodeID(adapter->GetNthChild(from, 0));
+	NodeID node = from;
+	for (;;)
+	{
+		TreeNodePtr<KFCResultNodeID> nodeID(node);
+		if (nodeID == nil || nodeID->IsRoot())
+			return NodeID();
+		const NodeID parent(adapter->GetParentNode(node));
+		if (!parent.IsValid())
+			return NodeID();
+		const int32 next = adapter->GetChildIndex(parent, node) + 1;
+		if (next > 0 && next < adapter->GetNumChildren(parent))
+			return NodeID(adapter->GetNthChild(parent, next));
+		node = parent;
+	}
+}
+
+// SHIFT+RETURN GOES ON (the author's call of 2026-10-08 - InDesign's own Change/Find, "replace, then find the next", for the
+// list). After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
+// on the way the arrows land on a row (HandleUpDownKey): its action - the jump, and a GREP row's Preview Text - then the
+// keyboard taken back. Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
+// KFCRuns()->CanReplaceHit, the question the row menu greys Replace by), and a closed row above the one landed on is opened
+// - a book search brings its chapters up closed. false = no such row below: the selection stays where it is.
+bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& from)
+{
+	InterfacePtr<const ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
+	if (adapter == nil || treeMgr == nil)
+		return false;
+	NodeID next = from;
+	int32 chapterIdx = -1, hitIdx = -1;
+	for (;;)
+	{
+		next = NextRowInTreeOrder(adapter, next);
+		TreeNodePtr<KFCResultNodeID> nodeID(next);
+		if (nodeID == nil)
+			return false;
+		if (nodeID->IsHitRow() && KFCRuns()->CanReplaceHit(nodeID->GetChapter(), nodeID->GetHit()))
+		{
+			chapterIdx = nodeID->GetChapter();
+			hitIdx = nodeID->GetHit();
+			break;
+		}
+	}
+	// Every row above it open, top down, so the tree draws it. (ExpandNode on an open row is a harmless no-op -
+	// HandleUpDownKey leans on the same.)
+	std::vector<NodeID> above;
+	for (NodeID up(adapter->GetParentNode(next)); up.IsValid(); up = NodeID(adapter->GetParentNode(up)))
+	{
+		TreeNodePtr<KFCResultNodeID> upID(up);
+		if (upID == nil || upID->IsRoot())
+			break;		// the hidden root is never drawn
+		above.push_back(up);
+	}
+	for (auto it = above.rbegin(); it != above.rend(); ++it)
+		treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
+	// THE WRITTEN ROW'S SELECTION OFF FIRST. The list selects one row at a time ("Items selectable: 1", KFCUI.fr), and in
+	// such a tree Select does not move a selection - it refuses while a row is selected (ITreeViewController::SelectCode
+	// eSingleItemAlreadySelected; measured: the next row was jumped to while the written one stayed selected).
+	controller->DeselectAll();
+	const ITreeViewController::SelectCode selected = controller->Select(next);
+	KFC_DIAG_LOG("GOON select code=%d chapter=%d hit=%d", static_cast<int>(selected), static_cast<int>(chapterIdx), static_cast<int>(hitIdx));
+	(void)selected;
+	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);
+	{
+		// One walk at a time, as for the arrows (gWalking): the landing may open a chapter, and that runs the message loop.
+		WalkGuard walkGuard;
+		KFCJump::ActivateNode(chapterIdx, hitIdx);
+	}
+	// The landing fronted a document window, which took the keyboard with it - as after the arrows.
+	(void)KFCResultTree::TakeKeyboard();
+	return true;
+}
+
 // RETURN ON THE SELECTED HIT ROW (spec F17), one place for the two that take it: the list's own KeyDown and the Return
 // filter below. Return or the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the
 // right-click Replace's own door (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced), the list
 // keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller passes it on.
+// WITH SHIFT (2026-10-08), the same, and then - only when the row was written - on to the next row below that can be
+// replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence. Ctrl and Alt
+// still make it not a Return of ours.
 //  - The KeyCmd a Return's character makes next is removed, first - the official shape for a list that acts on Return
 //    (open/components/spellpanel/SpellListBoxEH.cpp, KeyDown), through IEventUtils (EventUtilities.h asks to be replaced
 //    by it, and the interface's own note is this case: "when we handle the KeyDown and want to remove the following
@@ -135,8 +228,9 @@ bool StillHolding()
 bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 {
 	const VirtualKey key = e->GetVirtualKey();
-	if ((!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey)) || e->ShiftKeyDown() || e->CmdKeyDown() || e->OptionAltKeyDown())
+	if ((!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey)) || e->CmdKeyDown() || e->OptionAltKeyDown())
 		return kFalse;
+	const bool goOn = e->ShiftKeyDown() ? true : false;
 	if (controller == nil)
 		return kFalse;
 	NodeIDList selected;
@@ -155,10 +249,18 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 		HoldAfterReturn();
 		return kTrue;
 	}
-	(void)KFCResultTree::ReplaceRow(node->GetChapter(), node->GetHit());
+	PMString status;
+	const bool wrote = KFCResultTree::ReplaceRow(node->GetChapter(), node->GetHit(), &status);
 	// The write may have opened a closed chapter and given it a window, which takes the key focus - take it back, with the
 	// panel made the active one again, or the next arrow press lands in the document instead of walking on.
 	(void)KFCResultTree::TakeKeyboard();
+	// Shift: on to the next row that can be replaced - from the row as it was selected (a NodeID is its chapter, story
+	// and hit, which the write's repaint leaves standing).
+	if (goOn && wrote && !GoOnToNextReplaceableRow(controller, selected[0]))
+	{
+		status.Append(" No row below can be replaced.");
+		KFCResultTree::ShowStatus(status);
+	}
 	// Held from here, not before: the write itself lends the keyboard out and takes it back (InDesign's Find/Change code
 	// the walk goes through - measured, two round trips that always came home), and those are not to be refused.
 	HoldAfterReturn();
