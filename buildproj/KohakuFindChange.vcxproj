@@ -227,6 +227,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCProgressBar.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCReplaceEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCResultModel.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRowFoci.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagCommands.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp"/>
@@ -264,6 +265,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCProgressBar.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCReplaceEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCResultModel.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRowFoci.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.h"/>
