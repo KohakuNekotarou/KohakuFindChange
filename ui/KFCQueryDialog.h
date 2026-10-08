@@ -23,6 +23,12 @@ void KFCQueryDialogOpen();
     follows Book Scope, Search: and the selection as the panel's tab does (the spec's section 8, item 8). */
 void KFCQueryDialogRefreshScope();
 
+/** A saved query double-clicked in the left list (KFCQueryRowEH): put into Edit > Find/Change, whole, and that dialog
+    brought up - opened when closed, restored when minimised, left as it is when open (KFCShowFindChangeDialog) - so what
+    the query holds can be read at once (the author's call). The dialog's message line says what was loaded, or why
+    nothing was: a run going on, a query file gone since the list was read, the command failing. */
+void KFCQueryDialogShowInFindChange(int32 savedIndex);
+
 #endif // __KFCQueryDialog_h__
 
 // End, KFCQueryDialog.h.

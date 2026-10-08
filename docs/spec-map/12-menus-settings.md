@@ -29,13 +29,13 @@
   Save Panel Settings
   ──────────
   How to Use...
-  About This Plug-in...
+  About This Plug-In...
   ```
 
   2行目の名前は範囲で変わる（`Find in Book`／`Find in Document`／`Find in Story` など＝SET-03。上の絵は Book Scope OFF・検索: ドキュメントのとき）。
   `Book Scope` から `Remember Book Panel Placement` までの8つはトグルで、ON のとき左にチェックの印が付く（最初は `Hide Previous Chapter` だけ ON＝SET-23）。
   （`Change Checked` と `Show Changes by KohakuFindChange` は 2026-10-06 に外した。`Run Saved Queries...` と `Find/Change Selected Documents (Book)` は 2026-10-07 に足した＝第16章・SCOPE-26〜。`Run Saved Queries...` は同じ日の夜に `Clear Results` の下へ1つ下げた＝作者の依頼。）
-  - 訂正:
+  - 訂正: 2026-10-08＝最後の項目は、それまで SDK 共通の文字列で `About this plug-in...` と出ていた（この地図の表記と食い違っていた）。作者「英語として正しい方で」→ほかの項目と同じく語頭を大文字にし、ハイフンの後ろも大文字の `About This Plug-In...`（InDesign のメニューバーの `Plug-Ins`・このパネルのまとまり `Kohaku Plug-Ins` と同じ）。KFC 専用のキー `kKFCAboutThisPlugInMenuKey`（SDK のキーは自作のプラグイン全部が共有するので値を変えない）。
 
 - **SET-02** ★`Find in …`・`Change All in Book (No List)`・`Clear Results`・`Run Saved Queries...` の間に区切り線は無い（探すことと、一覧を使わない置換と、その前の片付けが1つのまとまり）。
   トグルの並びは、検索にかかわるもの（Book Scope・Find/Change Selected Documents (Book)・Hide Previous Chapter・アプリケーションバー）が先、窓の見た目が後。
@@ -51,7 +51,7 @@
 ## 2. 灰色になるとき
 
 - **SET-04** 検索・置換・Change All が**走っている間は、灰色にできる項目はすべて灰色**（GEN-33）。
-  `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-in...` の4つはこの確かめを受けないが、
+  `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-In...` の4つはこの確かめを受けないが、
   走っている間は進捗バーがモーダルなので、フライアウトそのものが開けない（2026-08-03 実測）。
   - 訂正:
 
@@ -74,7 +74,7 @@
   （★「ドックの中では効かないが押せる」は KCM（当時の KESCM）の 2026-07-29 の決定を引き継いだ）。チェックの印で ON／OFF が分かる。
   - 訂正:
 
-- **SET-08** `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-in...` は、いつも押せる（Open Find/Change は文書が0でも開く＝GEN-04）。
+- **SET-08** `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-In...` は、いつも押せる（Open Find/Change は文書が0でも開く＝GEN-04）。
   - 訂正:
 
 - **SET-09** 窓とアプリケーションバーのトグルを押すと、メッセージ欄にどうなったかを書く ―― `Translucent panel: on.`／`Translucent panel: off.`。

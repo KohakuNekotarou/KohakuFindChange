@@ -11,10 +11,16 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
+#include "ICommand.h"
 #include "IFindChangeOptions.h"		// SearchMode - the kinds' numbers
+#include "ISysFileData.h"
+#include "IUIFlagData.h"
 
 // General includes:
+#include "CmdUtils.h"
+#include "ErrorUtils.h"
 #include "FileUtils.h"
+#include "TextWalkerServiceProviderID.h"	// kFCQueryXMLReaderCmdBoss
 #include "LocaleSetting.h"			// the UI language - InDesign's own queries are kept per language
 
 // Published under source/open and reached by a relative path rather than by an include directory: the build files that
@@ -192,6 +198,26 @@ const char* KFCSavedQueries::KindName(int32 mode)
 {
 	const int32 kind = KindIndexOfMode(mode);
 	return kind < kKindCount ? kKinds[kind].folder : "?";
+}
+
+// ONE SAVED QUERY INTO EDIT > FIND/CHANGE. kFCQueryXMLReaderCmdBoss (TextWalkerServiceProviderID.h:135), measured
+// (docs/ai-notes/kfc-fcquery-reader-spike-2026-10-04.md): the query's own <QueryType> picks the tab and
+// fills it whole - strings, switches and formats. A file that is not there answers kSuccess and changes nothing, so
+// a caller asks for the file first (FileUtils::DoesFileExist). False = the command could not be made or reported a
+// failure; the error state is left clear.
+bool KFCSavedQueries::LoadIntoFindChange(const IDFile& file)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFCQueryXMLReaderCmdBoss));
+	InterfacePtr<ISysFileData> fileData(cmd, UseDefaultIID());
+	InterfacePtr<IUIFlagData> uiFlag(cmd, UseDefaultIID());
+	if (cmd == nil || fileData == nil || uiFlag == nil)
+		return false;
+	fileData->Set(file);
+	uiFlag->Set(kSuppressUI);
+	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
+	const bool ok = (err == kSuccess && ErrorUtils::PMGetGlobalErrorCode() == kSuccess);
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	return ok;
 }
 
 // End, KFCSavedQueries.cpp.

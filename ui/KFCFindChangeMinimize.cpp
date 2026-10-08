@@ -12,6 +12,14 @@
 
 #include "VCPlugInHeaders.h"
 
+// Interface includes:
+#include "IActionManager.h"		// PerformAction - Edit > Find/Change, for a dialog that is closed (KFCShowFindChangeDialog)
+#include "IApplication.h"
+#include "ISession.h"
+
+// General includes:
+#include "FindChangeID.h"		// kFindDialogActionID
+
 // Project includes:
 #include "KFCFindChangeMinimize.h"
 #include "KFCPanelAlpha.h"		// KFCQueryFindChangeWindow - the shared lookup of the dialog's window;
@@ -354,6 +362,34 @@ bool16 KFCRestoreMinimizedFindChange()
 	::ShowWindow(h, SW_RESTORE);
 	KFC_DIAG_LOG("FCMIN open: 0x%llx was minimized - restored instead of closed",
 		static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)));
+	return kTrue;
+#else
+	return kFalse;
+#endif
+}
+
+bool16 KFCShowFindChangeDialog()
+{
+#ifdef WINDOWS
+	// Asked afresh, as above: a cached "not open" must not answer for a dialog opened since.
+	KFCForgetFindChangeWindow();
+	HWND h = KFCQueryFindChangeWindow();
+	if (h != nullptr)
+	{
+		const bool wasMinimized = (::IsIconic(h) != FALSE);
+		if (wasMinimized)
+			::ShowWindow(h, SW_RESTORE);
+		KFC_DIAG_LOG("FCSHOW 0x%llx was open%s", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(h)),
+			wasMinimized ? " and minimized - restored" : "");
+		return kTrue;
+	}
+	ISession* session = GetExecutionContextSession();
+	InterfacePtr<IApplication> app(session != nil ? session->QueryApplication() : nil);
+	InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
+	if (actionMgr == nil)
+		return kFalse;
+	actionMgr->PerformAction(session->GetActiveContext(), kFindDialogActionID);
+	KFC_DIAG_LOG("FCSHOW closed - opened through kFindDialogActionID");
 	return kTrue;
 #else
 	return kFalse;

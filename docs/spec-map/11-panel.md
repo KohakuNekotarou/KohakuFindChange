@@ -95,7 +95,7 @@
   - 訂正:
 
 - **PNL-19** ★**About** は**名前と版数だけ**（`Kohaku Find/Change version 1.3.0`）で、どの UI 言語でも同じ（2026-08-09 の決定＝説明・謝辞・URL は外した）。
-  パネルメニューの末尾 `About This Plug-in...` と、本体の About のメニューの下から開く。
+  パネルメニューの末尾 `About This Plug-In...` と、本体の About のメニューの下から開く。
   - 訂正:
 
 ---

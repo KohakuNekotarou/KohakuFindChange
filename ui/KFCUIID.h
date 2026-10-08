@@ -89,6 +89,9 @@ DECLARE_PMID(kClassIDSpace, kKFCQueryFixedTextWidgetBoss, kKFCUIPrefix + 24)
 // The result list's Return, taken before the widget layer gets it (KFCResultTreeEH.cpp): an event handler
 // pushed on the application's IEventDispatcher while the list holds the keyboard.
 DECLARE_PMID(kClassIDSpace, kKFCReturnFilterBoss, kKFCUIPrefix + 25)
+// A row of the query dialog's two lists: the stock tree row with our event handler, so a saved query double-clicked
+// goes into Find/Change (KFCQueryRowEH.cpp - the author's call).
+DECLARE_PMID(kClassIDSpace, kKFCQueryRowWidgetBoss, kKFCUIPrefix + 26)
 
 
 // InterfaceIDs:
@@ -176,6 +179,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryListAdapterImpl, kKFCUIPrefix + 43
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryListWidgetMgrImpl, kKFCUIPrefix + 44)
 // The result list's Return filter: its event handler (KFCResultTreeEH.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKFCReturnFilterEHImpl, kKFCUIPrefix + 45)
+// The query dialog's rows: their event handler - the double click on a saved query (KFCQueryRowEH.cpp).
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowEHImpl, kKFCUIPrefix + 46)
 
 
 // ActionIDs:
@@ -360,6 +365,11 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // "About Plug-ins" sub-menu:
 #define kKFCAboutMenuKey			kKFCStringPrefix "kKFCAboutMenuKey"
 #define kKFCAboutMenuPath		kSDKDefStandardAboutMenuPath kKFCCompanyKey
+// The flyout's last item, "About This Plug-In..." - KFC's OWN key, not the SDK's kSDKDefAboutThisPlugInMenuKey: that key
+// is one string ("About this pl&ug-in...") every SDK-based plug-in shares, and a second value under it would leave
+// which one InDesign shows to the load order. Title case, as the rest of the flyout (the author's call: "the correct
+// English" - InDesign's own menu reads "Plug-Ins", and this panel's menu group "Kohaku Plug-Ins").
+#define kKFCAboutThisPlugInMenuKey	kKFCStringPrefix "kKFCAboutThisPlugInMenuKey"
 
 // Menu item keys:
 #define kKFCSearchBookMenuKey			kKFCStringPrefix "kKFCSearchBookMenuKey"

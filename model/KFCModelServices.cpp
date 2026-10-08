@@ -104,6 +104,7 @@ public:
 	virtual bool DescribeRunScope(PMString& outWords) { return KFCSearchEngine::DescribeRunScope(outWords); }
 	virtual const char* ChangeAllCommandName() { return KFCChangeAll::CommandName(); }
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) { return KFCReplaceEngine::PreviewHit(chapterIdx, hitIdx, outAfter); }
+	virtual bool LoadSavedQuery(const IDFile& file) { return KFCSavedQueries::LoadIntoFindChange(file); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

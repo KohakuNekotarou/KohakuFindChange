@@ -34,7 +34,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCCompanyKey,					"Kohaku Plug-Ins",	// menu-group display name (KCM's shape; distinct from kKFCCompanyValue)
                 kKFCAboutMenuKey,					kKFCDisplayName "...",
 
-                kSDKDefAboutThisPlugInMenuKey,			kSDKDefAboutThisPlugInMenuValue_enUS,
+                kKFCAboutThisPlugInMenuKey,		"About This Plug-In...",	// KFC's own key - KFCUIID.h says why
 
                 // ----- Command strings
                 kKFCSearchBookMenuKey,			"Search",

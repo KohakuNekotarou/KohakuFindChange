@@ -35,6 +35,13 @@ namespace KFCSavedQueries
 
 	/** "Text", "GREP", "Glyph", "Transliterate" - the kinds' folder names - or "?" for any other mode. */
 	const char* KindName(int32 mode);
+
+	/** Put one saved query into Edit > Find/Change, whole - its tab, strings, switches and formats - with the SDK's
+	    command that reads a query file (kFCQueryXMLReaderCmdBoss). For each query of a run
+	    (KFCQuerySequence) and for a query double-clicked in the dialog (KFCQueryDialog). A file that is not there
+	    changes nothing and answers true - ask DoesFileExist first. False = the command failed; the error state is
+	    left clear. */
+	bool LoadIntoFindChange(const IDFile& file);
 }
 
 #endif // __KFCSavedQueries_h__

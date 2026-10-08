@@ -16,15 +16,13 @@
 #include "IDataBase.h"
 #include "IDocument.h"
 #include "IDocumentList.h"
-#include "ISysFileData.h"
-#include "IUIFlagData.h"
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
 
 // General includes:
 #include "CmdUtils.h"
 #include "ErrorUtils.h"
 #include "FileUtils.h"
-#include "TextWalkerServiceProviderID.h"	// kFCQueryXMLReaderCmdBoss, kClearFindChangeOptionsCmdBoss
+#include "TextWalkerServiceProviderID.h"	// kClearFindChangeOptionsCmdBoss
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,7 +40,7 @@
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
-#include "KFCSavedQueries.h"	// Describe - a query file's name as the dialog shows it (RunFiles)
+#include "KFCSavedQueries.h"	// LoadIntoFindChange - each query in turn; Describe - a file's name as the dialog shows it
 #include "KFCSearchEngine.h"
 #include "KFCUndoFollow.h"
 
@@ -56,26 +54,6 @@ struct RunningFlagGuard
 	RunningFlagGuard()	{ gRunning = true; }
 	~RunningFlagGuard()	{ gRunning = false; }
 };
-
-// ONE SAVED QUERY INTO EDIT > FIND/CHANGE. kFCQueryXMLReaderCmdBoss (TextWalkerServiceProviderID.h:135), measured
-// (docs/ai-notes/kfc-fcquery-reader-spike-2026-10-04.md): the query's own <QueryType> picks the tab and
-// fills it whole - strings, switches and formats. A file that is not there answers kSuccess and changes nothing, so
-// the run asks for the file first (FileUtils::DoesFileExist). False = the command could not be made or reported a
-// failure; the error state is left clear.
-bool LoadQuery(const IDFile& file)
-{
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFCQueryXMLReaderCmdBoss));
-	InterfacePtr<ISysFileData> fileData(cmd, UseDefaultIID());
-	InterfacePtr<IUIFlagData> uiFlag(cmd, UseDefaultIID());
-	if (cmd == nil || fileData == nil || uiFlag == nil)
-		return false;
-	fileData->Set(file);
-	uiFlag->Set(kSuppressUI);
-	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
-	const bool ok = (err == kSuccess && ErrorUtils::PMGetGlobalErrorCode() == kSuccess);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	return ok;
-}
 
 // EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the spec's D7 - FindChangeByList.jsx empties the strings and the formats
 // after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on a live run
@@ -295,7 +273,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				why.Append(query.name);
 				break;
 			}
-			if (!LoadQuery(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
+			if (!KFCSavedQueries::LoadIntoFindChange(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
 				|| !KFCSearchEngine::HasFindQueryNow())
 			{
 				skippedNothing.push_back(query.name);

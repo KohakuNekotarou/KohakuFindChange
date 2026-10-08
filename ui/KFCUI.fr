@@ -448,6 +448,20 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
+	 * A row of those two lists: the stock tree row with one interface replaced - its event handler, so a saved query
+	 * DOUBLE-CLICKED goes into Find/Change (KFCQueryRowEH.cpp; the author's call). The result list's rows are made the
+	 * same way (kKFCResultNodeWidgetBoss above), and so are KCM's book dialog rows.
+	 */
+	Class
+	{
+		kKFCQueryRowWidgetBoss,
+		kTreeNodeWidgetBoss,
+		{
+			IID_IEVENTHANDLER, kKFCQueryRowEHImpl,
+		}
+	},
+
+	/*
 	 * The query dialog's "Runs on:" line. EVE treats a static text's .fr width as a MINIMUM and grows the widget - and
 	 * the dialog - to fit its words; this line names a book, so it would. IID_IEVEINFO answers EVE's size question with
 	 * the resource's frame instead (kFixedSizeEVEInfoImpl), and the widget's own ellipsis shortens what does not fit.
@@ -657,7 +671,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		// (basicpanel/BscPnl.fr:200) give it. The area only ever
 		// matters to the keyboard shortcut editor, and every action here is invisible in it, but
 		// this is the classification the SDK puts on this one item. The popup's own "About This
-		// Plug-in..." below stays kOtherActionArea - so does basicpanel's (:230).
+		// Plug-In..." below stays kOtherActionArea - so does basicpanel's (:230).
 		kHelpMenuActionArea,			// Area name (see ActionDefs.h).
 		kNormalAction,					// Type of action (see ActionDefs.h).
 		kDisableIfLowMem,				// Enabling type (see ActionDefs.h).
@@ -666,7 +680,7 @@ resource ActionDef (kSDKDefActionResourceID)
 
 		kKFCActionComponentBoss,
 		kKFCPopupAboutThisActionID,
-		kSDKDefAboutThisPlugInMenuKey,	// Key to the name of this action
+		kKFCAboutThisPlugInMenuKey,		// Key to the name of this action ("About This Plug-In..." - KFCUIID.h)
 		kOtherActionArea,
 		kNormalAction,
 		kDisableIfLowMem,
@@ -1003,7 +1017,7 @@ type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListW
 {
 	WidgetEveInfo;
 };
-type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kTreeNodeWidgetBoss) { };
+type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCQueryRowWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
 
 /*

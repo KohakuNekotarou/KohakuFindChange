@@ -35,6 +35,8 @@ REGISTER_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 REGISTER_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
 // ...and its Return, taken on the application's event dispatcher before the widget layer gets it.
 REGISTER_PMINTERFACE(KFCReturnFilterEH, kKFCReturnFilterEHImpl)
+// The query dialog's rows: a saved query double-clicked goes into Find/Change.
+REGISTER_PMINTERFACE(KFCQueryRowEH, kKFCQueryRowEHImpl)
 // The UI half's own startup/shutdown service.
 REGISTER_PMINTERFACE(KFCUIStartupShutdown, kKFCUIStartupShutdownImpl)
 // The panel's observer (KFCPanelTitle.cpp): the tab's name, the layout, the picture and the message as the panel

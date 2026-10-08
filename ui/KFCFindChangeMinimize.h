@@ -92,6 +92,15 @@ void	KFCChaseFindChangeWindow();
 // to the toggle: a minimised dialog is brought back whoever minimised it. Windows only; kFalse on Mac.
 bool16	KFCRestoreMinimizedFindChange();
 
+// BRING THE DIALOG UP, NEVER CLOSING IT - for a query double-clicked in the query dialog (the author's call: "open it
+// and show" - called BEFORE the query is put in, KFCQueryDialog.cpp says why). Open and on screen: left alone - it shows
+// what is put into Find/Change. Minimised:
+// restored, as above. Closed: InDesign's own Edit > Find/Change through the action manager, as the panel's Open
+// Find/Change... runs it - the toggle, which opens a closed dialog and is therefore NOT pressed while one is open.
+// "Is it open" is the window lookup (KFCQueryFindChangeWindow). kFalse = the action manager could not be reached, and
+// on Mac (nothing is done there - the lookup is Windows only).
+bool16	KFCShowFindChangeDialog();
+
 // Put the dialog back as it was, stop the chase and release the timer. Called from the plug-in's
 // shutdown.
 // *A style left on somebody else's window would outlive this plug-in - the same reason

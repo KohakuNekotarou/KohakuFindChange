@@ -226,7 +226,7 @@
   - 訂正:
 
 - **GEN-40** パネルは **ウィンドウ > Kohaku Plug-Ins > Kohaku Find/Change** から開く（KCM と同じ形・2026-09-29 から）。
-  About はパネルメニューの末尾（`About This Plug-in...`）と本体の About のメニューの下にあり、**名前と版数だけ**を出す（どの UI 言語でも同じ）。
+  About はパネルメニューの末尾（`About This Plug-In...`）と本体の About のメニューの下にあり、**名前と版数だけ**を出す（どの UI 言語でも同じ）。
   - 訂正:
 
 - **GEN-41** ID のプレフィックスは Adobe が発行した `0x1EA600`〜`0x1EA6FF`（256個）を2本で分けている ――

@@ -102,6 +102,8 @@ public:
 	virtual const char* ChangeAllCommandName() = 0;
 	/** = KFCReplaceEngine::PreviewHit (appended) - a GREP row's after-text, written and thrown away. */
 	virtual bool PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outAfter) = 0;
+	/** = KFCSavedQueries::LoadIntoFindChange (appended) - a query double-clicked in the query dialog, into Find/Change. */
+	virtual bool LoadSavedQuery(const IDFile& file) = 0;
 };
 
 #endif // __IKFCRuns_h__

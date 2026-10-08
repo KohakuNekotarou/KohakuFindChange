@@ -40,6 +40,7 @@
 // Project includes:
 #include "KFCQueryDialog.h"
 #include "KFCDiag.h"				// the test build's qd-order-reset (Repaint)
+#include "KFCFindChangeMinimize.h"	// KFCShowFindChangeDialog - a double-clicked query, shown
 #include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
 #include "KFCPanelTitle.h"
 #include "KFCQueryList.h"
@@ -100,7 +101,7 @@ namespace
 	/** The dialog's own message line (the author's call): the words the panel's message line is given, here
 	    too. The dialog is modeless and stands while the KFC panel is closed, and a Run's result - or why it could not
 	    run - was then shown nowhere; the panel still gets the same line (KFCResultTree::ShowStatus keeps it for its next
-	    show). Empty at every open (Repaint). */
+	    show). At every open it says how a saved query is seen in Find/Change (Repaint - the author's call). */
 	void ShowDialogMessage(IPanelControlData* panel, const PMString& message)
 	{
 		if (panel == nil)
@@ -149,7 +150,9 @@ namespace
 	{
 		if (panel == nil)
 			return;
-		ShowDialogMessage(panel, PMString());		// a fresh open says nothing of an earlier run
+		// A fresh open says nothing of an earlier run - it says how to see a saved query (the author's call: "show the
+		// double click in the message when the dialog opens").
+		ShowDialogMessage(panel, PMString("Double-click a saved query to load it into Find/Change."));
 #ifdef KFC_DIAG
 		// TEST BUILDS ONLY: the fault switch qd-order-reset (KFCDiag.h) - a test case starts from an empty order, as a
 		// fresh session does (the order outlives a case otherwise: it is the session's). One-shot: taken away here, so the
@@ -470,6 +473,48 @@ void KFCQueryDialogOpen()
 void KFCQueryDialogRefreshScope()
 {
 	ShowRunScope(gOpenPanel);		// nil while no dialog is open - nothing then
+}
+
+void KFCQueryDialogShowInFindChange(int32 savedIndex)
+{
+	const std::vector<KFCSavedQuery>& saved = KFCQueryOrder::Saved();
+	if (savedIndex < 0 || savedIndex >= static_cast<int32>(saved.size()))
+		return;
+	const KFCSavedQuery& query = saved[static_cast<size_t>(savedIndex)];
+	PMString say;
+	say.SetTranslatable(kFalse);
+	// NOT WHILE A RUN IS UP: its modal bar pumps events, so a double click can arrive in the middle of one - and a query
+	// run is putting its own queries into Find/Change (KFCRunGuard).
+	if (KFCRuns()->IsAnyRunning())
+	{
+		say.Append(KFCRuns()->BusyMessage());
+		ShowDialogMessage(gOpenPanel, say);
+		return;
+	}
+	// The command changes nothing for a file that is not there and still answers success (KFCSavedQueries.h) - asked
+	// first, as the run asks: the left list was read at the open, and a query can be deleted since.
+	if (!FileUtils::DoesFileExist(query.file))
+	{
+		say.Append(query.name);
+		say.Append(" cannot be found - nothing was loaded into Find/Change.");
+		ShowDialogMessage(gOpenPanel, say);
+		return;
+	}
+	// THE DIALOG FIRST, THEN THE QUERY (measured - cases qd-dblclick-closed / qd-dblclick-open). Find/Change opened AFTER
+	// the query was loaded came up on the tab it was last on: its open put that tab back over the query's (a GREP query
+	// loaded with the dialog last on Text - the GREP strings in, the Text tab shown). Loaded into the dialog once it
+	// stands, the query takes its own tab, as a query picked in the dialog's own Query menu does.
+	(void)KFCShowFindChangeDialog();
+	if (!KFCRuns()->LoadSavedQuery(query.file))
+	{
+		say.Append(query.name);
+		say.Append(" could not be loaded into Find/Change.");
+		ShowDialogMessage(gOpenPanel, say);
+		return;
+	}
+	say.Append("Loaded into Find/Change: ");
+	say.Append(KFCQueryOrder::SavedRowText(savedIndex));		// "<kind>  <name>", as the row reads
+	ShowDialogMessage(gOpenPanel, say);
 }
 
 // End, KFCQueryDialog.cpp.
