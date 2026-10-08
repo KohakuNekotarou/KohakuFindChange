@@ -194,8 +194,10 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 	// THE WRITTEN ROW'S SELECTION OFF FIRST. The list selects one row at a time ("Items selectable: 1", KFCUI.fr), and in
 	// such a tree Select does not move a selection - it refuses while a row is selected (ITreeViewController::SelectCode
 	// eSingleItemAlreadySelected; measured: the next row was jumped to while the written one stayed selected).
-	controller->DeselectAll();
-	const ITreeViewController::SelectCode selected = controller->Select(next);
+	// The official re-selection (docs/ai-notes/api-official-examples.md, "select a tree row again"): the deselect tells
+	// nobody - only the row that ends selected is announced - and both repaint.
+	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
+	const ITreeViewController::SelectCode selected = controller->Select(next, kTrue /*notifyOfChange*/, kTrue /*changeHilite*/);
 	KFC_DIAG_LOG("GOON select code=%d chapter=%d hit=%d", static_cast<int>(selected), static_cast<int>(chapterIdx), static_cast<int>(hitIdx));
 	(void)selected;
 	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);
