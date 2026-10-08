@@ -486,14 +486,33 @@ void KFCQueryDialogRefreshScope()
 // *BY NAME, the one handle the menu offers: its entries are strings (IStringListControlData). What it keeps beside them
 //  (IID_IFCINTLISTDATA, kFCIntListDataImpl) has no public interface, and KFC is on Exchange - no guessed vtable (the author
 //  also asked whether an ID would do; there is none to use).
-// *ONE MENU FOR EVERY KIND, so a name carried by two kinds is not chosen. Measured 2026-10-08 (work/kbs-regress case
-//  qd-dblclick-query-menu, FCMENU): the menu lists the Text queries, then the GREP ones, then the Object ones, the groups
-//  parted by "-" entries and [Custom] last - not refilled per tab - and each name as the file is named, bundled ones in
-//  English on a Japanese UI too. So a Text query and a GREP query of one name are two entries alike, and choosing the
-//  first could be the other kind's: then nothing is chosen, and the line says why.
+// *ONE MENU FOR EVERY KIND, IN GROUPS. Measured 2026-10-08 (work/kbs-regress case qd-dblclick-query-menu, FCMENU): the
+//  menu lists the Text queries, then the GREP ones, then the Object ones, the groups parted by "-" entries (disabled) and
+//  [Custom] last - not refilled per tab - and each name as the file is named, bundled ones in English on a Japanese UI
+//  too. So a Text query and a GREP query of one name are two entries alike.
+// *NAME AND PLACE, THEN (the author, the same day: name + order?): the name is looked for, and when more than one group
+//  carries it, each such group is weighed against the names KFC knows of the query's own kind - one point for an entry
+//  that is one of them, one off for an entry that is not - and the highest is the query's. Weighed rather than taken by
+//  position, because KFC does not list Object queries (nor whatever else the menu groups) and so cannot count the
+//  groups before it. InDesign's own queries make the Text and GREP groups unlike; only groups as alike as that can tie,
+//  and then nothing is chosen and the line says why.
 // *TOLD, AS A PERSON'S PICK IS (notifyOfChange = kTrue): the dialog loads it the way it loads a query picked in that menu
 //  (the same file the command above just read). Measured the same day with kFalse, a pick it was not told of: the menu
 //  named the query and its delete button stayed grey (FCWIDGET 0x497b, kFCQueryDeleteButtonWidgetID, 0/0).
+static bool16 IsMenuSeparator(IStringListControlData* entries, int32 i)
+{
+	return (!entries->IsEnabled(i) && entries->GetString(i) == PMString("-")) ? kTrue : kFalse;
+}
+
+static bool16 IsSavedNameOfMode(const PMString& name, int32 mode)
+{
+	const std::vector<KFCSavedQuery>& saved = KFCQueryOrder::Saved();
+	for (size_t i = 0; i < saved.size(); ++i)
+		if (saved[i].mode == mode && saved[i].name == name)
+			return kTrue;
+	return kFalse;
+}
+
 static bool16 ChooseInFindChangeQueryMenu(const KFCSavedQuery& query, PMString& outWhy)
 {
 	IControlView* menu = KFCQueryFindChangeWidget(kFindQueryDropDownWidgetID);
@@ -504,27 +523,51 @@ static bool16 ChooseInFindChangeQueryMenu(const KFCSavedQuery& query, PMString& 
 		outWhy.Append("Find/Change's Query menu could not be reached");
 		return kFalse;
 	}
-	int32 at = -1;
-	int32 carrying = 0;
-	for (int32 i = 0; i < entries->Length(); ++i)
+	int32 best = -1;			// the entry chosen
+	int32 bestScore = 0;
+	int32 tied = 0;				// other groups that carry the name and weigh the same as the best
+	int32 carrying = 0;			// groups that carry the name
+	int32 groupStart = 0;
+	const int32 count = entries->Length();
+	for (int32 i = 0; i <= count; ++i)
 	{
-		if (entries->GetString(i) != query.name)
+		if (i < count && !IsMenuSeparator(entries, i))
 			continue;
-		if (at < 0)
-			at = i;
-		++carrying;
+		// The group [groupStart, i): where it carries the name, and how much it looks like the query's kind.
+		int32 at = -1;
+		int32 score = 0;
+		for (int32 j = groupStart; j < i; ++j)
+		{
+			const PMString entry = entries->GetString(j);
+			if (at < 0 && entry == query.name)
+				at = j;
+			score += IsSavedNameOfMode(entry, query.mode) ? 1 : -1;
+		}
+		if (at >= 0)
+		{
+			++carrying;
+			if (best < 0 || score > bestScore)
+			{
+				best = at;
+				bestScore = score;
+				tied = 0;
+			}
+			else if (score == bestScore)
+				++tied;
+		}
+		groupStart = i + 1;
 	}
 	if (carrying == 0)
 	{
 		outWhy.Append("its Query menu does not list it");
 		return kFalse;
 	}
-	if (carrying > 1)
+	if (tied > 0)
 	{
-		outWhy.Append("its Query menu lists that name under more than one kind");
+		outWhy.Append("its Query menu lists that name under more than one kind, in groups that cannot be told apart");
 		return kFalse;
 	}
-	chooser->Select(at, kTrue, kTrue);
+	chooser->Select(best, kTrue, kTrue);
 	return kTrue;
 }
 
