@@ -238,8 +238,8 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	//          nothing is hardcoded and nothing vanishes when the UI brightness changes)
 	// Both have to move together: the context runs are faded TOWARD bg, so leaving bg as the panel
 	// fill on a selected row would fade them toward a colour that is not behind them any more.
-	// The matched text is drawn at the full theme text colour; the context (the "P<page>(<n>)"
-	// locator and the rest of the line) is that same colour faded toward the background, so the
+	// The matched text - and the "P<page>(<n>)" locator ahead of it (below) - is drawn at the full theme text
+	// colour; the context (the line around the match) is that same colour faded toward the background, so the
 	// match reads at full strength and the context recedes. How far it recedes is
 	// kKFCContextTextWeight (KFCPanelTextDraw.h, with its history) - one number for this cell and the
 	// panel's message area.
@@ -253,9 +253,9 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 	const RealAGMColor kFullColor = fg;									// the theme's text colour
 	const RealAGMColor kContextColor = KFCBlendColor(bg, fg, PMReal(kKFCContextTextWeight));	// faded toward bg
 
-	// The emphasised run: the matched text while these are search results, and the text that
-	// REPLACED it once a replace has run (the panel then lists only what changed, so the new text
-	// is exactly what the user wants to read - it gets the same emphasis a match does).
+	// The emphasised run: the matched text, and on a row this list has replaced the text that REPLACED it
+	// (its locator starts with "Changed" - the new text is exactly what the user wants to read, so it gets the
+	// same emphasis a match does).
 	const RealAGMColor kMatchColor = kFullColor;
 
 	// The accent run: the one word that says why this row could not be acted on

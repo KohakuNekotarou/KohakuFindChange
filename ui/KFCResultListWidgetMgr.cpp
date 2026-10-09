@@ -8,7 +8,7 @@
 //
 //    * BRANCH rows (from kKFCResultChapterNodeWidgetRsrcID): an expander arrow and a label. The
 //      BOOK row, the DOCUMENT rows ("<name>  (R/N)") and the STORY rows (the code's FONT
-//      rows - "P3  first words...  (R/N)") are all this one shape at different indents, so no level
+//      rows - "ID 260: first words...  (R/N)") are all this one shape at different indents, so no level
 //      needed a resource of its own.
 //      The expander is hidden on a row with no children, which DOES happen: a book search that
 //      finds nothing still draws its book row (the adapter gives the root one child whenever the
@@ -84,7 +84,8 @@ namespace
 	const PMReal kExpanderZone = 16.0;
 	// How much further right than its chapter row a hit row's content starts. ZERO: it begins exactly where
 	// the chapter row's expander arrow ends, so the two line up down the left edge (the author's call, from
-	// a screen shot - "put the check where the arrow is").
+	// a screen shot - "put the check where the arrow is" - while the row still began with its check box, which
+	// went with spec F16; the colour cell now starts kHitCellStep further right).
 	const PMReal kHitExtraIndent = 0.0;
 	// The hit row's colour cell starts this far right of the row's content: 8px, the step the book and story
 	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
@@ -263,8 +264,8 @@ public:
 		// ApplyNodeIDToWidget calls it on every row (CTreeViewWidgetMgr.cpp:212-218) - and it moves
 		// TWO kinds of child: the ones bound on BOTH sides (the hit row's colour cell, the chapter
 		// row's label) and the ones bound on NEITHER (this row's expander arrow, kBindNone in
-		// KFCUI.fr). Only a child bound on one side alone is left where it is - the hit row's check
-		// box. What makes the framework indent invisible in this panel is NOT that it is switched
+		// KFCUI.fr). Only a child bound on one side alone is left where it is - no row has one since the
+		// hit row's check box went (spec F16). What makes the framework indent invisible in this panel is NOT that it is switched
 		// off: it is that the Apply*Row methods run AFTER it and set every one of those frames
 		// themselves - they are called from ApplyDataToWidget, the base's last step (see there).
 		//
@@ -404,7 +405,7 @@ private:
 		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
-		// "P3  first words...  (R/N)", the way a document row reads out its count, like the rows
+		// "ID 260: first words...  (R/N)", the way a document row reads out its count, like the rows
 		// above it: what the row holds, not what the panel drew of it. (A group that answered
 		// GetFontDisplay is in range - no further test needed.)
 		PMString label(name);

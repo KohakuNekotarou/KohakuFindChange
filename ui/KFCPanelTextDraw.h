@@ -11,7 +11,7 @@
 //
 //  WHY THIS FILE EXISTS. Two widgets draw "the words that matter at full strength, the words around
 //  them faded": a hit row's cell (KFCColorTextView.cpp) and the panel's MESSAGE AREA
-//  (KFCStatusTextView.cpp), which shows a replaced row's text as it was BEFORE the replace. If each
+//  (KFCStatusTextView.cpp), which shows a selected GREP row's Preview Text - what its Replace would write. If each
 //  kept its own 0.65 and its own blend, the two would answer the same question in two places and drift
 //  apart the first time one of them was tuned.
 //
@@ -69,9 +69,9 @@ inline RealAGMColor KFCBlendColor(const RealAGMColor& bg, const RealAGMColor& fg
 
     A row whose match was replaced with NOTHING shows the line with the words simply gone: the
     context closes up and nothing says WHERE. A zero-width match (GREP ^ / $ / a lookaround) is the
-    same case from the search's side - a place with no characters. And the message area, showing the
-    text before a replace, meets it the other way round: a replace that INSERTED into an empty match
-    had nothing there before. All three are "a place, and nothing to show", and KCM draws that as a
+    same case from the search's side - a place with no characters. And the message area meets it in a
+    GREP row's Preview Text: a Replace that would write nothing (an empty Change To).
+    All three are "a place, and nothing to show", and KCM draws that as a
     thin bar the full height of the line.
 
     NOTHING IS ADDED TO ANY STRING. The bar is DRAWN; the placeholder below only reserves the room, so

@@ -18,8 +18,8 @@
 //
 //  The level under a document holds STORIES - a Find/Change result is grouped by story, the way KCM's
 //  Story mode lists them. !It is named "font" / FontGroup because it once held fonts (for the Find
-//  Missing Glyphs scan, since removed); the names were kept. A story row has no menu of its own - only a
-//  hit row has one (KFCResultNodeEH::RButtonDn).
+//  Missing Glyphs scan, since removed); the names were kept. A story row's right-click menu holds Search This
+//  Story Again, a hit row's holds Replace; the book and document rows have none (KFCResultNodeEH::RButtonDn).
 //
 //  hit stays the CHAPTER-wide index, not a position inside the font group. Everything that asks
 //  the model about a hit - the row's drawing, the jump, the replace - names it that

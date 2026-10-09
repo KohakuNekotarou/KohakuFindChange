@@ -222,8 +222,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * The panel's MESSAGE AREA, built the same way as the cell above and for the same
-	 * reason: a replaced row, once selected, shows its text as it was BEFORE the replace here, and
-	 * "which characters were replaced" is a question one colour cannot answer (KFCStatusTextView.cpp).
+	 * reason: a selected GREP row's Preview Text shows here what its Replace would write - the written
+	 * characters at full colour between the row's context faded - which one colour cannot draw (KFCStatusTextView.cpp).
 	 * Brought over from KCM, whose kKCMStatusTextWidgetBoss replaced the same stock widget.
 	 * ! No ITextControlData of our own: the one kGenericPanelWidgetBoss carries is persistent, and the
 	 *   data implementation writes the message into it for a reader that walks the widgets.
