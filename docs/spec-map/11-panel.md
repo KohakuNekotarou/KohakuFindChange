@@ -86,9 +86,10 @@
   - 訂正:
 
 - **PNL-17** ★説明は、UI 言語が日本語なら日本語、それ以外は英語（2026-08-05 の決定＝featureSet ではなく UI 言語で決める）。
-  中身は（英語）7つ ―― 免責／検索（Find in …）／検索範囲（Book Scope）／結果の見方／置換／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
-  （2026-10-06 に英語の置換の節を行の Replace・Return・Change All in Book (No List)・Clear Results・変更履歴の扱いに書き直し、300件の上限を検索の節に足した。）
-  ⚠**日本語は作者の確認待ち**（作者の文面そのままの節があるので、下書きを見てもらってから入れる）＝今は旧版の8つ（置換（Change Checked）と Show Changes の節が残る）。
+  中身は8つ ―― 免責／検索（Find in …）／検索範囲（Book Scope）／結果の見方／置換／保存したクエリを順に実行（Run Saved Queries...）／ブックパネル（Remember Book Panel Placement）／アプリケーションバーの検索欄。
+  ★**日本語は作者の文面そのまま、英語はそれに1行ずつ合わせる**（2026-10-09 朝 `33fecee`＝Change Checked と Show Changes の節を外した。同じ日の夜、作者が書いた「保存したクエリを順に実行」の節を足した＝作者「HOWTOにクエリダイアログの件がのってなかったですね」）。
+  （2026-10-06 の英語だけの書き直し（行の Replace・Change All in Book・Clear Results・300件）は、10-09 朝に日本語に合わせたときに無くなった。）
+  - ⬜ How to Use に載っていない項目＝Change All in Book (No List)・Find/Change Selected Documents (Book)・Clear Results・Search This Story Again・Translucent／Minimizable の設定・Save Panel Settings（足すかは作者）。
   - 訂正:
 
 - **PNL-18** スクリプトの窓が出せないときは、ふつうのアラートで同じ文を出す（先頭に `Kohaku Find/Change - How to Use` を付ける＝アラートには題が無いので）。
