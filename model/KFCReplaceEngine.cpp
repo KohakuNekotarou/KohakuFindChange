@@ -652,6 +652,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 	}
 	if (walker->IsWalking())
 		walker->Halt();
+	// The story's first words, read again for its row (1.4.0 - the author's call of 2026-10-10): what this walk wrote can
+	// be among them. Each row is backed up before it takes them (KFCResultModel::SetStoryLead), so a preview's rollback,
+	// an Undo and a Redo put the words back with the rows.
+	KFCSearchEngine::RereadStoryLead(chapterIdx, storyRef);
 	return true;
 }
 

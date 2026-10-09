@@ -132,7 +132,7 @@ namespace KFCResultModel
 	    be applied to a group with a lower_bound rather than a scan. */
 	struct FontGroup
 	{
-		PMString			fontName;	// the story row's text ("ID 260: first words..." - BuildFontGroups)
+		// (Its row's text - "ID 260: first words..." - is made from its rows' storyLead as it is read: GetFontDisplay.)
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
 		// Story mode lists stories, and every group is one.
@@ -453,6 +453,11 @@ namespace KFCResultModel
 	/** The whole text the replace wrote at the row's place (Hit::replacedText). The replace reads it from the
 	    document - the model reads no text - and hands it over here. */
 	void SetHitWrittenText(int32 chapterIdx, int32 hitIdx, const PMString& writtenText);
+
+	/** A story's first words, read again after a write (1.4.0 - KFCSearchEngine::RereadStoryLead): every row of the
+	    chapter in that story takes them as its storyLead - each one backed up first (a rollback, an Undo and a Redo put
+	    them back with the row) - and the story row's text follows (GetFontDisplay). True when a row changed. */
+	bool SetStoryLead(int32 chapterIdx, UID storyUID, const PMString& lead);
 	/** False when the row is not replaced, or the index is out of range. */
 	bool GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText);
 
@@ -606,8 +611,8 @@ namespace KFCResultModel
 	    compares against the document (KFCSearchEngine::RowReadsAsFound - the hash taken over the
 	    stored range, and the line around it), and a marked-up copy would fail every comparison - a
 	    click on a row would answer "the text is no longer here" about text that had not moved at all.
-	    Callers mark a COPY, at the moment they draw it. (The one marked string the model keeps is a
-	    story row's label, FontGroup::fontName, which nothing compares.)
+	    Callers mark a COPY, at the moment they draw it. (A story row's label is marked as it is read -
+	    GetFontDisplay - and nothing compares it.)
 
 	    It also DROPS the characters an object stands on - footnote / endnote references, anchors,
 	    a table's per-row continuations, page number markers (the author's call: they drew as a box).

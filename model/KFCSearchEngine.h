@@ -200,6 +200,18 @@ namespace KFCSearchEngine
 	    for nothing but the document. */
 	int32 CurrentSearchScope();
 
+	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - 1.4.0, the
+	    author's call of 2026-10-10: a row's click selects its match, and Edit > Find/Change, open, answers a selection
+	    change by re-picking Search: (measured: to Document, or to Selection), which its own Find Next does not do. The
+	    UI half asks this the moment it hears the change (KFCJump::KeepSearchScopeAfterClick). SCHEDULED, not processed:
+	    it is asked from inside the notification of the dialog's own command. Measured: written back, the open dialog
+	    shows the value again and keeps it. */
+	void RestoreSearchScope(int32 mode, int32 scope);
+
+	/** Read a story's first words again into its rows (KFCResultModel::SetStoryLead) - the story row's text - after a
+	    write of KFC's in it (1.4.0, the author's call of 2026-10-10: the story row says what the story says now). */
+	void RereadStoryLead(int32 chapterIdx, const UIDRef& storyRef);
+
 	/** WHAT THE SELECTION MAKES OF A Search:. The dialog offers Search: values by the
 	    selection - InDesign's own answer, IWalkerScopeFactoryUtils::GetActiveSelectionScope, the widest one it
 	    allows (SnpFindAndReplace builds its scope menu from it): nothing selected = All Documents and Document;

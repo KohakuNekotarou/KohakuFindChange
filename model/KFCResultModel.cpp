@@ -186,16 +186,7 @@ namespace
 			{
 				KFCResultModel::FontGroup group;
 				group.story = hit.storyUID;
-				group.fontName = PMString("ID ");
-				group.fontName.AppendNumber(static_cast<int32>(hit.storyUID.Get()));
-				group.fontName.Append(": ");
-				// The story's first words keep their breaks (KFCSearchEngine's StoryLeadText):
-				// drawn as the marks a hit row draws, by the same function.
-				PMString lead(hit.storyLead);
-				KFCResultModel::MarkUpBreaksForDisplay(lead);
-				group.fontName.Append(lead);
-				group.fontName.SetTranslatable(kFalse);
-				chapter.fontGroups.push_back(group);
+				chapter.fontGroups.push_back(group);	// its row's text is made as it is read - GetFontDisplay
 				found = static_cast<int32>(chapter.fontGroups.size()) - 1;
 				groupOf[key] = found;
 			}
@@ -568,7 +559,21 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
 	if (group == nil)
 		return false;
-	outName = group->fontName;			// the story row's text - see BuildFontGroups
+	// THE STORY ROW'S TEXT - "ID 260: first words..." - made from its rows' storyLead NOW, not kept beside them (1.4.0 -
+	// the author's call of 2026-10-10): a Replace reads the story's first words into its rows again (SetStoryLead), and
+	// a rollback, an Undo or a Redo puts the rows back with theirs, so the row says what the story says.
+	outName = PMString("ID ");
+	outName.AppendNumber(static_cast<int32>(group->story.Get()));
+	outName.Append(": ");
+	const Hit* first = group->hitIndices.empty() ? nil : HitAt(chapterIdx, group->hitIndices[0]);
+	if (first != nil)
+	{
+		// The story's first words keep their breaks (KFCSearchEngine's StoryLeadText): drawn as the marks a hit row
+		// draws, by the same function.
+		PMString lead(first->storyLead);
+		MarkUpBreaksForDisplay(lead);
+		outName.Append(lead);
+	}
 	outName.SetTranslatable(kFalse);
 	outHitCount = static_cast<int32>(group->hitIndices.size());
 	return true;
@@ -885,6 +890,25 @@ void KFCResultModel::SetHitWrittenText(int32 chapterIdx, int32 hitIdx, const PMS
 	BackUpRow(chapterIdx, hitIdx, *h);
 	h->replacedText = writtenText;
 	h->replacedText.SetTranslatable(kFalse);
+}
+
+bool KFCResultModel::SetStoryLead(int32 chapterIdx, UID storyUID, const PMString& lead)
+{
+	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()) || storyUID == kInvalidUID)
+		return false;
+	bool changed = false;
+	std::vector<Hit>& hits = gChapters[static_cast<size_t>(chapterIdx)].hits;
+	for (size_t i = 0; i < hits.size(); ++i)
+	{
+		Hit& hit = hits[i];
+		if (hit.storyUID != storyUID || hit.storyLead == lead)
+			continue;
+		BackUpRow(chapterIdx, static_cast<int32>(i), hit);
+		hit.storyLead = lead;
+		hit.storyLead.SetTranslatable(kFalse);
+		changed = true;
+	}
+	return changed;
 }
 
 bool KFCResultModel::GetHitWrittenText(int32 chapterIdx, int32 hitIdx, PMString& outWrittenText)

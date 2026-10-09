@@ -357,6 +357,24 @@ bool CommitFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
 	return ProcessFindChangeCmd(cmd);
 }
 
+// The same command SCHEDULED rather than processed (CmdUtils::ScheduleCommand - the queue keeps its own reference, as
+// snippetrunner's SnipRunLog::Resize hands one over): for a caller inside the notification of another find/change
+// command, where processing one of its own would nest it in the command being notified. Whether it was scheduled.
+bool ScheduleFindChangeInt(const ClassID& cmdBoss, int32 value, int32 mode)
+{
+	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
+	if (cmd == nil)
+		return false;
+	InterfacePtr<IIntData> valueData(cmd, UseDefaultIID());
+	if (valueData == nil)
+		return false;
+	valueData->Set(value);
+	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
+	if (modeData != nil)
+		modeData->Set(mode);
+	return CmdUtils::ScheduleCommand(cmd) == kSuccess;
+}
+
 // A frame UID -> its page, named the way the Pages panel names it (section prefix and all). Shared
 // by the visible-match path (the match's own frame) and the overset path (the "+" indicator's
 // frame). false only when neither a page nor a spread can be resolved. outPageIndex is the page's
@@ -4174,6 +4192,19 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	if (capped)
 		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
 	return true;
+}
+
+void KFCSearchEngine::RestoreSearchScope(int32 mode, int32 scope)
+{
+	// kScopeCmdBoss with the tab beside it - how SnpFindAndReplace sets Search: (ProcessFindChangeCommandInt32) -
+	// scheduled (ScheduleFindChangeInt): the caller is inside the notification of the dialog's own command.
+	if (mode >= 0 && scope >= 0)
+		(void)ScheduleFindChangeInt(kScopeCmdBoss, scope, mode);
+}
+
+void KFCSearchEngine::RereadStoryLead(int32 chapterIdx, const UIDRef& storyRef)
+{
+	(void)KFCResultModel::SetStoryLead(chapterIdx, storyRef.GetUID(), StoryLeadText(storyRef));
 }
 
 // End, KFCSearchEngine.cpp.

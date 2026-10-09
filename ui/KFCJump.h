@@ -6,10 +6,10 @@
 //
 //  Jump-to-hit navigation. A hit-row click (ActivateNode) jumps: it resolves the hit's stored
 //  location (reopening the chapter windowless if the user closed it), brings that chapter's window
-//  to the front, scrolls the view so the match is centred, and SELECTS the match (1.4.0 - the
-//  author's call of 2026-10-09: the tree does what Edit > Find/Change's Find Next does, so the
-//  selection is the pointer and no marker goes over it). The keyboard stays on the list and the
-//  tool as it is. A match that cannot be selected - locked, hidden, zero width, no longer found -
+//  to the front, scrolls the view so the match is centred, and SELECTS the match with the Type tool
+//  on (1.4.0 - the author's calls of 2026-10-09 and -10: the tree does what Edit > Find/Change's
+//  Find Next does, so the selection is the pointer and no marker goes over it). The keyboard stays
+//  on the list. A match that cannot be selected - locked, hidden, zero width, no longer found -
 //  gets the marker on its characters instead (KFCHitMarker - a global text adornment), which takes
 //  itself down after about a second, and nothing is left selected; until 1.4.0 every click did only
 //  that, and changed nothing in the document (JMP-06).
@@ -44,8 +44,8 @@ namespace KFCJump
 
 	/** SELECT the match in the document: switch to the Type tool and highlight the hit's own range,
 	    so the user can edit or copy it straight away. The DOUBLE-CLICK half of a hit row - a single
-	    click selects it too (1.4.0) but leaves the tool and the keyboard where they are (see the note
-	    at the head of this header) - this is the extra step that says "and put me in it".
+	    click selects it too, with the Type tool on (1.4.0), but leaves the keyboard on the list (see
+	    the note at the head of this header) - this is the extra step that says "and put me in it".
 
 	    Assumes the jump has already run for this row - the double-click sequence TRIES it on the first
 	    click, and this refuses, without a word, when the hit's layout window is not the one in front
@@ -66,6 +66,12 @@ namespace KFCJump
 	    @param hitIdx the hit index.
 	    @return kTrue if a text selection was actually made. */
 	bool SelectHitText(int32 chapterIdx, int32 hitIdx);
+
+	/** A Find/Change setting changed (KFCPanelTitle's observer, IID_IFINDCHANGEOPTIONS). If a row was activated a
+	    moment ago (ActivateNode - a click, the arrow walk) and Edit > Find/Change has re-picked Search: in answer to
+	    the selection or the front document that changed, Search: is put back as it was before the activation, when
+	    the selection offers it (1.4.0 - the author's call of 2026-10-10; the note above ScopeKeep in KFCJump.cpp). */
+	void KeepSearchScopeAfterClick();
 
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a
 	    chapter row lands, to decide whether to close the other displayed chapters; the flyout drives it.

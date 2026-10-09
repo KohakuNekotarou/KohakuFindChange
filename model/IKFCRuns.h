@@ -109,6 +109,8 @@ public:
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) = 0;
 	/** = KFCSearchEngine::SearchStoryAgain (appended) - a story row's Search This Story Again. */
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) = 0;
+	/** = KFCSearchEngine::RestoreSearchScope (appended, 1.4.0) - Search: put back after a row's click (scheduled). */
+	virtual void RestoreSearchScope(int32 mode, int32 scope) = 0;
 };
 
 #endif // __IKFCRuns_h__

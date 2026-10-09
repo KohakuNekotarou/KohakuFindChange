@@ -71,6 +71,7 @@
 #include "KFCBookPanelLookup.h"		// BringBookTabForward - a book row's tab
 #include "KFCResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KFCDiag.h"				// KFC_DIAG_LOG / KFC_DIAG_FAULT - test builds only
+#include <chrono>					// how soon after a click Search: changed (KeepSearchScopeAfterClick)
 #include <vector>
 
 namespace
@@ -723,14 +724,91 @@ void ClearSelection()
 		selectionManager->DeselectAll(nil);
 }
 
+// SEARCH: AS IT WAS BEFORE A CLICK (1.4.0 - the author's call of 2026-10-10: put Search: back as it was). Edit >
+// Find/Change - open, or minimized - re-picks Search: when the selection or the front document changes, and a row's
+// click can do both: measured 2026-10-10 with the dialog open and InDesign in front, about 0.2 s after a click that
+// selected, Story, To End of Story and All Documents became Document (on another run, Story became Selection);
+// Document stayed. A click that fronts ANOTHER document had it re-picked WHILE that document came forward (read after
+// the fronting, the value was Document already - t1-cross-alldocs-r2), and a click that cannot select still takes the
+// old selection away, which the dialog answers as well (All Documents -> Document - t1-locked-all_documents). The
+// dialog's own Find Next leaves Search: alone. So every activation (ActivateNode) remembers the tab's Search: BEFORE it
+// does anything, and a change to it within kScopeKeepMs is put back - KFCPanelTitle's observer hears the change and
+// calls KFCJump::KeepSearchScopeAfterClick. Measured: written back, the open dialog shows the value again and keeps it.
+// A change later than that is the user's own; one inside it is put back too - who made it cannot be told. A row's
+// Replace leaves Search: as it is (measured: replace-keeps-scope), so nothing arms for it.
+struct ScopeKeep
+{
+	bool	armed;
+	int32	mode;
+	int32	scope;
+	std::chrono::steady_clock::time_point at;
+	ScopeKeep() : armed(false), mode(-1), scope(-1) {}
+};
+ScopeKeep gScopeKeep;
+const long long kScopeKeepMs = 2000;
+
+// Arm for an activation about to happen. One INSIDE an armed window keeps the value already held and only renews the
+// window: the arrow walk's next row can come between the dialog's write and ours, and would take the dialog's value
+// as the one to keep.
+void ArmScopeKeep()
+{
+	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	const int32 mode = KFCRuns()->CurrentSearchMode();
+	if (gScopeKeep.armed && mode == gScopeKeep.mode
+		&& std::chrono::duration_cast<std::chrono::milliseconds>(now - gScopeKeep.at).count() <= kScopeKeepMs)
+	{
+		gScopeKeep.at = now;
+		KFC_DIAG_LOG("SCOPEKEEP renewed mode=%d scope=%d", (int)gScopeKeep.mode, (int)gScopeKeep.scope);
+		return;
+	}
+	const int32 scope = KFCRuns()->CurrentSearchScope();
+	gScopeKeep.armed = (mode >= 0 && scope >= 0);
+	gScopeKeep.mode = mode;
+	gScopeKeep.scope = scope;
+	gScopeKeep.at = now;
+	KFC_DIAG_LOG("SCOPEKEEP armed=%d mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
+}
+
+// The Type tool, because a selected match is an invitation to EDIT - the double click's (SelectHitText) and, since
+// 1.4.0, the click's as well: Edit > Find/Change's Find Next selects what it found and puts the Type tool on, and the
+// author asked for the same (2026-10-10). A text selection made while the Selection tool is active is not somewhere the
+// user can start typing. ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is written down in How to Use for
+// that reason.
+//
+// IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
+// more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
+// return kTrue from it as well - then names this call as the one to use "for traditional 'text'
+// tools that select text". Measured on the running application with IsTextTool: with the Hand,
+// Zoom or Gradient tool active, a double click left that tool in place and made the selection
+// anyway - text highlighted in a window the user cannot type into, which is the
+// one outcome the paragraph above says must not happen. (The Selection tool was the control
+// group and switched correctly, before and after.)
+// ! Every SDK sample uses IsTextTool here, gotolasttextedit included; the header is what they
+//   are all not reading. There is no call to IsToolOfType anywhere in the SDK to copy from.
+// False when the Type tool could not be put on.
+bool PutTypeToolOn()
+{
+	InterfacePtr<ITool> activeTool(Utils<IToolBoxUtils>()->QueryActiveTool());
+	if (activeTool == nil || !activeTool->IsToolOfType(ITool::kTextSelectionTool))
+	{
+		InterfacePtr<ITool> iBeamTool(Utils<IToolBoxUtils>()->QueryTool(kIBeamToolBoss));
+		if (iBeamTool == nil)
+			return false;
+		if (!Utils<IToolBoxUtils>()->SetActiveTool(iBeamTool))
+			return false;
+	}
+	return true;
+}
+
 // A CLICK'S SELECTION OF A TEXT ROW'S MATCH (1.4.0 - the author's call of 2026-10-09: the tree does what Edit >
 // Find/Change's Find Next does, one result selected after another, so the selection is the pointer and no marker goes
 // over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
 // overset one never comes here). Refused WITHOUT A WORD: the marker JumpToHit raises instead is the answer, as on every
-// click before 1.4.0; the reasons are the double click's to say (SelectHitText). The keyboard stays on the list - the
-// row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return replaces. The
-// tool is left as it is: a double click is still what puts the Type tool on. The document is in front and composed,
-// inside JumpToHit's dirty guard, its selection cleared. True when the match is selected.
+// click before 1.4.0; the reasons are the double click's to say (SelectHitText). The Type tool is put on, as Find Next
+// does (PutTypeToolOn - the author's call of 2026-10-10); the keyboard stays on the list - the row's LButtonUp acquires
+// it after the jump, the walk takes it back - so the arrows walk on and Return replaces. Handing the keyboard to the
+// text is still the double click's. The document is in front and composed, inside JumpToHit's dirty guard, its
+// selection cleared. True when the match is selected.
 bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end, bool found)
 {
 	if (!found || start >= end)
@@ -752,6 +830,10 @@ bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, 
 		return false;
 	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
 	if (textSelectionSuite == nil)
+		return false;
+	// The Type tool after the selection was cleared (JumpToHit) and before the text is selected - the order
+	// SelectHitText keeps, and the official recipes' (its note there).
+	if (!PutTypeToolOn())
 		return false;
 	// ! RangeData's two-argument form is (start, END) - SelectHitText's note.
 	return textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) != kFalse;
@@ -1182,30 +1264,11 @@ bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
 		selectionManager->DeselectAll(nil);
 
-	// The Type tool, because this is an invitation to EDIT. A text selection made while
-	// the Selection tool is active is not somewhere the user can start typing, which is the whole
-	// point of the double-click. ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is
-	// written down in How to Use for that reason.
-	//
-	// IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
-	// more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
-	// return kTrue from it as well - then names this call as the one to use "for traditional 'text'
-	// tools that select text". Measured on the running application with IsTextTool: with the Hand,
-	// Zoom or Gradient tool active, a double click left that tool in place and made the selection
-	// anyway - text highlighted in a window the user cannot type into, which is the
-	// one outcome the paragraph above says must not happen. (The Selection tool was the control
-	// group and switched correctly, before and after.)
-	// ! Every SDK sample uses IsTextTool here, gotolasttextedit included; the header is what they
-	//   are all not reading. There is no call to IsToolOfType anywhere in the SDK to copy from.
-	InterfacePtr<ITool> activeTool(Utils<IToolBoxUtils>()->QueryActiveTool());
-	if (activeTool == nil || !activeTool->IsToolOfType(ITool::kTextSelectionTool))
-	{
-		InterfacePtr<ITool> iBeamTool(Utils<IToolBoxUtils>()->QueryTool(kIBeamToolBoss));
-		if (iBeamTool == nil)
-			return false;
-		if (!Utils<IToolBoxUtils>()->SetActiveTool(iBeamTool))
-			return false;
-	}
+	// The Type tool, because this is an invitation to EDIT - PutTypeToolOn, whose note says why it
+	// is IsToolOfType and not IsTextTool. (Since 1.4.0 the click has already put it on, as Find Next
+	// does; asked again because a caller may come here another way.)
+	if (!PutTypeToolOn())
+		return false;
 
 	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
 	if (textSelectionSuite == nil)
@@ -1251,6 +1314,10 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		return;
 	ActivationGuard activationGuard;
 
+	// Search: as it is BEFORE this activation fronts a document or changes the selection - put back if Edit >
+	// Find/Change re-picks it in answer (ScopeKeep, above JumpToHit).
+	ArmScopeKeep();
+
 	// A GREP row landed on: what its Replace would write, on the message area (KFCResultTree::ShowRowPreview).
 	// Any other landing - a jump refused (its reason stands), a branch row - takes a previous row's preview
 	// away, so it never stands beside a row it does not belong to.
@@ -1269,6 +1336,36 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		else if (chapterIdx == -1)
 			ShowBook();
 	}
+}
+
+void KFCJump::KeepSearchScopeAfterClick()
+{
+	if (!gScopeKeep.armed)
+		return;
+	const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - gScopeKeep.at).count();
+	// Too late to be the click's doing, or a setting of another tab: let go.
+	if (ms > kScopeKeepMs || KFCRuns()->CurrentSearchMode() != gScopeKeep.mode)
+	{
+		gScopeKeep.armed = false;
+		return;
+	}
+	// Still armed after putting it back, for the window's length: the dialog can write more than once for one click
+	// (measured: a click that fronted another document had it written as the document came forward and again about
+	// 0.35 s later, for the selection - click-keeps-scope-cross), and a double click selects again inside it
+	// (SelectHitText), which the dialog answers too. Writing the same value back changes nothing, so the notification of
+	// our own write ends here.
+	//
+	// ONLY A VALUE THE SELECTION NOW OFFERS goes back (KFCSearchEngine::SearchScopeForSelection: All Documents and
+	// Document always; Story, To End of Story and Selection only with a selection that gives them). One it does not
+	// offer - Story after a click that could not select, which leaves nothing selected - is one the dialog cannot show
+	// either, and it stays as the dialog made it, as when the user takes a selection away themselves.
+	const int32 now = KFCRuns()->CurrentSearchScope();
+	const bool offered = (KFCRuns()->SearchScopeForSelection(gScopeKeep.scope) == gScopeKeep.scope);
+	KFC_DIAG_LOG("SCOPEKEEP heard ms=%d scope now=%d kept=%d offered=%d", (int)ms, (int)now, (int)gScopeKeep.scope,
+		offered ? 1 : 0);
+	if (now >= 0 && now != gScopeKeep.scope && offered)
+		KFCRuns()->RestoreSearchScope(gScopeKeep.mode, gScopeKeep.scope);
 }
 
 // End, KFCJump.cpp.

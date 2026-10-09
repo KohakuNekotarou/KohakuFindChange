@@ -109,6 +109,7 @@ public:
 	virtual bool LoadSavedQuery(const IDFile& file) { return KFCSavedQueries::LoadIntoFindChange(file); }
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::LocateRow(chapterIdx, hitIdx, docRef, ioStart, ioEnd); }
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }
+	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

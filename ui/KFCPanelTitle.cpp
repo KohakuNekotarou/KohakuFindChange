@@ -50,6 +50,7 @@ namespace GoToURLUtils
 #include "KFCQueryDialog.h"		// KFCQueryDialogRefreshScope - the query dialog's Runs on: line follows the tab's scope
 #include "KFCResultTree.h"		// RestoreStatusOnPanelShow - the message the workspace persisted
 #include "KFCDiag.h"			// a test build counts the recomputes (KFCDiagCounter)
+#include "KFCJump.h"			// KeepSearchScopeAfterClick - Search: back after a row's click
 
 namespace
 {
@@ -374,6 +375,8 @@ protected:
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 			KFCPanelTitle::Update();
+			// ...and Search: re-picked by Edit > Find/Change in answer to a row's click goes back (1.4.0).
+			KFCJump::KeepSearchScopeAfterClick();
 			return;
 		}
 
