@@ -25,6 +25,7 @@
 #include "KFCHitMarker.h"		// the jump marker's static state, emptied at shutdown
 #include "KFCBookScope.h"
 #include "KFCBookWatch.h"
+#include "KFCDiagCommands.h"	// the test build's undo-watch (a no-op in a shipping build)
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// the remembered Find Format: an attribute list and a raw IDataBase*
 #include "KFCUndoFollow.h"		// the writes kept for the panel's following of Undo
@@ -41,12 +42,15 @@ public:
 	virtual void Startup()
 	{
 		KFCBookWatchAttach();
+		// A test build's instrument, armed only while its fault switch is on (KFCDiagCommands.h); nothing otherwise.
+		KFCDiagCommands::WatchUndoArm();
 	}
 
 	/** Release the model's static storage, so every static destructor at DLL unload finds nothing left
 	    to do. */
 	virtual void Shutdown()
 	{
+		KFCDiagCommands::WatchUndoDisarm();
 		KFCBookWatchDetach();
 		// State-only - the marker holds a static IDFile (its document's file) as well as a raw
 		// IDataBase*, and neither may still be standing at DLL unload. Not ClearMarker: there is nothing to

@@ -37,6 +37,7 @@
 #include "KFCID.h"
 #include "KFCBookScope.h"		// FindOpenChapterDoc - a chapter's document found again by its file
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the test build's trace (compiled out of a shipping build)
+#include "KFCDiagCommands.h"	// LogHistory - the test build's undo-watch (nothing in a shipping build)
 #include "KFCResultModel.h"
 #include "KFCModelNotify.h"		// the panel drawn again, and its message line - told, never called
 #include "KFCRunGuard.h"		// IsAnyRunning - nothing is followed while any run of ours (the replace among them) is up
@@ -469,6 +470,7 @@ public:
 	{
 		KFC_DIAG_LOG("LAZY doc subject=%p proto=0x%x data=%p main=%d", (void*)theSubject, protocol.Get(),
 			(const void*)data, IDThreading::IsMainThreadDomain() ? 1 : 0);
+		KFCDiagCommands::LogHistory("lazy");
 		if (protocol != IID_IKFCUNDOMARK || theSubject == nil)
 			return;
 		// The main thread only (kModelPlugIn - the split's design, section 6): an Undo and a Redo

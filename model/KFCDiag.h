@@ -71,6 +71,11 @@
 //    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
 //                (a jumped-to replaced row drawn hilited)
+//    undo-watch  READ ONCE, AT STARTUP (the model half's): every command InDesign processes is written as an UNDOW line,
+//                with every open document's undo and redo history whenever it has changed (KFCDiagCommands.h - the
+//                final test's u1-false-redo-undo-other-type4, 2026-10-09: another document's history found empty).
+//                work\kbs-regress\run.ps1 writes a STEP line here before each step while the switch is on. Heavy:
+//                throwaway sessions only.
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

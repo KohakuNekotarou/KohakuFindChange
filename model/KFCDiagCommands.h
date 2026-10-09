@@ -31,6 +31,20 @@ namespace KFCDiagCommands
 	/** Write "COMMANDS <what> total=<n> <class name>=<count> ..." (the most frequent first) and stop counting. */
 	void DisarmAndLog(const char* what);
 
+	/** UNDO-WATCH (the final test, 2026-10-09 - u1-false-redo-undo-other-type4: ANOTHER document's undo history
+	    found empty after a script had written the first one). Installed at startup while the fault switch undo-watch
+	    is on (KFCDiag.h; read once, at startup), it writes one "UNDOW" line per command InDesign processes - its
+	    name, class, undoability and the database of its item list - and, whenever it has changed since the last line
+	    that carried it, every open document's undo and redo history (step counts and the top names) as it stands
+	    BEFORE that command: a change shows at the first command after whatever made it. Main thread only. A no-op
+	    without KFC_DIAG or with the switch off. */
+	void WatchUndoArm();
+	/** The undo-watch taken out again (the model half's shutdown). */
+	void WatchUndoDisarm();
+	/** "UNDOH <where> | <every open document's undo and redo history>" - written only while the undo-watch is
+	    armed (for the places no command passes: an Undo, a lazy notification). */
+	void LogHistory(const char* where);
+
 	/** Counting for the life of the object, whichever way the scope is left. ONE per run (a search, a query run):
 	    an inner one would end the outer one's count. Nothing without KFC_DIAG. */
 	class Scope
