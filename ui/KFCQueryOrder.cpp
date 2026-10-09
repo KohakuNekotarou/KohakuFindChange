@@ -11,7 +11,7 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IFindChangeOptions.h"	// the four kinds' SearchMode - an order file's "kind" read back
+#include "IFindChangeOptions.h"	// the five kinds' SearchMode - an order file's "kind" read back
 
 // General includes:
 #include "FileUtils.h"			// PMStringToSysFile / SysFileToPMString / DoesFileExist - a query's file
@@ -64,11 +64,13 @@ namespace
 		return s;
 	}
 
-	// An order file's "kind" as a SearchMode - the model's own names for the four (KFCSavedQueries::KindName); -1 = none.
+	// An order file's "kind" as a SearchMode - the model's own names for the five (KFCSavedQueries::KindName); -1 = none.
+	// (Object since 1.4.0 - without it an Object entry whose file had moved was never found again by its kind and name:
+	// case obj-qd-load-by-name.)
 	int32 ModeOfKind(const std::string& kind)
 	{
 		const int32 modes[] = { IFindChangeOptions::kTextSearch, IFindChangeOptions::kGrepSearch,
-			IFindChangeOptions::kGlyphSearch, IFindChangeOptions::kTransliterateSearch };
+			IFindChangeOptions::kGlyphSearch, IFindChangeOptions::kObjectSearch, IFindChangeOptions::kTransliterateSearch };
 		for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
 			if (kind == KFCRuns()->QueryKindName(modes[i]))
 				return modes[i];

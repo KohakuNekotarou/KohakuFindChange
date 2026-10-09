@@ -29,7 +29,7 @@
 
 namespace KFCQueryOrder
 {
-	/** The left list: every saved query of the four kinds, as the model lists them (LoadSaved fills it). */
+	/** The left list: every saved query of the five kinds, as the model lists them (LoadSaved fills it). */
 	const std::vector<KFCSavedQuery>& Saved();
 
 	/** Fill the left list again - at every open, so a query saved while the dialog was closed is there. */

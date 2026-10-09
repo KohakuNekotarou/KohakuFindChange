@@ -92,7 +92,7 @@ public:
 	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) = 0;
 	/** = KFCSavedQueries::Describe - one query file of the dialog's run order: its name, kind and whether it is there. */
 	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) = 0;
-	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Transliterate" / "?". */
+	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Object" (1.4.0) / "Transliterate" / "?". */
 	virtual const char* QueryKindName(int32 mode) = 0;
 	/** = KFCQuerySequence::RunFiles - the query dialog's Run: these query files, in this order. */
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) = 0;

@@ -45,13 +45,15 @@ namespace
 		int32		mode;
 	};
 
-	// The four, in the order the dialog lists them. Object and Color are not here: the query run skips both
-	// (KFCQuerySequence), so offering them would offer a query that does nothing.
+	// The five, in the order the dialog lists them. Object since 1.4.0 (spec O14 - the run writes it with InDesign's object
+	// Change All, a document at a time). Color is not here: the query run skips it (KFCQuerySequence), so offering it would
+	// offer a query that does nothing.
 	const QueryKind kKinds[] =
 	{
 		{ "Text",			IFindChangeOptions::kTextSearch },
 		{ "GREP",			IFindChangeOptions::kGrepSearch },
 		{ "Glyph",			IFindChangeOptions::kGlyphSearch },
+		{ "Object",			IFindChangeOptions::kObjectSearch },
 		{ "Transliterate",	IFindChangeOptions::kTransliterateSearch },
 	};
 	const int32 kKindCount = static_cast<int32>(sizeof(kKinds) / sizeof(kKinds[0]));
@@ -72,7 +74,7 @@ namespace
 		for (int32 i = 0; i < kKindCount; ++i)
 			if (kKinds[i].mode == mode)
 				return i;
-		return kKindCount;		// no kind: after all four
+		return kKindCount;		// no kind: after all five
 	}
 
 	/** InDesign's own queries' root, without a language: <InDesign>\Presets\Find-Change Queries. Empty when the presets

@@ -119,7 +119,8 @@ struct KFCSavedQuery
 {
 	IDFile		file;
 	PMString	name;		// the file's name without ".xml" - what the dialog shows
-	int32		mode;		// IFindChangeOptions::SearchMode: kTextSearch, kGrepSearch, kGlyphSearch, kTransliterateSearch; -1 = no kind's folder
+	int32		mode;		// IFindChangeOptions::SearchMode: kTextSearch, kGrepSearch, kGlyphSearch, kObjectSearch (1.4.0),
+							// kTransliterateSearch; -1 = no kind's folder
 	bool		bundled;	// InDesign's own (Presets\Find-Change Queries), not the user's
 	bool		exists;		// the file is there now
 

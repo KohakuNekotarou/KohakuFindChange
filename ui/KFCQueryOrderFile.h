@@ -35,7 +35,7 @@
 /** One entry of an order file, as written (UTF-8). */
 struct KFCOrderFileEntry
 {
-	std::string	kind;	// "Text" / "GREP" / "Glyph" / "Transliterate" (KFCSavedQueries::KindName); "?" = none
+	std::string	kind;	// "Text" / "GREP" / "Glyph" / "Object" (1.4.0) / "Transliterate" (KFCSavedQueries::KindName); "?" = none
 	std::string	name;	// the query's name - its file's name without ".xml"
 	std::string	file;	// the query's file, its full path
 };

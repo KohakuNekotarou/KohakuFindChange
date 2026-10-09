@@ -16,6 +16,7 @@
 #include "IDataBase.h"
 #include "IDocument.h"
 #include "IDocumentList.h"
+#include "IFindChangeOptions.h"		// kObjectSearch - an Object query (1.4.0)
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
 
 // General includes:
@@ -37,6 +38,8 @@
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
+#include "KFCObjectReplace.h"	// ReplaceAllInDoc - an Object query's write, a document at a time (1.4.0)
+#include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front (1.4.0)
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -232,11 +235,15 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
-	// The queries skipped, by the reason the message gives: nothing to find on a text tab - an Object or Colour query
-	// included (the spec map's QRY-22) - and, apart from those, a file InDesign's query reader could not read (the final
-	// audit's D18-1, 2026-10-09: it read "nothing to find" too).
+	// The queries skipped, by the reason the message gives: nothing to find - a Colour query included (the spec map's
+	// QRY-22), and an Object query with no Find Object Format - and, apart from those, a file InDesign's query reader could
+	// not read (the final audit's D18-1, 2026-10-09: it read "nothing to find" too). Since 1.4.0 (spec O14) also an Object
+	// query on a run over part of a document, and one with nothing to change to.
 	std::vector<PMString> skippedNothing;
 	std::vector<PMString> skippedUnread;
+	std::vector<PMString> skippedPart;		// an Object query on a run over part of a document
+	std::vector<PMString> skippedNoChange;	// an Object query with nothing to change to
+	bool objectRan = false;					// an Object query aimed the shared object walker at the run's documents
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did any query's Change All write anything there
 	int32 replaced = 0;
 	bool cancelled = false, failed = false;
@@ -286,7 +293,29 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				runBar.SetPosition(unit);
 				continue;
 			}
-			if (!KFCSearchEngine::CommitSearchMode())
+			// AN OBJECT QUERY (1.4.0, spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
+			// no story, and a text Selection names no page item - so on a run over part of the front document it is skipped
+			// and said; and one with nothing to change to is skipped as Change All in Book refuses it.
+			const bool objectQuery = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
+			if (objectQuery && !(scope.fromBook || scope.allDocuments)
+				&& scope.selectionScope != static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope))
+			{
+				skippedPart.push_back(query.name);
+				unit += static_cast<int32>(targets.size());
+				runBar.SetPosition(unit);
+				continue;
+			}
+			if (objectQuery && !KFCObjectSearch::HasChangeObjectFormat())
+			{
+				skippedNoChange.push_back(query.name);
+				unit += static_cast<int32>(targets.size());
+				runBar.SetPosition(unit);
+				continue;
+			}
+			// The tab and the change side are stated for a text query only: an Object query's write is the service's own
+			// object replace, which no text walker mode steers (CommitSearchMode turns that tab away by design - as in
+			// KFCSearchEngine::SearchBook and Change All in Book).
+			if (!objectQuery && !KFCSearchEngine::CommitSearchMode())
 			{
 				failed = true;
 				why = "the Find/Change tab could not be set for ";
@@ -296,7 +325,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			perQuery[q] = 0;
 			// THE CHANGE SIDE, STATED HERE - inside the run's sequence (the query run's one exception to CommitReplaceSide's
 			// rule): a Ctrl+Z of the run takes the whole of it back, the stated side included.
-			if (!KFCSearchEngine::CommitReplaceSide())
+			if (!objectQuery && !KFCSearchEngine::CommitReplaceSide())
 			{
 				failed = true;
 				why = "the Change To in Find/Change could not be stated for ";
@@ -339,8 +368,13 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				// of Story / Selection write that part of the front document (the one target).
 				const int32 writeScope = (scope.fromBook || scope.allDocuments)
 					? static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope) : scope.selectionScope;
-				int32 count = 0;
-				if (!KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count))
+				int32 count = 0, partial = 0;
+				const bool wrote = objectQuery
+					? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
+					: KFCChangeAll::WriteDocument(targets[d].docRef, writeScope, scopeOptions, count);
+				if (objectQuery)
+					objectRan = true;
+				if (!wrote)
 				{
 					failed = true;
 					why = "InDesign's Change All failed for ";
@@ -390,6 +424,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
+	if (objectRan)
+		KFCObjectSearch::AimSharedWalkerAtFront();		// O7 - the walker named the run's documents
 	ClearFindChange();		// outside the sequence (the spec's section 5)
 
 	if (cancelled || failed)
@@ -459,6 +495,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
 	AppendSkipped(outSummary, "the file could not be read", skippedUnread);
+	AppendSkipped(outSummary, "an Object query runs on whole documents", skippedPart);
+	AppendSkipped(outSummary, "nothing to change to", skippedNoChange);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return replaced;

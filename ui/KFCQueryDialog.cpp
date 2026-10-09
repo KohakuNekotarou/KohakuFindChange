@@ -493,8 +493,8 @@ void KFCQueryDialogRefreshScope()
 // *NAME AND PLACE, THEN (the author, the same day: name + order?): the name is looked for, and when more than one group
 //  carries it, each such group is weighed against the names KFC knows of the query's own kind - one point for an entry
 //  that is one of them, one off for an entry that is not - and the highest is the query's. Weighed rather than taken by
-//  position, because KFC does not list Object queries (nor whatever else the menu groups) and so cannot count the
-//  groups before it. InDesign's own queries make the Text and GREP groups unlike; only groups as alike as that can tie,
+//  position, because the menu can group queries KFC does not list (the Object ones did, before 1.4.0) and so KFC cannot
+//  count the groups before it. InDesign's own queries make the Text and GREP groups unlike; only groups as alike as that can tie,
 //  and then nothing is chosen and the line says why.
 // *TOLD, AS A PERSON'S PICK IS (notifyOfChange = kTrue): the dialog loads it the way it loads a query picked in that menu
 //  (the same file the command above just read). Measured the same day with kFalse, a pick it was not told of: the menu
