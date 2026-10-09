@@ -158,9 +158,12 @@ namespace
 
 	// GROUP A CHAPTER'S HITS BY STORY (the author's call) - the tree's middle level.
 	// One group per story in first-appearance (page) order - so the stories read in the order their
-	// first matches stand - and every hit given its group. The row reads "P<page of the story's first
-	// match>  <the story's first words>". (The "font" in the names is the level's old name: it held the
-	// fonts of Find Missing Glyphs, since removed; the level is the story's alone.)
+	// first matches stand - and every hit given its group. The row reads "ID <the story's UID>: <the story's
+	// first words>" (2026-10-09, the author: a story can run through threaded frames, so the page of its first
+	// match - "P2" for a story that begins on page 1, measured - does not name it; it read "P<page>  " /
+	// "overset  " before). The UID is the number the scripting DOM gives the story (Story.id). (The "font" in
+	// the names is the level's old name: it held the fonts of Find Missing Glyphs, since removed; the level is
+	// the story's alone.)
 	//
 	// The groups are rebuilt from scratch, and every hit's fontGroup / fontGroupPos written, whatever
 	// the hit held before.
@@ -183,10 +186,9 @@ namespace
 			{
 				KFCResultModel::FontGroup group;
 				group.story = hit.storyUID;
-				group.fontName = hit.pageString.IsEmpty() ? PMString("overset") : PMString("P");
-				if (!hit.pageString.IsEmpty())
-					group.fontName.Append(hit.pageString);
-				group.fontName.Append("  ");
+				group.fontName = PMString("ID ");
+				group.fontName.AppendNumber(static_cast<int32>(hit.storyUID.Get()));
+				group.fontName.Append(": ");
 				// The story's first words keep their breaks (KFCSearchEngine's StoryLeadText):
 				// drawn as the marks a hit row draws, by the same function.
 				PMString lead(hit.storyLead);
