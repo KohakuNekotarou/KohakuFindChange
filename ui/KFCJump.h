@@ -13,11 +13,10 @@
 //  gets the marker on its characters instead (KFCHitMarker - a global text adornment), which takes
 //  itself down after about a second, and nothing is left selected; until 1.4.0 every click did only
 //  that, and changed nothing in the document (JMP-06).
-//  A DOUBLE click: SelectHitText switches to the Type tool and highlights the match, and the keyboard
-//  goes to the text - for when pointing is not what was wanted. THE MARKER COMES UP AT ONCE, FROM
-//  BOTH DOORS (the author's call: on the same beat as KCM's Story-mode jump, which raises its flash
-//  straight away) - not booked for the double-click interval; a double click's selection takes it
-//  back down (SelectHitText ends by taking the marker down). With "Hide Previous Chapter" ON, every other
+//  A double click is two clicks (1.4.0 - the author's call of 2026-10-10: its own selection, which
+//  gave the keyboard to the text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
+//  call: on the same beat as KCM's Story-mode jump, which raises its flash straight away). With
+//  "Hide Previous Chapter" ON, every other
 //  displayed clean chapter of the searched book is closed as the jump lands (a document outside the
 //  book stays - 2026-10-08). Ported from KESCL's jump machinery (KESCL
 //  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
@@ -41,31 +40,6 @@ namespace KFCJump
 	    @param chapterIdx the chapter index, or -1 for the book row.
 	    @param hitIdx the hit index, or -1 when the row is not a hit row. */
 	void ActivateNode(int32 chapterIdx, int32 hitIdx);
-
-	/** SELECT the match in the document: switch to the Type tool and highlight the hit's own range,
-	    so the user can edit or copy it straight away. The DOUBLE-CLICK half of a hit row - a single
-	    click selects it too, with the Type tool on (1.4.0), but leaves the keyboard on the list (see
-	    the note at the head of this header) - this is the extra step that says "and put me in it".
-
-	    Assumes the jump has already run for this row - the double-click sequence TRIES it on the first
-	    click, and this refuses, without a word, when the hit's layout window is not the one in front
-	    (the jump could not bring it forward, or was dropped while an earlier landing was still opening
-	    a chapter). It does NOT scroll (Selection::kDontScrollSelection), because the
-	    jump's own centring is better than what scroll-into-view would do, and it does not front the
-	    window again. On success it TAKES THE JUMP'S MARKER BACK DOWN - the inverted rectangle and the
-	    selection say the same thing, and together they make the text unreadable.
-
-	    Refuses when there is nothing honest to select - a row with no place in its story (RowHasPlace: none the
-	    search makes is one, asked anyway), a LOCKED
-	    or HIDDEN match, a zero-width one, an OVERSET one, and one whose text is no longer what the
-	    search recorded (a stale range would highlight text the user never searched for). Each says why
-	    on the status line, except the stale one: the jump has already said it. The tests in
-	    SelectHitText are the list.
-
-	    @param chapterIdx the chapter index.
-	    @param hitIdx the hit index.
-	    @return kTrue if a text selection was actually made. */
-	bool SelectHitText(int32 chapterIdx, int32 hitIdx);
 
 	/** A Find/Change setting changed (KFCPanelTitle's observer, IID_IFINDCHANGEOPTIONS). If a row was activated a
 	    moment ago (ActivateNode - a click, the arrow walk) and Edit > Find/Change has re-picked Search: in answer to

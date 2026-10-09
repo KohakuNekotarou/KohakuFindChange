@@ -36,7 +36,7 @@
 #include "ISelectionManager.h"		// DeselectAll / SelectionExists - clearing before selecting
 #include "ISelectionUtils.h"		// GetActiveSelection - the active context's selection (the document the jump fronted)
 #include "ITextModel.h"
-#include "ITextSelectionSuite.h"	// SetTextSelection - the double-click's whole point
+#include "ITextSelectionSuite.h"	// SetTextSelection - a click selects its row's match (SelectMatchOnClick)
 #include "ITool.h"					// IsToolOfType(kTextSelectionTool) - is a text tool already active?
 #include "IToolBoxUtils.h"			// QueryActiveTool / QueryTool / SetActiveTool
 #include "IWaxStrand.h"
@@ -47,7 +47,7 @@
 
 // General includes:
 #include "RangeData.h"				// the range handed to SetTextSelection
-#include "TextEditorID.h"			// kIBeamToolBoss - the Type tool the double-click switches to
+#include "TextEditorID.h"			// kIBeamToolBoss - the Type tool a click switches to (PutTypeToolOn)
 #include "TextID.h"					// kFrameListBoss, IID_IWAXSTRAND
 #include "widgetid.h"				// IID_IPANORAMA
 #include "LayoutUIID.h"				// kOpenLayoutCmdBoss
@@ -620,14 +620,12 @@ void KFCJump::SetHidePreviousChapter(bool on)
 namespace
 {
 
-// One activation at a time, across BOTH public doors (a click and a keyboard walk share
-// ActivateNode; the double click's selection is the other entry). A landing opens documents, and
-// opening a document RUNS THE MESSAGE LOOP - so the next click, or the trailing half of a double
-// click, can be dispatched while the previous landing is still inside its own open, and would then
-// select or jump from a state that landing has not finished making. The keyboard walk guards itself
-// this way as well (KFCResultTreeEH's gWalking, which also guards its own selection step and
-// therefore stays). Kept HERE rather than in each event handler so the doors cannot drift apart and
-// a future caller is covered on arrival.
+// One activation at a time, across both callers of ActivateNode (a click and a keyboard walk). A landing
+// opens documents, and opening a document RUNS THE MESSAGE LOOP - so the next click can be dispatched while
+// the previous landing is still inside its own open, and would then jump from a state that landing has not
+// finished making. The keyboard walk guards itself this way as well (KFCResultTreeEH's gWalking, which also
+// guards its own selection step and therefore stays). Kept HERE rather than in each event handler so the
+// callers cannot drift apart and a future caller is covered on arrival.
 bool gActivating = false;
 
 class ActivationGuard
@@ -659,7 +657,7 @@ void SayRowHasNoPlace()
 // row (the stored HASH of the whole match, and the line around it), look-alikes are told apart by their count and
 // order, and a row found nowhere is looked for again. A row found elsewhere is gone to for this jump only (T3); when
 // a row moved or a Missing word went, the rows are repainted.
-// Shared by JumpToHit, which still moves the view when it is not found, and SelectHitText, which refuses.
+// Asked by JumpToHit, which still moves the view when it is not found - and selects nothing (SelectMatchOnClick).
 bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 	TextIndex& start, TextIndex& end)
 {
@@ -674,9 +672,9 @@ bool RowFoundOrFoundAgain(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, 
 // A row that is no longer found keeps its stored place, and an edit made since the search can have cut the
 // story short of it. Measured unclamped: a row at 40 in a story cut to 8 characters went on as 40 to the
 // overset test, the spread and the wax lookup - InDesign answered "overset" for a place that is not in the
-// story at all, and the double click's selection then refused with the overset reason instead of "not
-// found". Every other door bounds it too: KFCSearchEngine's RowReadsAsFound, the clamp at the foot of
-// SelectHitText, and the SDK's gotolasttextedit ("reset text index if it is out of range",
+// story at all, and the double click's selection of the time then refused with the overset reason instead
+// of "not found". The other doors bound it too: KFCSearchEngine's RowReadsAsFound, SelectMatchOnClick's
+// clamp, and the SDK's gotolasttextedit ("reset text index if it is out of range",
 // GTTxtEdtUtils.cpp:107-109). The story's last character is the nearest place there is to where the row
 // was, so the view still goes where the hit used to be. A story that has gone (its UID deleted) reads
 // as nil here and below (IDataBase.h:152-156).
@@ -769,17 +767,16 @@ void ArmScopeKeep()
 	KFC_DIAG_LOG("SCOPEKEEP armed=%d mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
 }
 
-// The Type tool, because a selected match is an invitation to EDIT - the double click's (SelectHitText) and, since
-// 1.4.0, the click's as well: Edit > Find/Change's Find Next selects what it found and puts the Type tool on, and the
-// author asked for the same (2026-10-10). A text selection made while the Selection tool is active is not somewhere the
-// user can start typing. ! This CHANGES THE USER'S ACTIVE TOOL - deliberately, and it is written down in How to Use for
-// that reason.
+// The Type tool, because a selected match is an invitation to EDIT - a click's, since 1.4.0: Edit > Find/Change's Find
+// Next selects what it found and puts the Type tool on, and the author asked for the same (2026-10-10). A text
+// selection made while the Selection tool is active is not somewhere the user can start typing. ! This CHANGES THE
+// USER'S ACTIVE TOOL - deliberately, and it is written down in How to Use for that reason.
 //
 // IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
 // more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
 // return kTrue from it as well - then names this call as the one to use "for traditional 'text'
 // tools that select text". Measured on the running application with IsTextTool: with the Hand,
-// Zoom or Gradient tool active, a double click left that tool in place and made the selection
+// Zoom or Gradient tool active, the double click of the time left that tool in place and made the selection
 // anyway - text highlighted in a window the user cannot type into, which is the
 // one outcome the paragraph above says must not happen. (The Selection tool was the control
 // group and switched correctly, before and after.)
@@ -804,10 +801,10 @@ bool PutTypeToolOn()
 // Find/Change's Find Next does, one result selected after another, so the selection is the pointer and no marker goes
 // over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
 // overset one never comes here). Refused WITHOUT A WORD: the marker JumpToHit raises instead is the answer, as on every
-// click before 1.4.0; the reasons are the double click's to say (SelectHitText). The Type tool is put on, as Find Next
-// does (PutTypeToolOn - the author's call of 2026-10-10); the keyboard stays on the list - the row's LButtonUp acquires
-// it after the jump, the walk takes it back - so the arrows walk on and Return replaces. Handing the keyboard to the
-// text is still the double click's. The document is in front and composed, inside JumpToHit's dirty guard, its
+// click before 1.4.0. (The double click said why - locked, hidden, no width, overset - until it went with the author's
+// call of 2026-10-10.) The Type tool is put on, as Find Next does (PutTypeToolOn - the author's call of 2026-10-10);
+// the keyboard stays on the list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the
+// arrows walk on and Return replaces. The document is in front and composed, inside JumpToHit's dirty guard, its
 // selection cleared. True when the match is selected.
 bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end, bool found)
 {
@@ -831,11 +828,16 @@ bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, 
 	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
 	if (textSelectionSuite == nil)
 		return false;
-	// The Type tool after the selection was cleared (JumpToHit) and before the text is selected - the order
-	// SelectHitText keeps, and the official recipes' (its note there).
+	// The Type tool after the selection was cleared (JumpToHit) and before the text is selected - the order both
+	// official recipes keep: gotolasttextedit deselects and then switches (GTTxtEdtUtils.cpp:113-128), typekitinspector
+	// deselects and never switches (TKITreeWidgetObserver.cpp:136-140). Switching first hands the incoming tool a
+	// selection it will convert, only for the next line to throw the result away.
 	if (!PutTypeToolOn())
 		return false;
-	// ! RangeData's two-argument form is (start, END) - SelectHitText's note.
+	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong selects from the match
+	//   to a point measured from the start of the STORY.
+	// kDontScrollSelection: the jump has already centred the match (IPanorama::ScrollContentLocationToFrameCenter);
+	// kScrollIntoView would only promise it is somewhere on screen, and undo that better answer.
 	return textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) != kFalse;
 }
 
@@ -980,11 +982,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// there any more is said by the status line and by the word on the row itself.
 			//
 			// AT ONCE, from the mouse as from the keyboard - the beat KCM's Story-mode jump flash
-			// keeps (the user's request). Not booked for the double-click interval so that a double
-			// click never flashes one: that brings it up about half a second after the view has
-			// moved. A double click shows the marker for that moment and SelectHitText's
-			// KFCHitMarkerView::Hide takes it down when the selection is made - exactly what KCM does
-			// ("THE MARK COMES DOWN").
+			// keeps (the user's request).
 			//
 			// 1.4.0: a match that can be selected IS selected, and no marker goes over it - a selection under an
 			// inversion cannot be read (JMP-17's reason). Every other row is marked as above.
@@ -1046,7 +1044,7 @@ void ShowChapter(int32 chapterIdx)
 		return;
 
 	// The guard the file's header promises for everything after the database is in hand - opening a
-	// window, zooming, making it active - and that JumpToHit and SelectHitText both keep. Without it
+	// window, zooming, making it active - and that JumpToHit keeps as well. Without it
 	// a chapter a search had closed and this row reopened could come out wanting to be saved for
 	// having been LOOKED at, and then "Hide Previous Chapter" would not close it. It restores the flag
 	// the document came in with, so it changes nothing when nothing was dirtied.
@@ -1098,211 +1096,6 @@ void ShowBook()
 
 } // anonymous namespace
 
-bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
-{
-	// A previous landing is still inside its own document-open (see gActivating above JumpToHit).
-	// Selecting NOW would put a caret into a state that landing has not finished making - refused
-	// instead, silently: the refusal leaves the click behaving as the single click whose jump is
-	// still under way, which is also why no status line is written over that jump's own.
-	if (gActivating)
-		return false;
-	ActivationGuard activationGuard;
-
-	UIDRef docRef;
-	IDFile file;
-	UID storyUID = kInvalidUID;
-	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
-	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, storyUID, start, end))
-		return false;
-
-	// A row with no range at all (see JumpToHit) - said before the zero-width test below, which would
-	// otherwise answer it with the wrong reason.
-	if (!RowHasPlace(start, end))
-	{
-		SayRowHasNoPlace();
-		return false;
-	}
-
-	// OUT OF THE USER'S REACH: move there and mark it, but do not select (the author's call).
-	// A LOCKED match is on a locked layer or in a locked story - InDesign
-	// can search locked content but offers no way to change it, so a selection would be an offer it
-	// cannot keep. A HIDDEN match is on a switched-off layer: it is composed and can be jumped to,
-	// but it draws nothing, so a selection over it would be invisible.
-	//
-	// Asked FIRST because it costs nothing - no database, no composition - and because there is no
-	// point doing any of that work for a row that is going to be refused.
-	//
-	// THE MARKER STAYS UP. It is taken down only when a selection replaces it (see the
-	// foot of this function). Here nothing replaces it, so it remains what it always was: the answer
-	// to "where is it?" - which is the whole of what a double click on these rows can give.
-	bool hitLocked = false, hitHidden = false;
-	KFCResults()->GetHitReach(chapterIdx, hitIdx, hitLocked, hitHidden);
-	if (hitLocked || hitHidden)
-	{
-		PMString message(hitLocked
-			? "That match is locked - it cannot be selected."
-			: "That match is on a hidden layer - it cannot be selected.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
-		return false;
-	}
-
-	// A ZERO-WIDTH MATCH HAS NOTHING TO SELECT. GREP's ^, $ and the lookarounds match at a POSITION
-	// rather than over characters, so such a row names a place, not text (measured: ^ returns one hit
-	// per paragraph). The clamp further down refuses the empty range
-	// anyway - but silently, and a double click that appears to do nothing is the one refusal this
-	// function must not make when every other one says why. Asked up here with the other tests that
-	// cost nothing, before any database work is done for a row that is going to be turned away.
-	if (start == end)
-	{
-		PMString message("That match has no width (^, $ or a lookaround) - there is nothing to select.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
-		return false;
-	}
-
-	// The jump that ran a moment ago already brought this chapter back if it had been closed, and
-	// already fronted its window. Asked again anyway: this is a public function, and a caller that
-	// reached it another way must not select into a database that is not there.
-	if (!EnsureChapterReachable(chapterIdx, docRef, file))
-		return false;
-
-	// ...AND ITS WINDOW HAS TO BE THE ONE IN FRONT. The selection below goes through the ACTIVE
-	// selection - the window in front - and the double click only promises that the jump was TRIED: it
-	// can have failed to bring the window forward (it has said why), or have been dropped while an
-	// earlier landing was still opening a chapter. Measured without this test, with the test build's
-	// fault switch jump-no-front: the front document's own selection was cleared, and the hit's
-	// text - in the document behind - was not selected. Refused without a word, as a click dropped by
-	// gActivating is: the jump has already said why, or a later click will land.
-	KFC_DIAG_LOG("SELECT row %d/%d: the hit's document is in front=%d", chapterIdx, hitIdx,
-		LayoutOfDocIsFrontmost(docRef) ? 1 : 0);
-	if (!LayoutOfDocIsFrontmost(docRef))
-		return false;
-
-	IDataBase* db = docRef.GetDataBase();
-	if (db == nil)
-		return false;
-	const UIDRef storyRef(db, storyUID);
-
-	// Same guard the jump puts round everything it does: making a selection recomposes and can dirty
-	// a document that this plug-in only opened to look at. IDataBase.h:389-412 - it restores the flag
-	// the document came in with rather than forcing it clean.
-	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-
-	// Compose first, then read - the order JumpToHit keeps, for the reason it gives there: being
-	// overset is a reading of the RESULT of composition. The first click's jump composed this story,
-	// but nothing between the two clicks promises it is still undamaged, and this function does not
-	// lean on its caller's history. A no-op when nothing is damaged.
-	RecomposeIfDamaged(storyRef);
-
-	// STALE: the same test the jump makes (RowFoundOrFoundAgain). There the answer only changes what
-	// the panel SAYS - the view still moves, which is useful, because it shows where the hit used to
-	// be. Here it changes what the user GETS: a selection over text they never searched for, ready to
-	// be typed over. So this one refuses. The jump has already put its own message up in this case;
-	// this adds nothing and would only overwrite it.
-	//
-	// ASKED BEFORE THE OVERSET TEST, IN THE ORDER JumpToHit ASKS THEM. The other way round, a stale
-	// place is handed to the overset test first: measured, a row at 40 in a story cut to 8 characters
-	// read as "overset", and the status line said "An overset match has no text on the page to select."
-	// over the jump's "Not found". And a row found again here (moved) would be tested for being overset
-	// at the place it had left.
-	if (!RowFoundOrFoundAgain(chapterIdx, hitIdx, docRef, storyUID, start, end))
-		return false;
-
-	// OVERSET: move there, but do not select. (Same rule as locked and hidden above - the author's
-	// call.) There is no on-page text to highlight. The jump has the same split and
-	// scrolls to the "+" indicator instead.
-	//
-	// The marker is left exactly as the jump left it - which for an overset row means there is none
-	// (JumpToHit clears it: those pixels belong to the "+" indicator, not to the text). Nothing is
-	// done about it here either way; this function only takes the marker down when a SELECTION
-	// replaces it.
-#ifdef KFC_DIAG
-	{
-		InterfacePtr<ITextModel> diagModel(storyRef, UseDefaultIID());
-		const TextIndex diagTotal = (diagModel != nil) ? diagModel->TotalLength() : -1;
-		KFC_DIAG_LOG("JUMPPOS select row %d/%d start=%d end=%d total=%d %s", chapterIdx, hitIdx,
-			(int)start, (int)end, (int)diagTotal, (start >= 0 && start < diagTotal) ? "inside" : "OUTSIDE");
-	}
-#endif
-	if (KFCRuns()->IsPositionOverset(storyRef, start))
-	{
-		PMString message("An overset match has no text on the page to select.");
-		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
-		return false;
-	}
-
-	// From here the shape is the official one: gotolasttextedit's GTTxtEdtUtils::ActivateStory
-	// (:99-140) = clear the selection, make sure a text tool is active, then SetTextSelection.
-
-	// A range past the end of the story cannot be selected. The story is the live one and the range
-	// is the recorded one; the stale test above says the TEXT still matches, which makes this a
-	// belt-and-braces clamp rather than a live case - but the official recipe clamps too, and a bad
-	// RangeData is an assert rather than a refusal.
-	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
-	if (textModel == nil)
-		return false;
-	const TextIndex total = textModel->TotalLength();
-	if (start >= total)
-		return false;
-	if (end > total)
-		end = total;
-	if (end <= start)
-		return false;
-
-	ISelectionManager* selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
-	if (selectionManager == nil)
-		return false;
-
-	// Clear whatever was selected first (a page-item selection left standing is a second selection in
-	// a different CSB). BEFORE the tool switch, which is the order both official recipes keep:
-	// gotolasttextedit deselects and then switches (GTTxtEdtUtils.cpp:113-128), typekitinspector
-	// deselects and never switches (TKITreeWidgetObserver.cpp:136-140, which is where the
-	// SelectionExists test comes from). Switching first hands the incoming tool a selection it will
-	// convert, only for the next line to throw the result away.
-	if (selectionManager->SelectionExists(kInvalidClass /*any CSB*/, ISelectionManager::kAnySelection))
-		selectionManager->DeselectAll(nil);
-
-	// The Type tool, because this is an invitation to EDIT - PutTypeToolOn, whose note says why it
-	// is IsToolOfType and not IsTextTool. (Since 1.4.0 the click has already put it on, as Find Next
-	// does; asked again because a caller may come here another way.)
-	if (!PutTypeToolOn())
-		return false;
-
-	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
-	if (textSelectionSuite == nil)
-		return false;
-
-	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong
-	//   selects from the match to a point measured from the start of the STORY.
-	//
-	// kDontScrollSelection: the jump has already centred the match with
-	// IPanorama::ScrollContentLocationToFrameCenter, which puts it in the middle of the window.
-	// kScrollIntoView would only guarantee it is somewhere on screen, and asking for it here would
-	// undo the better answer that has just been given.
-	if (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end),
-			Selection::kDontScrollSelection, nil) == kFalse)
-	{
-		return false;
-	}
-
-	// TAKE THE JUMP'S MARKER BACK DOWN (the author's call).
-	//
-	// The first click of this double click may have raised the marker, which INVERTS the pixels under
-	// the match (KFCHitMarker.h) - a pointer saying "it is here". (Since 1.4.0 it selects a match it
-	// can select and raises no marker over it - JumpToHit; a marker is up here only when that click
-	// could not select.) The selection now says the same thing, and it is what the user is about to
-	// type over. Leaving both up puts an inversion on top of a highlight, so the text the user came
-	// here to read is the one thing on screen that cannot be read.
-	//
-	// Only on SUCCESS. Every refusal above returns before this, and there the marker is the only
-	// feedback the click produced - taking it down as well would leave a double click that appears
-	// to do nothing.
-	KFCHitMarkerView::Hide();
-	return true;
-}
-
 void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 {
 	// One door for every row, so a click and a keyboard walk can never drift apart - the reason
@@ -1352,9 +1145,9 @@ void KFCJump::KeepSearchScopeAfterClick()
 	}
 	// Still armed after putting it back, for the window's length: the dialog can write more than once for one click
 	// (measured: a click that fronted another document had it written as the document came forward and again about
-	// 0.35 s later, for the selection - click-keeps-scope-cross), and a double click selects again inside it
-	// (SelectHitText), which the dialog answers too. Writing the same value back changes nothing, so the notification of
-	// our own write ends here.
+	// 0.35 s later, for the selection - click-keeps-scope-cross), and a double click's second click selects again inside
+	// it, which the dialog answers too. Writing the same value back changes nothing, so the notification of our own write
+	// ends here.
 	//
 	// ONLY A VALUE THE SELECTION NOW OFFERS goes back (KFCSearchEngine::SearchScopeForSelection: All Documents and
 	// Document always; Story, To End of Story and Selection only with a selection that gives them). One it does not

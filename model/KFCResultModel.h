@@ -432,8 +432,8 @@ namespace KFCResultModel
 	    to, but draws nothing). false = index out of range.
 
 	    Separate from GetHitFlags, which answers "can this row be replaced?". These two
-	    answer "can the user work on this match where it is?" - the question the double-click asks
-	    before it selects (KFCJump::SelectHitText). isLocked appears in both because it is a fact
+	    answer "can the user work on this match where it is?" - the question a click asks before it
+	    selects (KFCJump's SelectMatchOnClick). isLocked appears in both because it is a fact
 	    that bears on both questions; the DECISIONS made from it stay one per place. */
 	bool GetHitReach(int32 chapterIdx, int32 hitIdx, bool& outLocked, bool& outHidden);
 

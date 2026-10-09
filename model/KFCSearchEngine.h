@@ -363,8 +363,7 @@ namespace KFCSearchEngine
 	    will be returned" by GetParcelContaining. That walk - position to parcel to frame - is
 	    already this file's FrameUIDForPosition, which every hit is built through, so asking it here
 	    is what keeps "the row was overset when we found it" and "the jump treats it as overset"
-	    the same statement. Asked by the jump - KFCJump's JumpToHit and KFCJump::SelectHitText, the
-	    double click that selects the match - through IKFCRuns.
+	    the same statement. Asked by the jump - KFCJump's JumpToHit - through IKFCRuns.
 
 	    @note NOT the same question as ITextParcelList::GetIsOverset, which is about a whole
 	          THREAD (and is the only test that answers for a table cell overflowing on its own).
@@ -423,9 +422,9 @@ namespace KFCSearchEngine
 	    again the way the search read them (ReadHitText, RereadRowText's own reading) and compared with
 	    what the row holds. The line is what RelocateStaleRow already asks of a candidate ("the same text
 	    with the same line around it"). The answer is how the panel can say "the replacement is no
-	    longer here" instead of scrolling to whatever took its place, how the double click refuses to
-	    hand the user a selection over text they never searched for, and how a row whose text was
-	    edited is not written.
+	    longer here" instead of scrolling to whatever took its place, how a click refuses to hand the
+	    user a selection over text they never searched for, and how a row whose text was edited is not
+	    written.
 
 	    Why the line as well: a row's place is carried past every change KFC makes - and past an Undo
 	    or a Redo of one (KFCUndoFollow puts the rows back with it) - but never
@@ -441,8 +440,8 @@ namespace KFCSearchEngine
 	    edit that is not followed.)
 
 	    False when the row, its story or its place cannot be read. Asked by the verify walk, the row
-	    menus' Replace / Redo and RowStillStands (KFCReplaceEngine), and the jump and the double click
-	    (KFCJump). */
+	    menus' Replace / Redo and RowStillStands (KFCReplaceEngine); the jump reads a row the same way
+	    at each place LocateRow tries (RowReadsAsFoundAt). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
 	/** A ROW WHOSE PLACE HAS MOVED UNDER IT, LOOKED FOR AGAIN (the author's call). Before the jump gives up

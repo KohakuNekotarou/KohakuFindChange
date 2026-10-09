@@ -24,20 +24,11 @@
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
-//  DOUBLE-click on a hit row adds the other half: after the jump has selected the match with the
-//  Type tool on (1.4.0 - or marked it, when it cannot be selected; KFCJump.h), it selects it again
-//  and gives the keyboard to the text, so the user can edit or copy without hunting for it with the mouse.
-//  Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
-//  note explains why it cannot simply be done inside ButtonDblClk.
-//
-//  THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. The jump runs on
-//  the first button-up and raises its marker there (1.4.0: only on a match it cannot select - a
-//  selected match has none); a double click then selects, and the ordinary
-//  KFCHitMarkerView::Hide at the end of a successful SelectHitText takes the marker down. A double
-//  click that is REFUSED (KFCJump.h lists why it can be) never reaches that Hide, so its marker stays
-//  up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode jump keeps, and
-//  the user asked for it. (Booked for the double-click interval instead, so that a double click never
-//  flashes one, every single click's marker arrives about half a second after the view has moved.)
+//  A DOUBLE click is not told apart (1.4.0 - the author's call of 2026-10-10): the click selects the match with
+//  the Type tool on (or marks it, when it cannot be selected - KFCJump.h), so the double click's own selection,
+//  which gave the keyboard to the text, went. Each of its clicks is a click: the jump again, the keyboard left on
+//  the list. THE MARKER COMES UP AT ONCE, on the button-up - the beat KCM's Story-mode jump keeps, which the user
+//  asked for.
 //
 //  RIGHT-click on a hit row pops its menu (Replace), on a story row its menu (Search This Story Again); on any other
 //  row it does nothing (spec F16). See RButtonDn
@@ -73,27 +64,6 @@
 namespace
 {
 
-// THE DOUBLE-CLICK'S ONE BIT OF STATE, AND WHY IT IS NEEDED.
-//
-// A double click arrives as FOUR events, in this order:
-//
-//     LButtonDn   LButtonUp   ButtonDblClk   LButtonUp
-//
-// - so the FIRST up has already jumped by the time the double click is announced, and a SECOND up
-// comes after it. Doing the selecting inside ButtonDblClk therefore does not work: the trailing up
-// would run the jump a second time and take the keyboard focus back to the tree, undoing it.
-//
-// So ButtonDblClk only RAISES A FLAG, and the trailing up reads it and selects instead of jumping.
-//
-// ! The flag is cleared in LButtonDn, which is what makes it safe. Every click begins with a down,
-//   so a flag that was set but never consumed (if a trailing up ever failed to arrive) cannot
-//   survive into the next click and turn an ordinary single click into a double click's selection
-//   (the keyboard given to the text).
-//
-// A file static, not a member: the rows' widgets are recycled as the tree scrolls, and this belongs
-// to "the click going on right now" rather than to any one row. One click happens at a time.
-bool gSelectOnNextButtonUp = false;
-
 // Pop a row's right-click menu (a MenuDef subtree, by its internal name) at the click. The item the user picks
 // fires through the ordinary action component.
 void PopRowMenu(const char* menuName, IEvent* e, IPMUnknown* widget)
@@ -113,49 +83,14 @@ public:
 	KFCResultNodeEH(IPMUnknown* boss) : TreeNodeEventHandler(boss) {}
 	virtual ~KFCResultNodeEH() {}
 
-	virtual bool16 LButtonDn(IEvent* e);
 	virtual bool16 LButtonUp(IEvent* e);
-	virtual bool16 ButtonDblClk(IEvent* e);
 	virtual bool16 RButtonDn(IEvent* e);
 };
 
 CREATE_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 
-// Nothing of this plug-in's own happens on the way DOWN (see the note at the head of this file for
-// why the jump rides the button coming up). The one job here is to start every click with the
-// double-click flag down.
-bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
-{
-	gSelectOnNextButtonUp = false;
-	const bool16 handled = TreeNodeEventHandler::LButtonDn(e);
-	KFC_DIAG_LOG("CLICKFOCUS row LButtonDn handled=%d focus=%s", static_cast<int>(handled), KFCResultTree::DiagKeyFocus().c_str());
-	return handled;
-}
-
-// The second click of a double click. Only a HIT row has anything extra to offer: a chapter or book
-// row's double click is the tree's own expand / collapse, which the base handler does.
-bool16 KFCResultNodeEH::ButtonDblClk(IEvent* e)
-{
-	const bool16 result = TreeNodeEventHandler::ButtonDblClk(e);
-	if (result || e->ShiftKeyDown() || e->CmdKeyDown())
-		return result;
-
-	InterfacePtr<ITreeNodeIDData> nodeData(this, UseDefaultIID());
-	if (nodeData == nil)
-		return result;
-	TreeNodePtr<KFCResultNodeID> nodeID(nodeData->Get());
-	if (nodeID != nil && nodeID->IsHitRow())
-		gSelectOnNextButtonUp = true;
-
-	return result;
-}
-
 bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 {
-	// Consumed here, on the way in, so that every path out of this function leaves it down.
-	const bool selectRatherThanJump = gSelectOnNextButtonUp;
-	gSelectOnNextButtonUp = false;
-
 	// Let the stock handler finish the click (selection, expand / collapse, the end of a drag).
 	const bool16 result = TreeNodeEventHandler::LButtonUp(e);
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp stock=%d shift=%d cmd=%d focus=%s", static_cast<int>(result),
@@ -184,55 +119,9 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	}
 
-	// The second click of a double click SELECTS instead of jumping again.
-	// The first click already did the jump (fronted the document, centred the match, raised the
-	// marker), so repeating it would only re-do all of that. What is added is putting the user IN
-	// the match - Type tool, match highlighted.
-	if (selectRatherThanJump)
-	{
-		if (KFCJump::SelectHitText(nodeID->GetChapter(), nodeID->GetHit()))
-		{
-			// AND GIVE THE KEYBOARD BACK. The FIRST click of this double click ended in
-			// the AcquireKeyFocus at the foot of this function, so the TREE is holding the keyboard
-			// at this moment. Left that way, the caret would sit in the text while the arrow keys
-			// walked the panel and typing went nowhere - which is the one thing a user who asked
-			// for this wants to do.
-			//
-			// ! WHERE IT GOES IS NOT CHOSEN HERE. IKeyBoard.h:49-53 says Relinquish "restores key
-			//   focus to the PREVIOUS HOLDER" - it is a pop, not a hand-off to whoever should have
-			//   it. What makes that the right holder is the ORDER of the first click: the jump
-			//   fronted the document window and only then did the tree acquire, so the holder
-			//   underneath is that window. If anything ever comes to hold the focus between those
-			//   two - another palette, an edit box of ours - this hands the keyboard to THAT
-			//   instead, and it will look like the double click stopped working.
-			//   *The product does not lean on the pop when it cares where the focus lands: it
-			//    remembers the handler itself and calls AcquireKeyFocus(saved) to put it back
-			//    (spellpanel/SpellCheckWalker.cpp:95-139, SaveKeyboardEventHandler). That shape is
-			//    available here if this ever needs to name the window it wants.
-			//   *The bool16 both calls return (kFalse = the current holder would not let go) is
-			//    ignored, as it is at every product call site.
-			//
-			// This is the deliberate difference between the two clicks: a single click LEAVES the
-			// keyboard on the tree so the arrows keep walking the results, and a double click gives
-			// it up because it is a request to stop reading and start editing.
-			InterfacePtr<IEventHandler> treeEH(treeController, UseDefaultIID());
-			InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-			InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
-			if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() == treeEH)
-				keyBoard->RelinquishKeyFocus();
-			return result;
-		}
-		// It refused (SelectHitText's tests are the list) and has said why. Fall through: the first
-		// click's jump already happened, and the arrows below still want the tree.
-	}
-	else
-	{
-		// The jump, and its marker, now - even though this click may yet turn out to be the first half
-		// of a double click. Then the second click selects and SelectHitText takes the marker down,
-		// the beat KCM's Story-mode jump keeps (not booked for the double-click interval - see
-		// KFCJump.h).
-		KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
-	}
+	// The jump - its selection, or its marker - now, on every button-up: a double click's second click is a click
+	// like the first (see the note at the head of this file).
+	KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
 	// (KFCResultTreeEH). Two things happen in this one call, and BOTH are needed:

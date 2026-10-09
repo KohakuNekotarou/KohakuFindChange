@@ -3975,7 +3975,7 @@ bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UID
 	return true;
 }
 
-// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the double-click's selection. The row's stored place
+// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes. The row's stored place
 // and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them: that one. Both, at
 // different places (look-alikes - one reached by a focus an Undo left behind, or a stored place another look-alike
 // slid under): the look-alikes now are counted against the rows - the same count, by order (an Undo left the focus
