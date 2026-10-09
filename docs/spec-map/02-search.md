@@ -36,9 +36,11 @@
 
 ## 2. 対応するタブ
 
-- **FIND-07** 検索できるのは **Text・GREP・Glyph・Transliterate** の4つのタブ。
-  **Object・Colour のタブでは Find in … が灰色**になり、それでも（スクリプトなどから）押されたら
-  `The Find/Change dialog is on the Object tab. This panel lists text - use InDesign's own Find/Change.` と断る。
+- **FIND-07** 検索できるのは **Text・GREP・Glyph・Object・Transliterate** の5つのタブ（Object＝ページアイテムの一覧＝第17章）。
+  **Colour のタブでは Find in … が灰色**になり、それでも（スクリプトなどから）押されたら
+  `The Find/Change dialog is on the Colour tab. This panel does not search by colour - use InDesign's own Find/Change.` と断る。（1.4.0・17-objects.md）
+  （1.3 まで：検索できるのは Text・GREP・Glyph・Transliterate の4つのタブで、Object・Colour のタブでは灰色・押されたら
+  `The Find/Change dialog is on the Object tab. This panel lists text - use InDesign's own Find/Change.` と断っていた。）
   - 訂正:
 
 - **FIND-08** ★文字種変換（Transliterate）のタブも、ほかのタブと同じに検索・置換する（2026-08-05 の決定＝本体のパネルの設定どおりに）。
@@ -58,7 +60,8 @@
   （検索の最中にもう一度検索が来たときは `A search is already running.`）。
   - 訂正:
 
-- **FIND-11** ②**タブが Object／Colour** → FIND-07 の文。
+- **FIND-11** ②**タブが Colour** → FIND-07 の文。（1.4.0・17-objects.md＝1.3 までは Object も）
+  Object タブは③（探すもの）で断らない＝Find Object Format が空でも、その種類のフレームを全部並べる（OBJ-05）。範囲の断りは OBJ-03。
   - 訂正:
 
 - **FIND-12** ③**探すものが無い** → `No search text set on the Text tab. Type what to find in Edit > Find/Change, then search again.`
@@ -85,7 +88,7 @@
 - **FIND-16** ⑧**タブを確定し直せなかった**（FIND-19）→ `The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.`
   - 訂正:
 
-- **FIND-17** メニューで**灰色になるのは ①②⑥⑦ だけ**。③④⑤⑧ は Find in … を押せるが、押すとメッセージ欄で断る
+- **FIND-17** メニューで**灰色になるのは ①②⑥⑦ だけ**（②は 1.4.0 から Colour のタブだけ＝Object のタブでは灰色にならない・17-objects.md）。③④⑤⑧ は Find in … を押せるが、押すとメッセージ欄で断る
   （灰色にするのは「押しても何も始められない」ときだけ。理由を言えるものは押させて言う）。
   - 訂正:
 

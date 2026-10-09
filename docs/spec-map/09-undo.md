@@ -13,6 +13,7 @@
   - 訂正:
 
 - **UNDO-02** 追いかける書き込み＝ **行の Replace**（右クリック・Return キー）／**クエリ連続実行**（どれも取り消しの1段＝GEN-16）。
+  1.4.0 から**オブジェクトの行の Replace** も（物の指紋の前・後で見分ける＝OBJ-11）。オブジェクトのクエリだけのクエリ連続実行は、ストーリーの版が動かないので追いかけない（OBJ-11）。（1.4.0・17-objects.md）
   Change All in Book (No List) は一覧が無いときだけ走り、一覧を作らないので、追いかけるものが無い（文書は Ctrl+Z で戻る）。
   （Change Checked・ストーリーと文書の行の Replace・Replace Again・Reject Change・Accept Change・Accept All Changes by KohakuFindChange は 2026-10-06 に外した。）
   - 訂正:

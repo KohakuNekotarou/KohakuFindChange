@@ -55,8 +55,9 @@
   走っている間は進捗バーがモーダルなので、フライアウトそのものが開けない（2026-08-03 実測）。
   - 訂正:
 
-- **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Object／Colour のとき灰色（FIND-17）。
-  `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Object／Colour・検索する文字も形式も無いとき灰色（REP-33）。
+- **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
+  `Change All in Book (No List)` ＝Book Scope が OFF・対象のブックが無い・パネルにヒットの行がある・タブが Colour・検索する文字も形式も無い（Object タブでは Find Object Format も検索のオブジェクトスタイルも空）とき灰色（REP-33・OBJ-13）。
+  （1.4.0・17-objects.md＝1.3 までは、どちらも Object のタブでも灰色だった。）
   `Clear Results` ＝ヒットの行が無いとき灰色（0件のブックの行だけのときも・REP-34）。
   置換の文字は見ない（空でも「一致を消す」としてやれる）。
   `Run Saved Queries...` ＝走っている間（SET-04）のほかは灰色にならない（文書が無くても・結果が出ていても押せる＝QRY-02）。

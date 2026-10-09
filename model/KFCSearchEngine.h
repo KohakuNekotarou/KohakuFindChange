@@ -232,8 +232,8 @@ namespace KFCSearchEngine
 	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 
-	/** Can Find in ... run on this tab? No on Object and Colour, which find page items rather than
-	    text. Asked by the menu (greys the command) and by the search itself (refuses), so the two
+	/** Can Find in ... run on this tab? No on Colour alone (since 1.4.0 the Object tab lists page items -
+	    KFCObjectSearch). Asked by the menu (greys the command) and by the search itself (refuses), so the two
 	    cannot disagree. */
 	bool CanSearchTab(int32 mode);
 

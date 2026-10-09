@@ -836,8 +836,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Change All in Book (No List). kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
-		// the panel, no book to run on, the Object and Colour tabs, nothing to find). In the Keyboard Shortcuts editor
-		// under Palette Menus, like Find.
+		// the panel, no book to run on, the Colour tab, nothing to find - on the Object tab an empty Find Object Format,
+		// 1.4.0). In the Keyboard Shortcuts editor under Palette Menus, like Find.
 		kKFCActionComponentBoss,
 		kKFCChangeAllActionID,
 		kKFCChangeAllMenuKey,			// "Change All in Book (No List)"

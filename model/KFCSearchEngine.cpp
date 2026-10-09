@@ -1648,12 +1648,14 @@ bool KFCSearchEngine::CommitSearchMode()
 
 	// The tabs this panel can walk with the TEXT walker. Object and Colour search by attribute
 	// through walkers of their own (kObjectWalkerService / kColorSearchWalkerService) and return page
-	// items rather than lines of text; SearchBook turns those away before reaching here, so stating
-	// their mode would only mislead the engine.
+	// items rather than lines of text; no caller brings them here (the Colour tab is turned away, and since
+	// 1.4.0 the Object tab's search and writes - SearchBook, a row's Replace, Change All in Book, the query
+	// run - skip this call: InDesign's object search is aimed by the object walker, not by a mode stated
+	// here), so stating their mode would only mislead the engine.
 	//
 	// false rather than "nothing to do": nothing was stated, so a caller that walked anyway would
-	// walk in whatever mode was committed last. Both callers turn these tabs away before they get
-	// here, so this is the answer for a route that does not exist yet rather than for one that does.
+	// walk in whatever mode was committed last. Every caller keeps these tabs away from here, so this is
+	// the answer for a route that does not exist rather than for one that does.
 	if (mode != IFindChangeOptions::kTextSearch
 		&& mode != IFindChangeOptions::kGrepSearch
 		&& mode != IFindChangeOptions::kGlyphSearch
@@ -2873,9 +2875,9 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// book is resolved wipes the record the run has just made (measured). So the commit point sits just
 	// above it, and the checks above the commit point.
 
-	// Tabs that search by ATTRIBUTE rather than by text. InDesign walks those with a different walker
-	// altogether (kObjectWalkerService / kColorSearchWalkerService), and what they find are page items,
-	// not lines of text - so there is nothing for this panel to list, whatever it did with them.
+	// The tab that searches by COLOUR (the Colour tab - since 1.4.0 the only one turned away: the Object tab's page items
+	// are listed by InDesign's own object search, KFCObjectSearch). InDesign walks it with a walker of its own
+	// (kColorSearchWalkerService), whose finds this panel has no rows for - so there is nothing for it to list.
 	//
 	// Named explicitly because the alternative is worse than useless: their find string IS empty, so
 	// without this the panel would answer "No Find/Change text set." and send the user looking for a
@@ -2893,7 +2895,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		// Short enough to be read whole at the panel's floor - this one composes a tab name into the
 		// middle of it, so it is longer than it looks here (see KFCPanelMetrics on the four-line
 		// budget, and what a message that outgrew it cost).
-		outSummary.Append(" tab. This panel lists text - use InDesign's own Find/Change.");
+		outSummary.Append(" tab. This panel does not search by colour - use InDesign's own Find/Change.");
 		return 0;
 	}
 	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch (1.4.0)

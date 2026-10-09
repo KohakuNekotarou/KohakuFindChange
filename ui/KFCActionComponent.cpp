@@ -430,8 +430,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			listToUpdate->SetNthActionName(i, name);
 			// The name is written whether or not it can run, so a greyed-out item still says which
 			// scope it would have used.
-			// ...and grey on the Object and Colour tabs too (the author's call): they find page
-			// items, which this panel does not list. The same question the search asks (CanSearchTab).
+			// ...and grey on the Colour tab too (the author's call): it finds by colour, which this panel
+			// does not list (the Object tab's page items are listed since 1.4.0). The same question the
+			// search asks (CanSearchTab).
 			const bool canRun = haveTarget
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
@@ -441,8 +442,9 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
 			// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
 			// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with Book Scope off, while the
-			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Object and
-			// Colour tabs, and with nothing to find - the spec's section 4; a run standing up greys everything above.
+			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Colour tab,
+			// and with nothing to find (on the Object tab: an empty Find Object Format - 1.4.0) - the spec's section 4; a run
+			// standing up greys everything above.
 			const bool canRun = KFCChapters()->IsBookScopeOn()
 				&& haveTarget
 				&& KFCResults()->GetTotalHitCount() <= 0

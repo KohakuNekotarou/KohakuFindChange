@@ -766,7 +766,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 	// GLYPH AND TRANSLITERATE ARE WRITTEN TOO (the author's call). One match at a time is the walk those
 	// two tabs were built and measured on: the caller (ReplaceRowNow) has already stated the change glyph or the
 	// character type the command writes (KFCSearchEngine::CommitReplaceSide - PreviewHit writes on the GREP tab
-	// only, where there is nothing to state), and the menu refuses the Object and Colour tabs before any of this.
+	// only, where there is nothing to state), and the Colour tab is refused before any of this. (An Object row never comes
+	// here - ReplaceHit sends it to KFCObjectReplace, 1.4.0.)
 
 	// Every row's place now (RowNow) - the ones asked for are what the walks look for, and every row is
 	// carried past what they write, for the read-back at the end.
@@ -1094,7 +1095,7 @@ QueryCompared CompareQueryWithSearch()
 	// specific thing that can be said, and because it does NOT cost the results: a tab is one click to
 	// put back. Read through the call the results were stamped with (KFCSearchEngine::CurrentSearchMode).
 	// (Not "is the searched tab one this panel walks at all": the tab on the results is one SearchBook
-	// could state, and only the four text tabs can be, so it would never answer no.)
+	// searched - the four text tabs or, since 1.4.0, the Object tab - so it would never answer no.)
 	const int32 searchedMode = KFCResultModel::GetSearchMode();
 	const int32 currentMode = KFCSearchEngine::CurrentSearchMode();
 	if (searchedMode >= 0 && currentMode >= 0 && currentMode != searchedMode)
