@@ -177,6 +177,14 @@ namespace
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KFCResultModel::Hit& hit = chapter.hits[i];
+			// AN OBJECT ROW (1.4.0) has no story: it hangs off its document row directly (the adapter's branch for a
+			// chapter with no groups, KFCResultListAdapter.cpp).
+			if (hit.itemUID != kInvalidUID)
+			{
+				hit.fontGroup = -1;
+				hit.fontGroupPos = -1;
+				continue;
+			}
 			int32 found = -1;
 			const UID key = hit.storyUID;
 			const std::map<UID, int32>::const_iterator known = groupOf.find(key);
@@ -1016,7 +1024,33 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	hit.accentFlag.Clear();
 	hit.accentFlag.SetTranslatable(kFalse);
 
-	if (hit.pageString.IsEmpty())
+	if (hit.itemUID != kInvalidUID)
+	{
+		// AN OBJECT ROW (1.4.0, O8): "pasteboard" for an item on no page, else the page and its place on it; then where the
+		// item stands - master, grouped, inline, anchored - each spelled out (ROW-14). hidden / locked follow, as for text.
+		if (hit.onPasteboard || hit.pageString.IsEmpty())
+			hit.locator.Append("pasteboard");
+		else
+		{
+			hit.locator.Append("P");
+			hit.locator.Append(hit.pageString);
+			if (hit.pageOrdinal > 0)
+			{
+				hit.locator.Append("(");
+				hit.locator.AppendNumber(hit.pageOrdinal);
+				hit.locator.Append(")");
+			}
+		}
+		if (hit.isMaster)
+			hit.locator.Append(" master");
+		if (hit.isGrouped)
+			hit.locator.Append(" grouped");
+		if (hit.isInline)
+			hit.locator.Append(" inline");
+		if (hit.isAnchored)
+			hit.locator.Append(" anchored");
+	}
+	else if (hit.pageString.IsEmpty())
 	{
 		hit.locator.Append("overset");	// overset with nothing placed anywhere: no page to name
 	}
@@ -1286,6 +1320,22 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	ForgetRowBackup();
 	// The list put back - its rows' foci where KFC knows the stories as they stand (spec T7).
 	KFCRowFoci::AttachOpenChapters();
+}
+
+UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	return (h != nil) ? h->itemUID : kInvalidUID;
+}
+
+bool KFCResultModel::GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength)
+{
+	const Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return false;
+	outPrint = h->itemPrint;
+	outLength = h->itemPrintLength;
+	return true;
 }
 
 // End, KFCResultModel.cpp.

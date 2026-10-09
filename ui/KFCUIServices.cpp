@@ -20,6 +20,10 @@
 #include "IDocumentUIUtils.h"	// FindPresentationForDocument (has-a-window test)
 #include "IOpenLayoutCmdData.h"	// GetResultingPresentation - did the window actually appear?
 #include "IWindow.h"			// the window kOpenLayoutCmdBoss is supposed to have produced
+#include "IConcreteSelection.h"	// GetSelectedPageItems - the layout selection's concrete selection
+#include "ILayoutHitTestSuite.h"	// ...reached through the active layout hit-test suite
+#include "ILayoutTarget.h"		// GetUIDList(kStripStandoffs) - the selected page items
+#include "ISelectionUtils.h"	// QueryActiveLayoutHitTestSuite
 
 // General includes:
 #include "CmdUtils.h"
@@ -141,6 +145,24 @@ public:
 	virtual bool GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
 	{
 		return KFCBookPanelLookup::GetPanelBookSelection(bookFile, outContents, outTotal);
+	}
+
+	virtual bool GetSelectedPageItems(UIDList& outItems)
+	{
+		// The layout selection's items, standoffs stripped - how the SDK's snippets read a selection
+		// (SnpInspectLayoutModel.cpp: ILayoutTarget::GetUIDList(kStripStandoffs)) - reached from the active selection
+		// through its layout hit-test suite's concrete selection (csxsdemo's VDActionComponent.cpp; KT measured it).
+		outItems.Clear();
+		Utils<ISelectionUtils> selectionUtils;
+		if (!selectionUtils.Exists())
+			return false;
+		InterfacePtr<ILayoutHitTestSuite> hitSuite(selectionUtils->QueryActiveLayoutHitTestSuite());
+		InterfacePtr<IConcreteSelection> concrete(hitSuite, UseDefaultIID());
+		InterfacePtr<ILayoutTarget> target(concrete, UseDefaultIID());
+		if (target == nil)
+			return false;
+		outItems = target->GetUIDList(kStripStandoffs);
+		return outItems.Length() > 0;
 	}
 };
 

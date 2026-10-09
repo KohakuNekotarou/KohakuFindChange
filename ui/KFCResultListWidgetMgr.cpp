@@ -291,11 +291,11 @@ private:
 		return KFCResults()->IsFromBook() ? kBookLevelIndent : PMReal(0.0);
 	}
 
-	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story
-	// row every hit sits under.
-	PMReal FontShift(int32 /*chapterIdx*/) const
+	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story row every TEXT
+	// hit sits under; none for an OBJECT chapter (1.4.0), whose rows hang off the document row directly.
+	PMReal FontShift(int32 chapterIdx) const
 	{
-		return kFontLevelIndent;
+		return (KFCResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
 	}
 
 	// The shared shape of the two BRANCH rows (book and document): an expander arrow and a label

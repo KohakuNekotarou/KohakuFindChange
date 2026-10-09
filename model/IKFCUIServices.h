@@ -50,6 +50,7 @@
 #include "IDFile.h"
 #include "PMString.h"
 #include "UIDRef.h"
+#include "UIDList.h"
 
 #include <vector>
 
@@ -97,6 +98,9 @@ public:
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
 	    selected BookContent UIDs (the book's database); outTotal = the panel's rows. */
 	virtual bool				GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal) = 0;
+	/** The page items selected in the front layout view, standoffs stripped (1.4.0 - the Object tab's Search: =
+	    Selection searches these: spec O3). false (outItems emptied) when there is no layout selection or no item in it. */
+	virtual bool				GetSelectedPageItems(UIDList& outItems) = 0;
 };
 
 #endif // __IKFCUIServices_h__

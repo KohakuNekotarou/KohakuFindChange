@@ -98,6 +98,7 @@
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
 #include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List) (F18)
+#include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query (1.4.0)
 
 namespace
 {
@@ -1868,6 +1869,33 @@ void KFCSearchEngine::BuildWalkSignature(PMString& outSignature)
 	outSignature.Append("m");
 	outSignature.AppendNumber(static_cast<int32>(mode));
 
+	// THE OBJECT TAB (1.4.0, spec O10 step 1): what decides which page items come back - the Type, the tab's own five
+	// Include switches, how many conditions Find Object Format holds and the object style it looks for. The conditions'
+	// values are RememberFindFormat's list, as for text. The Change side stays out, as for text.
+	if (mode == IFindChangeOptions::kObjectSearch)
+	{
+		outSignature.Append(" ot");
+		outSignature.AppendNumber(static_cast<int32>(opts->GetObjectSearchType()));
+		const bool16 objectSwitches[] =
+		{
+			opts->GetIncludeMasterPages(mode),
+			opts->GetIncludeLockedLayersForFind(mode),
+			opts->GetIncludeHiddenLayers(mode),
+			opts->GetIncludeLockedStoriesForFind(mode),
+			opts->GetIncludeFootnotes(mode),
+		};
+		outSignature.Append(" o");
+		for (size_t i = 0; i < sizeof(objectSwitches) / sizeof(objectSwitches[0]); ++i)
+			outSignature.Append(objectSwitches[i] ? "1" : "0");
+		const AttributeBossList* const objectAttrs = opts->GetFindAttributeBossList(db, mode);
+		outSignature.Append(" n");
+		outSignature.AppendNumber(objectAttrs != nil ? objectAttrs->CountBosses() : 0);
+		outSignature.Append(" fs");
+		outSignature.AppendNumber(static_cast<int32>(opts->GetObjectFindStyle(db).Get()));
+		outSignature.SetTranslatable(kFalse);
+		return;
+	}
+
 	// ----- WHAT is being looked for -----
 	if (mode == IFindChangeOptions::kGlyphSearch)
 	{
@@ -2868,6 +2896,7 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 		outSummary.Append(" tab. This panel lists text - use InDesign's own Find/Change.");
 		return 0;
 	}
+	const bool objectTab = (tab == IFindChangeOptions::kObjectSearch);	// the Object tab - KFCObjectSearch (1.4.0)
 
 	// Transliterate - the CJK character-type conversion (Kanji / kana / half- and full-width) - is
 	// walked like any other text tab (the author's call: whatever the official panel is set to, this
@@ -2877,7 +2906,9 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// Roman-featureset install the tab cannot be reached at all, so the transliterate paths simply lie
 	// dormant there.)
 
-	if (!HasFindQuery())
+	// (The Object tab always has a query: its Type, and Find Object Format when one is set - an empty one lists every
+	//  frame of the Type, the way InDesign's own Find Next walks them; spec section 7.)
+	if (!objectTab && !HasFindQuery())
 	{
 		// Which tab, so this reads as "nothing set on THIS tab" - each one keeps its own query, so a
 		// query on another tab is no help and saying so avoids a hunt.
@@ -2911,7 +2942,8 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// The same two questions KFCBookScope::HasScopeTarget asks for the menu's grey state; asked
 	// separately here because each one has its own sentence to say.
 	RunScope runScope;
-	if (!KFCSearchEngine::ResolveRunScope(runScope, outSummary))
+	if (!(objectTab ? KFCObjectSearch::ResolveObjectRunScope(runScope, outSummary)
+			: KFCSearchEngine::ResolveRunScope(runScope, outSummary)))
 		return 0;
 	const bool fromBook = runScope.fromBook;
 	const bool allDocuments = runScope.allDocuments;
@@ -2933,7 +2965,11 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	// every other one in this function, so it has to leave the previous results standing - and it must
 	// not search on in whatever mode had been committed last. Asking it this early changes nothing the
 	// user can see: it writes back the value it has just read.
-	if (!KFCSearchEngine::CommitSearchMode())
+	// NOT FOR THE OBJECT TAB (1.4.0): its walk is the service's own object search (SearchObject) over the shared object
+	// walker, which no text walker mode steers - CommitSearchMode states the text walker's tabs only and turns the Object
+	// tab away by design. Measured: KT's object walks found the Object tab's matches with no mode committed and the
+	// dialog's mode on Text (the plan's Task 1 M4).
+	if (!objectTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("The Find/Change tab could not be set - nothing was searched. Try reopening Edit > Find/Change.");
 		return 0;
@@ -3073,7 +3109,21 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 	KFCSearchEngine::RememberFindFormat();
 
 	CollectTally tally;
-	CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
+	if (objectTab)
+	{
+		// THE OBJECT TAB (1.4.0): page items, walked by InDesign's own object search one document at a time.
+		KFCObjectSearch::Tally objects;
+		KFCObjectSearch::CollectTargets(targets, fromBook, allDocuments, static_cast<int32>(selectionScope), unopenable, objects);
+		tally.total = objects.total;
+		tally.chaptersWithHits = objects.chaptersWithHits;
+		tally.truncated = objects.truncated;
+		tally.cancelled = objects.cancelled;
+		tally.unsearchable.swap(objects.unsearchable);
+		tally.brokeOff.swap(objects.brokeOff);
+		tally.unclosed.swap(objects.unclosed);
+	}
+	else
+		CollectTargets(targets, fromBook, allDocuments, selectionScope, unopenable, tally);
 	const int32 total = tally.total;
 	const int32 chaptersWithHits = tally.chaptersWithHits;
 	const bool collectionTruncated = tally.truncated;
@@ -3230,6 +3280,10 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 bool KFCSearchEngine::HasFindQueryNow()
 {
+	// THE OBJECT TAB (1.4.0): its query is Find Object Format - IsThereSomethingToFind answers no there even with one set
+	// (measured, KT 2026-10-09; the plan's Task 1 M7). What Change All in Book's grey state and door, and the query run, ask.
+	if (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
+		return KFCObjectSearch::HasFindObjectFormat();
 	return HasFindQuery();
 }
 
@@ -3350,6 +3404,17 @@ const char* KFCSearchEngine::FindCommandName(bool bookScopeOn)
 		return "Find in Book";
 	}
 	// what the search will make of Search: with this selection - the dialog's own display
+	// The Object tab's Search: is read its own way (KFCObjectSearch::ObjectSearchScope - page items, not text).
+	if (CurrentSearchMode() == IFindChangeOptions::kObjectSearch)
+	{
+		PMString note;
+		switch (KFCObjectSearch::ObjectSearchScope(note))
+		{
+			case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "Find in All Documents";
+			case IWalkerScopeFactoryUtils::kSelectionScope:		return "Find in Selection";
+			default:											return "Find in Document";
+		}
+	}
 	switch (SearchScopeForSelection(CurrentSearchScope()))
 	{
 		case IWalkerScopeFactoryUtils::kAllDocumentScope:	return "Find in All Documents";
@@ -3382,9 +3447,10 @@ bool KFCSearchEngine::SetQuery(const PMString& text, int32 mode)
 
 bool KFCSearchEngine::CanSearchTab(int32 mode)
 {
-	// Object and Colour search by ATTRIBUTE, with walkers of their own, and find page items - not lines
-	// of text. Every other value (including -1, settings unreadable) is left for the search to answer.
-	return mode != IFindChangeOptions::kObjectSearch && mode != IFindChangeOptions::kColorSearch;
+	// Colour searches swatch use, with a walker of its own, and finds no text and no frame this panel lists. The Object
+	// tab is searched since 1.4.0 (KFCObjectSearch). Every other value (including -1, settings unreadable) is left for the
+	// search to answer.
+	return mode != IFindChangeOptions::kColorSearch;
 }
 
 void KFCSearchEngine::ShutdownCleanup()

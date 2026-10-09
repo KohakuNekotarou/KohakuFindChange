@@ -119,10 +119,28 @@ namespace KFCResultModel
 								// textStart then (the spec's T14: a row among look-alikes is found again by its
 								// order). Set by AppendChapter; never changed after (a row that moves keeps it).
 
+		// --- an OBJECT row (the Object tab - 1.4.0, docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O8) ---
+		// A row for a PAGE ITEM rather than a match in a story. storyUID stays kInvalidUID on it, so every text door - the
+		// rows' text foci, the story groups, the replace's walks - passes it by; itemUID is the item, in the chapter's
+		// database. The words on its locator: onPasteboard reads "pasteboard" in place of the page, then isMaster,
+		// isGrouped, isInline and isAnchored (BuildHitLocator).
+		UID			itemUID;
+		bool		onPasteboard;
+		bool		isMaster;
+		bool		isGrouped;
+		bool		isInline;		// an inline or above-line object in text
+		bool		isAnchored;		// an anchored object with a custom position
+		// Its FINGERPRINT (O12, KFCObjectSearch::Fingerprint): its own snippet's hash and length - taken by the search,
+		// and again by each Replace of KFC's own. A row's Replace refuses an item that no longer reads this way.
+		uint64		itemPrint;
+		uint32		itemPrintLength;
+
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
-				replaced(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1) {}
+				replaced(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
+				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
+				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -425,6 +443,12 @@ namespace KFCResultModel
 
 	/** A row's place among its story's rows as the search found them (Hit::storyOrdinal); -1 = no such row. */
 	int32 GetHitStoryOrdinal(int32 chapterIdx, int32 hitIdx);
+
+	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
+	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
+
+	/** An object row's fingerprint (Hit::itemPrint / itemPrintLength). false for a text row or an index out of range. */
+	bool GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength);
 
 	/** The two flags that say the match IS in the document but is out of the user's reach there:
 	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no
