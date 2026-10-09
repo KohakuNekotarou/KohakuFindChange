@@ -177,6 +177,7 @@
   ブック `N hit(s) in M of T chapter(s).`（M＝一致のあった章、T＝調べた章）／All Documents `N hit(s) in M of T document(s).`／
   それ以外 `N hit(s).`（Story・To End of Story・Selection は ` in the story` ` to the end of the story` ` in the selection` が付く）。
   最後に（章の注の後に）` Replace a row with its right-click menu, or select it and press Return.` を付ける（2026-10-06・F19＝置換のしかたを画面のどこも言っていなかったので）。
+  その後ろに ` Shift+Return replaces it and moves on to the next row.` を続ける（2026-10-09 の作者の依頼＝Shift+Return も案内する）。回帰＝`nobox-hit-rows`・`ret-hint`。
   （それまでの ` Right-click the book or a document row for a menu.` は、ブック・文書の行のメニューと一緒に 2026-10-06 に外した。）
   ★**文書名・ブック名は書かない**（2026-08-03 の決定＝すぐ下の木の最初の行に出ているので、欄を食うだけ）。
   - 訂正:

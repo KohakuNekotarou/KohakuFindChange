@@ -3534,10 +3534,12 @@ int32 KFCSearchEngine::SearchBook(PMString& outSummary)
 
 	// How to replace (spec F19): a hit row's Replace - its right-click menu, or Return on a selected row
 	// (F17) - is the one write from the list, and nothing else on screen says so (the user's request).
+	// Shift+Return - replace, then on to the next row - said too (the author, 2026-10-09).
 	//
 	// Last, after the warnings: it is an offer, not something that went wrong, and the status field
 	// truncates its tail when it has to.
-	outSummary.Append(" Replace a row with its right-click menu, or select it and press Return.");
+	outSummary.Append(" Replace a row with its right-click menu, or select it and press Return."
+		" Shift+Return replaces it and moves on to the next row.");
 	return total;
 }
 
