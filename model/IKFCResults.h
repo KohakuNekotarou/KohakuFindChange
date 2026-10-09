@@ -108,6 +108,8 @@ public:
 	    popped over, for its Search This Story Again. */
 	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) = 0;
 	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) = 0;
+	/** = KFCResultModel::GetHitItem (appended, 1.4.0) - the page item an object row stands for, kInvalidUID for a text row. */
+	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) = 0;
 };
 
 #endif // __IKFCResults_h__

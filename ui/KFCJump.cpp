@@ -26,6 +26,8 @@
 #include "IFrameList.h"
 #include "IFrameListComposer.h"
 #include "IHierarchy.h"				// the match's frame as a page item - which spread is it on?
+#include "IGeometry.h"				// an object row's item: its outline, scrolled to (ShowItemInView, 1.4.0)
+#include "ILayoutSelectionSuite.h"	// SelectPageItems - an object row's click selects its item (1.4.0)
 #include "ILayoutCmdData.h"			// kSetSpreadCmdBoss carries the view it is addressing
 #include "ILayoutControlData.h"		// kFitNone; GetSpreadRef - which spread the view is showing
 #include "ILayoutUIUtils.h"
@@ -60,6 +62,7 @@
 #include "UIDList.h"
 #include "Utils.h"
 #include "K2SmartPtr.h"				// K2::scoped_ptr
+#include "TransformUtils.h"			// InnerToPasteboardMatrix - an object row's item in pasteboard coordinates (1.4.0)
 #include "PMPoint.h"
 #include "PMRect.h"
 #include "PMMatrix.h"
@@ -291,6 +294,8 @@ namespace
 		return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
 	}
 
+	void EnsureSpreadUIDInView(IControlView* view, IDataBase* db, UID targetSpread);	// below EnsureSpreadInView
+
 	/** Put the layout view on the SPREAD the match sits on, before anything is scrolled.
 
 	    SCROLLING TO A POINT ASSUMES THE VIEW IS ALREADY ON THAT POINT'S SPREAD. The scroll below
@@ -327,7 +332,13 @@ namespace
 	    Silent when it cannot do it: the scroll that follows is no worse off than before. */
 	void EnsureSpreadInView(IControlView* view, const UIDRef& storyRef, TextIndex pos)
 	{
-		const UID targetSpread = SpreadForMatch(storyRef, pos);
+		EnsureSpreadUIDInView(view, storyRef.GetDataBase(), SpreadForMatch(storyRef, pos));
+	}
+
+	/** Put the view on ONE SPREAD (the tail of EnsureSpreadInView, above - shared with an object row's jump, 1.4.0). The
+	    rules are EnsureSpreadInView's: a different spread or nothing, the view's own document, the error state kept. */
+	void EnsureSpreadUIDInView(IControlView* view, IDataBase* db, UID targetSpread)
+	{
 		if (targetSpread == kInvalidUID)
 			return;
 
@@ -341,11 +352,11 @@ namespace
 		if (viewDoc == nil)
 			return;
 
-		// The spread UID was read out of the STORY's database and is about to be handed to a command
+		// The spread UID was read out of the match's (or the item's) database and is about to be handed to a command
 		// addressed at the VIEW's. They are the same database on every path that reaches here - the
 		// caller has just brought this hit's document to the front - but a UID means nothing outside
 		// the database it came from, so the two are checked rather than assumed.
-		if (::GetDataBase(viewDoc) != storyRef.GetDataBase())
+		if (::GetDataBase(viewDoc) != db)
 			return;
 
 		// PRESERVE, THEN CLEAR - the caller's error state goes back the way it came. Clearing the
@@ -1094,6 +1105,121 @@ void ShowBook()
 	KFCBookPanelLookup::BringBookTabForward(bookPath);
 }
 
+// AN OBJECT ROW'S ITEM IS STILL THERE: its UID valid in the database, and a page item (it has a hierarchy).
+bool ItemIsThere(const UIDRef& itemRef)
+{
+	IDataBase* const db = itemRef.GetDataBase();
+	if (db == nil || itemRef.GetUID() == kInvalidUID || !db->IsValidUID(itemRef.GetUID()))
+		return false;
+	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
+	return hier != nil;
+}
+
+// THE VIEW ON THE ITEM (spec O9): its spread first - a parent page's included, the rule EnsureSpreadInView keeps - then
+// the middle of its outline scrolled to the window's centre. The document is already in front.
+void ShowItemInView(const UIDRef& itemRef)
+{
+	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
+	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
+	if (frontView == nil || hier == nil)
+		return;
+	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+	if (spread != nil)
+		EnsureSpreadUIDInView(frontView, itemRef.GetDataBase(), ::GetUID(spread));
+	InterfacePtr<IGeometry> geometry(itemRef, UseDefaultIID());
+	if (geometry == nil)
+		return;
+	const PMRect bounds = geometry->GetStrokeBoundingBox(::InnerToPasteboardMatrix(geometry));
+	ScrollViewToPoint(frontView, PBPMPoint(bounds.GetHCenter(), bounds.GetVCenter()));
+}
+
+// SELECT ONE PAGE ITEM in the front document - the SDK's own way (SnpSelectShape.cpp: DeselectAll, then SelectPageItems
+// with kReplace), inside a dirty guard. The tool is left as it is (D9 - the plan's Task 1 M11b: a page item is selected
+// under the Type tool, and InDesign's own Find Next on the Object tab selects with the Type tool left on, M5). True when
+// something is selected.
+bool SelectItem(const UIDRef& itemRef)
+{
+	IDataBase::SaveRestoreModifiedState dirtyGuard(itemRef.GetDataBase());
+	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
+	if (selectionManager == nil)
+		return false;
+	InterfacePtr<ILayoutSelectionSuite> layoutSuite(selectionManager, UseDefaultIID());
+	if (layoutSuite == nil)
+		return false;
+	selectionManager->DeselectAll(nil);
+	layoutSuite->SelectPageItems(UIDList(itemRef), Selection::kReplace, Selection::kDontScrollLayoutSelection);
+	return selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+}
+
+// A CLICK ON AN OBJECT ROW (form S - the author's call of 2026-10-09: whatever Search: is, as Find Next does, and as the
+// text rows do - Task 0): the item selected; a locked or hidden one leaves nothing selected, and the line says why -
+// form S builds no frame marker, so the line and the view are the pointer. The document is in front and the view on
+// the item (JumpToObject).
+void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
+{
+	bool locked = false, hidden = false;
+	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
+	if (locked || hidden)
+	{
+		ClearSelection();
+		PMString message(locked ? "That object is locked - not selected." : "That object is hidden - not selected.");
+		message.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(message);
+		return;
+	}
+	(void)SelectItem(itemRef);
+}
+
+/** Jump to an OBJECT row (spec O9): its document in front (a windowless chapter given its window - JMP-09), the view on
+    the item, then the item selected where the click may select (SelectItemOnClick - form S). An item no longer there: the
+    document still comes forward, the row reads Missing. Returns true when it landed on the item. */
+bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
+{
+	UIDRef docRef;
+	IDFile file;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, story, start, end)
+		|| !EnsureChapterReachable(chapterIdx, docRef, file))
+	{
+		KFCHitMarkerView::Hide();
+		return false;
+	}
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+	{
+		KFCHitMarkerView::Hide();
+		return false;
+	}
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+	const UIDRef itemRef(db, item);
+	const bool there = ItemIsThere(itemRef);
+	if (!FrontChapter(docRef))
+	{
+		KFCHitMarkerView::Hide();
+		return false;
+	}
+	if (!there)
+	{
+		KFCHitMarkerView::Hide();
+		bool replaced = false, locked = false;
+		KFCResults()->GetHitFlags(chapterIdx, hitIdx, replaced, locked);
+		if (!replaced)
+		{
+			KFCResults()->SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
+			KFCResultTree::RefreshRows();
+		}
+		PMString message("Not found - the object is no longer in the document. Search again.");
+		message.SetTranslatable(kFalse);
+		KFCResultTree::ShowStatus(message);
+		return false;
+	}
+	ShowItemInView(itemRef);
+	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up
+	SelectItemOnClick(chapterIdx, hitIdx, itemRef);
+	return true;
+}
+
 } // anonymous namespace
 
 void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
@@ -1116,7 +1242,14 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 	// away, so it never stands beside a row it does not belong to.
 	if (hitIdx >= 0)
 	{
-		if (JumpToHit(chapterIdx, hitIdx))
+		const UID item = KFCResults()->GetHitItem(chapterIdx, hitIdx);
+		if (item != kInvalidUID)
+		{
+			// AN OBJECT ROW (1.4.0): the item shown and selected (form S); it has no preview (a GREP row's alone).
+			(void)JumpToObject(chapterIdx, hitIdx, item);
+			KFCResultTree::DropRowPreview();
+		}
+		else if (JumpToHit(chapterIdx, hitIdx))
 			(void)KFCResultTree::ShowRowPreview(chapterIdx, hitIdx);
 		else
 			KFCResultTree::DropRowPreview();
