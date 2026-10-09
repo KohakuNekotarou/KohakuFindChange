@@ -51,6 +51,7 @@
 #include "KFCSearchEngine.h"	// the shared walker scope and the line-splitting the rows use
 #include "KFCBookScope.h"		// reopening a chapter the user closed since the search
 #include "KFCUndoFollow.h"		// every write recorded, so that the panel follows its Undo and Redo
+#include "KFCObjectReplace.h"	// an object row's Replace (1.4.0)
 #ifdef KFC_DIAG
 #include "ITextFocusManager.h"	// how many foci a story carries while it is written (WALKSTEP) - test builds only
 #include "IFrameList.h"			// whether its frames stand damaged around a find (WALKSTEP) - test builds only
@@ -1124,7 +1125,11 @@ QueryCompared CompareQueryWithSearch()
 	// user's report). So the failure is not swallowed. The results are NOT cleared: they still describe the
 	// search that found them, so RefuseChangedQuery refuses the way every other door in this plug-in does and
 	// leaves the panel be.
-	if (!KFCSearchEngine::CommitSearchMode())
+	//
+	// NOT FOR THE OBJECT TAB (1.4.0): its walk is the service's own object search, which no text walker mode steers, and
+	// CommitSearchMode turns that tab away by design; SearchBook commits nothing for it either, so the signatures below
+	// are still taken on the same side (KFCSearchEngine::SearchBook's note on it).
+	if (currentMode != IFindChangeOptions::kObjectSearch && !KFCSearchEngine::CommitSearchMode())
 		return kQueryTabNotStated;
 
 	// ----- (2) the QUERY itself, which the tab does not cover -----
@@ -1495,6 +1500,9 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 		outStatus = "Replace: this row cannot be replaced (already replaced, locked, or not a match of Find/Change).";
 		return false;
 	}
+	// AN OBJECT ROW (1.4.0) is written by InDesign's object replace, not by a walk of a story (KFCObjectReplace).
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		return KFCObjectReplace::ReplaceRow(chapterIdx, hitIdx, outStatus);
 	return ReplaceRowNow(chapterIdx, hitIdx, outStatus);
 }
 
@@ -1517,6 +1525,8 @@ bool KFCReplaceEngine::PreviewHit(int32 chapterIdx, int32 hitIdx, PMString& outA
 {
 	outAfter.Clear();
 	outAfter.SetTranslatable(kFalse);
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		return false;		// an object row has no after-text (a GREP row's alone - 1.4.0)
 	if (KFCRunGuard::IsAnyRunning() || !CanReplaceHit(chapterIdx, hitIdx))
 		return false;
 	if (KFCSearchEngine::CurrentSearchMode() != IFindChangeOptions::kGrepSearch || !QueryUnchangedSinceSearch())

@@ -111,6 +111,9 @@ public:
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) = 0;
 	/** = KFCSearchEngine::RestoreSearchScope (appended, 1.4.0) - Search: put back after a row's click (scheduled). */
 	virtual void RestoreSearchScope(int32 mode, int32 scope) = 0;
+	/** = KFCObjectReplace::CheckRowNow (appended, 1.4.0) - an object row's Replace asked before its window is brought
+	    forward: false = refused, outStatus says why. */
+	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

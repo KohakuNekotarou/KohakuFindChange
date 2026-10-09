@@ -450,6 +450,11 @@ namespace KFCResultModel
 	/** An object row's fingerprint (Hit::itemPrint / itemPrintLength). false for a text row or an index out of range. */
 	bool GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength);
 
+	/** An object row KFC has replaced (1.4.0, O10 step 10): marked replaced - "Changed", its Replace greyed - with the
+	    item's fingerprint as the write left it. Backed up like every change a write makes (BeginRowBackup), so an Undo
+	    puts the row and its fingerprint back together. */
+	void MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength);
+
 	/** The two flags that say the match IS in the document but is out of the user's reach there:
 	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no
 	    way to change it) and HIDDEN (a switched-off layer - the text is composed and can be jumped

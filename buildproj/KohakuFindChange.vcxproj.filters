@@ -99,6 +99,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h">
@@ -177,6 +180,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>

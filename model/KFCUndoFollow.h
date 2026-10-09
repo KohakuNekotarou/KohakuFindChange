@@ -87,6 +87,10 @@ namespace KFCUndoFollow
 		    moved none has nothing an Undo could take back). */
 		void Keep(StepKind kind);
 
+		/** AN OBJECT ROW'S ITEM (1.4.0, spec O11): read its fingerprint now, before the write - an object Replace moves no
+		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". */
+		void RecordItem(int32 chapterIdx, UID item);
+
 	private:
 		bool fOpen;
 		StepRecorder(const StepRecorder&);

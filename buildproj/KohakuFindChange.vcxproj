@@ -250,6 +250,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp"/>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h"/>
@@ -279,6 +280,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">

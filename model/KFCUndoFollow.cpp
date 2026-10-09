@@ -549,6 +549,11 @@ void KFCUndoFollow::StepRecorder::Keep(StepKind kind)
 	KeepStep(step);
 }
 
+// (Filled by the plan's Task 7 - the object rows' Undo / Redo followed by the item's fingerprint.)
+void KFCUndoFollow::StepRecorder::RecordItem(int32 /*chapterIdx*/, UID /*item*/)
+{
+}
+
 KFCUndoFollow::RunRecorder::RunRecorder()
 	: fOpen(true)
 {

@@ -1338,4 +1338,15 @@ bool KFCResultModel::GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& out
 	return true;
 }
 
+void KFCResultModel::MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return;
+	BackUpRow(chapterIdx, hitIdx, *h);
+	h->replaced = true;
+	h->itemPrint = newPrint;
+	h->itemPrintLength = newLength;
+}
+
 // End, KFCResultModel.cpp.

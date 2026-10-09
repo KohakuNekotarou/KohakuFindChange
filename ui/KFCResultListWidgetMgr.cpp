@@ -59,6 +59,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 #include "KFCResultTree.h"
+#include "KFCJump.h"			// ReplaceObjectRow - an object row's Replace (1.4.0)
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
@@ -929,7 +930,10 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStat
 		return false;
 	PMString status;
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow begin focus=%s", DiagKeyFocus().c_str());
-	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, status);	// no prompt (the author's call)
+	// AN OBJECT ROW (1.4.0) is replaced through the jump's machinery - its document fronted around the write (KFCJump).
+	const bool wrote = (KFCResults()->GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
+		? KFCJump::ReplaceObjectRow(chapterIdx, hitIdx, status)
+		: KFCRuns()->ReplaceHit(chapterIdx, hitIdx, status);	// no prompt (the author's call)
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
 	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
@@ -947,7 +951,8 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStat
 	else
 		Rebuild();
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the repaint focus=%s", DiagKeyFocus().c_str());
-	ShowStatus(status);
+	if (!status.IsEmpty())		// (an object row dropped while a landing is under way says nothing; a text row always does)
+		ShowStatus(status);
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the status focus=%s", DiagKeyFocus().c_str());
 	if (outStatus != nil)
 		*outStatus = status;

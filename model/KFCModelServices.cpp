@@ -23,6 +23,7 @@
 #include "KFCBookScope.h"
 #include "KFCChangeAll.h"
 #include "KFCHitMarker.h"
+#include "KFCObjectReplace.h"
 #include "KFCOversetLocator.h"
 #include "KFCQuerySequence.h"
 #include "KFCReplaceEngine.h"
@@ -111,6 +112,7 @@ public:
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::LocateRow(chapterIdx, hitIdx, docRef, ioStart, ioEnd); }
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }
 	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
+	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

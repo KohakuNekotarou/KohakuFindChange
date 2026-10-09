@@ -1294,4 +1294,38 @@ void KFCJump::KeepSearchScopeAfterClick()
 		KFCRuns()->RestoreSearchScope(gScopeKeep.mode, gScopeKeep.scope);
 }
 
+bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (gActivating)
+		return false;		// a landing is still opening a document (see gActivating) - the next press will land
+	ActivationGuard activationGuard;
+	if (!KFCRuns()->CheckObjectReplace(chapterIdx, hitIdx, outStatus))
+		return false;
+	UIDRef docRef;
+	IDFile file;
+	UID story = kInvalidUID;
+	TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
+	const UID item = KFCResults()->GetHitItem(chapterIdx, hitIdx);
+	if (!KFCResults()->GetHitLocation(chapterIdx, hitIdx, docRef, file, story, start, end)
+		|| !EnsureChapterReachable(chapterIdx, docRef, file))
+		return false;
+	IDataBase* const db = docRef.GetDataBase();
+	if (db == nil)
+		return false;
+	{
+		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
+		if (!FrontChapter(docRef))
+			return false;		// it has said why
+		ShowItemInView(UIDRef(db, item));
+	}
+	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, outStatus);
+	// 9. Nothing left selected - InDesign's walk to the item and its replace selected what they met (in this document,
+	// now in front). Taken away whether the write went through or not.
+	if (LayoutOfDocIsFrontmost(docRef))
+		ClearSelection();
+	return wrote;
+}
+
 // End, KFCJump.cpp.

@@ -47,6 +47,12 @@ namespace KFCJump
 	    the selection offers it (1.4.0 - the author's call of 2026-10-10; the note above ScopeKeep in KFCJump.cpp). */
 	void KeepSearchScopeAfterClick();
 
+	/** AN OBJECT ROW'S REPLACE (1.4.0, spec O10): the model's checks first (IKFCRuns::CheckObjectReplace - a refused row
+	    brings no window forward), then the row's document in front and the view on its item (InDesign's replace selects
+	    what it writes in the FRONT document - O10 step 6), the write (IKFCRuns::ReplaceHit) and the selection it left
+	    taken away (step 9 - the author's call). outStatus = what to say. True when it wrote. */
+	bool ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a
 	    chapter row lands, to decide whether to close the other displayed chapters; the flyout drives it.
 
