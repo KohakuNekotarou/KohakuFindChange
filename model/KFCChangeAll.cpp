@@ -42,6 +42,8 @@
 #include "KFCDiag.h"
 #include "KFCID.h"				// kKFCChangeAllStepKey
 #include "KFCLoc.h"
+#include "KFCObjectReplace.h"	// ReplaceAllInDoc - the Object tab's Change All in one chapter (1.4.0)
+#include "KFCObjectSearch.h"	// the Object tab's doors and Search:, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -86,6 +88,16 @@ void AppendByChapter(PMString& outSummary, const std::vector<std::pair<PMString,
 		outSummary.Append(" more");
 	}
 	outSummary.Append(".");
+}
+
+/** " (K partially)" - the items InDesign's object Change All changed only in part (1.4.0, spec O13); nothing when none. */
+void AppendPartially(PMString& outSummary, int32 partially)
+{
+	if (partially <= 0)
+		return;
+	outSummary.Append(" (");
+	outSummary.AppendNumber(partially);
+	outSummary.Append(" partially)");
 }
 }	// anonymous namespace
 
@@ -200,7 +212,21 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	if (!KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode()))
 	{
-		outSummary.Append("Change All: the Object and Colour tabs are not supported.");
+		outSummary.Append("Change All: the Colour tab is not supported.");
+		return 0;
+	}
+	// THE OBJECT TAB (1.4.0, spec O13): InDesign's object Change All over each chapter. Refused with nothing to find - an
+	// empty Find Object Format would change every frame of the Type in the book - or nothing to change to. (The menu greys
+	// the item with nothing to find - HasFindQueryNow - so these doors are for a caller that never went through the menu.)
+	const bool objectTab = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
+	if (objectTab && !KFCObjectSearch::HasFindObjectFormat())
+	{
+		outSummary.Append("Change All: nothing to find on the Object tab - set Find Object Format or an object style in Edit > Find/Change first.");
+		return 0;
+	}
+	if (objectTab && !KFCObjectSearch::HasChangeObjectFormat())
+	{
+		outSummary.Append("Change All: nothing to change to on the Object tab - set Change Object Format or an object style first.");
 		return 0;
 	}
 	if (!KFCSearchEngine::HasFindQueryNow())
@@ -216,16 +242,19 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		return 0;
 	}
 	KFCSearchEngine::RunScope scope;
-	if (!KFCSearchEngine::ResolveRunScope(scope, outSummary))
+	if (!(objectTab ? KFCObjectSearch::ResolveObjectRunScope(scope, outSummary)
+			: KFCSearchEngine::ResolveRunScope(scope, outSummary)))
 		return 0;
 	// THE TAB AND THE CHANGE SIDE, STATED BEFORE THE SEQUENCE (outside any command sequence - CommitSearchMode's rule):
-	// what the command writes is what the dialog shows.
-	if (!KFCSearchEngine::CommitSearchMode())
+	// what the command writes is what the dialog shows. Not for the Object tab (1.4.0): its Change All is the service's
+	// own object replace, which no text walker mode steers - CommitSearchMode turns that tab away by design, as in
+	// KFCSearchEngine::SearchBook.
+	if (!objectTab && !KFCSearchEngine::CommitSearchMode())
 	{
 		outSummary.Append("Change All: the Find/Change tab could not be stated - nothing was changed.");
 		return 0;
 	}
-	if (!KFCSearchEngine::CommitReplaceSide())
+	if (!objectTab && !KFCSearchEngine::CommitReplaceSide())
 	{
 		outSummary.Append("Change All: the Change To in Find/Change could not be stated - nothing was changed.");
 		return 0;
@@ -284,6 +313,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
+	int32 partially = 0;		// the Object tab's items changed only in part (1.4.0, spec O13)
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did its Change All write anything
 	std::vector<std::pair<PMString, int32> > written;		// the By chapter list: each chapter written, how many (book order)
 	bool cancelled = false, failed = false;
@@ -319,15 +349,18 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 				cancelled = true;
 				break;
 			}
-			int32 count = 0;
-			if (!WriteDocument(targets[d].docRef, static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope), scopeOptions,
-					count))
+			int32 count = 0, partial = 0;
+			const bool wrote = objectTab
+				? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
+				: WriteDocument(targets[d].docRef, static_cast<int32>(IWalkerScopeFactoryUtils::kDocumentScope), scopeOptions, count);
+			if (!wrote)
 			{
 				failed = true;
 				why = "InDesign's Change All failed in ";
 				why.Append(targets[d].shortName);
 				break;
 			}
+			partially += partial;
 			if (count > 0)
 			{
 				replaced += count;
@@ -349,6 +382,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
+	if (objectTab)
+		KFCObjectSearch::AimSharedWalkerAtFront();		// O7 - the walker named the book's chapters
 
 	if (cancelled || failed)
 	{
@@ -419,14 +454,18 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.AppendNumber(selection.selected);
 		outSummary.Append(" selected document(s) (");
 		outSummary.AppendNumber(selection.total);
-		outSummary.Append(" in the book).");
+		outSummary.Append(" in the book)");
+		AppendPartially(outSummary, partially);
+		outSummary.Append(".");
 	}
 	else
 	{
 		outSummary.AppendNumber(replaced);
 		outSummary.Append(" replaced in ");
 		outSummary.AppendNumber(static_cast<int32>(written.size()));
-		outSummary.Append(" chapter(s).");		// one undo step; nothing said of Ctrl+Z (spec F20)
+		outSummary.Append(" chapter(s)");
+		AppendPartially(outSummary, partially);
+		outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	}
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
