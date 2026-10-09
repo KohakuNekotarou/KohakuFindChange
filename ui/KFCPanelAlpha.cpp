@@ -5,8 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  The "Translucent Panel" toggle, and "Translucent Find/Change" beside it. Win32 is reached from
-//  here, KFCFindChangeMinimize.cpp, KFCPanelState.cpp and KFCAppBarSearchEnter.cpp (a grep for
-//  windows.h recounts them).
+//  here, KFCFindChangeMinimize.cpp, KFCPanelState.cpp, KFCAppBarSearchEnter.cpp and KFCQueryDialog.cpp
+//  (its minimize box) - and, in a test build only, KFCResultTreeEH.cpp (a grep for windows.h recounts
+//  them).
 //
 //  Ported from KCM's KCMPanelAlpha.cpp. Everything below is what that file established on the real
 //  application - see docs/ai-notes/win32-window-transparency.md before changing any of it.

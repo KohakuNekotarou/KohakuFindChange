@@ -227,7 +227,7 @@ namespace KFCResultModel
 	void CloseChapter(int32 chapterIdx);
 
 	/** CloseChapter's work on a chapter that is not in the model - one of a kept whole result set
-	    (KFCUndoFollow::ForgetDocument): its rows, groups and versions gone, no docRef, no file. */
+	    (KFCUndoFollow::ForgetDocument): its rows, groups, versions and searched parts gone, no docRef, no file. */
 	void EmptyChapter(Chapter& chapter);
 
 	/** The nth chapter the tree SHOWS - the chapters with rows, under the display cap - as a chapter index;
@@ -567,9 +567,9 @@ namespace KFCResultModel
 	    cannot act on. "+" is deliberately NOT the separator: InDesign's own overset marker is a "+",
 	    so "P5+locked" reads as "page 5, overset".
 
-	    The flags STACK - "P4(1) locked missing" is a locked row that has since been jumped to and
-	    found changed. Only the words that come from the row's outcome exclude each other, being values
-	    of one field: missing and refused. */
+	    The flags STACK - "Missing P4(1) locked" is a locked row that has since been jumped to and
+	    found changed (Missing leads the locator since 2026-10-08 - the author's call). Only the words that come
+	    from the row's outcome exclude each other, being values of one field: missing and refused. */
 	void BuildHitLocator(Hit& hit);
 
 	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The

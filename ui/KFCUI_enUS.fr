@@ -90,8 +90,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 // be wrong as often as not.
                 kKFCStaticTextKey,				"Type what to find in Edit > Find/Change, then run Find from this panel's menu.",
 
-                // (The model half's strings - the replace's own alert and what Edit > Undo calls a
-                //  KFC write - are in model/KFC_enUS.fr.)
+                // (The model half's strings - what Edit > Undo calls a KFC write: Replace, Run Queries,
+                //  Change All - are in model/KFC_enUS.fr.)
 
 
 		// ----- Misc strings

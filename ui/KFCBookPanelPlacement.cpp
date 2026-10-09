@@ -1583,7 +1583,7 @@ public:
 			}
 			// A document opened or made: the session is past its launch, and the Home screen is looked at
 			// no more (see gHomeTimer - measured, no visibility message comes while a document
-			// is open, so this is the place that sees one). Two more comparisons, and only until then.
+			// is open, so this is the place that sees one). Three more comparisons, and only until then.
 			else if (!gHomeWindowOver && (cls == kOpenDocCmdBoss || cls == kNewDocCmdBoss || cls == kOpenDocFromBookCmdBoss)
 				&& IDThreading::IsMainThreadDomain())
 			{

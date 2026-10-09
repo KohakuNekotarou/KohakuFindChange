@@ -43,7 +43,7 @@
 #include "KFCReplaceEngine.h"
 #include "KFCDiag.h"			// KFC_DIAG_LOG - why a write was refused, in a test build (compiled out of a shipping one)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
-#include "KFCID.h"				// the string keys the stale-results alert and the Undo step are worded from
+#include "KFCID.h"				// kKFCReplaceStepKey - the string key the Undo step is named from
 #include "KFCLoc.h"				// runtime Japanese - there is no jaJP string table
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"			// ReanchorStory - the rows' text foci put back after a write, its rollback and a preview
@@ -788,7 +788,8 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 			// ONLY a row whose stored place is still its text (RowStillStands - a replaced row must still hold what it
 			// wrote, or, having written nothing, sit in a story as KFC left it): one an edit has moved is left as it
 			// is, never read back at a place that is no longer its own. Its place is taken only here, after
-			// RowStillStands, which can move it: a row that does not stand stays unknown - neither carried nor read back.
+			// RowStillStands: a row that does not stand stays unknown - neither carried nor read back. (RowStillStands moved
+			// a replaced row from its tracked change until 2026-10-06 - KFC records none now; it only asks.)
 			if (RowStillStands(chapterIdx, i, db))
 			{
 				UID s2 = kInvalidUID;

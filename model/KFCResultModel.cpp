@@ -353,6 +353,8 @@ void KFCResultModel::EmptyChapter(Chapter& chapter)
 	std::vector<Hit>().swap(chapter.hits);
 	std::vector<FontGroup>().swap(chapter.fontGroups);
 	chapter.storyVersions.clear();
+	// ...and the searched parts of its stories (SearchedRange - 2026-10-09): they describe the rows that just went.
+	chapter.searchedRanges.clear();
 	chapter.docRef = UIDRef(nil, kInvalidUID);
 	chapter.file = IDFile();
 }

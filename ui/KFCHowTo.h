@@ -18,8 +18,8 @@
 namespace KFCHowTo
 {
 	/** Show the operating reference. Japanese on a Japanese InDesign, English otherwise - the same
-	    split KFCLoc makes for the names Edit > Undo shows for KFC's writes and the stale-results
-	    alerts, asked through the one function KFCLoc::JapaneseUI(). */
+	    split KFCLoc makes for the names Edit > Undo shows for KFC's writes, asked through the one
+	    function KFCLoc::JapaneseUI(). */
 	void Show();
 }
 

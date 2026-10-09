@@ -399,7 +399,8 @@ bool16 KFCShowFindChangeDialog()
 void KFCShutdownFindChangeMinimize()
 {
 #ifdef WINDOWS
-	// Order: stop the booking first, then undo the window, then let go of the timer.
+	// Order: the flag first (nothing is booked after it), the booking stopped and the timer let go, then the
+	// window undone.
 	sMinimizeShutdown = true;
 	sRetriesLeft = 0;
 	if (sRetryTimer != nil)

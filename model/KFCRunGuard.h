@@ -35,7 +35,11 @@
 //      chapters a run is walking;
 //    * the document-close responder (KFCCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
-//    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run.
+//    * the document-open responder (KFCOpenDocResponder), which leaves the chapters a run opens to the
+//      run (it binds them itself);
+//    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run;
+//    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
+//      which would otherwise load a query into Find/Change while a query run is putting its own there.
 //
 //  A run added later is one line in KFCRunGuard.cpp rather than a fault nobody notices in the callers.
 //
