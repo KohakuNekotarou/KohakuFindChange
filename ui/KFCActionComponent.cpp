@@ -199,6 +199,9 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			KFCPanelTitle::Update();
 			PMString summary;
 			(void)KFCRuns()->ChangeAll(summary);
+			// Drawn again: a run that got past its doors threw the results away (a search's book row that found nothing -
+			// KFCChangeAll::Run's commit point), and a refusal left them as they were, which a rebuild draws the same.
+			KFCResultTree::Rebuild();
 			KFCResultTree::ShowStatus(summary);
 			break;
 		}

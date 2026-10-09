@@ -231,6 +231,25 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		return 0;
 	}
 
+	// ===== THE COMMIT POINT - the results thrown away (KFCSearchEngine::DropResults: the rows, the searched book and the
+	// chapters it holds, the find format) before the book's chapters are listed, as the search and the query run do. What
+	// can stand here is a search that found nothing - Change All runs only with no list (above) - and a book search leaves
+	// its book's row up then, "<book>  (0/0)". Left standing, that row read "(0/0)" over a run that wrote (the query run's
+	// reason for leaving the panel empty - KFCQuerySequence.cpp, "NO LIST"), and ListBookChapters below records THIS
+	// run's book as the searched one (its header asks for ReleaseSearchedBook first): the row then named one book and
+	// KFC watched another - closing the book Change All wrote cleared the row ("Results cleared - the book was closed."),
+	// closing the row's own book left it, and a click on it brought the other book forward (the final audit's D9-3,
+	// 2026-10-09 - case ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says
+	// why). The UI half draws the empty tree when the run returns (KFCActionComponent).
+	// THE PANEL'S PICTURE STAYS WHAT IT WAS (spec map PNL-07 / PNL-08): the results go, the fact that a search has run does
+	// not - DropResults' Clear() takes it away with them, and only a Change All that WROTE changes the picture (the pencil
+	// cat, NoteChangeAllWrote at the end).
+	const bool hadRun = KFCResultModel::HasRun();
+	KFCBookScope::ReleaseHeldDocs(true /*close now*/);
+	KFCSearchEngine::DropResults();
+	if (hadRun)
+		KFCResultModel::NoteRun();
+
 	// ===== THE CHAPTERS, OPENED AND HELD FOR THE WHOLE RUN, as the query run holds them: an open inside the sequence
 	// throws the undo history of what was written away (KFCQuerySequence.h).
 	std::vector<KFCBookScope::ChapterDoc> targets;
