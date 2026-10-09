@@ -656,12 +656,27 @@ static const UTF32TextChar kKFCReturnArrow = 0x21B5;
 // EXCEPT THE TABLE'S ANCHOR - it is shown as kKFCTableSign (the author: "the way KCM does it, a table
 // sign"). Its continuations (one per row after the first) are still dropped: a table is one sign however
 // many rows it has.
-// By TextChar.h's own names (0x18 is also kTextChar_AutoText there - the same code).
+// ONE SET FOR EVERY ROW (2026-10-09 - the header re-read 50's proposal, the author's yes): it named seven of
+// these, and End Nested Style Here (0x03), Indent to Here (0x07), the Right Indent Tab (0x08) and an index
+// marker (kTextChar_IndexMarker - in a story's text, though TextChar.h files it with the find-only codes:
+// KIDMCP measured it there) came through a hit row as boxes, where a story row (StoryLeadText) drops them -
+// so it is every control character now, as there, but the breaks and the tab (marks and white space, above)
+// and the table's anchor (its sign), and the non-Roman special glyph (0x1A): a glyph with no code of its own
+// stands on it, and a Glyph search's match can be that very character - dropped, the match would read empty.
+// (StoryLeadText also drops UnicodeClass::IsIgnoredCharacter's characters - variation selectors, special glyphs
+// - which a story row's first words can do without, and a hit row cannot: its match may be one of them.)
+bool KFCResultModel::IsMarkerNotShown(UTF32TextChar c)
+{
+	const uint32 v = c.GetValue();
+	if (v < kTextChar_Space)
+		return v != kTextChar_CR && v != kTextChar_LF && v != kTextChar_Tab && v != kTextChar_Table
+			&& v != kTextChar_NonRomanSpecialGlyph;
+	return v == kTextChar_ZeroSpaceNoBreak || v == kTextChar_ObjectReplacementCharacter || v == kTextChar_IndexMarker;
+}
+
 static bool IsHiddenMarker(UTF16TextChar c)
 {
-	return c == kTextChar_FootnoteMarker || c == kTextChar_EndnoteMarker || c == kTextChar_TableContinued
-		|| c == kTextChar_PageNumber || c == kTextChar_SectionName
-		|| c == kTextChar_ZeroSpaceNoBreak || c == kTextChar_ObjectReplacementCharacter;
+	return KFCResultModel::IsMarkerNotShown(UTF32TextChar(c));
 }
 
 // THE SIGN A TABLE LEAVES IN A ROW (the author: "can it be like KCM - a table mark between the two

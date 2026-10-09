@@ -615,6 +615,11 @@ namespace KFCResultModel
 	    `a<sign>b` on a hit row, a story row and the "Preview Text:" alike. */
 	void MarkUpBreaksForDisplay(PMString& s);
 
+	/** A character a row does not show, a hit row and a story row alike (MarkUpBreaksForDisplay, StoryLeadText): a mark an
+	    object or a piece of formatting stands on, with no glyph of its own - every control character but the breaks, the
+	    tab, a table's anchor and the non-Roman special glyph; U+FEFF, U+FFFC and an index marker. */
+	bool IsMarkerNotShown(UTF32TextChar c);
+
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
 	    and the row is not offered again (IsWorkOutcome).
 	    Called by the replace pass, and by the jump when it finds the text at a row's position is no

@@ -962,7 +962,10 @@ PMString StoryLeadText(const UIDRef& storyRef)
 				pendingSpace = (shown > 0 && pendingBreaks.CharCount() == 0);
 				continue;
 			}
-			if (!isTableSign && (v < kTextChar_Space || v == kTextChar_ObjectReplacementCharacter
+			// The marks every row leaves out (KFCResultModel::IsMarkerNotShown - an index marker among them, 2026-10-09), and
+			// for a story row's first words all control characters and IsIgnoredCharacter's (variation selectors, special
+			// glyphs), which a hit row keeps.
+			if (!isTableSign && (v < kTextChar_Space || KFCResultModel::IsMarkerNotShown(c)
 				|| UnicodeClass::IsIgnoredCharacter(c, UnicodeClass::kIgnoreSpellingIgnorable)))
 				continue;
 			if (UnicodeClass::IsWhiteSpace(c) || v == kTextChar_IdeographicSpace)
