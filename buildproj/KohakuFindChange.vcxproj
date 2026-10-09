@@ -247,6 +247,8 @@
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
          <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.cpp"/>
    </ItemGroup>
    <ItemGroup>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h"/>
@@ -273,6 +275,8 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCSavedQueries.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCUndoFollow.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCPageItemFacts.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">
