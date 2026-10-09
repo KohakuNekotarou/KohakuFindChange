@@ -138,7 +138,7 @@
   - 訂正:
 
 - **REP-27** 行の Replace は**書く前に確かめる**（条件が変わった＝結果を消して断る・版・行の文字）。文書が変わっていたら**アラートを出さず、メッセージ欄で断る** ――
-  `Replace: the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again, or right-click its story row and choose Search This Story Again.`（後半の案内は 2026-10-09 から＝REP-35）／
+  `Replace: the story of this row has changed since the search - right-click the story row: Search This Story Again.`（後半の案内は 2026-10-09 から＝REP-35。同日の最終検査で縮めた＝前の文〈約200字〉はメッセージ欄の4行に入らず「…or ri…」で切れ、案内が読めなかった＝実測）／
   `Replace: the text of this row has changed since the search (edited, or undone) - search again.`
   書けなかった行は、理由を言って元のまま（`Replace: InDesign's replace command would not run there - left as it is.` など）。行の状態も元に戻る（語は付かない）。
   ✅利用者に見える文の旧名は改名（2026-10-04）で `KohakuFindChange` に直した（"not by KohakuFindChange"）。
@@ -192,7 +192,7 @@
   ★**検索が To End of Story・Selection だったときは、検索したその部分だけを歩き直す**（2026-10-09・作者の案「ストーリーの途中からの検索なら、その始める場所にテキストフォーカスを付けて覚えれば」・それまでは断っていた）。
   検索のときに本体が歩いた範囲（文字のかたまりの列＝表があるとその前・セル・後ろの3つ）を記録し、同じかたまりを公式の口（To End＝`QueryToEndOfStoryWalkerScope`・Selection＝`QueryFocusListWalkerScope`）で作り直せることをその場で確かめておく。範囲にはテキストフォーカスを付ける。
   歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
-  断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the part of this story the search covered cannot be searched again on its own ...`／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
+  断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the searched part cannot be searched again on its own (separate stretches) - search again.`（2026-10-09 の最終検査で縮めた＝前の文は約190字で「search again」が切れた）／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
   KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 

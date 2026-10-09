@@ -166,7 +166,8 @@
   `Ran <N> queries: <合計> replaced (1: <数>, 2: <数>, 3: -).`（`-`＝飛ばしたクエリ・1本なら `query:`）。
   選んだ文書のときは `… replaced (…) in <S> selected document(s) of <T>.`。
   飛ばしたクエリは ` Skipped <n> queries: nothing to find (<名前>, …).`
-  （Object・Color のクエリと、検索する文字も形式も無いクエリ）。開けなかった章・窓なしで残った章の注は第3章と同じ。
+  （Object・Color のクエリと、検索する文字も形式も無いクエリ）。本体のクエリの読み込みが失敗したファイル（壊れたファイル）は別の理由で
+  ` Skipped <n> queries: the file could not be read (<名前>, …).`（2026-10-09 の最終検査から＝それまでは nothing to find と言っていた）。開けなかった章・窓なしで残った章の注は第3章と同じ。
   （ファイルの無いクエリは飛ばさない＝走らない＝QRY-23・2026-10-07 夜から。）
   - 訂正:
 

@@ -1361,7 +1361,11 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 			// THE STORY, NOT THE ROW (the author's call). An edit anywhere in the story - typing, Undo, the
 			// Track Changes panel, a script - stops it (StoryAsKFCLeftIt), the row's own text untouched or not;
 			// so the line names the story, not "the text of this row".
-			outStatus.Append("the story of this row has changed since the search (edited or undone somewhere in it, not by KohakuFindChange) - search again, or right-click its story row and choose Search This Story Again.");
+			// FOUR LINES AT THE FLOOR (KFCPanelMetrics.cpp, kMessageLines): what to do comes last and has to be read, so
+			// the line is kept under about 117 characters, "Replace: " included (2026-10-09, the final audit's D9-2: with
+			// "(edited or undone somewhere in it, not by KohakuFindChange) - search again, or" it ran to 200, and the
+			// panel cut it at "or ri..." - measured, case msg-story-changed-shot).
+			outStatus.Append("the story of this row has changed since the search - right-click the story row: Search This Story Again.");
 			return false;
 		}
 		outStatus.Append("the text of this row has changed since the search (edited, or undone) - search again.");

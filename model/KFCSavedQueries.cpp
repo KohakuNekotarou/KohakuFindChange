@@ -34,6 +34,7 @@
 
 // Project includes:
 #include "KFCSavedQueries.h"
+#include "KFCDiag.h"			// KFC_DIAG_LOG - what the query reader answered, test builds only
 
 namespace
 {
@@ -215,7 +216,10 @@ bool KFCSavedQueries::LoadIntoFindChange(const IDFile& file)
 	fileData->Set(file);
 	uiFlag->Set(kSuppressUI);
 	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
-	const bool ok = (err == kSuccess && ErrorUtils::PMGetGlobalErrorCode() == kSuccess);
+	const ErrorCode standing = ErrorUtils::PMGetGlobalErrorCode();
+	const bool ok = (err == kSuccess && standing == kSuccess);
+	// (Test builds: what the reader answered - a broken file's answer was not measured until the final audit, 2026-10-09.)
+	KFC_DIAG_LOG("QUERYLOAD err=%d standing=%d ok=%d", static_cast<int>(err), static_cast<int>(standing), ok ? 1 : 0);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return ok;
 }

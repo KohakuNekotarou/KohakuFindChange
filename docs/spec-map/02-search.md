@@ -74,7 +74,7 @@
   - 訂正:
 
 - **FIND-14** ⑤**Book Scope が OFF で、「検索:」が KFC の知らない値**（スクリプトでしか設定できない「ストーリーの一覧」など）→
-  `Search: in Edit > Find/Change is set to something this panel cannot follow. Set it to Document, All Documents, Story, To End of Story or Selection.`
+  `Search: in Edit > Find/Change is set to something this panel cannot follow - choose another one there.`（2026-10-09 の最終検査で縮めた＝前の文は5つの値を並べて約150字・メッセージ欄の4行〈床の幅で約117字〉を超えた。値の一覧は本体の「検索:」の欄にある）
   - 訂正:
 
 - **FIND-15** ⑥**Book Scope が ON でブックが開いていない** → `Book Scope is on, but no book is open.`／

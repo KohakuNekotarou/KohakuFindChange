@@ -232,7 +232,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 
 	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
+	// The queries skipped, by the reason the message gives: nothing to find on a text tab - an Object or Colour query
+	// included (the spec map's QRY-22) - and, apart from those, a file InDesign's query reader could not read (the final
+	// audit's D18-1, 2026-10-09: it read "nothing to find" too).
 	std::vector<PMString> skippedNothing;
+	std::vector<PMString> skippedUnread;
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did any query's Change All write anything there
 	int32 replaced = 0;
 	bool cancelled = false, failed = false;
@@ -273,10 +277,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				why.Append(query.name);
 				break;
 			}
-			if (!KFCSavedQueries::LoadIntoFindChange(query.file) || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
+			const bool loaded = KFCSavedQueries::LoadIntoFindChange(query.file);
+			if (!loaded || !KFCSearchEngine::CanSearchTab(KFCSearchEngine::CurrentSearchMode())
 				|| !KFCSearchEngine::HasFindQueryNow())
 			{
-				skippedNothing.push_back(query.name);
+				(loaded ? skippedNothing : skippedUnread).push_back(query.name);
 				unit += static_cast<int32>(targets.size());
 				runBar.SetPosition(unit);
 				continue;
@@ -453,6 +458,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	}
 	outSummary.Append(".");		// one undo step; nothing said of Ctrl+Z (spec F20)
 	AppendSkipped(outSummary, "nothing to find", skippedNothing);
+	AppendSkipped(outSummary, "the file could not be read", skippedUnread);
 	KFCBookScope::AppendUnopenableNote(outSummary, unopenable);
 	KFCBookScope::AppendUnclosedNote(outSummary, unclosed);
 	return replaced;

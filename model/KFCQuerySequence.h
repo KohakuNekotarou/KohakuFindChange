@@ -14,7 +14,8 @@
 //  replaced with nothing left to undo it with). The panel's list is cleared at the
 //  start (a Ctrl+Z of the run puts it back - KFCUndoFollow::RunRecorder), and Edit > Find/Change is emptied at the end
 //  (the spec's D7). A query whose file is gone stops the whole run before anything is written (the author's
-//  call); one with nothing to find is skipped and named; a failed write or Cancel takes the whole run back.
+//  call); one with nothing to find is skipped and named - and so, under a reason of its own, is one whose file
+//  InDesign's query reader could not read; a failed write or Cancel takes the whole run back.
 //
 //========================================================================================
 

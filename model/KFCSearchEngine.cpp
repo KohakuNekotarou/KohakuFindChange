@@ -3012,7 +3012,9 @@ bool KFCSearchEngine::ResolveRunScope(RunScope& out, PMString& outRefusal)
 	}
 	if (!fromBook && *scopeName == '\0')
 	{
-		outRefusal.Append("Search: in Edit > Find/Change is set to something this panel cannot follow. Set it to Document, All Documents, Story, To End of Story or Selection.");
+		// (Under about 117 characters - the message area's four lines at the panel's floor, KFCPanelMetrics.cpp. Listing the
+		// five values it can follow ran it to 147; the dialog's own Search: menu lists them - the final audit, 2026-10-09.)
+		outRefusal.Append("Search: in Edit > Find/Change is set to something this panel cannot follow - choose another one there.");
 		return false;
 	}
 	const bool allDocuments = !fromBook && searchScope == IWalkerScopeFactoryUtils::kAllDocumentScope;
@@ -4072,8 +4074,10 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	KFCResultModel::SearchedRange part;
 	if (overPart && (!KFCResultModel::GetSearchedRange(chapterIdx, story, part) || !part.walkable))
 	{
-		outStatus.Append("the part of this story the search covered cannot be searched again on its own (separate stretches, "
-			"such as table cells selected over more than one row) - search again.");
+		// (Under about 117 characters with its "Search This Story Again: " - the four lines the message area holds at the
+		// panel's floor, KFCPanelMetrics.cpp: "such as table cells selected over more than one row" ran it to 192, and the
+		// "search again" went - the final audit's D9-2, 2026-10-09. The case of separate stretches is MakeSearchedRange's.)
+		outStatus.Append("the searched part cannot be searched again on its own (separate stretches) - search again.");
 		return false;
 	}
 	// Asked, not refused (QueryUnchangedSinceSearch - RelocateStaleRow's note): nothing is cleared, and the tab the walk

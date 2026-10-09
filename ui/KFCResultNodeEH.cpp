@@ -280,8 +280,11 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		return TreeNodeEventHandler::RButtonDn(e);
 
 	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
-	// The story it names is cleared first, so a story menu item fired later (a script, a shortcut) cannot act on a
-	// story nobody right-clicked this time.
+	// BOTH stashes are cleared first, so a menu item fired later (a script invoking its ActionID - neither item is
+	// offered for a shortcut) cannot act on a row nobody right-clicked this time. (Until 2026-10-09 only the story's
+	// was: a hit row right-clicked, then a story row, and the Replace action invoked by a script wrote the hit row -
+	// measured, case ctx-hit-stash-story-rclick - the final audit's D7-1.)
+	KFCResults()->SetContextMenuHit(-1, -1);
 	KFCResults()->SetContextMenuStory(-1, -1);
 	if (nodeID->IsHitRow())
 	{
