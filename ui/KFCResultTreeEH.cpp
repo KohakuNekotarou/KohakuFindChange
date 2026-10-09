@@ -511,8 +511,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	if (!node->IsHitRow())
 		treeMgr->ExpandNode(selected[0], kFalse /*expandAllDescendants*/);
 
-	// The row's action - the same one a click on it would run, marker and all (the two come up at
-	// once - see KFCJump.h).
+	// The row's action - the same one a click on it would run, its selection or marker and all (1.4.0:
+	// the match selected, or marked when it cannot be - they come up at once - see KFCJump.h).
 	KFCJump::ActivateNode(node->GetChapter(), node->GetHit());
 
 	// That action activated a document window - or, on a book row, the Book panel - which took the

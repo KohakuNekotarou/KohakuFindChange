@@ -6,16 +6,18 @@
 //
 //  Jump-to-hit navigation. A hit-row click (ActivateNode) jumps: it resolves the hit's stored
 //  location (reopening the chapter windowless if the user closed it), brings that chapter's window
-//  to the front, scrolls the view so the match is centred, and raises the marker on the match's
-//  characters (KFCHitMarker - a global text adornment) which takes itself down after about a
-//  second. It does NOT select the text - it points at the match, VS-style.
-//  A DOUBLE click does: SelectHitText switches to the Type tool and highlights the match, for when
-//  pointing is not what was wanted. The two are deliberately different - a single click can be spent
-//  freely because it changes nothing in the document, and that is only true while it does not
-//  select. THE MARKER COMES UP AT ONCE, FROM BOTH DOORS (the author's call: on the same beat as
-//  KCM's Story-mode jump, which raises its flash straight away) - not booked for the double-click
-//  interval; a double click's selection takes it back down (SelectHitText ends by taking the
-//  marker down). With "Hide Previous Chapter" ON, every other
+//  to the front, scrolls the view so the match is centred, and SELECTS the match (1.4.0 - the
+//  author's call of 2026-10-09: the tree does what Edit > Find/Change's Find Next does, so the
+//  selection is the pointer and no marker goes over it). The keyboard stays on the list and the
+//  tool as it is. A match that cannot be selected - locked, hidden, zero width, no longer found -
+//  gets the marker on its characters instead (KFCHitMarker - a global text adornment), which takes
+//  itself down after about a second, and nothing is left selected; until 1.4.0 every click did only
+//  that, and changed nothing in the document (JMP-06).
+//  A DOUBLE click: SelectHitText switches to the Type tool and highlights the match, and the keyboard
+//  goes to the text - for when pointing is not what was wanted. THE MARKER COMES UP AT ONCE, FROM
+//  BOTH DOORS (the author's call: on the same beat as KCM's Story-mode jump, which raises its flash
+//  straight away) - not booked for the double-click interval; a double click's selection takes it
+//  back down (SelectHitText ends by taking the marker down). With "Hide Previous Chapter" ON, every other
 //  displayed clean chapter of the searched book is closed as the jump lands (a document outside the
 //  book stays - 2026-10-08). Ported from KESCL's jump machinery (KESCL
 //  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
@@ -29,7 +31,8 @@
 namespace KFCJump
 {
 	/** The single door every result row goes through: a hit row jumps (front its document, scroll to
-	    the match, raise the marker - an overset match scrolls to the frame's "+" and is not marked), a
+	    the match, select the match, or raise the marker on one that cannot be selected - an overset
+	    match scrolls to the frame's "+" and is neither), a
 	    chapter row shows its document (no scroll, no marker), the book row activates its book (the
 	    active book AND its tab in the book panel; a book closed since the search is not reopened).
 	    Called by the row click and by the keyboard walk, which is why it exists - two callers must not
@@ -41,8 +44,8 @@ namespace KFCJump
 
 	/** SELECT the match in the document: switch to the Type tool and highlight the hit's own range,
 	    so the user can edit or copy it straight away. The DOUBLE-CLICK half of a hit row - a single
-	    click still only POINTS at the match (KFCJump's whole design; see the note at the head of this
-	    header), and this is the extra step that says "and put me in it".
+	    click selects it too (1.4.0) but leaves the tool and the keyboard where they are (see the note
+	    at the head of this header) - this is the extra step that says "and put me in it".
 
 	    Assumes the jump has already run for this row - the double-click sequence TRIES it on the first
 	    click, and this refuses, without a word, when the hit's layout window is not the one in front

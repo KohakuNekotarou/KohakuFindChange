@@ -24,14 +24,15 @@
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
-//  DOUBLE-click on a hit row adds the other half: after the jump has pointed at the
-//  match, it SELECTS it - Type tool, match highlighted - so the user can edit or copy without
-//  hunting for it with the mouse. Single click still only points; that is the design
-//  (KFCJump.h). Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
+//  DOUBLE-click on a hit row adds the other half: after the jump has selected the match (1.4.0 - or
+//  marked it, when it cannot be selected; KFCJump.h), it SELECTS it with the Type tool on and gives
+//  the keyboard to the text, so the user can edit or copy without hunting for it with the mouse.
+//  Which of the two a button-up is doing rides on gSelectOnNextButtonUp below, whose
 //  note explains why it cannot simply be done inside ButtonDblClk.
 //
 //  THE FIRST CLICK'S MARKER COMES UP AT ONCE, AND THE SECOND CLICK TAKES IT DOWN. The jump runs on
-//  the first button-up and raises its marker there; a double click then selects, and the ordinary
+//  the first button-up and raises its marker there (1.4.0: only on a match it cannot select - a
+//  selected match has none); a double click then selects, and the ordinary
 //  KFCHitMarkerView::Hide at the end of a successful SelectHitText takes the marker down. A double
 //  click that is REFUSED (KFCJump.h lists why it can be) never reaches that Hide, so its marker stays
 //  up - the rule that a refusal is still pointed at. That is the beat KCM's Story-mode jump keeps, and
@@ -86,7 +87,8 @@ namespace
 //
 // ! The flag is cleared in LButtonDn, which is what makes it safe. Every click begins with a down,
 //   so a flag that was set but never consumed (if a trailing up ever failed to arrive) cannot
-//   survive into the next click and turn an ordinary single click into a selection.
+//   survive into the next click and turn an ordinary single click into a double click's selection
+//   (the Type tool on, the keyboard given to the text).
 //
 // A file static, not a member: the rows' widgets are recycled as the tree scrolls, and this belongs
 // to "the click going on right now" rather than to any one row. One click happens at a time.

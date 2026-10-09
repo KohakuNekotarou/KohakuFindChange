@@ -714,10 +714,54 @@ bool FrontChapter(const UIDRef& docRef)
 	return true;
 }
 
-/** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, raise the
-    marker. Does not select. An unreachable chapter (missing / locked file) reports through the status
-    line. An overset match has no on-page location of its own, so the view scrolls to the frame's
-    overset "+" instead and NO marker is raised - those pixels belong to the indicator, not to the text.
+// NOTHING SELECTED in the front document - DeselectAll on the active selection, when there is one (1.4.0: a hit row's
+// click clears the way for its own selection; an object row's Replace takes away what InDesign's replace selected).
+void ClearSelection()
+{
+	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
+	if (selectionManager != nil && selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection))
+		selectionManager->DeselectAll(nil);
+}
+
+// A CLICK'S SELECTION OF A TEXT ROW'S MATCH (1.4.0 - the author's call of 2026-10-09: the tree does what Edit >
+// Find/Change's Find Next does, one result selected after another, so the selection is the pointer and no marker goes
+// over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
+// overset one never comes here). Refused WITHOUT A WORD: the marker JumpToHit raises instead is the answer, as on every
+// click before 1.4.0; the reasons are the double click's to say (SelectHitText). The keyboard stays on the list - the
+// row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return replaces. The
+// tool is left as it is: a double click is still what puts the Type tool on. The document is in front and composed,
+// inside JumpToHit's dirty guard, its selection cleared. True when the match is selected.
+bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end, bool found)
+{
+	if (!found || start >= end)
+		return false;
+	bool locked = false, hidden = false;
+	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
+	if (locked || hidden)
+		return false;
+	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
+	if (textModel == nil)
+		return false;
+	const TextIndex total = textModel->TotalLength();
+	if (start >= total)
+		return false;
+	if (end > total)
+		end = total;
+	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
+	if (selectionManager == nil)
+		return false;
+	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
+	if (textSelectionSuite == nil)
+		return false;
+	// ! RangeData's two-argument form is (start, END) - SelectHitText's note.
+	return textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) != kFalse;
+}
+
+/** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
+    it - or raise the marker on one that cannot be selected (SelectMatchOnClick, 1.4.0). An unreachable
+    chapter (missing / locked file) reports through the status line. An overset match has no on-page
+    location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is raised
+    - those pixels belong to the indicator, not to the text.
     The marker comes up at once, whichever door asked (see the note at the head of KFCJump.h).
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
@@ -808,6 +852,11 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		return false;
 	}
 
+	// A CLICK LEAVES ITS ROW'S MATCH SELECTED, OR NOTHING (1.4.0 - the author's call: whatever Search: is, as Find Next
+	// does). What was selected goes first; the match is selected below when it can be, and otherwise the marker alone
+	// points.
+	ClearSelection();
+
 	// ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW - not one per user through two different
 	// calls that do not mean the same thing (ILayoutUIUtils.h:89-98 vs :127-133 - see
 	// ScrollViewToPoint). Taken here, after the document has been fronted and before any geometry is
@@ -854,7 +903,13 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// moved. A double click shows the marker for that moment and SelectHitText's
 			// KFCHitMarkerView::Hide takes it down when the selection is made - exactly what KCM does
 			// ("THE MARK COMES DOWN").
-			KFCHitMarkerView::Show(db, storyUID, start, end);
+			//
+			// 1.4.0: a match that can be selected IS selected, and no marker goes over it - a selection under an
+			// inversion cannot be read (JMP-17's reason). Every other row is marked as above.
+			if (SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence))
+				KFCHitMarkerView::Hide();
+			else
+				KFCHitMarkerView::Show(db, storyUID, start, end);
 		}
 		else
 		{
@@ -1171,10 +1226,12 @@ bool KFCJump::SelectHitText(int32 chapterIdx, int32 hitIdx)
 
 	// TAKE THE JUMP'S MARKER BACK DOWN (the author's call).
 	//
-	// The first click of this double click raised the marker, which INVERTS the pixels under the
-	// match (KFCHitMarker.h) - a pointer saying "it is here". The selection now says the same thing,
-	// and it is what the user is about to type over. Leaving both up puts an inversion on top of a
-	// highlight, so the text the user came here to read is the one thing on screen that cannot be read.
+	// The first click of this double click may have raised the marker, which INVERTS the pixels under
+	// the match (KFCHitMarker.h) - a pointer saying "it is here". (Since 1.4.0 it selects a match it
+	// can select and raises no marker over it - JumpToHit; a marker is up here only when that click
+	// could not select.) The selection now says the same thing, and it is what the user is about to
+	// type over. Leaving both up puts an inversion on top of a highlight, so the text the user came
+	// here to read is the one thing on screen that cannot be read.
 	//
 	// Only on SUCCESS. Every refusal above returns before this, and there the marker is the only
 	// feedback the click produced - taking it down as well would leave a double click that appears
