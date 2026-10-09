@@ -167,7 +167,8 @@
   Return と同じ口でその行を置換し、**書けたときだけ**、その行より下で次の「置換できる行」（Replace が灰色でない行＝置換済み・ロック・検索の一致でない行は飛ばす）を選んで、矢印キーと同じようにジャンプする（閉じた章の行は開いて中へ入る・GREP の行なら Preview Text が出る）。キーボードは木に残る。
   書けなかったとき（断られた・巻き戻った）は動かない（理由をメッセージ欄で読めるように）。下に置換できる行が無ければ、置換した行に留まり、メッセージ欄の文の後ろに ` No row below can be replaced.` を付ける。
   「下」は木の上から下の順で、木を作っている階層の口（`ITreeViewHierarchyAdapter`）でたどる（結果のモデルの数え方ではたどらない＝木に無い行へは行かない）。
-  Return（REP-32）は今のまま＝置換して、その行に留まる。検索の結果の文の最後の案内（FIND-34）には Shift+Return を足していない（How to Use にだけ書いた）。回帰＝`ret-shift`／`ret-shift-walk`／`ret-shift-skip`／`ret-shift-refused`／`ret-shift-book-closed`。
+  Return（REP-32）は今のまま＝置換して、その行に留まる。検索の結果の文の最後の案内（FIND-34）にも、2026-10-09 から Shift+Return を書く（作者の依頼）。回帰＝`ret-shift`／`ret-shift-walk`／`ret-shift-skip`／`ret-shift-refused`／`ret-shift-book-closed`。
+  ★**押したまま（キーの自動反復）では1回だけ**（2026-10-09・ヘッダーの読み直し52の提案の案 A・作者の承認）＝反復のキーは受け取って、置換も移動もしない（それまでは反復のたびに置換して次へ進み、1秒押すと十数行が書かれる見込みだった）。Return も Shift+Return も同じ。たくさんを一度に書くのは Change All。アプリケーションバーの検索欄も、押したままの Return は1回だけ。回帰＝`ret-shift-held`（押し下げ3回で1行だけ）／`ret-shift-held-armed`（テスト用ビルドの故障スイッチ `return-repeat` で検査を外すと、何行も書かれる＝検査が効いていることの証拠）。
   - 訂正:
 
 ## 7. Change All in Book (No List) と Clear Results
@@ -187,7 +188,11 @@
 
 - **REP-35** ★**Search This Story Again**（ストーリーの行の右クリック・2026-10-09 の作者の決定）＝**そのストーリーだけ**を、検索のときの条件でもう一度歩き、その行を作り直し、ストーリーの版を覚え直す ―― 検索の後で直したストーリーでも、その行の Replace がまた書ける（REP-13 ①が通る）。
   そのストーリーの**置換済みの行は消える**（検索がもう見つけないため・作者「よいで」）。ほかのストーリー・章の行と、その状態はそのまま。行は、そのストーリーの前の行があった所に入り、章はページの順に並べ直す（検索と同じ並べ方）。一覧の行の数の上限（300）はそのまま（入りきらなければ文で言う）。
-  断る（一覧はそのまま・メッセージ欄で言う）＝実行中／検索の後で検索と置換の設定が変わった（`Search This Story Again: the Find/Change settings have changed since the search - search again.`）／検索が To End of Story・Selection だった（ストーリーの一部しか見ていないので、全体を歩くと検索が見ていない一致まで並ぶ）。
+  断る（一覧はそのまま・メッセージ欄で言う）＝実行中／検索の後で検索と置換の設定が変わった（`Search This Story Again: the Find/Change settings have changed since the search - search again.`）。
+  ★**検索が To End of Story・Selection だったときは、検索したその部分だけを歩き直す**（2026-10-09・作者の案「ストーリーの途中からの検索なら、その始める場所にテキストフォーカスを付けて覚えれば」・それまでは断っていた）。
+  検索のときに本体が歩いた範囲（文字のかたまりの列＝表があるとその前・セル・後ろの3つ）を記録し、同じかたまりを公式の口（To End＝`QueryToEndOfStoryWalkerScope`・Selection＝`QueryFocusListWalkerScope`）で作り直せることをその場で確かめておく。範囲にはテキストフォーカスを付ける。
+  歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
+  断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the part of this story the search covered cannot be searched again on its own ...`／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
   KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
   - 訂正:
 

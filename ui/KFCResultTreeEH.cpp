@@ -243,7 +243,22 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	if (node == nil || node->IsRoot() || !node->IsHitRow())
 		return kFalse;
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
-	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
+	// A RETURN HELD DOWN WRITES ONCE (2026-10-09 - the header re-read 52's proposal, the author's yes). Windows repeats a key
+	// held down, and each repeat was one more replace and, with Shift, one more row on (one second of Shift+Return: a dozen
+	// rows). A repeat (IEvent::IsRepeatKey - IEvent.h) is taken and writes nothing, as the application bar's search field
+	// takes a held Return once (KFCAppBarSearchEnter.cpp); many rows at once are Change All's. (Fault switch
+	// return-repeat, a test build's only - KFCDiag.h: the repeat goes through as before, the case that shows what this
+	// stops.)
+	bool repeatGoesThrough = false;
+#ifdef KFC_DIAG
+	repeatGoesThrough = KFC_DIAG_FAULT("return-repeat");
+#endif
+	if (e->IsRepeatKey() && !repeatGoesThrough)
+	{
+		HoldAfterReturn();
+		return kTrue;
+	}
 	// A previous landing is still opening a document - see gWalking. The key is taken, and nothing is written from a
 	// half-made selection.
 	if (gWalking)
