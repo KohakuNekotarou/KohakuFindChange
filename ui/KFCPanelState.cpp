@@ -443,13 +443,10 @@ static bool KFCReadWholeFile(const IDFile& file, std::string& out)
 // put in place.
 // The move is Win32's MoveFileEx - KFC is Windows alone (the author's call) - told to replace the file
 // that is there and to return only once the move is on the disk.
-// NOT FileUtils::SwapFiles (measured). The SDK's "moves file1 to
-// file2" (FileUtils.h:132) does replace a file2 that is there (KT's app.ktProbe "swapfiles": file2 read
-// "old-B" before and "new-B" after) - but in TWO steps: Public.dll's SwapFiles is file2.Exists() ->
-// file2.Delete() -> afl::CoreFileUtils::MoveFile(file1, file2, false) (read off its machine code). A crash
-// between the delete and the move leaves NO settings file, only the side file - the very gap the side
-// file exists to close. MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume (and
-// AFL's MoveFile is itself a wrapper around MoveFileExW).
+// NOT FileUtils::SwapFiles. The SDK's "moves file1 to file2" (FileUtils.h:132) does replace a file2
+// that is there (KT's app.ktProbe "swapfiles": file2 read "old-B" before and "new-B" after), but its
+// header does not say the replace is made in one step - and one step is what the side file is for.
+// MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume.
 // side = the side file, in the same folder as `file` (one volume: MoveFileEx's one-step replace) - the settings file's
 // is kKFCPanelStateSideFileName; a file of ours at a path the person chose has "<its path>.tmp" (KFCWriteFileSafely).
 static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const IDFile& sideFile)
