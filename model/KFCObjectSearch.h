@@ -97,10 +97,20 @@ namespace KFCObjectSearch
 	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
 		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled);
 
-	/** An item's FINGERPRINT (O12): its own snippet (ISnippetExport::ExportPageitems into memory) up to the snippet's XMP
-	    packet, as a 64-bit hash and a length. Moving, restyling or editing the item changes it; recomposing does not
-	    (measured - the plan's Task 1 M2). false = no snippet (no item, no exporter). */
+	/** An item's FINGERPRINT (O12): its own persistent data as the database writes it (IPMPersist::SaveAll into memory),
+	    with what it holds - a group's members, a graphic frame's image - its anchored settings when it hangs in text,
+	    and a text frame's (or a path's) story's version (ITextModel::GetChangeCount): one 64-bit hash and a length.
+	    Moving, restyling, relinking or typing into it changes it; recomposing, zooming or selecting does not, and an Undo
+	    puts it back exactly (measured 2026-10-10 night - the SaveAll probe, work/note-scripts/2026-10-10-kfc-saveall-probe/;
+	    it took the place of the item's snippet, which was 20 to 100 times slower and crashed InDesign on an inline in
+	    overset text). false = nothing of the item could be read. */
 	bool Fingerprint(const UIDRef& item, uint64& outHash, uint32& outLength);
+
+	/** Does a spread hold the item now - is it laid out (IPasteboardUtils::QuerySpread)? No for an item in text that is
+	    not composed - an inline in OVERSET text: nothing of it can be shown or selected, and its row's Replace is refused
+	    (2026-10-10 night - found when InDesign's snippet export, the fingerprint of the time, crashed on one:
+	    work/kfc-crash-2026-10-10-overset-inline.xml). */
+	bool IsOnSpread(const UIDRef& item);
 
 	/** The shared object walker aimed at the front document again (O7) - after every run of ours that aimed it elsewhere.
 	    No front document: nothing is done. */

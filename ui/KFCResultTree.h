@@ -112,7 +112,8 @@ namespace KFCResultTree
 	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - object rows' items selected as
 	    the rows are (KFCJump::SelectObjectRows - the row clicked shown when it was added), a text row added jumped to as a
 	    click jumps (KFCJump::ActivateNode - InDesign selects one stretch of text) - or the message area says why the row
-	    could not be added (another document, another spread). Nothing for a story, document or book row. */
+	    could not be added (another document, another spread, an object in overset text). Nothing for a story, document
+	    or book row. */
 	void FollowModifiedClick(const NodeID& clicked);
 
 	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's calls of 2026-10-10): the run of hit rows grown or

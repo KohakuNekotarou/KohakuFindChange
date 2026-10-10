@@ -69,8 +69,9 @@ namespace KFCJump
 	    multiple selection): their document in front, and on the page exactly their items selected - the SDK's way
 	    (SnpSelectShape.cpp: DeselectAll, then SelectPageItems with kReplace), the tool left as it is (a click's rule).
 	    Left out, each counted: an item gone (its row reads Missing), a locked or hidden one (the row's flags, as a click
-	    reads them), one now on another spread than the rest. shownHit: the row whose item the view is brought to (-1 =
-	    the view stays - a row taken away). No rows: nothing selected in their document when it is in front.
+	    reads them), one in overset text (on no spread), one now on another spread than the rest. shownHit: the row whose
+	    item the view is brought to (-1 = the view stays - a row taken away). No rows: nothing selected in their document
+	    when it is in front.
 	    sayCount: the message area says what was selected ("Selected 3 objects." / "Selected 3 of 5 objects - 1 locked,
 	    1 hidden.") - false when the caller has its own sentence there. */
 	void SelectObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, bool sayCount);

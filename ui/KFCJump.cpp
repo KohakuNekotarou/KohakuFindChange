@@ -26,6 +26,7 @@
 #include "IFrameList.h"
 #include "IFrameListComposer.h"
 #include "IHierarchy.h"				// the match's frame as a page item - which spread is it on?
+#include "IInlineData.h"			// an object row's item in overset text: its anchor's story and place (1.4.0)
 #include "IGeometry.h"				// an object row's item: its outline, scrolled to (ShowItemInView, 1.4.0)
 #include "ILayoutSelectionSuite.h"	// SelectPageItems - an object row's click selects its item (1.4.0)
 #include "ILayoutCmdData.h"			// kSetSpreadCmdBoss carries the view it is addressing
@@ -1254,6 +1255,35 @@ void ShowItemInView(const UIDRef& itemRef)
 	ScrollViewToPoint(frontView, PBPMPoint(bounds.GetHCenter(), bounds.GetVCenter()));
 }
 
+// THE VIEW ON AN ITEM IN OVERSET TEXT (2026-10-10 night): the red "+" of the frame its anchor overflows from - a text row's
+// overset match's landing (JumpToHit: the spread, then KFCFindOversetLocator). The anchor is the kInlineBoss the item
+// hangs from, or a group inside it does - its story and place (IInlineData::GetTextModelUID / GetILGIndex,
+// XDocBkImageSizerCmd.cpp's way). Silent when there is none: the view stays.
+void ShowOversetAnchorInView(const UIDRef& itemRef)
+{
+	IDataBase* const db = itemRef.GetDataBase();
+	UID anchor = itemRef.GetUID();
+	while (anchor != kInvalidUID && db->GetClass(anchor) != kInlineBoss)
+	{
+		InterfacePtr<IHierarchy> hier(db, anchor, UseDefaultIID());
+		anchor = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+	}
+	if (anchor == kInvalidUID)
+		return;
+	InterfacePtr<IInlineData> inlineData(db, anchor, UseDefaultIID());
+	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
+	if (inlineData == nil || frontView == nil)
+		return;
+	const UIDRef storyRef(db, inlineData->GetTextModelUID());
+	const TextIndex at = inlineData->GetILGIndex();
+	if (storyRef.GetUID() == kInvalidUID || at < 0)
+		return;
+	EnsureSpreadInView(frontView, storyRef, at);
+	const KFCOversetLoc loc = KFCRuns()->FindOversetLocator(storyRef, at);
+	if (loc.found)
+		ScrollViewToPoint(frontView, loc.outportPb);
+}
+
 // SELECT PAGE ITEMS in the front document - the SDK's own way (SnpSelectShape.cpp: DeselectAll, then SelectPageItems
 // with kReplace), inside a dirty guard. The tool is left as it is (D9 - the plan's Task 1 M11b: a page item is selected
 // under the Type tool, and InDesign's own Find Next on the Object tab selects with the Type tool left on, M5). The items
@@ -1297,10 +1327,11 @@ struct RowItems
 	int32		missing;		// gone from the document - its row now reads Missing (marked here)
 	int32		locked;
 	int32		hidden;
-	int32		elsewhere;		// on another spread than the rest now (or on none that can be read)
+	int32		overset;		// in overset text - no spread holds it (2026-10-10 night)
+	int32		elsewhere;		// on another spread than the rest now
 	bool		rowsChanged;	// a row was marked Missing - the rows want repainting
-	explicit RowItems(IDataBase* db) : items(db), shown(kInvalidUID), missing(0), locked(0), hidden(0), elsewhere(0),
-		rowsChanged(false) {}
+	explicit RowItems(IDataBase* db) : items(db), shown(kInvalidUID), missing(0), locked(0), hidden(0), overset(0),
+		elsewhere(0), rowsChanged(false) {}
 };
 
 void CollectRowItems(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, RowItems& out)
@@ -1332,7 +1363,13 @@ void CollectRowItems(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 
 			++(isLocked ? out.locked : out.hidden);
 			continue;
 		}
-		there.push_back(std::make_pair(itemRef.GetUID(), SpreadOfItem(itemRef)));
+		const UID itemSpread = SpreadOfItem(itemRef);
+		if (itemSpread == kInvalidUID)
+		{
+			++out.overset;		// nothing to select (JumpToObject's rule)
+			continue;
+		}
+		there.push_back(std::make_pair(itemRef.GetUID(), itemSpread));
 		if (hit == shownHit)
 			shownItem = itemRef.GetUID();
 	}
@@ -1344,7 +1381,7 @@ void CollectRowItems(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 
 			spread = there[k].second;
 	for (size_t k = 0; k < there.size(); ++k)
 	{
-		if (spread == kInvalidUID || there[k].second != spread)
+		if (there[k].second != spread)
 		{
 			++out.elsewhere;
 			continue;
@@ -1366,12 +1403,12 @@ PMString SelectedObjectsSentence(int32 rows, int32 taken, const RowItems& left)
 		sentence.AppendNumber(rows);
 	}
 	sentence.Append(rows == 1 ? " object" : " objects");
-	const int32 counts[5] = { left.missing, left.locked, left.hidden, left.elsewhere,
+	const int32 counts[6] = { left.missing, left.locked, left.hidden, left.overset, left.elsewhere,
 		static_cast<int32>(left.items.Length()) - taken };
-	const char* const words[5] = { "no longer in the document", "locked", "hidden", "on another spread now",
+	const char* const words[6] = { "no longer in the document", "locked", "hidden", "in overset text", "on another spread now",
 		"not taken by InDesign" };
 	bool first = true;
-	for (int32 i = 0; i < 5; ++i)
+	for (int32 i = 0; i < 6; ++i)
 	{
 		if (counts[i] <= 0)
 			continue;
@@ -1408,7 +1445,8 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 
 /** Jump to an OBJECT row (spec O9): its document in front (a windowless chapter given its window - JMP-09), the view on
     the item, then the item selected where the click may select (SelectItemOnClick - form S). An item no longer there: the
-    document still comes forward, the row reads Missing. Returns true when it landed on the item. */
+    document still comes forward, the row reads Missing. An item in overset text: the view on the "+" its text overflows
+    at, nothing selected, and the row's note says why. Returns true when it landed on the item. */
 bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 {
 	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
@@ -1451,8 +1489,20 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 		KFCResultTree::ShowStatus(message);
 		return false;
 	}
-	ShowItemInView(itemRef);
 	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up
+	// AN ITEM IN OVERSET TEXT - no spread holds it (2026-10-10 night; the model's KFCObjectSearch::IsOnSpread): nothing of
+	// it is laid out to scroll to or select. The view goes to the "+" its text overflows at, as a text row's overset match
+	// does; nothing is selected, and the row's note says why, as a locked one's does (SelectItemOnClick).
+	if (SpreadOfItem(itemRef) == kInvalidUID)
+	{
+		ClearSelection();
+		ShowOversetAnchorInView(itemRef);
+		PMString message("That object is in overset text - not selected.");
+		message.SetTranslatable(kFalse);
+		KFCResultTree::ShowRowNote(message);
+		return false;
+	}
+	ShowItemInView(itemRef);
 	SelectItemOnClick(chapterIdx, hitIdx, itemRef);
 	return true;
 }

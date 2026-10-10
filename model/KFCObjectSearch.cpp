@@ -16,19 +16,24 @@
 #include "IDocument.h"
 #include "IFindChangeOptions.h"
 #include "IFindChangeService.h"
+#include "IGraphicFrameData.h"		// a text frame's columns - its story (the fingerprint, O12)
 #include "IHierarchy.h"
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ILayoutUtils.h"			// GetOwnerPageUID / IsAMaster
+#include "IMainItemTOPData.h"		// text on a path - its story (the fingerprint)
+#include "IMultiColumnTextFrame.h"	// QueryTextModel - the story a text frame holds
 #include "IObjectWalker.h"
 #include "IPageItemNameFacade.h"	// a row's item by the name the Layers panel shows (2026-10-10)
 #include "IPageList.h"				// GetPageString / GetPageIndex
 #include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on (O17)
+#include "IPMPersist.h"				// SaveAll - an item's own persistent data, the fingerprint (O12)
 #include "IPMStream.h"
 #include "ISession.h"
-#include "ISnippetExport.h"			// the fingerprint (O12)
 #include "ISpread.h"
 #include "ISpreadList.h"			// where the walk stands, for the bar inside a document (O16)
+#include "ITextFrameColumn.h"		// a text frame's column - the composition, left out of the fingerprint
+#include "ITextModel.h"				// GetChangeCount - a story's version (the fingerprint)
 #include "ITextWalkerSelectionUtils.h"	// the selection snapshot (O6)
 #include "IWalkerScopeFactoryUtils.h"
 
@@ -46,7 +51,6 @@
 #include "TextWalkerServiceProviderID.h"	// kObjectWalkerService, kFindChangeServiceBoss, kTextWalkerService
 #include "Utils.h"
 
-#include <cstring>					// memcmp - the fingerprint's end at the XMP packet
 #include <set>
 #include <utility>
 
@@ -260,6 +264,118 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			return kWalkCancelled;
 	}
 }
+
+// AN ITEM'S PRINT (O12, the fingerprint): bytes folded into one 64-bit FNV-1a hash - the text rows' hash family
+// (KFCSearchEngine.cpp) - and counted.
+class Print
+{
+public:
+	Print() : fHash(14695981039346656037ULL), fLength(0) {}
+	void Add(const void* data, uint32 size)
+	{
+		const unsigned char* const bytes = static_cast<const unsigned char*>(data);
+		for (uint32 i = 0; i < size; ++i)
+		{
+			fHash ^= static_cast<uint64>(bytes[i]);
+			fHash *= 1099511628211ULL;
+		}
+		fLength += size;
+	}
+	void AddNumber(int64 n) { Add(&n, sizeof(n)); }
+	void AddReal(const PMReal& r) { const double d = ::ToDouble(r); Add(&d, sizeof(d)); }
+	uint64 Hash() const { return (fHash != 0) ? fHash : 1; }
+	uint32 Length() const { return fLength; }
+
+private:
+	uint64	fHash;
+	uint32	fLength;
+};
+
+// One object's own persistent data - the bytes the database would write for it (IPMPersist::SaveAll, clearDirty false:
+// "in all other cases" than the database's own write, IPMPersist.h). A plain memory stream writes a child it owns as the
+// child's UID alone (IPMStream::XferObject), so PrintTree prints the children itself. false = nothing could be written.
+bool PrintObject(IDataBase* db, UID uid, Print& print)
+{
+	InterfacePtr<IPMPersist> persist(db, uid, UseDefaultIID());
+	if (persist == nil)
+		return false;
+	KFCMemXferBytes bytes;
+	{
+		// takeOwnership and recycleBoss both kFalse: the bytes live on this frame (KIDMCPVerify.cpp's rule).
+		InterfacePtr<IPMStream> stream(StreamUtil::CreateMemoryStreamWrite(&bytes, kFalse, kFalse));
+		if (stream == nil)
+			return false;
+		persist->SaveAll(stream, kFalse);
+		stream->Flush();
+	}
+	if (bytes.GetData() != nil)
+		print.Add(bytes.GetData(), bytes.GetSize());
+	return true;
+}
+
+// An item and what it holds - a group's members, a graphic frame's image, a text frame's columns object - each by
+// PrintObject. NOT a text frame's column frames (ITextFrameColumn - kFrameItemBoss, kTOPFrameItemBoss): they hold the
+// composition - which text fell in them, the inlines composed there - and typing moved their bytes while the frame
+// itself stayed as it was (measured 2026-10-10 night - the SaveAll probe's T1). The story's version stands for the text
+// (PrintStory), and a reflow is no change.
+bool PrintTree(IDataBase* db, UID uid, Print& print)
+{
+	if (!PrintObject(db, uid, print))
+		return false;
+	InterfacePtr<IHierarchy> hier(db, uid, UseDefaultIID());
+	if (hier == nil)
+		return true;
+	const int32 children = hier->GetChildCount();
+	for (int32 i = 0; i < children; ++i)
+	{
+		const UID child = hier->GetChildUID(i);
+		InterfacePtr<ITextFrameColumn> column(db, child, UseDefaultIID());
+		if (column == nil && !PrintTree(db, child, print))
+			return false;
+	}
+	return true;
+}
+
+// AN INLINE OR ANCHORED ITEM'S SETTINGS (Object > Anchored Object > Options): IAnchoredObjectData on the kInlineBoss it
+// hangs from, value by value. Not that boss's bytes: they carry where the anchor was composed, and typing before the
+// anchor moved them while the item stayed as it was (measured 2026-10-10 night - the SaveAll probe's I1).
+void PrintAnchor(IDataBase* db, UID item, Print& print)
+{
+	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
+	const UID parent = (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+	if (parent == kInvalidUID || db->GetClass(parent) != kInlineBoss)
+		return;
+	InterfacePtr<IAnchoredObjectData> anchored(db, parent, UseDefaultIID());
+	if (anchored == nil)
+		return;
+	print.AddNumber(anchored->GetPosition());
+	print.AddNumber(anchored->GetSpineRelative());
+	print.AddNumber(anchored->GetAnchorTypeHorizontal());
+	print.AddNumber(anchored->GetObjectHorizontal());
+	print.AddNumber(anchored->GetAnchorPtHorizontal());
+	print.AddNumber(anchored->GetAnchorTypeVertical());
+	print.AddNumber(anchored->GetObjectVertical());
+	print.AddNumber(anchored->GetAnchorPtVertical());
+	const PMPoint offset = anchored->GetOffset();
+	print.AddReal(offset.X());
+	print.AddReal(offset.Y());
+	print.AddReal(anchored->GetYOffsetAbove());
+	print.AddNumber(anchored->GetPinPosition());
+	print.AddNumber(anchored->GetLockPosition());
+}
+
+// THE TEXT A FRAME HOLDS - a text frame's, or a path's: its story's version (ITextModel::GetChangeCount - every change
+// to the story's text, attributes, and what hangs in it, inlines and tables included - the text rows' version,
+// KFCSearchEngine::ReadStoryVersion, which an Undo puts back to exactly the value it had).
+void PrintStory(const IMultiColumnTextFrame* columns, Print& print)
+{
+	InterfacePtr<ITextModel> model((columns != nil) ? columns->QueryTextModel() : nil);
+	if (model == nil)
+		return;
+	print.AddNumber(columns->GetTextModelUID().Get());
+	print.AddNumber(model->GetChangeCount());
+}
+
 }	// anonymous namespace
 
 IObjectWalker* KFCObjectSearch::QuerySharedWalker()
@@ -450,53 +566,37 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 	IDataBase* const db = item.GetDataBase();
 	if (db == nil || item.GetUID() == kInvalidUID || !db->IsValidUID(item.GetUID()))
 		return false;
-	// The exporter is a service: its arrow on a missing one would be the crash (memory utils-boss-facade-access).
-	Utils<ISnippetExport> exporter;
-	if (!exporter.Exists())
+#ifdef KFC_DIAG
+	const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+#endif
+	IDataBase::SaveRestoreModifiedState dirtyGuard(db);	// SaveAll reads; the flag is put back all the same
+	Print print;
+	if (!PrintTree(db, item.GetUID(), print))
 		return false;
-	IDataBase::SaveRestoreModifiedState dirtyGuard(db);	// an export reads; the flag is put back all the same
-	KFCMemXferBytes bytes;
-	ErrorCode status = kFailure;
-	{
-		// takeOwnership and recycleBoss both kFalse: the bytes live on this frame (KIDMCPVerify.cpp's rule).
-		InterfacePtr<IPMStream> stream(StreamUtil::CreateMemoryStreamWrite(&bytes, kFalse, kFalse));
-		if (stream == nil)
-			return false;
-		status = exporter->ExportPageitems(stream, UIDList(item));
-		stream->Flush();
-	}
-	if (status != kSuccess || bytes.GetData() == nil || bytes.GetSize() == 0)
-	{
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		return false;
-	}
-	// ONLY UP TO THE SNIPPET'S XMP PACKET. The packet that ends a snippet carries fresh xmpMM:InstanceID / DocumentID
-	// GUIDs and the export's dates: two exports of an untouched item differed there and nowhere else (measured - the
-	// plan's Task 1 M2: 20 of 20 differed with the packet in; without it 40 of 40 agreed, and a move, a tint, a typed
-	// character still changed it while a recompose did not).
-	static const char kPacket[] = "<?xpacket begin";
-	const uint32 packetLength = static_cast<uint32>(sizeof(kPacket) - 1);
-	const char* const data = bytes.GetData();
-	const uint32 size = bytes.GetSize();
-	uint32 end = size;
-	for (uint32 i = 0; i + packetLength <= size; ++i)
-	{
-		if (std::memcmp(data + i, kPacket, packetLength) == 0)
-		{
-			end = i;
-			break;
-		}
-	}
-	// FNV-1a, 64-bit - the text rows' hash family (KFCSearchEngine.cpp).
-	uint64 hash = 14695981039346656037ULL;
-	for (uint32 i = 0; i < end; ++i)
-	{
-		hash ^= static_cast<uint64>(static_cast<unsigned char>(data[i]));
-		hash *= 1099511628211ULL;
-	}
-	outHash = (hash != 0) ? hash : 1;
-	outLength = end;
+	PrintAnchor(db, item.GetUID(), print);
+	InterfacePtr<IGraphicFrameData> frameData(item, UseDefaultIID());
+	InterfacePtr<IMultiColumnTextFrame> columns((frameData != nil) ? frameData->QueryMCTextFrame() : nil);
+	PrintStory(columns, print);
+	InterfacePtr<IMainItemTOPData> path(item, UseDefaultIID());
+	InterfacePtr<IMultiColumnTextFrame> pathColumns((path != nil) ? path->QueryTOPMCTextFrame() : nil);
+	PrintStory(pathColumns, print);
+	outHash = print.Hash();
+	outLength = print.Length();
+#ifdef KFC_DIAG
+	KFC_DIAG_LOG("FPRINT item=%u print=%016llx/%u us=%.0f", static_cast<unsigned>(item.GetUID().Get()),
+		static_cast<unsigned long long>(outHash), static_cast<unsigned>(outLength),
+		std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count());
+#endif
 	return true;
+}
+
+bool KFCObjectSearch::IsOnSpread(const UIDRef& item)
+{
+	InterfacePtr<IHierarchy> hier(item, UseDefaultIID());
+	if (hier == nil)
+		return false;
+	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+	return spread != nil;
 }
 
 void KFCObjectSearch::AimSharedWalkerAtFront()
@@ -591,12 +691,14 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	}
 
 	// THE SPREAD (O17): which rows can be selected together - InDesign selects page items on one spread at a time. An inline
-	// in overset text has none (QuerySpread answers nil) and is selected only on its own.
+	// in overset text has none (QuerySpread answers nil): its row reads "overset" (BuildHitLocator), and nothing of it is
+	// shown or selected, and its row's Replace is refused (IsOnSpread).
 	if (hier != nil)
 	{
 		InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
 		out.itemSpread = (spread != nil) ? ::GetUID(spread) : kInvalidUID;
 	}
+	out.isOverset = (out.itemSpread == kInvalidUID);
 
 	// Out of the user's reach where it is (the text rows' two words, by the same code).
 	out.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);

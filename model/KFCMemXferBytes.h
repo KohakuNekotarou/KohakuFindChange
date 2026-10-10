@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC), copied from KIDMCP (written for Kohaku Change Marker) - the object rows' fingerprint (1.4.0)
 //
-//  An IXferBytes that keeps everything in memory, so a snippet can be exported without a file
-//  ever existing.
+//  An IXferBytes that keeps everything in memory, so an item's persistent data can be written - the
+//  object rows' fingerprint, IPMPersist::SaveAll - without a file ever existing.
 //
 //  StreamUtil::CreateMemoryStreamWrite takes an IXferBytes, and the SDK ships no usable
 //  implementation of one: public/libs/publiclib/strings/WideString.cpp:37 includes

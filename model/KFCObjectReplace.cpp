@@ -59,6 +59,7 @@ enum Refusal
 	kRefusedNoDoc,			// its document could not be found
 	kRefusedNotOpened,		// ...or not opened
 	kRefusedMissing,		// the item is gone - the row now reads Missing
+	kRefusedOverset,		// no spread holds it - in overset text (KFCObjectSearch::IsOnSpread)
 	kRefusedLocked,			// locked now
 	kRefusedEdited,			// changed since the search (its fingerprint)
 	kRefusedNotReached,		// InDesign's walk never came to it - no longer a match
@@ -77,6 +78,7 @@ const char* RowSentence(Refusal why)
 		case kRefusedNoDoc:			return "the document of this row could not be found.";
 		case kRefusedNotOpened:		return "the document of this row could not be opened.";
 		case kRefusedMissing:		return "the object is no longer in the document - search again.";
+		case kRefusedOverset:		return "the object is in overset text - left as it is.";
 		case kRefusedLocked:		return "the object is locked now (a locked layer, or Object > Lock) - left as it is.";
 		case kRefusedEdited:		return "the object has changed since the search (moved, restyled or edited) - search again.";
 		case kRefusedNotReached:	return "the object no longer matches the Find/Change settings - search again.";
@@ -96,6 +98,7 @@ const char* RefusalWords(Refusal why)
 		case kRefusedNoDoc:			return "document not found";
 		case kRefusedNotOpened:		return "document not opened";
 		case kRefusedMissing:		return "no longer in the document";
+		case kRefusedOverset:		return "in overset text";
 		case kRefusedLocked:		return "locked";
 		case kRefusedEdited:		return "changed since the search";
 		case kRefusedNotReached:	return "no longer matching";
@@ -166,10 +169,15 @@ Refusal CheckItem(int32 chapterIdx, int32 hitIdx, UIDRef& outDoc, UID& outItem)
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 		return kRefusedMissing;
 	}
+	// 3b. On a spread (2026-10-10 night): an item in overset text is not written. A row's Replace brings the view to its
+	// item and leaves it selected (KFCJump::ReplaceObjectRow), and nothing of an overset one is laid out to show or
+	// select (KFCObjectSearch::IsOnSpread).
+	if (!KFCObjectSearch::IsOnSpread(UIDRef(db, outItem)))
+		return kRefusedOverset;
 	// 4. Not locked (Object > Lock, an insert lock, a locked layer).
 	if (KFCPageItemFacts::IsPageItemLockedForEdit(db, outItem) || KFCPageItemFacts::IsFrameOnLockedLayer(db, outItem))
 		return kRefusedLocked;
-	// 5. As the search found it - or as KFC last wrote it (O12): any change the item's snippet shows refuses.
+	// 5. As the search found it - or as KFC last wrote it (O12): any change its fingerprint shows refuses.
 	uint64 was = 0, now = 0;
 	uint32 wasLength = 0, nowLength = 0;
 	if (!KFCResultModel::GetHitItemPrint(chapterIdx, hitIdx, was, wasLength)

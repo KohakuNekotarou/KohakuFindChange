@@ -65,7 +65,8 @@ enum JoinAnswer
 	kJoins = 0,
 	kNotHitRows,		// either is a story, document or book row, or the two are of two kinds: always alone
 	kOtherDocument,		// hit rows of two documents - InDesign selects in one document
-	kOtherSpread		// object rows whose items stood on two spreads (or on none that could be read)
+	kOtherSpread,		// object rows whose items stood on two spreads
+	kInOverset			// an object row whose item stood on no spread - in overset text: always alone (2026-10-10 night)
 };
 
 bool IsObjectRow(const KFCResultNodeID* node)
@@ -87,7 +88,9 @@ JoinAnswer Join(const NodeID& a, const NodeID& b)
 		return kJoins;			// text rows: any story of the document
 	const UID spreadA = KFCResults()->GetHitSpread(first->GetChapter(), first->GetHit());
 	const UID spreadB = KFCResults()->GetHitSpread(second->GetChapter(), second->GetHit());
-	if (spreadA == kInvalidUID || spreadA != spreadB)
+	if (spreadA == kInvalidUID || spreadB == kInvalidUID)
+		return kInOverset;
+	if (spreadA != spreadB)
 		return kOtherSpread;
 	return kJoins;
 }
@@ -99,6 +102,7 @@ const char* WhyNotJoined(JoinAnswer answer)
 	{
 		case kOtherDocument:	return "Not added - that row is in another document. Rows are selected together in one document.";
 		case kOtherSpread:		return "Not added - that object is on another spread. InDesign selects objects on one spread at a time.";
+		case kInOverset:		return "Not added - an object in overset text cannot be selected: its row is selected on its own.";
 		default:				return "";
 	}
 }
@@ -405,7 +409,7 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	if (answer != kJoins)
 	{
 		// The next row cannot join: the run stays. Said only for a hit row of another document or an object row of
-		// another spread - a document row is the plain edge of the run.
+		// another spread or in overset text - a document row is the plain edge of the run.
 		if (answer != kNotHitRows)
 		{
 			PMString note(WhyNotJoined(answer));

@@ -1055,7 +1055,11 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	{
 		// AN OBJECT ROW (1.4.0, O8): "pasteboard" for an item on no page, else the page and its place on it; then where the
 		// item stands - master, grouped, inline, anchored - each spelled out (ROW-14). hidden / locked follow, as for text.
-		if (hit.onPasteboard || hit.pageString.IsEmpty())
+		// An item no spread holds - an inline in overset text - reads "overset" as a text row's overset match does (with
+		// its page when one is named), not "pasteboard" (2026-10-10 night).
+		if (hit.isOverset && (hit.onPasteboard || hit.pageString.IsEmpty()))
+			hit.locator.Append("overset");
+		else if (hit.onPasteboard || hit.pageString.IsEmpty())
 			hit.locator.Append("pasteboard");
 		else
 		{
@@ -1067,6 +1071,8 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 				hit.locator.AppendNumber(hit.pageOrdinal);
 				hit.locator.Append(")");
 			}
+			if (hit.isOverset)
+				hit.locator.Append(" overset");
 		}
 		if (hit.isMaster)
 			hit.locator.Append(" master");

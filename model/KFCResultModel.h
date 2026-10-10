@@ -57,7 +57,8 @@ namespace KFCResultModel
 								// indicator (or "" when nothing is placed anywhere).
 		int32		pageIndex;	// that page's document order (-1 = no page); sorts hits into page order
 		bool		isOverset;	// match is overset -> the locator gets a trailing " overset"
-								// ("P<page>(<n>) overset")
+								// ("P<page>(<n>) overset"). An object row: no spread holds its item - an inline
+								// in overset text (KFCObjectSearch::IsOnSpread).
 		bool		isLocked;	// match sits on a locked layer or in a locked story -> the locator
 								// gets " locked" and the row's Replace is greyed. InDesign can search
 								// locked content but offers no way to change it ("Search Only"), so
@@ -130,14 +131,15 @@ namespace KFCResultModel
 		bool		isGrouped;
 		bool		isInline;		// an inline or above-line object in text
 		bool		isAnchored;		// an anchored object with a custom position
-		// Its FINGERPRINT (O12, KFCObjectSearch::Fingerprint): its own snippet's hash and length - taken by the search,
-		// and again by each Replace of KFC's own. A row's Replace refuses an item that no longer reads this way.
+		// Its FINGERPRINT (O12, KFCObjectSearch::Fingerprint): its own persistent data's hash and length, with what it holds
+		// and a text frame's story's version - taken by the search, and again by each Replace of KFC's own. A row's Replace
+		// refuses an item that no longer reads this way.
 		uint64		itemPrint;
 		uint32		itemPrintLength;
 		// The SPREAD the item stood on when the search found it (O17 - a parent page's spread for a parent page's item,
 		// the spread of its pasteboard for one on no page). Rows are selected together only within one spread: InDesign
 		// selects page items on one spread at a time (measured 2026-10-10 - "two objects on different spreads cannot be
-		// selected", the DOM's own refusal). kInvalidUID when it could not be read.
+		// selected", the DOM's own refusal). kInvalidUID when no spread holds it - an inline in overset text (isOverset).
 		UID			itemSpread;
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
@@ -460,7 +462,7 @@ namespace KFCResultModel
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
 
 	/** The spread an OBJECT row's item stood on when the search found it (Hit::itemSpread - O17); kInvalidUID for a
-	    text row, an index out of range, or a spread that could not be read. */
+	    text row, an index out of range, or an item no spread held (in overset text - Hit::isOverset). */
 	UID GetHitSpread(int32 chapterIdx, int32 hitIdx);
 
 	/** An object row's fingerprint (Hit::itemPrint / itemPrintLength). false for a text row or an index out of range. */
