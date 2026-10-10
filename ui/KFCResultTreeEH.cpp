@@ -244,13 +244,13 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	if (controller == nil)
 		return kFalse;
 	// The rows this Return writes: the hit row selected - or the rows selected together (O18 - the author's calls of
-	// 2026-10-10, object rows and then text rows), in the order they are drawn. `last` is the row Shift+Return goes on
-	// from: the lowest of them (a hit row's NodeID is its chapter, story and hit - the same row the tree draws).
-	int32 chapter = -1;
-	std::vector<int32> rows;
-	if (!KFCResultTree::GetSelectedHitRows(chapter, rows))
+	// 2026-10-10, object rows and then text rows, of one document or several), in the order they are drawn. `last` is the
+	// row Shift+Return goes on from: the lowest of them (a hit row's NodeID is its chapter, story and hit - the same row
+	// the tree draws).
+	KFCRowsByChapter rows;
+	if (!KFCResultTree::GetSelectedHitRows(rows))
 		return kFalse;
-	const NodeID last(KFCResultNodeID::Create(chapter, rows.back()));
+	const NodeID last(KFCResultNodeID::Create(rows.back().first, rows.back().second.back()));
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
 	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
 	// A RETURN HELD DOWN WRITES ONCE (2026-10-09 - the header re-read 52's proposal, the author's yes). Windows repeats a key
@@ -276,7 +276,7 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 		return kTrue;
 	}
 	PMString status;
-	const bool wrote = KFCResultTree::ReplaceRows(chapter, rows, &status);
+	const bool wrote = KFCResultTree::ReplaceRows(rows, &status);
 	// The write may have opened a closed chapter and given it a window, which takes the key focus - take it back, with the
 	// panel made the active one again, or the next arrow press lands in the document instead of walking on.
 	(void)KFCResultTree::TakeKeyboard();

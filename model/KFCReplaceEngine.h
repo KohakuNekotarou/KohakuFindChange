@@ -32,6 +32,7 @@
 
 #include "PMString.h"
 #include "UIDRef.h"
+#include "KFCModelTypes.h"		// KFCRowsByChapter
 
 #include <vector>
 
@@ -95,12 +96,14 @@ namespace KFCReplaceEngine
 	    opened, or the row would not be replaced (locked since, missing, refused). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** THE ROWS SELECTED TOGETHER (O18 - the author's call of 2026-10-10), all of one document and one kind, in ONE undo
-	    step: object rows by KFCObjectReplace::ReplaceRows (row by row - a row that cannot be written is left and
-	    counted); text rows whose Replace is greyed are left and counted, and the others are written all or nothing, as
-	    ReplaceHit writes one ("Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." / "Replaced 2 of 3 rows: ... Left as
-	    they were: 1 locked."; a refusal names "a selected row"). One row = ReplaceHit. */
-	bool ReplaceHits(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
+	/** THE ROWS SELECTED TOGETHER (O18 - the author's calls of 2026-10-10), all of one kind, of one document or several
+	    (as Change Checked's ticked rows were), in ONE undo step: object rows by KFCObjectReplace::ReplaceRows (row by row -
+	    a row that cannot be written is left and counted); text rows whose Replace is greyed are left and counted, and the
+	    others are written all or nothing, as ReplaceHit writes one ("Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." /
+	    "Replaced 2 of 3 rows: ... Left as they were: 1 locked." / "Replaced 3 rows in 2 documents: a.indd ID:262 #1;
+	    b.indd ID:270 #1."; a refusal names "a selected row"). Several documents are one abortable step around every
+	    document's write (ReplaceRowsNow's note). One row = ReplaceHit. */
+	bool ReplaceHits(const KFCRowsByChapter& rows, PMString& outStatus);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
 	    outcome - WhyGreyed answering kGreyedNot. */

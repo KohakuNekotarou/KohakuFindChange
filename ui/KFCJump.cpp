@@ -677,6 +677,34 @@ private:
 	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
 };
 
+// The same for EVERY document of rows selected together (KFCJump::ReplaceObjectRows - 1.4.0, rows of several documents):
+// the model's check can reopen any of their chapters windowless and hold it, and a way out between that check and the
+// write - the shown row's chapter not reached, its window not forward - would leave them so. A chapter the write gave a
+// window, or one the user has open, is not held: nothing happens to it.
+class HandBackChaptersOnExit
+{
+public:
+	explicit HandBackChaptersOnExit(const KFCRowsByChapter& rows)
+	{
+		for (size_t c = 0; c < rows.size(); ++c)
+			fChapters.push_back(rows[c].first);
+	}
+	~HandBackChaptersOnExit()
+	{
+		for (size_t c = 0; c < fChapters.size(); ++c)
+		{
+			UIDRef docRef;
+			IDFile file;
+			if (KFCResults()->GetChapterLocation(fChapters[c], docRef, file))
+				KFCChapters()->HandBackIfHeld(docRef);
+		}
+	}
+private:
+	std::vector<int32> fChapters;
+	HandBackChaptersOnExit(const HandBackChaptersOnExit&);
+	HandBackChaptersOnExit& operator=(const HandBackChaptersOnExit&);
+};
+
 // Does a row name a place in its story? Every row the search makes does, and nothing in KFC takes one away -
 // asked anyway, because what follows (the overset test, the spread, the wax rectangle) must never be handed -1.
 bool RowHasPlace(TextIndex start, TextIndex end)
@@ -1540,19 +1568,24 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 	return wrote;
 }
 
-bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, PMString& outStatus)
+bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter, int32 shownHit, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (hitIdxs.size() == 1)
-		return ReplaceObjectRow(chapterIdx, hitIdxs[0], outStatus);
-	if (hitIdxs.empty() || gActivating)
+	size_t total = 0;
+	for (size_t c = 0; c < rows.size(); ++c)
+		total += rows[c].second.size();
+	if (total == 1)
+		return ReplaceObjectRow(shownChapter, shownHit, outStatus);
+	if (total == 0 || gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
-	// (As one row's: the check below can reopen the chapter windowless - HandBackChapterOnExit.)
-	const HandBackChapterOnExit handBack(chapterIdx);
-	if (!KFCRuns()->CheckObjectReplaceRows(chapterIdx, hitIdxs, outStatus))
+	// (As one row's: the check below can reopen a chapter windowless - every document's, the shown row's among them -
+	// HandBackChaptersOnExit. The write hands back what it reached and did not write - KFCObjectReplace::ReplaceRows.)
+	const HandBackChaptersOnExit handBack(rows);
+	if (!KFCRuns()->CheckObjectReplaceRows(rows, outStatus))
 		return false;
+	const int32 chapterIdx = shownChapter;
 	UIDRef docRef;
 	IDFile file;
 	if (!KFCResults()->GetChapterLocation(chapterIdx, docRef, file) || !EnsureChapterReachable(chapterIdx, docRef, file))
@@ -1561,8 +1594,9 @@ bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitI
 	if (db == nil)
 		return false;
 	{
-		// O10 step 6 for the rows: their document in front - InDesign's replace selects what it writes in the FRONT
-		// document - and the view on the item of the row selected last (the one the page shows).
+		// O10 step 6 for the rows: the document of the row selected last in front - InDesign's replace selects what it
+		// writes in the FRONT document (another document's walk selects in this one, put right below) - and the view on
+		// that row's item (the one the page shows).
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		if (!FrontChapter(docRef))
 			return false;		// it has said why
@@ -1570,7 +1604,7 @@ bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitI
 		if (ItemIsThere(shown) && SpreadOfItem(shown) != kInvalidUID)
 			ShowItemInView(shown);
 	}
-	const bool wrote = KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, outStatus);
+	const bool wrote = KFCRuns()->ReplaceRows(rows, outStatus);
 	// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.
 	if (LayoutOfDocIsFrontmost(docRef))
 	{

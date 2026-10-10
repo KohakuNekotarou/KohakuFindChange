@@ -81,6 +81,9 @@ namespace KFCUndoFollow
 	{
 	public:
 		explicit StepRecorder(int32 chapterIdx);
+		/** One write over the rows of SEVERAL documents (1.4.0 - O18, rows of several documents replaced together in one
+		    undo step, as Change Checked's ticked rows were): every chapter's stories read, one row backup. */
+		explicit StepRecorder(const std::vector<int32>& chapterIdxs);
 		~StepRecorder();
 
 		/** The write went through and the rows show it: kept, if a story's version moved (a write that
@@ -92,6 +95,7 @@ namespace KFCUndoFollow
 		void RecordItem(int32 chapterIdx, UID item);
 
 	private:
+		void Open(const std::vector<int32>& chapterIdxs);
 		bool fOpen;
 		StepRecorder(const StepRecorder&);
 		StepRecorder& operator=(const StepRecorder&);

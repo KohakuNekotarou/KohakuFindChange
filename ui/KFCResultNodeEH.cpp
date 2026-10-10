@@ -203,8 +203,9 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 //
 // A STORY row's right-click pops ITS menu - Search This Story Again (the author's call of 2026-10-09), stashed the same
 // way (KFCResultModel::GetContextMenuStory); a DOCUMENT row's, Search This Document Again (the author's call of
-// 2026-10-10 - KFCResultModel::GetContextMenuChapter). The book row has no menu (spec F16) - its right-click is taken and
-// does nothing.
+// 2026-10-10 - KFCResultModel::GetContextMenuChapter). The story and document menus hold Select All Rows as well, and the
+// BOOK row has a menu of its own for it (the author's call of 2026-10-11 - KFCResultTree::SetContextMenuBook: the book's
+// rows are every row of the list, so the UI half's own flag is all the stash it needs).
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
@@ -229,6 +230,7 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	KFCResults()->SetContextMenuHit(-1, -1);
 	KFCResults()->SetContextMenuStory(-1, -1);
 	KFCResults()->SetContextMenuChapter(-1);
+	KFCResultTree::SetContextMenuBook(false);
 	if (nodeID->IsHitRow())
 	{
 		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
@@ -242,9 +244,15 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	}
 	else if (nodeID->IsDocumentRow())
 	{
-		// A DOCUMENT row: its own menu (Search This Document Again - the author's call of 2026-10-10).
+		// A DOCUMENT row: its own menu (Search This Document Again - the author's call of 2026-10-10; Select All Rows).
 		KFCResults()->SetContextMenuChapter(nodeID->GetChapter());
 		PopRowMenu(kKFCResultDocumentMenuName, e, this);
+	}
+	else if (nodeID->IsBookRow())
+	{
+		// The BOOK row: its own menu (Select All Rows - the author's call of 2026-10-11).
+		KFCResultTree::SetContextMenuBook(true);
+		PopRowMenu(kKFCResultBookMenuName, e, this);
 	}
 	return kTrue;
 }

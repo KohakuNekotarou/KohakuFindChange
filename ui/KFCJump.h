@@ -29,6 +29,7 @@
 #define __KFCJump_h__
 
 #include "PMString.h"
+#include "KFCModelTypes.h"		// KFCRowsByChapter - the rows selected together, by document
 #include <vector>
 
 namespace KFCJump
@@ -58,12 +59,13 @@ namespace KFCJump
 	    outStatus = what to say. True when it wrote. */
 	bool ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER (O18): the model's checks first (IKFCRuns::
-	    CheckObjectReplaceRows - none that could be written brings no window forward), then their document in front and
-	    the view on the item of shownHit - the row selected last, the one the page shows (KFCResultTree::LastSelectedHit)
-	    - the write in one undo step (IKFCRuns::ReplaceRows), and that row's item left selected as its click selects it
-	    (quietly - the status says what was written). One row = ReplaceObjectRow. True when something was written. */
-	bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, PMString& outStatus);
+	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER (O18), of one document or several: the model's checks first
+	    (IKFCRuns::CheckObjectReplaceRows - none that could be written brings no window forward), then the document of
+	    shownChapter / shownHit - the row selected last, the one the page shows (KFCResultTree::LastSelectedHit) - in front
+	    and the view on its item, the write in one undo step (IKFCRuns::ReplaceRows), and that row's item left selected as
+	    its click selects it (quietly - the status says what was written). One row = ReplaceObjectRow. True when something
+	    was written. */
+	bool ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter, int32 shownHit, PMString& outStatus);
 
 	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own
 	    clearing (1.4.0), for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */

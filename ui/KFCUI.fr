@@ -676,6 +676,24 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchDocumentAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- Select All Rows: the book, document and story rows' menus (the author's call of 2026-10-11) -----
+		// Every hit row under the row right-clicked selected, for Return to replace them all together
+		// (KFCResultTree::SelectAllRows).
+		kKFCSelectAllRowsActionID,
+		kKFCResultStoryMenuName
+		kKFCSelectAllRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCSelectAllRowsActionID,
+		kKFCResultDocumentMenuName
+		kKFCSelectAllRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
+		kKFCSelectAllRowsActionID,
+		kKFCResultBookMenuName
+		kKFCSelectAllRowsMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -909,6 +927,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchDocumentAgainActionID,
 		kKFCSearchDocumentAgainMenuKey,	// "Search This Document Again"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Select All Rows - a book, document or story row's right-click menu (the author's call of 2026-10-11).
+		// kCustomEnabling: UpdateActionStates greys it while no such row is stashed or a run is up.
+		kKFCActionComponentBoss,
+		kKFCSelectAllRowsActionID,
+		kKFCSelectAllRowsMenuKey,		// "Select All Rows"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

@@ -37,6 +37,7 @@
 #include "KFCUIID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCResultTree.h"		// rebuild the result tree after a search
+#include "KFCResultNodeID.h"		// Select All Rows - the book, document or story row right-clicked
 #include "KFCJump.h"			// the Hide Previous Chapter toggle lives with the jump logic
 #include "KFCPanelTitle.h"		// the panel's tab name carries the current scope
 #include "KFCHowTo.h"			// "How to Use..." - the operating reference
@@ -336,7 +337,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// 2026-10-10, object rows and then text rows). Any other row: that row alone (KFCResultTree::RowsOfRightClick).
 			int32 chapter = -1, hit = -1;
 			if (KFCResults()->GetContextMenuHit(chapter, hit))
-				(void)KFCResultTree::ReplaceRows(chapter, KFCResultTree::RowsOfRightClick(chapter, hit));
+				(void)KFCResultTree::ReplaceRows(KFCResultTree::RowsOfRightClick(chapter, hit));
 			break;
 		}
 
@@ -356,6 +357,20 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1;
 			if (KFCResults()->GetContextMenuChapter(chapter))
 				(void)KFCResultTree::SearchDocumentAgain(chapter);
+			break;
+		}
+
+		case kKFCSelectAllRowsActionID:
+		{
+			// A book, document or story row's right-click menu (2026-10-11): the row its right-click stashed - one of the
+			// three, as KFCResultNodeEH::RButtonDn clears them all first. Nothing stashed: do nothing.
+			int32 chapter = -1, group = -1;
+			if (KFCResults()->GetContextMenuStory(chapter, group))
+				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::CreateFont(chapter, group));
+			else if (KFCResults()->GetContextMenuChapter(chapter))
+				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::Create(chapter));
+			else if (KFCResultTree::GetContextMenuBook())
+				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::CreateBook());
 			break;
 		}
 
@@ -567,7 +582,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
 			int32 chapter = -1, hit = -1;
 			const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
-				&& KFCResultTree::CanReplaceAny(chapter, KFCResultTree::RowsOfRightClick(chapter, hit));
+				&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCSearchStoryAgainActionID)
@@ -587,6 +602,14 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			int32 chapter = -1;
 			const bool enable = KFCResults()->GetContextMenuChapter(chapter) && !KFCRuns()->IsAnyRunning();
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCSelectAllRowsActionID)
+		{
+			// A book, document or story row's menu: Select All Rows while one of those rows is stashed and no run is up.
+			int32 chapter = -1, group = -1;
+			const bool stashed = KFCResults()->GetContextMenuStory(chapter, group) || KFCResults()->GetContextMenuChapter(chapter)
+				|| KFCResultTree::GetContextMenuBook();
+			listToUpdate->SetNthActionState(i, (stashed && !KFCRuns()->IsAnyRunning()) ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

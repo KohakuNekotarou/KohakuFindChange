@@ -963,38 +963,45 @@ bool KFCResultTree::TakeKeyboard()
 	return keyBoard->GetKeyFocus() == listEH;
 }
 
-bool KFCResultTree::CanReplaceAny(int32 chapterIdx, const std::vector<int32>& hitIdxs)
+bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
 {
-	for (size_t k = 0; k < hitIdxs.size(); ++k)
-		if (KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]))
-			return true;
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].second.size(); ++k)
+			if (KFCRuns()->CanReplaceHit(rows[c].first, rows[c].second[k]))
+				return true;
 	return false;
 }
 
-bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus)
+bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus)
 {
-	if (hitIdxs.empty() || RefusedWhileRunning())
+	int32 shownChapter = -1, shownHit = -1;
+	if (!LastSelectedHit(rows, shownChapter, shownHit) || RefusedWhileRunning())
 		return false;
 	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then.
-	if (!CanReplaceAny(chapterIdx, hitIdxs))
+	if (!CanReplaceAny(rows))
 		return false;
 	PMString status;
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows begin focus=%s", DiagKeyFocus().c_str());
 	// OBJECT ROWS (1.4.0) are replaced through the jump's machinery - their document fronted around the write (KFCJump);
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
 	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
-	const bool wrote = (KFCResults()->GetHitItem(chapterIdx, hitIdxs[0]) != kInvalidUID)
-		? KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, LastSelectedHit(chapterIdx, hitIdxs), status)
-		: KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, status);	// no prompt (the author's call)
+	const bool wrote = (KFCResults()->GetHitItem(shownChapter, shownHit) != kInvalidUID)
+		? KFCJump::ReplaceObjectRows(rows, shownChapter, shownHit, status)
+		: KFCRuns()->ReplaceRows(rows, status);	// no prompt (the author's call)
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
 	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
 	// write is over (a book chapter the Replace reopened has been given its window by then).
-	UIDRef docRef;
-	IDFile file;
-	if (wrote && KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
-		&& !KFCChapters()->HasWindow(docRef))
-		status.Append(" The document has no window - still hidden.");
+	bool hidden = false;
+	for (size_t c = 0; c < rows.size() && wrote && !hidden; ++c)
+	{
+		UIDRef docRef;
+		IDFile file;
+		hidden = KFCResults()->GetChapterLocation(rows[c].first, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
+			&& !KFCChapters()->HasWindow(docRef);
+	}
+	if (hidden)
+		status.Append(rows.size() == 1 ? " The document has no window - still hidden." : " A document written has no window - still hidden.");
 	// Repainted in place - or the tree rebuilt, when the write threw the results away: a refusal on a changed
 	// Find/Change query clears them (KFCReplaceEngine::RefuseChangedQuery), and RefreshRows repaints only the chapters
 	// the model still holds - none, so the old rows would stay drawn and answer nothing until the next search.

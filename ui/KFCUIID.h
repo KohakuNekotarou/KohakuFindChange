@@ -306,6 +306,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSearchStoryAgainActionID, kKFCUIPrefix + 50)
 // again whole with the search's query, its rows put back (KFCSearchEngine::SearchDocumentAgain). + 51: the next after the
 // highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
+// "Select All Rows" on a BOOK, DOCUMENT or STORY row's right-click menu (the author's call of 2026-10-11): every hit row
+// under that row selected - for Return to replace them all together (O18). One action in the three menus: the row
+// right-clicked is told by the stash its right-click left (KFCActionComponent). + 52: the next after the highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 
 
 // WidgetIDs:
@@ -409,6 +413,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCSearchStoryAgainMenuKey		kKFCStringPrefix "kKFCSearchStoryAgainMenuKey"
 // The document row's own right-click menu (2026-10-10).
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
+// The book, document and story rows' menus (2026-10-11).
+#define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
 // half's Undo names (kKFCReplaceStepKey and friends, KFCID.h) and this page's body.
@@ -476,6 +482,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // The DOCUMENT rows' right-click menu (Search This Document Again - the author's call of 2026-10-10), popped the same way.
 // A name of its own, not the retired "KFCRtMenuResultRow" above.
 #define kKFCResultDocumentMenuName			"KFCRtMenuResultDocument"
+// The BOOK row's right-click menu (Select All Rows - the author's call of 2026-10-11), popped the same way.
+#define kKFCResultBookMenuName				"KFCRtMenuResultBook"
 
 // Menu item positions:
 //
@@ -540,6 +548,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCSearchStoryAgainMenuItemPosition	0.5
 // The document row's menu: Search This Document Again.
 #define kKFCSearchDocumentAgainMenuItemPosition	0.5
+// Select All Rows: after the row's own Search ... Again on a story or document row; alone on the book row's menu.
+#define kKFCSelectAllRowsMenuItemPosition		1.0
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

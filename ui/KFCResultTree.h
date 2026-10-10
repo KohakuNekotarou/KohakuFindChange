@@ -20,6 +20,7 @@
 
 #include "PMRect.h"
 #include "PMString.h"
+#include "KFCModelTypes.h"		// KFCRowsByChapter - the rows selected together, by document
 #include <vector>
 #ifdef KFC_DIAG
 #include <string>
@@ -85,46 +86,58 @@ namespace KFCResultTree
 	void DropRowPreview();
 
 	/** REPLACE THE ROWS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17 for one row;
-	    O18 - the author's calls of 2026-10-10 - for rows selected together: hit rows of one kind in one document). Return
+	    O18 - the author's calls of 2026-10-10 - for rows selected together: hit rows of one kind, of one document or
+	    several - Change Checked's ticked rows, made by selecting). Return
 	    on the selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a
 	    run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question
 	    the row menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and
-	    Redo - object rows through KFCJump::ReplaceObjectRows (their document in front, the item of the row selected last
+	    Redo - object rows through KFCJump::ReplaceObjectRows (the document of the row selected last in front, its item
 	    left selected - LastSelectedHit), text
 	    rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the status line set. True = something
 	    written. outStatus, when given, gets the status line it set - Shift+Return adds to it when there is no row below to
 	    go on to (KFCResultTreeEH). */
-	bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus = nil);
+	bool ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus = nil);
 
 	/** Can the Replace run on these rows - can any of them be replaced (KFCRuns()->CanReplaceHit)? The one question the
 	    row menu greys Replace by (KFCActionComponent) and ReplaceRows asks first. */
-	bool CanReplaceAny(int32 chapterIdx, const std::vector<int32>& hitIdxs);
+	bool CanReplaceAny(const KFCRowsByChapter& rows);
 
-	/** THE HIT ROWS SELECTED TOGETHER now (O17): their document and their rows in the order drawn; outObjects (optional) =
-	    object rows rather than text rows. false when nothing is selected, or a story, document or book row is
+	/** THE HIT ROWS SELECTED TOGETHER now (O17): by document, in the order drawn; outObjects (optional) = object rows
+	    rather than text rows. false when nothing is selected, or a story, document or book row is
 	    (KFCResultTreeController.cpp). */
-	bool GetSelectedHitRows(int32& outChapter, std::vector<int32>& outHits, bool* outObjects = nil);
+	bool GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects = nil);
 
-	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES (O18): every row selected together, in the order drawn, when the hit row
-	    right-clicked is one of several selected; else that row alone. Asked by the menu's grey state and by the Replace
-	    itself (KFCActionComponent) - one answer for both. */
-	std::vector<int32> RowsOfRightClick(int32 chapterIdx, int32 hitIdx);
+	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES (O18): every row selected together, by document in the order drawn, when
+	    the hit row right-clicked is one of several selected; else that row alone. Asked by the menu's grey state and by
+	    the Replace itself (KFCActionComponent) - one answer for both. */
+	KFCRowsByChapter RowsOfRightClick(int32 chapterIdx, int32 hitIdx);
 
-	/** THE ROW SELECTED LAST among these rows of the chapter - the one the page shows (FollowModifiedClick,
-	    ExtendSelection): where the last click or Shift+arrow left the selection, while it is one of them; else the last
-	    of them. -1 for none. A right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */
-	int32 LastSelectedHit(int32 chapterIdx, const std::vector<int32>& hitIdxs);
+	/** SELECT ALL ROWS (a book, document or story row's right-click menu - the author's call of 2026-10-11): every hit row
+	    under `row` selected - its rows expanded first, as a run walks what is drawn - for Return to replace them all
+	    together (O18). The page does not jump (the rows are the list's selection, not the page's); the message area says
+	    how many were selected. false = none under it. */
+	bool SelectAllRows(const NodeID& row);
+
+	/** The BOOK row's right-click stash for Select All Rows (KFCResultNodeEH::RButtonDn sets it, clears it with the
+	    model's stashes): the book's rows are every row of the list, so a flag is all it needs. */
+	void SetContextMenuBook(bool rightClicked);
+	bool GetContextMenuBook();
+
+	/** THE ROW SELECTED LAST among these rows - the one the page shows (FollowModifiedClick, ExtendSelection): where the
+	    last click or Shift+arrow left the selection, while it is one of them; else the last of them. false for none. A
+	    right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */
+	bool LastSelectedHit(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit);
 
 	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - the row added jumped to as a
 	    click jumps (KFCJump::ActivateNode: the page shows the row selected last, a text row's match or an object row's
-	    item), a row taken away leaving the page as it is - or the message area says why the row could not be added
-	    (another document). Nothing for a story, document or book row. */
+	    item, its document in front), a row taken away leaving the page as it is. Nothing for a story, document or book
+	    row. */
 	void FollowModifiedClick(const NodeID& clicked);
 
 	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's calls of 2026-10-10): the run of hit rows grown or
-	    shrunk by one row at its moving end - the run's other end stays where it began; a story row of the document is
-	    passed over - and the page following (the moving end's jump, text and object rows alike). A row that cannot join
-	    stops it (the message area says why for another document). false = not a run of hit
+	    shrunk by one row at its moving end - the run's other end stays where it began; story, document and book rows are
+	    passed over, into the next story's and the next document's rows - and the page following (the moving end's jump,
+	    text and object rows alike). false = not a run of hit
 	    rows: the key is not this function's. */
 	bool ExtendSelection(ITreeViewController* controller, bool down);
 

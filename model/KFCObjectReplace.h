@@ -21,6 +21,7 @@
 
 #include "PMString.h"
 #include "UIDRef.h"
+#include "KFCModelTypes.h"		// KFCRowsByChapter
 
 #include <vector>
 
@@ -39,18 +40,22 @@ namespace KFCObjectReplace
 	    item selected (the author's call of 2026-10-10). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** SEVERAL OBJECT ROWS OF ONE DOCUMENT REPLACED TOGETHER (O18 - the author's call of 2026-10-10: the rows selected
-	    together are replaced together). Steps 1-2 asked once; 3-5 row by row - a row that fails is left as it is and
-	    counted by its reason, the others written in ONE walk (InDesign's own matching, its replace on each row's item as
-	    the walk stands on it) and ONE undo step with KFC's undo mark in it; each written row Changed with its item's new
-	    fingerprint. outStatus: "Replaced 3 objects: ID:259, ID:260, ID:261." - or "Replaced 3 of 5 objects: ... Left as
-	    they were: 1 locked, 1 changed since the search."; a refusal when none could be written. One row = ReplaceRow.
-	    True when something was written. */
-	bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
+	/** SEVERAL OBJECT ROWS REPLACED TOGETHER (O18 - the author's calls of 2026-10-10: the rows selected together are
+	    replaced together, of one document or several, as Change Checked's ticked rows were). Steps 1-2 asked once; 3-5
+	    row by row - a row that fails is left as it is and counted by its reason, the others written in ONE walk of each
+	    document (InDesign's own matching, its replace on each row's item as the walk stands on it) and ONE undo step with
+	    KFC's undo mark in it for every document written - one document's a plain sequence, several documents' one
+	    abortable sequence around them all (KFCReplaceEngine.cpp, ReplaceRowsNow's note); each written row Changed with its
+	    item's new fingerprint; a chapter of ours written is given a window, one not written handed back.
+	    outStatus: "Replaced 3 objects: ID:259, ID:260, ID:261." - or "Replaced 3 of 5 objects: ... Left as they were:
+	    1 locked, 1 changed since the search." / "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd
+	    ID:12."; a refusal when none could be written. One row = ReplaceRow. True when something was written. */
+	bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus);
 
-	/** ReplaceRows asked before its window is brought forward, nothing written: true at the first row that would be
-	    written; false = none would, outStatus says why (the reasons counted). One row = CheckRowNow. */
-	bool CheckRowsNow(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
+	/** ReplaceRows asked before a window is brought forward, nothing written: true at the first row that would be
+	    written; false = none would, outStatus says why (the reasons counted), and what the checks reached is handed back.
+	    One row = CheckRowNow. */
+	bool CheckRowsNow(const KFCRowsByChapter& rows, PMString& outStatus);
 
 	/** InDesign's Change All on the Object tab over one document (O13, O14): ReplaceAllObject with the shared walker aimed
 	    at it. outReplaced = what InDesign changed fully or in part; outPartially = in part. false = InDesign failed. The

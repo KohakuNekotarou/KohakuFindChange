@@ -582,11 +582,23 @@ void KFCUndoFollow::MarkWrite(IDataBase* db)
 KFCUndoFollow::StepRecorder::StepRecorder(int32 chapterIdx)
 	: fOpen(true)
 {
+	Open(std::vector<int32>(1, chapterIdx));
+}
+
+KFCUndoFollow::StepRecorder::StepRecorder(const std::vector<int32>& chapterIdxs)
+	: fOpen(true)
+{
+	Open(chapterIdxs);
+}
+
+void KFCUndoFollow::StepRecorder::Open(const std::vector<int32>& chapterIdxs)
+{
 	CloseRecording();
 	gRecording = true;
 	gPendingResultSet = KFCResultModel::GetResultSetId();
 	gPendingLayout = KFCResultModel::GetLayoutGeneration();
-	ReadChapterStories(chapterIdx, gPendingStories);
+	for (size_t k = 0; k < chapterIdxs.size(); ++k)
+		ReadChapterStories(chapterIdxs[k], gPendingStories);
 	KFCResultModel::BeginRowBackup();
 }
 

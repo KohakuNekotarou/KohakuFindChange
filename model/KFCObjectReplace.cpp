@@ -353,33 +353,104 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	return true;
 }
 
-bool KFCObjectReplace::CheckRowsNow(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus)
+namespace
+{
+
+// ONE DOCUMENT'S OBJECT ROWS in a Replace of rows selected together (CheckRowsNow / ReplaceRows): its rows that pass the
+// checks, with their items, and what the write did to them.
+struct ObjectChapterWrite
+{
+	int32								chapterIdx;
+	UIDRef								docRef;			// reached by CheckItem (a closed chapter reopened windowless, held)
+	bool								wasModified;	// its "unsaved" flag before the step
+	std::vector<std::pair<int32, UID> >	todo;			// (the row, its item)
+	std::set<UID>						written;
+	ObjectChapterWrite() : chapterIdx(-1), wasModified(false) {}
+};
+
+// WHAT EACH DOCUMENT IS LEFT AS (the text rows' ChaptersAfter, KFCReplaceEngine.cpp): written - a chapter of ours is given
+// a window, to be seen and saved; not written - a flag the checks raised is put back on a document that was clean, and a
+// chapter of ours is handed back.
+void LeaveObjectChapters(const std::vector<ObjectChapterWrite>& chapters)
+{
+	for (size_t k = 0; k < chapters.size(); ++k)
+	{
+		const ObjectChapterWrite& c = chapters[k];
+		if (c.docRef.GetDataBase() == nil)
+			continue;
+		if (!c.written.empty())
+		{
+			if (KFCBookScope::IsHeldDoc(c.docRef))
+				(void)KFCBookScope::ShowChapterWindow(c.docRef);
+			continue;
+		}
+		if (!c.todo.empty() && !c.wasModified && KFCBookScope::IsDocStillOpen(c.docRef))
+			c.docRef.GetDataBase()->SetModified(kFalse);
+		HandBackIfHeld(c.docRef);
+	}
+}
+
+size_t RowCount(const KFCRowsByChapter& rows)
+{
+	size_t total = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+		total += rows[k].second.size();
+	return total;
+}
+
+// The one row of rows selected together that holds one (a Ctrl+click left a chapter's list empty).
+bool TheOneRow(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (!rows[k].second.empty())
+		{
+			outChapter = rows[k].first;
+			outHit = rows[k].second[0];
+			return true;
+		}
+	return false;
+}
+
+}	// anonymous namespace
+
+bool KFCObjectReplace::CheckRowsNow(const KFCRowsByChapter& rows, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	if (hitIdxs.size() == 1)
-		return CheckRowNow(chapterIdx, hitIdxs[0], outStatus);
+	const size_t total = RowCount(rows);
+	int32 oneChapter = -1, oneHit = -1;
+	if (total == 1 && TheOneRow(rows, oneChapter, oneHit))
+		return CheckRowNow(oneChapter, oneHit, outStatus);
 	if (!CheckSettings(outStatus))
 		return false;
-	// Yes at the first row that would be written; the rest are asked again by the write itself (ReplaceRows).
+	// Yes at the first row that would be written; the rest are asked again by the write itself (ReplaceRows), which
+	// hands back what it reached and did not write.
 	int32 counts[kRefusalCount] = {};
-	UIDRef docRef;
-	for (size_t k = 0; k < hitIdxs.size(); ++k)
+	std::vector<UIDRef> reached;
+	for (size_t c = 0; c < rows.size(); ++c)
 	{
-		if (!RowIsReplaceable(chapterIdx, hitIdxs[k]))
+		const int32 chapterIdx = rows[c].first;
+		const std::vector<int32>& hitIdxs = rows[c].second;
+		UIDRef docRef;
+		for (size_t k = 0; k < hitIdxs.size(); ++k)
 		{
-			++counts[GreyedRefusal(chapterIdx, hitIdxs[k])];
-			continue;
+			if (!RowIsReplaceable(chapterIdx, hitIdxs[k]))
+			{
+				++counts[GreyedRefusal(chapterIdx, hitIdxs[k])];
+				continue;
+			}
+			UID item = kInvalidUID;
+			const Refusal why = CheckItem(chapterIdx, hitIdxs[k], docRef, item);
+			if (why == kRefusedNone)
+				return true;
+			++counts[why];
 		}
-		UID item = kInvalidUID;
-		const Refusal why = CheckItem(chapterIdx, hitIdxs[k], docRef, item);
-		if (why == kRefusedNone)
-			return true;
-		++counts[why];
+		reached.push_back(docRef);
 	}
-	HandBackIfHeld(docRef);
+	for (size_t k = 0; k < reached.size(); ++k)
+		HandBackIfHeld(reached[k]);
 	outStatus = "Replace: none of the ";
-	outStatus.AppendNumber(static_cast<int32>(hitIdxs.size()));
+	outStatus.AppendNumber(static_cast<int32>(total));
 	outStatus.Append(" selected rows can be replaced - ");
 	AppendRefusals(outStatus, counts);
 	outStatus.Append(".");
@@ -387,14 +458,16 @@ bool KFCObjectReplace::CheckRowsNow(int32 chapterIdx, const std::vector<int32>& 
 	return false;
 }
 
-bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus)
+bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
+	const size_t total = RowCount(rows);
 	// ONE ROW is the row's own Replace, word for word.
-	if (hitIdxs.size() == 1)
-		return ReplaceRow(chapterIdx, hitIdxs[0], outStatus);
-	if (hitIdxs.empty())
+	int32 oneChapter = -1, oneHit = -1;
+	if (total == 1 && TheOneRow(rows, oneChapter, oneHit))
+		return ReplaceRow(oneChapter, oneHit, outStatus);
+	if (total == 0)
 		return false;
 	// Forward, as the search was - outside the sequence (KFCForwardSearchScope's contract).
 	KFCForwardSearchScope forward;
@@ -403,70 +476,109 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 
 	// O10 steps 3-5, row by row: the rows that pass are written, the rest are counted by their reason.
 	int32 counts[kRefusalCount] = {};
-	UIDRef docRef;
-	std::vector<std::pair<int32, UID> > todo;		// (the row, its item)
-	for (size_t k = 0; k < hitIdxs.size(); ++k)
+	std::vector<ObjectChapterWrite> chapters(rows.size());
+	size_t toWrite = 0, documents = 0;
+	for (size_t c = 0; c < rows.size(); ++c)
 	{
-		if (!RowIsReplaceable(chapterIdx, hitIdxs[k]))
+		ObjectChapterWrite& chapter = chapters[c];
+		chapter.chapterIdx = rows[c].first;
+		const std::vector<int32>& hitIdxs = rows[c].second;
+		for (size_t k = 0; k < hitIdxs.size(); ++k)
 		{
-			++counts[GreyedRefusal(chapterIdx, hitIdxs[k])];
-			continue;
+			if (!RowIsReplaceable(chapter.chapterIdx, hitIdxs[k]))
+			{
+				++counts[GreyedRefusal(chapter.chapterIdx, hitIdxs[k])];
+				continue;
+			}
+			UID item = kInvalidUID;
+			const Refusal why = CheckItem(chapter.chapterIdx, hitIdxs[k], chapter.docRef, item);
+			if (why != kRefusedNone)
+			{
+				++counts[why];
+				continue;
+			}
+			chapter.todo.push_back(std::make_pair(hitIdxs[k], item));
 		}
-		UID item = kInvalidUID;
-		const Refusal why = CheckItem(chapterIdx, hitIdxs[k], docRef, item);
-		if (why != kRefusedNone)
+		if (!chapter.todo.empty())
 		{
-			++counts[why];
-			continue;
+			toWrite += chapter.todo.size();
+			++documents;
+			chapter.wasModified = chapter.docRef.GetDataBase()->IsModified() != kFalse;
 		}
-		todo.push_back(std::make_pair(hitIdxs[k], item));
 	}
-	if (todo.empty())
+	if (toWrite == 0)
 	{
-		HandBackIfHeld(docRef);
+		LeaveObjectChapters(chapters);
 		outStatus = "Replace: none of the ";
-		outStatus.AppendNumber(static_cast<int32>(hitIdxs.size()));
+		outStatus.AppendNumber(static_cast<int32>(total));
 		outStatus.Append(" selected rows can be replaced - ");
 		AppendRefusals(outStatus, counts);
 		outStatus.Append(".");
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	IDataBase* const db = docRef.GetDataBase();
-	const bool wasModified = db->IsModified() != kFalse;
 	InterfacePtr<IFindChangeService> svc(KFCObjectSearch::CreateFindChangeService());
 	InterfacePtr<IObjectWalker> shared(KFCObjectSearch::QuerySharedWalker());
 	if (svc == nil || shared == nil)
 	{
+		LeaveObjectChapters(chapters);
 		Refuse(outStatus, "InDesign's object search could not be reached - nothing was changed.");
 		return false;
 	}
-	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (O11): one step, every item's fingerprint read before the write.
-	KFCUndoFollow::StepRecorder recorder(chapterIdx);
-	std::set<UID> wanted;
-	for (size_t k = 0; k < todo.size(); ++k)
+	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (O11): one step, every item's fingerprint read before the write - of
+	// every document it writes.
+	std::vector<int32> chapterIdxs;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		if (!chapters[c].todo.empty())
+			chapterIdxs.push_back(chapters[c].chapterIdx);
+	KFCUndoFollow::StepRecorder recorder(chapterIdxs);
+	for (size_t c = 0; c < chapters.size(); ++c)
+		for (size_t k = 0; k < chapters[c].todo.size(); ++k)
+			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].todo[k].second);
+	// ONE STEP. One document keeps the plain sequence its rows have always had; SEVERAL documents are one abortable
+	// sequence around every document's walk and none inside it - Change Checked's measured rule for a step across
+	// documents (KFCReplaceEngine.cpp, ReplaceRowsNow's note).
+	const bool acrossDocuments = documents > 1;
+	const PMString stepName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
+	ICommandSequence* sequence = nil;
+	IAbortableCmdSeq* acrossSequence = nil;
+	if (acrossDocuments)
 	{
-		recorder.RecordItem(chapterIdx, todo[k].second);
-		wanted.insert(todo[k].second);
+		acrossSequence = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
+		if (acrossSequence != nil)
+			acrossSequence->SetName(stepName);
 	}
-	ICommandSequence* const sequence = CmdUtils::BeginCommandSequence("KFC Replace");
-	if (sequence == nil)
+	else
 	{
+		sequence = CmdUtils::BeginCommandSequence("KFC Replace");
+		if (sequence != nil)
+			sequence->SetName(stepName);
+	}
+	if (sequence == nil && acrossSequence == nil)
+	{
+		LeaveObjectChapters(chapters);
 		Refuse(outStatus, "InDesign would not start a command sequence - nothing was changed.");
 		return false;
 	}
-	sequence->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
-	std::set<UID> written, refusedByInDesign;
 	bool errorStands = false;		// InDesign left the error state raised: the step is rolled back whole
 	bool searchError = false;		// ...raised by the walk's search rather than by a replace
-	bool walkFailed = false;		// the walk broke off before every item was met (WalkBroke)
+	size_t writtenCount = 0;
+	const bool walkMisses = KFC_DIAG_FAULT("object-walk-miss");	// (a test build's: no item reached - oca-walk-miss)
+	for (size_t c = 0; c < chapters.size() && !errorStands; ++c)
 	{
-		// 7-8 FOR EVERY ROW IN ONE WALK: InDesign's own matching from the document's first match, and its replace on each
-		// row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when every item has
-		// been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5).
-		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
+		ObjectChapterWrite& chapter = chapters[c];
+		if (chapter.todo.empty())
+			continue;
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		std::set<UID> wanted, refusedByInDesign;
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+			wanted.insert(chapter.todo[k].second);
+		bool walkFailed = false;		// the walk broke off before every item was met (WalkBroke)
+		// 7-8 FOR EVERY ROW IN ONE WALK of its document: InDesign's own matching from the document's first match, and its
+		// replace on each row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when
+		// every item has been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5).
+		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(chapter.docRef, nil));
 		std::set<UID> seen;
-		const bool walkMisses = KFC_DIAG_FAULT("object-walk-miss");	// (a test build's: no item reached - oca-walk-miss)
 		while (!walkMisses)
 		{
 			UIDRef found;
@@ -482,7 +594,7 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 			if (wanted.count(current.GetUID()) == 0)
 				continue;
 			const bool replacedIt = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess);
-			// The error state too, as one row's write asks it (ReplaceRow's step 8): the sequence ends by it, so with one
+			// The error state too, as one row's write asks it (ReplaceRow's step 8): the step ends by it, so with one
 			// standing the whole step goes back - and nothing more is written into it.
 			if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 			{
@@ -490,39 +602,56 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 				break;
 			}
 			if (replacedIt)
-				written.insert(current.GetUID());
+				chapter.written.insert(current.GetUID());
 			else
 				refusedByInDesign.insert(current.GetUID());
-			if (written.size() + refusedByInDesign.size() == wanted.size())
+			if (chapter.written.size() + refusedByInDesign.size() == wanted.size())
 				break;
 		}
 		// ...AND AFTER THE WALK (the header re-read 102's find, 2026-10-10): a search step that broke off with the error state
-		// raised, after rows were written, ends the sequence by that error just the same - the whole step goes back, so the
+		// raised, after rows were written, ends the step by that error just the same - the whole step goes back, so the
 		// rows are not marked Changed, and no mark is put over the error (MarkWrite).
 		if (!errorStands && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			errorStands = true;
 			searchError = true;
 		}
-		if (!written.empty() && !errorStands)
-			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
+		writtenCount += chapter.written.size();
+		counts[kRefusedNotWritten] += static_cast<int32>(refusedByInDesign.size());
+		counts[walkFailed ? kRefusedWalkFailed : kRefusedNotReached]
+			+= static_cast<int32>(wanted.size() - chapter.written.size() - refusedByInDesign.size());
 	}
-	// The plain sequence's end, rolled back when nothing was written or an error stands - KFCReplaceEngine's
-	// EndPlainSequence.
-	const bool ok = !written.empty() && !errorStands;
-	if (!ok)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (!ok && !wasModified)
-		db->SetModified(kFalse);
+	const bool ok = writtenCount > 0 && !errorStands;
+	if (ok)
+		for (size_t c = 0; c < chapters.size(); ++c)
+			if (!chapters[c].written.empty())
+				KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());		// in this step, so its Undo / Redo is heard
+	if (acrossDocuments)
+	{
+		// Ended, or taken back whole across the documents (AbortCommandSequence - the error state does not carry a
+		// rollback across them); no error left standing for the application to report again.
+		if (ok)
+			CmdUtils::EndCommandSequence(acrossSequence);
+		else
+			CmdUtils::AbortCommandSequence(acrossSequence);
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
+	else
+	{
+		// The plain sequence's end, rolled back when nothing was written or an error stands - KFCReplaceEngine's
+		// EndPlainSequence.
+		if (!ok)
+			ErrorUtils::PMSetGlobalErrorCode(kFailure);
+		CmdUtils::EndCommandSequence(sequence);
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
 	KFCObjectSearch::AimSharedWalkerAtFront();		// 11 (O7)
-	counts[kRefusedNotWritten] += static_cast<int32>(refusedByInDesign.size());
-	counts[walkFailed ? kRefusedWalkFailed : kRefusedNotReached]
-		+= static_cast<int32>(wanted.size() - written.size() - refusedByInDesign.size());
 	if (!ok)
 	{
+		for (size_t c = 0; c < chapters.size(); ++c)
+			chapters[c].written.clear();		// rolled back: nothing of it is in the documents
 		KFCResultModel::RollBackRows();
+		LeaveObjectChapters(chapters);
 		if (errorStands)
 		{
 			Refuse(outStatus, searchError ? "InDesign's search stopped with an error - nothing was changed."
@@ -536,40 +665,83 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 		return false;
 	}
 	// 10. Each written row Changed, with its item as the write left it; the message names the items (REP-22's form).
-	std::vector<UID> named;
-	for (size_t k = 0; k < todo.size(); ++k)
+	for (size_t c = 0; c < chapters.size(); ++c)
 	{
-		if (written.count(todo[k].second) == 0)
-			continue;
-		uint64 print = 0;
-		uint32 length = 0;
-		(void)KFCObjectSearch::Fingerprint(UIDRef(db, todo[k].second), print, length);
-		KFCResultModel::MarkItemReplaced(chapterIdx, todo[k].first, print, length);
-		named.push_back(todo[k].second);
+		const ObjectChapterWrite& chapter = chapters[c];
+		IDataBase* const db = chapter.docRef.GetDataBase();
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+		{
+			if (chapter.written.count(chapter.todo[k].second) == 0)
+				continue;
+			uint64 print = 0;
+			uint32 length = 0;
+			(void)KFCObjectSearch::Fingerprint(UIDRef(db, chapter.todo[k].second), print, length);
+			KFCResultModel::MarkItemReplaced(chapter.chapterIdx, chapter.todo[k].first, print, length);
+		}
 	}
 	recorder.Keep(KFCUndoFollow::kStepReplace);
+	LeaveObjectChapters(chapters);
 	// "Replaced 3 objects: ID:259, ID:260, ID:261." - and, when some were left, "Replaced 3 of 5 objects: ... Left as they
-	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs.
+	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs. Objects of several documents name
+	// each document before its IDs (2026-10-10 night): "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260;
+	// b.indd ID:12."
 	const size_t kNamedIDs = 8;
 	outStatus = "Replaced ";
-	outStatus.AppendNumber(static_cast<int32>(named.size()));
-	if (named.size() < hitIdxs.size())
+	outStatus.AppendNumber(static_cast<int32>(writtenCount));
+	if (writtenCount < total)
 	{
 		outStatus.Append(" of ");
-		outStatus.AppendNumber(static_cast<int32>(hitIdxs.size()));
+		outStatus.AppendNumber(static_cast<int32>(total));
 	}
-	outStatus.Append(" objects: ");
-	for (size_t k = 0; k < named.size() && k < kNamedIDs; ++k)
+	outStatus.Append(" objects");
+	size_t writtenDocuments = 0;
+	for (size_t c = 0; c < chapters.size(); ++c)
+		if (!chapters[c].written.empty())
+			++writtenDocuments;
+	if (writtenDocuments > 1)
 	{
-		if (k > 0)
-			outStatus.Append(", ");
-		outStatus.Append("ID:");
-		outStatus.AppendNumber(static_cast<int32>(named[k].Get()));
+		outStatus.Append(" in ");
+		outStatus.AppendNumber(static_cast<int32>(writtenDocuments));
+		outStatus.Append(" documents");
 	}
-	if (named.size() > kNamedIDs)
+	outStatus.Append(": ");
+	size_t named = 0;
+	bool firstDocument = true;
+	for (size_t c = 0; c < chapters.size() && named < kNamedIDs; ++c)
+	{
+		const ObjectChapterWrite& chapter = chapters[c];
+		if (chapter.written.empty())
+			continue;
+		bool first = true;
+		if (writtenDocuments > 1)
+		{
+			if (!firstDocument)
+				outStatus.Append("; ");
+			PMString docName;
+			int32 rowsNow = 0;
+			if (KFCResultModel::GetChapterDisplay(chapter.chapterIdx, docName, rowsNow))
+			{
+				outStatus.Append(docName);
+				outStatus.Append(" ");
+			}
+		}
+		firstDocument = false;
+		for (size_t k = 0; k < chapter.todo.size() && named < kNamedIDs; ++k)
+		{
+			if (chapter.written.count(chapter.todo[k].second) == 0)
+				continue;
+			if (!first || (writtenDocuments <= 1 && named > 0))
+				outStatus.Append(", ");
+			outStatus.Append("ID:");
+			outStatus.AppendNumber(static_cast<int32>(chapter.todo[k].second.Get()));
+			first = false;
+			++named;
+		}
+	}
+	if (writtenCount > kNamedIDs)
 		outStatus.Append(", ...");
 	outStatus.Append(".");
-	if (named.size() < hitIdxs.size())
+	if (writtenCount < total)
 	{
 		outStatus.Append(" Left as they were: ");
 		AppendRefusals(outStatus, counts);

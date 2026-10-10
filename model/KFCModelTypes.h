@@ -23,6 +23,9 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
+#include <utility>			// KFCRowsByChapter
+#include <vector>
+
 namespace KFCResultModel
 {
 	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9 - the
@@ -126,5 +129,10 @@ struct KFCSavedQuery
 
 	KFCSavedQuery() : mode(-1), bundled(false), exists(false) {}
 };
+
+// HIT ROWS SELECTED TOGETHER, by document (1.4.0 - O18, the author's call of 2026-10-10 night: rows of several documents
+// replaced together, as Change Checked's ticked rows were): each chapter of the result model with its hit rows, in the
+// order the list draws them.
+typedef std::vector<std::pair<int32, std::vector<int32> > > KFCRowsByChapter;
 
 #endif // __KFCModelTypes_h__

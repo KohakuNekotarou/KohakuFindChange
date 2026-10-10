@@ -115,8 +115,8 @@ public:
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }
 	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
 	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }
-	virtual bool CheckObjectReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCObjectReplace::CheckRowsNow(chapterIdx, hitIdxs, outStatus); }
-	virtual bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCReplaceEngine::ReplaceHits(chapterIdx, hitIdxs, outStatus); }
+	virtual bool CheckObjectReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCObjectReplace::CheckRowsNow(rows, outStatus); }
+	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) { return KFCReplaceEngine::ReplaceHits(rows, outStatus); }
 	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) { return KFCSearchEngine::SearchDocumentAgain(chapterIdx, outStatus); }
 };
 
