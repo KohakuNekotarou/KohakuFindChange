@@ -93,6 +93,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeController.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCDiagHiddenDocs.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTreeEH.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -192,6 +195,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultNodeID.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCDiagHiddenDocs.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCResultTree.h">

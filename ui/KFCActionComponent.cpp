@@ -47,6 +47,7 @@
 #include "KFCBookPanelPlacement.h"	// "Remember Book Panel Placement" - InDesign's own Book panel
 #include "KFCQueryDialog.h"		// "Run Saved Queries..." - the query dialog
 #include "KFCDiag.h"				// a test build's UIOBS line (KFCDiagCounter)
+#include "KFCDiagHiddenDocs.h"		// the hidden-document check after an action - test builds only
 
 /** Implements IActionComponent; performs the actions that are executed when the plug-in's
 	menu items are selected.
@@ -123,6 +124,7 @@ KFCActionComponent::KFCActionComponent(IPMUnknown* boss)
 */
 void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoint mousePoint, IPMUnknown* widget)
 {
+	KFC_DIAG_HIDDEN_DOCS_CHECK("action");		// (test builds only - a document left with no window when the action is over)
 	switch (actionID.Get())
 	{
 
@@ -333,8 +335,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1, hit = -1;
 			if (KFCResults()->GetContextMenuHit(chapter, hit))
 			{
-				// The row right-clicked is one of several object rows selected together: all of them (O18 - the author's
-				// call of 2026-10-10). Any other row: that row alone.
+				// The row right-clicked is one of several rows selected together: all of them (O18 - the author's calls of
+				// 2026-10-10, object rows and then text rows). Any other row: that row alone.
 				std::vector<int32> rows;
 				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
 					(void)KFCResultTree::ReplaceRows(chapter, rows);
@@ -561,7 +563,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			bool enable = KFCResults()->GetContextMenuHit(chapter, hit);
 			if (enable)
 			{
-				// Several object rows selected together, the right-clicked among them: while any of them can be (O18).
+				// Several rows selected together, the right-clicked among them: while any of them can be (O18).
 				std::vector<int32> rows;
 				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
 				{

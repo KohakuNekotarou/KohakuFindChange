@@ -8,7 +8,7 @@
 //
 //    * BRANCH rows (from kKFCResultChapterNodeWidgetRsrcID): an expander arrow and a label. The
 //      BOOK row, the DOCUMENT rows ("<name>  (R/N)") and the STORY rows (the code's FONT
-//      rows - "ID 260: first words...  (R/N)") are all this one shape at different indents, so no level
+//      rows - "ID260: first words...  (R/N)") are all this one shape at different indents, so no level
 //      needed a resource of its own.
 //      The expander is hidden on a row with no children, which DOES happen: a book search that
 //      finds nothing still draws its book row (the adapter gives the root one child whenever the
@@ -406,7 +406,7 @@ private:
 		if (!KFCResults()->GetFontDisplay(nodeID->GetChapter(), nodeID->GetFont(), name, fullCount))
 			return;
 
-		// "ID 260: first words...  (R/N)", the way a document row reads out its count, like the rows
+		// "ID260: first words...  (R/N)", the way a document row reads out its count, like the rows
 		// above it: what the row holds, not what the panel drew of it. (A group that answered
 		// GetFontDisplay is in range - no further test needed.)
 		PMString label(name);
@@ -965,17 +965,28 @@ bool KFCResultTree::TakeKeyboard()
 
 bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus)
 {
-	if (RefusedWhileRunning())
+	return ReplaceRows(chapterIdx, std::vector<int32>(1, hitIdx), outStatus);
+}
+
+bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus)
+{
+	if (hitIdxs.empty() || RefusedWhileRunning())
 		return false;
-	if (!KFCRuns()->CanReplaceHit(chapterIdx, hitIdx))
+	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then.
+	bool any = false;
+	for (size_t k = 0; k < hitIdxs.size() && !any; ++k)
+		any = KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]);
+	if (!any)
 		return false;
 	PMString status;
-	KFC_DIAG_LOG("RETFOCUS ReplaceRow begin focus=%s", DiagKeyFocus().c_str());
-	// AN OBJECT ROW (1.4.0) is replaced through the jump's machinery - its document fronted around the write (KFCJump).
-	const bool wrote = (KFCResults()->GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
-		? KFCJump::ReplaceObjectRow(chapterIdx, hitIdx, status)
-		: KFCRuns()->ReplaceHit(chapterIdx, hitIdx, status);	// no prompt (the author's call)
-	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the write focus=%s", DiagKeyFocus().c_str());
+	KFC_DIAG_LOG("RETFOCUS ReplaceRows begin focus=%s", DiagKeyFocus().c_str());
+	// OBJECT ROWS (1.4.0) are replaced through the jump's machinery - their document fronted around the write (KFCJump);
+	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
+	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
+	const bool wrote = (KFCResults()->GetHitItem(chapterIdx, hitIdxs[0]) != kInvalidUID)
+		? KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, status)
+		: KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, status);	// no prompt (the author's call)
+	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
 	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
 	// write is over (a book chapter the Replace reopened has been given its window by then).
@@ -991,42 +1002,10 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStat
 		RefreshRows();
 	else
 		Rebuild();
-	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the repaint focus=%s", DiagKeyFocus().c_str());
+	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the repaint focus=%s", DiagKeyFocus().c_str());
 	if (!status.IsEmpty())		// (an object row dropped while a landing is under way says nothing; a text row always does)
 		ShowStatus(status);
-	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the status focus=%s", DiagKeyFocus().c_str());
-	if (outStatus != nil)
-		*outStatus = status;
-	return wrote;
-}
-
-bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus)
-{
-	if (hitIdxs.size() == 1)
-		return ReplaceRow(chapterIdx, hitIdxs[0], outStatus);
-	if (hitIdxs.empty() || RefusedWhileRunning())
-		return false;
-	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then,
-	// as on one row that cannot be replaced.
-	bool any = false;
-	for (size_t k = 0; k < hitIdxs.size() && !any; ++k)
-		any = KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]);
-	if (!any)
-		return false;
-	PMString status;
-	const bool wrote = KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, status);
-	// The same notes and repaint as one row's (ReplaceRow).
-	UIDRef docRef;
-	IDFile file;
-	if (wrote && KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
-		&& !KFCChapters()->HasWindow(docRef))
-		status.Append(" The document has no window - still hidden.");
-	if (KFCResults()->HasRun())
-		RefreshRows();
-	else
-		Rebuild();
-	if (!status.IsEmpty())
-		ShowStatus(status);
+	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the status focus=%s", DiagKeyFocus().c_str());
 	if (outStatus != nil)
 		*outStatus = status;
 	return wrote;

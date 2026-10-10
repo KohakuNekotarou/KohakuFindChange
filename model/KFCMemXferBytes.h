@@ -38,7 +38,8 @@ public:
 	*/
 	virtual uint32 Read(void* buffer, uint32 num);
 
-	/** See IXferBytes::Write. Grows the buffer as needed, so a caller never has to size it. */
+	/** See IXferBytes::Write. Grows the buffer as needed, so a caller never has to size it; one that cannot grow fails
+		the write (0 transferred, the stream failed) - no exception leaves it. */
 	virtual uint32 Write(void* buffer, uint32 num);
 
 	/** See IXferBytes::Seek. Seeking past the end is allowed and does not grow the buffer -

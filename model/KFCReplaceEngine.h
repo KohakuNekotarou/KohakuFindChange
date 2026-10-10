@@ -33,6 +33,8 @@
 #include "PMString.h"
 #include "UIDRef.h"
 
+#include <vector>
+
 namespace KFCReplaceEngine
 {
 
@@ -93,9 +95,25 @@ namespace KFCReplaceEngine
 	    opened, or the row would not be replaced (locked since, missing, refused). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
+	/** THE ROWS SELECTED TOGETHER (O18 - the author's call of 2026-10-10), all of one document and one kind, in ONE undo
+	    step: object rows by KFCObjectReplace::ReplaceRows (row by row - a row that cannot be written is left and
+	    counted); text rows whose Replace is greyed are left and counted, and the others are written all or nothing, as
+	    ReplaceHit writes one ("Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." / "Replaced 2 of 3 rows: ... Left as
+	    they were: 1 locked."; a refusal names "a selected row"). One row = ReplaceHit. */
+	bool ReplaceHits(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
+
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
 	    outcome. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
+
+	/** WHY A ROW'S REPLACE IS GREYED (CanReplaceHit says no), as its row shows it - Changed, Missing, locked, refused -
+	    for the rows left by a Replace of rows selected together, counted by reason (O18 - the author's call of
+	    2026-10-10: "1 already replaced, 1 locked" rather than one "already replaced or locked" for all of them, which
+	    named a row reading Missing as one of those). One reason a row: replaced, then missing, then locked, then refused
+	    (a locked row a jump found changed reads "Missing ... locked" - missing is what keeps it from being written).
+	    kGreyedNot when the row can be replaced. Text and object rows alike (KFCObjectReplace counts its rows by it). */
+	enum GreyedReason { kGreyedNot = 0, kGreyedReplaced, kGreyedMissing, kGreyedLocked, kGreyedRefused, kGreyedReasonCount };
+	GreyedReason WhyGreyed(int32 chapterIdx, int32 hitIdx);
 
 	/** A GREP row's AFTER-TEXT: what the row's Replace would write at its place, read from a write that is
 	    then thrown away (an aborted sequence - no undo step, the text, the story's version, the rows and the modified

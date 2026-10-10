@@ -74,6 +74,12 @@ public:
 	virtual bool IsSelectedDocumentsOn() = 0;
 	/** = KFCBookScope::SetSelectedDocumentsOn - just the flag. */
 	virtual void SetSelectedDocumentsOn(bool on) = 0;
+	/** = KFCBookScope::HandBackIfHeld (appended, 1.4.0 - 2026-10-10): a landing that reached a chapter and is leaving it
+	    without its window hands it back (KFCJump's HandBackChapterOnExit). */
+	virtual void HandBackIfHeld(const UIDRef& docRef) = 0;
+	/** = KFCBookScope::IsHeldDoc (appended, 1.4.0 - 2026-10-10): asked by the test build's hidden-document check
+	    (ui/KFCDiagHiddenDocs.cpp). */
+	virtual bool IsHeldDoc(const UIDRef& docRef) = 0;
 };
 
 #endif // __IKFCChapters_h__

@@ -115,7 +115,7 @@ public:
 	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
 	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }
 	virtual bool CheckObjectReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCObjectReplace::CheckRowsNow(chapterIdx, hitIdxs, outStatus); }
-	virtual bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCObjectReplace::ReplaceRows(chapterIdx, hitIdxs, outStatus); }
+	virtual bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCReplaceEngine::ReplaceHits(chapterIdx, hitIdxs, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
@@ -139,6 +139,8 @@ public:
 	virtual bool ClearMarker(IDataBase*& outDB) { return KFCHitMarker::ClearMarker(outDB); }
 	virtual bool IsSelectedDocumentsOn() { return KFCBookScope::IsSelectedDocumentsOn(); }
 	virtual void SetSelectedDocumentsOn(bool on) { KFCBookScope::SetSelectedDocumentsOn(on); }
+	virtual void HandBackIfHeld(const UIDRef& docRef) { KFCBookScope::HandBackIfHeld(docRef); }
+	virtual bool IsHeldDoc(const UIDRef& docRef) { return KFCBookScope::IsHeldDoc(docRef); }
 };
 
 CREATE_PMINTERFACE(KFCChaptersSession, kKFCChaptersImpl)

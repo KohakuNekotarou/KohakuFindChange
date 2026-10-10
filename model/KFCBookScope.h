@@ -376,6 +376,16 @@ namespace KFCBookScope
 	    Cheap - a walk of a list that holds at most a handful of entries. */
 	bool IsHeldDoc(const UIDRef& docRef);
 
+	/** A CHAPTER OF OURS HANDED BACK WHEN THE WORK ON IT ENDS WITHOUT ITS WINDOW (2026-10-10 - the author: "a hidden
+	    document left behind would be trouble"). HandBackHeldDocNow when the chapter is held; nothing for any other
+	    document. Every verdict is ReleaseHeldDoc's: closed when windowless and clean, left alone - and no longer held -
+	    with a window, kept with unsaved work. For a door that reached a chapter (ReachChapterDoc - which may reopen it
+	    windowless and hold it) and is leaving it without the window that would have made it the user's: an object row's
+	    refused Replace (KFCObjectReplace), and every landing of the UI half's (KFCJump, through IKFCChapters) whose window
+	    did not come forward. closeNow's rule applies: outside any command sequence, with no walk standing - and the
+	    caller holds nothing of the chapter's database any more (no IDataBase::SaveRestoreModifiedState left to run). */
+	void HandBackIfHeld(const UIDRef& docRef);
+
 	/** Name the chapters a run opened and could NOT hand back, appending to a status line. The
 	    companion of AppendUnopenableNote, at the other end of the same run: one says which chapters
 	    never opened, this one says which ones never closed.

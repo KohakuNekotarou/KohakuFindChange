@@ -647,6 +647,36 @@ public:
 	~ActivationGuard() { gActivating = false; }
 };
 
+// A CHAPTER THE LANDING REOPENED IS HANDED BACK UNLESS IT GOT ITS WINDOW (2026-10-10 - the author: "a hidden document left
+// behind would be trouble"). A landing on a chapter the user closed since the search reopens it windowless and held
+// (EnsureChapterReachable, or the model's own check - IKFCRuns::CheckObjectReplace); the window it brings forward makes the
+// chapter the user's (EnsureDocFrontmost -> ForgetHeldDoc). Every other way out - the window would not come forward, the
+// row could not be read - left it open with no window until the next search (measured with the fault switch
+// jump-no-front: work/kbs-regress/hid-cases.tsv). So at the end of each landing the chapter's document, if KFC still holds
+// it, goes back - the model decides how (KFCBookScope::HandBackIfHeld: closed when windowless and clean, kept with unsaved
+// work), as the text Replace's own ChapterAfter hands its chapter back on every exit (KFCReplaceEngine).
+// The chapter is asked for as the model holds it when the landing ends: every door that reaches a chapter rebinds it there
+// (RebindChapterDoc), so a chapter reopened anywhere in the landing is the one handed back.
+// DECLARED AFTER the landing's ActivationGuard (a landing dropped by that guard must not hand back what the landing in
+// progress is still opening) and BEFORE any IDataBase::SaveRestoreModifiedState on the chapter's database, so that guard
+// puts the flag back on a database still open before this can close it.
+class HandBackChapterOnExit
+{
+public:
+	explicit HandBackChapterOnExit(int32 chapterIdx) : fChapter(chapterIdx) {}
+	~HandBackChapterOnExit()
+	{
+		UIDRef docRef;
+		IDFile file;
+		if (KFCResults()->GetChapterLocation(fChapter, docRef, file))
+			KFCChapters()->HandBackIfHeld(docRef);
+	}
+private:
+	int32 fChapter;
+	HandBackChapterOnExit(const HandBackChapterOnExit&);
+	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
+};
+
 // Does a row name a place in its story? Every row the search makes does, and nothing in KFC takes one away -
 // asked anyway, because what follows (the overset test, the spread, the wax rectangle) must never be handed -1.
 bool RowHasPlace(TextIndex start, TextIndex end)
@@ -756,7 +786,10 @@ struct ScopeKeep
 	ScopeKeep() : armed(false), mode(-1), scope(-1) {}
 };
 ScopeKeep gScopeKeep;
-const long long kScopeKeepMs = 2000;
+// ONE SECOND (the author's call of 2026-10-10 - it was two): the dialog's writes came about 0.2 s after the click, and
+// again about 0.35 s after it (measured - the note above, and KeepSearchScopeAfterClick's), so one second still covers
+// them with room - and a Search: the user picks again themselves after a click is put back for half as long.
+const long long kScopeKeepMs = 1000;
 
 // Arm for an activation about to happen. One INSIDE an armed window keeps the value already held and only renews the
 // window: the arrow walk's next row can come between the dialog's write and ours, and would take the dialog's value
@@ -865,13 +898,11 @@ const char* NotSelectedWords(NotSelected why)
 // list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return
 // replaces. The document is in front and composed, inside JumpToHit's dirty guard, its selection cleared. kSelected
 // when the match is selected.
-NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
-	bool found)
+// OUT OF A CLICK'S REACH whatever the document says: locked, then hidden, then no width - the order the double click asked
+// them in (a locked zero-width match is locked). kSelected = none of the three. Asked of a match found where its row says
+// (SelectMatchOnClick), and of an overset one, which is out of reach for its own reason after these (JumpToHit).
+NotSelected OutOfReach(int32 chapterIdx, int32 hitIdx, TextIndex start, TextIndex end)
 {
-	// A row whose text is not where it says has its own sentence - the jump's "Not found" - and nothing else to add.
-	if (!found)
-		return kNotSelectedQuietly;
-	// Locked and hidden before the width, the order the double click asked them in: a locked zero-width match is locked.
 	bool locked = false, hidden = false;
 	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
 	if (locked)
@@ -880,6 +911,18 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 		return kNotSelectedHidden;
 	if (start >= end)
 		return kNotSelectedNoWidth;
+	return kSelected;
+}
+
+NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
+	bool found)
+{
+	// A row whose text is not where it says has its own sentence - the jump's "Not found" - and nothing else to add.
+	if (!found)
+		return kNotSelectedQuietly;
+	const NotSelected outOfReach = OutOfReach(chapterIdx, hitIdx, start, end);
+	if (outOfReach != kSelected)
+		return outOfReach;
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
 		return kNotSelectedQuietly;
@@ -926,6 +969,7 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 {
 	outWhy = kNotSelectedQuietly;
+	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
 	UIDRef docRef;
 	IDFile file;
 	UID storyUID = kInvalidUID;
@@ -1041,16 +1085,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		// A row whose text has gone says only the "Not found" below.
 		if (sameOccurrence)
 		{
-			bool locked = false, hidden = false;
-			KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
-			if (locked)
-				outWhy = kNotSelectedLocked;
-			else if (hidden)
-				outWhy = kNotSelectedHidden;
-			else if (start >= end)
-				outWhy = kNotSelectedNoWidth;
-			else
-				outWhy = kNotSelectedOverset;
+			const NotSelected outOfReach = OutOfReach(chapterIdx, hitIdx, start, end);
+			outWhy = (outOfReach != kSelected) ? outOfReach : kNotSelectedOverset;
 		}
 	}
 	else
@@ -1122,6 +1158,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
     JumpToHit. */
 void ShowChapter(int32 chapterIdx)
 {
+	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
 	UIDRef docRef;
 	IDFile file;
 	if (!KFCResults()->GetChapterLocation(chapterIdx, docRef, file))
@@ -1191,17 +1228,24 @@ bool ItemIsThere(const UIDRef& itemRef)
 	return hier != nil;
 }
 
+// The spread a page item stands on now (O17); kInvalidUID when none can be read (an inline in overset text).
+UID SpreadOfItem(const UIDRef& itemRef)
+{
+	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
+	if (hier == nil)
+		return kInvalidUID;
+	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
+	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
+}
+
 // THE VIEW ON THE ITEM (spec O9): its spread first - a parent page's included, the rule EnsureSpreadInView keeps - then
 // the middle of its outline scrolled to the window's centre. The document is already in front.
 void ShowItemInView(const UIDRef& itemRef)
 {
 	InterfacePtr<IControlView> frontView(Utils<ILayoutUIUtils>()->QueryFrontView());
-	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
-	if (frontView == nil || hier == nil)
+	if (frontView == nil)
 		return;
-	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-	if (spread != nil)
-		EnsureSpreadUIDInView(frontView, itemRef.GetDataBase(), ::GetUID(spread));
+	EnsureSpreadUIDInView(frontView, itemRef.GetDataBase(), SpreadOfItem(itemRef));		// (nothing for kInvalidUID)
 	InterfacePtr<IGeometry> geometry(itemRef, UseDefaultIID());
 	if (geometry == nil)
 		return;
@@ -1241,16 +1285,6 @@ bool SelectItems(const UIDList& items, int32* outTaken = nil)
 bool SelectItem(const UIDRef& itemRef)
 {
 	return SelectItems(UIDList(itemRef));
-}
-
-// The spread a page item stands on now (O17); kInvalidUID when none can be read (an inline in overset text).
-UID SpreadOfItem(const UIDRef& itemRef)
-{
-	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
-	if (hier == nil)
-		return kInvalidUID;
-	InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-	return (spread != nil) ? ::GetUID(spread) : kInvalidUID;
 }
 
 // THE ITEMS OF ROWS SELECTED TOGETHER that can be selected now (O17) - and the others, counted by why not. The spread
@@ -1376,6 +1410,7 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
     document still comes forward, the row reads Missing. Returns true when it landed on the item. */
 bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 {
+	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
 	UIDRef docRef;
 	IDFile file;
 	UID story = kInvalidUID;
@@ -1518,6 +1553,9 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 	if (gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
+	// (The check below can reopen the chapter windowless - it is handed back on every way out that leaves it without its
+	//  window: HandBackChapterOnExit, before the dirty guard below.)
+	const HandBackChapterOnExit handBack(chapterIdx);
 	if (!KFCRuns()->CheckObjectReplace(chapterIdx, hitIdx, outStatus))
 		return false;
 	UIDRef docRef;
@@ -1560,6 +1598,7 @@ void KFCJump::SelectObjectRows(int32 chapterIdx, const std::vector<int32>& hitId
 	if (gActivating)
 		return;
 	ActivationGuard activationGuard;
+	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
 	ArmScopeKeep();
 	KFCResultTree::DropRowPreview();
 	UIDRef docRef;
@@ -1604,6 +1643,8 @@ bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitI
 	if (hitIdxs.empty() || gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
+	// (As one row's: the check below can reopen the chapter windowless - HandBackChapterOnExit.)
+	const HandBackChapterOnExit handBack(chapterIdx);
 	if (!KFCRuns()->CheckObjectReplaceRows(chapterIdx, hitIdxs, outStatus))
 		return false;
 	UIDRef docRef;
@@ -1623,7 +1664,7 @@ bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitI
 		if (ItemIsThere(first))
 			ShowItemInView(first);
 	}
-	const bool wrote = KFCRuns()->ReplaceObjectRows(chapterIdx, hitIdxs, outStatus);
+	const bool wrote = KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, outStatus);
 	// 9. THE ROWS' ITEMS LEFT SELECTED, as the rows are in the list (one row's Replace leaves its item selected - the
 	// author's call of 2026-10-10). Quietly: the status says what was written.
 	if (LayoutOfDocIsFrontmost(docRef))

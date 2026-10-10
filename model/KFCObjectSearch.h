@@ -62,10 +62,11 @@ namespace KFCObjectSearch
 	/** The page items selected now - what Search: = Selection searches. Empty when none, or no UI half. */
 	void SelectedPageItems(UIDList& out);
 
-	/** Is the cursor in text now - a caret or a range, and no page item selected? Then Search: = Selection searches the
-	    frame the cursor stands in, as InDesign's own Find does (the author's call of 2026-10-10; the plan's Task 1 M6
-	    measured it: a caret -> that frame only). false with no UI half. */
-	bool CursorInTextOnly();
+	/** Is the cursor in text now - a caret or a range? With no page item selected (the callers have just read the page
+	    items - SelectedPageItems), Search: = Selection then searches the frame the cursor stands in, as InDesign's own
+	    Find does (the author's call of 2026-10-10; the plan's Task 1 M6 measured it: a caret -> that frame only). false
+	    with no UI half. */
+	bool CursorInText();
 
 	/** What one listing over a run's targets found (KFCSearchEngine.cpp's CollectTally, for page items). */
 	struct Tally

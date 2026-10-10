@@ -764,10 +764,10 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 		return false;
 	}
 	// GLYPH AND TRANSLITERATE ARE WRITTEN TOO (the author's call). One match at a time is the walk those
-	// two tabs were built and measured on: the caller (ReplaceRowNow) has already stated the change glyph or the
+	// two tabs were built and measured on: the caller (ReplaceRowsNow) has already stated the change glyph or the
 	// character type the command writes (KFCSearchEngine::CommitReplaceSide - PreviewHit writes on the GREP tab
 	// only, where there is nothing to state), and the Colour tab is refused before any of this. (An Object row never comes
-	// here - ReplaceHit sends it to KFCObjectReplace, 1.4.0.)
+	// here - ReplaceHit and ReplaceHits send it to KFCObjectReplace, 1.4.0.)
 
 	// Every row's place now (RowNow) - the ones asked for are what the walks look for, and every row is
 	// carried past what they write, for the read-back at the end.
@@ -860,8 +860,9 @@ bool ReplaceInChapterOneByOne(int32 chapterIdx, const UIDRef& docRef, const Walk
 				return true;
 			}
 		}
-		// A row asked for that the walk never came to is missing. (One row is written at a time - ReplaceRowNow,
-		// PreviewHit - so no other row asked for can have taken its thread away with a footnote or an object.)
+		// A row asked for that the walk never came to is missing. (Since 1.4.0 several rows of a document can be written in
+		// one go - ReplaceRowsNow, the rows selected together: one whose thread an earlier row's write took away, with a
+		// footnote or an object, is missing here, and that caller rolls the whole step back.)
 		for (std::set<int32>::const_iterator p = pending.begin(); p != pending.end(); ++p)
 		{
 			++outMissing;
@@ -1229,6 +1230,43 @@ bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 		&& KFCResultModel::IsWorkOutcome(KFCResultModel::GetHitOutcome(chapterIdx, hitIdx));
 }
 
+KFCReplaceEngine::GreyedReason KFCReplaceEngine::WhyGreyed(int32 chapterIdx, int32 hitIdx)
+{
+	// CanReplaceHit's three questions, each with the word its row shows (KFCResultModel::BuildHitLocator).
+	bool replaced = false, locked = false;
+	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked))
+		return kGreyedMissing;		// no such row (a selected row always is one - asked anyway)
+	if (replaced)
+		return kGreyedReplaced;
+	const KFCResultModel::ChangeOutcome outcome = KFCResultModel::GetHitOutcome(chapterIdx, hitIdx);
+	if (outcome == KFCResultModel::kOutcomeMissing)
+		return kGreyedMissing;
+	if (locked || outcome == KFCResultModel::kOutcomeLocked)
+		return kGreyedLocked;
+	if (outcome == KFCResultModel::kOutcomeRefused)
+		return kGreyedRefused;
+	return kGreyedNot;
+}
+
+// The greyed rows counted by reason, after "Left as they were: " - "1 already replaced, 2 locked" - in GreyedReason's order.
+static void AppendGreyedCounts(PMString& out, const int32 (&counts)[KFCReplaceEngine::kGreyedReasonCount])
+{
+	static const char* const kWords[KFCReplaceEngine::kGreyedReasonCount] =
+		{ "", "already replaced", "missing", "locked", "refused" };
+	bool first = true;
+	for (int32 why = KFCReplaceEngine::kGreyedReplaced; why < KFCReplaceEngine::kGreyedReasonCount; ++why)
+	{
+		if (counts[why] == 0)
+			continue;
+		if (!first)
+			out.Append(", ");
+		out.AppendNumber(counts[why]);
+		out.Append(" ");
+		out.Append(kWords[why]);
+		first = false;
+	}
+}
+
 // A refusal of the row's Replace begins with the command's name (the author's call).
 static void StartStatus(PMString& out)
 {
@@ -1276,12 +1314,23 @@ static bool DocIsModified(IDataBase* db)
 	return db != nil && db->IsModified() != kFalse;
 }
 
-// The row replaced now, in ONE undo step - a hit row's Replace (its right-click menu or Return - spec F16). The
-// caller has asked CanReplaceHit of the row.
-static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
+// The rows replaced now, in ONE undo step - a hit row's Replace (its right-click menu or Return - spec F16), or the text
+// rows of one document selected together (O18 - the author's call of 2026-10-10: replaced together, as object rows are).
+// The caller has asked CanReplaceHit of every row. All or nothing, as one row's has always been: a row the check finds
+// moved refuses them all before a character is written, and a write that does not land on every one is rolled back
+// whole. greyed = the rows selected with them whose Replace was greyed, counted by reason (WhyGreyed - all 0 for one row's
+// Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and the rows
+// left are counted by their reason.
+static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplace,
+	const int32 (&greyed)[KFCReplaceEngine::kGreyedReasonCount], PMString& outStatus)
 {
-	std::set<int32> rowsToReplace;		// the walks below take a set of rows - here, the one
-	rowsToReplace.insert(hitIdx);
+	if (rowsToReplace.empty())
+		return false;
+	int32 left = 0;
+	for (int32 why = 0; why < KFCReplaceEngine::kGreyedReasonCount; ++why)
+		left += greyed[why];
+	const int32 selectedCount = static_cast<int32>(rowsToReplace.size()) + left;
+	const bool several = selectedCount > 1;
 	// Forward, as the search was - outside the sequence below (the walk's direction for a GREP query
 	// holding ^ is turned below, also outside it).
 	KFCForwardSearchScope forward;
@@ -1308,13 +1357,13 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file))
 	{
 		StartStatus(outStatus);
-		outStatus.Append("the document of this row could not be found.");
+		outStatus.Append(several ? "the document of the selected rows could not be found." : "the document of this row could not be found.");
 		return false;
 	}
 	if (!KFCBookScope::ReachChapterDoc(file, docRef))
 	{
 		StartStatus(outStatus);
-		outStatus.Append("the document of this row could not be opened.");
+		outStatus.Append(several ? "the document of the selected rows could not be opened." : "the document of this row could not be opened.");
 		return false;
 	}
 	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
@@ -1358,7 +1407,7 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 	} chapterAfter(docRef, wasModified);
 	WalkerScopeOptions scopeOptions;
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-	// THE VERIFY WALK'S THREE QUESTIONS, OVER THIS ROW. Its story at the version KFC last recorded, the row
+	// THE VERIFY WALK'S THREE QUESTIONS, OVER THESE ROWS. Each one's story at the version KFC last recorded, the row
 	// still reading as it was found - match and line - and a match of the walk at its start and length
 	// (ChapterMovedUnderRows). Not the match's hash alone: a row an Undo has left on the next occurrence of
 	// its own text passes that, and would be written there.
@@ -1376,20 +1425,23 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 			// the line is kept under about 117 characters, "Replace: " included (2026-10-09, the final audit's D9-2: with
 			// "(edited or undone somewhere in it, not by KohakuFindChange) - search again, or" it ran to 200, and the
 			// panel cut it at "or ri..." - measured, case msg-story-changed-shot).
-			outStatus.Append("the story of this row has changed since the search - right-click the story row: Search This Story Again.");
+			outStatus.Append(several ? "a selected row's story has changed since the search - right-click the story row: Search This Story Again."
+				: "the story of this row has changed since the search - right-click the story row: Search This Story Again.");
 			return false;
 		}
-		outStatus.Append("the text of this row has changed since the search (edited, or undone) - search again.");
+		outStatus.Append(several ? "the text of a selected row has changed since the search (edited, or undone) - search again."
+			: "the text of this row has changed since the search (edited, or undone) - search again.");
 		return false;
 	}
-	// The story this writes to - at the version on record, as the check has just said - takes its new version
+	// The stories this writes to - at the versions on record, as the check has just said - take their new versions
 	// once it has gone through (NoteStoryVersions, below).
 	std::set<UID> writtenStories;
+	for (std::set<int32>::const_iterator r = rowsToReplace.begin(); r != rowsToReplace.end(); ++r)
 	{
 		UID story = kInvalidUID;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
-		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash))
+		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, *r, story, start, end, hash))
 			writtenStories.insert(story);
 	}
 
@@ -1413,7 +1465,7 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 		// (the row backup was started by the recorder, above)
 		const bool wrote = ReplaceInChapterOneByOne(chapterIdx, docRef, scopeOptions,
 			replaced, missing, locked, refused, walkFailed, failed, whyNot, rowsToReplace);
-		ok = wrote && !failed && replaced == 1;
+		ok = wrote && !failed && replaced == static_cast<int32>(rowsToReplace.size());
 		if (ok)
 			KFCUndoFollow::MarkWrite(db);	// in this step, so its Undo / Redo is heard
 		EndPlainSequence(sequence, ok, db, wasModified);
@@ -1426,21 +1478,23 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 		for (std::set<UID>::const_iterator ws = writtenStories.begin(); ws != writtenStories.end(); ++ws)
 			KFCRowFoci::ReanchorStory(chapterIdx, *ws);
 		StartStatus(outStatus);
-		// The reason the row was not written, in its words.
+		// The reason the row was not written, in its words - for several, the first reason met (and nothing of them was
+		// written: the step went back whole).
 		const char* why = nil;
 		bool searchAgain = false;
 		if (locked > 0)
-			why = "the match is locked now (a locked layer or story)";
+			why = several ? "a selected row's match is locked now (a locked layer or story)" : "the match is locked now (a locked layer or story)";
 		else if (walkFailed)
 		{
 			// The walk broke off before it reached the row: the row is "not found" only because nobody looked (the
 			// search's own "stopped with a search error" - measured, case xq-walkfail).
-			why = "InDesign's search stopped with an error before it reached the match";
+			why = several ? "InDesign's search stopped with an error before it reached a selected row's match"
+				: "InDesign's search stopped with an error before it reached the match";
 			searchAgain = true;
 		}
 		else if (missing > 0)
 		{
-			why = "the match was not found where the search found it";
+			why = several ? "a selected row's match was not found where the search found it" : "the match was not found where the search found it";
 			searchAgain = true;
 		}
 		else if (refused > 0)
@@ -1473,18 +1527,66 @@ static bool ReplaceRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 	// third hit row in the list (the tree's middle level is one group per story, BuildFontGroups; GetHitFontGroupPos
 	// is the hit's place under it, from 0), and the UID a script reaches the story by (stories.itemByID). A story UID
 	// is the document's own number: in a book the chapter row above says which document.
-	outStatus = "Replaced.";
+	// "ID:262 #3" for one row - empty when its story or its place under the story row cannot be read.
+	auto rowName = [chapterIdx](int32 hitIdx) -> PMString
 	{
+		PMString name;
 		UID story = kInvalidUID;
 		TextIndex start = kInvalidTextIndex, end = kInvalidTextIndex;
 		uint64 hash = 0;
 		const int32 place = KFCResultModel::GetHitFontGroupPos(chapterIdx, hitIdx);
 		if (KFCResultModel::GetHitMatchIdentity(chapterIdx, hitIdx, story, start, end, hash) && story != kInvalidUID && place >= 0)
 		{
-			outStatus = "Replaced ID:";
-			outStatus.AppendNumber(static_cast<int32>(story.Get()));
-			outStatus.Append(" #");
-			outStatus.AppendNumber(place + 1);
+			name.Append("ID:");
+			name.AppendNumber(static_cast<int32>(story.Get()));
+			name.Append(" #");
+			name.AppendNumber(place + 1);
+		}
+		return name;
+	};
+	if (!several)
+	{
+		const PMString name(rowName(*rowsToReplace.begin()));
+		outStatus = name.IsEmpty() ? PMString("Replaced.") : PMString("Replaced ");
+		if (!name.IsEmpty())
+		{
+			outStatus.Append(name);
+			outStatus.Append(".");
+		}
+	}
+	else
+	{
+		// SEVERAL (O18): "Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." - the rows in the chapter's own order (the
+		// search's page order), up to kNamedRows of them; with rows left, "Replaced 2 of 3 rows: ... Left as they were:
+		// 1 locked." - counted by reason (WhyGreyed - the object rows' form, KFCObjectReplace::ReplaceRows).
+		const size_t kNamedRows = 8;
+		const int32 written = static_cast<int32>(rowsToReplace.size());
+		outStatus = "Replaced ";
+		outStatus.AppendNumber(written);
+		if (written < selectedCount)
+		{
+			outStatus.Append(" of ");
+			outStatus.AppendNumber(selectedCount);
+		}
+		outStatus.Append(" rows: ");
+		size_t named = 0;
+		for (std::set<int32>::const_iterator r = rowsToReplace.begin(); r != rowsToReplace.end() && named < kNamedRows; ++r)
+		{
+			const PMString name(rowName(*r));
+			if (name.IsEmpty())
+				continue;
+			if (named > 0)
+				outStatus.Append(", ");
+			outStatus.Append(name);
+			++named;
+		}
+		if (rowsToReplace.size() > kNamedRows)
+			outStatus.Append(", ...");
+		outStatus.Append(".");
+		if (left > 0)
+		{
+			outStatus.Append(" Left as they were: ");
+			AppendGreyedCounts(outStatus, greyed);
 			outStatus.Append(".");
 		}
 	}
@@ -1504,13 +1606,53 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 	// AN OBJECT ROW (1.4.0) is written by InDesign's object replace, not by a walk of a story (KFCObjectReplace).
 	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) != kInvalidUID)
 		return KFCObjectReplace::ReplaceRow(chapterIdx, hitIdx, outStatus);
-	return ReplaceRowNow(chapterIdx, hitIdx, outStatus);
+	std::set<int32> rows;
+	rows.insert(hitIdx);
+	const int32 none[kGreyedReasonCount] = {};
+	return ReplaceRowsNow(chapterIdx, rows, none, outStatus);
+}
+
+bool KFCReplaceEngine::ReplaceHits(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (hitIdxs.empty())
+		return false;
+	if (hitIdxs.size() == 1)
+		return ReplaceHit(chapterIdx, hitIdxs[0], outStatus);
+	// OBJECT ROWS: InDesign's object replace, row by row in one walk (KFCObjectReplace::ReplaceRows - it asks each row).
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdxs[0]) != kInvalidUID)
+		return KFCObjectReplace::ReplaceRows(chapterIdx, hitIdxs, outStatus);
+	// TEXT ROWS: a row whose Replace is greyed (already replaced, missing, locked, refused) is left and counted by its
+	// reason; the others are written together, all or nothing (ReplaceRowsNow).
+	std::set<int32> rows;
+	int32 greyed[kGreyedReasonCount] = {};
+	for (size_t k = 0; k < hitIdxs.size(); ++k)
+	{
+		const GreyedReason why = WhyGreyed(chapterIdx, hitIdxs[k]);
+		if (why == kGreyedNot)
+			rows.insert(hitIdxs[k]);
+		else
+			++greyed[why];
+	}
+	if (rows.empty())
+	{
+		// (the object rows' form - KFCObjectReplace::CheckRowsNow)
+		outStatus = "Replace: none of the ";
+		outStatus.AppendNumber(static_cast<int32>(hitIdxs.size()));
+		outStatus.Append(" selected rows can be replaced - ");
+		AppendGreyedCounts(outStatus, greyed);
+		outStatus.Append(".");
+		outStatus.SetTranslatable(kFalse);
+		return false;
+	}
+	return ReplaceRowsNow(chapterIdx, rows, greyed, outStatus);
 }
 
 // ======================================================================================================
 // A GREP ROW'S AFTER-TEXT - WRITTEN, READ, AND THROWN AWAY (the author's call: an ordinary search's row shows what
 // it would become, as an ordinary search's after-text - GREP only, the row selected, that row alone). The row's own
-// Replace (ReplaceInChapterOneByOne, as ReplaceRowNow writes it), inside an ABORTABLE sequence that is then aborted -
+// Replace (ReplaceInChapterOneByOne, as ReplaceRowsNow writes it), inside an ABORTABLE sequence that is then aborted -
 // measured in KT first (docs/ai-notes/kfc-preview-spike-2026-10-07.md):
 //  - no undo step, the text back, the caret where it was, no Track Changes record left;
 //  - the story's version (ITextModel::GetChangeCount) back where the search recorded it - so the Return that follows

@@ -55,7 +55,9 @@ void Refuse(PMString& out, const char* why)
 enum Refusal
 {
 	kRefusedNone = 0,
-	kRefusedRow,			// already replaced, locked when found, or not a match of Find/Change (CanReplaceHit)
+	kRefusedRow,			// already replaced, locked when found, or not a match of Find/Change (CanReplaceHit) - one row's
+							// sentence; rows selected together are counted by the row's own reason (GreyedRefusal)
+	kRefusedReplaced,		// already replaced (rows selected together - 2026-10-10)
 	kRefusedNoDoc,			// its document could not be found
 	kRefusedNotOpened,		// ...or not opened
 	kRefusedMissing,		// the item is gone - the row now reads Missing
@@ -72,6 +74,7 @@ const char* RowSentence(Refusal why)
 	switch (why)
 	{
 		case kRefusedRow:			return "this row cannot be replaced (already replaced, locked, or not a match of Find/Change).";
+		case kRefusedReplaced:		return "this row has already been replaced.";
 		case kRefusedNoDoc:			return "the document of this row could not be found.";
 		case kRefusedNotOpened:		return "the document of this row could not be opened.";
 		case kRefusedMissing:		return "the object is no longer in the document - search again.";
@@ -88,7 +91,8 @@ const char* RefusalWords(Refusal why)
 {
 	switch (why)
 	{
-		case kRefusedRow:			return "already replaced or locked";
+		case kRefusedRow:			return "not an object row";		// (never - rows of one kind are selected together)
+		case kRefusedReplaced:		return "already replaced";
 		case kRefusedNoDoc:			return "document not found";
 		case kRefusedNotOpened:		return "document not opened";
 		case kRefusedMissing:		return "no longer in the document";
@@ -180,6 +184,23 @@ bool RowIsReplaceable(int32 chapterIdx, int32 hitIdx)
 		&& KFCReplaceEngine::CanReplaceHit(chapterIdx, hitIdx);
 }
 
+// A greyed row of several selected together, counted by the reason its row shows (2026-10-10 - the author's call, as the
+// text rows are: KFCReplaceEngine::WhyGreyed). An item that went missing reads as one "no longer in the document", one
+// locked as "locked" - the words a row found so by the write itself is counted with.
+Refusal GreyedRefusal(int32 chapterIdx, int32 hitIdx)
+{
+	if (KFCResultModel::GetHitItem(chapterIdx, hitIdx) == kInvalidUID)
+		return kRefusedRow;
+	switch (KFCReplaceEngine::WhyGreyed(chapterIdx, hitIdx))
+	{
+		case KFCReplaceEngine::kGreyedReplaced:	return kRefusedReplaced;
+		case KFCReplaceEngine::kGreyedMissing:	return kRefusedMissing;
+		case KFCReplaceEngine::kGreyedLocked:	return kRefusedLocked;
+		case KFCReplaceEngine::kGreyedRefused:	return kRefusedNotWritten;
+		default:								return kRefusedRow;
+	}
+}
+
 // O10 steps 1-5 for one row, in the order a row's Replace has always asked them.
 bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDoc, UID& outItem)
 {
@@ -200,12 +221,9 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
-// A chapter of ours reopened to be asked goes back when nothing is written (KFCReplaceEngine's ChapterAfter rule).
-void HandBackIfHeld(const UIDRef& docRef)
-{
-	if (docRef.GetDataBase() != nil && KFCBookScope::IsHeldDoc(docRef))
-		(void)KFCBookScope::HandBackHeldDocNow(docRef);
-}
+// A chapter of ours reopened to be asked goes back when nothing is written (KFCReplaceEngine's ChapterAfter rule) -
+// KFCBookScope::HandBackIfHeld, the one the UI half's landings use too (2026-10-10).
+using KFCBookScope::HandBackIfHeld;
 }	// anonymous namespace
 
 bool KFCObjectReplace::CheckRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
@@ -274,9 +292,12 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		// (A test build's fault switch: the walk taken as never reaching the item - Review Focus 3, case oca-walk-miss.)
 		if (KFC_DIAG_FAULT("object-walk-miss"))
 			reached = false;
-		// 8. That item alone (D1 - the plan's Task 1 M8: ReplaceObject answers kSuccess when it wrote).
+		// 8. That item alone (D1 - the plan's Task 1 M8: ReplaceObject answers kSuccess when it wrote). Its answer AND the
+		// error state: the sequence below ends by the error state (rolled back when one stands), so a write left with an
+		// error standing would be taken back by InDesign under a row marked Changed - the text Replace asks both
+		// (KFCReplaceEngine's walks: the command's ErrorCode and its result).
 		if (reached)
-			ok = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess);
+			ok = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess) && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
 		if (ok)
 			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
 	}
@@ -322,7 +343,7 @@ bool KFCObjectReplace::CheckRowsNow(int32 chapterIdx, const std::vector<int32>& 
 	{
 		if (!RowIsReplaceable(chapterIdx, hitIdxs[k]))
 		{
-			++counts[kRefusedRow];
+			++counts[GreyedRefusal(chapterIdx, hitIdxs[k])];
 			continue;
 		}
 		UID item = kInvalidUID;
@@ -363,7 +384,7 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 	{
 		if (!RowIsReplaceable(chapterIdx, hitIdxs[k]))
 		{
-			++counts[kRefusedRow];
+			++counts[GreyedRefusal(chapterIdx, hitIdxs[k])];
 			continue;
 		}
 		UID item = kInvalidUID;
@@ -411,6 +432,7 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 	}
 	sequence->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	std::set<UID> written, refusedByInDesign;
+	bool errorStands = false;		// InDesign's replace left the error state raised: the step is rolled back whole
 	{
 		// 7-8 FOR EVERY ROW IN ONE WALK: InDesign's own matching from the document's first match, and its replace on each
 		// row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when every item has
@@ -428,18 +450,27 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 				break;
 			if (wanted.count(current.GetUID()) == 0)
 				continue;
-			if (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess)
+			const bool replacedIt = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess);
+			// The error state too, as one row's write asks it (ReplaceRow's step 8): the sequence ends by it, so with one
+			// standing the whole step goes back - and nothing more is written into it.
+			if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+			{
+				errorStands = true;
+				break;
+			}
+			if (replacedIt)
 				written.insert(current.GetUID());
 			else
 				refusedByInDesign.insert(current.GetUID());
 			if (written.size() + refusedByInDesign.size() == wanted.size())
 				break;
 		}
-		if (!written.empty())
+		if (!written.empty() && !errorStands)
 			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
 	}
-	// The plain sequence's end, rolled back when nothing was written - KFCReplaceEngine's EndPlainSequence.
-	const bool ok = !written.empty();
+	// The plain sequence's end, rolled back when nothing was written or an error stands - KFCReplaceEngine's
+	// EndPlainSequence.
+	const bool ok = !written.empty() && !errorStands;
 	if (!ok)
 		ErrorUtils::PMSetGlobalErrorCode(kFailure);
 	CmdUtils::EndCommandSequence(sequence);
@@ -452,6 +483,11 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
+		if (errorStands)
+		{
+			Refuse(outStatus, "InDesign's replace stopped with an error - nothing was changed.");
+			return false;
+		}
 		outStatus = "Replace: nothing was changed - ";
 		AppendRefusals(outStatus, counts);
 		outStatus.Append(".");
@@ -513,9 +549,12 @@ bool KFCObjectReplace::ReplaceAllInDoc(const UIDRef& docRef, int32& outReplaced,
 	shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
 	int32 found = 0, fully = 0, partially = 0;
 	const IFindChangeService::FindChangeResult result = svc->ReplaceAllObject(&found, &fully, &partially, kFalse);
-	// The error state is the caller's to judge by (its sequence ends by it) - this one's answer is the result's.
+	// FAILED = its answer is kFailure, OR it left the error state raised - the text side's Change All asks both of its
+	// command (WriteDocument). The state is cleared here either way, and a failure is the caller's to act on: it rolls
+	// its whole step back (KFCChangeAll::Run, KFCQuerySequence::Run).
+	const bool errorStood = (ErrorUtils::PMGetGlobalErrorCode() != kSuccess);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (result == IFindChangeService::kFailure)
+	if (result == IFindChangeService::kFailure || errorStood)
 		return false;
 	outReplaced = fully + partially;
 	outPartially = partially;

@@ -18,6 +18,7 @@
 #ifndef __KFCResultTree_h__
 #define __KFCResultTree_h__
 
+#include "PMRect.h"
 #include "PMString.h"
 #include <vector>
 #ifdef KFC_DIAG
@@ -84,37 +85,39 @@ namespace KFCResultTree
 	void DropRowPreview();
 
 	/** REPLACE ONE ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
-	    hit row's right-click Replace and Return on a selected row both come here. Writes nothing while a run of ours is
-	    up (RefusedWhileRunning says so) or when the row cannot be replaced (KFCRuns()->CanReplaceHit - the question the
-	    row menu greys Replace by); then the row's one replace (KFCRuns()->ReplaceHit, no prompt - one undo step, the
-	    panel following Ctrl+Z and Redo), the rows repainted and the status line set. True = written. outStatus, when
-	    given, gets the status line it set - Shift+Return adds to it when there is no row below to go on to
-	    (KFCResultTreeEH). */
+	    hit row's right-click Replace and Return on a selected row both come here - ReplaceRows with the one row. */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus = nil);
 
-	/** REPLACE THE ROWS SELECTED TOGETHER (O18 - the author's call of 2026-10-10): object rows of one document, by Return
-	    or by the Replace of a right-click on one of them. One row = ReplaceRow. Nothing while a run of ours is up, nor
-	    when none of them can be replaced (the menu is grey then); otherwise their Replace in one undo step
-	    (KFCJump::ReplaceObjectRows), the rows repainted and the status line set. True = something written. */
+	/** REPLACE THE ROWS SELECTED (F16 / F17 for one row; O18 - the author's calls of 2026-10-10 - for rows selected
+	    together: hit rows of one kind in one document, by Return or by the Replace of a right-click on one of them).
+	    Writes nothing while a run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced
+	    (KFCRuns()->CanReplaceHit - the question the row menu greys Replace by); then their Replace in one undo step, no
+	    prompt, the panel following Ctrl+Z and Redo - object rows through KFCJump::ReplaceObjectRows (their document in
+	    front, their items left selected), text rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and
+	    the status line set. True = something written. outStatus, when given, gets the status line it set - Shift+Return
+	    adds to it when there is no row below to go on to (KFCResultTreeEH). */
 	bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus = nil);
 
-	/** THE OBJECT ROWS SELECTED TOGETHER now (O17): their document and their rows in the order drawn. false when nothing
-	    is selected, or a text or branch row is (KFCResultTreeController.cpp). */
-	bool GetSelectedObjectRows(int32& outChapter, std::vector<int32>& outHits);
+	/** THE HIT ROWS SELECTED TOGETHER now (O17): their document and their rows in the order drawn; outObjects (optional) =
+	    object rows rather than text rows. false when nothing is selected, or a story, document or book row is
+	    (KFCResultTreeController.cpp). */
+	bool GetSelectedHitRows(int32& outChapter, std::vector<int32>& outHits, bool* outObjects = nil);
 
-	/** Is this object row one of SEVERAL selected together? outHits = them all, in the order drawn - what a right-click
+	/** Is this hit row one of SEVERAL selected together? outHits = them all, in the order drawn - what a right-click
 	    Replace on it writes (O18). false (and outHits empty) when it is not, or only it is selected. */
 	bool SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
 
-	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page's selection follows the object rows now
-	    selected (KFCJump::SelectObjectRows - the row clicked shown when it was added), or the message area says why the
-	    row could not be added (another document, another spread). Nothing for a text or branch row. */
+	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - object rows' items selected as
+	    the rows are (KFCJump::SelectObjectRows - the row clicked shown when it was added), a text row added jumped to as a
+	    click jumps (KFCJump::ActivateNode - InDesign selects one stretch of text) - or the message area says why the row
+	    could not be added (another document, another spread). Nothing for a story, document or book row. */
 	void FollowModifiedClick(const NodeID& clicked);
 
-	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's call of 2026-10-10): the run of object rows grown or
-	    shrunk by one row at its moving end - the run's other end stays where it began - and the page's selection
-	    following. A row that cannot join stops it (the message area says why for another spread or document). false =
-	    not a run of object rows: the key is not this function's. */
+	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's calls of 2026-10-10): the run of hit rows grown or
+	    shrunk by one row at its moving end - the run's other end stays where it began; a story row of the document is
+	    passed over - and the page following (object rows' items selected; for text rows the moving end's jump). A row
+	    that cannot join stops it (the message area says why for another document or spread). false = not a run of hit
+	    rows: the key is not this function's. */
 	bool ExtendSelection(ITreeViewController* controller, bool down);
 
 	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call of 2026-10-09): nothing while a run of
@@ -129,27 +132,34 @@ namespace KFCResultTree
 	bool TakeKeyboard();
 
 	/** THE KEYBOARD FRAME (1.4.0 - the author's call of 2026-10-10: "make it plain that the list has the keyboard"):
-	    does the result list hold InDesign's keyboard now - IKeyBoard's focus is the list's own handler? Asked when the
-	    panel draws the frame around the list (KFCPanelView::Draw). false while the panel is closed. Defined in
-	    KFCResultTreeEH.cpp, as the next one. */
+	    do the keys go to the result list now - IKeyBoard's focus is the list's own handler, AND the system sends the keys
+	    to the panel's window (KFCPanelHasSystemKeyboard - a click on Find/Change's title bar moves the second and not the
+	    first)? Asked when the panel draws the frame around the list (KFCPanelView::DV_Draw). false while the panel is
+	    closed. Defined in KFCResultTreeEH.cpp, as the next two. */
 	bool ListHoldsKeyboard();
 
 	/** The strip around the list drawn again, so the keyboard frame comes or goes - called when the list takes the
-	    keyboard or lets it go (KFCResultTreeEH's PostGetKeyFocus / PostGiveUpKeyFocus). Nothing while the panel is
-	    closed. */
+	    keyboard or lets it go (KFCResultTreeEH's PostGetKeyFocus / PostGiveUpKeyFocus), and when a window is made active
+	    or inactive (its Return filter's Activate / Deactivate). Nothing while the panel is closed. */
 	void RedrawKeyboardFrame();
 
 	/** The keyboard frame's width in pixels, drawn just outside the list's edges - the panel leaves 3 or 4 px around the
 	    list (KFCUI.fr). */
 	const int32 kKeyboardFrameWidth = 2;
 
+	/** The keyboard frame's four strips - above, below, left, right - kKeyboardFrameWidth wide just outside 'list' (the
+	    list's frame, in the panel's coordinates). The one place they are worked out: the panel fills them
+	    (KFCPanelView::DV_Draw) and RedrawKeyboardFrame has them drawn again, so the two cannot drift apart and leave a
+	    strip behind. */
+	void KeyboardFrameStrips(const PMRect& list, PMRect (&outStrips)[4]);
+
 	/** The result list's Return filter off the application's event dispatcher and released, for good - the UI half's
 	    shutdown (through ShutdownCleanup). Defined in KFCResultTreeEH.cpp, where the filter lives. */
 	void ShutdownReturnFilter();
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
-	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRow -
-	    the row's Replace and Return -, SearchStoryAgain and Clear Results). */
+	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRows -
+	    the rows' Replace and Return -, SearchStoryAgain and Clear Results). */
 	bool RefusedWhileRunning();
 
 	/** Put the status read-out back to what THIS session last had on it - the last message - or, when

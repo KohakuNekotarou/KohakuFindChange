@@ -155,7 +155,7 @@ namespace KFCResultModel
 	    be applied to a group with a lower_bound rather than a scan. */
 	struct FontGroup
 	{
-		// (Its row's text - "ID 260: first words..." - is made from its rows' storyLead as it is read: GetFontDisplay.)
+		// (Its row's text - "ID260: first words..." - is made from its rows' storyLead as it is read: GetFontDisplay.)
 		std::vector<int32>	hitIndices;	// this group's hits, in the chapter's own order
 		// A STORY GROUP (the author's call). A Find/Change result groups its hits by story, the way KCM's
 		// Story mode lists stories, and every group is one.
@@ -369,7 +369,7 @@ namespace KFCResultModel
 	    cap. 0 for an index out of range, and for a group the cap cut off entirely. */
 	int32 GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx);
 
-	/** A story row's display: its text ("ID 260: first words...") and its FULL hit count - uncapped, like
+	/** A story row's display: its text ("ID260: first words...") and its FULL hit count - uncapped, like
 	    every other number the tree reads out: what a row holds, not what the panel drew of it.
 	    false = index out of range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);

@@ -217,15 +217,14 @@ void KFCPanelView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
 	if (colors != nil)
 		colors->GetRealAGMColor(kInterfaceHighLight, frameColor);
 
-	// Four strips just outside the list's edges, filled - not a stroke, whose width would straddle the edge. The list's
-	// frame is in this panel's coordinates (IControlView::GetFrame - its parent's), the ones this view draws in, as the
-	// Layers panel's row view draws at its children's frames.
-	const PMRect list(treeView->GetFrame());
-	const PMReal w(KFCResultTree::kKeyboardFrameWidth);
-	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Top() - w, list.Right() + w, list.Top()));		// above
-	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Bottom(), list.Right() + w, list.Bottom() + w));	// below
-	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Top(), list.Left(), list.Bottom()));			// left
-	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Right(), list.Top(), list.Right() + w, list.Bottom()));		// right
+	// Four strips just outside the list's edges (KFCResultTree::KeyboardFrameStrips - the same ones the list has drawn
+	// again when the frame comes or goes), filled. The list's frame is in this panel's coordinates
+	// (IControlView::GetFrame - its parent's), the ones this view draws in, as the Layers panel's row view draws at its
+	// children's frames.
+	PMRect strips[4];
+	KFCResultTree::KeyboardFrameStrips(treeView->GetFrame(), strips);
+	for (int32 i = 0; i < 4; ++i)
+		dv_utils::DVFillRect(drawbotP, frameColor, strips[i]);
 }
 
 // End, KFCPanelView.cpp.

@@ -64,20 +64,6 @@ namespace
 // measured) and the walk below stops on an item given twice; this is for a walk that does neither.
 const int32 kMaxWalkSteps = 100000;
 
-// "Chapter 3 / 12 - ch03.indd" - the text search's form (KFCSetChapterTask, KFCSearchEngine.cpp).
-void SetTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name)
-{
-	PMString task(noun);
-	task.SetTranslatable(kFalse);
-	task.Append(" ");
-	task.AppendNumber(static_cast<int32>(index) + 1);
-	task.Append(" / ");
-	task.AppendNumber(static_cast<int32>(count));
-	task.Append(" - ");
-	task.Append(name);
-	bar.SetTaskText(task);
-}
-
 // THE USER'S SELECTION, GIVEN BACK (O6). The text walker service's snapshot - the spelling panel's, which InDesign's own
 // search takes the same way (ITextWalkerSelectionUtils.h, SaveSelectionsSnapshot / RestoreSelectionsSnapshot); measured
 // with an object search over a windowless document and over the front one (KT, 2026-10-09 and the plan's Task 1 M4 -
@@ -322,12 +308,8 @@ void KFCObjectSearch::SelectedPageItems(UIDList& out)
 		(void)ui->GetSelectedPageItems(out);
 }
 
-bool KFCObjectSearch::CursorInTextOnly()
+bool KFCObjectSearch::CursorInText()
 {
-	UIDList items;
-	SelectedPageItems(items);
-	if (items.Length() > 0)
-		return false;
 	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
 	return ui != nil && ui->HasTextSelection();
 }
@@ -392,10 +374,10 @@ bool KFCObjectSearch::ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMSt
 	if (!fromBook && scope == IWalkerScopeFactoryUtils::kSelectionScope)
 	{
 		// Selection with nothing selected: nothing to search, as InDesign's own Find has it (ObjectSearchScope). The
-		// cursor in text counts as its frame selected - InDesign's Find searches that frame (CursorInTextOnly).
+		// cursor in text counts as its frame selected - InDesign's Find searches that frame (CursorInText).
 		UIDList items;
 		SelectedPageItems(items);
-		if (items.Length() == 0 && !CursorInTextOnly())
+		if (items.Length() == 0 && !CursorInText())
 		{
 			outRefusal.Append("Search: is Selection, but nothing is selected. Select page items or click in a text frame, or set Search: to Document in Edit > Find/Change.");
 			return false;
@@ -501,7 +483,8 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	// The name as the Layers panel shows it, by the panel's own recipe (LayerPanelUtils::GetDefaultPageItemElementName,
 	// source/open): the user's name when one was given; else InDesign's default for the item, translated, in < >; and
 	// in [ ] for an item that takes no name of the user's. Cut at kMaxItemNameChars, as a row's text is kept short
-	// (ROW-16) - never through a surrogate pair.
+	// (ROW-16) - never through a surrogate pair: a PMString counts and cuts in code points (UnicodeSavvyString.h -
+	// CharCount, and GetUTF32TextChar's "position (in code points)").
 	PMString name;
 	Utils<Facade::IPageItemNameFacade> nameFacade;
 	if (nameFacade.Exists())
@@ -530,12 +513,7 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	const int32 kMaxItemNameChars = 40;
 	if (name.CharCount() > kMaxItemNameChars)
 	{
-		// Not through the middle of a surrogate pair (the doubt KFCStatusTextView's KFCSafeCut carries).
-		int32 keep = kMaxItemNameChars;
-		const uint32 at = name.GetWChar(keep).GetValue();
-		if (at >= 0xDC00 && at <= 0xDFFF)
-			--keep;
-		name.Truncate(name.CharCount() - keep);
+		name.Truncate(name.CharCount() - kMaxItemNameChars);		// Truncate(n) takes n characters off the end
 		name.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
 	}
 	out.matchText = "ID";
@@ -617,7 +595,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 	if (!fromBook && !allDocuments && selectionScope == static_cast<int32>(IWalkerScopeFactoryUtils::kSelectionScope))
 	{
 		SelectedPageItems(selected);
-		fromSearchScope = (selected.Length() == 0) && CursorInTextOnly();
+		fromSearchScope = (selected.Length() == 0) && CursorInText();
 	}
 	const UIDList* const items = (selected.Length() > 0) ? &selected : nil;
 	// NOTHING SELECTED IS GIVEN BACK TOO (2026-10-10 - the author's report: "an object-style search starts with an object
@@ -640,7 +618,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const size_t limit = static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit);
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
-			SetTask(bar, fromBook ? "Chapter" : "Document", i, targets.size(), targets[i].shortName);
+			KFCSetCountedTask(bar, fromBook ? "Chapter" : "Document", i, targets.size(), targets[i].shortName);
 			const int32 barBase = static_cast<int32>(i) * kDocSpan;
 			bar.SetPosition(barBase);
 			if (bar.WasCancelled(kFalse))

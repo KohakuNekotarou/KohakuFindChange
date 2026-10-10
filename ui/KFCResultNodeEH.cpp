@@ -20,9 +20,9 @@
 //                      go, is not a request to go anywhere.
 //    * !result       - the base returns kTrue for what it handled itself (a drag, an expander).
 //                      Jumping on top of that would be a second action from one click.
-//    * no Shift/Cmd  - those are selection modifiers, not "take me there". Since 1.4.0 they select OBJECT
+//    * no Shift/Cmd  - those are selection modifiers, not "take me there". Since 1.4.0 they select hit
 //                      rows together (O17 - KFCResultTreeController.cpp), and their button-up makes the
-//                      page's selection follow instead of jumping (KFCResultTree::FollowModifiedClick).
+//                      page follow the selection (KFCResultTree::FollowModifiedClick).
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
@@ -61,6 +61,7 @@
 #include "KFCJump.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the CLICKFOCUS trace, test builds only
+#include "KFCDiagHiddenDocs.h"	// the hidden-document check after a click - test builds only
 #include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 
 namespace
@@ -96,6 +97,7 @@ CREATE_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 
 bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 {
+	KFC_DIAG_HIDDEN_DOCS_CHECK("click");		// (test builds only - a document left with no window when the click is over)
 	// Let the stock handler finish the click (selection, expand / collapse, the end of a drag).
 	const bool16 result = TreeNodeEventHandler::LButtonUp(e);
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp stock=%d shift=%d cmd=%d focus=%s", static_cast<int>(result),
@@ -104,11 +106,11 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	if (e->ShiftKeyDown() || e->CmdKeyDown())
 	{
-		// SHIFT / CTRL - ROWS SELECTED TOGETHER (O17 - the author's call of 2026-10-10, the Layers panel's way): the press
-		// has made the selection (KFCResultTreeController); the page follows it, or the message area says why the row was
-		// not added (KFCResultTree::FollowModifiedClick). No jump - a text or branch row selected this way stays where it
-		// was before 1.4.0, selected alone. The keyboard to the list after it, as after every click (below), so
-		// Shift+Down goes on from here.
+		// SHIFT / CTRL - ROWS SELECTED TOGETHER (O17 - the author's calls of 2026-10-10, the Layers panel's way): the press
+		// has made the selection (KFCResultTreeController); the page follows it - object rows' items selected, a text row
+		// added jumped to - or the message area says why the row was not added (KFCResultTree::FollowModifiedClick). A
+		// story, document or book row selected this way is selected alone, with no jump. The keyboard to the list after
+		// it, as after every click (below), so Shift+Down goes on from here.
 		InterfacePtr<ITreeNodeIDData> clickedData(this, UseDefaultIID());
 		if (clickedData != nil)
 			KFCResultTree::FollowModifiedClick(clickedData->Get());
@@ -192,7 +194,7 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 #endif
 
 // Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call; about all of them when it is one of
-// several object rows selected together - O18, KFCActionComponent) - at the cursor (PopRowMenu).
+// several rows selected together - O18, KFCActionComponent) - at the cursor (PopRowMenu).
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
 // KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
 // MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action

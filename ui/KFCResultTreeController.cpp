@@ -5,22 +5,26 @@
 //  KohakuFindChange (KFC)
 //
 //  THE RESULT LIST'S SELECTION (1.4.0 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O17, the author's
-//  call of 2026-10-10: several object rows selected at once, the way the Layers panel selects several rows - Shift for a
-//  run of rows, Ctrl to add one or take it away, Shift+Up / Shift+Down to grow or shrink the run - so InDesign's own
-//  Align, Group, Transform or an object style can be applied to all of their items at once).
+//  calls of 2026-10-10: several rows selected at once, the way the Layers panel selects several rows - Shift for a run of
+//  rows, Ctrl to add one or take it away, Shift+Up / Shift+Down to grow or shrink the run. Object rows first - so
+//  InDesign's own Align, Group, Transform or an object style can be applied to all of their items at once - then text
+//  rows as well; either kind's rows are replaced together - O18, KFCResultTree::ReplaceRows).
 //
-//  The list's controller is the tree's own (CTreeViewController, public/includes) made a multiple-selection one, with one
-//  rule of KFC's on top: ROWS ARE SELECTED TOGETHER ONLY WHEN INDESIGN CAN SELECT THEIR ITEMS TOGETHER - object rows of
-//  ONE document whose items stood on ONE spread. InDesign selects page items on one spread at a time (measured
-//  2026-10-10: the DOM refuses with "two objects on different spreads cannot be selected"; two items on one spread were
-//  selected together). A text row, and a story, document or book row, is always selected alone.
+//  The list's controller is the tree's own (CTreeViewController, public/includes) made a multiple-selection one, with
+//  KFC's rule on top: ROWS ARE SELECTED TOGETHER WHEN THEY ARE HIT ROWS OF ONE KIND IN ONE DOCUMENT -
+//    * object rows whose items stood on ONE spread: InDesign selects page items on one spread at a time (measured
+//      2026-10-10: the DOM refuses with "two objects on different spreads cannot be selected"; two items on one spread
+//      were selected together);
+//    * text rows of any of the document's stories (the author's call): InDesign selects one stretch of text, so the page
+//      shows the row clicked last, as a click does (FollowModifiedClick, ExtendSelection).
+//  A story, document or book row is always selected alone.
 //  The shape is Adobe's: the Layers panel's controller runs the stock rules and then takes rows of the other kind out
 //  (open/components/layerpanel/LayersPanelTreeViewController.cpp), and the Multi-State Object panel's changes the stock
 //  rules where its panel needs it (open/components/buttonui/msopanel/MSOPanelTreeViewController.cpp).
 //
-//  What a selection does to the page - its items selected - is KFCJump::SelectObjectRows. The click that asks for it is
-//  KFCResultNodeEH's (FollowModifiedClick, below), the keys KFCResultTreeEH's (ExtendSelection, below; Return replaces the
-//  rows selected together - KFCResultTree::ReplaceRows).
+//  What a selection does to the page is KFCJump's: SelectObjectRows for object rows (their items selected), the click's
+//  own jump (ActivateNode) for a text row. The click that asks for it is KFCResultNodeEH's (FollowModifiedClick, below),
+//  the keys KFCResultTreeEH's (ExtendSelection, below; Return replaces the rows selected together).
 //
 //========================================================================================
 
@@ -47,7 +51,7 @@
 
 // Project includes:
 #include "KFCUIID.h"
-#include "KFCJump.h"				// SelectObjectRows - the page follows the rows
+#include "KFCJump.h"				// SelectObjectRows / ActivateNode - the page follows the rows
 #include "KFCModelAccess.h"			// GetHitItem / GetHitSpread - what a row is and where its item stood
 #include "KFCResultNodeID.h"
 #include "KFCResultTree.h"
@@ -59,8 +63,8 @@ namespace
 enum JoinAnswer
 {
 	kJoins = 0,
-	kNotObjectRows,		// either is a text row, or a story, document or book row: always alone
-	kOtherDocument,		// object rows of two documents - InDesign selects in one document
+	kNotHitRows,		// either is a story, document or book row, or the two are of two kinds: always alone
+	kOtherDocument,		// hit rows of two documents - InDesign selects in one document
 	kOtherSpread		// object rows whose items stood on two spreads (or on none that could be read)
 };
 
@@ -72,10 +76,15 @@ bool IsObjectRow(const KFCResultNodeID* node)
 JoinAnswer Join(const NodeID& a, const NodeID& b)
 {
 	TreeNodePtr<KFCResultNodeID> first(a), second(b);
-	if (!IsObjectRow(first) || !IsObjectRow(second))
-		return kNotObjectRows;
+	if (first == nil || second == nil || !first->IsHitRow() || !second->IsHitRow())
+		return kNotHitRows;
+	const bool objects = IsObjectRow(first);
+	if (objects != IsObjectRow(second))
+		return kNotHitRows;		// (a list holds one kind - a search is on one tab; asked anyway)
 	if (first->GetChapter() != second->GetChapter())
 		return kOtherDocument;
+	if (!objects)
+		return kJoins;			// text rows: any story of the document
 	const UID spreadA = KFCResults()->GetHitSpread(first->GetChapter(), first->GetHit());
 	const UID spreadB = KFCResults()->GetHitSpread(second->GetChapter(), second->GetHit());
 	if (spreadA == kInvalidUID || spreadA != spreadB)
@@ -88,7 +97,7 @@ const char* WhyNotJoined(JoinAnswer answer)
 {
 	switch (answer)
 	{
-		case kOtherDocument:	return "Not added - that object is in another document. Objects are selected together in one document.";
+		case kOtherDocument:	return "Not added - that row is in another document. Rows are selected together in one document.";
 		case kOtherSpread:		return "Not added - that object is on another spread. InDesign selects objects on one spread at a time.";
 		default:				return "";
 	}
@@ -109,7 +118,7 @@ struct RowRef
 // the run's other end stays where the run began (the controller's master item - CTreeViewController's fFirstSelected).
 RowRef gRunEnd;
 
-// The object row the last Shift / Ctrl click could not add (O17), and why - for the click's button-up to say
+// The hit row the last Shift / Ctrl click could not add (O17), and why - for the click's button-up to say
 // (FollowModifiedClick). Cleared by every click.
 RowRef gRefused;
 JoinAnswer gRefusedWhy = kJoins;
@@ -129,8 +138,9 @@ ITreeViewController* QueryListController()
 }
 
 // A RUN OF ROWS selected: anchor to end, in the order the rows are drawn, each through the controller's Select - which
-// turns away a row that cannot join (KFCResultTreeController::Select), so a run that crosses into another spread's rows
-// stops there. The stock Shift click's own walk (CTreeViewController::ProcessSelectionRules).
+// turns away a row that cannot join (KFCResultTreeController::Select): a story row between two stories' text rows is
+// passed over, and a run that crosses into another spread's object rows stops taking them. The stock Shift click's own
+// walk (CTreeViewController::ProcessSelectionRules).
 void SelectRun(ITreeViewController* controller, const NodeID& anchor, const NodeID& end)
 {
 	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
@@ -175,15 +185,15 @@ protected:
 	virtual bool16 IgnoreIfNodeIsSelected() const;
 
 private:
-	// MULTIPLE SELECTION, ONE PARENT, GAPS ALLOWED (KFCUI.fr says the same). Set here as well because the stock
+	// MULTIPLE SELECTION, SEVERAL PARENTS, GAPS ALLOWED (KFCUI.fr says the same). Set here as well because the stock
 	// controller keeps its mode with the panel's saved state (CTreeViewController::ReadWrite): a panel saved by 1.3,
-	// one row at a time, would otherwise come back that way whatever KFCUI.fr now says. One parent: an object row hangs
-	// off its document row (KFCResultListAdapter), so rows of two documents are never selected together - the stock
-	// controller's own rule (eSingleParentOnly) already says so; Join says the rest.
+	// one row at a time, would otherwise come back that way whatever KFCUI.fr now says. Several parents: a text row hangs
+	// off its story row (KFCResultListAdapter), and the text rows of two stories are selected together; Join keeps them
+	// to one document.
 	void ForceMultipleSelection()
 	{
 		fNumSelectableItems = eAllowMultipleSelection;
-		fAllowMultipleParents = kFalse;
+		fAllowMultipleParents = kTrue;
 		fAllowDiscontiguousSelection = kTrue;
 	}
 };
@@ -197,8 +207,8 @@ void KFCResultTreeController::ReadWrite(IPMStream* s, ImplementationID prop)
 }
 
 // A PLAIN CLICK ON ONE OF SEVERAL SELECTED ROWS SELECTS THAT ROW ALONE. The stock rule leaves the selection as it is
-// when the row clicked is already selected; with several selected, the click's jump (KFCResultNodeEH) would then select
-// one item on the page under a list still showing several.
+// when the row clicked is already selected; with several selected, the click's jump (KFCResultNodeEH) would then act on
+// one row under a list still showing several.
 bool16 KFCResultTreeController::IgnoreIfNodeIsSelected() const
 {
 	return (fSelectedNodes.size() <= 1) ? kTrue : kFalse;
@@ -224,10 +234,10 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 	if (modified && !IsSelected(node) && !fSelectedNodes.empty())
 	{
 		const JoinAnswer answer = Join(fSelectedNodes[0], node);
-		if (answer == kNotObjectRows)
+		if (answer == kNotHitRows)
 		{
-			// A ROW OF ANOTHER KIND - a text, story, document or book row clicked, or an object row while one of those is
-			// selected: that row alone (the Layers panel's rule - rows of one kind together; the newly clicked kind stays).
+			// A ROW OF ANOTHER KIND - a story, document or book row clicked, or a hit row while one of those is selected:
+			// that row alone (the Layers panel's rule - rows of one kind together; the newly clicked kind stays).
 			DeselectAll(kFalse, kTrue);
 			(void)Select(node, notifyOfChange);
 			gRunEnd = RowOf(node);
@@ -235,9 +245,9 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 		}
 		if (answer != kJoins)
 		{
-			// AN OBJECT ROW OF ANOTHER DOCUMENT OR SPREAD: not added. Ctrl leaves the selection as it is; Shift still takes
-			// the run from where it began toward this row, cut where the selection's spread ends (Select turns the
-			// others away). The click's button-up says why (FollowModifiedClick).
+			// A HIT ROW OF ANOTHER DOCUMENT, OR AN OBJECT ROW OF ANOTHER SPREAD: not added. Ctrl leaves the selection as it
+			// is; Shift still takes the run from where it began toward this row, cut where the rows that can join end
+			// (Select turns the others away). The click's button-up says why (FollowModifiedClick).
 			gRefused = RowOf(node);
 			gRefusedWhy = answer;
 			if (!event->ShiftKeyDown())
@@ -263,38 +273,46 @@ ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& no
 //========================================================================================
 // What the clicks and keys ask (KFCResultTree.h)
 //========================================================================================
-bool KFCResultTree::GetSelectedObjectRows(int32& outChapter, std::vector<int32>& outHits)
+bool KFCResultTree::GetSelectedHitRows(int32& outChapter, std::vector<int32>& outHits, bool* outObjects)
 {
 	outChapter = -1;
 	outHits.clear();
+	if (outObjects != nil)
+		*outObjects = false;
 	InterfacePtr<ITreeViewController> controller(QueryListController());
 	if (controller == nil)
 		return false;
 	NodeIDList selected;
 	controller->GetSelectedItemsDisplayOrder(selected);
+	bool objects = false;
 	for (size_t k = 0; k < selected.size(); ++k)
 	{
 		TreeNodePtr<KFCResultNodeID> nodeID(selected[k]);
-		if (!IsObjectRow(nodeID))
+		if (nodeID == nil || !nodeID->IsHitRow())
 		{
 			outHits.clear();
-			return false;		// a text or branch row selected: not a selection of object rows
+			return false;		// a story, document or book row selected: not a selection of hit rows
 		}
-		if (outChapter >= 0 && nodeID->GetChapter() != outChapter)
+		const bool object = IsObjectRow(nodeID);
+		if (k == 0)
+			objects = object;
+		if (object != objects || (outChapter >= 0 && nodeID->GetChapter() != outChapter))
 		{
 			outHits.clear();
-			return false;		// (never - the rules keep one document; asked anyway)
+			return false;		// (never - the rules keep one kind in one document; asked anyway)
 		}
 		outChapter = nodeID->GetChapter();
 		outHits.push_back(nodeID->GetHit());
 	}
+	if (outObjects != nil)
+		*outObjects = objects;
 	return !outHits.empty();
 }
 
 bool KFCResultTree::SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
 {
 	int32 chapter = -1;
-	if (!GetSelectedObjectRows(chapter, outHits) || outHits.size() < 2 || chapter != chapterIdx
+	if (!GetSelectedHitRows(chapter, outHits) || outHits.size() < 2 || chapter != chapterIdx
 		|| std::find(outHits.begin(), outHits.end(), hitIdx) == outHits.end())
 	{
 		outHits.clear();
@@ -306,18 +324,20 @@ bool KFCResultTree::SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vecto
 void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 {
 	TreeNodePtr<KFCResultNodeID> nodeID(clicked);
-	if (!IsObjectRow(nodeID))
-		return;		// a text, story, document or book row with Shift / Ctrl: selected alone, and no jump (as before 1.4.0)
+	if (nodeID == nil || !nodeID->IsHitRow())
+		return;		// a story, document or book row with Shift / Ctrl: selected alone, and no jump (as before 1.4.0)
+	const bool object = IsObjectRow(nodeID);
 	if (gRefused.IsValid() && gRefused.chapter == nodeID->GetChapter() && gRefused.hit == nodeID->GetHit())
 	{
 		const JoinAnswer why = gRefusedWhy;
 		gRefused = RowRef();
 		gRefusedWhy = kJoins;
-		// Shift's run toward it may still have changed the selection: the page follows what is selected now - FIRST, as
-		// SelectObjectRows takes a previous row's note away (measured 2026-10-10: the reason said before it never showed).
+		// Shift's run toward it may still have changed the selection: object rows' items follow what is selected now -
+		// FIRST, as SelectObjectRows takes a previous row's note away (measured 2026-10-10: the reason said before it
+		// never showed). A text row's page is left as it is: the row clicked was not added.
 		int32 chapter = -1;
 		std::vector<int32> hits;
-		if (GetSelectedObjectRows(chapter, hits))
+		if (object && GetSelectedHitRows(chapter, hits))
 			KFCJump::SelectObjectRows(chapter, hits, -1, false /*sayCount*/);
 		PMString note(WhyNotJoined(why));
 		note.SetTranslatable(kFalse);
@@ -326,15 +346,20 @@ void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 	}
 	int32 chapter = -1;
 	std::vector<int32> hits;
-	if (!GetSelectedObjectRows(chapter, hits))
+	const bool any = GetSelectedHitRows(chapter, hits);
+	const bool added = any && std::find(hits.begin(), hits.end(), nodeID->GetHit()) != hits.end();
+	if (object)
 	{
-		// Ctrl took the last row away: nothing selected on the page either.
-		KFCJump::SelectObjectRows(nodeID->GetChapter(), hits, -1, true);
+		// The items selected as the rows are (none when Ctrl took the last one away); the row clicked shown when it was
+		// added, one taken away leaving the view where it is.
+		KFCJump::SelectObjectRows(any ? chapter : nodeID->GetChapter(), hits, added ? nodeID->GetHit() : -1, true);
 		return;
 	}
-	// The row clicked shown when it was added; one taken away leaves the view where it is.
-	const bool added = std::find(hits.begin(), hits.end(), nodeID->GetHit()) != hits.end();
-	KFCJump::SelectObjectRows(chapter, hits, added ? nodeID->GetHit() : -1, true);
+	// A TEXT ROW ADDED: its jump, as a click makes it - the match selected with the Type tool on (or marked, and why it
+	// could not be selected); InDesign selects one stretch of text, so the page shows the row clicked last. A text row
+	// taken away leaves the page as it is.
+	if (added)
+		KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 }
 
 bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
@@ -350,8 +375,8 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	if (!anchor.IsValid() || !controller->IsSelected(anchor))
 		anchor = selected[0];
 	TreeNodePtr<KFCResultNodeID> anchorID(anchor);
-	if (!IsObjectRow(anchorID))
-		return false;		// Shift+arrow on a text or branch row: not a run of object rows
+	if (anchorID == nil || !anchorID->IsHitRow())
+		return false;		// Shift+arrow on a story, document or book row: not a run of hit rows
 	// The moving end: where the last click or Shift+arrow left it, while it is still selected - else the anchor.
 	NodeID end(anchor);
 	if (gRunEnd.IsValid() && gRunEnd.chapter == anchorID->GetChapter())
@@ -363,19 +388,27 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	InterfacePtr<ITreeViewMgr> treeMgr(controller, UseDefaultIID());
 	if (treeMgr == nil)
 		return false;
+	// The next row the end can move to - a story row of the same document passed over, so a run of text rows goes on
+	// into the next story's rows (an object row hangs off its document row: there is no story row among them).
 	TreeNodeTraverser walk(end, treeMgr, kTrue /*expandedNodesOnly*/,
 		down ? TreeNodeTraverser::eForward : TreeNodeTraverser::eReverse);
 	NodeID next;
-	if (!walk.Completed())
+	while (!walk.Completed())
+	{
 		next = walk.Next();
+		TreeNodePtr<KFCResultNodeID> nextID(next);
+		if (nextID == nil || !nextID->IsFontRow() || nextID->GetChapter() != anchorID->GetChapter())
+			break;
+		next = NodeID();
+	}
 	if (!next.IsValid())
 		return true;		// the list's end: nothing to add
 	const JoinAnswer answer = Join(anchor, next);
 	if (answer != kJoins)
 	{
-		// The next row cannot join: the run stays. Said only for an object row of another spread or document - a
-		// document or story row is the plain edge of the run.
-		if (answer != kNotObjectRows)
+		// The next row cannot join: the run stays. Said only for a hit row of another document or an object row of
+		// another spread - a document row is the plain edge of the run.
+		if (answer != kNotHitRows)
 		{
 			PMString note(WhyNotJoined(answer));
 			note.SetTranslatable(kFalse);
@@ -387,13 +420,19 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	SelectRun(controller, anchor, next);
 	gRunEnd = RowOf(next);
 	treeMgr->ScrollToNode(next, ITreeViewMgr::eScrollIntoView);
+	TreeNodePtr<KFCResultNodeID> nextID(next);
+	if (nextID == nil)
+		return true;
+	if (!IsObjectRow(nextID))
+	{
+		// TEXT ROWS: the page shows the run's moving end, grown or shrunk - its jump, as a click makes it.
+		KFCJump::ActivateNode(nextID->GetChapter(), nextID->GetHit());
+		return true;
+	}
 	int32 chapter = -1;
 	std::vector<int32> hits;
-	if (GetSelectedObjectRows(chapter, hits))
-	{
-		TreeNodePtr<KFCResultNodeID> nextID(next);
-		KFCJump::SelectObjectRows(chapter, hits, (adds && nextID != nil) ? nextID->GetHit() : -1, true);
-	}
+	if (GetSelectedHitRows(chapter, hits))
+		KFCJump::SelectObjectRows(chapter, hits, adds ? nextID->GetHit() : -1, true);
 	return true;
 }
 

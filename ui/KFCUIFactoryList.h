@@ -35,7 +35,7 @@ REGISTER_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
 REGISTER_PMINTERFACE(KFCResultTreeEH, kKFCResultTreeEHImpl)
 // ...and its Return, taken on the application's event dispatcher before the widget layer gets it.
 REGISTER_PMINTERFACE(KFCReturnFilterEH, kKFCReturnFilterEHImpl)
-// ...and its selection rules: object rows selected together (1.4.0).
+// ...and its selection rules: hit rows selected together (1.4.0).
 REGISTER_PMINTERFACE(KFCResultTreeController, kKFCResultTreeControllerImpl)
 // The query dialog's rows: a saved query double-clicked goes into Find/Change.
 REGISTER_PMINTERFACE(KFCQueryRowEH, kKFCQueryRowEHImpl)

@@ -34,7 +34,6 @@
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ITextModel.h"
-#include "ITextStoryThread.h"		// a story row's first words: the threads after the body (StoryLeadText)
 #include "ITextWalker.h"			// also declares ITextWalkerClient
 #include "ITextWalkerScope.h"
 #include "ITextWalkerSelectionUtils.h"	// TextWalkerSelections_CriticalSection
@@ -64,7 +63,7 @@
 #include "AttributeBossList.h"		// the Find Format list the search remembers (RememberFindFormat)
 #include "TextWalkerServiceProviderID.h"	// kFindTextCmdBoss, kFindChangeClientBoss, kTextWalkerService(...)
 #include "CTextEnum.h"				// Text::GlyphID / kInvalidGlyphID (the Glyph tab's query)
-#include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner, StoryLeadText)
+#include "TextChar.h"				// kTextChar_Ellipse - the mark a cut segment carries (SplitLineWithScanner)
 #include "UnicodeClass.h"			// IsWhiteSpace / IsIgnoredCharacter - which characters a story row's first words keep
 #include "WalkerScopeOptions.h"
 #include "ErrorUtils.h"				// PMSetGlobalErrorCode
@@ -72,7 +71,7 @@
 #include "CmdUtils.h"
 #include "CreateObject.h"
 #include "PreferenceUtils.h"		// QuerySessionPreferences
-#include "PersistUtils.h"			// ::GetClass (StoryLeadText: which thread is a deletion's)
+#include "PersistUtils.h"			// ::GetDataBase - every open document's, for a Search: walk's dirty guards
 #include "InCopySharedID.h"			// kDeletedTextBoss - the thread Track Changes keeps a deletion's text in
 #include "IDataBase.h"				// SaveRestoreModifiedState
 #include "Utils.h"
@@ -115,10 +114,6 @@ namespace
 // ways). WasCancelled has to be ASKED, and asking it only inside the chapter loop misses a cancel pressed during
 // the last chapter - see the ask-once-more test that follows the loop in SearchBook.
 void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bool force = false);
-
-// Put "<noun> <index + 1> / <count> - <name>" on the bar ("Chapter 3 / 12 - ch03.indd"). Text only - the bar's
-// position is KFCAdvanceProgress's.
-void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
 
 // The smallest advance worth reporting to the progress bar. Moving the bar keeps Cancel answering (which
 // call on the bar takes the click is not measured - see KFCAdvanceProgress), but it is not free: doing it
@@ -1623,20 +1618,6 @@ void KFCAdvanceProgress(KFCProgressBar* bar, int32& ioReported, int32 target, bo
 	bar->SetPosition(target);
 	ioReported = target;
 }
-
-void KFCSetChapterTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name)
-{
-	PMString taskLine;
-	taskLine.SetTranslatable(kFalse);
-	taskLine.Append(noun);
-	taskLine.Append(" ");
-	taskLine.AppendNumber(static_cast<int32>(index) + 1);
-	taskLine.Append(" / ");
-	taskLine.AppendNumber(static_cast<int32>(count));
-	taskLine.Append(" - ");
-	taskLine.Append(name);
-	bar.SetTaskText(taskLine);
-}
 }	// anonymous namespace
 
 bool KFCSearchEngine::CommitSearchMode()
@@ -2383,7 +2364,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			progressBar.SetTaskText(taskLine);
 		}
 		else
-			KFCSetChapterTask(progressBar, "Document", 0, 1, targets[0].shortName);
+			KFCSetCountedTask(progressBar, "Document", 0, 1, targets[0].shortName);
 		KFCAdvanceProgress(&progressBar, progressReported, 0, true /*force*/);
 
 		// What a walk that did not end cleanly owes the summary, named for what was walked: one that broke off
@@ -2425,7 +2406,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			for (size_t t = 0; t < targets.size(); ++t)
 			{
 				const int32 base = static_cast<int32>(t) * kKFCChapterProgressSpan;
-				KFCSetChapterTask(progressBar, "Document", t, targets.size(), targets[t].shortName);
+				KFCSetCountedTask(progressBar, "Document", t, targets.size(), targets[t].shortName);
 				KFCAdvanceProgress(&progressBar, progressReported, base, true /*force*/);
 				if (t > 0 && progressBar.WasCancelled(kFalse))
 				{
@@ -2548,7 +2529,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// "Chapter 3 / 12" over the chapter's own name, called BEFORE the chapter is walked so the
 		// bar names what is being worked on rather than what has just finished. This is also what
 		// keeps the bar moving through chapters that hold no hits at all.
-		KFCSetChapterTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
+		KFCSetCountedTask(progressBar, "Chapter", i, targets.size(), targets[i].shortName);
 		KFCAdvanceProgress(&progressBar, progressReported, progressBase, true /*force*/);
 
 		// Cancel is asked here, after the bar has been moved - from inside the walk and just above

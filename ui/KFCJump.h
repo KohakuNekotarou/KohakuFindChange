@@ -60,7 +60,7 @@ namespace KFCJump
 
 	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER (O18): the model's checks first (IKFCRuns::
 	    CheckObjectReplaceRows - none that could be written brings no window forward), then their document in front and
-	    the view on the first row's item, the write in one undo step (IKFCRuns::ReplaceObjectRows), and their items left
+	    the view on the first row's item, the write in one undo step (IKFCRuns::ReplaceRows), and their items left
 	    selected as the rows are (quietly - the status says what was written). One row = ReplaceObjectRow. True when
 	    something was written. */
 	bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);

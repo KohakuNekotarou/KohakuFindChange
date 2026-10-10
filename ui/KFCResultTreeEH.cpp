@@ -21,9 +21,9 @@
 //       the keyboard alone walks the rows and replaces where the match is right. SHIFT+RETURN
 //       replaces it and goes on to the next row below that can be replaced (the author's call of
 //       2026-10-08 - InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
-//       Object rows selected together are replaced together (O18 - 1.4.0).
-//    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF OBJECT ROWS selected together (O17 - 1.4.0), the
-//       page's selection following - see HandleUpDownKey and KFCResultTreeController.cpp.
+//       Rows selected together are replaced together (O18 - 1.4.0).
+//    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together (O17 - 1.4.0), the
+//       page following - see HandleUpDownKey and KFCResultTreeController.cpp.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
@@ -82,6 +82,7 @@
 #include "KFCResultTree.h"		// ReplaceRows - Return on hit rows; ExtendSelection - Shift+Up / Shift+Down
 #include "KFCModelAccess.h"		// KFCRuns()->CanReplaceHit - which row Shift+Return goes on to
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the RETFOCUS trace, test builds only
+#include "KFCDiagHiddenDocs.h"	// the hidden-document check after an arrow or a Return - test builds only
 #include "KFCPanelAlpha.h"		// KFCPanelHasSystemKeyboard - the keyboard frame's second question
 #ifdef KFC_DIAG
 #include <windows.h>			// CaptureStackBackTrace - who takes the keyboard (DiagCallers), test builds only
@@ -197,7 +198,7 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 		treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
 	// THE WRITTEN ROWS' SELECTION OFF FIRST. Select does not move a selection: in the one-row list of 1.3 it refused while
 	// a row was selected (ITreeViewController::SelectCode eSingleItemAlreadySelected; measured: the next row was jumped to
-	// while the written one stayed selected), and in the list of 1.4.0, which selects object rows together (O17 -
+	// while the written one stayed selected), and in the list of 1.4.0, which selects rows together (O17 -
 	// KFCResultTreeController), it would add to them.
 	// The official re-selection (docs/ai-notes/api-official-examples.md, "select a tree row again"): the deselect tells
 	// nobody - only the row that ends selected is announced - and both repaint.
@@ -237,13 +238,15 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	const VirtualKey key = e->GetVirtualKey();
 	if ((!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey)) || e->CmdKeyDown() || e->OptionAltKeyDown())
 		return kFalse;
+	KFC_DIAG_HIDDEN_DOCS_CHECK("return");		// (test builds only - a document left with no window when the Return is over)
 	const bool goOn = e->ShiftKeyDown() ? true : false;
 	if (controller == nil)
 		return kFalse;
 	NodeIDList selected;
 	controller->GetSelectedItems(selected);
-	// The rows this Return writes: the one hit row selected - or the object rows selected together (O18 - the author's
-	// call of 2026-10-10), in the order they are drawn. `last` is the row Shift+Return goes on from: the lowest of them.
+	// The rows this Return writes: the one hit row selected - or the rows selected together (O18 - the author's calls of
+	// 2026-10-10, object rows and then text rows), in the order they are drawn. `last` is the row Shift+Return goes on
+	// from: the lowest of them.
 	int32 chapter = -1;
 	std::vector<int32> rows;
 	NodeID last;
@@ -256,7 +259,7 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 		rows.push_back(node->GetHit());
 		last = selected[0];
 	}
-	else if (KFCResultTree::GetSelectedObjectRows(chapter, rows))
+	else if (KFCResultTree::GetSelectedHitRows(chapter, rows))
 		last = NodeID(KFCResultNodeID::Create(chapter, rows.back()));
 	else
 		return kFalse;
@@ -530,6 +533,7 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	KFC_DIAG_LOG("RETFOCUS list arrow vk=%d walking=%d", static_cast<int>(key.GetDVKeyCode()), gWalking ? 1 : 0);
 	if (!(key == kVirtualDownArrowKey) && !(key == kVirtualUpArrowKey))
 		return TreeViewEventHandler::HandleUpDownKey(e, key);
+	KFC_DIAG_HIDDEN_DOCS_CHECK("arrow");		// (test builds only - a document left with no window when the key is over)
 
 	// A previous landing is still opening a document - see gWalking. Swallow the key rather than
 	// stepping from a half-made selection.
@@ -537,15 +541,15 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 		return kTrue;
 	WalkGuard walkGuard;
 
-	// SHIFT+DOWN / SHIFT+UP (O17 - the author's call of 2026-10-10: "Shift+Down to add rows to the selection"): the run of
-	// object rows grown or shrunk by one row, the page's selection following (KFCResultTree::ExtendSelection) - not the
-	// stock's own Shift move, whose rules know nothing of spreads. On any other row it does nothing: text, story,
-	// document and book rows are selected one at a time.
+	// SHIFT+DOWN / SHIFT+UP (O17 - the author's calls of 2026-10-10: "Shift+Down to add rows to the selection", for object
+	// rows and then for text rows): the run of hit rows grown or shrunk by one row, the page following
+	// (KFCResultTree::ExtendSelection) - not the stock's own Shift move, whose rules know nothing of spreads or of the
+	// story rows between. On a story, document or book row it does nothing: those are selected one at a time.
 	if (e->ShiftKeyDown() && !e->CmdKeyDown() && !e->OptionAltKeyDown())
 	{
 		InterfacePtr<ITreeViewController> runController(this, UseDefaultIID());
 		if (KFCResultTree::ExtendSelection(runController, key == kVirtualDownArrowKey))
-			(void)KFCResultTree::TakeKeyboard();	// the page's selection fronted the document, which took the keyboard
+			(void)KFCResultTree::TakeKeyboard();	// the page's follow fronted the document, which took the keyboard
 		return kTrue;
 	}
 
@@ -717,9 +721,20 @@ bool KFCResultTree::ListHoldsKeyboard()
 	return KFCPanelHasSystemKeyboard() != kFalse;
 }
 
+void KFCResultTree::KeyboardFrameStrips(const PMRect& list, PMRect (&outStrips)[4])
+{
+	// Filled, not stroked (a stroke's width would straddle the edge), and only outside the list - its rows are not drawn
+	// over, nor drawn again.
+	const PMReal w(kKeyboardFrameWidth);
+	outStrips[0] = PMRect(list.Left() - w, list.Top() - w, list.Right() + w, list.Top());			// above
+	outStrips[1] = PMRect(list.Left() - w, list.Bottom(), list.Right() + w, list.Bottom() + w);	// below
+	outStrips[2] = PMRect(list.Left() - w, list.Top(), list.Left(), list.Bottom());				// left
+	outStrips[3] = PMRect(list.Right(), list.Top(), list.Right() + w, list.Bottom());				// right
+}
+
 void KFCResultTree::RedrawKeyboardFrame()
 {
-	// Four strips just outside the list's edges, where the panel draws the frame (KFCPanelView::Draw) - not the list
+	// The strips where the panel draws the frame (KeyboardFrameStrips, filled by KFCPanelView::DV_Draw) - not the list
 	// itself, whose rows would all be drawn again for nothing. The list's frame is in its parent's coordinates
 	// (IControlView::GetFrame) - the panel's, which is what the panel's Invalidate takes.
 	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
@@ -727,14 +742,8 @@ void KFCResultTree::RedrawKeyboardFrame()
 	IControlView* const listView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
 	if (panelView == nil || listView == nil)
 		return;
-	const PMRect list(listView->GetFrame());
-	const PMReal w(kKeyboardFrameWidth);
-	PMRect strips[4] = {
-		PMRect(list.Left() - w, list.Top() - w, list.Right() + w, list.Top()),			// above
-		PMRect(list.Left() - w, list.Bottom(), list.Right() + w, list.Bottom() + w),		// below
-		PMRect(list.Left() - w, list.Top(), list.Left(), list.Bottom()),					// left
-		PMRect(list.Right(), list.Top(), list.Right() + w, list.Bottom())					// right
-	};
+	PMRect strips[4];
+	KeyboardFrameStrips(listView->GetFrame(), strips);
 	for (int32 i = 0; i < 4; ++i)
 		panelView->Invalidate(&strips[i]);
 }

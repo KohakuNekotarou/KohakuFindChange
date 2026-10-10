@@ -53,4 +53,18 @@ void KFCProgressBar::DisableChildProgressBars(bool16 disable)
 		fBar->DisableChildProgressBars(disable);
 }
 
+void KFCSetCountedTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name)
+{
+	PMString taskLine;
+	taskLine.SetTranslatable(kFalse);
+	taskLine.Append(noun);
+	taskLine.Append(" ");
+	taskLine.AppendNumber(static_cast<int32>(index) + 1);
+	taskLine.Append(" / ");
+	taskLine.AppendNumber(static_cast<int32>(count));
+	taskLine.Append(" - ");
+	taskLine.Append(name);
+	bar.SetTaskText(taskLine);
+}
+
 // End, KFCProgressBar.cpp.

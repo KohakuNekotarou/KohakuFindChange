@@ -43,6 +43,7 @@
 // Project includes:
 #include "KFCQueryDialog.h"
 #include "KFCDiag.h"				// the test build's qd-order-reset (Repaint)
+#include "KFCDiagHiddenDocs.h"		// the hidden-document check after a Run - test builds only
 #include "KFCFindChangeMinimize.h"	// KFCShowFindChangeDialog - a double-clicked query, shown
 #include "KFCPanelAlpha.h"			// KFCQueryFindChangeWidget - Find/Change's Query menu, found as the dialog is
 #include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
@@ -182,6 +183,7 @@ namespace
 	    panel's message line (the model's refusals); nothing is greyed for it. */
 	void PressRun(IPanelControlData* panel)
 	{
+		KFC_DIAG_HIDDEN_DOCS_CHECK("query-run");	// (test builds only - a document left with no window when the run is over)
 		KFCPanelTitle::Update();	// the tab's scope written before the run, as Find writes it (this line with it)
 		PMString summary;
 		(void)KFCRuns()->RunQueries(KFCQueryOrder::OrderFiles(), summary);

@@ -44,4 +44,9 @@ private:
 	KFCProgressBarUI*	fBar;	// the UI half's bar, or nil when there is no UI
 };
 
+/** "<noun> <index + 1> / <count> - <name>" on the bar ("Chapter 3 / 12 - ch03.indd") - the line every search's bar shows
+    for the document or chapter it is in (the text search and the object search alike). Text only: the bar's position is
+    the caller's. */
+void KFCSetCountedTask(KFCProgressBar& bar, const char* noun, size_t index, size_t count, const PMString& name);
+
 #endif // __KFCProgressBar_h__

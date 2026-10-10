@@ -209,25 +209,25 @@ void DropOtherResultSets()
 // the writes after it are undone, and a write made after its Undo throws its Redo away (KeepStep). One InDesign
 // takes back or does again out of that order is not followed: the rows stay as they are, and the doors stand
 // behind them as for any edit KFC did not make (the story's version, the row's text).
-// (Since 1.4.0 a write's documents are its stories' AND its items' - DocsOf.)
-void DocsOf(const Step& s, std::vector<IDataBase*>& out)
+// (Since 1.4.0 a write's documents are its stories' AND its items' - DocCount / DocAt, read in place: this is asked
+//  for pairs of kept writes, up to kMaxSteps of them, so it makes no copies.)
+size_t DocCount(const Step& s)
 {
-	for (size_t k = 0; k < s.stories.size(); ++k)
-		out.push_back(s.stories[k].now);
-	for (size_t k = 0; k < s.items.size(); ++k)
-		out.push_back(s.items[k].now);
+	return s.stories.size() + s.items.size();
+}
+
+IDataBase* DocAt(const Step& s, size_t k)
+{
+	return (k < s.stories.size()) ? s.stories[k].now : s.items[k - s.stories.size()].now;
 }
 
 bool ShareDoc(const Step& a, const Step& b)
 {
 	if (a.whole || b.whole)
 		return true;
-	std::vector<IDataBase*> da, db;
-	DocsOf(a, da);
-	DocsOf(b, db);
-	for (size_t x = 0; x < da.size(); ++x)
-		for (size_t y = 0; y < db.size(); ++y)
-			if (da[x] == db[y])
+	for (size_t x = 0; x < DocCount(a); ++x)
+		for (size_t y = 0; y < DocCount(b); ++y)
+			if (DocAt(a, x) == DocAt(b, y))
 				return true;
 	return false;
 }
