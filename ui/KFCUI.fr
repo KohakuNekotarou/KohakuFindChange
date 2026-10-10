@@ -197,8 +197,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ITREEVIEWHIERARCHYADAPTER, kKFCResultListAdapterImpl,
 			IID_ITREEVIEWWIDGETMGR, kKFCResultListWidgetMgrImpl,
-			/* The selection rules (1.4.0, O17): hit rows of one kind in one document selected together (object rows of one
-			   spread) - the stock controller made a multiple-selection one, with KFC's rule on top
+			/* The selection rules (1.4.0, O17): hit rows of one kind selected together, of any story, spread or
+			   document - the stock controller made a multiple-selection one, with KFC's rule on top
 			   (KFCResultTreeController.cpp). Persistent, as the stock one it replaces is (CREATE_PERSIST_PMINTERFACE - a
 			   non-persistent implementation over an inherited persistent one fails as the resource is read). */
 			IID_ITREEVIEWCONTROLLER, kKFCResultTreeControllerImpl,
@@ -1289,8 +1289,8 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCResultRowHeight,			// fHThumbScrollIncrement
 			2,								// Items selectable: 2 = multiple selection (1.4.0 - hit rows together,
 											// KFCResultTreeController.cpp, which sets the same three again)
-			kTrue,							// Allow children from multiple parents to be selected: yes - the text rows
-											// of two stories (KFC's own rule keeps one document)
+			kTrue,							// Allow children from multiple parents to be selected: yes - the rows of
+											// two stories or two documents (KFC's own rule keeps one kind)
 			kTrue,							// Allow discontiguous selection: Ctrl+click
 			{
 			},

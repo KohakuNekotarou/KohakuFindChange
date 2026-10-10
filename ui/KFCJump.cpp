@@ -1257,7 +1257,8 @@ bool ItemIsThere(const UIDRef& itemRef)
 	return hier != nil;
 }
 
-// The spread a page item stands on now (O17); kInvalidUID when none can be read (an inline in overset text).
+// The spread a page item stands on now; kInvalidUID when none can be read (an inline in overset text - the model asks the
+// same of a row's item, KFCObjectSearch::IsOnSpread).
 UID SpreadOfItem(const UIDRef& itemRef)
 {
 	InterfacePtr<IHierarchy> hier(itemRef, UseDefaultIID());
@@ -1311,38 +1312,18 @@ void ShowOversetAnchorInView(const UIDRef& itemRef)
 		ScrollViewToPoint(frontView, loc.outportPb);
 }
 
-// SELECT PAGE ITEMS in the front document - the SDK's own way (SnpSelectShape.cpp: DeselectAll, then SelectPageItems
+// SELECT A PAGE ITEM in the front document - the SDK's own way (SnpSelectShape.cpp: DeselectAll, then SelectPageItems
 // with kReplace), inside a dirty guard. The tool is left as it is (D9 - the plan's Task 1 M11b: a page item is selected
-// under the Type tool, and InDesign's own Find Next on the Object tab selects with the Type tool left on, M5). The items
-// are one spread's: InDesign selects on one spread at a time (O17). outTaken (optional): how many of them InDesign took
-// into the selection (ILayoutSelectionSuite::IsPageItemSelected, each). True when something is selected.
-bool SelectItems(const UIDList& items, int32* outTaken = nil)
+// under the Type tool, and InDesign's own Find Next on the Object tab selects with the Type tool left on, M5).
+void SelectItem(const UIDRef& itemRef)
 {
-	if (outTaken != nil)
-		*outTaken = 0;
-	IDataBase::SaveRestoreModifiedState dirtyGuard(items.GetDataBase());
+	IDataBase::SaveRestoreModifiedState dirtyGuard(itemRef.GetDataBase());
 	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
-	if (selectionManager == nil)
-		return false;
 	InterfacePtr<ILayoutSelectionSuite> layoutSuite(selectionManager, UseDefaultIID());
 	if (layoutSuite == nil)
-		return false;
+		return;
 	selectionManager->DeselectAll(nil);
-	if (items.Length() > 0)
-		layoutSuite->SelectPageItems(items, Selection::kReplace, Selection::kDontScrollLayoutSelection);
-	if (outTaken != nil)
-	{
-		for (int32 i = 0; i < items.Length(); ++i)
-			if (layoutSuite->IsPageItemSelected(items[i]))
-				++*outTaken;
-	}
-	return selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
-}
-
-// One page item, as above.
-bool SelectItem(const UIDRef& itemRef)
-{
-	return SelectItems(UIDList(itemRef));
+	layoutSuite->SelectPageItems(UIDList(itemRef), Selection::kReplace, Selection::kDontScrollLayoutSelection);
 }
 
 // A CLICK ON AN OBJECT ROW (form S - the author's call of 2026-10-09: whatever Search: is, as Find Next does, and as the
@@ -1362,7 +1343,7 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 		KFCResultTree::ShowRowNote(message);
 		return;
 	}
-	(void)SelectItem(itemRef);
+	SelectItem(itemRef);
 }
 
 // A REPLACED ROW'S ITEM LEFT SELECTED (step 9 - the author's call of 2026-10-10: the item stays selected after its Replace;
@@ -1572,9 +1553,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	size_t total = 0;
-	for (size_t c = 0; c < rows.size(); ++c)
-		total += rows[c].second.size();
+	const size_t total = KFCRowCount(rows);
 	if (total == 1)
 		return ReplaceObjectRow(shownChapter, shownHit, outStatus);
 	if (total == 0 || gActivating)

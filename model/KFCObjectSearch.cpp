@@ -229,11 +229,12 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 				(diagUi != nil && diagUi->HasAnySelection()) ? 1 : 0);
 		}
 #endif
-		if (result == IFindChangeService::kNotFound || result == IFindChangeService::kFoundCompleted)
+		const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(result);
+		if (at == KFCObjectSearch::kWalkStepEnd)
 			return kWalkDone;
-		if (result != IFindChangeService::kSuccess)
+		if (at == KFCObjectSearch::kWalkStepBroke)
 		{
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+			ErrorUtils::PMSetGlobalErrorCode(kSuccess);		// the search's own failure, cleared where it happened
 			return kWalkBroke;
 		}
 		const UIDRef current(shared->GetCurrentItem());
@@ -391,6 +392,17 @@ IFindChangeService* KFCObjectSearch::CreateFindChangeService()
 {
 	// As SnpFindAndReplace.cpp makes it - IFindChangeService has no kDefaultIID.
 	return static_cast<IFindChangeService*>(::CreateObject(kFindChangeServiceBoss, IID_IFINDCHANGSERVICE));
+}
+
+KFCObjectSearch::WalkStep KFCObjectSearch::ReadWalkStep(IFindChangeService::FindChangeResult result)
+{
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		return kWalkStepBroke;
+	if (result == IFindChangeService::kSuccess)
+		return kWalkStepOn;
+	if (result == IFindChangeService::kNotFound || result == IFindChangeService::kFoundCompleted)
+		return kWalkStepEnd;
+	return kWalkStepBroke;
 }
 
 ObjectWalkerScopeOptions KFCObjectSearch::WalkerOptionsFor(const UIDRef& docRef, const UIDList* items)

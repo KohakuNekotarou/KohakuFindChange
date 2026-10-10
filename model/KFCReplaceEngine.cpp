@@ -1751,20 +1751,14 @@ bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMStri
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	size_t total = 0;
-	for (size_t k = 0; k < rowsByChapter.size(); ++k)
-		total += rowsByChapter[k].second.size();
-	if (total == 0)
+	int32 firstChapter = -1, firstHit = -1;
+	if (!KFCFirstRow(rowsByChapter, firstChapter, firstHit))
 		return false;
+	const size_t total = KFCRowCount(rowsByChapter);
 	if (total == 1)
-	{
-		for (size_t k = 0; k < rowsByChapter.size(); ++k)
-			if (!rowsByChapter[k].second.empty())
-				return ReplaceHit(rowsByChapter[k].first, rowsByChapter[k].second[0], outStatus);
-	}
+		return ReplaceHit(firstChapter, firstHit, outStatus);
 	// OBJECT ROWS: InDesign's object replace, row by row (KFCObjectReplace::ReplaceRows - it asks each row).
-	const KFCRowsByChapter::value_type& first = rowsByChapter[0].second.empty() ? rowsByChapter.back() : rowsByChapter[0];
-	if (KFCResultModel::GetHitItem(first.first, first.second[0]) != kInvalidUID)
+	if (KFCResultModel::GetHitItem(firstChapter, firstHit) != kInvalidUID)
 		return KFCObjectReplace::ReplaceRows(rowsByChapter, outStatus);
 	// TEXT ROWS: a row whose Replace is greyed (already replaced, missing, locked, refused) is left and counted by its
 	// reason; the others are written together, all or nothing (ReplaceRowsNow) - of one document or several.

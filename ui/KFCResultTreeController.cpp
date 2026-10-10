@@ -161,8 +161,8 @@ private:
 	// MULTIPLE SELECTION, SEVERAL PARENTS, GAPS ALLOWED (KFCUI.fr says the same). Set here as well because the stock
 	// controller keeps its mode with the panel's saved state (CTreeViewController::ReadWrite): a panel saved by 1.3,
 	// one row at a time, would otherwise come back that way whatever KFCUI.fr now says. Several parents: a text row hangs
-	// off its story row (KFCResultListAdapter), and the text rows of two stories are selected together; Join keeps them
-	// to one document.
+	// off its story row (KFCResultListAdapter), and the rows of two stories - or of two documents - are selected
+	// together; Join keeps them to one kind.
 	void ForceMultipleSelection()
 	{
 		fNumSelectableItems = eAllowMultipleSelection;

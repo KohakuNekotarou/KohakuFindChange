@@ -230,15 +230,6 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
-// Did a walk's SearchObject that answered other than kSuccess break off - rather than come to the end of the matches
-// (kNotFound / kFoundCompleted)? An error left standing is a break too. KFCObjectSearch.cpp's WalkDoc reads a walk's end
-// the same way, and the text Replace tells its walk's error from "not found" (its walkFailed).
-bool WalkBroke(IFindChangeService::FindChangeResult result)
-{
-	return (result != IFindChangeService::kNotFound && result != IFindChangeService::kFoundCompleted)
-		|| ErrorUtils::PMGetGlobalErrorCode() != kSuccess;
-}
-
 // A chapter of ours that a check reopened goes back when the check refuses (KFCBookScope::HandBackIfHeld - the UI half's
 // landings hand back the same way). The writes are reached only through the UI half's landing, which has brought the
 // chapter's window forward first - the chapter is then the user's, no longer held - and which hands back on its own way
@@ -293,16 +284,17 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	bool reached = false, walkFailed = false, ok = false;
 	{
 		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item. The walk ends by
-		// itself - InDesign has no more, or an item comes round again (the search's guard, spec O5).
+		// itself - InDesign has no more, or an item comes round again (the search's guard, spec O5) - or breaks off
+		// (KFCObjectSearch::ReadWalkStep: nothing is written over an error left standing).
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
 		std::set<UID> seen;
 		for (;;)
 		{
 			UIDRef found;
-			const IFindChangeService::FindChangeResult result = svc->SearchObject(found, kFalse);
-			if (result != IFindChangeService::kSuccess)
+			const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
+			if (at != KFCObjectSearch::kWalkStepOn)
 			{
-				walkFailed = WalkBroke(result);
+				walkFailed = (at == KFCObjectSearch::kWalkStepBroke);
 				break;
 			}
 			const UIDRef current(shared->GetCurrentItem());
@@ -369,8 +361,9 @@ struct ObjectChapterWrite
 };
 
 // WHAT EACH DOCUMENT IS LEFT AS (the text rows' ChaptersAfter, KFCReplaceEngine.cpp): written - a chapter of ours is given
-// a window, to be seen and saved; not written - a flag the checks raised is put back on a document that was clean, and a
-// chapter of ours is handed back.
+// a window, to be seen and saved; not written - nothing of the step is in it, so a document that was clean is made clean
+// again (a step rolled back or aborted can leave the "unsaved" flag up - KFCChangeAll.cpp), and a chapter of ours is
+// handed back.
 void LeaveObjectChapters(const std::vector<ObjectChapterWrite>& chapters)
 {
 	for (size_t k = 0; k < chapters.size(); ++k)
@@ -390,36 +383,15 @@ void LeaveObjectChapters(const std::vector<ObjectChapterWrite>& chapters)
 	}
 }
 
-size_t RowCount(const KFCRowsByChapter& rows)
-{
-	size_t total = 0;
-	for (size_t k = 0; k < rows.size(); ++k)
-		total += rows[k].second.size();
-	return total;
-}
-
-// The one row of rows selected together that holds one (a Ctrl+click left a chapter's list empty).
-bool TheOneRow(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit)
-{
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (!rows[k].second.empty())
-		{
-			outChapter = rows[k].first;
-			outHit = rows[k].second[0];
-			return true;
-		}
-	return false;
-}
-
 }	// anonymous namespace
 
 bool KFCObjectReplace::CheckRowsNow(const KFCRowsByChapter& rows, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	const size_t total = RowCount(rows);
+	const size_t total = KFCRowCount(rows);
 	int32 oneChapter = -1, oneHit = -1;
-	if (total == 1 && TheOneRow(rows, oneChapter, oneHit))
+	if (total == 1 && KFCFirstRow(rows, oneChapter, oneHit))
 		return CheckRowNow(oneChapter, oneHit, outStatus);
 	if (!CheckSettings(outStatus))
 		return false;
@@ -462,10 +434,10 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
-	const size_t total = RowCount(rows);
+	const size_t total = KFCRowCount(rows);
 	// ONE ROW is the row's own Replace, word for word.
 	int32 oneChapter = -1, oneHit = -1;
-	if (total == 1 && TheOneRow(rows, oneChapter, oneHit))
+	if (total == 1 && KFCFirstRow(rows, oneChapter, oneHit))
 		return ReplaceRow(oneChapter, oneHit, outStatus);
 	if (total == 0)
 		return false;
@@ -573,19 +545,20 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		std::set<UID> wanted, refusedByInDesign;
 		for (size_t k = 0; k < chapter.todo.size(); ++k)
 			wanted.insert(chapter.todo[k].second);
-		bool walkFailed = false;		// the walk broke off before every item was met (WalkBroke)
+		bool walkFailed = false;		// the walk broke off before every item was met (KFCObjectSearch::ReadWalkStep)
 		// 7-8 FOR EVERY ROW IN ONE WALK of its document: InDesign's own matching from the document's first match, and its
 		// replace on each row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when
-		// every item has been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5).
+		// every item has been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5) - or
+		// breaks off, nothing written over an error left standing.
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(chapter.docRef, nil));
 		std::set<UID> seen;
 		while (!walkMisses)
 		{
 			UIDRef found;
-			const IFindChangeService::FindChangeResult result = svc->SearchObject(found, kFalse);
-			if (result != IFindChangeService::kSuccess)
+			const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
+			if (at != KFCObjectSearch::kWalkStepOn)
 			{
-				walkFailed = WalkBroke(result);
+				walkFailed = (at == KFCObjectSearch::kWalkStepBroke);
 				break;
 			}
 			const UIDRef current(shared->GetCurrentItem());
@@ -608,9 +581,9 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 			if (chapter.written.size() + refusedByInDesign.size() == wanted.size())
 				break;
 		}
-		// ...AND AFTER THE WALK (the header re-read 102's find, 2026-10-10): a search step that broke off with the error state
-		// raised, after rows were written, ends the step by that error just the same - the whole step goes back, so the
-		// rows are not marked Changed, and no mark is put over the error (MarkWrite).
+		// ...AND AFTER THE WALK: a search step that broke off with the error state raised, after rows were written, ends the
+		// step by that error just the same - the whole step goes back, so the rows are not marked Changed, and no mark is
+		// put over the error (MarkWrite).
 		if (!errorStands && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			errorStands = true;

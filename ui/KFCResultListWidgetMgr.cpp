@@ -71,6 +71,8 @@
 #include "IPanelMgr.h"			// ShowPanelByWidgetID with giveKeyFocus (TakeKeyboard)
 #include "ISession.h"
 #include "IWidgetParent.h"		// the panel that holds the list (TakeKeyboard)
+#include <algorithm>			// std::find - the documents a Replace of rows wrote to (ReplaceRows)
+#include <utility>
 #ifdef KFC_DIAG
 #include "PersistUtils.h"		// ::GetClass
 #include <cstdio>
@@ -982,6 +984,16 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 		return false;
 	PMString status;
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows begin focus=%s", DiagKeyFocus().c_str());
+	// The rows not replaced yet, before the write: the ones of them that read replaced after it are what it wrote, and their
+	// documents the ones written to (the note on a hidden document below names those alone - a row left greyed is no write).
+	std::vector<std::pair<int32, int32> > notYet;
+	for (size_t c = 0; c < rows.size(); ++c)
+		for (size_t k = 0; k < rows[c].second.size(); ++k)
+		{
+			bool replaced = false, locked = false;
+			if (KFCResults()->GetHitFlags(rows[c].first, rows[c].second[k], replaced, locked) && !replaced)
+				notYet.push_back(std::make_pair(rows[c].first, rows[c].second[k]));
+		}
 	// OBJECT ROWS (1.4.0) are replaced through the jump's machinery - their document fronted around the write (KFCJump);
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
 	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
@@ -992,16 +1004,24 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the
 	// user may keep a heavy document hidden on purpose - so the line says what the screen cannot show. Asked once the
 	// write is over (a book chapter the Replace reopened has been given its window by then).
+	std::vector<int32> written;
+	for (size_t r = 0; r < notYet.size() && wrote; ++r)
+	{
+		bool replaced = false, locked = false;
+		if (KFCResults()->GetHitFlags(notYet[r].first, notYet[r].second, replaced, locked) && replaced
+			&& std::find(written.begin(), written.end(), notYet[r].first) == written.end())
+			written.push_back(notYet[r].first);
+	}
 	bool hidden = false;
-	for (size_t c = 0; c < rows.size() && wrote && !hidden; ++c)
+	for (size_t c = 0; c < written.size() && !hidden; ++c)
 	{
 		UIDRef docRef;
 		IDFile file;
-		hidden = KFCResults()->GetChapterLocation(rows[c].first, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
+		hidden = KFCResults()->GetChapterLocation(written[c], docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
 			&& !KFCChapters()->HasWindow(docRef);
 	}
 	if (hidden)
-		status.Append(rows.size() == 1 ? " The document has no window - still hidden." : " A document written has no window - still hidden.");
+		status.Append(written.size() == 1 ? " The document has no window - still hidden." : " A document written has no window - still hidden.");
 	// Repainted in place - or the tree rebuilt, when the write threw the results away: a refusal on a changed
 	// Find/Change query clears them (KFCReplaceEngine::RefuseChangedQuery), and RefreshRows repaints only the chapters
 	// the model still holds - none, so the old rows would stay drawn and answer nothing until the next search.

@@ -35,8 +35,8 @@
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 
 /** The hierarchy over KFCResultModel: hidden root -> the BOOK row when the results came from a book
-    -> one document node per chapter with hits -> a STORY ("font") node per group -> one hit node per
-    match. Without a book the document
+    -> one document node per chapter shown (with hits, or searched again with none - Chapter::shownEmpty)
+    -> a STORY ("font") node per group -> one hit node per match. Without a book the document
     nodes hang off the root itself. */
 class KFCResultListAdapter : public CPMUnknown<ITreeViewHierarchyAdapter>
 {

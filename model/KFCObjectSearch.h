@@ -23,6 +23,7 @@
 #ifndef __KFCObjectSearch_h__
 #define __KFCObjectSearch_h__
 
+#include "IFindChangeService.h"	// FindChangeResult - ReadWalkStep
 #include "PMString.h"
 #include "UIDList.h"
 #include "UIDRef.h"
@@ -34,7 +35,6 @@
 #include "KFCResultModel.h"		// Hit - an object row
 #include "KFCSearchEngine.h"	// RunScope
 
-class IFindChangeService;
 class IObjectWalker;
 
 namespace KFCObjectSearch
@@ -126,8 +126,19 @@ namespace KFCObjectSearch
 	/** InDesign's find/change service (kFindChangeServiceBoss - IFindChangeService has no kDefaultIID). */
 	IFindChangeService* CreateFindChangeService();
 
-	/** One object row for one page item (O8): its kind and what it holds, its page and where it stands, hidden / locked,
-	    its fingerprint. The locator is built later, with the chapter's page order (KFCResultModel::OrderHitsByPage). */
+	/** HOW ONE STEP OF A WALK ENDED - SearchObject's answer read with the global error state, the one reading every walk of
+	    ours makes (the search's WalkDoc, a Replace's walk to its rows - KFCObjectReplace): kWalkStepOn = on an item
+	    (kSuccess); kWalkStepEnd = InDesign has no more (kNotFound, kFoundCompleted); kWalkStepBroke = any other answer,
+	    and ANY answer with the error state left raised - nothing more is processed over it (a command processed while it
+	    stands brings InDesign's protective shutdown - CmdUtils.h, ProcessCommand). The error state is left as it is: the
+	    search clears it, a Replace ends its step by it. (The text Replace tells its walk's error from "not found" the
+	    same way - its walkFailed.) */
+	enum WalkStep { kWalkStepOn = 0, kWalkStepEnd, kWalkStepBroke };
+	WalkStep ReadWalkStep(IFindChangeService::FindChangeResult result);
+
+	/** One object row for one page item (O8): its text ("ID<uid>:<name>"), its page and where it stands - grouped, inline,
+	    anchored, in overset text - hidden / locked, its fingerprint. The locator is built later, with the chapter's page
+	    order (KFCResultModel::OrderHitsByPage). */
 	void BuildObjectHit(const UIDRef& docRef, UID item, KFCResultModel::Hit& out);
 }
 

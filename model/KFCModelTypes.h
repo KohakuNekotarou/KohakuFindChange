@@ -135,4 +135,30 @@ struct KFCSavedQuery
 // order the list draws them.
 typedef std::vector<std::pair<int32, std::vector<int32> > > KFCRowsByChapter;
 
+// How many rows they are - every chapter's together.
+inline size_t KFCRowCount(const KFCRowsByChapter& rows)
+{
+	size_t total = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+		total += rows[k].second.size();
+	return total;
+}
+
+// The first of them: the one row when there is one, and the row that tells which kind they are (rows of one kind are
+// selected together). Every chapter the list hands over holds a row (KFCResultTree::GetSelectedHitRows); a chapter with
+// none is passed over all the same. false = no row.
+inline bool KFCFirstRow(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (!rows[k].second.empty())
+		{
+			outChapter = rows[k].first;
+			outHit = rows[k].second[0];
+			return true;
+		}
+	outChapter = -1;
+	outHit = -1;
+	return false;
+}
+
 #endif // __KFCModelTypes_h__
