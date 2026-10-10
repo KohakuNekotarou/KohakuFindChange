@@ -45,7 +45,7 @@ namespace KFCChangeAll
 	    (QueryDocumentWalkerScope); Story / To End of Story / Selection: that scope of the front document's selection
 	    (QueryWalkerScope_UsingSelections - the query run's, which follows Search:). outCount = the command's own count
 	    (IFindChangeCmdData::GetReplacementCount; 0 when it says nothing). False = the walk could not start or the
-	    command failed; the error state is left clear. */
+	    command failed - answered kFailure, or left the error state raised; the error state is left clear. */
 	bool WriteDocument(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions, int32& outCount);
 
 	/** Clear Results: the panel's list emptied (KFCSearchEngine::DropResults - the rows, the searched book's held

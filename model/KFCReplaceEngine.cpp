@@ -1548,10 +1548,12 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			// processed while the error state stands is a protective shutdown - guide vol1-03), and the step goes back.
 			ok = wrote && !chapterFailed && chapterReplaced == static_cast<int32>(c.rows.size());
 		}
-		// THE ERROR STATE AT THE END - the abortable step's: a command can report success and still leave it up, so
-		// anything standing here is a failure nothing reported, and the step goes back (Change Checked's rule). The plain
-		// step ends by it as it has always done (EndPlainSequence).
-		if (ok && acrossDocuments && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		// THE ERROR STATE AT THE END: a command can report success and still leave it up, so anything standing here is a
+		// failure nothing reported, and the step goes back (Change Checked's rule) - the abortable step by its abort, the
+		// plain one by EndPlainSequence - with the rows put back and the line saying so. Asked of BOTH: a plain step ends by
+		// the error state whatever `ok` says (CmdUtils.h - SequenceContext), so one left to end by it alone would be taken
+		// back by InDesign under rows marked Changed (the object rows ask the same - KFCObjectReplace's step 8).
+		if (ok && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			ok = false;
 			failed = true;

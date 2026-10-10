@@ -184,7 +184,7 @@ namespace KFCResultTree
 
 	/** A RUN OF OURS IS UP - its progress bar pumps events, so a key or a menu can arrive in the middle of it: the
 	    status line says so and the caller turns it away. True = refused. The one place this is asked (ReplaceRows -
-	    the rows' Replace and Return -, SearchStoryAgain and Clear Results). */
+	    the rows' Replace and Return -, SearchStoryAgain, SearchDocumentAgain and Clear Results). */
 	bool RefusedWhileRunning();
 
 	/** Put the status read-out back to what THIS session last had on it - the last message - or, when

@@ -32,9 +32,9 @@
 //  the list. THE MARKER COMES UP AT ONCE, on the button-up - the beat KCM's Story-mode jump keeps, which the user
 //  asked for.
 //
-//  RIGHT-click on a hit row pops its menu (Replace), on a story row its menu (Search This Story Again); on any other
-//  row it does nothing (spec F16). See RButtonDn
-//  at the foot of this file.
+//  RIGHT-click on a row pops that row's menu - a hit row's Replace; a story row's Search This Story Again, a document
+//  row's Search This Document Again, both with Select All Rows; the book row's Select All Rows. See RButtonDn at the foot
+//  of this file.
 //
 //========================================================================================
 
@@ -107,10 +107,10 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	if (e->ShiftKeyDown() || e->CmdKeyDown())
 	{
 		// SHIFT / CTRL - ROWS SELECTED TOGETHER (O17 - the author's calls of 2026-10-10, the Layers panel's way): the press
-		// has made the selection (KFCResultTreeController); the page follows it - object rows' items selected, a text row
-		// added jumped to - or the message area says why the row was not added (KFCResultTree::FollowModifiedClick). A
-		// story, document or book row selected this way is selected alone, with no jump. The keyboard to the list after
-		// it, as after every click (below), so Shift+Down goes on from here.
+		// has made the selection (KFCResultTreeController); the page follows it - the row added jumped to as a click jumps
+		// (the page shows the row selected last), a row taken away leaving the page as it is
+		// (KFCResultTree::FollowModifiedClick). A story, document or book row selected this way is selected alone, with no
+		// jump. The keyboard to the list after it, as after every click (below), so Shift+Down goes on from here.
 		InterfacePtr<ITreeNodeIDData> clickedData(this, UseDefaultIID());
 		if (clickedData != nil)
 			KFCResultTree::FollowModifiedClick(clickedData->Get());
@@ -223,10 +223,10 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		return TreeNodeEventHandler::RButtonDn(e);
 
 	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
-	// BOTH stashes are cleared first, so a menu item fired later (a script invoking its ActionID - neither item is
+	// EVERY stash is cleared first, so a menu item fired later (a script invoking its ActionID - none of the items is
 	// offered for a shortcut) cannot act on a row nobody right-clicked this time. (Until 2026-10-09 only the story's
 	// was: a hit row right-clicked, then a story row, and the Replace action invoked by a script wrote the hit row -
-	// measured, case ctx-hit-stash-story-rclick - the final audit's D7-1.)
+	// measured, case ctx-hit-stash-story-rclick.)
 	KFCResults()->SetContextMenuHit(-1, -1);
 	KFCResults()->SetContextMenuStory(-1, -1);
 	KFCResults()->SetContextMenuChapter(-1);

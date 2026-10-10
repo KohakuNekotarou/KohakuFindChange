@@ -587,29 +587,29 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCSearchStoryAgainActionID)
 		{
-			// A story row's menu: Search This Story Again while a story row is stashed and no run is up. What the engine
-			// refuses (a changed query, a search over part of a story) it says on the status line rather than greying
-			// the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
+			// A story row's menu: Search This Story Again while a story row is stashed (a run standing greys everything,
+			// above). What the engine refuses (a changed query, a search over part of a story) it says on the status line
+			// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 			int32 chapter = -1, group = -1;
-			const bool enable = KFCResults()->GetContextMenuStory(chapter, group) && !KFCRuns()->IsAnyRunning();
+			const bool enable = KFCResults()->GetContextMenuStory(chapter, group);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCSearchDocumentAgainActionID)
 		{
-			// A document row's menu: Search This Document Again while a document row is stashed and no run is up - its
-			// refusals (a changed query, a search over part of a document) said on the status line, as the story row's are
+			// A document row's menu: Search This Document Again while a document row is stashed - its refusals (a changed
+			// query, a search over part of a document) said on the status line, as the story row's are
 			// (KFCSearchEngine::SearchDocumentAgain).
 			int32 chapter = -1;
-			const bool enable = KFCResults()->GetContextMenuChapter(chapter) && !KFCRuns()->IsAnyRunning();
+			const bool enable = KFCResults()->GetContextMenuChapter(chapter);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCSelectAllRowsActionID)
 		{
-			// A book, document or story row's menu: Select All Rows while one of those rows is stashed and no run is up.
+			// A book, document or story row's menu: Select All Rows while one of those rows is stashed.
 			int32 chapter = -1, group = -1;
 			const bool stashed = KFCResults()->GetContextMenuStory(chapter, group) || KFCResults()->GetContextMenuChapter(chapter)
 				|| KFCResultTree::GetContextMenuBook();
-			listToUpdate->SetNthActionState(i, (stashed && !KFCRuns()->IsAnyRunning()) ? kEnabledAction : kDisabled_Unselected);
+			listToUpdate->SetNthActionState(i, stashed ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

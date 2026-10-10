@@ -531,8 +531,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 
 	// SHIFT+DOWN / SHIFT+UP (O17 - the author's calls of 2026-10-10: "Shift+Down to add rows to the selection", for object
 	// rows and then for text rows): the run of hit rows grown or shrunk by one row, the page following
-	// (KFCResultTree::ExtendSelection) - not the stock's own Shift move, whose rules know nothing of spreads or of the
-	// story rows between. On a story, document or book row it does nothing: those are selected one at a time.
+	// (KFCResultTree::ExtendSelection) - not the stock's own Shift move, whose rules know nothing of the story and document
+	// rows between. On a story, document or book row it does nothing: those are selected one at a time.
 	if (e->ShiftKeyDown() && !e->CmdKeyDown() && !e->OptionAltKeyDown())
 	{
 		InterfacePtr<ITreeViewController> runController(this, UseDefaultIID());

@@ -151,8 +151,12 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 		cmdData->SetTextWalker(walker);
 		if (CmdUtils::ProcessCommand(cmd) == kSuccess)
 		{
+			// FAILED = its answer is kFailure, OR it left the error state raised: the caller's step would end by that error
+			// (rolled back), so a write cleared of it and reported done would stand under a message InDesign did not mean -
+			// the Object tab's Change All asks the same two (KFCObjectReplace::ReplaceAllInDoc). The state is cleared below
+			// either way; a failure is the caller's to act on - it takes its whole step back (Run, KFCQuerySequence::Run).
 			const IFindChangeService::FindChangeResult result = cmdData->GetFindChangeResult();
-			ok = (result != IFindChangeService::kFailure);
+			ok = (result != IFindChangeService::kFailure) && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
 			const int32 count = cmdData->GetReplacementCount();
 			outCount = (count > 0) ? count : 0;
 			KFC_DIAG_LOG("CHANGEALL doc=%p scope=%d result=%d count=%d", (void*)docRef.GetDataBase(), (int)selectionScope,

@@ -56,8 +56,8 @@ public:
 			return kInvalidNodeID;	// the root has no parent
 		if (nodeID->IsHitRow())
 		{
-			// A hit hangs off its story ("font") row - and off the document row only when it names no
-			// group, which no list has now.
+			// A hit hangs off its story ("font") row - and off the document row when it names no group: an
+			// object row (1.4.0), which has no story (KFCResultModel's BuildFontGroups).
 			const int32 font = nodeID->GetFont();
 			if (font >= 0)
 				return KFCResultNodeID::CreateFont(nodeID->GetChapter(), font);
@@ -84,8 +84,8 @@ public:
 		if (nodeID->IsFontRow())
 			return KFCResults()->GetDisplayFontHitCount(nodeID->GetChapter(), nodeID->GetFont());
 
-		// A document row: its story ("font") rows (its hits directly only for a chapter with no groups - see the
-		// head of the file).
+		// A document row: its story ("font") rows - its hits directly for a chapter with no groups, an object search's
+		// (see GetParentNode).
 		const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 			return fonts;
