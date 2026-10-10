@@ -567,10 +567,11 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
 	if (group == nil)
 		return false;
-	// THE STORY ROW'S TEXT - "ID 260: first words..." - made from its rows' storyLead NOW, not kept beside them (1.4.0 -
+	// THE STORY ROW'S TEXT - "ID260: first words..." - made from its rows' storyLead NOW, not kept beside them (1.4.0 -
 	// the author's call of 2026-10-10): a Replace reads the story's first words into its rows again (SetStoryLead), and
-	// a rollback, an Undo or a Redo puts the rows back with theirs, so the row says what the story says.
-	outName = PMString("ID ");
+	// a rollback, an Undo or a Redo puts the rows back with theirs, so the row says what the story says. No space after
+	// "ID" (the author's call of the same day, as an object row reads "ID259:<name>").
+	outName = PMString("ID");
 	outName.AppendNumber(static_cast<int32>(group->story.Get()));
 	outName.Append(": ");
 	const Hit* first = group->hitIndices.empty() ? nil : HitAt(chapterIdx, group->hitIndices[0]);

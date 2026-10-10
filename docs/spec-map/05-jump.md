@@ -193,6 +193,14 @@
   回帰＝`click-keeps-scope-*`・`replace-keeps-scope`・`click-scope-user-change-stands`（2秒の後の利用者の変更は残る）。
   - 訂正:
 
+- **JMP-33** ★**クリックのたびに、キーボードをパネルの口で取り直す**（2026-10-10 作者の報告「オブジェクトを検索した後 他のダイアログを触る（検索ダイアログなど） そののちKFCの結果の行を触って ↓で行を移動しようとすると、行の移動ではなくアイテムが移動してしまう」）――
+  「検索と置換」のタイトルバーを押すと、OS がキーを送る窓はダイアログに移るが、InDesign のキーボードの持ち主は一覧のまま残る。それまでのクリックは「持ち主が一覧なら何もしない」だったので、次の ↓ はダイアログへ行き、そこから文書へ回って選んでいた物を 1pt 動かした（実測＝`red-obj-arrow-dialog-first`・故障スイッチ `click-acquire-only`）。
+  今はクリックのたびに、矢印の歩きと同じ道（パネルを前に出してキーボードを渡す＝`IPanelMgr::ShowPanelByWidgetID`・`IPanelControlData::SetKeyboardFocus`）で取り直す＝OS のキーの窓もパネルへ戻る。
+  （文字の行で起きなかったのは、文字の一致の選択がいったんキーボードを持って行き、取り直しが走っていたから。）
+  （レイヤーパネルはキーボードを自分で取らず標準のツリーに任せている＝`source/open/components/layerpanel`。KFC は行のクリックで文書へジャンプする（選択・文字ツール）ので、その後で取り直す。）
+  回帰＝`click-arrow-dialog-first`／`obj-arrow-dialog-first`（作者の順：検索と置換を開く→行→タイトルバー→行→↓）・`click-arrow-after-title`／`obj-arrow-after-title`・`click-arrow-after-dialog(-again)`。キーボードの枠（PNL-20）も同じ合図で描き直す。
+  - 訂正:
+
 ---
 
 ## ⬜ この章で未確認

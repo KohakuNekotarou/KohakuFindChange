@@ -54,12 +54,18 @@ namespace KFCObjectSearch
 	int32 ObjectSearchScope(PMString& outFellBackNote);
 
 	/** KFCSearchEngine::ResolveRunScope's doors and sentences, with ObjectSearchScope's reading of Search: - and one
-	    door of its own: Search: = Selection with no page item selected is refused, as InDesign's own Find walks nothing
-	    there (and its object search fails a walk aimed at the document while Selection is stored - measured 2026-10-10). */
+	    door of its own: Search: = Selection with nothing selected - no page item, and no cursor in text - is refused, as
+	    InDesign's own Find walks nothing there (and its object search fails a walk aimed at the document while Selection
+	    is stored - measured 2026-10-10). */
 	bool ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMString& outRefusal);
 
 	/** The page items selected now - what Search: = Selection searches. Empty when none, or no UI half. */
 	void SelectedPageItems(UIDList& out);
+
+	/** Is the cursor in text now - a caret or a range, and no page item selected? Then Search: = Selection searches the
+	    frame the cursor stands in, as InDesign's own Find does (the author's call of 2026-10-10; the plan's Task 1 M6
+	    measured it: a caret -> that frame only). false with no UI half. */
+	bool CursorInTextOnly();
 
 	/** What one listing over a run's targets found (KFCSearchEngine.cpp's CollectTally, for page items). */
 	struct Tally

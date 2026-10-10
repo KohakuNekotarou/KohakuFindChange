@@ -5,7 +5,8 @@
 //  Kohaku Find/Change (KFC)
 //
 //  The panel's IControlView: stock palette behaviour, plus a FLOOR under how small the user can
-//  drag the panel, and a HEIGHT THAT LANDS ON A WHOLE NUMBER OF ROWS.
+//  drag the panel, a HEIGHT THAT LANDS ON A WHOLE NUMBER OF ROWS, and THE KEYBOARD FRAME round the
+//  result list while it holds the keyboard (DV_Draw, at the foot of the file).
 //
 //  Why the floor exists. Every widget on this panel is bound to the edges, so the panel narrows
 //  happily past the point where it says anything: at about half its width the message wraps to five
@@ -46,17 +47,23 @@
 
 // Interface includes:
 #include "IControlView.h"				// GetFrame - this panel's and the tree's
+#include "IInterfaceColors.h"			// RealAGMColor, kInterfaceHighLight - the keyboard frame's colour
 #include "IPanelControlData.h"			// FindWidget - reaching the tree from the panel
+#include "ISession.h"					// GetExecutionContextSession - the theme's colours
 #include "ITreeViewHierarchyAdapter.h"	// GetRootNode - the node the row height is asked about
 #include "ITreeViewWidgetMgr.h"			// GetNodeWidgetHeight - how tall one row is
 
 // General includes:
+#include "DVAPublicIncludes.h"			// dvaui::drawbot - what DV_Draw is handed
+#include "DVPublicUtilities.h"			// dv_utils::DVFillRect - the keyboard frame (source/open/includes/widgets)
 #include "PMUtils.h"					// maximum - the floor still wins after rounding
 #include "PalettePanelView.h"
 
 // Project includes:
 #include "KFCUIID.h"				// kKFCResultListWidgetID / kKFCResultRowHeight (the fallback)
 #include "KFCPanelMetrics.h"	// the floor, which moves with the message block's height
+#include "KFCResultTree.h"		// ListHoldsKeyboard / kKeyboardFrameWidth - the keyboard frame
+#include "KFCDiag.h"			// KFC_DIAG_LOG - the KEYFRAME trace, test builds only
 
 /** The panel's view: PalettePanelView with a minimum size and row-height rounding.
 
@@ -80,6 +87,18 @@ public:
 		@return the size to actually use.
 	*/
 	virtual PMPoint ConstrainDimensions(const PMPoint& dimensions) const;
+
+	/** The panel as the stock view draws it - then THE KEYBOARD FRAME: while the result list holds InDesign's
+		keyboard, a frame in the theme's selection colour around the list, in the strip the panel leaves round it (1.4.0
+		- the author's call of 2026-10-10, after the down arrow moved a page item the user meant to walk the list with).
+		Who holds the keyboard is asked as it is drawn (KFCResultTree::ListHoldsKeyboard); the list has the strip drawn
+		again when it takes the keyboard or lets it go (KFCResultTree::RedrawKeyboardFrame).
+		DV_Draw, not Draw: a palette panel is drawn through Drover's drawbot, and DVErasablePanelView keeps Draw private
+		("no descendent should be calling draw on an erasable panel"). The shape is the Layers panel's row view
+		(open/components/layerpanel/DVLayerElementView.cpp): the stock DV_Draw first, then the drawing over it at a child's
+		frame, with dv_utils.
+	*/
+	virtual void DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const;
 
 	// THE TWO NUMBERS ARE NOT HERE. They are KFCPanelMetrics', because the height one
 	// has to move with the message block, and how tall THAT is depends on the UI language. What they
@@ -168,6 +187,45 @@ PMPoint KFCPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 	constrainedDim.Y(::maximum(listHeight + nonListHeight, minHeight));
 
 	return constrainedDim;
+}
+
+/* DV_Draw
+*/
+void KFCPanelView::DV_Draw(dvaui::drawbot::Drawbot* drawbotP) const
+{
+	PalettePanelView::DV_Draw(drawbotP);
+	InterfacePtr<const IPanelControlData> panelData(this, IID_IPANELCONTROLDATA);
+	IControlView* const treeView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+	const bool framed = treeView != nil && treeView->IsVisible() && KFCResultTree::ListHoldsKeyboard();
+#ifdef KFC_DIAG
+	// (Test builds only) The frame's state each time it changes - what a case reads (run.ps1's "frame" step).
+	static int sLastFramed = -1;
+	if ((framed ? 1 : 0) != sLastFramed)
+	{
+		sLastFramed = framed ? 1 : 0;
+		KFC_DIAG_LOG("KEYFRAME %s focus=%s", framed ? "on" : "off", KFCResultTree::DiagKeyFocus().c_str());
+	}
+#endif
+	if (!framed)
+		return;
+
+	// The theme's selection colour - the fill of the selected row - so the frame says "this list" in the colour the list
+	// already uses for "this row", in the light UI and the dark one alike. (Not kInterfaceItemHighLight: a row's accent
+	// words - "locked", "hidden" - are drawn in that.)
+	RealAGMColor frameColor(0.2, 0.45, 0.9);	// a sane fallback if the query fails
+	InterfacePtr<IInterfaceColors> colors(GetExecutionContextSession(), UseDefaultIID());
+	if (colors != nil)
+		colors->GetRealAGMColor(kInterfaceHighLight, frameColor);
+
+	// Four strips just outside the list's edges, filled - not a stroke, whose width would straddle the edge. The list's
+	// frame is in this panel's coordinates (IControlView::GetFrame - its parent's), the ones this view draws in, as the
+	// Layers panel's row view draws at its children's frames.
+	const PMRect list(treeView->GetFrame());
+	const PMReal w(KFCResultTree::kKeyboardFrameWidth);
+	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Top() - w, list.Right() + w, list.Top()));		// above
+	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Bottom(), list.Right() + w, list.Bottom() + w));	// below
+	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Left() - w, list.Top(), list.Left(), list.Bottom()));			// left
+	dv_utils::DVFillRect(drawbotP, frameColor, PMRect(list.Right(), list.Top(), list.Right() + w, list.Bottom()));		// right
 }
 
 // End, KFCPanelView.cpp.

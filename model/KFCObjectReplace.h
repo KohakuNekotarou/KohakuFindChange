@@ -31,7 +31,8 @@ namespace KFCObjectReplace
 
 	/** An object row's Replace (O10 steps 1-5, 7, 8, 10, 11): the doors again, then the walk to the item and ReplaceObject,
 	    one undo step ("Replace") with KFC's undo mark in it; the row Changed with the item's new fingerprint;
-	    "Replaced ID:<uid>." on success. The selection InDesign leaves (step 9) is the UI half's to take away. */
+	    "Replaced ID:<uid>." on success. The selection InDesign leaves (step 9) is the UI half's to settle: the row's
+	    item selected (the author's call of 2026-10-10). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** InDesign's Change All on the Object tab over one document (O13, O14): ReplaceAllObject with the shared walker aimed

@@ -79,6 +79,7 @@
 #include "KFCResultTree.h"		// ReplaceRow - Return on a hit row
 #include "KFCModelAccess.h"		// KFCRuns()->CanReplaceHit - which row Shift+Return goes on to
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the RETFOCUS trace, test builds only
+#include "KFCPanelAlpha.h"		// KFCPanelHasSystemKeyboard - the keyboard frame's second question
 #ifdef KFC_DIAG
 #include <windows.h>			// CaptureStackBackTrace - who takes the keyboard (DiagCallers), test builds only
 #include <cstdio>
@@ -427,24 +428,58 @@ bool16 KFCResultTreeEH::ResumeKeyFocus()
 	return resumed;
 }
 
+// The system's keyboard window and the active window, each by its root window's handle and title (see the header).
+std::string KFCResultTree::DiagSystemFocus()
+{
+	auto describe = [](HWND hwnd) -> std::string
+	{
+		if (hwnd == nil)
+			return "none";
+		const HWND root = ::GetAncestor(hwnd, GA_ROOT);
+		wchar_t title[80] = { 0 };
+		if (root != nil)
+			::GetWindowTextW(root, title, 80);
+		char utf8[256] = "";
+		if (::WideCharToMultiByte(CP_UTF8, 0, title, -1, utf8, static_cast<int>(sizeof(utf8)), nil, nil) == 0)
+			utf8[0] = '\0';
+		char one[300];
+		::sprintf_s(one, sizeof(one), "0x%llx'%s'", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(root)), utf8);
+		return one;
+	};
+	const HWND focus = ::GetFocus();
+	const HWND active = ::GetActiveWindow();
+	std::string out("os=");
+	out += describe(focus);
+	if (active != nil && (focus == nil || ::GetAncestor(focus, GA_ROOT) != ::GetAncestor(active, GA_ROOT)))
+	{
+		out += " active=";
+		out += describe(active);
+	}
+	return out;
+}
+
 #endif
 
-// The list has the keyboard: the Return filter goes on the dispatcher's stack (see gReturnFilter).
+// The list has the keyboard: the Return filter goes on the dispatcher's stack (see gReturnFilter), and the panel draws
+// the keyboard frame around the list (KFCResultTree::RedrawKeyboardFrame).
 void KFCResultTreeEH::PostGetKeyFocus()
 {
 	TreeViewEventHandler::PostGetKeyFocus();
 	KFC_DIAG_LOG("RETFOCUS list GOT the keyboard");
 	PushReturnFilter();
+	KFCResultTree::RedrawKeyboardFrame();
 }
 
-// ...and has let it go: the filter comes off. (One that stays - the keyboard taken from the list without this call -
-// does nothing: it acts only while the list holds the keyboard.)
+// ...and has let it go: the filter comes off, and the frame. (A filter that stays - the keyboard taken from the list
+// without this call - does nothing: it acts only while the list holds the keyboard. Nor does a frame that stays: the
+// panel asks who holds the keyboard each time it draws it.)
 void KFCResultTreeEH::PostGiveUpKeyFocus()
 {
 	TreeViewEventHandler::PostGiveUpKeyFocus();
 	KFC_DIAG_LOG("RETFOCUS list GAVE UP the keyboard focus=%s callers: %s", KFCResultTree::DiagKeyFocus().c_str(),
 		DiagCallers().c_str());
 	RemoveReturnFilter();
+	KFCResultTree::RedrawKeyboardFrame();
 }
 
 // See gHolding: while a handled Return holds, the request to let the keyboard go - InDesign's own, straight after
@@ -558,6 +593,16 @@ public:
 	virtual bool16 KeyCmd(IEvent* e);
 	virtual bool16 KeyUp(IEvent* e);
 
+	// A window made active or inactive while the list holds the keyboard - which no widget hears (IEvent.h) - is when the
+	// system's keyboard moves without InDesign's (a click on Find/Change's title bar, another application brought
+	// forward): the keyboard frame is drawn again (KFCResultTree::RedrawKeyboardFrame), and asks again. Passed on.
+	virtual bool16 Activate(IEvent* e);
+	virtual bool16 Deactivate(IEvent* e);
+#ifdef KFC_DIAG
+	// (Test builds only) A press of the mouse anywhere, for the trace. Passed on.
+	virtual bool16 LButtonDn(IEvent* e);
+#endif
+
 private:
 	bool fTook;		// this filter took the Return now going through - its KeyCmd and KeyUp are taken too
 };
@@ -603,6 +648,66 @@ bool16 KFCReturnFilterEH::KeyUp(IEvent* e)
 	gHolding = false;		// the Return is over; the keyboard is the user's to move again (gHolding)
 	KFC_DIAG_LOG("RETFOCUS filter took the Return's KeyUp focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 	return kTrue;
+}
+
+bool16 KFCReturnFilterEH::Activate(IEvent* /*e*/)
+{
+	KFC_DIAG_LOG("RETFOCUS filter saw Activate focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	KFCResultTree::RedrawKeyboardFrame();
+	return kFalse;
+}
+
+bool16 KFCReturnFilterEH::Deactivate(IEvent* /*e*/)
+{
+	KFC_DIAG_LOG("RETFOCUS filter saw Deactivate focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	KFCResultTree::RedrawKeyboardFrame();
+	return kFalse;
+}
+
+#ifdef KFC_DIAG
+bool16 KFCReturnFilterEH::LButtonDn(IEvent* /*e*/)
+{
+	KFC_DIAG_LOG("RETFOCUS filter saw LButtonDn focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	return kFalse;
+}
+#endif
+
+bool KFCResultTree::ListHoldsKeyboard()
+{
+	IControlView* const listView = ResultListView();
+	if (listView == nil)
+		return false;
+	InterfacePtr<IEventHandler> listEH(listView, UseDefaultIID());
+	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+	if (listEH == nil || keyBoard == nil || keyBoard->GetKeyFocus() != listEH)
+		return false;
+	// ...AND THE SYSTEM SENDS THE KEYS TO THE LIST'S WINDOW (measured 2026-10-10, red-obj-arrow-dialog-first): a click on
+	// Find/Change's title bar made the dialog the system's keyboard window and left InDesign's keyboard on the list, and
+	// the down arrow then went to the dialog and moved the page item. InDesign's holder alone said "the list" all through.
+	return KFCPanelHasSystemKeyboard() != kFalse;
+}
+
+void KFCResultTree::RedrawKeyboardFrame()
+{
+	// Four strips just outside the list's edges, where the panel draws the frame (KFCPanelView::Draw) - not the list
+	// itself, whose rows would all be drawn again for nothing. The list's frame is in its parent's coordinates
+	// (IControlView::GetFrame) - the panel's, which is what the panel's Invalidate takes.
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
+	InterfacePtr<IControlView> panelView(panelData, UseDefaultIID());
+	IControlView* const listView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+	if (panelView == nil || listView == nil)
+		return;
+	const PMRect list(listView->GetFrame());
+	const PMReal w(kKeyboardFrameWidth);
+	PMRect strips[4] = {
+		PMRect(list.Left() - w, list.Top() - w, list.Right() + w, list.Top()),			// above
+		PMRect(list.Left() - w, list.Bottom(), list.Right() + w, list.Bottom() + w),		// below
+		PMRect(list.Left() - w, list.Top(), list.Left(), list.Bottom()),					// left
+		PMRect(list.Right(), list.Top(), list.Right() + w, list.Bottom())					// right
+	};
+	for (int32 i = 0; i < 4; ++i)
+		panelView->Invalidate(&strips[i]);
 }
 
 void KFCResultTree::ShutdownReturnFilter()

@@ -24,6 +24,8 @@
 #include "ILayoutHitTestSuite.h"	// ...reached through the active layout hit-test suite
 #include "ILayoutTarget.h"		// GetUIDList(kStripStandoffs) - the selected page items
 #include "ISelectionUtils.h"	// QueryActiveLayoutHitTestSuite
+#include "ISelectionManager.h"	// HasTextSelection - SelectionExists on the text CSB
+#include "TextEditorID.h"		// kTextSelectionBoss
 
 // General includes:
 #include "CmdUtils.h"
@@ -41,6 +43,7 @@
 #include "KFCUIID.h"				// kKFCUIServicesImpl
 #include "IKFCUIServices.h"
 #include "KFCBookPanelLookup.h"
+#include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door
 
 namespace
 {
@@ -163,6 +166,35 @@ public:
 			return false;
 		outItems = target->GetUIDList(kStripStandoffs);
 		return outItems.Length() > 0;
+	}
+
+	virtual bool HasTextSelection()
+	{
+		// The text concrete selection boss's own answer, asked through the active selection manager by its class
+		// (ISelectionManager::SelectionExists - public, as KFCJump's ClearSelection asks it of every CSB).
+		Utils<ISelectionUtils> selectionUtils;
+		if (!selectionUtils.Exists())
+			return false;
+		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
+		return selectionManager != nil
+			&& selectionManager->SelectionExists(kTextSelectionBoss, ISelectionManager::kAnySelection) != kFalse;
+	}
+
+	virtual bool HasAnySelection()
+	{
+		// Every concrete selection asked at once (kInvalidClass, kAnySelection - ISelectionManager.h), as KFCJump's
+		// ClearSelection asks before it clears.
+		Utils<ISelectionUtils> selectionUtils;
+		if (!selectionUtils.Exists())
+			return false;
+		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
+		return selectionManager != nil
+			&& selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+	}
+
+	virtual void ClearSelection()
+	{
+		KFCJump::ClearFrontSelection();
 	}
 };
 

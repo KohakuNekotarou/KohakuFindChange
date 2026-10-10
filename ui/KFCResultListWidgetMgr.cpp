@@ -661,6 +661,10 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 // again (RestoreStatusOnPanelShow).
 static PMString gLastStatus;
 
+// The message area shows a row's own note (ShowRowNote - 1.4.0): what DropRowPreview takes away, as it takes a preview.
+// Set by ShowRowNote after it writes; every other write - WriteMessage, a preview - clears it.
+static bool gRowNoteShown = false;
+
 void KFCResultTree::ShutdownCleanup()
 {
 	// The statics this file keeps, emptied for the reason KFCResultModel empties its own: a PMString
@@ -668,6 +672,7 @@ void KFCResultTree::ShutdownCleanup()
 	// already torn itself down (the KESCL ShutdownCleanup rule). When a static is added above, it is
 	// added here too.
 	gLastStatus.Clear();
+	gRowNoteShown = false;
 	// ...and the Return filter the list pushes on the application's event dispatcher (KFCResultTreeEH.cpp): off the
 	// stack and released before the .pln goes.
 	ShutdownReturnFilter();
@@ -708,6 +713,7 @@ IKFCStatusTextData* QueryStatusTextData(IControlView*& outView)
                        there is nothing on screen to force yet, and this runs mid-construction. */
 void WriteMessage(const PMString& message, bool16 forceRedraw)
 {
+	gRowNoteShown = false;		// whatever stood there is replaced (ShowRowNote sets it again after it writes)
 	IControlView* textView = nil;
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
@@ -783,10 +789,20 @@ void KFCResultTree::ShowStatus(const PMString& message)
 // KFCResultTree::ShowRowPreview - a GREP row's after-text on the message area
 //----------------------------------------------------------------------------------------
 
-// The heading of a preview - and how the area is known to be showing one (DropRowPreview).
+// The heading of a preview - and how the area is known to be showing one (DropRowPreview: a heading that starts with the
+// stem - "Preview Text:", or "Preview Text (not selected - no width):" when the click could not select the match, 1.4.0).
 static const char* const kPreviewLabel = "Preview Text:";
+static const char* const kPreviewLabelStem = "Preview Text";
 
-bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
+void KFCResultTree::ShowRowNote(const PMString& note)
+{
+	// Not remembered in gLastStatus (the row's, not a report - ShowRowPreview's rule) and no panel icon to settle: a
+	// note reports nothing that ran. Written at once, as a report is - the click that made it is the user's.
+	WriteMessage(note, kTrue /*force the redraw*/);
+	gRowNoteShown = true;		// after the write, which clears it
+}
+
+bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy)
 {
 	// What Return would write at this row (the author's call: an ordinary GREP search's row shows its after-text
 	// when selected) - the model writes it inside a step it throws away (KFCReplaceEngine::PreviewHit) and says false
@@ -828,9 +844,19 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
 	KFCResults()->MarkUpBreaksForDisplay(pre);
 	KFCResults()->MarkUpBreaksForDisplay(shown);
 	KFCResults()->MarkUpBreaksForDisplay(post);
+	// WHY THE CLICK DID NOT SELECT THE MATCH, in the heading (1.4.0 - the author's call of 2026-10-10: the reason and the
+	// preview both): "Preview Text (not selected - no width):". The heading owns its line(s) and wraps like the rest.
 	PMString label(kPreviewLabel);
+	if (notSelectedWhy != nil && *notSelectedWhy != '\0')
+	{
+		label = kPreviewLabelStem;
+		label.Append(" (not selected - ");
+		label.Append(notSelectedWhy);
+		label.Append("):");
+	}
 	label.SetTranslatable(kFalse);
 	textData->SetSegments(label, pre, shown, post, shown.IsEmpty() ? kTrue : kFalse);
+	gRowNoteShown = false;		// a preview stands there now (DropRowPreview knows it by its heading)
 	textView->ForceRedraw();
 	return true;
 }
@@ -838,7 +864,8 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx)
 void KFCResultTree::DropRowPreview()
 {
 	// A row with no preview (replaced, a Text search's, a branch row...) must not leave the last row's standing beside
-	// it: the area goes back to the last ordinary message (gLastStatus - a preview is never kept there).
+	// it: the area goes back to the last ordinary message (gLastStatus - a preview is never kept there). Nor the last
+	// row's note (ShowRowNote - 1.4.0): its reason is about that row alone.
 	IControlView* textView = nil;
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
@@ -846,7 +873,8 @@ void KFCResultTree::DropRowPreview()
 	PMString label, pre, mid, post;
 	bool16 wantCaret = kFalse;
 	textData->GetSegments(label, pre, mid, post, wantCaret);
-	if (label != PMString(kPreviewLabel))
+	const bool preview = label.IndexOfString(PMString(kPreviewLabelStem)) == 0;
+	if (!preview && !gRowNoteShown)
 		return;
 	WriteMessage(gLastStatus.IsEmpty() ? InitialMessage() : gLastStatus, kTrue /*force the redraw*/);
 }
@@ -864,22 +892,31 @@ bool KFCResultTree::RefusedWhileRunning()
 #ifdef KFC_DIAG
 std::string KFCResultTree::DiagKeyFocus()
 {
+	// InDesign's holder, then the system's keyboard window beside it (DiagSystemFocus - 2026-10-10).
+	std::string holder;
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+	IEventHandler* const focus = (keyBoard != nil) ? keyBoard->GetKeyFocus() : nil;	// not counted (IKeyBoard.h)
 	if (keyBoard == nil)
-		return "no-keyboard";
-	IEventHandler* const focus = keyBoard->GetKeyFocus();		// not counted (IKeyBoard.h) - used here only
-	if (focus == nil)
-		return "nobody";
-	InterfacePtr<ITreeViewMgr> treeMgr(QueryResultTreeMgr());
-	InterfacePtr<IEventHandler> treeEH(treeMgr, UseDefaultIID());
-	if (treeEH != nil && treeEH.get() == focus)
-		return "tree";
-	InterfacePtr<IControlView> view(focus, UseDefaultIID());
-	char text[96];
-	::sprintf_s(text, sizeof(text), "class=0x%x widget=0x%x", static_cast<unsigned>(::GetClass(focus).Get()),
-		view != nil ? static_cast<unsigned>(view->GetWidgetID().Get()) : 0u);
-	return text;
+		holder = "no-keyboard";
+	else if (focus == nil)
+		holder = "nobody";
+	else
+	{
+		InterfacePtr<ITreeViewMgr> treeMgr(QueryResultTreeMgr());
+		InterfacePtr<IEventHandler> treeEH(treeMgr, UseDefaultIID());
+		if (treeEH != nil && treeEH.get() == focus)
+			holder = "tree";
+		else
+		{
+			InterfacePtr<IControlView> view(focus, UseDefaultIID());
+			char text[96];
+			::sprintf_s(text, sizeof(text), "class=0x%x widget=0x%x", static_cast<unsigned>(::GetClass(focus).Get()),
+				view != nil ? static_cast<unsigned>(view->GetWidgetID().Get()) : 0u);
+			holder = text;
+		}
+	}
+	return holder + " " + DiagSystemFocus();
 }
 #endif
 
@@ -919,6 +956,10 @@ bool KFCResultTree::TakeKeyboard()
 	KFC_DIAG_LOG("RETFOCUS TakeKeyboard after the panel's doors focus=%s", DiagKeyFocus().c_str());
 	if (keyBoard->GetKeyFocus() != listEH)
 		keyBoard->AcquireKeyFocus(listEH);
+	// The keyboard frame drawn again: the panel's doors can bring the system's keyboard back to the panel's window with
+	// InDesign's holder unchanged (a row clicked after Find/Change's title bar - measured 2026-10-10), and then nothing
+	// else asks the frame again (KFCResultTreeEH's PostGetKeyFocus does it when the holder changes).
+	RedrawKeyboardFrame();
 	return keyBoard->GetKeyFocus() == listEH;
 }
 

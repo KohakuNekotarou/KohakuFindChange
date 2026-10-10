@@ -54,6 +54,13 @@ void	KFCSetPanelTranslucent(bool16 on);
 //    docked", rather than leaving a click with no visible result unexplained.
 bool16	KFCApplyPanelTranslucency();
 
+// (2026-10-10) Does the SYSTEM send the keys to the window this panel is on now - is the root of ::GetFocus() the root
+// of the panel's window (OWL.Dock while it floats, the main frame while docked)? The keyboard frame's second question
+// (KFCResultTree::ListHoldsKeyboard): a click on Find/Change's title bar takes the system's keyboard to the dialog and
+// leaves InDesign's on the result list, and a key then goes to the dialog. Here because this file finds the panel's
+// window (KFCQueryPaletteWindow). kFalse with no panel, or while InDesign is not the active application.
+bool16	KFCPanelHasSystemKeyboard();
+
 //----------------------------------------------------------------------------------------
 // The same treatment for InDesign's OWN Find/Change dialog (the user's request).
 //

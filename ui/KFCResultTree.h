@@ -63,11 +63,20 @@ namespace KFCResultTree
 	/** A selected GREP row's AFTER-TEXT on the message area: "Preview Text:", the row's context faded and
 	    what its Replace would write at full colour (KFCReplaceEngine::PreviewHit - written in a step thrown away).
 	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
-	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report. */
-	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx);
+	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report.
+	    @param notSelectedWhy  a word or two on why the click did not select the row's match ("no width", "overset",
+	           "hidden layer" - 1.4.0, the author's call of 2026-10-10), put in the heading: "Preview Text (not
+	           selected - no width):". nil when it was selected. */
+	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
-	/** The message area showing a preview goes back to the last ordinary message - for a row that has none, so the
-	    previous row's does not stand beside it. Nothing when it shows anything else. */
+	/** A ROW'S OWN NOTE on the message area (1.4.0): why a click did not select the row's match or item. Like a preview
+	    it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
+	    is landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row
+	    that was selected). Safe when the panel is closed. */
+	void ShowRowNote(const PMString& note);
+
+	/** The message area showing a preview or a row's note goes back to the last ordinary message - for a row that has
+	    none, so the previous row's does not stand beside it. Nothing when it shows anything else. */
 	void DropRowPreview();
 
 	/** REPLACE ONE ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
@@ -89,6 +98,21 @@ namespace KFCResultTree
 	    land it. For the arrows' walk and a Return's replace (KFCResultTreeEH), after a document window has come forward.
 	    Does nothing while the panel is closed. True = the list holds the keyboard. */
 	bool TakeKeyboard();
+
+	/** THE KEYBOARD FRAME (1.4.0 - the author's call of 2026-10-10: "make it plain that the list has the keyboard"):
+	    does the result list hold InDesign's keyboard now - IKeyBoard's focus is the list's own handler? Asked when the
+	    panel draws the frame around the list (KFCPanelView::Draw). false while the panel is closed. Defined in
+	    KFCResultTreeEH.cpp, as the next one. */
+	bool ListHoldsKeyboard();
+
+	/** The strip around the list drawn again, so the keyboard frame comes or goes - called when the list takes the
+	    keyboard or lets it go (KFCResultTreeEH's PostGetKeyFocus / PostGiveUpKeyFocus). Nothing while the panel is
+	    closed. */
+	void RedrawKeyboardFrame();
+
+	/** The keyboard frame's width in pixels, drawn just outside the list's edges - the panel leaves 3 or 4 px around the
+	    list (KFCUI.fr). */
+	const int32 kKeyboardFrameWidth = 2;
 
 	/** The result list's Return filter off the application's event dispatcher and released, for good - the UI half's
 	    shutdown (through ShutdownCleanup). Defined in KFCResultTreeEH.cpp, where the filter lives. */
@@ -123,6 +147,11 @@ namespace KFCResultTree
 	    holder's boss and widget. Made when a Return that replaced a row let the keyboard go to the document: the
 	    trace says where in the Return it went (KFCResultTreeEH::KeyDown, ReplaceRow). */
 	std::string DiagKeyFocus();
+
+	/** (Test builds only.) The window the SYSTEM sends the keys to - the root of ::GetFocus(), by its title, and the
+	    active window - for the trace beside DiagKeyFocus (2026-10-10: after Find/Change's title bar was clicked the
+	    list still held InDesign's keyboard, yet the down arrow moved the page item). Defined in KFCResultTreeEH.cpp. */
+	std::string DiagSystemFocus();
 #endif
 }
 

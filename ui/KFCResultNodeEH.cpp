@@ -59,7 +59,7 @@
 #include "KFCJump.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces (the model/UI split)
 #include "KFCDiag.h"			// KFC_DIAG_LOG - the CLICKFOCUS trace, test builds only
-#include "KFCResultTree.h"		// DiagKeyFocus - who holds the keyboard, for that trace
+#include "KFCResultTree.h"		// TakeKeyboard - the hand-off after a click; DiagKeyFocus - who holds the keyboard, for that trace
 
 namespace
 {
@@ -85,6 +85,9 @@ public:
 
 	virtual bool16 LButtonUp(IEvent* e);
 	virtual bool16 RButtonDn(IEvent* e);
+#ifdef KFC_DIAG
+	virtual bool16 LButtonDn(IEvent* e);	// (test builds only) the CLICKFOCUS trace of the press
+#endif
 };
 
 CREATE_PMINTERFACE(KFCResultNodeEH, kKFCResultNodeEHImpl)
@@ -124,27 +127,54 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
-	// (KFCResultTreeEH). Two things happen in this one call, and BOTH are needed:
+	// (KFCResultTreeEH). Two things happen below, and BOTH are needed:
 	//
 	//   * The QUERY brings the list's IID_IEVENTHANDLER into existence. Interface implementations
 	//     are created on first use, and nothing else in this plug-in ever asks the tree for its
 	//     event handler - so without this line KFCResultTreeEH is never constructed at all and the
 	//     arrows keep the stock behaviour (visible rows only). Measured: with the panel
 	//     open and a book searched, a trace in that class's constructor never fired.
-	//   * AcquireKeyFocus makes it the key target. ActivateNode above brings a document window -
+	//   * The hand-off makes it the key target. ActivateNode above brings a document window -
 	//     or, on a book row, the Book panel - forward, and that takes the focus with it.
 	//
 	// AFTER the jump, deliberately: acquiring first and jumping second leaves the arrows stranded
 	// in the document. KESCL hit exactly this and settled on the same order (KESCLResultNodeEH.cpp).
-	// IKeyBoard lives on the application boss.
+	//
+	// THROUGH THE PANEL'S DOORS, EVERY CLICK (2026-10-10 - the author's report: Find/Change's title bar clicked, then a
+	// row, and the down arrow moved the selected page item instead of walking the list). At that click the list still
+	// held InDesign's keyboard ("focus=tree" in the trace), so the hand-off - IKeyBoard alone, and only when it named
+	// another holder - did nothing, and the arrow never reached the list. KFCResultTree::TakeKeyboard makes the panel the
+	// active one with the keyboard given to it (IPanelMgr::ShowPanelByWidgetID), then the list - what the arrows' walk
+	// does after each landing.
 	InterfacePtr<IEventHandler> treeEH(treeController, UseDefaultIID());
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
-	if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() != treeEH)
-		keyBoard->AcquireKeyFocus(treeEH);
+	bool acquireOnly = false;
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch click-acquire-only: the hand-off as it was before 2026-10-10 - the case that shows
+	// what the panel's doors add (click-arrow-after-title).
+	acquireOnly = KFC_DIAG_FAULT("click-acquire-only");
+#endif
+	if (acquireOnly)
+	{
+		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());	// IKeyBoard is the app's
+		InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+		if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() != treeEH)
+			keyBoard->AcquireKeyFocus(treeEH);
+	}
+	else if (treeEH != nil)
+		(void)KFCResultTree::TakeKeyboard();
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp handed the keyboard to the list focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 	return result;
 }
+
+#ifdef KFC_DIAG
+// (Test builds only) The press, for the CLICKFOCUS trace: who held the keyboard - InDesign's and the system's - as the
+// click began (2026-10-10, Find/Change's title bar).
+bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
+{
+	KFC_DIAG_LOG("CLICKFOCUS row LButtonDn focus=%s", KFCResultTree::DiagKeyFocus().c_str());
+	return TreeNodeEventHandler::LButtonDn(e);
+}
+#endif
 
 // Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call) - at the cursor (PopRowMenu).
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as

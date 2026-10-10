@@ -556,6 +556,24 @@ bool16 KFCApplyPanelTranslucency()
 #endif
 }
 
+bool16 KFCPanelHasSystemKeyboard()
+{
+#ifdef WINDOWS
+	// The root of the system's keyboard window against the root of the panel's own (KFCQueryPaletteWindow - the same
+	// OWL.Palette the translucency aims at; GA_ROOT is OWL.Dock while it floats, the main frame while docked, as
+	// KFCQueryTranslucentTarget measured). Measured 2026-10-10 (run.ps1's osfocus beside the trace's os=): while the list
+	// walked on the arrows the system's keyboard was the panel's OWL.Dock; after Find/Change's title bar was clicked it
+	// was the dialog, with InDesign's keyboard still on the list - and the down arrow moved the page item.
+	const HWND focus = ::GetFocus();
+	const HWND palette = KFCQueryPaletteWindow();
+	if (focus == nullptr || palette == nullptr)
+		return kFalse;
+	return (::GetAncestor(focus, GA_ROOT) == ::GetAncestor(palette, GA_ROOT)) ? kTrue : kFalse;
+#else
+	return kTrue;		// Mac: no second keyboard to ask - InDesign's holder is the answer
+#endif
+}
+
 //========================================================================================
 // InDesign's OWN Find/Change dialog (the user's request)
 //

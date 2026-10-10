@@ -725,7 +725,8 @@ bool FrontChapter(const UIDRef& docRef)
 }
 
 // NOTHING SELECTED in the front document - DeselectAll on the active selection, when there is one (1.4.0: a hit row's
-// click clears the way for its own selection; an object row's Replace takes away what InDesign's replace selected).
+// click clears the way for its own selection; an object row's Replace whose item is gone takes away what InDesign's walk
+// selected).
 void ClearSelection()
 {
 	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
@@ -808,48 +809,102 @@ bool PutTypeToolOn()
 	return true;
 }
 
+// WHY A CLICK LEFT ITS ROW'S MATCH UNSELECTED (1.4.0 - the author's call of 2026-10-10: a text row's click says why it
+// cannot select). Said by ActivateNode once the landing is over: on a GREP row whose preview comes up, in the preview's
+// heading ("Preview Text (not selected - no width):" - the author chose both, the same day); on any other row as the
+// row's note (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes it away). The
+// sentences are the ones the double click said until it went (2026-10-10). kNotSelectedQuietly: no reason to give - a
+// row whose text is gone (the jump has said "Not found") or a step InDesign refused.
+enum NotSelected
+{
+	kSelected = 0,
+	kNotSelectedLocked,
+	kNotSelectedHidden,
+	kNotSelectedNoWidth,
+	kNotSelectedOverset,
+	kNotSelectedQuietly
+};
+
+// The reason as a sentence - the row's note when no preview carries it. Empty for kSelected / kNotSelectedQuietly.
+PMString NotSelectedSentence(NotSelected why)
+{
+	const char* text = "";
+	switch (why)
+	{
+		case kNotSelectedLocked:	text = "That match is locked - it cannot be selected."; break;
+		case kNotSelectedHidden:	text = "That match is on a hidden layer - it cannot be selected."; break;
+		case kNotSelectedNoWidth:	text = "That match has no width (^, $ or a lookaround) - there is nothing to select."; break;
+		case kNotSelectedOverset:	text = "An overset match has no text on the page to select."; break;
+		default:					break;
+	}
+	PMString sentence(text);
+	sentence.SetTranslatable(kFalse);
+	return sentence;
+}
+
+// The reason in a word or two - for a GREP row's preview heading. nil for kSelected / kNotSelectedQuietly.
+const char* NotSelectedWords(NotSelected why)
+{
+	switch (why)
+	{
+		case kNotSelectedLocked:	return "locked";
+		case kNotSelectedHidden:	return "hidden layer";
+		case kNotSelectedNoWidth:	return "no width";
+		case kNotSelectedOverset:	return "overset";
+		default:					return nil;
+	}
+}
+
 // A CLICK'S SELECTION OF A TEXT ROW'S MATCH (1.4.0 - the author's call of 2026-10-09: the tree does what Edit >
 // Find/Change's Find Next does, one result selected after another, so the selection is the pointer and no marker goes
 // over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
-// overset one never comes here). Refused WITHOUT A WORD: the marker JumpToHit raises instead is the answer, as on every
-// click before 1.4.0. (The double click said why - locked, hidden, no width, overset - until it went with the author's
-// call of 2026-10-10.) The Type tool is put on, as Find Next does (PutTypeToolOn - the author's call of 2026-10-10);
-// the keyboard stays on the list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the
-// arrows walk on and Return replaces. The document is in front and composed, inside JumpToHit's dirty guard, its
-// selection cleared. True when the match is selected.
-bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end, bool found)
+// overset one never comes here). One that cannot be is marked by JumpToHit instead, and the answer says why (NotSelected
+// - the reasons the double click gave until it went, said for the click since the author's call of 2026-10-10). The
+// Type tool is put on, as Find Next does (PutTypeToolOn - the author's call of 2026-10-10); the keyboard stays on the
+// list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return
+// replaces. The document is in front and composed, inside JumpToHit's dirty guard, its selection cleared. kSelected
+// when the match is selected.
+NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex start, TextIndex end,
+	bool found)
 {
-	if (!found || start >= end)
-		return false;
+	// A row whose text is not where it says has its own sentence - the jump's "Not found" - and nothing else to add.
+	if (!found)
+		return kNotSelectedQuietly;
+	// Locked and hidden before the width, the order the double click asked them in: a locked zero-width match is locked.
 	bool locked = false, hidden = false;
 	KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
-	if (locked || hidden)
-		return false;
+	if (locked)
+		return kNotSelectedLocked;
+	if (hidden)
+		return kNotSelectedHidden;
+	if (start >= end)
+		return kNotSelectedNoWidth;
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
-		return false;
+		return kNotSelectedQuietly;
 	const TextIndex total = textModel->TotalLength();
 	if (start >= total)
-		return false;
+		return kNotSelectedQuietly;
 	if (end > total)
 		end = total;
 	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
 	if (selectionManager == nil)
-		return false;
+		return kNotSelectedQuietly;
 	InterfacePtr<ITextSelectionSuite> textSelectionSuite(selectionManager, UseDefaultIID());
 	if (textSelectionSuite == nil)
-		return false;
+		return kNotSelectedQuietly;
 	// The Type tool after the selection was cleared (JumpToHit) and before the text is selected - the order both
 	// official recipes keep: gotolasttextedit deselects and then switches (GTTxtEdtUtils.cpp:113-128), typekitinspector
 	// deselects and never switches (TKITreeWidgetObserver.cpp:136-140). Switching first hands the incoming tool a
 	// selection it will convert, only for the next line to throw the result away.
 	if (!PutTypeToolOn())
-		return false;
+		return kNotSelectedQuietly;
 	// ! RangeData's two-argument form is (start, END) - not (start, length). Getting that wrong selects from the match
 	//   to a point measured from the start of the STORY.
 	// kDontScrollSelection: the jump has already centred the match (IPanorama::ScrollContentLocationToFrameCenter);
 	// kScrollIntoView would only promise it is somewhere on screen, and undo that better answer.
-	return textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil) != kFalse;
+	return (textSelectionSuite->SetTextSelection(storyRef, RangeData(start, end), Selection::kDontScrollSelection, nil)
+		!= kFalse) ? kSelected : kNotSelectedQuietly;
 }
 
 /** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
@@ -861,12 +916,15 @@ bool SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, 
 
     Reached only through ActivateNode, where the "one activation at a time" guard lives - which is why
     it is in here.
+    @param outWhy  kSelected, or why the landing left the match unselected (NotSelected - an overset match's
+          too) - for ActivateNode to say once the preview, if any, is up.
     @return true when the jump LANDED ON THE ROW - its document in front and the text at its place
           still the text the row describes (overset or not). False for every other end: a bad index,
           a row with no place, an unreachable chapter, a window that could not be fronted, a row whose
           text is no longer there (each of which has said why, or has nothing to say). */
-bool JumpToHit(int32 chapterIdx, int32 hitIdx)
+bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 {
+	outWhy = kNotSelectedQuietly;
 	UIDRef docRef;
 	IDFile file;
 	UID storyUID = kInvalidUID;
@@ -978,6 +1036,21 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 		if (loc.found)
 			ScrollViewToPoint(frontView, loc.outportPb);	// scroll only - no marker on the "+" locator
 		KFCHitMarkerView::Hide();
+		// Nothing selected (cleared above), and why - in the double click's order: locked, hidden, no width, then overset.
+		// A row whose text has gone says only the "Not found" below.
+		if (sameOccurrence)
+		{
+			bool locked = false, hidden = false;
+			KFCResults()->GetHitReach(chapterIdx, hitIdx, locked, hidden);
+			if (locked)
+				outWhy = kNotSelectedLocked;
+			else if (hidden)
+				outWhy = kNotSelectedHidden;
+			else if (start >= end)
+				outWhy = kNotSelectedNoWidth;
+			else
+				outWhy = kNotSelectedOverset;
+		}
 	}
 	else
 	{
@@ -996,8 +1069,10 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx)
 			// keeps (the user's request).
 			//
 			// 1.4.0: a match that can be selected IS selected, and no marker goes over it - a selection under an
-			// inversion cannot be read (JMP-17's reason). Every other row is marked as above.
-			if (SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence))
+			// inversion cannot be read (JMP-17's reason). Every other row is marked as above, and the answer says
+			// why it was not selected (ActivateNode says it).
+			outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
+			if (outWhy == kSelected)
 				KFCHitMarkerView::Hide();
 			else
 				KFCHitMarkerView::Show(db, storyUID, start, end);
@@ -1164,7 +1239,8 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 		ClearSelection();
 		PMString message(locked ? "That object is locked - not selected." : "That object is hidden - not selected.");
 		message.SetTranslatable(kFalse);
-		KFCResultTree::ShowStatus(message);
+		// The row's note, as a text row's reason is (2026-10-10): the next row landed on takes it away.
+		KFCResultTree::ShowRowNote(message);
 		return;
 	}
 	(void)SelectItem(itemRef);
@@ -1222,6 +1298,11 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 
 } // anonymous namespace
 
+void KFCJump::ClearFrontSelection()
+{
+	ClearSelection();
+}
+
 void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 {
 	// One door for every row, so a click and a keyboard walk can never drift apart - the reason
@@ -1243,14 +1324,25 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 	if (hitIdx >= 0)
 	{
 		const UID item = KFCResults()->GetHitItem(chapterIdx, hitIdx);
+		NotSelected why = kNotSelectedQuietly;
 		if (item != kInvalidUID)
 		{
-			// AN OBJECT ROW (1.4.0): the item shown and selected (form S); it has no preview (a GREP row's alone).
-			(void)JumpToObject(chapterIdx, hitIdx, item);
+			// AN OBJECT ROW (1.4.0): the item shown and selected (form S); it has no preview (a GREP row's alone). The
+			// previous row's preview or note goes FIRST - the jump can put this row's own note up (SelectItemOnClick).
 			KFCResultTree::DropRowPreview();
+			(void)JumpToObject(chapterIdx, hitIdx, item);
 		}
-		else if (JumpToHit(chapterIdx, hitIdx))
-			(void)KFCResultTree::ShowRowPreview(chapterIdx, hitIdx);
+		else if (JumpToHit(chapterIdx, hitIdx, why))
+		{
+			// WHY IT WAS NOT SELECTED (the author's call of 2026-10-10): in a GREP row's preview heading when the preview
+			// comes up, otherwise as the row's own note - after the preview, which takes a previous row's note away.
+			if (!KFCResultTree::ShowRowPreview(chapterIdx, hitIdx, NotSelectedWords(why)))
+			{
+				const PMString sentence(NotSelectedSentence(why));
+				if (!sentence.IsEmpty())
+					KFCResultTree::ShowRowNote(sentence);
+			}
+		}
 		else
 			KFCResultTree::DropRowPreview();
 	}
@@ -1321,10 +1413,19 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 		ShowItemInView(UIDRef(db, item));
 	}
 	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, outStatus);
-	// 9. Nothing left selected - InDesign's walk to the item and its replace selected what they met (in this document,
-	// now in front). Taken away whether the write went through or not.
+	// 9. THE ROW'S ITEM LEFT SELECTED (the author's call of 2026-10-10: the item stays selected after its Replace - it
+	// reverses 10-09's "nothing left selected"). InDesign's walk to the item and its replace selected what they met (in
+	// this document, now in front) - the item itself when the write went through, another one when the walk stopped
+	// short - so the row's item is selected outright, the way its click selects it (a locked or hidden one: nothing,
+	// and the row's note says why), whether the write went through or not. An item gone meanwhile leaves nothing.
 	if (LayoutOfDocIsFrontmost(docRef))
-		ClearSelection();
+	{
+		const UIDRef itemRef(db, item);
+		if (ItemIsThere(itemRef))
+			SelectItemOnClick(chapterIdx, hitIdx, itemRef);
+		else
+			ClearSelection();
+	}
 	return wrote;
 }
 

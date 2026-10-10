@@ -12,7 +12,8 @@
 //  on the list. A match that cannot be selected - locked, hidden, zero width, no longer found -
 //  gets the marker on its characters instead (KFCHitMarker - a global text adornment), which takes
 //  itself down after about a second, and nothing is left selected; until 1.4.0 every click did only
-//  that, and changed nothing in the document (JMP-06).
+//  that, and changed nothing in the document (JMP-06). Why it was not selected is said (the author's
+//  call of 2026-10-10): the row's note on the message area, or a GREP row's preview heading.
 //  A double click is two clicks (1.4.0 - the author's call of 2026-10-10: its own selection, which
 //  gave the keyboard to the text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
 //  call: on the same beat as KCM's Story-mode jump, which raises its flash straight away). With
@@ -49,9 +50,14 @@ namespace KFCJump
 
 	/** AN OBJECT ROW'S REPLACE (1.4.0, spec O10): the model's checks first (IKFCRuns::CheckObjectReplace - a refused row
 	    brings no window forward), then the row's document in front and the view on its item (InDesign's replace selects
-	    what it writes in the FRONT document - O10 step 6), the write (IKFCRuns::ReplaceHit) and the selection it left
-	    taken away (step 9 - the author's call). outStatus = what to say. True when it wrote. */
+	    what it writes in the FRONT document - O10 step 6), the write (IKFCRuns::ReplaceHit), and the row's item left
+	    selected as a click selects it (step 9 - the author's call of 2026-10-10; nothing selected when the item is gone).
+	    outStatus = what to say. True when it wrote. */
 	bool ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+
+	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own
+	    clearing (1.4.0), for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
+	void ClearFrontSelection();
 
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a
 	    chapter row lands, to decide whether to close the other displayed chapters; the flyout drives it.

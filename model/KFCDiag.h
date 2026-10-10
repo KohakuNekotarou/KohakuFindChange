@@ -71,6 +71,10 @@
 //    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
 //                (a jumped-to replaced row drawn hilited)
+//    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list as before
+//                2026-10-10 - IKeyBoard alone, and only when it names another holder - not through the panel's doors
+//                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
+//                clicked (work\kbs-regress\cases\fault-click-acquire-only-on.jsx)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
