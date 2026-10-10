@@ -237,7 +237,12 @@ boost::shared_ptr<AttributeBossList> gSearchedFindAttrs;
 
 // The attribute database that list's UIDs are in. Kept beside it because a UID means nothing
 // without its database, so a list from a DIFFERENT one must not be compared against it - see
-// FindFormatHasChanged.
+// FindFormatHasChanged. A raw address, so both are let go if that database closes
+// (ForgetSearchedFindFormatOf): the address can be handed to the next document opened.
+// Measured (10-11, a test build's FINDFORMAT lines): it was NOT a document's - the same database for
+// four documents in turn, outliving each, with the style given by name or as a document's style
+// (which the options keep by name) - and not the options' own either. So that forget has not been
+// seen to fire; it stays for any route that would hand this a document's database.
 IDataBase* gSearchedFindAttrDB = nil;
 
 // Raise gSearching for the length of a search, whichever way SearchBook returns.
@@ -1790,6 +1795,8 @@ void KFCSearchEngine::RememberFindFormat()
 	// the dialog, and the user is free to edit the format pane the moment the search returns.
 	gSearchedFindAttrs.reset(attrs->Duplicate());
 	gSearchedFindAttrDB = db;
+	// Which database that is - the session's own (the options' workspace) or a document's - in a test build.
+	KFC_DIAG_LOG("FINDFORMAT remembered attrDB=%p optionsDB=%p", (void*)db, (void*)::GetDataBase(opts));
 }
 
 bool KFCSearchEngine::FindFormatHasChanged()
@@ -1819,6 +1826,14 @@ void KFCSearchEngine::ForgetSearchedFindFormat()
 	// against a database no list belongs to.
 	gSearchedFindAttrs.reset();
 	gSearchedFindAttrDB = nil;
+}
+
+void KFCSearchEngine::ForgetSearchedFindFormatOf(IDataBase* closingDB)
+{
+	if (closingDB == nil || closingDB != gSearchedFindAttrDB)
+		return;
+	KFC_DIAG_LOG("FINDFORMAT forgotten - its attribute database %p is closing", (void*)closingDB);
+	KFCSearchEngine::ForgetSearchedFindFormat();
 }
 
 void KFCSearchEngine::DropResults()

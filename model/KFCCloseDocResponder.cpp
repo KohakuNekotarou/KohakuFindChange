@@ -18,8 +18,9 @@
 //  results because one chapter was closed would throw away work. Book results are retired when the
 //  BOOK closes, by KFCBookWatch (an observer: a book close has no signal to respond to).
 //
-//  One piece of bookkeeping DOES run for every close, whatever the scope: the closing document
-//  comes off the held-chapter list (ForgetHeldDoc) - see the comment in Respond.
+//  Some bookkeeping DOES run for every close, whatever the scope: everything that holds the closing
+//  document by address lets it go (the held-chapter list, the jump marker, the rows' text foci, the
+//  Undo follow, the remembered Find Format) - see the comments in Respond.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
@@ -67,7 +68,7 @@
 #include "KFCRowFoci.h"			// DetachDocument - the rows' text foci let go of a closing document
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
-#include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together
+#include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together; ForgetSearchedFindFormatOf
 #include "KFCUndoFollow.h"		// ForgetDocument / ForgetBookChapter - All Documents and a book let one document go
 
 /** Retires a document-scope result set when its document is closed.
@@ -137,6 +138,11 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// ...and the Undo follow takes its observer off the closing document, for every close and ahead of every
 	// exit (KFCUndoFollow::DocumentClosing): what was attached is detached.
 	KFCUndoFollow::DocumentClosing(closingDocRef);
+
+	// ...and the Find Format the rows were searched with lets go of the closing database if its UIDs are in it, for every
+	// close and ahead of every exit: FindFormatHasChanged tells databases apart by address, and this one's can be handed
+	// to the next document opened (KFCSearchEngine::ForgetSearchedFindFormatOf).
+	KFCSearchEngine::ForgetSearchedFindFormatOf(closingDocRef.GetDataBase());
 
 	// ...and a chapter of a book's list leaves the kept writes, so that a query run that wrote it is still followed
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - All

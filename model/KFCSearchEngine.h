@@ -303,6 +303,15 @@ namespace KFCSearchEngine
 	    being thrown away, so it has no business outliving them. DropResults does all three. */
 	void ForgetSearchedFindFormat();
 
+	/** Drop what RememberFindFormat kept when the database its UIDs are in is the one closing - and
+	    nothing else. FindFormatHasChanged tells databases apart by address alone, and a closed
+	    document's address is free to be handed to the next document opened, so the copy goes with its
+	    database rather than being compared later against somebody else's ([[uidref-reuse-after-close]]).
+	    KFCCloseDocResponder calls it for every close, the way the held list and the jump marker forget
+	    a closing document. Insurance: measured, that database has been one of the session's, which
+	    outlives every document (the note over gSearchedFindAttrDB in the .cpp). */
+	void ForgetSearchedFindFormatOf(IDataBase* closingDB);
+
 	/** THROW THE RESULTS AWAY - ALL OF WHAT DESCRIBES THEM. The rows
 	    (KFCResultModel::Clear), the book they were searched in and the chapters it holds open
 	    (KFCBookScope::ReleaseSearchedBook) and the Find Format they were found with
