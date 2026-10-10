@@ -984,7 +984,7 @@ bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitI
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
 	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
 	const bool wrote = (KFCResults()->GetHitItem(chapterIdx, hitIdxs[0]) != kInvalidUID)
-		? KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, status)
+		? KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, LastSelectedHit(chapterIdx, hitIdxs), status)
 		: KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, status);	// no prompt (the author's call)
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the write focus=%s", DiagKeyFocus().c_str());
 	// A WRITE INTO A DOCUMENT THAT HAS NO WINDOW (Search: = All Documents): it goes through and nothing opens one - the

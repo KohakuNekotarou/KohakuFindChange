@@ -110,9 +110,6 @@ public:
 	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) = 0;
 	/** = KFCResultModel::GetHitItem (appended, 1.4.0) - the page item an object row stands for, kInvalidUID for a text row. */
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) = 0;
-	/** = KFCResultModel::GetHitSpread (appended, 1.4.0 - O17) - the spread an object row's item stood on when found: which
-	    rows can be selected together. */
-	virtual UID GetHitSpread(int32 chapterIdx, int32 hitIdx) = 0;
 	/** = KFCResultModel::SetContextMenuChapter / GetContextMenuChapter (appended, 1.4.0 - 2026-10-10) - the document row a
 	    right-click menu was popped over, for its Search This Document Again. */
 	virtual void SetContextMenuChapter(int32 chapterIdx) = 0;

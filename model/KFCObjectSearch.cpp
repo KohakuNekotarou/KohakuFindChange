@@ -690,15 +690,9 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 			: ((pageList != nil) ? pageList->GetPageIndex(page) : -1);
 	}
 
-	// THE SPREAD (O17): which rows can be selected together - InDesign selects page items on one spread at a time. An inline
-	// in overset text has none (QuerySpread answers nil): its row reads "overset" (BuildHitLocator), and nothing of it is
-	// shown or selected, and its row's Replace is refused (IsOnSpread).
-	if (hier != nil)
-	{
-		InterfacePtr<ISpread> spread(Utils<IPasteboardUtils>()->QuerySpread(hier));
-		out.itemSpread = (spread != nil) ? ::GetUID(spread) : kInvalidUID;
-	}
-	out.isOverset = (out.itemSpread == kInvalidUID);
+	// NO SPREAD HOLDS IT - an inline in overset text (QuerySpread answers nil): its row reads "overset" (BuildHitLocator),
+	// nothing of it is shown or selected, and its row's Replace is refused (IsOnSpread).
+	out.isOverset = !IsOnSpread(itemRef);
 
 	// Out of the user's reach where it is (the text rows' two words, by the same code).
 	out.isHidden = KFCPageItemFacts::IsFrameHidden(db, item);

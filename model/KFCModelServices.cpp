@@ -71,7 +71,6 @@ public:
 	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuStory(chapterIdx, groupIdx); }
 	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuStory(outChapterIdx, outGroupIdx); }
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitItem(chapterIdx, hitIdx); }
-	virtual UID GetHitSpread(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitSpread(chapterIdx, hitIdx); }
 	virtual void SetContextMenuChapter(int32 chapterIdx) { KFCResultModel::SetContextMenuChapter(chapterIdx); }
 	virtual bool GetContextMenuChapter(int32& outChapterIdx) { return KFCResultModel::GetContextMenuChapter(outChapterIdx); }
 };

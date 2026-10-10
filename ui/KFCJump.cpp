@@ -76,7 +76,6 @@
 #include "KFCResultTree.h"			// RefreshRows / ShowStatus - telling the panel what was found here
 #include "KFCDiag.h"				// KFC_DIAG_LOG / KFC_DIAG_FAULT - test builds only
 #include <chrono>					// how soon after a click Search: changed (KeepSearchScopeAfterClick)
-#include <utility>					// the items of rows selected together, with their spreads (CollectRowItems)
 #include <vector>
 
 namespace
@@ -1318,111 +1317,6 @@ bool SelectItem(const UIDRef& itemRef)
 	return SelectItems(UIDList(itemRef));
 }
 
-// THE ITEMS OF ROWS SELECTED TOGETHER that can be selected now (O17) - and the others, counted by why not. The spread
-// they are selected on is the shown row's item's when it can be selected, else the first one's.
-struct RowItems
-{
-	UIDList		items;
-	UID			shown;			// the shown row's item, when it is among `items`
-	int32		missing;		// gone from the document - its row now reads Missing (marked here)
-	int32		locked;
-	int32		hidden;
-	int32		overset;		// in overset text - no spread holds it (2026-10-10 night)
-	int32		elsewhere;		// on another spread than the rest now
-	bool		rowsChanged;	// a row was marked Missing - the rows want repainting
-	explicit RowItems(IDataBase* db) : items(db), shown(kInvalidUID), missing(0), locked(0), hidden(0), overset(0),
-		elsewhere(0), rowsChanged(false) {}
-};
-
-void CollectRowItems(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, RowItems& out)
-{
-	IDataBase* const db = out.items.GetDataBase();
-	std::vector<std::pair<UID, UID> > there;		// (item, the spread it stands on now)
-	UID shownItem = kInvalidUID;
-	for (size_t k = 0; k < hitIdxs.size(); ++k)
-	{
-		const int32 hit = hitIdxs[k];
-		const UIDRef itemRef(db, KFCResults()->GetHitItem(chapterIdx, hit));
-		if (!ItemIsThere(itemRef))
-		{
-			++out.missing;
-			bool replaced = false, lockedFlag = false;
-			KFCResults()->GetHitFlags(chapterIdx, hit, replaced, lockedFlag);
-			if (!replaced)
-			{
-				KFCResults()->SetHitOutcome(chapterIdx, hit, KFCResultModel::kOutcomeMissing);
-				out.rowsChanged = true;
-			}
-			continue;
-		}
-		// Out of reach where it is - the row's own flags, as a click reads them (SelectItemOnClick).
-		bool isLocked = false, isHidden = false;
-		KFCResults()->GetHitReach(chapterIdx, hit, isLocked, isHidden);
-		if (isLocked || isHidden)
-		{
-			++(isLocked ? out.locked : out.hidden);
-			continue;
-		}
-		const UID itemSpread = SpreadOfItem(itemRef);
-		if (itemSpread == kInvalidUID)
-		{
-			++out.overset;		// nothing to select (JumpToObject's rule)
-			continue;
-		}
-		there.push_back(std::make_pair(itemRef.GetUID(), itemSpread));
-		if (hit == shownHit)
-			shownItem = itemRef.GetUID();
-	}
-	if (there.empty())
-		return;
-	UID spread = there[0].second;
-	for (size_t k = 0; k < there.size(); ++k)
-		if (there[k].first == shownItem)
-			spread = there[k].second;
-	for (size_t k = 0; k < there.size(); ++k)
-	{
-		if (there[k].second != spread)
-		{
-			++out.elsewhere;
-			continue;
-		}
-		out.items.push_back(there[k].first);
-		if (there[k].first == shownItem)
-			out.shown = shownItem;
-	}
-}
-
-// "Selected 3 objects." / "Selected 3 of 5 objects - 1 locked, 1 hidden."
-PMString SelectedObjectsSentence(int32 rows, int32 taken, const RowItems& left)
-{
-	PMString sentence("Selected ");
-	sentence.AppendNumber(taken);
-	if (taken < rows)
-	{
-		sentence.Append(" of ");
-		sentence.AppendNumber(rows);
-	}
-	sentence.Append(rows == 1 ? " object" : " objects");
-	const int32 counts[6] = { left.missing, left.locked, left.hidden, left.overset, left.elsewhere,
-		static_cast<int32>(left.items.Length()) - taken };
-	const char* const words[6] = { "no longer in the document", "locked", "hidden", "in overset text", "on another spread now",
-		"not taken by InDesign" };
-	bool first = true;
-	for (int32 i = 0; i < 6; ++i)
-	{
-		if (counts[i] <= 0)
-			continue;
-		sentence.Append(first ? " - " : ", ");
-		sentence.AppendNumber(counts[i]);
-		sentence.Append(" ");
-		sentence.Append(words[i]);
-		first = false;
-	}
-	sentence.Append(".");
-	sentence.SetTranslatable(kFalse);
-	return sentence;
-}
-
 // A CLICK ON AN OBJECT ROW (form S - the author's call of 2026-10-09: whatever Search: is, as Find Next does, and as the
 // text rows do - Task 0): the item selected; a locked or hidden one leaves nothing selected, and the line says why -
 // form S builds no frame marker, so the line and the view are the pointer. The document is in front and the view on
@@ -1441,6 +1335,18 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 		return;
 	}
 	(void)SelectItem(itemRef);
+}
+
+// A REPLACED ROW'S ITEM LEFT SELECTED (step 9 - the author's call of 2026-10-10: the item stays selected after its Replace;
+// for rows replaced together, the item of the row selected last - the page shows that row, as their click did): selected
+// the way its click selects it (a locked or hidden one: nothing, and the row's note says why); one gone meanwhile, or in
+// overset text, leaves nothing selected. InDesign's walk and replace selected what they met, which this puts right.
+void LeaveRowItemSelected(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
+{
+	if (ItemIsThere(itemRef) && SpreadOfItem(itemRef) != kInvalidUID)
+		SelectItemOnClick(chapterIdx, hitIdx, itemRef);
+	else
+		ClearSelection();
 }
 
 /** Jump to an OBJECT row (spec O9): its document in front (a windowless chapter given its window - JMP-09), the view on
@@ -1627,65 +1533,14 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 		ShowItemInView(UIDRef(db, item));
 	}
 	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, outStatus);
-	// 9. THE ROW'S ITEM LEFT SELECTED (the author's call of 2026-10-10: the item stays selected after its Replace - it
-	// reverses 10-09's "nothing left selected"). InDesign's walk to the item and its replace selected what they met (in
-	// this document, now in front) - the item itself when the write went through, another one when the walk stopped
-	// short - so the row's item is selected outright, the way its click selects it (a locked or hidden one: nothing,
-	// and the row's note says why), whether the write went through or not. An item gone meanwhile leaves nothing.
+	// 9. THE ROW'S ITEM LEFT SELECTED (the author's call of 2026-10-10 - it reverses 10-09's "nothing left selected"),
+	// whether the write went through or not (LeaveRowItemSelected).
 	if (LayoutOfDocIsFrontmost(docRef))
-	{
-		const UIDRef itemRef(db, item);
-		if (ItemIsThere(itemRef))
-			SelectItemOnClick(chapterIdx, hitIdx, itemRef);
-		else
-			ClearSelection();
-	}
+		LeaveRowItemSelected(chapterIdx, hitIdx, UIDRef(db, item));
 	return wrote;
 }
 
-void KFCJump::SelectObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, bool sayCount)
-{
-	// One activation at a time, Search: kept and a previous row's preview or note gone first - as a click's (ActivateNode).
-	if (gActivating)
-		return;
-	ActivationGuard activationGuard;
-	const HandBackChapterOnExit handBack(chapterIdx);		// before the dirty guard below - see the class
-	ArmScopeKeep();
-	KFCResultTree::DropRowPreview();
-	UIDRef docRef;
-	IDFile file;
-	if (!KFCResults()->GetChapterLocation(chapterIdx, docRef, file))
-		return;
-	if (hitIdxs.empty())
-	{
-		// The last row taken away: nothing selected in its document - when that is the one in front (another document's
-		// selection is not the rows').
-		if (docRef.GetDataBase() != nil && KFCChapters()->IsDocStillOpen(docRef) && LayoutOfDocIsFrontmost(docRef))
-			ClearSelection();
-		return;
-	}
-	if (!EnsureChapterReachable(chapterIdx, docRef, file))
-		return;
-	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil)
-		return;
-	IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-	if (!FrontChapter(docRef))
-		return;
-	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up
-	RowItems rows(db);
-	CollectRowItems(chapterIdx, hitIdxs, shownHit, rows);
-	if (rows.shown != kInvalidUID)
-		ShowItemInView(UIDRef(db, rows.shown));
-	int32 taken = 0;
-	(void)SelectItems(rows.items, &taken);
-	if (rows.rowsChanged)
-		KFCResultTree::RefreshRows();
-	if (sayCount)
-		KFCResultTree::ShowRowNote(SelectedObjectsSentence(static_cast<int32>(hitIdxs.size()), taken, rows));
-}
-
-bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus)
+bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, PMString& outStatus)
 {
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
@@ -1707,23 +1562,20 @@ bool KFCJump::ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitI
 		return false;
 	{
 		// O10 step 6 for the rows: their document in front - InDesign's replace selects what it writes in the FRONT
-		// document - and the view on the first row's item.
+		// document - and the view on the item of the row selected last (the one the page shows).
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		if (!FrontChapter(docRef))
 			return false;		// it has said why
-		const UIDRef first(db, KFCResults()->GetHitItem(chapterIdx, hitIdxs[0]));
-		if (ItemIsThere(first))
-			ShowItemInView(first);
+		const UIDRef shown(db, KFCResults()->GetHitItem(chapterIdx, shownHit));
+		if (ItemIsThere(shown) && SpreadOfItem(shown) != kInvalidUID)
+			ShowItemInView(shown);
 	}
 	const bool wrote = KFCRuns()->ReplaceRows(chapterIdx, hitIdxs, outStatus);
-	// 9. THE ROWS' ITEMS LEFT SELECTED, as the rows are in the list (one row's Replace leaves its item selected - the
-	// author's call of 2026-10-10). Quietly: the status says what was written.
+	// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.
 	if (LayoutOfDocIsFrontmost(docRef))
 	{
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-		RowItems rows(db);
-		CollectRowItems(chapterIdx, hitIdxs, -1, rows);
-		(void)SelectItems(rows.items);
+		LeaveRowItemSelected(chapterIdx, shownHit, UIDRef(db, KFCResults()->GetHitItem(chapterIdx, shownHit)));
 	}
 	return wrote;
 }

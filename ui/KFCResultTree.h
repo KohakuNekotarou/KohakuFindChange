@@ -74,7 +74,7 @@ namespace KFCResultTree
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
 	/** A ROW'S OWN NOTE on the message area (1.4.0): why a click did not select the row's match or item - and, for rows
-	    selected together, what was selected (KFCJump::SelectObjectRows) or why a row was not added. Like a preview
+	    selected together, why a row was not added. Like a preview
 	    it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
 	    is landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row
 	    that was selected). Safe when the panel is closed. */
@@ -89,7 +89,8 @@ namespace KFCResultTree
 	    on the selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a
 	    run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question
 	    the row menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and
-	    Redo - object rows through KFCJump::ReplaceObjectRows (their document in front, their items left selected), text
+	    Redo - object rows through KFCJump::ReplaceObjectRows (their document in front, the item of the row selected last
+	    left selected - LastSelectedHit), text
 	    rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the status line set. True = something
 	    written. outStatus, when given, gets the status line it set - Shift+Return adds to it when there is no row below to
 	    go on to (KFCResultTreeEH). */
@@ -109,17 +110,21 @@ namespace KFCResultTree
 	    itself (KFCActionComponent) - one answer for both. */
 	std::vector<int32> RowsOfRightClick(int32 chapterIdx, int32 hitIdx);
 
-	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - object rows' items selected as
-	    the rows are (KFCJump::SelectObjectRows - the row clicked shown when it was added), a text row added jumped to as a
-	    click jumps (KFCJump::ActivateNode - InDesign selects one stretch of text) - or the message area says why the row
-	    could not be added (another document, another spread, an object in overset text). Nothing for a story, document
-	    or book row. */
+	/** THE ROW SELECTED LAST among these rows of the chapter - the one the page shows (FollowModifiedClick,
+	    ExtendSelection): where the last click or Shift+arrow left the selection, while it is one of them; else the last
+	    of them. -1 for none. A right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */
+	int32 LastSelectedHit(int32 chapterIdx, const std::vector<int32>& hitIdxs);
+
+	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - the row added jumped to as a
+	    click jumps (KFCJump::ActivateNode: the page shows the row selected last, a text row's match or an object row's
+	    item), a row taken away leaving the page as it is - or the message area says why the row could not be added
+	    (another document). Nothing for a story, document or book row. */
 	void FollowModifiedClick(const NodeID& clicked);
 
 	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's calls of 2026-10-10): the run of hit rows grown or
 	    shrunk by one row at its moving end - the run's other end stays where it began; a story row of the document is
-	    passed over - and the page following (object rows' items selected; for text rows the moving end's jump). A row
-	    that cannot join stops it (the message area says why for another document or spread). false = not a run of hit
+	    passed over - and the page following (the moving end's jump, text and object rows alike). A row that cannot join
+	    stops it (the message area says why for another document). false = not a run of hit
 	    rows: the key is not this function's. */
 	bool ExtendSelection(ITreeViewController* controller, bool down);
 

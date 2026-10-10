@@ -1385,12 +1385,6 @@ UID KFCResultModel::GetHitItem(int32 chapterIdx, int32 hitIdx)
 	return (h != nil) ? h->itemUID : kInvalidUID;
 }
 
-UID KFCResultModel::GetHitSpread(int32 chapterIdx, int32 hitIdx)
-{
-	const Hit* h = HitAt(chapterIdx, hitIdx);
-	return (h != nil && h->itemUID != kInvalidUID) ? h->itemSpread : kInvalidUID;
-}
-
 bool KFCResultModel::GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
