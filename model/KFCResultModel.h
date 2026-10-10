@@ -134,13 +134,18 @@ namespace KFCResultModel
 		// and again by each Replace of KFC's own. A row's Replace refuses an item that no longer reads this way.
 		uint64		itemPrint;
 		uint32		itemPrintLength;
+		// The SPREAD the item stood on when the search found it (O17 - a parent page's spread for a parent page's item,
+		// the spread of its pasteboard for one on no page). Rows are selected together only within one spread: InDesign
+		// selects page items on one spread at a time (measured 2026-10-10 - "two objects on different spreads cannot be
+		// selected", the DOM's own refusal). kInvalidUID when it could not be read.
+		UID			itemSpread;
 
 		Hit() : pageIndex(-1), isOverset(false), isLocked(false), isHidden(false),
 				fontGroup(-1), fontGroupPos(-1), storyUID(kInvalidUID),
 				textStart(kInvalidTextIndex), textEnd(kInvalidTextIndex), matchHash(0),
 				replaced(false), outcome(kOutcomeNone), pageOrdinal(0), storyOrdinal(-1),
 				itemUID(kInvalidUID), onPasteboard(false), isMaster(false), isGrouped(false), isInline(false),
-				isAnchored(false), itemPrint(0), itemPrintLength(0) {}
+				isAnchored(false), itemPrint(0), itemPrintLength(0), itemSpread(kInvalidUID) {}
 	};
 
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
@@ -446,6 +451,10 @@ namespace KFCResultModel
 
 	/** The page item an OBJECT row stands for (Hit::itemUID); kInvalidUID for a text row or an index out of range. */
 	UID GetHitItem(int32 chapterIdx, int32 hitIdx);
+
+	/** The spread an OBJECT row's item stood on when the search found it (Hit::itemSpread - O17); kInvalidUID for a
+	    text row, an index out of range, or a spread that could not be read. */
+	UID GetHitSpread(int32 chapterIdx, int32 hitIdx);
 
 	/** An object row's fingerprint (Hit::itemPrint / itemPrintLength). false for a text row or an index out of range. */
 	bool GetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64& outPrint, uint32& outLength);

@@ -181,6 +181,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryListWidgetMgrImpl, kKFCUIPrefix + 
 DECLARE_PMID(kImplementationIDSpace, kKFCReturnFilterEHImpl, kKFCUIPrefix + 45)
 // The query dialog's rows: their event handler - the double click on a saved query (KFCQueryRowEH.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowEHImpl, kKFCUIPrefix + 46)
+// The result list's selection rules - object rows selected together (KFCResultTreeController.cpp, 1.4.0 O17).
+DECLARE_PMID(kImplementationIDSpace, kKFCResultTreeControllerImpl, kKFCUIPrefix + 47)
 
 
 // ActionIDs:

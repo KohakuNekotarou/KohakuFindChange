@@ -28,6 +28,9 @@
 #ifndef __KFCJump_h__
 #define __KFCJump_h__
 
+#include "PMString.h"
+#include <vector>
+
 namespace KFCJump
 {
 	/** The single door every result row goes through: a hit row jumps (front its document, scroll to
@@ -54,6 +57,23 @@ namespace KFCJump
 	    selected as a click selects it (step 9 - the author's call of 2026-10-10; nothing selected when the item is gone).
 	    outStatus = what to say. True when it wrote. */
 	bool ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
+
+	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER (O18): the model's checks first (IKFCRuns::
+	    CheckObjectReplaceRows - none that could be written brings no window forward), then their document in front and
+	    the view on the first row's item, the write in one undo step (IKFCRuns::ReplaceObjectRows), and their items left
+	    selected as the rows are (quietly - the status says what was written). One row = ReplaceObjectRow. True when
+	    something was written. */
+	bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
+
+	/** THE PAGE FOLLOWS THE OBJECT ROWS SELECTED TOGETHER (O17 - the author's call of 2026-10-10, the Layers panel's
+	    multiple selection): their document in front, and on the page exactly their items selected - the SDK's way
+	    (SnpSelectShape.cpp: DeselectAll, then SelectPageItems with kReplace), the tool left as it is (a click's rule).
+	    Left out, each counted: an item gone (its row reads Missing), a locked or hidden one (the row's flags, as a click
+	    reads them), one now on another spread than the rest. shownHit: the row whose item the view is brought to (-1 =
+	    the view stays - a row taken away). No rows: nothing selected in their document when it is in front.
+	    sayCount: the message area says what was selected ("Selected 3 objects." / "Selected 3 of 5 objects - 1 locked,
+	    1 hidden.") - false when the caller has its own sentence there. */
+	void SelectObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, int32 shownHit, bool sayCount);
 
 	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own
 	    clearing (1.4.0), for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */

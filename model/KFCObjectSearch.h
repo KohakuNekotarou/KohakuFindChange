@@ -82,7 +82,9 @@ namespace KFCObjectSearch
 
 	/** SEARCHBOOK'S WALK FOR THE OBJECT TAB: every target walked under one bar, a book's chapters opened and handed back
 	    one at a time, each target's rows into the model as a chapter (page order). The user's selection is given back at
-	    the end (O6) and the shared walker aimed at the front document (O7). selectionScope = RunScope::selectionScope. */
+	    the end (O6) and the shared walker aimed at the front document (O7). selectionScope = RunScope::selectionScope.
+	    CANCEL IS HEARD INSIDE A DOCUMENT (O16 - the author's call of 2026-10-10): the bar is moved and asked at every item
+	    the walk lists, not only between documents; a Cancel ends the run as one between documents does (out.cancelled). */
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, Tally& out);
 

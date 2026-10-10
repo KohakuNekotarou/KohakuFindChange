@@ -59,7 +59,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 #include "KFCResultTree.h"
-#include "KFCJump.h"			// ReplaceObjectRow - an object row's Replace (1.4.0)
+#include "KFCJump.h"			// ReplaceObjectRow / ReplaceObjectRows - object rows' Replace (1.4.0)
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
@@ -995,6 +995,38 @@ bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStat
 	if (!status.IsEmpty())		// (an object row dropped while a landing is under way says nothing; a text row always does)
 		ShowStatus(status);
 	KFC_DIAG_LOG("RETFOCUS ReplaceRow after the status focus=%s", DiagKeyFocus().c_str());
+	if (outStatus != nil)
+		*outStatus = status;
+	return wrote;
+}
+
+bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus)
+{
+	if (hitIdxs.size() == 1)
+		return ReplaceRow(chapterIdx, hitIdxs[0], outStatus);
+	if (hitIdxs.empty() || RefusedWhileRunning())
+		return false;
+	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then,
+	// as on one row that cannot be replaced.
+	bool any = false;
+	for (size_t k = 0; k < hitIdxs.size() && !any; ++k)
+		any = KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]);
+	if (!any)
+		return false;
+	PMString status;
+	const bool wrote = KFCJump::ReplaceObjectRows(chapterIdx, hitIdxs, status);
+	// The same notes and repaint as one row's (ReplaceRow).
+	UIDRef docRef;
+	IDFile file;
+	if (wrote && KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
+		&& !KFCChapters()->HasWindow(docRef))
+		status.Append(" The document has no window - still hidden.");
+	if (KFCResults()->HasRun())
+		RefreshRows();
+	else
+		Rebuild();
+	if (!status.IsEmpty())
+		ShowStatus(status);
 	if (outStatus != nil)
 		*outStatus = status;
 	return wrote;

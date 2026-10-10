@@ -19,10 +19,13 @@
 #define __KFCResultTree_h__
 
 #include "PMString.h"
+#include <vector>
 #ifdef KFC_DIAG
 #include <string>
 #endif
 
+class ITreeViewController;
+class NodeID;
 
 namespace KFCResultTree
 {
@@ -69,7 +72,8 @@ namespace KFCResultTree
 	           selected - no width):". nil when it was selected. */
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
-	/** A ROW'S OWN NOTE on the message area (1.4.0): why a click did not select the row's match or item. Like a preview
+	/** A ROW'S OWN NOTE on the message area (1.4.0): why a click did not select the row's match or item - and, for rows
+	    selected together, what was selected (KFCJump::SelectObjectRows) or why a row was not added. Like a preview
 	    it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
 	    is landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row
 	    that was selected). Safe when the panel is closed. */
@@ -87,6 +91,31 @@ namespace KFCResultTree
 	    given, gets the status line it set - Shift+Return adds to it when there is no row below to go on to
 	    (KFCResultTreeEH). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus = nil);
+
+	/** REPLACE THE ROWS SELECTED TOGETHER (O18 - the author's call of 2026-10-10): object rows of one document, by Return
+	    or by the Replace of a right-click on one of them. One row = ReplaceRow. Nothing while a run of ours is up, nor
+	    when none of them can be replaced (the menu is grey then); otherwise their Replace in one undo step
+	    (KFCJump::ReplaceObjectRows), the rows repainted and the status line set. True = something written. */
+	bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus = nil);
+
+	/** THE OBJECT ROWS SELECTED TOGETHER now (O17): their document and their rows in the order drawn. false when nothing
+	    is selected, or a text or branch row is (KFCResultTreeController.cpp). */
+	bool GetSelectedObjectRows(int32& outChapter, std::vector<int32>& outHits);
+
+	/** Is this object row one of SEVERAL selected together? outHits = them all, in the order drawn - what a right-click
+	    Replace on it writes (O18). false (and outHits empty) when it is not, or only it is selected. */
+	bool SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
+
+	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page's selection follows the object rows now
+	    selected (KFCJump::SelectObjectRows - the row clicked shown when it was added), or the message area says why the
+	    row could not be added (another document, another spread). Nothing for a text or branch row. */
+	void FollowModifiedClick(const NodeID& clicked);
+
+	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's call of 2026-10-10): the run of object rows grown or
+	    shrunk by one row at its moving end - the run's other end stays where it began - and the page's selection
+	    following. A row that cannot join stops it (the message area says why for another spread or document). false =
+	    not a run of object rows: the key is not this function's. */
+	bool ExtendSelection(ITreeViewController* controller, bool down);
 
 	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call of 2026-10-09): nothing while a run of
 	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt

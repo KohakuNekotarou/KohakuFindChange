@@ -332,7 +332,15 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// action by ID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
 			int32 chapter = -1, hit = -1;
 			if (KFCResults()->GetContextMenuHit(chapter, hit))
-				(void)KFCResultTree::ReplaceRow(chapter, hit);
+			{
+				// The row right-clicked is one of several object rows selected together: all of them (O18 - the author's
+				// call of 2026-10-10). Any other row: that row alone.
+				std::vector<int32> rows;
+				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
+					(void)KFCResultTree::ReplaceRows(chapter, rows);
+				else
+					(void)KFCResultTree::ReplaceRow(chapter, hit);
+			}
 			break;
 		}
 
@@ -552,7 +560,18 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			int32 chapter = -1, hit = -1;
 			bool enable = KFCResults()->GetContextMenuHit(chapter, hit);
 			if (enable)
-				enable = KFCRuns()->CanReplaceHit(chapter, hit);
+			{
+				// Several object rows selected together, the right-clicked among them: while any of them can be (O18).
+				std::vector<int32> rows;
+				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
+				{
+					enable = false;
+					for (size_t k = 0; k < rows.size() && !enable; ++k)
+						enable = KFCRuns()->CanReplaceHit(chapter, rows[k]);
+				}
+				else
+					enable = KFCRuns()->CanReplaceHit(chapter, hit);
+			}
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCSearchStoryAgainActionID)

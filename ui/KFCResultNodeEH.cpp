@@ -20,7 +20,9 @@
 //                      go, is not a request to go anywhere.
 //    * !result       - the base returns kTrue for what it handled itself (a drag, an expander).
 //                      Jumping on top of that would be a second action from one click.
-//    * no Shift/Cmd  - those are selection modifiers, not "take me there".
+//    * no Shift/Cmd  - those are selection modifiers, not "take me there". Since 1.4.0 they select OBJECT
+//                      rows together (O17 - KFCResultTreeController.cpp), and their button-up makes the
+//                      page's selection follow instead of jumping (KFCResultTree::FollowModifiedClick).
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
@@ -98,8 +100,21 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	const bool16 result = TreeNodeEventHandler::LButtonUp(e);
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp stock=%d shift=%d cmd=%d focus=%s", static_cast<int>(result),
 		static_cast<int>(e->ShiftKeyDown()), static_cast<int>(e->CmdKeyDown()), KFCResultTree::DiagKeyFocus().c_str());
-	if (result || e->ShiftKeyDown() || e->CmdKeyDown())
+	if (result)
 		return result;
+	if (e->ShiftKeyDown() || e->CmdKeyDown())
+	{
+		// SHIFT / CTRL - ROWS SELECTED TOGETHER (O17 - the author's call of 2026-10-10, the Layers panel's way): the press
+		// has made the selection (KFCResultTreeController); the page follows it, or the message area says why the row was
+		// not added (KFCResultTree::FollowModifiedClick). No jump - a text or branch row selected this way stays where it
+		// was before 1.4.0, selected alone. The keyboard to the list after it, as after every click (below), so
+		// Shift+Down goes on from here.
+		InterfacePtr<ITreeNodeIDData> clickedData(this, UseDefaultIID());
+		if (clickedData != nil)
+			KFCResultTree::FollowModifiedClick(clickedData->Get());
+		(void)KFCResultTree::TakeKeyboard();
+		return result;
+	}
 
 	// The node's NodeID lives on this boss's ITreeNodeIDData (every TreeNode widget carries it).
 	InterfacePtr<ITreeNodeIDData> nodeData(this, UseDefaultIID());
@@ -176,7 +191,8 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 }
 #endif
 
-// Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call) - at the cursor (PopRowMenu).
+// Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call; about all of them when it is one of
+// several object rows selected together - O18, KFCActionComponent) - at the cursor (PopRowMenu).
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
 // KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
 // MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action

@@ -71,6 +71,7 @@ public:
 	virtual void SetContextMenuStory(int32 chapterIdx, int32 groupIdx) { KFCResultModel::SetContextMenuStory(chapterIdx, groupIdx); }
 	virtual bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx) { return KFCResultModel::GetContextMenuStory(outChapterIdx, outGroupIdx); }
 	virtual UID GetHitItem(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitItem(chapterIdx, hitIdx); }
+	virtual UID GetHitSpread(int32 chapterIdx, int32 hitIdx) { return KFCResultModel::GetHitSpread(chapterIdx, hitIdx); }
 };
 
 CREATE_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
@@ -113,6 +114,8 @@ public:
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) { return KFCSearchEngine::SearchStoryAgain(chapterIdx, groupIdx, outStatus); }
 	virtual void RestoreSearchScope(int32 mode, int32 scope) { KFCSearchEngine::RestoreSearchScope(mode, scope); }
 	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) { return KFCObjectReplace::CheckRowNow(chapterIdx, hitIdx, outStatus); }
+	virtual bool CheckObjectReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCObjectReplace::CheckRowsNow(chapterIdx, hitIdxs, outStatus); }
+	virtual bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) { return KFCObjectReplace::ReplaceRows(chapterIdx, hitIdxs, outStatus); }
 };
 
 CREATE_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)

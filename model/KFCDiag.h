@@ -75,6 +75,9 @@
 //                2026-10-10 - IKeyBoard alone, and only when it names another holder - not through the panel's doors
 //                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
 //                clicked (work\kbs-regress\cases\fault-click-acquire-only-on.jsx)
+//    objsearch-cancel  the file holds "<n>": the Object tab's search (KFCObjectSearch.cpp's WalkDoc) takes Cancel as pressed
+//                once a document's walk has listed its nth item - heard inside the document, where the bar is asked
+//                (O16; work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

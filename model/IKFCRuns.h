@@ -114,6 +114,11 @@ public:
 	/** = KFCObjectReplace::CheckRowNow (appended, 1.4.0) - an object row's Replace asked before its window is brought
 	    forward: false = refused, outStatus says why. */
 	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) = 0;
+	/** = KFCObjectReplace::CheckRowsNow (appended, 1.4.0 - O18) - the rows selected together, asked before their window is
+	    brought forward: true at the first row that would be written. */
+	virtual bool CheckObjectReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) = 0;
+	/** = KFCObjectReplace::ReplaceRows (appended, 1.4.0 - O18) - the rows selected together, replaced in one undo step. */
+	virtual bool ReplaceObjectRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

@@ -187,8 +187,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * Result tree list: the tree-view widget carrying our hierarchy adapter and row
-	 * widget manager. The framework provides the tree controller and default event handling
-	 * (selection, expand/collapse); the row-click jump handler is the row's (kKFCResultNodeWidgetBoss, below).
+	 * widget manager. The framework provides the default event handling (expand/collapse); the
+	 * row-click jump handler is the row's (kKFCResultNodeWidgetBoss, below).
 	 */
 	Class
 	{
@@ -197,6 +197,11 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ITREEVIEWHIERARCHYADAPTER, kKFCResultListAdapterImpl,
 			IID_ITREEVIEWWIDGETMGR, kKFCResultListWidgetMgrImpl,
+			/* The selection rules (1.4.0, O17): object rows of one document and one spread selected together - the stock
+			   controller made a multiple-selection one, with KFC's rule on top (KFCResultTreeController.cpp). Persistent,
+			   as the stock one it replaces is (CREATE_PERSIST_PMINTERFACE - a non-persistent implementation over an
+			   inherited persistent one fails as the resource is read). */
+			IID_ITREEVIEWCONTROLLER, kKFCResultTreeControllerImpl,
 			/* Extends the stock handler so the up / down arrows OPEN the row they land on and run
 			   that row's action - see KFCResultTreeEH.cpp. A book search comes up with every
 			   chapter closed, and the stock keys walk visible rows only.
@@ -1234,9 +1239,10 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCResultRowHeight,			// fVThumbScrollIncrement
 			kKFCResultRowHeight,			// fHScrollButtonIncrement (unused, no H bar)
 			kKFCResultRowHeight,			// fHThumbScrollIncrement
-			1,								// Items selectable: 1 = single selection
-			kFalse,							// Allow children from multiple parents to be selected
-			kFalse,							// Allow discontiguous selection
+			2,								// Items selectable: 2 = multiple selection (1.4.0 - object rows together,
+											// KFCResultTreeController.cpp, which sets the same three again)
+			kFalse,							// Allow children from multiple parents to be selected: no - one document
+			kTrue,							// Allow discontiguous selection: Ctrl+click
 			{
 			},
 		),
