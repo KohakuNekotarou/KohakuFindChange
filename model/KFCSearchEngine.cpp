@@ -2217,6 +2217,25 @@ struct CollectTally
 	CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
 };
 
+// EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN.
+// ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
+// before it writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's
+// own - which the panel follows, KFCUndoFollow) is not written to. A book's chapter has
+// it read in front of the release that closes a chapter this search opened (CollectTargets, and Search This
+// Document Again - KFCSearchEngine::SearchDocumentAgain).
+void ReadStoryVersions(const UIDRef& docRef, const std::vector<KFCResultModel::Hit>& hits,
+	std::map<UID, uint32>& outVersions)
+{
+	IDataBase* const db = docRef.GetDataBase();
+	for (size_t h = 0; h < hits.size(); ++h)
+	{
+		const UID story = hits[h].storyUID;
+		uint32 version = 0;
+		if (outVersions.count(story) == 0 && KFCSearchEngine::ReadStoryVersion(db, story, version))
+			outVersions[story] = version;
+	}
+}
+
 // SEARCHBOOK'S WALK OVER ITS TARGETS. Every target walked and its hits appended to the model chapter by chapter,
 // under one bar. (A query run does not come here: it is Change All only - KFCQuerySequence.)
 void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
@@ -2289,23 +2308,6 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// neither see them nor close them, and each holds its .indd locked (KFCBookScope::AppendUnclosedNote).
 	std::vector<PMString> unclosed;
 
-	// EVERY STORY'S VERSION, WHILE ITS DOCUMENT IS STILL OPEN.
-	// ITextModel::GetChangeCount of each story holding a hit (ReadStoryVersion) - what the replace compares
-	// before it writes, so a story moved since without KFC (typing, Ctrl+Z of anything but a write of KFC's
-	// own - which the panel follows, KFCUndoFollow) is not written to. A book's chapter has
-	// it read in front of the release that closes a chapter this search opened.
-	auto readStoryVersions = [](const UIDRef& docRef, const std::vector<KFCResultModel::Hit>& hits,
-		std::map<UID, uint32>& outVersions)
-	{
-		IDataBase* const db = docRef.GetDataBase();
-		for (size_t h = 0; h < hits.size(); ++h)
-		{
-			const UID story = hits[h].storyUID;
-			uint32 version = 0;
-			if (outVersions.count(story) == 0 && KFCSearchEngine::ReadStoryVersion(db, story, version))
-				outVersions[story] = version;
-		}
-	};
 	// One target's hits into the model as a chapter - the book's chapters and the Book Scope OFF walk's
 	// documents alike. Page-orders the hits and bakes the "P<page>(<n>) " locator onto each line: this needs
 	// the WHOLE chapter's hits (page order and the within-page ordinal are only known once it is complete),
@@ -2506,7 +2508,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 				if (perTarget[t].empty())
 					continue;
 				std::map<UID, uint32> storyVersions;
-				readStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
+				ReadStoryVersions(targets[t].docRef, perTarget[t], storyVersions);
 				// The searched part of each story holding a row (a search over part of a story).
 				std::map<UID, KFCResultModel::SearchedRange> parts;
 				for (size_t h = 0; overPart && h < perTarget[t].size(); ++h)
@@ -2605,9 +2607,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// The release's false cannot be read alone - HandBackHeldDocNow asks whether the chapter was ours
 		// and whether it is still open, so a chapter the user closed under the run is not counted as one
 		// left open with no window.
-		// The story versions are read first, while the chapter is still open (readStoryVersions).
+		// The story versions are read first, while the chapter is still open (ReadStoryVersions).
 		std::map<UID, uint32> storyVersions;
-		readStoryVersions(chapterDocRef, hits, storyVersions);
+		ReadStoryVersions(chapterDocRef, hits, storyVersions);
 
 		if (!KFCBookScope::HandBackHeldDocNow(chapterDocRef))
 			unclosed.push_back(targets[i].shortName);
@@ -3898,6 +3900,126 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 	const int32 now = KFCResultModel::ReplaceStoryRows(chapterIdx, story, hits, version);
 	outStatus.Clear();
 	outStatus.Append("Searched this story again: ");
+	outStatus.AppendNumber(now > 0 ? now : 0);
+	outStatus.Append(" match(es).");
+	if (capped)
+		outStatus.Append(" The list's limit of rows was reached - its other matches are not listed.");
+	return true;
+}
+
+// SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call of 2026-10-10: "for a book search over
+// several documents - the Object tab and every other search too"). Search This Story Again over a whole document: the
+// document walked again with the search's own query and switches - the walk the search makes of each of its documents (a
+// book's chapter, a document of All Documents or of Document; the Object tab's by KFCObjectSearch) - and all of its rows
+// replaced by what that walk finds (KFCResultModel::ReplaceChapterRows), its stories' versions recorded, so they can be
+// replaced. Its replaced rows go (the query no longer finds what they wrote); the other documents' rows and their state
+// stay. Nothing found: the document's row stays, empty, to be searched again (the author's call).
+// REFUSED - the list as it was - while a run is up; for a search over part of a document (Search: Story, To End of Story,
+// Selection - the author's call: whole-document searches only; a story's part is Search This Story Again's); when the
+// query changed since the search; when the document cannot be opened; when the walk breaks off or is cancelled.
+// A chapter the search handed back is reopened windowless for the walk and handed back after it, before the rows go in.
+// The list keeps its limit (F9): the document gets the room the other rows leave it. Under a bar of its own, with Cancel -
+// a document can take as long as a search - so it counts as a search for every other door (gSearching).
+bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
+{
+	outStatus.Clear();
+	outStatus.SetTranslatable(kFalse);
+	if (KFCRunGuard::IsAnyRunning())
+	{
+		outStatus.Append(KFCRunGuard::BusyMessage());
+		return false;
+	}
+	outStatus.Append("Search This Document Again: ");
+	UIDRef docRef;
+	IDFile file;
+	PMString name;
+	int32 rowsNow = 0;
+	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file) || !KFCResultModel::GetChapterDisplay(chapterIdx, name, rowsNow))
+	{
+		outStatus.Append("that document row is no longer on the list.");
+		return false;
+	}
+	const char* part = nil;
+	switch (KFCResultModel::GetSearchScope())
+	{
+		case KFCResultModel::kScopeStory:			part = "Story"; break;
+		case KFCResultModel::kScopeToEndOfStory:	part = "To End of Story"; break;
+		case KFCResultModel::kScopeSelection:		part = "Selection"; break;
+		default:									break;
+	}
+	if (part != nil)
+	{
+		outStatus.Append("the search was over part of the document (Search: ");
+		outStatus.Append(part);
+		outStatus.Append(") - search again.");
+		return false;
+	}
+	// Asked, not refused (Search This Story Again's rule): nothing is cleared, and the tab the walk runs in is stated.
+	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
+	{
+		outStatus.Append("the Find/Change settings have changed since the search - search again.");
+		return false;
+	}
+	// The document, by its file first (a UIDRef can outlive its document - KFCBookScope::ReachChapterDoc).
+	if (!KFCBookScope::ReachChapterDoc(file, docRef))
+	{
+		outStatus.Append("the document of this row could not be opened.");
+		return false;
+	}
+	KFCResultModel::RebindChapterDoc(chapterIdx, docRef);
+	const bool ours = KFCBookScope::IsHeldDoc(docRef);
+	// The room the list leaves: its limit less every row of the other documents.
+	const int32 room = KFCResultModel::kKFCCollectHitLimit - (KFCResultModel::GetTotalHitCount() - rowsNow);
+	const size_t limit = static_cast<size_t>(room > 0 ? room : 0);
+	std::vector<KFCResultModel::Hit> hits;
+	std::map<UID, uint32> storyVersions;
+	bool capped = false, cancelled = false, walked = false;
+	{
+		const SearchingFlagGuard searchingGuard;
+		KFCForwardSearchScope forward;		// forward, as the search was
+		if (KFCResultModel::GetSearchMode() == IFindChangeOptions::kObjectSearch)
+			walked = KFCObjectSearch::WalkOneDocument(docRef, name, limit, hits, capped, cancelled);
+		else
+		{
+			// The search's walk of one of its documents (CollectTargets' chapter walk): from the top, the whole of it.
+			WalkerScopeOptions scopeOptions;
+			KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
+			PMString title("Searching...");
+			title.SetTranslatable(kFalse);
+			KFCProgressBar bar(title, 0, kKFCChapterProgressSpan, kTrue, kTrue);
+			bar.DisableChildProgressBars(kTrue);
+			KFCSetCountedTask(bar, "Document", 0, 1, name);
+			int32 reported = 0;
+			KFCAdvanceProgress(&bar, reported, 0, true /*force*/);
+			int32 stories = CountSearchableStories(docRef);
+			if (stories < 1)
+				stories = 1;
+			ChapterWalkResult result = kChapterWalked;
+			CollectHitsInDoc(docRef, limit, scopeOptions, kHitEverything, hits, capped, result, &bar, 0,
+				kKFCChapterProgressSpan, stories, reported);
+			cancelled = (result == kChapterCancelled) || bar.WasCancelled(kFalse) != kFalse;
+			walked = (result == kChapterWalked) && !cancelled;
+			if (walked)
+				ReadStoryVersions(docRef, hits, storyVersions);		// while the document is open
+		}
+	}
+	// A chapter of ours goes back now - outside any sequence, with the walk over (HandBackHeldDocNow's rule) - and before
+	// the rows go in, so they do not get foci on a document about to close.
+	if (ours)
+		(void)KFCBookScope::HandBackHeldDocNow(docRef);
+	if (cancelled)
+	{
+		outStatus.Append("cancelled - the document's rows are left as they were.");
+		return false;
+	}
+	if (!walked)
+	{
+		outStatus.Append("InDesign's search stopped with an error - the document's rows are left as they were.");
+		return false;
+	}
+	const int32 now = KFCResultModel::ReplaceChapterRows(chapterIdx, hits, storyVersions);
+	outStatus.Clear();
+	outStatus.Append("Searched this document again: ");
 	outStatus.AppendNumber(now > 0 ? now : 0);
 	outStatus.Append(" match(es).");
 	if (capped)

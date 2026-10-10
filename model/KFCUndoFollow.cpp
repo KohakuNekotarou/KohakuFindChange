@@ -562,9 +562,16 @@ void KFCUndoFollow::MarkWrite(IDataBase* db)
 	// A MARK THAT FAILS MUST NOT TAKE THE WRITE WITH IT. The write's sequence decides by the global
 	// error state as it ends, and the write has already gone through: a mark that could not be processed costs
 	// the panel this step's following, never the user's replace.
-	const ErrorCode before = ErrorUtils::PMGetGlobalErrorCode();
+	// NOR IS ONE PUT OVER AN ERROR ALREADY STANDING (2026-10-10 - the header re-read 102): a command processed while the
+	// global error code is set brings on InDesign's protective shutdown (CmdUtils.h, ProcessCommand), and the write's
+	// sequence ends by that error anyway - rolled back, with nothing left for an Undo to take back.
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+	{
+		KFC_DIAG_LOG("MARK doc=%p skipped - an error stands", (void*)db);
+		return;
+	}
 	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
-	if (err != kSuccess && before == kSuccess)
+	if (err != kSuccess)
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	KFC_DIAG_LOG("MARK doc=%p err=%d", (void*)db, (int)err);
 }
@@ -691,14 +698,15 @@ void KFCUndoFollow::RunRecorder::Keep()
 	step.whole = true;
 	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
 	step.layoutBefore = gPendingLayout;
+	// The stories it moved - and no items: a query run records none (an Object query's Change All names none of what it
+	// changed), so a run of Object queries alone is not followed (the spec map's OBJ-11).
 	TakeMovedStories(step);
-	TakeMovedItems(step);
 	step.before = std::move(gPendingBefore);	// the list before the run, header and all - moved, not copied
 	KFCResultModel::TakeModelSnapshot(step.after);
 	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
 	CloseRecording();
-	KFC_DIAG_LOG("KEEP RUN moved=%u items=%u set=%u", (unsigned)step.stories.size(), (unsigned)step.items.size(), step.resultSet);
-	if (step.stories.empty() && step.items.empty())
+	KFC_DIAG_LOG("KEEP RUN moved=%u set=%u", (unsigned)step.stories.size(), step.resultSet);
+	if (step.stories.empty())
 		return;
 	KeepStep(step);
 }

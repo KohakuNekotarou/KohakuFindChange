@@ -95,15 +95,25 @@ namespace
 	// ...and which STORY row it was popped over, for its menu (Search This Story Again). -1 = none.
 	int32 gContextMenuStoryChapter = -1;
 	int32 gContextMenuStoryGroup = -1;
+	// ...and which DOCUMENT row (Search This Document Again - 2026-10-10). -1 = none.
+	int32 gContextMenuChapter = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
-	// RestoreModelSnapshot, ReplaceStoryRows).
+	// RestoreModelSnapshot, ReplaceStoryRows, ReplaceChapterRows).
 	void ForgetContextMenus()
 	{
 		gContextMenuHitChapter = -1;
 		gContextMenuHit = -1;
 		gContextMenuStoryChapter = -1;
 		gContextMenuStoryGroup = -1;
+		gContextMenuChapter = -1;
+	}
+
+	// Does the tree show this chapter (the cap aside)? Rows, or searched again with none (Chapter::shownEmpty) - the one
+	// question GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask.
+	bool ChapterShown(const KFCResultModel::Chapter& c)
+	{
+		return !c.hits.empty() || c.shownEmpty;
 	}
 
 	// THE INDEXES, ASKED IN ONE PLACE. A chapter, a row, a story group - or nil when an index
@@ -343,6 +353,8 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 		gContextMenuStoryChapter = -1;
 		gContextMenuStoryGroup = -1;
 	}
+	if (gContextMenuChapter == chapterIdx)
+		gContextMenuChapter = -1;
 }
 
 void KFCResultModel::EmptyChapter(Chapter& chapter)
@@ -356,6 +368,7 @@ void KFCResultModel::EmptyChapter(Chapter& chapter)
 	chapter.searchedRanges.clear();
 	chapter.docRef = UIDRef(nil, kInvalidUID);
 	chapter.file = IDFile();
+	chapter.shownEmpty = false;		// a closed document's chapter is not shown (CloseChapter)
 }
 
 int32 KFCResultModel::GetShownChapter(int32 nth)
@@ -369,7 +382,7 @@ int32 KFCResultModel::GetShownChapter(int32 nth)
 	{
 		if (before >= kKFCDisplayHitLimit)
 			break;
-		if (gChapters[i].hits.empty())
+		if (!ChapterShown(gChapters[i]))
 			continue;
 		if (shown == nth)
 			return static_cast<int32>(i);
@@ -382,11 +395,11 @@ int32 KFCResultModel::GetShownChapter(int32 nth)
 int32 KFCResultModel::GetShownChapterPos(int32 chapterIdx)
 {
 	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil || c->hits.empty())
+	if (c == nil || !ChapterShown(*c))
 		return -1;
 	int32 pos = 0;
 	for (int32 i = 0; i < chapterIdx; ++i)
-		if (!gChapters[i].hits.empty())
+		if (ChapterShown(gChapters[i]))
 			++pos;
 	return (pos < GetDisplayChapterCount()) ? pos : -1;
 }
@@ -484,7 +497,7 @@ int32 KFCResultModel::GetDisplayChapterCount()
 	{
 		if (before >= kKFCDisplayHitLimit)
 			break;
-		if (gChapters[i].hits.empty())
+		if (!ChapterShown(gChapters[i]))
 			continue;	// a chapter CloseChapter emptied - kept in place, not shown
 		++shown;
 		before += static_cast<int32>(gChapters[i].hits.size());
@@ -885,6 +898,19 @@ bool KFCResultModel::GetContextMenuStory(int32& outChapterIdx, int32& outGroupId
 	return true;
 }
 
+void KFCResultModel::SetContextMenuChapter(int32 chapterIdx)
+{
+	gContextMenuChapter = chapterIdx;
+}
+
+bool KFCResultModel::GetContextMenuChapter(int32& outChapterIdx)
+{
+	if (ChapterAt(gContextMenuChapter) == nil)
+		return false;
+	outChapterIdx = gContextMenuChapter;
+	return true;
+}
+
 KFCResultModel::ChangeOutcome KFCResultModel::GetHitOutcome(int32 chapterIdx, int32 hitIdx)
 {
 	const Hit* h = HitAt(chapterIdx, hitIdx);
@@ -1191,6 +1217,30 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 		if (c->hits[i].storyUID == story)
 			++count;
 	return count;
+}
+
+int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions)
+{
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil)
+		return -1;
+	// ReplaceStoryRows' steps over the whole chapter: its foci let go (they name rows by index), the walk's rows in, in
+	// page order, grouped and numbered as the search's are (AppendChapter), and what indexes the rows forgotten.
+	KFCRowFoci::DetachChapter(chapterIdx);
+	OrderHitsByPage(docHits);
+	c->hits.swap(docHits);
+	std::vector<Hit>().swap(docHits);
+	BuildFontGroups(*c);
+	NumberHitsWithinStories(*c);
+	c->storyVersions.swap(storyVersions);
+	storyVersions.clear();
+	c->searchedRanges.clear();
+	c->shownEmpty = c->hits.empty();
+	gLayoutGeneration = ++gIdCounter;
+	ForgetContextMenus();
+	ForgetRowBackup();
+	KFCRowFoci::AttachChapter(chapterIdx);
+	return static_cast<int32>(c->hits.size());
 }
 
 void KFCResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome)

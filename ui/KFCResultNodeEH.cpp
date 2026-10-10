@@ -144,11 +144,11 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 
 	// Hand the keyboard focus to the LIST, so the up / down arrows walk the tree from here on
-	// (KFCResultTreeEH). Two things happen below, and BOTH are needed:
+	// (KFCResultTreeEH). Two things happen in that hand-off (KFCResultTree::TakeKeyboard), and BOTH are needed:
 	//
-	//   * The QUERY brings the list's IID_IEVENTHANDLER into existence. Interface implementations
-	//     are created on first use, and nothing else in this plug-in ever asks the tree for its
-	//     event handler - so without this line KFCResultTreeEH is never constructed at all and the
+	//   * The QUERY of the list's IID_IEVENTHANDLER brings it into existence. Interface implementations
+	//     are created on first use, and nothing else in this plug-in asks the tree for its event
+	//     handler that early - so without it KFCResultTreeEH is never constructed at all and the
 	//     arrows keep the stock behaviour (visible rows only). Measured: with the panel
 	//     open and a book searched, a trace in that class's constructor never fired.
 	//   * The hand-off makes it the key target. ActivateNode above brings a document window -
@@ -163,7 +163,6 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	// another holder - did nothing, and the arrow never reached the list. KFCResultTree::TakeKeyboard makes the panel the
 	// active one with the keyboard given to it (IPanelMgr::ShowPanelByWidgetID), then the list - what the arrows' walk
 	// does after each landing.
-	InterfacePtr<IEventHandler> treeEH(treeController, UseDefaultIID());
 	bool acquireOnly = false;
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch click-acquire-only: the hand-off as it was before 2026-10-10 - the case that shows
@@ -172,12 +171,13 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 #endif
 	if (acquireOnly)
 	{
+		InterfacePtr<IEventHandler> treeEH(treeController, UseDefaultIID());
 		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());	// IKeyBoard is the app's
 		InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
 		if (treeEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() != treeEH)
 			keyBoard->AcquireKeyFocus(treeEH);
 	}
-	else if (treeEH != nil)
+	else
 		(void)KFCResultTree::TakeKeyboard();
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonUp handed the keyboard to the list focus=%s", KFCResultTree::DiagKeyFocus().c_str());
 	return result;
@@ -202,13 +202,16 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 // model's context-menu row (KFCResultModel::GetContextMenuHit) is how it learns what the menu was about.
 //
 // A STORY row's right-click pops ITS menu - Search This Story Again (the author's call of 2026-10-09), stashed the same
-// way (KFCResultModel::GetContextMenuStory). The book and document rows have no menu (spec F16) - their right-click is
-// taken and does nothing.
+// way (KFCResultModel::GetContextMenuStory); a DOCUMENT row's, Search This Document Again (the author's call of
+// 2026-10-10 - KFCResultModel::GetContextMenuChapter). The book row has no menu (spec F16) - its right-click is taken and
+// does nothing.
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
 // user's place in the tree. (KESCL had a sharper version of the same rule - there a selection change
-// drove the jump.)
+// drove the jump.) Since 1.4.0 it keeps rows selected together as well: the stock press would collapse them to the row
+// right-clicked (KFCResultTreeController's IgnoreIfNodeIsSelected says no with several selected), and the right-click
+// Replace on one of them - meant for all of them (O18) - would write that row alone.
 bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 {
 	InterfacePtr<ITreeNodeIDData> nodeData(this, UseDefaultIID());
@@ -225,6 +228,7 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	// measured, case ctx-hit-stash-story-rclick - the final audit's D7-1.)
 	KFCResults()->SetContextMenuHit(-1, -1);
 	KFCResults()->SetContextMenuStory(-1, -1);
+	KFCResults()->SetContextMenuChapter(-1);
 	if (nodeID->IsHitRow())
 	{
 		KFCResults()->SetContextMenuHit(nodeID->GetChapter(), nodeID->GetHit());
@@ -235,6 +239,12 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 		// A STORY row: its own menu (Search This Story Again - the author's call of 2026-10-09).
 		KFCResults()->SetContextMenuStory(nodeID->GetChapter(), nodeID->GetFont());
 		PopRowMenu(kKFCResultStoryMenuName, e, this);
+	}
+	else if (nodeID->IsDocumentRow())
+	{
+		// A DOCUMENT row: its own menu (Search This Document Again - the author's call of 2026-10-10).
+		KFCResults()->SetContextMenuChapter(nodeID->GetChapter());
+		PopRowMenu(kKFCResultDocumentMenuName, e, this);
 	}
 	return kTrue;
 }

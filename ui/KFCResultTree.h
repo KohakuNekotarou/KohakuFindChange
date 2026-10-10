@@ -84,28 +84,30 @@ namespace KFCResultTree
 	    none, so the previous row's does not stand beside it. Nothing when it shows anything else. */
 	void DropRowPreview();
 
-	/** REPLACE ONE ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17): the
-	    hit row's right-click Replace and Return on a selected row both come here - ReplaceRows with the one row. */
-	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus = nil);
-
-	/** REPLACE THE ROWS SELECTED (F16 / F17 for one row; O18 - the author's calls of 2026-10-10 - for rows selected
-	    together: hit rows of one kind in one document, by Return or by the Replace of a right-click on one of them).
-	    Writes nothing while a run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced
-	    (KFCRuns()->CanReplaceHit - the question the row menu greys Replace by); then their Replace in one undo step, no
-	    prompt, the panel following Ctrl+Z and Redo - object rows through KFCJump::ReplaceObjectRows (their document in
-	    front, their items left selected), text rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and
-	    the status line set. True = something written. outStatus, when given, gets the status line it set - Shift+Return
-	    adds to it when there is no row below to go on to (KFCResultTreeEH). */
+	/** REPLACE THE ROWS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17 for one row;
+	    O18 - the author's calls of 2026-10-10 - for rows selected together: hit rows of one kind in one document). Return
+	    on the selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a
+	    run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question
+	    the row menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and
+	    Redo - object rows through KFCJump::ReplaceObjectRows (their document in front, their items left selected), text
+	    rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the status line set. True = something
+	    written. outStatus, when given, gets the status line it set - Shift+Return adds to it when there is no row below to
+	    go on to (KFCResultTreeEH). */
 	bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus = nil);
+
+	/** Can the Replace run on these rows - can any of them be replaced (KFCRuns()->CanReplaceHit)? The one question the
+	    row menu greys Replace by (KFCActionComponent) and ReplaceRows asks first. */
+	bool CanReplaceAny(int32 chapterIdx, const std::vector<int32>& hitIdxs);
 
 	/** THE HIT ROWS SELECTED TOGETHER now (O17): their document and their rows in the order drawn; outObjects (optional) =
 	    object rows rather than text rows. false when nothing is selected, or a story, document or book row is
 	    (KFCResultTreeController.cpp). */
 	bool GetSelectedHitRows(int32& outChapter, std::vector<int32>& outHits, bool* outObjects = nil);
 
-	/** Is this hit row one of SEVERAL selected together? outHits = them all, in the order drawn - what a right-click
-	    Replace on it writes (O18). false (and outHits empty) when it is not, or only it is selected. */
-	bool SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits);
+	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES (O18): every row selected together, in the order drawn, when the hit row
+	    right-clicked is one of several selected; else that row alone. Asked by the menu's grey state and by the Replace
+	    itself (KFCActionComponent) - one answer for both. */
+	std::vector<int32> RowsOfRightClick(int32 chapterIdx, int32 hitIdx);
 
 	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - object rows' items selected as
 	    the rows are (KFCJump::SelectObjectRows - the row clicked shown when it was added), a text row added jumped to as a
@@ -124,6 +126,10 @@ namespace KFCResultTree
 	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt
 	    when its rows were put back (their places in the list moved) and the status line set either way. True = done. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx);
+
+	/** SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call of 2026-10-10): as
+	    SearchStoryAgain, over the whole document (KFCRuns()->SearchDocumentAgain). True = done. */
+	bool SearchDocumentAgain(int32 chapterIdx);
 
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
@@ -184,7 +190,7 @@ namespace KFCResultTree
 #ifdef KFC_DIAG
 	/** (Test builds only.) Who holds the keyboard, in a few words for the trace: "tree" (this list), "nobody", or the
 	    holder's boss and widget. Made when a Return that replaced a row let the keyboard go to the document: the
-	    trace says where in the Return it went (KFCResultTreeEH::KeyDown, ReplaceRow). */
+	    trace says where in the Return it went (KFCResultTreeEH::KeyDown, ReplaceRows). */
 	std::string DiagKeyFocus();
 
 	/** (Test builds only.) The window the SYSTEM sends the keys to - the root of ::GetFocus(), by its title, and the

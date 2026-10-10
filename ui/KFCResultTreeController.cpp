@@ -309,16 +309,14 @@ bool KFCResultTree::GetSelectedHitRows(int32& outChapter, std::vector<int32>& ou
 	return !outHits.empty();
 }
 
-bool KFCResultTree::SelectionHoldsRow(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outHits)
+std::vector<int32> KFCResultTree::RowsOfRightClick(int32 chapterIdx, int32 hitIdx)
 {
 	int32 chapter = -1;
-	if (!GetSelectedHitRows(chapter, outHits) || outHits.size() < 2 || chapter != chapterIdx
-		|| std::find(outHits.begin(), outHits.end(), hitIdx) == outHits.end())
-	{
-		outHits.clear();
-		return false;
-	}
-	return true;
+	std::vector<int32> rows;
+	if (GetSelectedHitRows(chapter, rows) && rows.size() >= 2 && chapter == chapterIdx
+		&& std::find(rows.begin(), rows.end(), hitIdx) != rows.end())
+		return rows;		// one of several selected together: all of them
+	return std::vector<int32>(1, hitIdx);
 }
 
 void KFCResultTree::FollowModifiedClick(const NodeID& clicked)

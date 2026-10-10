@@ -757,11 +757,12 @@ bool FrontChapter(const UIDRef& docRef)
 
 // NOTHING SELECTED in the front document - DeselectAll on the active selection, when there is one (1.4.0: a hit row's
 // click clears the way for its own selection; an object row's Replace whose item is gone takes away what InDesign's walk
-// selected).
+// selected). Unasked, as the SDK's own recipes deselect (gotolasttextedit, SnpSelectShape): DeselectAll goes to the
+// CSBs holding a selection (ISelectionManager.h), so with nothing selected nothing happens.
 void ClearSelection()
 {
 	ISelectionManager* const selectionManager = Utils<ISelectionUtils>()->GetActiveSelection();
-	if (selectionManager != nil && selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection))
+	if (selectionManager != nil)
 		selectionManager->DeselectAll(nil);
 }
 

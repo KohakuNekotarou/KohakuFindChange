@@ -302,6 +302,10 @@ DECLARE_PMID(kActionIDSpace, kKFCSelectedDocumentsActionID, kKFCUIPrefix + 49)
 // replaced in again (KFCSearchEngine::SearchStoryAgain). + 50: the next after the highest spent (+ 30 ... + 34, the
 // story row's earlier items, are retired and never reused).
 DECLARE_PMID(kActionIDSpace, kKFCSearchStoryAgainActionID, kKFCUIPrefix + 50)
+// "Search This Document Again" on a DOCUMENT row's right-click menu (the author's call of 2026-10-10): that document walked
+// again whole with the search's query, its rows put back (KFCSearchEngine::SearchDocumentAgain). + 51: the next after the
+// highest spent.
+DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
 
 
 // WidgetIDs:
@@ -403,6 +407,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCReplaceHitMenuKey			kKFCStringPrefix "kKFCReplaceHitMenuKey"
 // The story row's own right-click menu.
 #define kKFCSearchStoryAgainMenuKey		kKFCStringPrefix "kKFCSearchStoryAgainMenuKey"
+// The document row's own right-click menu (2026-10-10).
+#define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
 // half's Undo names (kKFCReplaceStepKey and friends, KFCID.h) and this page's body.
@@ -467,6 +473,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
 // The STORY rows' right-click menu (Search This Story Again - the author's call of 2026-10-09), popped the same way.
 #define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
+// The DOCUMENT rows' right-click menu (Search This Document Again - the author's call of 2026-10-10), popped the same way.
+// A name of its own, not the retired "KFCRtMenuResultRow" above.
+#define kKFCResultDocumentMenuName			"KFCRtMenuResultDocument"
 
 // Menu item positions:
 //
@@ -529,6 +538,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCReplaceHitMenuItemPosition		0.5
 // The story row's menu: Search This Story Again.
 #define kKFCSearchStoryAgainMenuItemPosition	0.5
+// The document row's menu: Search This Document Again.
+#define kKFCSearchDocumentAgainMenuItemPosition	0.5
 
 
 // View (kViewRsrcType) resource IDs for the result tree's row widgets. Offset from the panel's own

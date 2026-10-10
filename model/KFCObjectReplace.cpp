@@ -41,8 +41,6 @@
 
 namespace
 {
-const int32 kMaxWalkSteps = 100000;		// KFCObjectSearch.cpp's guard
-
 // A refusal begins with the command's name (the text Replace's rule).
 void Refuse(PMString& out, const char* why)
 {
@@ -64,6 +62,7 @@ enum Refusal
 	kRefusedLocked,			// locked now
 	kRefusedEdited,			// changed since the search (its fingerprint)
 	kRefusedNotReached,		// InDesign's walk never came to it - no longer a match
+	kRefusedWalkFailed,		// InDesign's walk broke off with an error before it came to it - nobody looked
 	kRefusedNotWritten,		// InDesign's replace would not run on it
 	kRefusalCount
 };
@@ -81,6 +80,7 @@ const char* RowSentence(Refusal why)
 		case kRefusedLocked:		return "the object is locked now (a locked layer, or Object > Lock) - left as it is.";
 		case kRefusedEdited:		return "the object has changed since the search (moved, restyled or edited) - search again.";
 		case kRefusedNotReached:	return "the object no longer matches the Find/Change settings - search again.";
+		case kRefusedWalkFailed:	return "InDesign's search stopped with an error before it reached the object - search again.";
 		case kRefusedNotWritten:	return "InDesign's replace would not run on this object - nothing was changed.";
 		default:					return "";
 	}
@@ -99,6 +99,7 @@ const char* RefusalWords(Refusal why)
 		case kRefusedLocked:		return "locked";
 		case kRefusedEdited:		return "changed since the search";
 		case kRefusedNotReached:	return "no longer matching";
+		case kRefusedWalkFailed:	return "not reached - InDesign's search stopped with an error";
 		case kRefusedNotWritten:	return "not replaced by InDesign";
 		default:					return "";
 	}
@@ -221,8 +222,19 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
-// A chapter of ours reopened to be asked goes back when nothing is written (KFCReplaceEngine's ChapterAfter rule) -
-// KFCBookScope::HandBackIfHeld, the one the UI half's landings use too (2026-10-10).
+// Did a walk's SearchObject that answered other than kSuccess break off - rather than come to the end of the matches
+// (kNotFound / kFoundCompleted)? An error left standing is a break too. KFCObjectSearch.cpp's WalkDoc reads a walk's end
+// the same way, and the text Replace tells its walk's error from "not found" (its walkFailed).
+bool WalkBroke(IFindChangeService::FindChangeResult result)
+{
+	return (result != IFindChangeService::kNotFound && result != IFindChangeService::kFoundCompleted)
+		|| ErrorUtils::PMGetGlobalErrorCode() != kSuccess;
+}
+
+// A chapter of ours that a check reopened goes back when the check refuses (KFCBookScope::HandBackIfHeld - the UI half's
+// landings hand back the same way). The writes are reached only through the UI half's landing, which has brought the
+// chapter's window forward first - the chapter is then the user's, no longer held - and which hands back on its own way
+// out whatever an exit of the write's leaves (KFCJump's HandBackChapterOnExit).
 using KFCBookScope::HandBackIfHeld;
 }	// anonymous namespace
 
@@ -270,16 +282,21 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		return false;
 	}
 	sequence->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
-	bool reached = false, ok = false;
+	bool reached = false, walkFailed = false, ok = false;
 	{
-		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item.
+		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item. The walk ends by
+		// itself - InDesign has no more, or an item comes round again (the search's guard, spec O5).
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
 		std::set<UID> seen;
-		for (int32 step = 0; step < kMaxWalkSteps; ++step)
+		for (;;)
 		{
 			UIDRef found;
-			if (svc->SearchObject(found, kFalse) != IFindChangeService::kSuccess)
+			const IFindChangeService::FindChangeResult result = svc->SearchObject(found, kFalse);
+			if (result != IFindChangeService::kSuccess)
+			{
+				walkFailed = WalkBroke(result);
 				break;
+			}
 			const UIDRef current(shared->GetCurrentItem());
 			if (current.GetDataBase() != db || !seen.insert(current.GetUID()).second)
 				break;
@@ -312,7 +329,7 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
-		Refuse(outStatus, RowSentence(reached ? kRefusedNotWritten : kRefusedNotReached));
+		Refuse(outStatus, RowSentence(reached ? kRefusedNotWritten : (walkFailed ? kRefusedWalkFailed : kRefusedNotReached)));
 		return false;
 	}
 	// 10. The row Changed, with the item as the write left it; the message names the item (REP-22's form).
@@ -432,19 +449,25 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 	}
 	sequence->SetName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	std::set<UID> written, refusedByInDesign;
-	bool errorStands = false;		// InDesign's replace left the error state raised: the step is rolled back whole
+	bool errorStands = false;		// InDesign left the error state raised: the step is rolled back whole
+	bool searchError = false;		// ...raised by the walk's search rather than by a replace
+	bool walkFailed = false;		// the walk broke off before every item was met (WalkBroke)
 	{
 		// 7-8 FOR EVERY ROW IN ONE WALK: InDesign's own matching from the document's first match, and its replace on each
 		// row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when every item has
-		// been met, or InDesign has no more.
+		// been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5).
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
 		std::set<UID> seen;
 		const bool walkMisses = KFC_DIAG_FAULT("object-walk-miss");	// (a test build's: no item reached - oca-walk-miss)
-		for (int32 step = 0; step < kMaxWalkSteps && !walkMisses; ++step)
+		while (!walkMisses)
 		{
 			UIDRef found;
-			if (svc->SearchObject(found, kFalse) != IFindChangeService::kSuccess)
+			const IFindChangeService::FindChangeResult result = svc->SearchObject(found, kFalse);
+			if (result != IFindChangeService::kSuccess)
+			{
+				walkFailed = WalkBroke(result);
 				break;
+			}
 			const UIDRef current(shared->GetCurrentItem());
 			if (current.GetDataBase() != db || !seen.insert(current.GetUID()).second)
 				break;
@@ -465,6 +488,14 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 			if (written.size() + refusedByInDesign.size() == wanted.size())
 				break;
 		}
+		// ...AND AFTER THE WALK (the header re-read 102's find, 2026-10-10): a search step that broke off with the error state
+		// raised, after rows were written, ends the sequence by that error just the same - the whole step goes back, so the
+		// rows are not marked Changed, and no mark is put over the error (MarkWrite).
+		if (!errorStands && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		{
+			errorStands = true;
+			searchError = true;
+		}
 		if (!written.empty() && !errorStands)
 			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
 	}
@@ -479,13 +510,15 @@ bool KFCObjectReplace::ReplaceRows(int32 chapterIdx, const std::vector<int32>& h
 		db->SetModified(kFalse);
 	KFCObjectSearch::AimSharedWalkerAtFront();		// 11 (O7)
 	counts[kRefusedNotWritten] += static_cast<int32>(refusedByInDesign.size());
-	counts[kRefusedNotReached] += static_cast<int32>(wanted.size() - written.size() - refusedByInDesign.size());
+	counts[walkFailed ? kRefusedWalkFailed : kRefusedNotReached]
+		+= static_cast<int32>(wanted.size() - written.size() - refusedByInDesign.size());
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
 		if (errorStands)
 		{
-			Refuse(outStatus, "InDesign's replace stopped with an error - nothing was changed.");
+			Refuse(outStatus, searchError ? "InDesign's search stopped with an error - nothing was changed."
+				: "InDesign's replace stopped with an error - nothing was changed.");
 			return false;
 		}
 		outStatus = "Replace: nothing was changed - ";

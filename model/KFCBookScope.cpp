@@ -411,10 +411,9 @@ bool KFCBookScope::IsHeldDoc(const UIDRef& docRef)
 
 void KFCBookScope::HandBackIfHeld(const UIDRef& docRef)
 {
-	// (See the header. IsHeldDoc compares the pair against the list without following it, so a reference to a document
-	//  closed since is answered "not held" here, and nothing reads it.)
-	if (IsHeldDoc(docRef))
-		(void)HandBackHeldDocNow(docRef);
+	// (See the header.) HandBackHeldDocNow asks IsHeldDoc itself and does nothing to a document that is not held - one
+	// closed since included: the held list is compared against without following the pointer.
+	(void)HandBackHeldDocNow(docRef);
 }
 
 bool KFCBookScope::HandBackHeldDocNow(const UIDRef& docRef)

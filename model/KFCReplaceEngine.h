@@ -103,10 +103,11 @@ namespace KFCReplaceEngine
 	bool ReplaceHits(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
-	    outcome. */
+	    outcome - WhyGreyed answering kGreyedNot. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
-	/** WHY A ROW'S REPLACE IS GREYED (CanReplaceHit says no), as its row shows it - Changed, Missing, locked, refused -
+	/** WHY A ROW'S REPLACE IS GREYED - the one place the reasons are asked (CanReplaceHit is this answering kGreyedNot) -
+	    as its row shows it - Changed, Missing, locked, refused -
 	    for the rows left by a Replace of rows selected together, counted by reason (O18 - the author's call of
 	    2026-10-10: "1 already replaced, 1 locked" rather than one "already replaced or locked" for all of them, which
 	    named a row reading Missing as one of those). One reason a row: replaced, then missing, then locked, then refused

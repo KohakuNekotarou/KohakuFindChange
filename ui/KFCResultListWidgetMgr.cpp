@@ -59,7 +59,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 #include "KFCResultTree.h"
-#include "KFCJump.h"			// ReplaceObjectRow / ReplaceObjectRows - object rows' Replace (1.4.0)
+#include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace (1.4.0)
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
@@ -963,9 +963,12 @@ bool KFCResultTree::TakeKeyboard()
 	return keyBoard->GetKeyFocus() == listEH;
 }
 
-bool KFCResultTree::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString* outStatus)
+bool KFCResultTree::CanReplaceAny(int32 chapterIdx, const std::vector<int32>& hitIdxs)
 {
-	return ReplaceRows(chapterIdx, std::vector<int32>(1, hitIdx), outStatus);
+	for (size_t k = 0; k < hitIdxs.size(); ++k)
+		if (KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]))
+			return true;
+	return false;
 }
 
 bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString* outStatus)
@@ -973,10 +976,7 @@ bool KFCResultTree::ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitI
 	if (hitIdxs.empty() || RefusedWhileRunning())
 		return false;
 	// Nothing to write when none can be replaced - the menu greys Replace by the same question; Return does nothing then.
-	bool any = false;
-	for (size_t k = 0; k < hitIdxs.size() && !any; ++k)
-		any = KFCRuns()->CanReplaceHit(chapterIdx, hitIdxs[k]);
-	if (!any)
+	if (!CanReplaceAny(chapterIdx, hitIdxs))
 		return false;
 	PMString status;
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows begin focus=%s", DiagKeyFocus().c_str());
@@ -1018,6 +1018,19 @@ bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
 	PMString status;
 	const bool done = KFCRuns()->SearchStoryAgain(chapterIdx, groupIdx, status);
 	// Rebuilt, not repainted: the story's rows were put back, and every row after them in the chapter has another place.
+	if (done)
+		Rebuild();
+	ShowStatus(status);
+	return done;
+}
+
+bool KFCResultTree::SearchDocumentAgain(int32 chapterIdx)
+{
+	if (RefusedWhileRunning())
+		return false;
+	PMString status;
+	const bool done = KFCRuns()->SearchDocumentAgain(chapterIdx, status);
+	// Rebuilt, not repainted: the document's rows were put back - another number of them, another order.
 	if (done)
 		Rebuild();
 	ShowStatus(status);

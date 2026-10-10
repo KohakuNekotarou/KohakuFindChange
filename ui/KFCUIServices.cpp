@@ -171,7 +171,7 @@ public:
 	virtual bool HasTextSelection()
 	{
 		// The text concrete selection boss's own answer, asked through the active selection manager by its class
-		// (ISelectionManager::SelectionExists - public, as KFCJump's ClearSelection asks it of every CSB).
+		// (ISelectionManager::SelectionExists - public; the class names the CSB, ISelectionManager.h).
 		Utils<ISelectionUtils> selectionUtils;
 		if (!selectionUtils.Exists())
 			return false;
@@ -182,8 +182,7 @@ public:
 
 	virtual bool HasAnySelection()
 	{
-		// Every concrete selection asked at once (kInvalidClass, kAnySelection - ISelectionManager.h), as KFCJump's
-		// ClearSelection asks before it clears.
+		// Every concrete selection asked at once (kInvalidClass, kAnySelection - ISelectionManager.h).
 		Utils<ISelectionUtils> selectionUtils;
 		if (!selectionUtils.Exists())
 			return false;

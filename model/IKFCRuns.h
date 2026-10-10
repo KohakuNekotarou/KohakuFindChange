@@ -120,6 +120,9 @@ public:
 	/** = KFCReplaceEngine::ReplaceHits (appended, 1.4.0 - O18) - the rows selected together, object or text, replaced in
 	    one undo step. */
 	virtual bool ReplaceRows(int32 chapterIdx, const std::vector<int32>& hitIdxs, PMString& outStatus) = 0;
+	/** = KFCSearchEngine::SearchDocumentAgain (appended, 1.4.0 - 2026-10-10) - a document row's Search This Document
+	    Again. */
+	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) = 0;
 };
 
 #endif // __IKFCRuns_h__

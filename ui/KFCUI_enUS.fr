@@ -51,6 +51,7 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
                 kKFCClearResultsMenuKey,		"Clear Results",
                 kKFCReplaceHitMenuKey,			"Replace",
                 kKFCSearchStoryAgainMenuKey,	"Search This Story Again",
+                kKFCSearchDocumentAgainMenuKey,	"Search This Document Again",
                 // The operating reference. English in every UI language, like the rest of the flyout.
                 kKFCHowToMenuKey,				"How to Use...",
                 kKFCOpenFindChangeMenuKey,		"Open Find/Change...",

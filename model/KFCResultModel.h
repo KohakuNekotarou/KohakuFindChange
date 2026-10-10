@@ -196,9 +196,15 @@ namespace KFCResultModel
 		std::map<UID, uint32>	storyVersions;
 		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise.
 		std::map<UID, SearchedRange>	searchedRanges;
+		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again - the author's call of 2026-10-10): shown with no
+		// rows, (0/0), so it can be searched again after the next edit. A chapter with no rows is otherwise not shown - a
+		// search lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
+		bool					shownEmpty;
 
 		// (No "not reached" mark per chapter for a cancelled replace: a cancel aborts the single sequence
 		// the whole run is wrapped in, so either every chapter was replaced or none was.)
+
+		Chapter() : shownEmpty(false) {}
 	};
 
 
@@ -253,7 +259,8 @@ namespace KFCResultModel
 	    (KFCUndoFollow::ForgetDocument): its rows, groups, versions and searched parts gone, no docRef, no file. */
 	void EmptyChapter(Chapter& chapter);
 
-	/** The nth chapter the tree SHOWS - the chapters with rows, under the display cap - as a chapter index;
+	/** The nth chapter the tree SHOWS - the chapters with rows (and one searched again with none - Chapter::shownEmpty),
+	    under the display cap - as a chapter index;
 	    -1 = none. With no emptied chapter the nth shown is chapter nth. */
 	int32 GetShownChapter(int32 nth);
 
@@ -344,9 +351,9 @@ namespace KFCResultModel
 	/** The total number of hits across ALL chapters (uncapped) - for the status summary. */
 	int32 GetTotalHitCount();
 
-	/** The number of chapters that have at least one DISPLAYED hit (the tree root's child count
-	    under the display cap). Chapters past the cap are not shown, and neither is one CloseChapter
-	    emptied - so the nth of them is GetShownChapter(nth), not chapter nth. */
+	/** The number of chapters the tree shows - those with at least one DISPLAYED hit, and one searched again with none
+	    (Chapter::shownEmpty) - the tree root's child count under the display cap. Chapters past the cap are not shown,
+	    and neither is one CloseChapter emptied - so the nth of them is GetShownChapter(nth), not chapter nth. */
 	int32 GetDisplayChapterCount();
 
 	/** The number of hits DISPLAYED under chapter 'chapterIdx' - capped in book order so the whole
@@ -484,6 +491,11 @@ namespace KFCResultModel
 	    result set and by a right-click on any other row; false when no story row is stashed or it is out of range. */
 	void SetContextMenuStory(int32 chapterIdx, int32 groupIdx);
 	bool GetContextMenuStory(int32& outChapterIdx, int32& outGroupIdx);
+
+	/** The DOCUMENT row the right-click menu was popped over (its Search This Document Again acts on it - 2026-10-10).
+	    Cleared as the story row's is; false when no document row is stashed or it is out of range. */
+	void SetContextMenuChapter(int32 chapterIdx);
+	bool GetContextMenuChapter(int32& outChapterIdx);
 
 	/** A row's outcome (kOutcomeNone for an out-of-range index). */
 	ChangeOutcome GetHitOutcome(int32 chapterIdx, int32 hitIdx);
@@ -634,6 +646,14 @@ namespace KFCResultModel
 	    generation moves - KFCUndoFollow drops it, UNDO-14), the right-click targets, the row backup, the chapter's text
 	    foci (attached again, KFCRowFoci). Returns the story's row count now; -1 = no such chapter. */
 	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion);
+
+	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call of
+	    2026-10-10): every row of the chapter replaced by docHits - the document walked again, taken (swapped out) - put in
+	    page order, its story groups and their numbers rebuilt, its stories' versions replaced by storyVersions (taken),
+	    its searched parts dropped (a document is searched again whole). With no row left the chapter is shown empty
+	    (Chapter::shownEmpty). The rows' places in the list change, so what indexes them is let go, as ReplaceStoryRows
+	    lets it go. Returns the chapter's row count now; -1 = no such chapter. */
+	int32 ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& docHits, std::map<UID, uint32>& storyVersions);
 
 	/** Turn the two break characters into the marks InDesign itself draws with Show Hidden
 	    Characters on - a pilcrow for a paragraph end (CR), a return arrow for a forced line break

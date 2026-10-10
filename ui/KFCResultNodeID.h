@@ -146,6 +146,9 @@ public:
 	/** Is this the book row - the one that names the book the results came from? */
 	bool16 IsBookRow() const { return fChapter == -1 && fHit < 0; }
 
+	/** Is this a DOCUMENT row - a chapter of the results (a book's chapter, or an open document)? */
+	bool16 IsDocumentRow() const { return fChapter >= 0 && fFont < 0 && fHit < 0; }
+
 	/** Is this the hidden root? */
 	bool16 IsRoot() const { return fChapter <= -2; }
 

@@ -123,7 +123,7 @@ namespace KFCUndoFollow
 	    once it has written and before the sequence ends - so the mark is part of the write's one undo step -
 	    for each document it wrote to. Puts the observer on the document first; a mark that cannot be
 	    processed leaves the write's error state as it found it (the panel loses this step's following, the
-	    user keeps the write). */
+	    user keeps the write). Nothing is processed over an error already standing (the step goes back on it). */
 	void MarkWrite(IDataBase* db);
 
 	/** THE WORK OF THE OBSERVER. Every kept write an Undo or a Redo has moved - the newest one first for an

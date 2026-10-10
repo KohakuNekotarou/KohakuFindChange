@@ -668,6 +668,14 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchStoryAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
+		// ----- A document row's right-click menu -----
+		// Popped by KFCResultNodeEH::RButtonDn over a document row: Search This Document Again walks that document whole
+		// with the search's query and puts its rows back (KFCSearchEngine::SearchDocumentAgain).
+		kKFCSearchDocumentAgainActionID,
+		kKFCResultDocumentMenuName
+		kKFCSearchDocumentAgainMenuItemPosition,
+		kSDKDefIsNotDynamicMenuFlag,
+
 	}
 };
 
@@ -890,6 +898,17 @@ resource ActionDef (kSDKDefActionResourceID)
 		kKFCActionComponentBoss,
 		kKFCSearchStoryAgainActionID,
 		kKFCSearchStoryAgainMenuKey,	// "Search This Story Again"
+		kOtherActionArea,
+		kNormalAction,
+		kCustomEnabling|kDisableIfLowMem,
+		kInvalidInterfaceID,
+		kSDKDefInvisibleInKBSCEditorFlag,
+
+		// Search This Document Again - a document row's right-click menu (the author's call of 2026-10-10).
+		// kCustomEnabling: UpdateActionStates greys it while no document row is stashed or a run is up.
+		kKFCActionComponentBoss,
+		kKFCSearchDocumentAgainActionID,
+		kKFCSearchDocumentAgainMenuKey,	// "Search This Document Again"
 		kOtherActionArea,
 		kNormalAction,
 		kCustomEnabling|kDisableIfLowMem,

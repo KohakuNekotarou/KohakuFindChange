@@ -9,7 +9,7 @@
 //  operation a person starts on the panel - a click on a row, an arrow or Return in the list, a menu action, the query
 //  dialog's Run - one line in the test build's trace (KFCDiag.h):
 //
-//      HIDDENDOCS <where> held=<n> hidden=<m> [<name>|held|clean] ...
+//      HIDDENDOCS <where> held=<n> hidden=<m> [<name>|held or not-held|clean or modified] ...
 //
 //  m = the open documents with no window, each named; n = how many of them KFC still holds (KFCBookScope's held list - a
 //  chapter it reopened windowless). Every operation of KFC's hands back what it reopened, or gives it its window, so a

@@ -332,17 +332,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit row (a script firing the
 			// action by ID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
+			// The row right-clicked is one of several rows selected together: all of them (O18 - the author's calls of
+			// 2026-10-10, object rows and then text rows). Any other row: that row alone (KFCResultTree::RowsOfRightClick).
 			int32 chapter = -1, hit = -1;
 			if (KFCResults()->GetContextMenuHit(chapter, hit))
-			{
-				// The row right-clicked is one of several rows selected together: all of them (O18 - the author's calls of
-				// 2026-10-10, object rows and then text rows). Any other row: that row alone.
-				std::vector<int32> rows;
-				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
-					(void)KFCResultTree::ReplaceRows(chapter, rows);
-				else
-					(void)KFCResultTree::ReplaceRow(chapter, hit);
-			}
+				(void)KFCResultTree::ReplaceRows(chapter, KFCResultTree::RowsOfRightClick(chapter, hit));
 			break;
 		}
 
@@ -352,6 +346,16 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			int32 chapter = -1, group = -1;
 			if (KFCResults()->GetContextMenuStory(chapter, group))
 				(void)KFCResultTree::SearchStoryAgain(chapter, group);
+			break;
+		}
+
+		case kKFCSearchDocumentAgainActionID:
+		{
+			// A document row's right-click menu (2026-10-10). Nothing stashed = nobody right-clicked a document row: do
+			// nothing.
+			int32 chapter = -1;
+			if (KFCResults()->GetContextMenuChapter(chapter))
+				(void)KFCResultTree::SearchDocumentAgain(chapter);
 			break;
 		}
 
@@ -559,21 +563,11 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
 			// with nothing said about it (KFCReplaceEngine::CanReplaceHit).
+			// Several rows selected together, the right-clicked among them: while any of them can be (O18) - the rows and the
+			// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
 			int32 chapter = -1, hit = -1;
-			bool enable = KFCResults()->GetContextMenuHit(chapter, hit);
-			if (enable)
-			{
-				// Several rows selected together, the right-clicked among them: while any of them can be (O18).
-				std::vector<int32> rows;
-				if (KFCResultTree::SelectionHoldsRow(chapter, hit, rows))
-				{
-					enable = false;
-					for (size_t k = 0; k < rows.size() && !enable; ++k)
-						enable = KFCRuns()->CanReplaceHit(chapter, rows[k]);
-				}
-				else
-					enable = KFCRuns()->CanReplaceHit(chapter, hit);
-			}
+			const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
+				&& KFCResultTree::CanReplaceAny(chapter, KFCResultTree::RowsOfRightClick(chapter, hit));
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 		else if (action == kKFCSearchStoryAgainActionID)
@@ -583,6 +577,15 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
 			int32 chapter = -1, group = -1;
 			const bool enable = KFCResults()->GetContextMenuStory(chapter, group) && !KFCRuns()->IsAnyRunning();
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+		}
+		else if (action == kKFCSearchDocumentAgainActionID)
+		{
+			// A document row's menu: Search This Document Again while a document row is stashed and no run is up - its
+			// refusals (a changed query, a search over part of a document) said on the status line, as the story row's are
+			// (KFCSearchEngine::SearchDocumentAgain).
+			int32 chapter = -1;
+			const bool enable = KFCResults()->GetContextMenuChapter(chapter) && !KFCRuns()->IsAnyRunning();
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}

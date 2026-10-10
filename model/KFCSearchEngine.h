@@ -464,6 +464,13 @@ namespace KFCSearchEngine
 	    refused or failed, the list unchanged; outStatus says what happened either way. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 
+	/** Search This Document Again (a document row's right-click menu - the author's call of 2026-10-10): that document
+	    walked again whole with the search's query - the walk the search makes of each document, the Object tab's
+	    included - under a bar with Cancel, its rows put back as the walk finds them and its stories' versions recorded
+	    (KFCResultModel::ReplaceChapterRows). A search over part of a document is refused. False = refused, failed or
+	    cancelled, the list unchanged; outStatus says what happened either way. */
+	bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus);
+
 	/** A story's VERSION: ITextModel::GetChangeCount - the counter InDesign moves for every change to the
 	    story's text, attributes, tables and inlines (ITextModel.h, GetChangeCount), and moves BACK on Undo
 	    to exactly the value it had (measured - docs/ai-notes/text-change-counters-2026-08-08.md). The

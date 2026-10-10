@@ -60,10 +60,6 @@
 
 namespace
 {
-// THE WALK'S GUARD: no document's walk asks the service more often than this. InDesign ends a walk itself (kNotFound -
-// measured) and the walk below stops on an item given twice; this is for a walk that does neither.
-const int32 kMaxWalkSteps = 100000;
-
 // THE USER'S SELECTION, GIVEN BACK (O6). The text walker service's snapshot - the spelling panel's, which InDesign's own
 // search takes the same way (ITextWalkerSelectionUtils.h, SaveSelectionsSnapshot / RestoreSelectionsSnapshot); measured
 // with an object search over a windowless document and over the front one (KT, 2026-10-09 and the plan's Task 1 M4 -
@@ -82,17 +78,55 @@ public:
 		if (fUtils != nil)
 			fUtils->SaveSelectionsSnapshot();
 	}
-	~SelectionKeeper()
+	~SelectionKeeper() { GiveBack(); }
+	// The snapshot given back now (once - the destructor then does nothing).
+	void GiveBack()
 	{
 		if (fUtils == nil)
 			return;
 		fUtils->RestoreSelectionsSnapshot();
 		fUtils->Release();
+		fUtils = nil;
 	}
 private:
 	ITextWalkerSelectionUtils* fUtils;
 	SelectionKeeper(const SelectionKeeper&);
 	SelectionKeeper& operator=(const SelectionKeeper&);
+};
+
+// WHAT A LISTING'S WALKS COST THE USER, PUT BACK as they end - every listing's (CollectTargets, WalkOneDocument):
+//  - the selection, given back (SelectionKeeper - O6);
+//  - NOTHING SELECTED, given back too (2026-10-10 - the author's report: "an object-style search starts with an object
+//    selected; leave the selection as it was before the search"). With nothing selected the snapshot has nothing to give
+//    back, and what InDesign's walk selected stayed selected - measured in the test build's trace (OBJWALK / OBJSEL): both
+//    searches began with nothing selected; the style search's last find, A3 on page 1, was still selected after the
+//    snapshot, while a fill-colour search whose last find was on page 2 ended with nothing selected (obj-list-basic passed
+//    by that, not by the snapshot). So the UI half is asked first, and clears the selection after the snapshot when
+//    nothing was selected;
+//  - the shared walker, aimed at the front document again (O7).
+// Made before the walks' bar (whose events can come in while it stands) and after the page items Search: = Selection
+// names are read.
+class WalkAftercare
+{
+public:
+	WalkAftercare() : fUi(GetExecutionContextSession(), UseDefaultIID()), fNothingSelected(fUi != nil && !fUi->HasAnySelection()) {}
+	~WalkAftercare()
+	{
+		fKeep.GiveBack();
+#ifdef KFC_DIAG
+		KFC_DIAG_LOG("OBJSEL nothing-before=%d selected-after-restore=%d", fNothingSelected ? 1 : 0,
+			(fUi != nil && fUi->HasAnySelection()) ? 1 : 0);
+#endif
+		if (fNothingSelected)
+			fUi->ClearSelection();
+		KFCObjectSearch::AimSharedWalkerAtFront();
+	}
+private:
+	InterfacePtr<IKFCUIServices>	fUi;
+	const bool						fNothingSelected;
+	SelectionKeeper					fKeep;		// the snapshot - taken after the question above
+	WalkAftercare(const WalkAftercare&);
+	WalkAftercare& operator=(const WalkAftercare&);
 };
 
 // How one document's walk ended - which is not how many rows it found (the text search's ChapterWalkResult, cut down).
@@ -174,8 +208,10 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 	// listed its <n>th item, heard where the walk asks the bar.
 	const int diagCancelAt = KFCDiagFaultValue("objsearch-cancel", 0, 0);
 #endif
+	// THE WALK ENDS BY ITSELF - no count of steps of our own (spec O5; the text walks' rule as well): InDesign says there is
+	// no more (kNotFound - measured), an item comes round again, or the rows reach the run's limit.
 	std::set<UID> seen;
-	for (int32 step = 0; step < kMaxWalkSteps; ++step)
+	for (int32 step = 0; ; ++step)
 	{
 		UIDRef found;	// stays empty even on kSuccess (measured) - the match is the shared walker's current item
 		const IFindChangeService::FindChangeResult result =
@@ -223,7 +259,6 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		if (cancel)
 			return kWalkCancelled;
 	}
-	return kWalkBroke;
 }
 }	// anonymous namespace
 
@@ -598,17 +633,8 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		fromSearchScope = (selected.Length() == 0) && CursorInText();
 	}
 	const UIDList* const items = (selected.Length() > 0) ? &selected : nil;
-	// NOTHING SELECTED IS GIVEN BACK TOO (2026-10-10 - the author's report: "an object-style search starts with an object
-	// selected; leave the selection as it was before the search"). With nothing selected the snapshot below has nothing to
-	// give back, and what InDesign's walk selected stayed selected - measured in the test build's trace (OBJWALK / OBJSEL):
-	// both searches began with nothing selected; the style search's last find, A3 on page 1, was still selected after the
-	// snapshot, while a fill-colour search whose last find was on page 2 ended with nothing selected (obj-list-basic passed
-	// by that, not by the snapshot). So the UI half is asked first, and clears the selection after the snapshot when
-	// nothing was selected.
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
-	const bool nothingSelected = (ui != nil) && !ui->HasAnySelection();
 	{
-		const SelectionKeeper keep;		// given back as this block ends, after the last chapter is handed back (O6)
+		const WalkAftercare aftercare;		// O6 / O7 as this block ends, after the last chapter is handed back
 		PMString title(fromBook ? "Searching book..." : "Searching...");
 		title.SetTranslatable(kFalse);
 		// A document's slice is kDocSpan steps, so the bar can move inside one (O16 - DocProgress).
@@ -672,13 +698,36 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 			out.cancelled = true;
 		bar.SetPosition(barEnd);
 	}
-#ifdef KFC_DIAG
-	KFC_DIAG_LOG("OBJSEL nothing-before=%d selected-after-restore=%d", nothingSelected ? 1 : 0,
-		(ui != nil && ui->HasAnySelection()) ? 1 : 0);
-#endif
-	if (nothingSelected)
-		ui->ClearSelection();
-	AimSharedWalkerAtFront();		// O7
+}
+
+bool KFCObjectSearch::WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
+	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled)
+{
+	outHits.clear();
+	outCapped = false;
+	outCancelled = false;
+	InterfacePtr<IFindChangeService> svc(CreateFindChangeService());
+	InterfacePtr<IObjectWalker> shared(QuerySharedWalker());
+	if (svc == nil || shared == nil)
+		return false;
+	WalkEnd end = kWalkDone;
+	{
+		const WalkAftercare aftercare;		// O6 / O7 as this block ends - CollectTargets' rule
+		PMString title("Searching...");
+		title.SetTranslatable(kFalse);
+		KFCProgressBar bar(title, 0, kDocSpan, kTrue, kTrue);
+		bar.DisableChildProgressBars(kTrue);
+		KFCSetCountedTask(bar, "Document", 0, 1, name);
+		bar.SetPosition(0);
+		// The whole document, from the top - Search: as the search had it is a whole document's (the caller refuses one
+		// over part of a document).
+		end = WalkDoc(svc, shared, docRef, nil, limit, outHits, outCapped, false, bar, 0);
+		if (end == kWalkDone && bar.WasCancelled(kFalse))
+			end = kWalkCancelled;
+		bar.SetPosition(kDocSpan);
+	}
+	outCancelled = (end == kWalkCancelled);
+	return end == kWalkDone;
 }
 
 // End, KFCObjectSearch.cpp.

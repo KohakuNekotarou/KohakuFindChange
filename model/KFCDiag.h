@@ -32,7 +32,8 @@
 //                itself and points its record at that window before putting the dialog's style back - a
 //                handle the OS has since given to another window (work\kbs-fcmin\decoy.ps1 makes one)
 //    jump-no-front (UI half) ui/KFCJump.cpp's EnsureDocFrontmost reports that the hit's window
-//                could not be brought forward (work\kbs-jump\j2-select-unfronted.ps1)
+//                could not be brought forward (work\kbs-jump\j2-select-unfronted.ps1; work\kbs-regress\hid-cases.tsv - a
+//                chapter a landing reopened goes back when its window does not come forward)
 //    replace-refuse KFCReplaceEngine.cpp's WalkStoryReplacing takes InDesign's replace command as having
 //                refused every row - a chapter where nothing lands (work\kbs-regress\cases\fault-replace-refuse-on.jsx
 //                / -off.jsx)
@@ -78,6 +79,12 @@
 //    objsearch-cancel  the file holds "<n>": the Object tab's search (KFCObjectSearch.cpp's WalkDoc) takes Cancel as pressed
 //                once a document's walk has listed its nth item - heard inside the document, where the bar is asked
 //                (O16; work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
+//    object-walk-miss  an object row's Replace (KFCObjectReplace.cpp) takes InDesign's walk as never coming to the row's
+//                item - the row must say it no longer matches, nothing written (work\kbs-regress\oca-cases.tsv, oca-walk-miss)
+//    return-repeat  (UI half) ui/KFCResultTreeEH.cpp's TakeReturn lets a held Return's repeats through as before 2026-10-09
+//                - each one a write: the case that shows what taking the repeat stops (ret-shift-held-armed)
+//    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
+//                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

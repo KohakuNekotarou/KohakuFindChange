@@ -89,6 +89,14 @@ namespace KFCObjectSearch
 	void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBook, bool allDocuments,
 		int32 selectionScope, std::vector<KFCBookScope::SkippedChapter>& unopenable, Tally& out);
 
+	/** SEARCH THIS DOCUMENT AGAIN on the Object tab (2026-10-10 - KFCSearchEngine::SearchDocumentAgain): ONE open document
+	    walked whole as CollectTargets walks each of its targets, under a bar of its own ("Document 1 / 1 - <name>"), the
+	    user's selection given back and the shared walker aimed at the front after (O6 / O7). Its rows come back in
+	    outHits (not in the model) - at most `limit` (outCapped when there were more). true = the walk ended cleanly;
+	    false = it broke off, or Cancel was pressed (outCancelled) - the rows are not to be used then. */
+	bool WalkOneDocument(const UIDRef& docRef, const PMString& name, size_t limit,
+		std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool& outCancelled);
+
 	/** An item's FINGERPRINT (O12): its own snippet (ISnippetExport::ExportPageitems into memory) up to the snippet's XMP
 	    packet, as a 64-bit hash and a length. Moving, restyling or editing the item changes it; recomposing does not
 	    (measured - the plan's Task 1 M2). false = no snippet (no item, no exporter). */

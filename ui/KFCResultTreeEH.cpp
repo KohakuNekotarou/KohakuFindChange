@@ -218,9 +218,10 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 }
 
 // RETURN ON THE SELECTED HIT ROW (spec F17), one place for the two that take it: the list's own KeyDown and the Return
-// filter below. Return or the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the
-// right-click Replace's own door (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced), the list
-// keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller passes it on.
+// filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or several together - O18): they are
+// replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing happens when none can be
+// replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller
+// passes it on.
 // WITH SHIFT (2026-10-08), the same, and then - only when the row was written - on to the next row below that can be
 // replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence. Ctrl and Alt
 // still make it not a Return of ours.
@@ -242,27 +243,14 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	const bool goOn = e->ShiftKeyDown() ? true : false;
 	if (controller == nil)
 		return kFalse;
-	NodeIDList selected;
-	controller->GetSelectedItems(selected);
-	// The rows this Return writes: the one hit row selected - or the rows selected together (O18 - the author's calls of
+	// The rows this Return writes: the hit row selected - or the rows selected together (O18 - the author's calls of
 	// 2026-10-10, object rows and then text rows), in the order they are drawn. `last` is the row Shift+Return goes on
-	// from: the lowest of them.
+	// from: the lowest of them (a hit row's NodeID is its chapter, story and hit - the same row the tree draws).
 	int32 chapter = -1;
 	std::vector<int32> rows;
-	NodeID last;
-	if (selected.size() == 1)
-	{
-		TreeNodePtr<KFCResultNodeID> node(selected[0]);
-		if (node == nil || node->IsRoot() || !node->IsHitRow())
-			return kFalse;
-		chapter = node->GetChapter();
-		rows.push_back(node->GetHit());
-		last = selected[0];
-	}
-	else if (KFCResultTree::GetSelectedHitRows(chapter, rows))
-		last = NodeID(KFCResultNodeID::Create(chapter, rows.back()));
-	else
+	if (!KFCResultTree::GetSelectedHitRows(chapter, rows))
 		return kFalse;
+	const NodeID last(KFCResultNodeID::Create(chapter, rows.back()));
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
 	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
 	// A RETURN HELD DOWN WRITES ONCE (2026-10-09 - the header re-read 52's proposal, the author's yes). Windows repeats a key
@@ -594,8 +582,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 
 // RETURN REPLACES THE SELECTED ROW (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F17 - the
 // author's call: walk the rows with the arrows and replace with Return where the match is right, the keyboard alone). Return or
-// the keypad's Enter, no modifier, one HIT row selected: that row is replaced through the right-click Replace's own door
-// (KFCResultTree::ReplaceRow - nothing happens on a row that cannot be replaced). Any other key, a modified Return, or
+// the keypad's Enter, no modifier, HIT rows selected: they are replaced through the right-click Replace's own door
+// (KFCResultTree::ReplaceRows - nothing happens when none can be replaced). Any other key, a modified Return, or
 // Return on a story / document / book row goes to the stock handler. Only while the TREE holds the keyboard - typing
 // in a document never comes here.
 bool16 KFCResultTreeEH::KeyDown(IEvent* e)
@@ -603,7 +591,7 @@ bool16 KFCResultTreeEH::KeyDown(IEvent* e)
 	gHolding = false;		// any key ends a previous Return's hold; this one may start a new one (TakeReturn)
 	// THE RETURN, WHEN THE FILTER DID NOT GET IT FIRST (found by the author: after a Return had replaced a
 	// row, the down arrow moved the page item selected in the layout instead of walking the list, while the right-click
-	// Replace, which runs the same ReplaceRow, left the arrows walking). Normally the Return filter on the dispatcher's
+	// Replace, which runs the same ReplaceRows, left the arrows walking). Normally the Return filter on the dispatcher's
 	// stack takes it before it gets here (gReturnFilter); this is the same Return through the same door for when it
 	// does not - the filter off the stack - with only the hold to keep the keyboard (TakeReturn).
 	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());

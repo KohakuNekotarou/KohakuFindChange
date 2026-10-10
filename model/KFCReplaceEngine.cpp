@@ -1224,15 +1224,15 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
 {
-	bool replaced = false, locked = false;
-	return KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked)
-		&& !replaced && !locked
-		&& KFCResultModel::IsWorkOutcome(KFCResultModel::GetHitOutcome(chapterIdx, hitIdx));
+	// Nothing greys it (WhyGreyed - the one place the reasons are asked: the menu's grey state and the rows a Replace of
+	// rows selected together leaves are the same question).
+	return WhyGreyed(chapterIdx, hitIdx) == kGreyedNot;
 }
 
 KFCReplaceEngine::GreyedReason KFCReplaceEngine::WhyGreyed(int32 chapterIdx, int32 hitIdx)
 {
-	// CanReplaceHit's three questions, each with the word its row shows (KFCResultModel::BuildHitLocator).
+	// A Find/Change match not replaced, not locked, with no outcome is not greyed. Each other answer with the word its row
+	// shows (KFCResultModel::BuildHitLocator).
 	bool replaced = false, locked = false;
 	if (!KFCResultModel::GetHitFlags(chapterIdx, hitIdx, replaced, locked))
 		return kGreyedMissing;		// no such row (a selected row always is one - asked anyway)
@@ -1243,8 +1243,8 @@ KFCReplaceEngine::GreyedReason KFCReplaceEngine::WhyGreyed(int32 chapterIdx, int
 		return kGreyedMissing;
 	if (locked || outcome == KFCResultModel::kOutcomeLocked)
 		return kGreyedLocked;
-	if (outcome == KFCResultModel::kOutcomeRefused)
-		return kGreyedRefused;
+	if (!KFCResultModel::IsWorkOutcome(outcome))
+		return kGreyedRefused;		// refused - and any outcome that is not work (IsWorkOutcome)
 	return kGreyedNot;
 }
 
@@ -1335,7 +1335,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// holding ^ is turned below, also outside it).
 	KFCForwardSearchScope forward;
 	// A changed query CLEARS the results (RefuseChangedQuery) - the UI half redraws the tree for it
-	// (KFCResultTree::ReplaceRow). The refusal says which of its three answers it was - not
+	// (KFCResultTree::ReplaceRows). The refusal says which of its three answers it was - not
 	// "the query changed" in front of all three, the other tab and a tab that could not be stated included.
 	PMString refusal;
 	if (KFCReplaceEngine::RefuseChangedQuery(refusal))
@@ -1375,7 +1375,7 @@ static bool ReplaceRowsNow(int32 chapterIdx, const std::set<int32>& rowsToReplac
 	// ReopenChapterDoc opens a closed chapter windowless and holds it. WRITTEN: a chapter of ours gets a window,
 	// so the replace can be seen and saved (ShowChapterWindow); a document that is not ours is left as it is -
 	// one with a window has it, and one the user keeps WITHOUT one (Search: = All Documents) stays hidden (the
-	// author's call), and the status line says so (KFCResultTree::ReplaceRow).
+	// author's call), and the status line says so (KFCResultTree::ReplaceRows).
 	// NOT WRITTEN (refused, rolled back): nothing of this is in the document, so a flag the check's walk raised is
 	// put back on a document that was clean (any document), and a chapter of ours is then handed back - flag
 	// first, since a held chapter that says "unsaved" is not closed.
