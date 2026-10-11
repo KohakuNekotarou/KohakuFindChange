@@ -9,9 +9,8 @@
 //
 //  The RUNS and what they ask - the search and the replace family, whether one is
 //  running, the Find/Change settings they follow, and the questions the jump asks of a row's text.
-//  Each method forwards to the function named beside it in KFCModelServices.cpp; the contract is
-//  written there (KFCSearchEngine.h / KFCReplaceEngine.h / KFCRunGuard.h /
-//  KFCOversetLocator.h).
+//  Each method forwards to the function named beside it (KFCModelServices.cpp); the contract is
+//  written where that function is declared.
 //
 //  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
 //  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
@@ -92,7 +91,7 @@ public:
 	virtual void ListSavedQueries(std::vector<KFCSavedQuery>& out) = 0;
 	/** = KFCSavedQueries::Describe - one query file of the dialog's run order: its name, kind and whether it is there. */
 	virtual void DescribeQueryFile(const IDFile& file, KFCSavedQuery& out) = 0;
-	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Object" (1.4.0) / "Transliterate" / "?". */
+	/** = KFCSavedQueries::KindName - "Text" / "GREP" / "Glyph" / "Object" / "Transliterate" / "?". */
 	virtual const char* QueryKindName(int32 mode) = 0;
 	/** = KFCQuerySequence::RunFiles - the query dialog's Run: these query files, in this order. */
 	virtual int32 RunQueries(const std::vector<IDFile>& files, PMString& outSummary) = 0;
@@ -109,19 +108,18 @@ public:
 	virtual KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart, TextIndex& ioEnd) = 0;
 	/** = KFCSearchEngine::SearchStoryAgain (appended) - a story row's Search This Story Again. */
 	virtual bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus) = 0;
-	/** = KFCSearchEngine::RestoreSearchScope (appended, 1.4.0) - Search: put back after a row's click (scheduled). */
+	/** = KFCSearchEngine::RestoreSearchScope (appended) - Search: put back after a row's click (scheduled). */
 	virtual void RestoreSearchScope(int32 mode, int32 scope) = 0;
-	/** = KFCObjectReplace::CheckRowNow (appended, 1.4.0) - an object row's Replace asked before its window is brought
+	/** = KFCObjectReplace::CheckRowNow (appended) - an object row's Replace asked before its window is brought
 	    forward: false = refused, outStatus says why. */
 	virtual bool CheckObjectReplace(int32 chapterIdx, int32 hitIdx, PMString& outStatus) = 0;
-	/** = KFCObjectReplace::CheckRowsNow (appended, 1.4.0 - O18) - the rows selected together, of one document or several,
+	/** = KFCObjectReplace::CheckRowsNow (appended) - the rows selected together, of one document or several,
 	    asked before a window is brought forward: true at the first row that would be written. */
 	virtual bool CheckObjectReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
-	/** = KFCReplaceEngine::ReplaceHits (appended, 1.4.0 - O18) - the rows selected together, object or text, of one
+	/** = KFCReplaceEngine::ReplaceHits (appended) - the rows selected together, object or text, of one
 	    document or several, replaced in one undo step. */
 	virtual bool ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus) = 0;
-	/** = KFCSearchEngine::SearchDocumentAgain (appended, 1.4.0 - 2026-10-10) - a document row's Search This Document
-	    Again. */
+	/** = KFCSearchEngine::SearchDocumentAgain (appended) - a document row's Search This Document Again. */
 	virtual bool SearchDocumentAgain(int32 chapterIdx, PMString& outStatus) = 0;
 };
 

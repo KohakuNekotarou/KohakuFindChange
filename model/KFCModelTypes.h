@@ -52,7 +52,7 @@ namespace KFCResultModel
 	{
 		kRowNotFound = 0,	// nowhere that can be told - the jump says "Not found"
 		kRowAtPlace,		// at its stored place
-		kRowMoved,			// moved to the one free candidate (today's relocation) - the row stands there now
+		kRowMoved,			// moved to the one free candidate (RelocateStaleRow's rule) - the row stands there now
 		kRowElsewhere		// found through its text focus or by order - for this jump only (spec T3)
 	};
 
@@ -78,7 +78,6 @@ namespace KFCResultModel
 		bool			replaced;
 		bool			locked;
 		ChangeOutcome	outcome;
-		// (A footnote's row is told apart by GetHitInFootnote, not by a field here.)
 
 		RowDisplay() : replaced(false), locked(false), outcome(kOutcomeNone) {}
 	};
@@ -116,13 +115,14 @@ struct KFCNotifyPayload
 	explicit KFCNotifyPayload(Kind k) : kind(k), chapterIdx(-1), text(nil) {}
 };
 
-/** One saved Find/Change query as the query dialog shows it (KFCSavedQueries; the query dialog's spec, section 2-2):
+/** One saved Find/Change query as the query dialog shows it (KFCSavedQueries;
+    docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md section 2-2):
     the file, its name, its kind, InDesign's own or the user's, and whether the file is there now. */
 struct KFCSavedQuery
 {
 	IDFile		file;
 	PMString	name;		// the file's name without ".xml" - what the dialog shows
-	int32		mode;		// IFindChangeOptions::SearchMode: kTextSearch, kGrepSearch, kGlyphSearch, kObjectSearch (1.4.0),
+	int32		mode;		// IFindChangeOptions::SearchMode: kTextSearch, kGrepSearch, kGlyphSearch, kObjectSearch,
 							// kTransliterateSearch; -1 = no kind's folder
 	bool		bundled;	// InDesign's own (Presets\Find-Change Queries), not the user's
 	bool		exists;		// the file is there now
@@ -130,9 +130,8 @@ struct KFCSavedQuery
 	KFCSavedQuery() : mode(-1), bundled(false), exists(false) {}
 };
 
-// HIT ROWS SELECTED TOGETHER, by document (1.4.0 - O18, the author's call of 2026-10-10 night: rows of several documents
-// replaced together, as Change Checked's ticked rows were): each chapter of the result model with its hit rows, in the
-// order the list draws them.
+// HIT ROWS SELECTED TOGETHER, by document (the author's call: rows of several documents are replaced together, in one
+// undo step): each chapter of the result model with its hit rows, in the order the list draws them.
 typedef std::vector<std::pair<int32, std::vector<int32> > > KFCRowsByChapter;
 
 // How many rows they are - every chapter's together.

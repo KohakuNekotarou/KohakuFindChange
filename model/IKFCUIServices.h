@@ -98,16 +98,16 @@ public:
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
 	    selected BookContent UIDs (the book's database); outTotal = the panel's rows. */
 	virtual bool				GetPanelBookSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal) = 0;
-	/** The page items selected in the front layout view, standoffs stripped (1.4.0 - the Object tab's Search: =
-	    Selection searches these: spec O3). false (outItems emptied) when there is no layout selection or no item in it. */
+	/** The page items selected in the front layout view, standoffs stripped (the Object tab's Search: = Selection
+	    searches these). false (outItems emptied) when there is no layout selection or no item in it. */
 	virtual bool				GetSelectedPageItems(UIDList& outItems) = 0;
-	/** Is there a TEXT selection in the front view - a range, or a caret (1.4.0 - the author's call of 2026-10-10: on the
-	    Object tab, Search: = Selection with the cursor in text searches the frame the cursor stands in, as Find/Change's
-	    own Find does; KFCObjectSearch then lets InDesign aim its walk from Search:). */
+	/** Is there a TEXT selection in the front view - a range, or a caret (the author's call: on the Object tab,
+	    Search: = Selection with the cursor in text searches the frame the cursor stands in, as Find/Change's own Find
+	    does; KFCObjectSearch then lets InDesign aim its walk from Search:). */
 	virtual bool				HasTextSelection() = 0;
-	/** Is anything selected in the front view - a page item, text, cells (1.4.0, 2026-10-10: the author's report "an
-	    object-style search leaves an object selected" - the selection snapshot gives "nothing" back as nothing to do, so
-	    the object search asks this before its walk and clears what the walk selected when the answer was no). */
+	/** Is anything selected in the front view - a page item, text, cells. The selection snapshot gives "nothing" back
+	    as nothing to do, so the object search asks this before its walk and clears what the walk selected when the
+	    answer was no - without it an object search left an object selected (the user's report). */
 	virtual bool				HasAnySelection() = 0;
 	/** Nothing selected in the front view - DeselectAll on the active selection, when there is one (KFCJump's
 	    ClearSelection, the SDK's way in SnpSelectShape.cpp). */
