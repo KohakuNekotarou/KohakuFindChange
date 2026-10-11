@@ -4,13 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE OBJECT TAB'S WRITES (1.4.0 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O10, O13, O14):
+//  THE OBJECT TAB'S WRITES (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O10, O13, O14):
 //  InDesign's own object replace, aimed by the shared object walker as the search is (KFCObjectSearch.h).
 //    A ROW'S REPLACE - the walker aimed at the row's document, InDesign's SearchObject asked until it stands on the row's
 //    item (StartWithItem does not move where a search begins - measured), then ReplaceObject: that item alone, in one undo
 //    step. Its doors - the settings, the change side, the item there, unlocked and as the search found it - are asked
 //    first and can be asked alone (CheckRowNow), so the UI half refuses before it brings a window forward.
-//    SEVERAL ROWS' REPLACE (O18) - the rows selected together: the same doors row by row, then one walk replacing each
+//    SEVERAL ROWS' REPLACE - the rows selected together: the same doors row by row, then one walk replacing each
 //    row's item as the walk stands on it, in one undo step (ReplaceRows / CheckRowsNow).
 //    A DOCUMENT'S CHANGE ALL - ReplaceAllObject over the document (it selects nothing - measured).
 //
@@ -37,11 +37,11 @@ namespace KFCObjectReplace
 	/** An object row's Replace (O10 steps 1-5, 7, 8, 10, 11): the doors again, then the walk to the item and ReplaceObject,
 	    one undo step ("Replace") with KFC's undo mark in it; the row Changed with the item's new fingerprint;
 	    "Replaced ID:<uid>." on success. The selection InDesign leaves (step 9) is the UI half's to settle: the row's
-	    item selected (the author's call of 2026-10-10). */
+	    item selected (the author's call). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** SEVERAL OBJECT ROWS REPLACED TOGETHER (O18 - the author's calls of 2026-10-10: the rows selected together are
-	    replaced together, of one document or several, as Change Checked's ticked rows were). Steps 1-2 asked once; 3-5
+	/** SEVERAL OBJECT ROWS REPLACED TOGETHER (the author's calls: the rows selected together are replaced together, of
+	    one document or several). Steps 1-2 asked once; 3-5
 	    row by row - a row that fails is left as it is and counted by its reason, the others written in ONE walk of each
 	    document (InDesign's own matching, its replace on each row's item as the walk stands on it) and ONE undo step with
 	    KFC's undo mark in it for every document written - one document's a plain sequence, several documents' one

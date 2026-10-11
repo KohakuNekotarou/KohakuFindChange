@@ -8,8 +8,8 @@
 //  F6, F18 and section 4). InDesign's own Change All (kReplaceAllTextCmdBoss) over the book's chapters - Book Scope on
 //  only (F18: a document's Change All is InDesign's own dialog's) - once a chapter, in ONE undo step, with no list: the
 //  panel says how many were replaced, and how many in each chapter. Track Changes is each story's own
-//  setting, left as it is (F1). Runs only while
-//  the panel holds no list (the old design's C4); Clear Results empties it (C8). What may stand then - a search that found
+//  setting, left as it is (F1). Runs only while the panel holds no list; Clear Results empties it
+//  (docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md C4, C8). What may stand then - a search that found
 //  nothing, a book's "(0/0)" row - is thrown away at the run's commit point, as the query run throws its list away
 //  (Run says why). The query run writes through WriteDocument too, in whatever scope Search: names.
 //

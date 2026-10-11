@@ -83,10 +83,10 @@ namespace KFCReplaceEngine
 	/** RefuseChangedQuery's question WITHOUT ITS CONSEQUENCES: true when the Find/Change settings
 	    still describe the search the results came from. The tab is stated as RefuseChangedQuery
 	    states it - a walk after this runs in it - and NOTHING IS CLEARED whatever the answer. For a
-	    caller that only has to know: the jump's look for a row Undo moved
-	    (KFCSearchEngine::RelocateStaleRow), where RefuseChangedQuery would clear the whole result set
-	    in the middle of a jump on a changed query. Same rule as RefuseChangedQuery: outside any
-	    command sequence. */
+	    caller that only has to know (the jump's look for a row an Undo moved -
+	    KFCSearchEngine::RelocateStaleRow - is one), where RefuseChangedQuery would clear the whole result
+	    set in the middle of the caller's work on a changed query. Same rule as RefuseChangedQuery: outside
+	    any command sequence. */
 	bool QueryUnchangedSinceSearch();
 
 	/** Replace on a hit row's right-click menu, or Return (the author's call): that one row, with no prompt, in ONE
@@ -96,8 +96,8 @@ namespace KFCReplaceEngine
 	    opened, or the row would not be replaced (locked since, missing, refused). */
 	bool ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** THE ROWS SELECTED TOGETHER (O18 - the author's calls of 2026-10-10), all of one kind, of one document or several
-	    (as Change Checked's ticked rows were), in ONE undo step: object rows by KFCObjectReplace::ReplaceRows (row by row -
+	/** THE ROWS SELECTED TOGETHER (the author's calls), all of one kind, of one document or several, in ONE undo step:
+	    object rows by KFCObjectReplace::ReplaceRows (row by row -
 	    a row that cannot be written is left and counted); text rows whose Replace is greyed are left and counted, and the
 	    others are written all or nothing, as ReplaceHit writes one ("Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." /
 	    "Replaced 2 of 3 rows: ... Left as they were: 1 locked." / "Replaced 3 rows in 2 documents: a.indd ID:262 #1;
@@ -111,9 +111,9 @@ namespace KFCReplaceEngine
 
 	/** WHY A ROW'S REPLACE IS GREYED - the one place the reasons are asked (CanReplaceHit is this answering kGreyedNot) -
 	    as its row shows it - Changed, Missing, locked, refused -
-	    for the rows left by a Replace of rows selected together, counted by reason (O18 - the author's call of
-	    2026-10-10: "1 already replaced, 1 locked" rather than one "already replaced or locked" for all of them, which
-	    named a row reading Missing as one of those). One reason a row: replaced, then missing, then locked, then refused
+	    for the rows left by a Replace of rows selected together, counted by reason (the author's call: "1 already
+	    replaced, 1 locked" rather than one "already replaced or locked" for all of them, which named a row reading
+	    Missing as one of those). One reason a row: replaced, then missing, then locked, then refused
 	    (a locked row a jump found changed reads "Missing ... locked" - missing is what keeps it from being written).
 	    kGreyedNot when the row can be replaced. Text and object rows alike (KFCObjectReplace counts its rows by it). */
 	enum GreyedReason { kGreyedNot = 0, kGreyedReplaced, kGreyedMissing, kGreyedLocked, kGreyedRefused, kGreyedReasonCount };

@@ -42,7 +42,7 @@
 #include "KFCDiag.h"
 #include "KFCID.h"				// kKFCChangeAllStepKey
 #include "KFCLoc.h"
-#include "KFCObjectReplace.h"	// ReplaceAllInDoc - the Object tab's Change All in one chapter (1.4.0)
+#include "KFCObjectReplace.h"	// ReplaceAllInDoc - the Object tab's Change All in one chapter
 #include "KFCObjectSearch.h"	// the Object tab's doors and Search:, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
@@ -90,7 +90,8 @@ void AppendByChapter(PMString& outSummary, const std::vector<std::pair<PMString,
 	outSummary.Append(".");
 }
 
-/** " (K partially)" - the items InDesign's object Change All changed only in part (1.4.0, spec O13); nothing when none. */
+/** " (K partially)" - the items InDesign's object Change All changed only in part (O13 - the object search's spec,
+    docs/superpowers/specs/2026-10-09-kfc-object-search-design.md); nothing when none. */
 void AppendPartially(PMString& outSummary, int32 partially)
 {
 	if (partially <= 0)
@@ -206,7 +207,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	const RunningFlagGuard runningGuard;
 	KFC_DIAG_PHASE(phaseRun, "change-all");		// a test build's timer (KFCDiag.h)
-	// ONLY WITH NO LIST (the old design's C4): a list describes the documents as they were searched, and a Change All
+	// ONLY WITH NO LIST: a list describes the documents as they were searched, and a Change All
 	// under it would leave it describing text that is gone. The menu greys the item; a caller that never went through
 	// the menu (a shortcut, a script firing the action) is turned away here.
 	if (KFCResultModel::GetTotalHitCount() > 0)
@@ -219,7 +220,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		outSummary.Append("Change All: the Colour tab is not supported.");
 		return 0;
 	}
-	// THE OBJECT TAB (1.4.0, spec O13): InDesign's object Change All over each chapter. Refused with nothing to find - an
+	// THE OBJECT TAB (spec O13): InDesign's object Change All over each chapter. Refused with nothing to find - an
 	// empty Find Object Format would change every frame of the Type in the book - or nothing to change to. (The menu greys
 	// the item with nothing to find - HasFindQueryNow - so these doors are for a caller that never went through the menu.)
 	const bool objectTab = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
@@ -250,7 +251,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 			: KFCSearchEngine::ResolveRunScope(scope, outSummary)))
 		return 0;
 	// THE TAB AND THE CHANGE SIDE, STATED BEFORE THE SEQUENCE (outside any command sequence - CommitSearchMode's rule):
-	// what the command writes is what the dialog shows. Not for the Object tab (1.4.0): its Change All is the service's
+	// what the command writes is what the dialog shows. Not for the Object tab: its Change All is the service's
 	// own object replace, which no text walker mode steers - CommitSearchMode turns that tab away by design, as in
 	// KFCSearchEngine::SearchBook.
 	if (!objectTab && !KFCSearchEngine::CommitSearchMode())
@@ -271,9 +272,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// reason for leaving the panel empty - KFCQuerySequence.cpp, "NO LIST"), and ListBookChapters below records THIS
 	// run's book as the searched one (its header asks for ReleaseSearchedBook first): the row then named one book and
 	// KFC watched another - closing the book Change All wrote cleared the row ("Results cleared - the book was closed."),
-	// closing the row's own book left it, and a click on it brought the other book forward (the final audit's D9-3,
-	// 2026-10-09 - case ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says
-	// why). The UI half draws the empty tree when the run returns (KFCActionComponent).
+	// closing the row's own book left it, and a click on it brought the other book forward (case
+	// ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says why). The UI half draws the empty tree when the run returns (KFCActionComponent).
 	// THE PANEL'S PICTURE STAYS WHAT IT WAS (spec map PNL-07 / PNL-08): the results go, the fact that a search has run does
 	// not - DropResults' Clear() takes it away with them, and only a Change All that WROTE changes the picture (the pencil
 	// cat, NoteChangeAllWrote at the end).
@@ -317,7 +317,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	// ===== ONE SEQUENCE AROUND EVERY CHAPTER - one Ctrl+Z for the whole book.
 	int32 replaced = 0;
-	int32 partially = 0;		// the Object tab's items changed only in part (1.4.0, spec O13)
+	int32 partially = 0;		// the Object tab's items changed only in part (spec O13)
 	std::vector<bool> wroteTo(targets.size(), false);		// by target: did its Change All write anything
 	std::vector<std::pair<PMString, int32> > written;		// the By chapter list: each chapter written, how many (book order)
 	bool cancelled = false, failed = false;

@@ -49,13 +49,13 @@ void Refuse(PMString& out, const char* why)
 	out.SetTranslatable(kFalse);
 }
 
-// WHY A ROW IS NOT WRITTEN - said in full for one row (RowSentence), counted for several (RefusalWords - O18).
+// WHY A ROW IS NOT WRITTEN - said in full for one row (RowSentence), counted for several (RefusalWords).
 enum Refusal
 {
 	kRefusedNone = 0,
 	kRefusedRow,			// already replaced, locked when found, or not a match of Find/Change (CanReplaceHit) - one row's
 							// sentence; rows selected together are counted by the row's own reason (GreyedRefusal)
-	kRefusedReplaced,		// already replaced (rows selected together - 2026-10-10)
+	kRefusedReplaced,		// already replaced (rows selected together)
 	kRefusedNoDoc,			// its document could not be found
 	kRefusedNotOpened,		// ...or not opened
 	kRefusedMissing,		// the item is gone - the row now reads Missing
@@ -88,7 +88,7 @@ const char* RowSentence(Refusal why)
 	}
 }
 
-// The same reasons, a few words each, for a count of rows (O18): "2 locked".
+// The same reasons, a few words each, for a count of rows: "2 locked".
 const char* RefusalWords(Refusal why)
 {
 	switch (why)
@@ -169,7 +169,7 @@ Refusal CheckItem(int32 chapterIdx, int32 hitIdx, UIDRef& outDoc, UID& outItem)
 		KFCResultModel::SetHitOutcome(chapterIdx, hitIdx, KFCResultModel::kOutcomeMissing);
 		return kRefusedMissing;
 	}
-	// 3b. On a spread (2026-10-10 night): an item in overset text is not written. A row's Replace brings the view to its
+	// 3b. On a spread: an item in overset text is not written. A row's Replace brings the view to its
 	// item and leaves it selected (KFCJump::ReplaceObjectRow), and nothing of an overset one is laid out to show or
 	// select (KFCObjectSearch::IsOnSpread).
 	if (!KFCObjectSearch::IsOnSpread(UIDRef(db, outItem)))
@@ -193,8 +193,8 @@ bool RowIsReplaceable(int32 chapterIdx, int32 hitIdx)
 		&& KFCReplaceEngine::CanReplaceHit(chapterIdx, hitIdx);
 }
 
-// A greyed row of several selected together, counted by the reason its row shows (2026-10-10 - the author's call, as the
-// text rows are: KFCReplaceEngine::WhyGreyed). An item that went missing reads as one "no longer in the document", one
+// A greyed row of several selected together, counted by the reason its row shows (the author's call, as the text rows
+// are: KFCReplaceEngine::WhyGreyed). An item that went missing reads as one "no longer in the document", one
 // locked as "locked" - the words a row found so by the write itself is counted with.
 Refusal GreyedRefusal(int32 chapterIdx, int32 hitIdx)
 {
@@ -306,11 +306,11 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 				break;
 			}
 		}
-		// (A test build's fault switch: the walk taken as never reaching the item - Review Focus 3, case oca-walk-miss.)
+		// (A test build's fault switch: the walk taken as never reaching the item - case oca-walk-miss.)
 		if (KFC_DIAG_FAULT("object-walk-miss"))
 			reached = false;
-		// 8. That item alone (D1 - the plan's Task 1 M8: ReplaceObject answers kSuccess when it wrote). Its answer AND the
-		// error state: the sequence below ends by the error state (rolled back when one stands), so a write left with an
+		// 8. That item alone (ReplaceObject answers kSuccess when it wrote - measured, the object search plan's Task 1 M8,
+		// docs/superpowers/plans/2026-10-09-kfc-object-search.md). Its answer AND the error state: the sequence below ends by the error state (rolled back when one stands), so a write left with an
 		// error standing would be taken back by InDesign under a row marked Changed - the text Replace asks both
 		// (KFCReplaceEngine's walks: the command's ErrorCode and its result).
 		if (reached)
@@ -508,8 +508,8 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		for (size_t k = 0; k < chapters[c].todo.size(); ++k)
 			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].todo[k].second);
 	// ONE STEP. One document keeps the plain sequence its rows have always had; SEVERAL documents are one abortable
-	// sequence around every document's walk and none inside it - Change Checked's measured rule for a step across
-	// documents (KFCReplaceEngine.cpp, ReplaceRowsNow's note).
+	// sequence around every document's walk and none inside it - the measured rule for a step across documents
+	// (KFCReplaceEngine.cpp, ReplaceRowsNow's note).
 	const bool acrossDocuments = documents > 1;
 	const PMString stepName(KFCLoc::Text(kKFCReplaceStepKey, KFCJa::kReplaceStep));
 	ICommandSequence* sequence = nil;
@@ -656,8 +656,7 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	LeaveObjectChapters(chapters);
 	// "Replaced 3 objects: ID:259, ID:260, ID:261." - and, when some were left, "Replaced 3 of 5 objects: ... Left as they
 	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs. Objects of several documents name
-	// each document before its IDs (2026-10-10 night): "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260;
-	// b.indd ID:12."
+	// each document before its IDs: "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."
 	const size_t kNamedIDs = 8;
 	outStatus = "Replaced ";
 	outStatus.AppendNumber(static_cast<int32>(writtenCount));
