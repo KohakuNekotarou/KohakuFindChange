@@ -123,8 +123,7 @@ NodeID SelectAllRowsTarget()
 		return KFCResultNodeID::CreateFont(chapter, group);
 	if (KFCResults()->GetContextMenuChapter(chapter))
 		return KFCResultNodeID::Create(chapter);
-	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW (2026-10-11, the full re-check C-2). It is the UI
-	// half's own flag, which a new list does not clear as it clears the model's three: the book row right-clicked, its
+	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW. It is the UI half's own flag, which a new list does not clear as it clears the model's three: the book row right-clicked, its
 	// menu closed unpressed, then a document search - and the action fired by its ActionID from a script selected every
 	// row of a list with no book row in it (case ctx-book-stash-docsearch).
 	if (KFCResultTree::GetContextMenuBook() && KFCResults()->IsFromBook())
@@ -171,8 +170,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// for one, and a panel item has its own. It runs the product's action through the action
 			// manager, the way linksui's buttons run theirs (LinksUIButtonObserver.cpp) - so the dialog
 			// opens exactly as Edit > Find/Change opens it, and nothing of InDesign's own menu is changed.
-			// (Not an IActionFilter taking the "needs a document" bit off the Edit menu's action: the user
-			// prefers KFC to leave InDesign's menu alone.)
+			// (Not an IActionFilter taking the "needs a document" bit off the Edit menu's action: the
+			// author's call - KFC leaves InDesign's menu alone.)
 			// *A MINIMISED DIALOG IS BROUGHT BACK, NOT CLOSED (the author's call): that action is a toggle,
 			//  and on a minimised dialog it closes it (measured).
 			if (KFCRestoreMinimizedFindChange())
@@ -238,7 +237,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCClearResultsActionID:
 		{
-			// Clear Results: the list emptied, so Change All can run (the old design's C8). The documents are not touched.
+			// Clear Results: the list emptied, so Change All can run (C8 of
+			// docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md). The documents are not touched.
 			if (KFCResultTree::RefusedWhileRunning())
 				break;
 			PMString status;
@@ -327,7 +327,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// "Remember Book Panel Placement": InDesign's own Book panel is measured as it closes (and
 		// when InDesign quits) and put back where it was when it next appears. OFF by default.
 		// *Flipping it WRITES ITS OWN KEY to the settings file at once, and the status line says
-		// whether that worked (the user's rules) - unlike the toggles above, which wait
+		// whether that worked (the author's rules) - unlike the toggles above, which wait
 		// for "Save Panel Settings". Everything is in KFCBookPanelPlacement.cpp.
 		case kKFCRememberBookPanelActionID:
 		{
@@ -352,8 +352,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// A hit row's right-click menu. Nothing stashed = nobody right-clicked a hit row (a script firing the
 			// action by ID): do nothing. Return on a selected row writes through the same door (KFCResultTreeEH::KeyDown).
-			// The row right-clicked is one of several rows selected together: all of them (O18 - the author's calls of
-			// 2026-10-10, object rows and then text rows). Any other row: that row alone (KFCResultTree::RowsOfRightClick).
+			// The row right-clicked is one of several rows selected together: all of them (the author's calls - object
+			// rows, then text rows). Any other row: that row alone (KFCResultTree::RowsOfRightClick).
 			int32 chapter = -1, hit = -1;
 			if (KFCResults()->GetContextMenuHit(chapter, hit))
 				(void)KFCResultTree::ReplaceRows(KFCResultTree::RowsOfRightClick(chapter, hit));
@@ -371,8 +371,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCSearchDocumentAgainActionID:
 		{
-			// A document row's right-click menu (2026-10-10). Nothing stashed = nobody right-clicked a document row: do
-			// nothing.
+			// A document row's right-click menu. Nothing stashed = nobody right-clicked a document row: do nothing.
 			int32 chapter = -1;
 			if (KFCResults()->GetContextMenuChapter(chapter))
 				(void)KFCResultTree::SearchDocumentAgain(chapter);
@@ -381,8 +380,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCSelectAllRowsActionID:
 		{
-			// A book, document or story row's right-click menu (2026-10-11): the row its right-click stashed. Nothing
-			// stashed: do nothing.
+			// A book, document or story row's right-click menu: the row its right-click stashed. Nothing stashed: do
+			// nothing.
 			const NodeID row(SelectAllRowsTarget());
 			if (row.IsValid())
 				(void)KFCResultTree::SelectAllRows(row);
@@ -475,8 +474,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// The name is written whether or not it can run, so a greyed-out item still says which
 			// scope it would have used.
 			// ...and grey on the Colour tab too (the author's call): it finds by colour, which this panel
-			// does not list (the Object tab's page items are listed since 1.4.0). The same question the
-			// search asks (CanSearchTab).
+			// does not list (the Object tab's page items it does). The same question the search asks
+			// (CanSearchTab).
 			const bool canRun = haveTarget
 				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
 			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
@@ -485,10 +484,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
 			// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
-			// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with Book Scope off, while the
-			// panel holds a list (Clear Results first), with no book or chapter to run on (haveTarget), on the Colour tab,
-			// and with nothing to find (on the Object tab: an empty Find Object Format - 1.4.0) - the spec's section 4; a run
-			// standing up greys everything above.
+			// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with
+			// Book Scope off, while the panel holds a list (Clear Results first), with no book or chapter to run on
+			// (haveTarget), on the Colour tab, and with nothing to find (on the Object tab: an empty Find Object
+			// Format) - the spec's section 4; a run standing up greys everything above.
 			const bool canRun = KFCChapters()->IsBookScopeOn()
 				&& haveTarget
 				&& KFCResults()->GetTotalHitCount() <= 0
@@ -545,7 +544,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCTranslucentPanelActionID)
 		{
-			// *Selectable even while the panel is docked - deliberately NOT greyed out (the user's
+			// *Selectable even while the panel is docked - deliberately NOT greyed out (the author's
 			// call, in KCM). Where the click has no visible result, DoAction says so on
 			// the status line instead.
 			int16 actionState = kEnabledAction;
@@ -593,7 +592,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
 			// with nothing said about it (KFCReplaceEngine::CanReplaceHit).
-			// Several rows selected together, the right-clicked among them: while any of them can be (O18) - the rows and the
+			// Several rows selected together, the right-clicked among them: while any of them can be - the rows and the
 			// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
 			int32 chapter = -1, hit = -1;
 			const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
@@ -622,7 +621,7 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		{
 			// A book, document or story row's menu: Select All Rows while one of those rows is stashed and has a hit row
 			// under it - disabled on one with none (a document row Search This Document Again left at (0/0), a book search's
-			// that found nothing) rather than doing nothing: the author's call of 2026-10-11.
+			// that found nothing) rather than doing nothing: the author's call.
 			const NodeID row(SelectAllRowsTarget());
 			const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
 			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
