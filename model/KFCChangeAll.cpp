@@ -33,6 +33,7 @@
 #include "TextWalkerServiceProviderID.h"	// kReplaceAllTextCmdBoss / kFindChangeClientBoss / the walker service
 #include "Utils.h"
 
+#include <set>			// the documents written - a book listing one file twice
 #include <utility>		// std::pair - a chapter and how many it got
 #include <vector>
 
@@ -40,6 +41,7 @@
 #include "KFCChangeAll.h"
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
+#include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCChangeAllStepKey
 #include "KFCLoc.h"
 #include "KFCObjectReplace.h"	// ReplaceAllInDoc - the Object tab's Change All in one chapter
@@ -191,6 +193,7 @@ bool KFCChangeAll::ClearResults(PMString& outStatus)
 
 int32 KFCChangeAll::Run(PMString& outSummary)
 {
+	KFC_DIAG_WRITTEN_DOCS_CHECK("change-all");	// (test builds: when the run is over - KFCDiagWrittenDocs.h)
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
@@ -414,10 +417,25 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		return 0;
 	}
 
+	// (Test builds: every chapter written, noted before any of them is left as the loop below leaves it -
+	// KFCDiagWrittenDocs.h.)
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i])
+			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
+
 	// ===== AFTER THE SEQUENCE: a window for each held chapter written to, the rest handed back (the replace's rule).
+	// A DOCUMENT ANOTHER TARGET WROTE IS WRITTEN: a book listing one file twice gives two targets one document, and the
+	// second - nothing left to change - must not take its "unsaved" flag down over the first one's write (KFCObjectReplace's
+	// LeaveObjectChapters says why). It is left as the target that wrote it leaves it.
+	std::set<IDataBase*> writtenDBs;
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)
+			writtenDBs.insert(targets[i].docRef.GetDataBase());
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
+		if (!wroteTo[i] && writtenDBs.count(targets[i].docRef.GetDataBase()) > 0)
+			continue;
 		if (wroteTo[i])
 		{
 			// A WINDOW THAT COULD NOT BE OPENED IS SAID: the chapter stays held and windowless with what was written in it,

@@ -70,9 +70,9 @@ namespace KFCResultModel
 
 		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
 		int32		fontGroupPos;	// to, and where it sits inside that group. -1 before AppendChapter
-								// groups it (every hit has a group). Filled by AppendChapter; the
-								// tree reads them to answer "who is my parent" and "which child am
-								// I" without searching.
+								// groups it, and on an object row, which has no story (every text hit
+								// has a group). Filled by AppendChapter; the tree reads them to answer
+								// "who is my parent" and "which child am I" without searching.
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
@@ -187,7 +187,7 @@ namespace KFCResultModel
 		UIDRef					docRef;	// current binding (RebindChapterDoc after a reopen)
 		IDFile					file;	// the chapter's .indd (to reopen a closed chapter)
 		std::vector<Hit>		hits;
-		std::vector<FontGroup>	fontGroups;	// its story groups - every hit is in one
+		std::vector<FontGroup>	fontGroups;	// its story groups - every text hit is in one (an object row in none)
 		// Each story's version (ITextModel::GetChangeCount) where KFC last knew the rows in it to stand
 		// - see GetStoryVersion.
 		std::map<UID, uint32>	storyVersions;
@@ -392,7 +392,8 @@ namespace KFCResultModel
 	int32 GetFontGroupHit(int32 chapterIdx, int32 fontIdx, int32 nth);
 
 	/** Which story group a hit belongs to, and where it sits inside that group: the tree's "who is my
-	    parent" and "which child am I". -1 for an index out of range (every hit has a group). */
+	    parent" and "which child am I". -1 for an index out of range, and for an object row, which has no story (every
+	    text hit has a group). */
 	int32 GetHitFontGroup(int32 chapterIdx, int32 hitIdx);
 	int32 GetHitFontGroupPos(int32 chapterIdx, int32 hitIdx);
 

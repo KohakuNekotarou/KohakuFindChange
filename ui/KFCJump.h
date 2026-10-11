@@ -62,9 +62,10 @@ namespace KFCJump
 	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER, of one document or several: the model's checks first
 	    (IKFCRuns::CheckObjectReplaceRows - none that could be written brings no window forward), then the document of
 	    shownChapter / shownHit - the row selected last, the one the page shows (KFCResultTree::LastSelectedHit) - in front
-	    and the view on its item, the write in one undo step (IKFCRuns::ReplaceRows), and that row's item left selected as
-	    its click selects it (quietly - the status says what was written). One row = ReplaceObjectRow. True when something
-	    was written. */
+	    and the view on its item, the write in one undo step (IKFCRuns::ReplaceRows), that document in front again (the
+	    write gives a window to each closed chapter it wrote, and that window comes forward), and that row's item left
+	    selected as its click selects it (quietly - the status says what was written). One row = ReplaceObjectRow. True
+	    when something was written. */
 	bool ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter, int32 shownHit, PMString& outStatus);
 
 	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own

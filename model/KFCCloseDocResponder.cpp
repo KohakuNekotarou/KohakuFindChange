@@ -62,6 +62,7 @@
 // Project includes:
 #include "KFCBookScope.h"		// ForgetHeldDoc
 #include "KFCDiag.h"			// KFC_DIAG_LOG - which way a close went, in a test build (compiled out of a shipping one)
+#include "KFCDiagWrittenDocs.h"	// KFC_DIAG_DOC_CLOSING - a test build's written-document check (nothing in a shipping one)
 #include "KFCHitMarker.h"		// ForgetDoc - the jump marker lets go of a closing document
 #include "KFCID.h"
 #include "KFCResultModel.h"
@@ -120,6 +121,10 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (closingDocRef == UIDRef::gNull)
 		return;
 	KFC_DIAG_LOG("CLOSE doc=%p uid=%u", (void*)closingDocRef.GetDataBase(), closingDocRef.GetUID().Get());
+	// (A test build's written-document check, for every close and while the document is whole: a close KFC asked for that
+	// finds work unsaved in it, or a document KFC wrote going with nothing unsaved and its file not written since -
+	// KFCDiagWrittenDocs.h.)
+	KFC_DIAG_DOC_CLOSING(closingDocRef);
 
 	// THE HELD LIST HEARS ABOUT EVERY CLOSE, ahead of every exit below. A held chapter someone ELSE
 	// closes (the user, after the book panel windowed it; a script) would otherwise stay on gHeldDocs,

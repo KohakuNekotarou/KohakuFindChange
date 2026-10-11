@@ -12,8 +12,8 @@
 //
 //  Under a document, a STORY node per group, each holding that story's hits - the code calls the level
 //  FONT, the name it had when it held the fonts of the Find Missing Glyphs scan (since removed).
-//  Every chapter's hits are grouped; the branches below that hang hits off the document directly are the
-//  safe answer for a node that names no group, not a shape any list has now.
+//  A text search's hits are all grouped; an OBJECT search's rows have no story and hang off their document row
+//  directly - the branches below for a node that names no group (KFCResultModel's BuildFontGroups).
 //
 //  See KFCResultNodeID.h for the five node shapes and for why the root sits at -2. Ported from
 //  KESCL's KESCLResultListAdapter, dropping its filtered-view indirection (KFC shows every chapter

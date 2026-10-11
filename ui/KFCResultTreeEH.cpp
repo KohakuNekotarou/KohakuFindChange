@@ -635,15 +635,32 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 	const VirtualKey key = e->GetVirtualKey();
 	if (!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey))
 		return kFalse;
-	// Only while the result list holds the keyboard - a Return anywhere else (a document, a dialog) is not ours.
+	// Only while the result list holds the keyboard - a Return anywhere else (a document, a dialog) is not ours. ASKED AS THE
+	// KEYBOARD FRAME ASKS IT (KFCResultTree::ListHoldsKeyboard - the spec map's PNL-20): InDesign's holder AND the window
+	// the system sends the keys to. Find/Change's title bar clicked leaves InDesign's holder on the list and sends the keys
+	// to the dialog (JMP-33): the frame goes away, and a Return then is the dialog's - with the holder alone asked here, it
+	// replaced the rows selected in the list instead (the 1.3 -> 1.4 re-check of 2026-10-11 night).
 	IControlView* listView = ResultListView();
 	if (listView == nil)
 		return kFalse;
-	InterfacePtr<IEventHandler> listEH(listView, UseDefaultIID());
-	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
-	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
-	if (listEH == nil || keyBoard == nil || keyBoard->GetKeyFocus() != listEH)
+	bool holds = KFCResultTree::ListHoldsKeyboard();
+#ifdef KFC_DIAG
+	// (Test builds only) Fault switch return-filter-holder-only: InDesign's holder alone asked, as before - the case that
+	// shows what the second question stops (ret-after-fc-title-armed).
+	if (KFC_DIAG_FAULT("return-filter-holder-only"))
+	{
+		InterfacePtr<IEventHandler> listEH(listView, UseDefaultIID());
+		InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
+		InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
+		holds = listEH != nil && keyBoard != nil && keyBoard->GetKeyFocus() == listEH;
+	}
+#endif
+	if (!holds)
+	{
+		KFC_DIAG_LOG("RETFOCUS filter let a Return go - the list does not hold the keyboard focus=%s",
+			KFCResultTree::DiagKeyFocus().c_str());
 		return kFalse;
+	}
 	InterfacePtr<ITreeViewController> controller(listView, UseDefaultIID());
 	if (!TakeReturn(e, controller))
 		return kFalse;

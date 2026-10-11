@@ -464,12 +464,14 @@ namespace
 	// Bring the given document's layout window to the front. A windowless chapter gets its first
 	// window opened here; a background-tab window is activated; a minimised one is brought back
 	// (KFCBringBackIfMinimized). The zoom the user was looking at
-	// travels along (zoom first, scroll second). Returns false when no window could be produced or
+	// travels along (zoom first, scroll second) - unless carryZoom is false: a window only put back in front, which keeps
+	// the zoom it has (KFCJump::ReplaceObjectRows - its document was fronted with the zoom already, and a window the write
+	// opened has come forward over it since). Returns false when no window could be produced or
 	// the activation did not take (the caller then reports without scrolling).
 	//
 	// On success the chapter STOPS BEING HELD (KFCBookScope::ForgetHeldDoc). See the
 	// note beside that call at the foot of this function.
-	bool EnsureDocFrontmost(const UIDRef& docRef)
+	bool EnsureDocFrontmost(const UIDRef& docRef, bool carryZoom = true)
 	{
 #ifdef KFC_DIAG
 		if (KFC_DIAG_FAULT("jump-no-front"))
@@ -504,8 +506,10 @@ namespace
 		GlobalErrorStatePreserver frontErrorState;
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 
-		// The zoom to inherit, read BEFORE the switch (monitor-PPI corrected effective scale).
+		// The zoom to inherit, read BEFORE the switch (monitor-PPI corrected effective scale). None when it is not carried:
+		// srcZoom stays below 0, which every use below reads as "no zoom to hand on".
 		PMReal srcZoom(-1.0);
+		if (carryZoom)
 		{
 			InterfacePtr<IControlView> srcView(Utils<ILayoutUIUtils>()->QueryFrontView());
 			if (srcView != nil)
@@ -772,7 +776,12 @@ void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 // other displayed clean chapter of the searched book (scheduled; the landed-in document is the exception;
 // a document outside the book stays; book results only - see ShouldHidePreviousChapter). Shared by
 // JumpToHit and ShowChapter.
-bool FrontChapter(const UIDRef& docRef)
+// hidePreviousChapters = false: the window alone, no sweep - for a landing that WRITES other chapters after it
+// (KFCJump::ReplaceObjectRows): the sweep's closes are scheduled and run once the write is over, by which time the
+// chapters they name hold the write, and a close without UI throws it away (measured - the 1.3 -> 1.4 re-check of
+// 2026-10-11 night, case sel-book-objects-open-hide: "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as
+// before the Replace).
+bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 {
 	if (!EnsureDocFrontmost(docRef))
 	{
@@ -781,7 +790,7 @@ bool FrontChapter(const UIDRef& docRef)
 		KFCResultTree::ShowStatus(message);
 		return false;
 	}
-	if (ShouldHidePreviousChapter())
+	if (hidePreviousChapters && ShouldHidePreviousChapter())
 		KFCChapters()->CloseDisplayedDocsIfClean(docRef);
 	return true;
 }
@@ -1579,19 +1588,33 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		// O10 step 6 for the rows: the document of the row selected last in front - InDesign's replace selects what it
 		// writes in the FRONT document (another document's walk selects in this one, put right below) - and the view on
 		// that row's item (the one the page shows).
+		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE: its closes run after the write, and the rows' other chapters are what the
+		// write goes on to write - a clean one with a window would be closed with the write in it, thrown away
+		// (FrontChapter's hidePreviousChapters - measured, case sel-book-objects-open-hide). One row's Replace keeps the
+		// sweep: it spares the one document that row writes (ReplaceObjectRow).
+		// (Fault switch object-rows-sweep, a test build's only - KFCDiag.h: the sweep put back, as before that fix - the case
+		// that shows the test build's written-document check catching the close, KFCDiagWrittenDocs.h.)
+		const bool sweep = KFC_DIAG_FAULT("object-rows-sweep");
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-		if (!FrontChapter(docRef))
+		if (!FrontChapter(docRef, sweep /*hidePreviousChapters*/))
 			return false;		// it has said why
 		const UIDRef shown(db, KFCResults()->GetHitItem(chapterIdx, shownHit));
 		if (ItemIsThere(shown) && SpreadOfItem(shown) != kInvalidUID)
 			ShowItemInView(shown);
 	}
 	const bool wrote = KFCRuns()->ReplaceRows(rows, outStatus);
-	// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.
-	if (LayoutOfDocIsFrontmost(docRef))
 	{
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
-		LeaveRowItemSelected(chapterIdx, shownHit, UIDRef(db, KFCResults()->GetHitItem(chapterIdx, shownHit)));
+		// THE DOCUMENT OF THE ROW SELECTED LAST IN FRONT AGAIN (the spec map's OBJ-18 - the page shows that row). The write
+		// gives a window to each closed chapter it wrote (KFCObjectReplace's LeaveObjectChapters), and a window opened comes
+		// forward: rows of two closed chapters replaced together left the other chapter's window in front and nothing
+		// selected (the 1.3 -> 1.4 re-check of 2026-10-11 night - case sel-book-objects-replace read "active objC1.indd"
+		// over objC2's row). Put back in front with the zoom it has (EnsureDocFrontmost's carryZoom).
+		if (!LayoutOfDocIsFrontmost(docRef))
+			(void)EnsureDocFrontmost(docRef, false /*carryZoom*/);
+		// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.
+		if (LayoutOfDocIsFrontmost(docRef))
+			LeaveRowItemSelected(chapterIdx, shownHit, UIDRef(db, KFCResults()->GetHitItem(chapterIdx, shownHit)));
 	}
 	return wrote;
 }

@@ -43,6 +43,7 @@
 #include "KFCReplaceEngine.h"
 #include "KFCDiag.h"			// KFC_DIAG_LOG - why a write was refused, in a test build (compiled out of a shipping one)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
+#include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCReplaceStepKey - the string key the Undo step is named from
 #include "KFCLoc.h"				// runtime Japanese - there is no jaJP string table
 #include "KFCResultModel.h"
@@ -1386,6 +1387,7 @@ private:
 static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	const int32 (&greyed)[KFCReplaceEngine::kGreyedReasonCount], PMString& outStatus)
 {
+	KFC_DIAG_WRITTEN_DOCS_CHECK("replace-rows");	// (test builds: after ChaptersAfter, below - KFCDiagWrittenDocs.h)
 	int32 toWrite = 0;
 	for (size_t k = 0; k < chapters.size(); ++k)
 		toWrite += static_cast<int32>(chapters[k].rows.size());
@@ -1627,7 +1629,14 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	for (size_t k = 0; k < chapters.size(); ++k)
+	{
 		chapters[k].wrote = true;		// written to: a chapter of ours has to be seen and saved (ChaptersAfter)
+		KFC_DIAG_NOTE_WRITE(chapters[k].docRef);
+		// (Fault switch clean-after-write, a test build's only - KFCDiag.h: the written document's "unsaved" flag taken
+		// down, a close would then throw the write away unasked - the case that shows the written-document check catching it.)
+		if (KFC_DIAG_FAULT("clean-after-write") && chapters[k].docRef.GetDataBase() != nil)
+			chapters[k].docRef.GetDataBase()->SetModified(kFalse);
+	}
 	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
 	// WHAT IT DID (spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step. The
 	// message says nothing of Ctrl+Z (the author's call).

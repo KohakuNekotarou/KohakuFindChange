@@ -84,6 +84,16 @@
 //                item - the row must say it no longer matches, nothing written (work\kbs-regress\oca-cases.tsv, oca-walk-miss)
 //    return-repeat  (UI half) ui/KFCResultTreeEH.cpp's TakeReturn lets a held Return's repeats through, the old way
 //                - each one a write: the case that shows what taking the repeat stops (ret-shift-held-armed)
+//    return-filter-holder-only  (UI half) ui/KFCResultTreeEH.cpp's Return filter asks InDesign's keyboard holder alone,
+//                the old way - not the window the system sends the keys to as well: the case that shows what the second
+//                question stops, a Return pressed after Find/Change's title bar was clicked (ret-after-fc-title-armed)
+//    object-rows-sweep  (UI half) ui/KFCJump.cpp's ReplaceObjectRows fronts the shown row's chapter WITH the "Hide Previous
+//                Chapter" sweep, the old way - the other chapters it is about to write are closed after the write, the write in
+//                them: the case that shows the written-document check (KFCDiagWrittenDocs.h) catching it
+//                (sel-book-objects-open-hide-armed)
+//    clean-after-write  KFCReplaceEngine.cpp's row Replace takes each written document's "unsaved" flag down after the
+//                write - a close would then throw the write away unasked: the case that shows the written-document check
+//                catching it (written-cleaned-armed)
 //    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
 //    qd-order-file  (UI half) the file's first line is the file Save Order... and Load Order... use, in place of

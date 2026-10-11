@@ -48,6 +48,7 @@
 // Project includes:
 #include "KFCBookScope.h"
 #include "KFCDiag.h"			// KFC_DIAG_FAULT / KFC_DIAG_LOG - a test build's fault switch (compiled out of a shipping one)
+#include "KFCDiagWrittenDocs.h"	// KFC_DIAG_NOTE_CLOSE_ASKED - a test build's written-document check (nothing in a shipping one)
 #include "IKFCUIServices.h"		// the windows and the Book panel are the UI half's
 
 namespace
@@ -555,6 +556,7 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// about that combination, and it is not a rule worth testing: the DocHasAnyWindow door above
 	// returns before this line for every windowed chapter, so what reaches here is windowless by
 	// construction. Keep that order if either test is ever moved.
+	KFC_DIAG_NOTE_CLOSE_ASKED(docRef);		// (a test build's written-document check: the close that comes is ours)
 	docFileHandler->Close(docRef, kSuppressUI, kFalse /*allowCancel*/,
 		closeNow ? IDocFileHandler::kProcess : IDocFileHandler::kSchedule);
 	return true;
@@ -1008,6 +1010,7 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		if (docFileHandler->CanClose(toClose[i]))
 		{
 			ErrorUtils::PMSetGlobalErrorCode(kSuccess);	// a standing error would fail this close
+			KFC_DIAG_NOTE_CLOSE_ASKED(toClose[i]);		// (a test build's written-document check: the close that comes is ours)
 			docFileHandler->Close(toClose[i], kSuppressUI, kFalse /*allowCancel*/, IDocFileHandler::kSchedule);
 		}
 	}

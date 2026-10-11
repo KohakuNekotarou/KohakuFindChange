@@ -27,6 +27,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <set>			// the documents written - a book listing one file twice
 #include <string>
 #include <vector>
 
@@ -36,6 +37,7 @@
 #include "KFCChangeAll.h"		// WriteDocument - each query a document at a time with InDesign's own Change All (F7)
 #include "KFCDiag.h"
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
+#include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
 #include "KFCObjectReplace.h"	// ReplaceAllInDoc - an Object query's write, a document at a time
@@ -136,6 +138,7 @@ bool KFCQuerySequence::IsRunning()
 
 int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& outSummary)
 {
+	KFC_DIAG_WRITTEN_DOCS_CHECK("query-run");	// (test builds: when the run is over - KFCDiagWrittenDocs.h)
 	outSummary.Clear();
 	outSummary.SetTranslatable(kFalse);
 
@@ -452,7 +455,19 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		return 0;
 	}
 
+	// (Test builds: every document written, noted before any of them is left as the loop below leaves it -
+	// KFCDiagWrittenDocs.h.)
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i])
+			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
+
 	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back.
+	// A document another target wrote is left as that target leaves it (a book listing one file twice - Change All in
+	// Book's note, KFCChangeAll.cpp): not handed back from under its write, nor named as left open.
+	std::set<IDataBase*> writtenDBs;
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)
+			writtenDBs.insert(targets[i].docRef.GetDataBase());
 	std::vector<PMString> unclosed;
 	for (size_t i = 0; i < targets.size(); ++i)
 	{
@@ -463,6 +478,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
 				unclosed.push_back(targets[i].shortName);
 		}
+		else if (writtenDBs.count(targets[i].docRef.GetDataBase()) > 0)
+			continue;
 		else if (!KFCBookScope::HandBackHeldDocNow(targets[i].docRef))
 			unclosed.push_back(targets[i].shortName);
 	}

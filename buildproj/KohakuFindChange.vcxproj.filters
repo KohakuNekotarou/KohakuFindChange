@@ -57,6 +57,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagCommands.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -183,6 +186,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.h">
          <Filter>Header Files</Filter>
       </ClInclude>
    </ItemGroup>

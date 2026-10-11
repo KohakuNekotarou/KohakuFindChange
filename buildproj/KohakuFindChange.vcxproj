@@ -232,6 +232,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRowFoci.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCRunGuard.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagCommands.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCSearchEngine.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCQuerySequence.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCChangeAll.cpp"/>
@@ -282,6 +283,7 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCMemXferBytes.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectSearch.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.h"/>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.h"/>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">

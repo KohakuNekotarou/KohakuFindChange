@@ -29,6 +29,7 @@
 // Project includes:
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
+#include "KFCDiagWrittenDocs.h"	// a test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCReplaceStepKey
 #include "KFCLoc.h"
 #include "KFCObjectReplace.h"
@@ -251,6 +252,7 @@ bool KFCObjectReplace::CheckRowNow(int32 chapterIdx, int32 hitIdx, PMString& out
 
 bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
+	KFC_DIAG_WRITTEN_DOCS_CHECK("object-replace-row");	// (test builds: when it is over - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	// Forward, as the search was - outside the sequence (KFCForwardSearchScope's contract).
@@ -338,6 +340,7 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	(void)KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length);
 	KFCResultModel::MarkItemReplaced(chapterIdx, hitIdx, print, length);
 	recorder.Keep(KFCUndoFollow::kStepReplace);
+	KFC_DIAG_NOTE_WRITE(docRef);
 	outStatus = "Replaced ID:";
 	outStatus.AppendNumber(static_cast<int32>(item.Get()));
 	outStatus.Append(".");
@@ -366,12 +369,20 @@ struct ObjectChapterWrite
 // handed back.
 void LeaveObjectChapters(const std::vector<ObjectChapterWrite>& chapters)
 {
+	// A DOCUMENT ANOTHER CHAPTER OF THE STEP WROTE IS WRITTEN. Two chapters can be one document - a book listing one file
+	// twice reaches the same open document for both (KFCBookScope::ReopenChapterDoc rebinds by file) - and the one whose
+	// rows were not written must not take that document's "unsaved" flag down over the other's write: any close would then
+	// throw the write away without asking (the 1.3 -> 1.4 re-check of 2026-10-11 night).
+	std::set<IDataBase*> writtenDBs;
+	for (size_t k = 0; k < chapters.size(); ++k)
+		if (!chapters[k].written.empty() && chapters[k].docRef.GetDataBase() != nil)
+			writtenDBs.insert(chapters[k].docRef.GetDataBase());
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
 		const ObjectChapterWrite& c = chapters[k];
 		if (c.docRef.GetDataBase() == nil)
 			continue;
-		if (!c.written.empty())
+		if (writtenDBs.count(c.docRef.GetDataBase()) > 0)
 		{
 			if (KFCBookScope::IsHeldDoc(c.docRef))
 				(void)KFCBookScope::ShowChapterWindow(c.docRef);
@@ -432,6 +443,7 @@ bool KFCObjectReplace::CheckRowsNow(const KFCRowsByChapter& rows, PMString& outS
 
 bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outStatus)
 {
+	KFC_DIAG_WRITTEN_DOCS_CHECK("object-replace-rows");	// (test builds: when it is over - KFCDiagWrittenDocs.h)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	const size_t total = KFCRowCount(rows);
@@ -651,6 +663,8 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 			(void)KFCObjectSearch::Fingerprint(UIDRef(db, chapter.todo[k].second), print, length);
 			KFCResultModel::MarkItemReplaced(chapter.chapterIdx, chapter.todo[k].first, print, length);
 		}
+		if (!chapter.written.empty())
+			KFC_DIAG_NOTE_WRITE(chapter.docRef);
 	}
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	LeaveObjectChapters(chapters);
