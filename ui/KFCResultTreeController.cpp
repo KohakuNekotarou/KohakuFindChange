@@ -286,11 +286,12 @@ namespace
 // The book row's right-click (SetContextMenuBook).
 bool gContextMenuBook = false;
 
-// Every hit row under `node`, in the order drawn - descending through the rows under it.
-void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, NodeIDList& out)
+// Every hit row under `node`, in the order drawn - descending through the rows under it; it stops once `most` are in `out`
+// (CanSelectAllRows asks for one).
+void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, NodeIDList& out, int32 most = kMaxInt32)
 {
 	const int32 children = adapter->GetNumChildren(node);
-	for (int32 i = 0; i < children; ++i)
+	for (int32 i = 0; i < children && out.size() < static_cast<size_t>(most); ++i)
 	{
 		const NodeID child(adapter->GetNthChild(node, i));
 		TreeNodePtr<KFCResultNodeID> childID(child);
@@ -299,7 +300,7 @@ void CollectHitRows(ITreeViewHierarchyAdapter* adapter, const NodeID& node, Node
 		if (childID->IsHitRow())
 			out.push_back(child);
 		else
-			CollectHitRows(adapter, child, out);
+			CollectHitRows(adapter, child, out, most);
 	}
 }
 }	// anonymous namespace
@@ -312,6 +313,17 @@ void KFCResultTree::SetContextMenuBook(bool rightClicked)
 bool KFCResultTree::GetContextMenuBook()
 {
 	return gContextMenuBook;
+}
+
+bool KFCResultTree::CanSelectAllRows(const NodeID& row)
+{
+	InterfacePtr<ITreeViewController> controller(QueryListController());
+	InterfacePtr<ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
+	if (controller == nil || adapter == nil)
+		return false;
+	NodeIDList first;
+	CollectHitRows(adapter, row, first, 1);
+	return !first.empty();
 }
 
 bool KFCResultTree::SelectAllRows(const NodeID& row)

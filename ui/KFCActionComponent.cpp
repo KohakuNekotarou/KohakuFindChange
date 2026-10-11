@@ -112,6 +112,21 @@ void FlipAppearanceToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*appl
 	msg.SetTranslatable(kFalse);
 	KFCResultTree::ShowStatus(msg);
 }
+
+// The row Select All Rows is for: the book, document or story row whose right-click stashed itself - one of the three,
+// as KFCResultNodeEH::RButtonDn clears them all first; an empty NodeID when nobody right-clicked one of those rows. The
+// menu's enabled state and the action ask it - one answer for both.
+NodeID SelectAllRowsTarget()
+{
+	int32 chapter = -1, group = -1;
+	if (KFCResults()->GetContextMenuStory(chapter, group))
+		return KFCResultNodeID::CreateFont(chapter, group);
+	if (KFCResults()->GetContextMenuChapter(chapter))
+		return KFCResultNodeID::Create(chapter);
+	if (KFCResultTree::GetContextMenuBook())
+		return KFCResultNodeID::CreateBook();
+	return NodeID();
+}
 }
 
 /* KFCActionComponent Constructor
@@ -362,15 +377,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 
 		case kKFCSelectAllRowsActionID:
 		{
-			// A book, document or story row's right-click menu (2026-10-11): the row its right-click stashed - one of the
-			// three, as KFCResultNodeEH::RButtonDn clears them all first. Nothing stashed: do nothing.
-			int32 chapter = -1, group = -1;
-			if (KFCResults()->GetContextMenuStory(chapter, group))
-				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::CreateFont(chapter, group));
-			else if (KFCResults()->GetContextMenuChapter(chapter))
-				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::Create(chapter));
-			else if (KFCResultTree::GetContextMenuBook())
-				(void)KFCResultTree::SelectAllRows(KFCResultNodeID::CreateBook());
+			// A book, document or story row's right-click menu (2026-10-11): the row its right-click stashed. Nothing
+			// stashed: do nothing.
+			const NodeID row(SelectAllRowsTarget());
+			if (row.IsValid())
+				(void)KFCResultTree::SelectAllRows(row);
 			break;
 		}
 
@@ -605,11 +616,12 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 		}
 		else if (action == kKFCSelectAllRowsActionID)
 		{
-			// A book, document or story row's menu: Select All Rows while one of those rows is stashed.
-			int32 chapter = -1, group = -1;
-			const bool stashed = KFCResults()->GetContextMenuStory(chapter, group) || KFCResults()->GetContextMenuChapter(chapter)
-				|| KFCResultTree::GetContextMenuBook();
-			listToUpdate->SetNthActionState(i, stashed ? kEnabledAction : kDisabled_Unselected);
+			// A book, document or story row's menu: Select All Rows while one of those rows is stashed and has a hit row
+			// under it - disabled on one with none (a document row Search This Document Again left at (0/0), a book search's
+			// that found nothing) rather than doing nothing: the author's call of 2026-10-11.
+			const NodeID row(SelectAllRowsTarget());
+			const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
+			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
 		}
 	}
 }

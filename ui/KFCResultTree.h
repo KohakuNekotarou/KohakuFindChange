@@ -118,6 +118,12 @@ namespace KFCResultTree
 	    how many were selected. false = none under it. */
 	bool SelectAllRows(const NodeID& row);
 
+	/** Is there a hit row under `row` for SelectAllRows to select - the rows it walks, the first of them enough? The one
+	    question the row menu disables Select All Rows by (KFCActionComponent - the author's call of 2026-10-11 on a row
+	    with none under it, a document row Search This Document Again left at (0/0) or a book search's that found nothing:
+	    disabled rather than doing nothing; InDesign leaves a disabled item out of a right-click menu). */
+	bool CanSelectAllRows(const NodeID& row);
+
 	/** The BOOK row's right-click stash for Select All Rows (KFCResultNodeEH::RButtonDn sets it, clears it with the
 	    model's stashes): the book's rows are every row of the list, so a flag is all it needs. */
 	void SetContextMenuBook(bool rightClicked);
