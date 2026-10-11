@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE HIDDEN-DOCUMENT CHECK (test builds only - 2026-10-10, the author: "a hidden document left behind would be trouble:
-//  build a check for it into the code, and test for it always, the full regression included"). At the end of every
+//  THE HIDDEN-DOCUMENT CHECK (test builds only - the author: "a hidden document left behind would be trouble: build a
+//  check for it into the code, and test for it always, the full regression included"). At the end of every
 //  operation a person starts on the panel - a click on a row, an arrow or Return in the list, a menu action, the query
 //  dialog's Run - one line in the test build's trace (KFCDiag.h):
 //

@@ -73,16 +73,16 @@
 //    no-return-filter  (UI half) ui/KFCResultTreeEH.cpp's PushReturnFilter pushes nothing: the result list's
 //                Return filter stays off the dispatcher's stack - what the filter alone changes, told apart from the rest
 //                (a jumped-to replaced row drawn hilited)
-//    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list as before
-//                2026-10-10 - IKeyBoard alone, and only when it names another holder - not through the panel's doors
+//    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list the old way
+//                - IKeyBoard alone, and only when it names another holder - not through the panel's doors
 //                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
 //                clicked (work\kbs-regress\cases\fault-click-acquire-only-on.jsx)
 //    objsearch-cancel  the file holds "<n>": the Object tab's search (KFCObjectSearch.cpp's WalkDoc) takes Cancel as pressed
 //                once a document's walk has listed its nth item - heard inside the document, where the bar is asked
-//                (O16; work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
+//                (work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
 //    object-walk-miss  an object row's Replace (KFCObjectReplace.cpp) takes InDesign's walk as never coming to the row's
 //                item - the row must say it no longer matches, nothing written (work\kbs-regress\oca-cases.tsv, oca-walk-miss)
-//    return-repeat  (UI half) ui/KFCResultTreeEH.cpp's TakeReturn lets a held Return's repeats through as before 2026-10-09
+//    return-repeat  (UI half) ui/KFCResultTreeEH.cpp's TakeReturn lets a held Return's repeats through, the old way
 //                - each one a write: the case that shows what taking the repeat stops (ret-shift-held-armed)
 //    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)

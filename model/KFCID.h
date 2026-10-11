@@ -60,7 +60,7 @@
 //DECLARE_PMID(kClassIDSpace, kKFCDrawEventServiceBoss, kKFCPrefix + 5)
 DECLARE_PMID(kClassIDSpace, kKFCStartupShutdownBoss, kKFCPrefix + 7)
 // Result invalidation: the "a document is about to close" responder and its service provider. A
-// result row that names a closed document still jumps and still replaces (by reopening it), so the
+// result row that names a closed document would still jump and still replace (by reopening it), so the
 // results are retired with their document. Document scope only - see KFCCloseDocResponder.cpp.
 DECLARE_PMID(kClassIDSpace, kKFCCloseDocResponderBoss, kKFCPrefix + 9)
 // RETIRED (not reused): the scripting provider behind app.kfcStatus / app.kfcResults. Verification
@@ -87,7 +87,8 @@ DECLARE_PMID(kClassIDSpace, kKFCUndoMarkCmdBoss, kKFCPrefix + 22)
 // in a build with KFC_DIAG while the fault switch perf-commands is on - in every other build it is never created.
 DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 // The "a document has opened" responder (KFCOpenDocResponder.cpp): a chapter of the results the USER opens gets its
-// rows' text foci (spec T6 c). + 24: the next after the highest spent.
+// rows' text foci (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T6 c). + 24: the next after the
+// highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
 
 

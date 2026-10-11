@@ -181,7 +181,7 @@ DECLARE_PMID(kImplementationIDSpace, kKFCQueryListWidgetMgrImpl, kKFCUIPrefix + 
 DECLARE_PMID(kImplementationIDSpace, kKFCReturnFilterEHImpl, kKFCUIPrefix + 45)
 // The query dialog's rows: their event handler - the double click on a saved query (KFCQueryRowEH.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowEHImpl, kKFCUIPrefix + 46)
-// The result list's selection rules - hit rows selected together (KFCResultTreeController.cpp, 1.4.0 O17).
+// The result list's selection rules - hit rows selected together (KFCResultTreeController.cpp).
 DECLARE_PMID(kImplementationIDSpace, kKFCResultTreeControllerImpl, kKFCUIPrefix + 47)
 
 
@@ -198,7 +198,7 @@ DECLARE_PMID(kActionIDSpace, kKFCScopeBookActionID, kKFCUIPrefix + 6)
 // RETIRED (not reused): the separator between the search command and the toggles - Change Checked sat
 // right under the search then (the author's call).
 //DECLARE_PMID(kActionIDSpace, kKFCSeparator2ActionID, kKFCPrefix + 7)
-// The rule under block 1 (the search, Change All in Book, Clear Results), above the toggles.
+// The rule under block 1 (the commands - "Menu item positions" below), above the toggles.
 DECLARE_PMID(kActionIDSpace, kKFCSeparator3ActionID, kKFCUIPrefix + 8)
 //DECLARE_PMID(kActionIDSpace, kKFCReplaceCheckedActionID, kKFCUIPrefix + 9)	// retired (Change Checked - spec F16) - never reuse
 //DECLARE_PMID(kActionIDSpace, kKFCCheckAllActionID, kKFCUIPrefix + 10)	// retired (Change Checked - spec F16) - never reuse
@@ -256,12 +256,12 @@ DECLARE_PMID(kActionIDSpace, kKFCRememberBookPanelActionID, kKFCUIPrefix + 24)
 // story row's Reject and Replace Again, + 36 / + 37 the document row's, + 38 Show Changes, + 39 its rule,
 // + 40 / + 41 Accept Change (hit row, story row), + 42 / + 43 the run row's Reject and Accept.
 //DECLARE_PMID(kActionIDSpace, kKFCRejectChangeActionID, kKFCUIPrefix + 25)
-// (+ 26 was "Redo" on the same menu - a row taken back is replaced again with Replace. Not reused.)
+// (+ 26 was "Redo" on the same menu. Not reused.)
 //DECLARE_PMID(kActionIDSpace, kKFCAcceptAllChangesActionID, kKFCUIPrefix + 27)
 // RETIRED (not reused): the rule between Change Checked and the two scans, gone with them.
 //DECLARE_PMID(kActionIDSpace, kKFCSeparator5ActionID, kKFCPrefix + 28)
 // "Replace" on a hit row's right-click menu (the author's call): replaces that row - or, when it is one of rows
-// selected together, all of them (1.4.0, O18) - with no prompt; the list stays a work list (KFCReplaceEngine::ReplaceHit
+// selected together, all of them - with no prompt; the list stays a work list (KFCReplaceEngine::ReplaceHit
 // / ReplaceHits).
 DECLARE_PMID(kActionIDSpace, kKFCReplaceHitActionID, kKFCUIPrefix + 29)
 // A STORY row's right-click menu was Replace (its ticked rows), Check All, Uncheck All.
@@ -298,17 +298,17 @@ DECLARE_PMID(kActionIDSpace, kKFCRunSavedQueriesActionID, kKFCUIPrefix + 48)
 // Find/Change Selected Documents (Book) (the query dialog's spec, G9): a toggle - with Book Scope on, a run takes only
 // the documents selected in the Book panel (KFCBookScope::IsSelectedDocumentsOn). Grey with Book Scope off.
 DECLARE_PMID(kActionIDSpace, kKFCSelectedDocumentsActionID, kKFCUIPrefix + 49)
-// "Search This Story Again" on a STORY row's right-click menu (the author's call of 2026-10-09): that story alone walked
+// "Search This Story Again" on a STORY row's right-click menu (the author's call): that story alone walked
 // again with the search's query, its rows put back and its version recorded, so a story edited since the search can be
 // replaced in again (KFCSearchEngine::SearchStoryAgain). + 50: the next after the highest spent (+ 30 ... + 34, the
 // story row's earlier items, are retired and never reused).
 DECLARE_PMID(kActionIDSpace, kKFCSearchStoryAgainActionID, kKFCUIPrefix + 50)
-// "Search This Document Again" on a DOCUMENT row's right-click menu (the author's call of 2026-10-10): that document walked
+// "Search This Document Again" on a DOCUMENT row's right-click menu (the author's call): that document walked
 // again whole with the search's query, its rows put back (KFCSearchEngine::SearchDocumentAgain). + 51: the next after the
 // highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSearchDocumentAgainActionID, kKFCUIPrefix + 51)
-// "Select All Rows" on a BOOK, DOCUMENT or STORY row's right-click menu (the author's call of 2026-10-11): every hit row
-// under that row selected - for Return to replace them all together (O18). One action in the three menus: the row
+// "Select All Rows" on a BOOK, DOCUMENT or STORY row's right-click menu (the author's call): every hit row
+// under that row selected - for Return to replace them all together. One action in the three menus: the row
 // right-clicked is told by the stash its right-click left (KFCActionComponent). + 52: the next after the highest spent.
 DECLARE_PMID(kActionIDSpace, kKFCSelectAllRowsActionID, kKFCUIPrefix + 52)
 
@@ -412,9 +412,9 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCReplaceHitMenuKey			kKFCStringPrefix "kKFCReplaceHitMenuKey"
 // The story row's own right-click menu.
 #define kKFCSearchStoryAgainMenuKey		kKFCStringPrefix "kKFCSearchStoryAgainMenuKey"
-// The document row's own right-click menu (2026-10-10).
+// The document row's own right-click menu.
 #define kKFCSearchDocumentAgainMenuKey	kKFCStringPrefix "kKFCSearchDocumentAgainMenuKey"
-// The book, document and story rows' menus (2026-10-11).
+// The book, document and story rows' menus.
 #define kKFCSelectAllRowsMenuKey		kKFCStringPrefix "kKFCSelectAllRowsMenuKey"
 // "How to Use...": the operating reference. English in every UI language, like the rest of the
 // flyout - there is one string table, and what KFCLoc.h switches to Japanese at run time is the model
@@ -479,19 +479,19 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 // plain literal rather than a translated key. (The book / document rows' "KFCRtMenuResultRow" went with Change
 // Checked - spec F16 - and so did the story rows' first menu, Replace / Check All / Uncheck All.)
 #define kKFCResultHitMenuName				"KFCRtMenuResultHit"
-// The STORY rows' right-click menu (Search This Story Again - the author's call of 2026-10-09), popped the same way.
+// The STORY rows' right-click menu (Search This Story Again, Select All Rows), popped the same way.
 #define kKFCResultStoryMenuName				"KFCRtMenuResultStory"
-// The DOCUMENT rows' right-click menu (Search This Document Again - the author's call of 2026-10-10), popped the same way.
+// The DOCUMENT rows' right-click menu (Search This Document Again, Select All Rows), popped the same way.
 // A name of its own, not the retired "KFCRtMenuResultRow" above.
 #define kKFCResultDocumentMenuName			"KFCRtMenuResultDocument"
-// The BOOK row's right-click menu (Select All Rows - the author's call of 2026-10-11), popped the same way.
+// The BOOK row's right-click menu (Select All Rows), popped the same way.
 #define kKFCResultBookMenuName				"KFCRtMenuResultBook"
 
 // Menu item positions:
 //
 // The flyout, as KFCUI.fr lays it out (the author's arrangement):
-//    0.5 - 1.3    Open Find/Change..., Find in <scope>, Change All in Book (No List) and Run Saved Queries... (the
-//                 commands that write to the DOCUMENTS here), Clear Results between them
+//    0.5 - 1.3    the commands: Open Find/Change..., Find in <scope>, Change All in Book (No List), Clear Results,
+//                 Run Saved Queries... (the two that write to the DOCUMENTS among them)
 //   ---- 2.0
 //    2.2 - 2.9    the check-mark toggles (Block 3 below)
 //   ---- 3.0

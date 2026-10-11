@@ -26,7 +26,7 @@ REGISTER_PMINTERFACE(KFCHitMarkerAdornment, kKFCHitMarkerAdornmentImpl)
 REGISTER_PMINTERFACE(KFCStartupShutdown, kKFCStartupShutdownImpl)
 // Result invalidation: retire a document-scope result set when its document closes.
 REGISTER_PMINTERFACE(KFCCloseDocResponder, kKFCCloseDocResponderImpl)
-// The rows' text foci for a chapter the user opens again themselves (KFCOpenDocResponder.cpp - spec T6 c).
+// The rows' text foci for a chapter the user opens again themselves (KFCOpenDocResponder.cpp).
 REGISTER_PMINTERFACE(KFCOpenDocResponder, kKFCOpenDocResponderImpl)
 // Result invalidation: retire a book-scope result set when its book closes.
 REGISTER_PMINTERFACE(KFCBookWatch, kKFCBookWatchImpl)
