@@ -7,19 +7,18 @@
 //  Jump-to-hit navigation. A hit-row click (ActivateNode) jumps: it resolves the hit's stored
 //  location (reopening the chapter windowless if the user closed it), brings that chapter's window
 //  to the front, scrolls the view so the match is centred, and SELECTS the match with the Type tool
-//  on (1.4.0 - the author's calls of 2026-10-09 and -10: the tree does what Edit > Find/Change's
-//  Find Next does, so the selection is the pointer and no marker goes over it). The keyboard stays
-//  on the list. A match that cannot be selected - locked, hidden, zero width, no longer found -
-//  gets the marker on its characters instead (KFCHitMarker - a global text adornment), which takes
-//  itself down after about a second, and nothing is left selected; until 1.4.0 every click did only
-//  that, and changed nothing in the document (JMP-06). Why it was not selected is said (the author's
-//  call of 2026-10-10): the row's note on the message area, or a GREP row's preview heading.
-//  A double click is two clicks (1.4.0 - the author's call of 2026-10-10: its own selection, which
-//  gave the keyboard to the text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
+//  on (the author's calls: the tree does what Edit > Find/Change's Find Next does, so the selection
+//  is the pointer and no marker goes over it - JMP-06). The keyboard stays on the list. A match that
+//  cannot be selected - locked, hidden, zero width, no longer found - gets the marker on its
+//  characters instead (KFCHitMarker - a global text adornment), which takes itself down after about a
+//  second, and nothing is left selected. Why it was not selected is said (the author's call): the
+//  row's note on the message area, or a GREP row's preview heading.
+//  A double click is two clicks (the author's call: its own selection, which gave the keyboard to the
+//  text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
 //  call: on the same beat as KCM's Story-mode jump, which raises its flash straight away). With
 //  "Hide Previous Chapter" ON, every other
 //  displayed clean chapter of the searched book is closed as the jump lands (a document outside the
-//  book stays - 2026-10-08). Ported from KESCL's jump machinery (KESCL
+//  book stays). Ported from KESCL's jump machinery (KESCL
 //  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
 //  reverse mode).
 //
@@ -49,17 +48,18 @@ namespace KFCJump
 	/** A Find/Change setting changed (KFCPanelTitle's observer, IID_IFINDCHANGEOPTIONS). If a row was activated a
 	    moment ago (ActivateNode - a click, the arrow walk) and Edit > Find/Change has re-picked Search: in answer to
 	    the selection or the front document that changed, Search: is put back as it was before the activation, when
-	    the selection offers it (1.4.0 - the author's call of 2026-10-10; the note above ScopeKeep in KFCJump.cpp). */
+	    the selection offers it (the author's call; the note above ScopeKeep in KFCJump.cpp). */
 	void KeepSearchScopeAfterClick();
 
-	/** AN OBJECT ROW'S REPLACE (1.4.0, spec O10): the model's checks first (IKFCRuns::CheckObjectReplace - a refused row
-	    brings no window forward), then the row's document in front and the view on its item (InDesign's replace selects
-	    what it writes in the FRONT document - O10 step 6), the write (IKFCRuns::ReplaceHit), and the row's item left
-	    selected as a click selects it (step 9 - the author's call of 2026-10-10; nothing selected when the item is gone).
+	/** AN OBJECT ROW'S REPLACE (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O10): the model's checks
+	    first (IKFCRuns::CheckObjectReplace - a refused row brings no window forward), then the row's document in front and
+	    the view on its item (InDesign's replace selects what it writes in the FRONT document - O10 step 6), the write
+	    (IKFCRuns::ReplaceHit), and the row's item left selected as a click selects it (step 9 - the author's call; nothing
+	    selected when the item is gone).
 	    outStatus = what to say. True when it wrote. */
 	bool ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
-	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER (O18), of one document or several: the model's checks first
+	/** THE OBJECT ROWS SELECTED TOGETHER, REPLACED TOGETHER, of one document or several: the model's checks first
 	    (IKFCRuns::CheckObjectReplaceRows - none that could be written brings no window forward), then the document of
 	    shownChapter / shownHit - the row selected last, the one the page shows (KFCResultTree::LastSelectedHit) - in front
 	    and the view on its item, the write in one undo step (IKFCRuns::ReplaceRows), and that row's item left selected as
@@ -68,7 +68,7 @@ namespace KFCJump
 	bool ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter, int32 shownHit, PMString& outStatus);
 
 	/** Nothing selected in the front document - DeselectAll on the active selection, when there is one: the click's own
-	    clearing (1.4.0), for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
+	    clearing, for the object search's "nothing was selected" given back (IKFCUIServices::ClearSelection). */
 	void ClearFrontSelection();
 
 	/** The "Hide Previous Chapter" flyout toggle (session state; starts ON). Read as a hit row or a

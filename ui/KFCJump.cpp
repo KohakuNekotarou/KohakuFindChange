@@ -26,9 +26,9 @@
 #include "IFrameList.h"
 #include "IFrameListComposer.h"
 #include "IHierarchy.h"				// the match's frame as a page item - which spread is it on?
-#include "IInlineData.h"			// an object row's item in overset text: its anchor's story and place (1.4.0)
-#include "IGeometry.h"				// an object row's item: its outline, scrolled to (ShowItemInView, 1.4.0)
-#include "ILayoutSelectionSuite.h"	// SelectPageItems - an object row's click selects its item (1.4.0)
+#include "IInlineData.h"			// an object row's item in overset text: its anchor's story and place
+#include "IGeometry.h"				// an object row's item: its outline, scrolled to (ShowItemInView)
+#include "ILayoutSelectionSuite.h"	// SelectPageItems - an object row's click selects its item
 #include "ILayoutCmdData.h"			// kSetSpreadCmdBoss carries the view it is addressing
 #include "ILayoutControlData.h"		// kFitNone; GetSpreadRef - which spread the view is showing
 #include "ILayoutUIUtils.h"
@@ -63,7 +63,7 @@
 #include "UIDList.h"
 #include "Utils.h"
 #include "K2SmartPtr.h"				// K2::scoped_ptr
-#include "TransformUtils.h"			// InnerToPasteboardMatrix - an object row's item in pasteboard coordinates (1.4.0)
+#include "TransformUtils.h"			// InnerToPasteboardMatrix - an object row's item in pasteboard coordinates
 #include "PMPoint.h"
 #include "PMRect.h"
 #include "PMMatrix.h"
@@ -254,8 +254,11 @@ namespace
 		//
 		// What still stands, and is why the proportions below are kept: the returned PMLineSeg's
 		// COORDINATE SPACE is nowhere stated, and the rectangle here is assembled in a wax RUN's local
-		// space through that run's to-pasteboard matrix. There is no call site for GetSelectionLine
-		// anywhere in the SDK to settle it from. Measure it on a real document before trusting it.
+		// space through that run's to-pasteboard matrix. The SDK's two call sites do not settle it: both
+		// draw with it inside a text adornment's Draw, in the port the adornment is handed -
+		// basictextadornment's BscTAAdornment.cpp:200 (IWaxLineShape; rectpath(run->GetXPosition(),
+		// selection.Top(), ...)) and hiddentext's HidTxtAnchorTextAdornment.cpp:282 (IWaxRunShape) - not
+		// through a run's matrix as here. Measure it on a real document before trusting it.
 		const PMReal h       = waxLine->GetLineHeight();
 		const PMReal ascent  = h * PMReal(0.95);
 		const PMReal descent = h * PMReal(0.2);
@@ -336,7 +339,7 @@ namespace
 		EnsureSpreadUIDInView(view, storyRef.GetDataBase(), SpreadForMatch(storyRef, pos));
 	}
 
-	/** Put the view on ONE SPREAD (the tail of EnsureSpreadInView, above - shared with an object row's jump, 1.4.0). The
+	/** Put the view on ONE SPREAD (the tail of EnsureSpreadInView, above - shared with an object row's jump). The
 	    rules are EnsureSpreadInView's: a different spread or nothing, the view's own document, the error state kept. */
 	void EnsureSpreadUIDInView(IControlView* view, IDataBase* db, UID targetSpread)
 	{
@@ -571,7 +574,7 @@ namespace
 		// to hand back by closing them, with the UI suppressed. It has a window now and the user is
 		// looking at it, so that entitlement is over: the next run would otherwise close a window
 		// they are working in, and take with it whatever they have typed or replaced into it since
-		// (the user: "a document the user opened by jumping should not be closed, even if nothing was
+		// (the author: "a document the user opened by jumping should not be closed, even if nothing was
 		// replaced in it").
 		//
 		// KFCBookScope::ShowChapterWindow says this about the window IT opens after a replace. This is
@@ -647,14 +650,14 @@ public:
 	~ActivationGuard() { gActivating = false; }
 };
 
-// A CHAPTER THE LANDING REOPENED IS HANDED BACK UNLESS IT GOT ITS WINDOW (2026-10-10 - the author: "a hidden document left
-// behind would be trouble"). A landing on a chapter the user closed since the search reopens it windowless and held
+// A CHAPTER THE LANDING REOPENED IS HANDED BACK UNLESS IT GOT ITS WINDOW (the author: "a hidden document left behind
+// would be trouble"). A landing on a chapter the user closed since the search reopens it windowless and held
 // (EnsureChapterReachable, or the model's own check - IKFCRuns::CheckObjectReplace); the window it brings forward makes the
 // chapter the user's (EnsureDocFrontmost -> ForgetHeldDoc). Every other way out - the window would not come forward, the
 // row could not be read - left it open with no window until the next search (measured with the fault switch
 // jump-no-front: work/kbs-regress/hid-cases.tsv). So at the end of each landing the chapter's document, if KFC still holds
 // it, goes back - the model decides how (KFCBookScope::HandBackIfHeld: closed when windowless and clean, kept with unsaved
-// work), as the text Replace's own ChapterAfter hands its chapter back on every exit (KFCReplaceEngine).
+// work), as the text Replace's own ChaptersAfter hands its chapters back on every exit (KFCReplaceEngine).
 // The chapter is asked for as the model holds it when the landing ends: every door that reaches a chapter rebinds it there
 // (RebindChapterDoc), so a chapter reopened anywhere in the landing is the one handed back.
 // DECLARED AFTER the landing's ActivationGuard (a landing dropped by that guard must not hand back what the landing in
@@ -677,7 +680,7 @@ private:
 	HandBackChapterOnExit& operator=(const HandBackChapterOnExit&);
 };
 
-// The same for EVERY document of rows selected together (KFCJump::ReplaceObjectRows - 1.4.0, rows of several documents):
+// The same for EVERY document of rows selected together (KFCJump::ReplaceObjectRows - rows of several documents):
 // the model's check can reopen any of their chapters windowless and hold it, and a way out between that check and the
 // write - the shown row's chapter not reached, its window not forward - would leave them so. A chapter the write gave a
 // window, or one the user has open, is not held: nothing happens to it.
@@ -783,8 +786,8 @@ bool FrontChapter(const UIDRef& docRef)
 	return true;
 }
 
-// NOTHING SELECTED in the front document - DeselectAll on the active selection, when there is one (1.4.0: a hit row's
-// click clears the way for its own selection; an object row's Replace whose item is gone takes away what InDesign's walk
+// NOTHING SELECTED in the front document - DeselectAll on the active selection, when there is one (a hit row's click
+// clears the way for its own selection; an object row's Replace whose item is gone takes away what InDesign's walk
 // selected). Unasked, as the SDK's own recipes deselect (gotolasttextedit, SnpSelectShape): DeselectAll goes to the
 // CSBs holding a selection (ISelectionManager.h), so with nothing selected nothing happens.
 void ClearSelection()
@@ -794,16 +797,16 @@ void ClearSelection()
 		selectionManager->DeselectAll(nil);
 }
 
-// SEARCH: AS IT WAS BEFORE A CLICK (1.4.0 - the author's call of 2026-10-10: put Search: back as it was). Edit >
-// Find/Change - open, or minimized - re-picks Search: when the selection or the front document changes, and a row's
-// click can do both: measured 2026-10-10 with the dialog open and InDesign in front, about 0.2 s after a click that
-// selected, Story, To End of Story and All Documents became Document (on another run, Story became Selection);
-// Document stayed. A click that fronts ANOTHER document had it re-picked WHILE that document came forward (read after
-// the fronting, the value was Document already - t1-cross-alldocs-r2), and a click that cannot select still takes the
-// old selection away, which the dialog answers as well (All Documents -> Document - t1-locked-all_documents). The
-// dialog's own Find Next leaves Search: alone. So every activation (ActivateNode) remembers the tab's Search: BEFORE it
-// does anything, and a change to it within kScopeKeepMs is put back - KFCPanelTitle's observer hears the change and
-// calls KFCJump::KeepSearchScopeAfterClick. Measured: written back, the open dialog shows the value again and keeps it.
+// SEARCH: AS IT WAS BEFORE A CLICK (the author's call: put Search: back as it was). Edit > Find/Change - open, or
+// minimized - re-picks Search: when the selection or the front document changes, and a row's click can do both:
+// measured with the dialog open and InDesign in front, about 0.2 s after a click that selected, Story, To End of Story
+// and All Documents became Document (on another run, Story became Selection); Document stayed. A click that fronts
+// ANOTHER document had it re-picked WHILE that document came forward (read after the fronting, the value was Document
+// already - the probe t1-cross-alldocs-r2), and a click that cannot select still takes the old selection away, which the
+// dialog answers as well (All Documents -> Document - the probe t1-locked-all_documents; both probes are in
+// work/kbs-regress/archive). The dialog's own Find Next leaves Search: alone. So every activation (ActivateNode)
+// remembers the tab's Search: BEFORE it does anything, and a change to it within kScopeKeepMs is put back -
+// KFCPanelTitle's observer hears the change and calls KFCJump::KeepSearchScopeAfterClick. Measured: written back, the open dialog shows the value again and keeps it.
 // A change later than that is the user's own; one inside it is put back too - who made it cannot be told. A row's
 // Replace leaves Search: as it is (measured: replace-keeps-scope), so nothing arms for it.
 struct ScopeKeep
@@ -815,7 +818,7 @@ struct ScopeKeep
 	ScopeKeep() : armed(false), mode(-1), scope(-1) {}
 };
 ScopeKeep gScopeKeep;
-// ONE SECOND (the author's call of 2026-10-10 - it was two): the dialog's writes came about 0.2 s after the click, and
+// ONE SECOND (the author's call - it was two): the dialog's writes came about 0.2 s after the click, and
 // again about 0.35 s after it (measured - the note above, and KeepSearchScopeAfterClick's), so one second still covers
 // them with room - and a Search: the user picks again themselves after a click is put back for half as long.
 const long long kScopeKeepMs = 1000;
@@ -842,11 +845,10 @@ void ArmScopeKeep()
 	KFC_DIAG_LOG("SCOPEKEEP armed=%d mode=%d scope=%d", gScopeKeep.armed ? 1 : 0, (int)mode, (int)scope);
 }
 
-// The Type tool, because a selected match is an invitation to EDIT - a click's, since 1.4.0: Edit > Find/Change's Find
-// Next selects what it found and puts the Type tool on, and the author asked for the same (2026-10-10). A text
-// selection made while the Selection tool is active is not somewhere the user can start typing. ! This CHANGES THE
-// USER'S ACTIVE TOOL - deliberately. (How to Use does not say so since the author's own text of 2026-10-11, f64e142 - the
-// spec map's PNL-17 notes it.)
+// The Type tool, because a selected match is an invitation to EDIT - a click's: Edit > Find/Change's Find Next selects
+// what it found and puts the Type tool on, and the author asked for the same. A text selection made while the
+// Selection tool is active is not somewhere the user can start typing. ! This CHANGES THE USER'S ACTIVE TOOL -
+// deliberately. (How to Use, in the author's own text, does not say so - the spec map's PNL-17 notes it.)
 //
 // IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
 // more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools
@@ -873,11 +875,11 @@ bool PutTypeToolOn()
 	return true;
 }
 
-// WHY A CLICK LEFT ITS ROW'S MATCH UNSELECTED (1.4.0 - the author's call of 2026-10-10: a text row's click says why it
-// cannot select). Said by ActivateNode once the landing is over: on a GREP row whose preview comes up, in the preview's
-// heading ("Preview Text (not selected - no width):" - the author chose both, the same day); on any other row as the
-// row's note (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes it away). The
-// sentences are the ones the double click said until it went (2026-10-10). kNotSelectedQuietly: no reason to give - a
+// WHY A CLICK LEFT ITS ROW'S MATCH UNSELECTED (the author's call: a text row's click says why it cannot select). Said
+// by ActivateNode once the landing is over: on a GREP row whose preview comes up, in the preview's heading ("Preview
+// Text (not selected - no width):" - the author chose both); on any other row as the row's note
+// (KFCResultTree::ShowRowNote - the row's, like a preview: the next row landed on takes it away). The sentences are
+// the ones the double click said until it went. kNotSelectedQuietly: no reason to give - a
 // row whose text is gone (the jump has said "Not found") or a step InDesign refused.
 enum NotSelected
 {
@@ -919,12 +921,12 @@ const char* NotSelectedWords(NotSelected why)
 	}
 }
 
-// A CLICK'S SELECTION OF A TEXT ROW'S MATCH (1.4.0 - the author's call of 2026-10-09: the tree does what Edit >
-// Find/Change's Find Next does, one result selected after another, so the selection is the pointer and no marker goes
+// A CLICK'S SELECTION OF A TEXT ROW'S MATCH (the author's call: the tree does what Edit > Find/Change's Find Next
+// does, one result selected after another, so the selection is the pointer and no marker goes
 // over it). Only a match that can be selected - found where the row says, not locked, not hidden, not zero width (an
 // overset one never comes here). One that cannot be is marked by JumpToHit instead, and the answer says why (NotSelected
-// - the reasons the double click gave until it went, said for the click since the author's call of 2026-10-10). The
-// Type tool is put on, as Find Next does (PutTypeToolOn - the author's call of 2026-10-10); the keyboard stays on the
+// - the reasons the double click gave until it went, said for the click: the author's call). The Type tool is put
+// on, as Find Next does (PutTypeToolOn - the author's call); the keyboard stays on the
 // list - the row's LButtonUp acquires it after the jump, the walk takes it back - so the arrows walk on and Return
 // replaces. The document is in front and composed, inside JumpToHit's dirty guard, its selection cleared. kSelected
 // when the match is selected.
@@ -982,7 +984,7 @@ NotSelected SelectMatchOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& sto
 }
 
 /** Jump to hit 'hitIdx' of chapter 'chapterIdx': front its document, scroll to the match, and select
-    it - or raise the marker on one that cannot be selected (SelectMatchOnClick, 1.4.0). An unreachable
+    it - or raise the marker on one that cannot be selected (SelectMatchOnClick). An unreachable
     chapter (missing / locked file) reports through the status line. An overset match has no on-page
     location of its own, so the view scrolls to the frame's overset "+" instead and NO marker is raised
     - those pixels belong to the indicator, not to the text.
@@ -1080,9 +1082,8 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		return false;
 	}
 
-	// A CLICK LEAVES ITS ROW'S MATCH SELECTED, OR NOTHING (1.4.0 - the author's call: whatever Search: is, as Find Next
-	// does). What was selected goes first; the match is selected below when it can be, and otherwise the marker alone
-	// points.
+	// A CLICK LEAVES ITS ROW'S MATCH SELECTED, OR NOTHING (the author's call: whatever Search: is, as Find Next does).
+	// What was selected goes first; the match is selected below when it can be, and otherwise the marker alone points.
 	ClearSelection();
 
 	// ONE VIEW, LOOKED UP ONCE, USED BY EVERYTHING BELOW - not one per user through two different
@@ -1135,7 +1136,7 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 			// AT ONCE, from the mouse as from the keyboard - the beat KCM's Story-mode jump flash
 			// keeps (the user's request).
 			//
-			// 1.4.0: a match that can be selected IS selected, and no marker goes over it - a selection under an
+			// A match that can be selected IS selected, and no marker goes over it - a selection under an
 			// inversion cannot be read (JMP-17's reason). Every other row is marked as above, and the answer says
 			// why it was not selected (ActivateNode says it).
 			outWhy = SelectMatchOnClick(chapterIdx, hitIdx, storyRef, start, end, sameOccurrence);
@@ -1284,10 +1285,10 @@ void ShowItemInView(const UIDRef& itemRef)
 	ScrollViewToPoint(frontView, PBPMPoint(bounds.GetHCenter(), bounds.GetVCenter()));
 }
 
-// THE VIEW ON AN ITEM IN OVERSET TEXT (2026-10-10 night): the red "+" of the frame its anchor overflows from - a text row's
+// THE VIEW ON AN ITEM IN OVERSET TEXT: the red "+" of the frame its anchor overflows from - a text row's
 // overset match's landing (JumpToHit: the spread, then KFCFindOversetLocator). The anchor is the kInlineBoss the item
-// hangs from, or a group inside it does - its story and place (IInlineData::GetTextModelUID / GetILGIndex,
-// XDocBkImageSizerCmd.cpp's way). Silent when there is none: the view stays.
+// hangs from, or a group inside it does - its story and place (IInlineData::GetTextModelUID / GetILGIndex - the place
+// as XDocBkImageSizerCmd.cpp reads it). Silent when there is none: the view stays.
 void ShowOversetAnchorInView(const UIDRef& itemRef)
 {
 	IDataBase* const db = itemRef.GetDataBase();
@@ -1314,8 +1315,9 @@ void ShowOversetAnchorInView(const UIDRef& itemRef)
 }
 
 // SELECT A PAGE ITEM in the front document - the SDK's own way (SnpSelectShape.cpp: DeselectAll, then SelectPageItems
-// with kReplace), inside a dirty guard. The tool is left as it is (D9 - the plan's Task 1 M11b: a page item is selected
-// under the Type tool, and InDesign's own Find Next on the Object tab selects with the Type tool left on, M5).
+// with kReplace), inside a dirty guard. The tool is left as it is (measured - the object search plan's Task 1 M11b,
+// docs/superpowers/plans/2026-10-09-kfc-object-search.md: a page item is selected under the Type tool, and InDesign's
+// own Find Next on the Object tab selects with the Type tool left on, M5).
 void SelectItem(const UIDRef& itemRef)
 {
 	IDataBase::SaveRestoreModifiedState dirtyGuard(itemRef.GetDataBase());
@@ -1327,8 +1329,8 @@ void SelectItem(const UIDRef& itemRef)
 	layoutSuite->SelectPageItems(UIDList(itemRef), Selection::kReplace, Selection::kDontScrollLayoutSelection);
 }
 
-// A CLICK ON AN OBJECT ROW (form S - the author's call of 2026-10-09: whatever Search: is, as Find Next does, and as the
-// text rows do - Task 0): the item selected; a locked or hidden one leaves nothing selected, and the line says why -
+// A CLICK ON AN OBJECT ROW (the plan's form S - the author's call: whatever Search: is, as Find Next does, and as the
+// text rows do): the item selected; a locked or hidden one leaves nothing selected, and the line says why -
 // form S builds no frame marker, so the line and the view are the pointer. The document is in front and the view on
 // the item (JumpToObject).
 void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
@@ -1340,14 +1342,14 @@ void SelectItemOnClick(int32 chapterIdx, int32 hitIdx, const UIDRef& itemRef)
 		ClearSelection();
 		PMString message(locked ? "That object is locked - not selected." : "That object is hidden - not selected.");
 		message.SetTranslatable(kFalse);
-		// The row's note, as a text row's reason is (2026-10-10): the next row landed on takes it away.
+		// The row's note, as a text row's reason is: the next row landed on takes it away.
 		KFCResultTree::ShowRowNote(message);
 		return;
 	}
 	SelectItem(itemRef);
 }
 
-// A REPLACED ROW'S ITEM LEFT SELECTED (step 9 - the author's call of 2026-10-10: the item stays selected after its Replace;
+// A REPLACED ROW'S ITEM LEFT SELECTED (step 9 - the author's call: the item stays selected after its Replace;
 // for rows replaced together, the item of the row selected last - the page shows that row, as their click did): selected
 // the way its click selects it (a locked or hidden one: nothing, and the row's note says why); one gone meanwhile, or in
 // overset text, leaves nothing selected. InDesign's walk and replace selected what they met, which this puts right.
@@ -1406,7 +1408,7 @@ bool JumpToObject(int32 chapterIdx, int32 hitIdx, UID item)
 		return false;
 	}
 	KFCHitMarkerView::Hide();						// a text row's marker, if one is still up
-	// AN ITEM IN OVERSET TEXT - no spread holds it (2026-10-10 night; the model's KFCObjectSearch::IsOnSpread): nothing of
+	// AN ITEM IN OVERSET TEXT - no spread holds it (the model's KFCObjectSearch::IsOnSpread): nothing of
 	// it is laid out to scroll to or select. The view goes to the "+" its text overflows at, as a text row's overset match
 	// does; nothing is selected, and the row's note says why, as a locked one's does (SelectItemOnClick).
 	if (SpreadOfItem(itemRef) == kInvalidUID)
@@ -1454,14 +1456,14 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		NotSelected why = kNotSelectedQuietly;
 		if (item != kInvalidUID)
 		{
-			// AN OBJECT ROW (1.4.0): the item shown and selected (form S); it has no preview (a GREP row's alone). The
+			// AN OBJECT ROW: the item shown and selected (form S); it has no preview (a GREP row's alone). The
 			// previous row's preview or note goes FIRST - the jump can put this row's own note up (SelectItemOnClick).
 			KFCResultTree::DropRowPreview();
 			(void)JumpToObject(chapterIdx, hitIdx, item);
 		}
 		else if (JumpToHit(chapterIdx, hitIdx, why))
 		{
-			// WHY IT WAS NOT SELECTED (the author's call of 2026-10-10): in a GREP row's preview heading when the preview
+			// WHY IT WAS NOT SELECTED (the author's call): in a GREP row's preview heading when the preview
 			// comes up, otherwise as the row's own note - after the preview, which takes a previous row's note away.
 			if (!KFCResultTree::ShowRowPreview(chapterIdx, hitIdx, NotSelectedWords(why)))
 			{
@@ -1543,7 +1545,7 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 		ShowItemInView(UIDRef(db, item));
 	}
 	const bool wrote = KFCRuns()->ReplaceHit(chapterIdx, hitIdx, outStatus);
-	// 9. THE ROW'S ITEM LEFT SELECTED (the author's call of 2026-10-10 - it reverses 10-09's "nothing left selected"),
+	// 9. THE ROW'S ITEM LEFT SELECTED (the author's call - it reverses an earlier "nothing left selected"),
 	// whether the write went through or not (LeaveRowItemSelected).
 	if (LayoutOfDocIsFrontmost(docRef))
 		LeaveRowItemSelected(chapterIdx, hitIdx, UIDRef(db, item));

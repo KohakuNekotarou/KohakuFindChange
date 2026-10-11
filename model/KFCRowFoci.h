@@ -8,7 +8,8 @@
 //  focus when text is typed or deleted around it (ITextFocusManager::NewFocus - SnpManipulateTextModel.cpp's shape),
 //  so a row's place survives the user's edits. A HINT FOR THE JUMP ONLY: a focus does not follow an Undo or a Redo
 //  (measured, docs/ai-notes/kfc-text-focus-spike-2026-10-08.md), so nothing uses it without reading the text at it
-//  first (KFCSearchEngine::LocateRow), and the row's Replace never reads it at all (spec F14).
+//  first (KFCSearchEngine::LocateRow), and the row's Replace never reads it at all
+//  (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F14).
 //  Attached only where KFC still knows the story (its version unchanged); put back on the rows' places after every
 //  locate and after KFC's own writes; released before its document closes. The main thread only.
 //
