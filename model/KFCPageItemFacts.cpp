@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  See KFCPageItemFacts.h. The bodies are KFCSearchEngine.cpp's, moved for 1.4.0 without a change.
+//  See KFCPageItemFacts.h. (The bodies were KFCSearchEngine.cpp's - their history before the move is in its log.)
 //
 //========================================================================================
 
@@ -70,7 +70,7 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 	// spread UID too and spells it "PB" (IPageList.h:131, "Given a page UID (or spread UID)"). A
 	// match out on the pasteboard should say where it is rather than drop out of the list, so this
 	// does NOT check that the UID is a kPageBoss before using it. (Code that wants real pages only
-	// has to verify with db->GetClass - see KESCM's overset scan, which does exactly that.)
+	// has to verify with db->GetClass - see KCM's KCMFramePageUID (KCMCore.cpp), which does exactly that.)
 	if (pageUID == kInvalidUID)
 	{
 		InterfacePtr<IHierarchy> frameHier(db, frameUID, UseDefaultIID());
@@ -297,7 +297,7 @@ PMString StoryLeadText(const UIDRef& storyRef)
 				pendingSpace = (shown > 0 && pendingBreaks.CharCount() == 0);
 				continue;
 			}
-			// The marks every row leaves out (KFCResultModel::IsMarkerNotShown - an index marker among them, 2026-10-09), and
+			// The marks every row leaves out (KFCResultModel::IsMarkerNotShown - an index marker among them), and
 			// for a story row's first words all control characters and IsIgnoredCharacter's (variation selectors, special
 			// glyphs), which a hit row keeps.
 			if (!isTableSign && (v < kTextChar_Space || KFCResultModel::IsMarkerNotShown(c)

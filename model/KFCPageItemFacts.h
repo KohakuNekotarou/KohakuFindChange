@@ -5,9 +5,9 @@
 //  KohakuFindChange (KFC)
 //
 //  What a page item's PLACE says about it - its page, whether it is switched off, whether it may be edited - and a
-//  story's first words. Moved out of KFCSearchEngine.cpp for 1.4.0, unchanged, so the object search
-//  (KFCObjectSearch.cpp) asks the same questions the text search asks, by the same code: a text row and an object row
-//  on the same frame say the same page, "hidden" and "locked".
+//  story's first words. Shared by the text search (KFCSearchEngine.cpp) and the object search (KFCObjectSearch.cpp), so
+//  the two ask the same questions by the same code: a text row and an object row on the same frame say the same page,
+//  "hidden" and "locked".
 //
 //========================================================================================
 

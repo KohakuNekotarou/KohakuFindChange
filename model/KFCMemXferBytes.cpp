@@ -2,7 +2,7 @@
 //
 //  Owner: KohakuNekotarou
 //
-//  KohakuFindChange (KFC), copied from KIDMCP (written for Kohaku Change Marker) - the object rows' fingerprint (1.4.0)
+//  KohakuFindChange (KFC), copied from KIDMCP (written for Kohaku Change Marker) - the object rows' fingerprint
 //
 //  See KFCMemXferBytes.h for why this exists rather than the SDK's own MemXferBytes.
 //

@@ -2,7 +2,7 @@
 //
 //  Owner: KohakuNekotarou
 //
-//  KohakuFindChange (KFC), copied from KIDMCP (written for Kohaku Change Marker) - the object rows' fingerprint (1.4.0)
+//  KohakuFindChange (KFC), copied from KIDMCP (written for Kohaku Change Marker) - the object rows' fingerprint
 //
 //  An IXferBytes that keeps everything in memory, so an item's persistent data can be written - the
 //  object rows' fingerprint, IPMPersist::SaveAll - without a file ever existing.

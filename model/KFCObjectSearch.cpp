@@ -24,14 +24,14 @@
 #include "IMainItemTOPData.h"		// text on a path - its story (the fingerprint)
 #include "IMultiColumnTextFrame.h"	// QueryTextModel - the story a text frame holds
 #include "IObjectWalker.h"
-#include "IPageItemNameFacade.h"	// a row's item by the name the Layers panel shows (2026-10-10)
+#include "IPageItemNameFacade.h"	// a row's item by the name the Layers panel shows
 #include "IPageList.h"				// GetPageString / GetPageIndex
-#include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on (O17)
+#include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on
 #include "IPMPersist.h"				// SaveAll - an item's own persistent data, the fingerprint (O12)
 #include "IPMStream.h"
 #include "ISession.h"
 #include "ISpread.h"
-#include "ISpreadList.h"			// where the walk stands, for the bar inside a document (O16)
+#include "ISpreadList.h"			// where the walk stands, for the bar inside a document
 #include "ITextFrameColumn.h"		// a text frame's column - the composition, left out of the fingerprint
 #include "ITextModel.h"				// GetChangeCount - a story's version (the fingerprint)
 #include "ITextWalkerSelectionUtils.h"	// the selection snapshot (O6)
@@ -66,9 +66,9 @@ namespace
 {
 // THE USER'S SELECTION, GIVEN BACK (O6). The text walker service's snapshot - the spelling panel's, which InDesign's own
 // search takes the same way (ITextWalkerSelectionUtils.h, SaveSelectionsSnapshot / RestoreSelectionsSnapshot); measured
-// with an object search over a windowless document and over the front one (KT, 2026-10-09 and the plan's Task 1 M4 -
-// five selection states, the selection and the active layer the same before and after). Never around a write: see the
-// header.
+// with an object search over a windowless document and over the front one (KT - the object search plan's Task 1 M4,
+// docs/superpowers/plans/2026-10-09-kfc-object-search.md: five selection states, the selection and the active layer the
+// same before and after). Never around a write: see the header.
 class SelectionKeeper
 {
 public:
@@ -100,7 +100,7 @@ private:
 
 // WHAT A LISTING'S WALKS COST THE USER, PUT BACK as they end - every listing's (CollectTargets, WalkOneDocument):
 //  - the selection, given back (SelectionKeeper - O6);
-//  - NOTHING SELECTED, given back too (2026-10-10 - the author's report: "an object-style search starts with an object
+//  - NOTHING SELECTED, given back too (the author's report: "an object-style search starts with an object
 //    selected; leave the selection as it was before the search"). With nothing selected the snapshot has nothing to give
 //    back, and what InDesign's walk selected stayed selected - measured in the test build's trace (OBJWALK / OBJSEL): both
 //    searches began with nothing selected; the style search's last find, A3 on page 1, was still selected after the
@@ -138,20 +138,22 @@ enum WalkEnd
 {
 	kWalkDone = 0,		// InDesign said there is no more (kNotFound), or came round to an item already given
 	kWalkBroke,			// the service failed, or handed back an item of another database - the rest was not looked at
-	kWalkCancelled		// the user's Cancel, heard inside the document (O16)
+	kWalkCancelled		// the user's Cancel, heard inside the document
 };
 
-// One document's slice of the bar, in steps (O16). The bar runs 0 .. targets x this.
+// One document's slice of the bar, in steps. The bar runs 0 .. targets x this.
 const int32 kDocSpan = 1000;
 
-// THE BAR INSIDE ONE DOCUMENT (O16 - the author's call of 2026-10-10: a Cancel heard inside a document, where 300 items
-// could not be stopped before). The walk does not know how many items a document holds until it has found them all, but
+// THE BAR INSIDE ONE DOCUMENT (the author's call: a Cancel is heard inside a document, not only between documents, where
+// the 300 items of one could not be stopped). The walk does not know how many items a document holds until it has found them all, but
 // it knows where it stands - the spread of the item it is on - as the text search knows the story (KFCSearchEngine.cpp,
 // its slice cut by stories). So: one step per item listed, and on to a later spread's share of the slice when the walk
 // gets there; a parent page's spread (not in the spread list) only crawls. Never backwards, never past the slice.
 // Moved at every item, and asked at every item (WalkDoc): which call on the bar lets a click on Cancel in is not
 // measured (KFCSearchEngine.cpp's KFCAdvanceProgress), so the walk makes both, as KIDMCP's working cancel does. Each item
-// already costs a fingerprint (20-75 ms - the plan's Task 1 M2), so the two calls add little.
+// already costs a fingerprint, so the two calls were judged to add little - against the snippet print of the time (20-75
+// ms, the plan's Task 1 M2); the SaveAll print that replaced it is faster, and the two calls are not timed against it (a
+// test build's FPRINT line times the print).
 class DocProgress
 {
 public:
@@ -192,11 +194,11 @@ private:
 // ONE DOCUMENT'S WALK (O2 / O5): the shared walker initialised for it, InDesign's SearchObject asked "as is" until it
 // stops answering kSuccess, each match read off the shared walker. Read-only: the document's "unsaved" flag is put back
 // (SaveRestoreModifiedState - the text walk's guard).
-// fromSearchScope (2026-10-10 - the author's call: Search: = Selection with the cursor in text searches the frame the
+// fromSearchScope (the author's call: Search: = Selection with the cursor in text searches the frame the
 // cursor stands in, as Find/Change's own Find does): the walker is NOT initialised here - the first SearchObject asks
 // InDesign to initialise it from Search: itself (kTrue), which takes the caret's frame (measured: the plan's Task 1 M6),
 // and the steps after it go on "as is". Only for the front document, whose selection that is.
-// bar / barBase: the run's bar and this document's slice of it - moved and asked at every item listed (O16, DocProgress).
+// bar / barBase: the run's bar and this document's slice of it - moved and asked at every item listed (DocProgress).
 WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& docRef, const UIDList* items, size_t limit,
 	std::vector<KFCResultModel::Hit>& outHits, bool& outCapped, bool fromSearchScope, KFCProgressBar& bar, int32 barBase)
 {
@@ -222,7 +224,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 			svc->SearchObject(found, (fromSearchScope && step == 0) ? kTrue : kFalse);
 #ifdef KFC_DIAG
 		{
-			// (Test builds only) Each step's answer and what it left selected - the trace of the author's report E.
+			// (Test builds only) Each step's answer and what it left selected - the trace behind WalkAftercare's NOTHING SELECTED.
 			InterfacePtr<IKFCUIServices> diagUi(GetExecutionContextSession(), UseDefaultIID());
 			KFC_DIAG_LOG("OBJWALK step=%d result=%d current=%u selected=%d", static_cast<int>(step), static_cast<int>(result),
 				static_cast<unsigned>(shared->GetCurrentItem().GetUID().Get()),
@@ -250,7 +252,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 		KFCResultModel::Hit hit;
 		KFCObjectSearch::BuildObjectHit(docRef, current.GetUID(), hit);
 		outHits.push_back(std::move(hit));
-		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED (O16). The bar first, then the question (DocProgress says why both).
+		// CANCEL IS ASKED HERE, AT EVERY ITEM LISTED. The bar first, then the question (DocProgress says why both).
 		// kFalse = no global error state.
 		progress.Listed(shared->GetCurrentSpread());
 		bool cancel = bar.WasCancelled(kFalse) != kFalse;
@@ -321,7 +323,7 @@ bool PrintObject(IDataBase* db, UID uid, Print& print)
 // An item and what it holds - a group's members, a graphic frame's image, a text frame's columns object - each by
 // PrintObject. NOT a text frame's column frames (ITextFrameColumn - kFrameItemBoss, kTOPFrameItemBoss): they hold the
 // composition - which text fell in them, the inlines composed there - and typing moved their bytes while the frame
-// itself stayed as it was (measured 2026-10-10 night - the SaveAll probe's T1). The story's version stands for the text
+// itself stayed as it was (measured - the SaveAll probe's T1). The story's version stands for the text
 // (PrintStory), and a reflow is no change.
 bool PrintTree(IDataBase* db, UID uid, Print& print)
 {
@@ -343,7 +345,7 @@ bool PrintTree(IDataBase* db, UID uid, Print& print)
 
 // AN INLINE OR ANCHORED ITEM'S SETTINGS (Object > Anchored Object > Options): IAnchoredObjectData on the kInlineBoss it
 // hangs from, value by value. Not that boss's bytes: they carry where the anchor was composed, and typing before the
-// anchor moved them while the item stayed as it was (measured 2026-10-10 night - the SaveAll probe's I1).
+// anchor moved them while the item stayed as it was (measured - the SaveAll probe's I1).
 void PrintAnchor(IDataBase* db, UID item, Print& print)
 {
 	InterfacePtr<IHierarchy> hier(db, item, UseDefaultIID());
@@ -446,8 +448,8 @@ bool KFCObjectSearch::HasFindObjectFormat()
 	IDataBase* const db = (opts != nil) ? opts->GetUIDAttrDB() : nil;
 	if (db == nil)
 		return false;
-	// NOT IsThereSomethingToFind: on the Object tab it answered no with a format set (measured, KT 2026-10-09 and the
-	// plan's Task 1 M7 - fill Black set, the answer still 0).
+	// NOT IsThereSomethingToFind: on the Object tab it answered no with a format set (measured in KT - the plan's Task 1
+	// M7: fill Black set, the answer still 0).
 	const AttributeBossList* const attrs = opts->GetFindAttributeBossList(db, IFindChangeOptions::kObjectSearch);
 	if (attrs != nil && attrs->CountBosses() > 0)
 		return true;
@@ -502,8 +504,7 @@ int32 KFCObjectSearch::ObjectSearchScope(PMString& outFellBackNote)
 			// Selection: the page items selected when the run begins. With none selected the run is REFUSED
 			// (ResolveObjectRunScope), not widened to the document: InDesign's own Find walks nothing there (measured - the
 			// plan's Task 1 M6), and its object search fails a walk aimed at the whole document while this is stored
-			// (SearchObject answered kFailure at once; with Document stored, the same walk found the first item - measured
-			// 2026-10-10).
+			// (SearchObject answered kFailure at once; with Document stored, the same walk found the first item - measured).
 			return IWalkerScopeFactoryUtils::kSelectionScope;
 		default:
 		{
@@ -630,7 +631,7 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	const UIDRef itemRef(db, item);
 	out.itemUID = item;
 
-	// THE ROW'S TEXT (the author's calls of 2026-10-10): "ID<uid>:<the item's name>" - no kind word, no space after "ID".
+	// THE ROW'S TEXT (the author's calls): "ID<uid>:<the item's name>" - no kind word, no space after "ID".
 	// The name as the Layers panel shows it, by the panel's own recipe (LayerPanelUtils::GetDefaultPageItemElementName,
 	// source/open): the user's name when one was given; else InDesign's default for the item, translated, in < >; and
 	// in [ ] for an item that takes no name of the user's. Cut at kMaxItemNameChars, as a row's text is kept short
@@ -749,7 +750,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 		const WalkAftercare aftercare;		// O6 / O7 as this block ends, after the last chapter is handed back
 		PMString title(fromBook ? "Searching book..." : "Searching...");
 		title.SetTranslatable(kFalse);
-		// A document's slice is kDocSpan steps, so the bar can move inside one (O16 - DocProgress).
+		// A document's slice is kDocSpan steps, so the bar can move inside one (DocProgress).
 		const int32 barEnd = static_cast<int32>(targets.size()) * kDocSpan;
 		KFCProgressBar bar(title, 0, barEnd, kTrue, kTrue);
 		bar.DisableChildProgressBars(kTrue);

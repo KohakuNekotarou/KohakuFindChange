@@ -7,10 +7,12 @@
 //  Locate the overset "+" indicator for an overset text position. InDesign exposes no public API
 //  for the red "+" (frame) / red dot (table cell) overset locator, so we approximate it: the "+"
 //  sits at the outport (bottom-right, horizontal text) of the LAST frame the thread is placed in.
-//  Shared by three call sites so the geometry is computed one way only (named, so a new one has
+//  Shared by these call sites so the geometry is computed one way only (named, so a new one has
 //  somewhere to be added):
 //    * KFCJump's JumpToHit (the UI half, through IKFCRuns::FindOversetLocator) - scrolls the view to
 //      the "+" point (no marker) when a jumped-to hit is overset.
+//    * KFCJump's ShowOversetAnchorInView (the same way in) - the same for an object row whose page item
+//      hangs from an anchor in overset text.
 //    * KFCSearchEngine's BuildHit - names the page the "+" sits on so an overset hit lists as
 //      "P<page>(n) overset" and sorts into that page instead of being pushed to the end.
 //    * KFCSearchEngine::EditableFrameForMatch - answers WHICH FRAME speaks for an overset match, so

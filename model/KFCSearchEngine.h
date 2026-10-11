@@ -157,8 +157,8 @@ namespace KFCSearchEngine
 	          command inside the replace sequence would become part of that undo step.
 	          ! ONE CALLER DOES NOT, BY DESIGN: the query run (KFCQuerySequence) states each query's tab
 	          inside its one sequence, between queries, and loads the query there too. Measured
-	          (the spec's M3, case qs-undo): a Ctrl+Z of the run brought no Find/Change setting back - the
-	          strings stayed empty. */
+	          (case qs-undo): a Ctrl+Z of the run brought no Find/Change setting back - the strings stayed
+	          empty. */
 	bool CommitSearchMode();
 
 	/** State what a replace will WRITE, for the tabs whose change side is not a string: the Glyph
@@ -200,8 +200,8 @@ namespace KFCSearchEngine
 	    for nothing but the document. */
 	int32 CurrentSearchScope();
 
-	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - 1.4.0, the
-	    author's call of 2026-10-10: a row's click selects its match, and Edit > Find/Change, open, answers a selection
+	/** Put Search: of tab 'mode' back to 'scope' (a WalkScopeType value, as CurrentSearchScope gives it) - the
+	    author's call: a row's click selects its match, and Edit > Find/Change, open, answers a selection
 	    change by re-picking Search: (measured: to Document, or to Selection), which its own Find Next does not do. The
 	    UI half asks this the moment it hears the change (KFCJump::KeepSearchScopeAfterClick). SCHEDULED, not processed:
 	    it is asked from inside the notification of the dialog's own command. Measured: written back, the open dialog
@@ -209,7 +209,7 @@ namespace KFCSearchEngine
 	void RestoreSearchScope(int32 mode, int32 scope);
 
 	/** Read a story's first words again into its rows (KFCResultModel::SetStoryLead) - the story row's text - after a
-	    write of KFC's in it (1.4.0, the author's call of 2026-10-10: the story row says what the story says now). */
+	    write of KFC's in it (the author's call: the story row says what the story says now). */
 	void RereadStoryLead(int32 chapterIdx, const UIDRef& storyRef);
 
 	/** WHAT THE SELECTION MAKES OF A Search:. The dialog offers Search: values by the
@@ -232,8 +232,7 @@ namespace KFCSearchEngine
 	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 
-	/** Can Find in ... run on this tab? No on Colour alone (since 1.4.0 the Object tab lists page items -
-	    KFCObjectSearch). Asked by the menu (greys the command) and by the search itself (refuses), so the two
+	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch). Asked by the menu (greys the command) and by the search itself (refuses), so the two
 	    cannot disagree. */
 	bool CanSearchTab(int32 mode);
 
@@ -448,9 +447,9 @@ namespace KFCSearchEngine
 	    of KFC's own IS followed now, and the rows stand where their text is; the example stands for an
 	    edit that is not followed.)
 
-	    False when the row, its story or its place cannot be read. Asked by the verify walk, the row
-	    menus' Replace / Redo and RowStillStands (KFCReplaceEngine); the jump reads a row the same way
-	    at each place LocateRow tries (RowReadsAsFoundAt). */
+	    False when the row, its story or its place cannot be read. Asked by the verify walk and
+	    RowStillStands (KFCReplaceEngine), and by the jump through IKFCRuns; the jump reads a row the same
+	    way at each place LocateRow tries (RowReadsAsFoundAt). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
 	/** A ROW WHOSE PLACE HAS MOVED UNDER IT, LOOKED FOR AGAIN (the author's call). Before the jump gives up
@@ -462,7 +461,8 @@ namespace KFCSearchEngine
 	bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
 		TextIndex& ioStart, TextIndex& ioEnd);
 
-	/** Where the row is now (spec T2 / T3 / T14) - its stored place, its text focus, the story looked through again.
+	/** Where the row is now (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2 / T3 / T14) - its
+	    stored place, its text focus, the story looked through again.
 	    kRowMoved = the row was moved (RelocateStaleRow's rule); kRowElsewhere = found for this jump only - the row's
 	    stored place is unchanged. ioStart / ioEnd = the place to go to (unchanged for kRowAtPlace / kRowNotFound). */
 	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
@@ -473,7 +473,7 @@ namespace KFCSearchEngine
 	    refused or failed, the list unchanged; outStatus says what happened either way. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMString& outStatus);
 
-	/** Search This Document Again (a document row's right-click menu - the author's call of 2026-10-10): that document
+	/** Search This Document Again (a document row's right-click menu - the author's call): that document
 	    walked again whole with the search's query - the walk the search makes of each document, the Object tab's
 	    included - under a bar with Cancel, its rows put back as the walk finds them and its stories' versions recorded
 	    (KFCResultModel::ReplaceChapterRows). A search over part of a document is refused. False = refused, failed or
