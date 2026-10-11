@@ -83,20 +83,20 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 | 01 | [全体像](01-overview.md) | `GEN-` | 全体（0・2・3・5） | ✅ |
 | 02 | [検索 ― 何を探し、いつ断るか](02-search.md)（対応するタブ・断る順番と文言・前向き固定・タブの確定し直し・範囲ごとの歩き方・取り消し・メッセージ欄の文） | `FIND-` | 8 | ✅ |
 | 03 | [範囲 ― 文書とブック](03-scope.md)（Book Scope・対象のブックの決まり方・章を1つずつ開いて返す・開けなかった章・閉じるか残すか・All Documents・選んだ文書だけ＝Find/Change Selected Documents (Book)） | `SCOPE-` | 11・8 | ✅ |
-| 04 | [結果の一覧](04-rows.md)（木の形と開き方・各行に書かれるもの・ページの位置と状態の語・50文字の行・右クリックのメニュー・メッセージ欄） | `ROW-` | 6・7 | ✅ |
+| 04 | [結果の一覧](04-rows.md)（木の形と開き方・各行に書かれるもの・ページの位置と状態の語・50文字の行・右クリックのメニュー（4種類の行）・メッセージ欄・行をまとめて選ぶ（1.4.0・Select All Rows）） | `ROW-` | 6・7 | ✅ |
 | 05 | [ジャンプと印](05-jump.md)（行ごとの行き先・ジャンプの順・一致がもう無いとき・約1秒の印・矢印キー・Hide Previous Chapter・クリックで選ぶ（1.4.0・ダブルクリックの選択は 10-10 に外した）・「検索:」を戻す） | `JMP-` | 12 | ✅ |
-| 06 | [置換 ― 行の Replace と Change All in Book (No List)](06-replace.md)（1件ずつ書く・断る順・条件と文書の照合・置換されない理由・取り消し1段・Return キー・Change All in Book と章ごとの内訳・Clear Results） | `REP-` | 9 | ✅ |
+| 06 | [置換 ― 行の Replace と Change All in Book (No List)](06-replace.md)（1件ずつ書く・断る順・条件と文書の照合・置換されない理由・取り消し1段・Return キー・Change All in Book と章ごとの内訳・Clear Results・Search This Story Again・まとめて選んだ行の置換と Search This Document Again（1.4.0）） | `REP-` | 9 | ✅ |
 | 07 | [変更履歴 ― 利用者の設定のまま](07-track-changes.md)（KFC は記録を付けない・ON にもしない・それまでの記録は文書に残る。署名・色・却下と承認は 2026-10-06 に外した） | `TRK-` | 9 | ✅ |
 | 08 | [Show Changes by KohakuFindChange](08-show-changes.md)（2026-10-06 に外した） | `SHOW-` | ― | ― |
 | 09 | [Undo/Redo への追従](09-undo.md)（追いかける書き込み・追いかけないもの・知り方・順番・やめるとき・メッセージ欄） | `UNDO-` | 6b | ✅ |
 | 10 | [文書・ブックを閉じたとき](10-lifecycle.md)（文書の結果・All Documents・ブックの結果・復帰・ブックの別名保存・保存・起動と終了） | `LIFE-` | 11・13 | ✅ |
 | 11 | [パネルの見た目](11-panel.md)（開き方・タブ名・3枚の絵・メッセージ欄の高さ・大きさの下限と行の丸め・How to Use・About） | `PNL-` | 4・7・13 | ✅ |
-| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（ヒットの行の Replace）・ショートカット・保存するもの／しないもの・JSON の置き場・選んだ文書のトグル） | `SET-` | 4・5・3 | ✅ |
+| 12 | [フライアウトと設定の保存](12-menus-settings.md)（項目の並び・灰色の規則・右クリックメニュー（4種類の行）・ショートカット・保存するもの／しないもの・JSON の置き場・選んだ文書のトグル） | `SET-` | 4・5・3 | ✅ |
 | 13 | [窓の工夫（Windows）― Translucent Panel・Translucent Find/Change・Minimizable Find/Change](13-windows.md)（薄さと戻り方・効く場所・影・浮いた組・ダイアログの見つけ方・最小化ボタンとタスクバー・後始末） | `WIN-` | 14・15 | ✅ |
 | 14 | [ブックパネルの位置を覚える（Remember Book Panel Placement）](14-book-panel.md)（測る瞬間・戻す瞬間・浮いているとき・ドックの隣で覚える・放り出されたとき・ホーム画面・選択を読む） | `BPP-` | 16・11 | ✅ |
 | 15 | [アプリケーションバーの検索欄（Link the Application Bar's Search Field to This Panel）](15-app-bar.md)（欄に映すもの・書き戻し・Return で検索・テキストと正規表現だけ・見えないとき） | `BAR-` | 17 | ✅ |
 | 16 | [保存したクエリを順に実行（Run Saved Queries...）](16-queries.md)（入口・モードレスのダイアログ・左の一覧・右の並びとボタン・並びのファイル・Runs on: の行・Run） | `QRY-` | 19・18 | ✅（2026-10-07） |
-| 17 | [オブジェクトの検索（Object タブ）](17-objects.md)（4つの機能・本体の照合・範囲・歩き方・選択を戻す・行の形・クリック・行の置換と断る順・Undo・指紋・Change All in Book・クエリの実行・版） | `OBJ-` | ―（未記入） | ✅（2026-10-10・1.4.0） |
+| 17 | [オブジェクトの検索（Object タブ）](17-objects.md)（4つの機能・本体の照合・範囲・歩き方・選択を戻す・行の形・クリック・行の置換と断る順・Undo・指紋・Change All in Book・クエリの実行・版・文書の中の Cancel・まとめて選ぶ・まとめて置換する） | `OBJ-` | ―（未記入） | ✅（2026-10-10・1.4.0／2026-10-11 追記） |
 
 **1章ずつ作り、その都度読んでもらう**（KCM の地図と同じ進め方）。章立ては作りながら変わってよい。
 
@@ -117,4 +117,5 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 **2026-10-07 の追記の基準**: branch `feat/2026-10-07-query-dialog-selected-docs` `bab0cae`（10-06 の計画＝Track を使わない置換の Task 12 の途中の上に、クエリのダイアログ・選んだ文書・Change All の章ごとの内訳）。版数 `1.3.0`。第16章と、第3・6・12・14章の 2026-10-07 の項目はこの基準で書いた。
 **2026-10-08 の追記の基準**: branch `feat/2026-10-08-kfc-replace-next-book-hide`（main `f37b128` の上に、Shift+Return＝置換して次へ・Hide Previous Chapter をブックの章だけに）。GEN-02・GEN-11・SCOPE-17・JMP-26・JMP-28・REP-32・REP-32b はこの基準で書いた。
 **2026-10-10 の追記の基準**: branch `feat/2026-10-09-kfc-object-search`（main `0958109` の上に、オブジェクトの検索と、行のクリックで一致を選ぶ形 S）。版数 `1.4.0`。第17章と、末尾に（1.4.0）の付いた項目はこの基準で書いた。
+**2026-10-11 の追記の基準**: branch `chore/2026-10-10-kfc140-recheck` `9249878`（main `f64e142` の上に、検索形式の記憶が閉じる DB を忘れる直し）。版数 `1.4.0`。`59f615b` 以降の Search This Document Again（REP-37）・あふれの物の行と SaveAll の指紋（OBJ-08・09・10・12）・行のまとめ選択とまとめ置換・文書をまたぐ1段・Select All Rows（ROW-32・34〜38・REP-36・OBJ-16〜18・SET-10・11）・How to Use の作者の文面（PNL-17）・スレッド安全の試験（LIFE-08b）・検索形式の記憶（LIFE-07）はこの基準で書いた。
 ソースのクラス名・ファイル名・フォルダー名も **KFC**（2026-10-04 に旧名 KBS から改名・`chore/2026-10-04-kfc-rename`）。古いノート・memory の `KBS` は `KFC` と読み替える。

@@ -9,7 +9,7 @@
 
 ## 1. 何で、どう置換するか
 
-- **REP-01** 一覧から書くのは、**行の Replace（右クリックのメニュー／行を選んで Return キー）で選んだ1行だけ**。書く文字は本体の「検索と置換」の置換側
+- **REP-01** 一覧から書くのは、**行の Replace（右クリックのメニュー／行を選んで Return キー）で選んだ行だけ**（1.4.0 から、まとめて選んだ何行か＝REP-36。それまでは1行だけ）。書く文字は本体の「検索と置換」の置換側
   （置換文字列／字形タブなら置換字形／文字種変換タブなら置換後の文字種）。
   置換文字列が**空なら一致を消す**（空でも灰色にしない＝空は「消して」という正しい頼み）。
   - 訂正:
@@ -129,7 +129,7 @@
 
 ## 6. 行の Replace
 
-- **REP-25** **ヒットの行の Replace**＝その1行を、**確認なしで**置換する（★2026-09-27 の決定）。1回が取り消しの1段。
+- **REP-25** **ヒットの行の Replace**＝その1行を、**確認なしで**置換する（★2026-09-27 の決定）。1回が取り消しの1段。（まとめて選んだ行の1つなら、選んだ行すべて＝REP-36。）
   一覧は**作業リストのまま**（報告にならない）。置換した行は書いた文字を見せ、ほかの行は文字の今の位置へ移る。
   置換できない行（置換済み・ロック・検索の一致でない）では灰色。
   - 訂正:
@@ -159,6 +159,7 @@
 
 - **REP-32** ★**行を選んで Return キー**（テンキーの Enter も）でも、その行を置換する（2026-10-06・F17＝矢印キーで行を歩き、合っている所で Return＝キーボードだけで置換できる）。
   右クリックの Replace と同じ口（同じ確かめ・同じ文）。Ctrl・Alt を押しながらの Return・ストーリー／文書／本の行の Return・置換済みの行の Return では何もしない（Shift を押しながらの Return は REP-32b）。
+  1.4.0 から、ヒットの行を何行か選んでいれば、その全部を置換する（REP-36。選んだ行のどれも置換できなければ何もしない）。
   ダブルクリックでキーボードが本文に移っているときの Return は本文に改行を打つ（KFC は何もしない）。章を開いて書いたときも、キーボードはツリーに戻る。
   ★**Return で置換した後もキーボードはツリーに残る**＝続けて矢印で歩き、また Return で置換できる（2026-10-07・作者が見つけた不具合の直し＝それまでは Return の後に InDesign 自身がキーボードを文書へ返し、次の矢印が**レイアウトで選んでいるページアイテムを動かしていた**。右クリックの Replace では起きなかった）。KFC がツリーにキーボードがある間だけ Return を先に受け取り、InDesign のパネルの「Return で文書へ戻る」まで届かせない（`IEventDispatcher` に載せる小さな受け手）。
   - 訂正:
@@ -168,6 +169,7 @@
   書けなかったとき（断られた・巻き戻った）は動かない（理由をメッセージ欄で読めるように）。下に置換できる行が無ければ、置換した行に留まり、メッセージ欄の文の後ろに ` No row below can be replaced.` を付ける。
   「下」は木の上から下の順で、木を作っている階層の口（`ITreeViewHierarchyAdapter`）でたどる（結果のモデルの数え方ではたどらない＝木に無い行へは行かない）。
   Return（REP-32）は今のまま＝置換して、その行に留まる。検索の結果の文の最後の案内（FIND-34）にも、2026-10-09 から Shift+Return を書く（作者の依頼）。回帰＝`ret-shift`／`ret-shift-walk`／`ret-shift-skip`／`ret-shift-refused`／`ret-shift-book-closed`。
+  何行か選んでいれば、その全部を置換して（REP-36）、選んだ行の**一番下の行**から次の置換できる行へ進む（進んだ先の1行だけが選ばれる）。（1.4.0）
   ★**押したまま（キーの自動反復）では1回だけ**（2026-10-09・ヘッダーの読み直し52の提案の案 A・作者の承認）＝反復のキーは受け取って、置換も移動もしない（それまでは反復のたびに置換して次へ進み、1秒押すと十数行が書かれる見込みだった）。Return も Shift+Return も同じ。たくさんを一度に書くのは Change All。アプリケーションバーの検索欄も、押したままの Return は1回だけ。回帰＝`ret-shift-held`（押し下げ3回で1行だけ）／`ret-shift-held-armed`（テスト用ビルドの故障スイッチ `return-repeat` で検査を外すと、何行も書かれる＝検査が効いていることの証拠）。
   - 訂正:
 
@@ -197,6 +199,33 @@
   歩き直すときの範囲の端＝ストーリーが記録した版のままなら記録した位置、変わっていればフォーカス（編集に付いてくる）から、**端のすぐ外の8文字が同じに読める一番近い所**（取り消しで古くなったフォーカスも、端のちょうどに打った文字も、これで正しい所に戻る）。
   断る＝範囲が離れたかたまり（2行以上にまたがる表のセルの選択）`... the searched part cannot be searched again on its own (separate stretches) - search again.`（2026-10-09 の最終検査で縮めた＝前の文は約190字で「search again」が切れた）／端のすぐ外の文字が書き換えられた `... the text at the edge of the searched part of this story has changed - search again.`。回帰＝`sr-toend-*`・`sr-selection-*`・`sr-table-*`。
   KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。文は `Searched this story again: N match(es).`。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`sr-*`。
+  - 訂正:
+
+## 8. まとめて選んだ行の置換と、文書の探し直し（1.4.0）
+
+- **REP-36** ★**まとめて選んだ行は、まとめて置換する**（2026-10-10 作者の決定＝物の行・文字の行の順に。同じ日の夜にどの文書の行でもになった＝Change Checked の、チェックした行の置換を、選ぶ操作で作り直したもの）――
+  何行か選んで（ROW-34〜38）**Return**（REP-32）か、選んだ行の1つの**右クリックの Replace**（ROW-32）。Shift+Return は全部を置換してから下へ進む（REP-32b）。確認は出さない。
+  ★**取り消しの1段**（`置換`／`Replace`）。**文書が何個にまたがっても1段**＝どの文書で Ctrl+Z しても全部の文書が戻り、やり直しで全部書き直す（Change Checked と同じ作り＝文書をまたぐ段1つ。2026-10-10 夜〜10-11 未明の作者の決定・`5a2ef2a`）。一覧はそれに付いてくる（UNDO-02）。
+  **文字の行**＝灰色の行（置換済み・Missing・ロック・本体が断った）は書かずに理由ごとに数え、残りは**全部か無しか**（1行のときと同じ確かめ＝REP-13 を全部の行に。1行でも変わっていれば何も書かずに断り、書いた後で1行でも書けなければ段ごと戻す）。
+  断りの文は「a selected row」で言う（例 `Replace: the text of a selected row has changed since the search (edited, or undone) - search again.`・`Replace: a selected row's story has changed since the search - right-click the story row: Search This Story Again.`）。
+  **物の行**＝1つの文書を本体のオブジェクトの検索で1回歩き、着いた物から書く。書けない行は理由ごとに数えて残し、書けた行は書く（全部か無しかではない）。本体がエラーで止まったら段ごと戻す（`Replace: InDesign's replace stopped with an error - nothing was changed.`）。最後に選んだ行の物を選んだままにする（OBJ-10 ⑨）。
+  結果の文 ――
+  文字の行 `Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1.`／残した行があれば `Replaced 2 of 3 rows: ID:262 #1, ID:262 #3. Left as they were: 1 locked.`（数える語＝`already replaced`／`missing`／`locked`／`refused`・この順に1つ＝2026-10-10 の作者の決定 D-5＝灰色の行を行の状態ごとに数える・`docs/ai-notes/kfc140-diff-cleanup-2026-10-10.md`）／
+  文書をまたげば `Replaced 3 rows in 2 documents: a.indd ID:262 #1, ID:262 #3; b.indd ID:270 #1.`／
+  物の行 `Replaced 3 objects: ID:259, ID:260, ID:261.`・`Replaced 3 of 5 objects: ... Left as they were: 1 locked, 1 changed since the search.`・`Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12.`。
+  名前を挙げるのは8行（8個）までで、それより多ければ `, ...`。書いた文書のどれかが窓の無い利用者の文書なら、後ろに ` A document written has no window - still hidden.`（1つの文書なら ` The document has no window - still hidden.`＝REP-24）。
+  選んだ行のどれも置換できなければ Replace は灰色・Return は何もしない（ROW-32）。回帰＝`ms-cases.tsv`・`sel-cases.tsv`・`ov-cases.tsv`。（1.4.0）
+  - 訂正:
+
+- **REP-37** ★**Search This Document Again**（文書の行の右クリック・2026-10-10 作者の依頼＝ブックなど複数の文書の検索で、Object タブもほかのタブの検索も）＝**その文書を、検索のときの条件で丸ごともう一度歩き**、その文書の行を作り直し、ストーリーの版を覚え直す
+  ―― 検索の後で直した文書でも、その行の Replace がまた書ける。Search This Story Again（REP-35）の文書版。
+  使えるのは**文書を丸ごと探した検索**（ブックの章・All Documents の文書・「検索:」ドキュメント）だけ。Object タブの検索でも（本体のオブジェクトの検索で歩き直す・利用者の選択は戻す＝OBJ-06）。
+  その文書の置換済みの行は消え（検索がもう見つけないため）、ほかの文書の行と、その状態はそのまま。一致が0件になっても文書の行は `(0/0)` で残る（ROW-07）。一覧の行の数の上限（300）はそのまま（入りきらなければ文で言う）。
+  進捗バー（Cancel つき）を出す＝その間は検索と同じく、ほかの実行を断る（GEN-33）。KFC が検索の後で閉じた章は、窓なしで開いて歩き、閉じて返す。
+  断る（一覧はそのまま）＝実行中／検索が文書の一部だった `Search This Document Again: the search was over part of the document (Search: Story) - search again.`（`To End of Story`・`Selection` も）／
+  検索と置換の設定が変わった `Search This Document Again: the Find/Change settings have changed since the search - search again.`／開けない `...: the document of this row could not be opened.`／
+  Cancel `...: cancelled - the document's rows are left as they were.`／本体の検索がエラーで止まった `...: InDesign's search stopped with an error - the document's rows are left as they were.`。
+  文は `Searched this document again: N match(es).`（上限に当たれば ` The list's limit of rows was reached - its other matches are not listed.`）。行の並びが変わるので、それより前の KFC の書き込みの取り消しは一覧が追わなくなる（UNDO-14）。回帰＝`dr-cases.tsv`。（1.4.0）
   - 訂正:
 
 ---
