@@ -339,7 +339,8 @@ namespace KFCResultModel
 	/** Application-shutdown cleanup: release the vectors' storage, no UI. */
 	void ShutdownCleanup();
 
-	/** The number of chapters that hold a hit (uncapped; every chapter with >=1 hit). */
+	/** The number of chapters in the model (uncapped) - a chapter CloseChapter emptied, and one searched again with no
+	    match (Chapter::shownEmpty), included: indexes run 0 .. this - 1. (What the tree shows: GetDisplayChapterCount.) */
 	int32 GetChapterCount();
 
 	/** The number of hits under chapter 'chapterIdx' (uncapped, the full stored count). */
@@ -654,7 +655,7 @@ namespace KFCResultModel
 
 	    THE one definition, called where the document's text is shown: the panel's cell
 	    (KFCColorTextView - where it draws, and where it measures), a story row's first words
-	    (BuildFontGroups) and the "Preview Text:" line (KFCResultListWidgetMgr). A match is carried
+	    (GetFontDisplay) and the "Preview Text:" line (KFCResultListWidgetMgr). A match is carried
 	    WHOLE however many paragraphs it spans, and a raw break draws with no width - the paragraphs
 	    either side of it run together and read as one piece of text - so it has to be marked.
 

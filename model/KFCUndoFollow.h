@@ -140,18 +140,21 @@ namespace KFCUndoFollow
 
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
 	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
-	    write - a write left with none is dropped, as one of a closed document always was - and its chapter is
-	    emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
-	    documents; every write of rows is one document's) puts back the other documents' rows and not this
-	    one's. Without it the whole write would be dropped at the next follow (a document of it no longer
-	    open), and an Undo in the documents still open would go unfollowed.
+	    write - a write left with none is dropped, as one of a closed document always was; a write of rows of
+	    several documents (rows selected together - 1.4.0) keeps the others' and lets this one's rows go - and its
+	    chapter is emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
+	    documents) puts back the other documents' rows and not this one's. Without it the whole write would be
+	    dropped at the next follow (a document of it no longer open), and an Undo in the documents still open
+	    would go unfollowed.
 	    Called by KFCCloseDocResponder, before the document goes (its UIDRef is still good). */
 	void ForgetDocument(const UIDRef& docRef);
 
 	/** A CHAPTER OF A BOOK'S LIST IS CLOSING. A book's rows stay when a chapter closes (KFCCloseDocResponder),
-	    so its chapter is not emptied as ForgetDocument's is: the writes of rows in it go (its history goes with
-	    it), its stories come off every write of a whole result set (a query run) - which is then still followed
-	    in the chapters left open (an Undo there goes through: the same as All Documents) - and a kept whole
+	    so its chapter is not emptied as ForgetDocument's is: the writes of rows in it alone go (its history goes
+	    with it); a write of rows of several chapters (rows selected together - 1.4.0) is still followed in the
+	    others and lets this chapter's rows go, so an Undo there does not put back rows its file does not read as
+	    (2026-10-11); its stories come off every write of a whole result set (a query run) - which is then still
+	    followed in the chapters left open (an Undo there goes through: the same as All Documents) - and a kept whole
 	    result set holding it marks it FROZEN where that write, or one after it, wrote the chapter: when that set
 	    is put back, the chapter keeps the rows the panel has for it at that moment, since nothing an Undo in
 	    another chapter does reaches its file. A chapter nothing wrote is put back with the set, as its file reads

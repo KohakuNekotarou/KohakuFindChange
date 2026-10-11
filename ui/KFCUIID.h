@@ -260,8 +260,9 @@ DECLARE_PMID(kActionIDSpace, kKFCRememberBookPanelActionID, kKFCUIPrefix + 24)
 //DECLARE_PMID(kActionIDSpace, kKFCAcceptAllChangesActionID, kKFCUIPrefix + 27)
 // RETIRED (not reused): the rule between Change Checked and the two scans, gone with them.
 //DECLARE_PMID(kActionIDSpace, kKFCSeparator5ActionID, kKFCPrefix + 28)
-// "Replace" on a hit row's right-click menu (the author's call): replaces that one row, with no prompt;
-// the list stays a work list (KFCReplaceEngine::ReplaceHit).
+// "Replace" on a hit row's right-click menu (the author's call): replaces that row - or, when it is one of rows
+// selected together, all of them (1.4.0, O18) - with no prompt; the list stays a work list (KFCReplaceEngine::ReplaceHit
+// / ReplaceHits).
 DECLARE_PMID(kActionIDSpace, kKFCReplaceHitActionID, kKFCUIPrefix + 29)
 // A STORY row's right-click menu was Replace (its ticked rows), Check All, Uncheck All.
 //DECLARE_PMID(kActionIDSpace, kKFCStoryReplaceActionID, kKFCUIPrefix + 30)	// retired (Change Checked - spec F16) - never reuse
@@ -470,7 +471,8 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 #define kKFCPanelMenuActionAreaValue	"Palette Menus:Kohaku Find/Change"
 #define kKFCTargetMenuPath kKFCInternalPopupMenuNameKey
 
-// The HIT rows' right-click menu (Replace, about that one row): the popup's internal name.
+// The HIT rows' right-click menu (Replace - that row, or the rows selected together it is one of): the popup's internal
+// name.
 // KFCResultNodeEH::RButtonDn pops the MenuDef subtree of this name at the cursor with
 // IMenuManager::HandlePopupMenu - the same machinery as the real Links / Layers panel row menus, and
 // as KESCL's report rows (kKESCLReportRowMenuName). The root name is never displayed, so it is a

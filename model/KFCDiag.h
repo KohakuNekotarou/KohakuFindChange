@@ -24,8 +24,9 @@
 //  AND FAULT SWITCHES. KFC_DIAG_FAULT("name") is true while
 //  the file %TEMP%\kbs-diag-fault-<name> exists - a test creates it and deletes it again - so a test build can
 //  reach a state the product only gets into after something ELSE has failed (a window that would not open).
-//  Asked at each call, so the switch takes effect at once. In a build without KFC_DIAG it is the constant false;
-//  every use sits inside #ifdef KFC_DIAG all the same, so no name of a switch reaches a shipping .pln.
+//  Asked at each call, so the switch takes effect at once. In a build without KFC_DIAG it is the constant false, and
+//  the macro drops its argument with it - so no name of a switch reaches a shipping .pln, inside #ifdef KFC_DIAG or not
+//  (most uses sit inside one; KFCObjectReplace.cpp's object-walk-miss does not need to).
 //    keep-held   KFCBookScope::HandBackHeldDocNow keeps a held chapter instead of closing it
 //                (work\kbs-regress\cases\fault-keep-held-on.jsx / -off.jsx)
 //    fcmin-decoy (UI half) the file holds a window handle in hex; ui/KFCFindChangeMinimize.cpp reads it
@@ -85,6 +86,8 @@
 //                - each one a write: the case that shows what taking the repeat stops (ret-shift-held-armed)
 //    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
+//    qd-order-file  (UI half) the file's first line is the file Save Order... and Load Order... use, in place of
+//                Windows' own dialogs, which a test cannot press (ui/KFCQueryOrderFile.cpp; KFCDiagFaultText below)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

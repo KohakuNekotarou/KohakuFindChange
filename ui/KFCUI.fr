@@ -244,9 +244,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Result tree row: the node boss carries the click handler that jumps to a hit.
-	 * Shared by the chapter and hit row resources; the handler tells them apart by the node index
-	 * (only hit rows jump).
+	 * Result tree row: the node boss carries the click handler - a hit row jumps to its match, a branch row
+	 * brings its document or book forward - and the right-click menus.
+	 * Shared by the branch and hit row resources; the handler tells them apart by the node.
 	 */
 	Class
 	{
@@ -653,8 +653,8 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kSDKDefIsNotDynamicMenuFlag,
 
 		// ----- A hit row's right-click menu -----
-		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row alone with no
-		// prompt.
+		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row - or the rows selected
+		// together, when it is one of them (1.4.0) - with no prompt.
 		kKFCReplaceHitActionID,
 		kKFCResultHitMenuName
 		kKFCReplaceHitMenuItemPosition,
@@ -1268,8 +1268,8 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		),
 
 		// Result tree: the result rows, filling the rest of the panel and bound to all four
-		// edges so it grows with the window. Root hidden, single selection, vertical scroll bar
-		// only; scroll increments = one 19px row.
+		// edges so it grows with the window. Root hidden, multiple selection (1.4.0 - below), vertical
+		// scroll bar only; scroll increments = one 19px row.
 		KFCResultListWidget
 		(
 			kKFCResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
@@ -1301,9 +1301,9 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 };
 
 /*
- * One BRANCH row of the result tree - book, document, run and story alike - created at runtime by
+ * One BRANCH row of the result tree - book, document and story alike - created at runtime by
  * KFCResultListWidgetMgr for every node that is not a hit: a stock expander arrow (hidden by the
- * widget manager on a childless row) and the "<name>  (N)" label after the expander's zone. The widget manager
+ * widget manager on a childless row) and the "<name>  (R/N)" label after the expander's zone. The widget manager
  * owns the runtime layout; these frames are only the default state.
  */
 resource KFCResultNodeWidget(kKFCResultChapterNodeWidgetRsrcID + index_enUS)

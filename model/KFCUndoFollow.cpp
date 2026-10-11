@@ -200,6 +200,26 @@ void DropOtherResultSets()
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 }
 
+// A CLOSING CHAPTER'S ROWS OFF A KEPT WRITE OF ROWS (2026-10-11 - the pre-Exchange re-check, D6b-1). Since 1.4.0 a write of
+// rows can be several documents' (rows selected together, one undo step - KFCReplaceEngine::ReplaceRowsNow,
+// KFCObjectReplace::ReplaceRows). When one of them closes, the write is still followed in the others, and an Undo or a
+// Redo there takes back or does again their part alone (measured: the case sel-book-close-undo - chapter 1 saved and
+// closed, Ctrl+Z in chapter 2 put chapter 2's text back and left chapter 1's file as written). Put back with them, the
+// closed chapter's rows said it held the text before the Replace while its file held the text after it - so its rows and
+// its recorded versions leave the write, and they stay as the panel has them.
+void DropChapterRows(Step& step, int32 chapterIdx)
+{
+	KFCResultModel::RowStep& rows = step.rows;
+	const auto rowOf = [chapterIdx](const KFCResultModel::RowCopy& r) { return r.chapter == chapterIdx; };
+	const auto versionOf = [chapterIdx](const KFCResultModel::VersionCopy& v) { return v.chapter == chapterIdx; };
+	rows.before.erase(std::remove_if(rows.before.begin(), rows.before.end(), rowOf), rows.before.end());
+	rows.after.erase(std::remove_if(rows.after.begin(), rows.after.end(), rowOf), rows.after.end());
+	rows.versionsBefore.erase(std::remove_if(rows.versionsBefore.begin(), rows.versionsBefore.end(), versionOf),
+		rows.versionsBefore.end());
+	rows.versionsAfter.erase(std::remove_if(rows.versionsAfter.begin(), rows.versionsAfter.end(), versionOf),
+		rows.versionsAfter.end());
+}
+
 // Do the two writes share a document? (InDesign keeps one history per document, so two that do are
 // taken back and done again in order; two that do not, in any order.)
 // A WRITE OF A WHOLE RESULT SET SHARES WITH EVERY WRITE. What a query run's step puts back is the WHOLE result
@@ -872,6 +892,16 @@ void KFCUndoFollow::DocumentClosing(const UIDRef& docRef)
 
 void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 {
+	// Its chapter in the list - by its binding, as the close responder finds it (KFCCloseDocResponder).
+	int32 closing = -1;
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount() && closing < 0; ++c)
+	{
+		UIDRef chapterDoc;
+		IDFile chapterFile;
+		if (KFCResultModel::GetChapterLocation(c, chapterDoc, chapterFile) && chapterDoc == docRef)
+			closing = c;
+	}
+	const uint32 current = KFCResultModel::GetResultSetId();
 	for (size_t i = gSteps.size(); i-- > 0; )
 	{
 		Step& step = gSteps[i];
@@ -882,8 +912,9 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 				if (sets[s]->chapters[c].docRef == docRef)
 					KFCResultModel::EmptyChapter(sets[s]->chapters[c]);
-		// Its stories. A write of rows is one document's, so one of this document goes whole (and its rows
-		// with it); a query run keeps the stories of the documents still open.
+		// Its stories. A write of rows of this document alone goes whole (and its rows with it); one of several documents
+		// (rows selected together - 1.4.0) keeps the others' stories and lets this one's rows go (DropChapterRows); a query
+		// run keeps the stories of the documents still open.
 		std::vector<StoryMoved>& stories = step.stories;
 		for (size_t k = stories.size(); k-- > 0; )
 			if (stories[k].doc == docRef)
@@ -895,6 +926,8 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 				items.erase(items.begin() + static_cast<std::ptrdiff_t>(k));
 		if (stories.empty() && items.empty())
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
+		else if (!step.whole && closing >= 0 && step.resultSet == current)	// (row indices name the current list's rows only)
+			DropChapterRows(step, closing);
 	}
 }
 
@@ -950,7 +983,20 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 					frozen[s]->push_back(c);
 			}
 	}
-	// ...then its stories come off every write; a write of rows is one document's, so one of this chapter goes whole.
+	// The chapter in the list, found by its file the same way (its binding can be a document closed and opened again since).
+	std::vector<int32> closing;
+	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
+	{
+		UIDRef chapterDoc;
+		IDFile chapterFile;
+		if (!KFCResultModel::GetChapterLocation(c, chapterDoc, chapterFile))
+			continue;
+		UIDRef found = chapterDoc;
+		if (KFCBookScope::FindOpenChapterDoc(chapterFile, found) && found.GetDataBase() == db)
+			closing.push_back(c);
+	}
+	// ...then its stories come off every write. A write of rows of this chapter alone goes whole; one of several chapters
+	// (rows selected together - 1.4.0) keeps the others' stories and lets this chapter's rows go (DropChapterRows).
 	for (size_t i = gSteps.size(); i-- > 0; )
 	{
 		std::vector<StoryMoved>& stories = gSteps[i].stories;
@@ -963,6 +1009,9 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 				items.erase(items.begin() + static_cast<std::ptrdiff_t>(k));
 		if (stories.empty() && items.empty())
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
+		else if (!gSteps[i].whole)
+			for (size_t c = 0; c < closing.size(); ++c)
+				DropChapterRows(gSteps[i], closing[c]);
 	}
 	KFC_DIAG_STEPS("chapter closing");
 }

@@ -146,7 +146,7 @@ bool IsFrameHidden(IDataBase* db, UID frameUID)
 
 // Is this frame on a LOCKED layer? Same two-step as the hidden test above (spread layer -> the
 // document layer that carries the switch), asked so the replace can leave such a match alone.
-// A frame that resolves to no layer reads as unlocked - see IsFrameEditable in the header on why
+// A frame that resolves to no layer reads as unlocked - see IsFrameEditable in KFCSearchEngine.h on why
 // "cannot tell" must not turn into a refusal.
 bool IsFrameOnLockedLayer(IDataBase* db, UID frameUID)
 {

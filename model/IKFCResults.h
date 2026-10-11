@@ -7,9 +7,9 @@
 //  IKFCResults - one of the three doors the UI half reaches the model half through (the model/UI split;
 //  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
-//  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (the
-//  boxes, the row a right-click menu was popped over, where a jump found a row). Each method is the
-//  KFCResultModel function of the same name; the contract is written there.
+//  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (the row a
+//  right-click menu was popped over, and what a jump learns of a row - its document rebound, its outcome).
+//  Each method is the KFCResultModel function of the same name; the contract is written there.
 //
 //  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
 //  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is

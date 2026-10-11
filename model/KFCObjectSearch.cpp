@@ -309,6 +309,10 @@ bool PrintObject(IDataBase* db, UID uid, Print& print)
 		persist->SaveAll(stream, kFalse);
 		stream->Flush();
 	}
+	// A buffer that could not grow (KFCMemXferBytes::Write) holds part of the item: no fingerprint, rather than a print of
+	// that part - a door then refuses the row as it refuses any item it cannot read (KFCObjectReplace's CheckItem).
+	if (bytes.GetStreamState() == kStreamStateFailure)
+		return false;
 	if (bytes.GetData() != nil)
 		print.Add(bytes.GetData(), bytes.GetSize());
 	return true;
