@@ -94,7 +94,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	if (signalMgr == nil)
 		return;
 
-	// The main thread only (kModelPlugIn - the split's design, section 6). A model plug-in's
+	// The main thread only (kModelPlugIn - docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 6).
+	// A model plug-in's
 	// responder is also called on a background task's thread, where the document "closing" is the task's
 	// own copy (an export's clone) - and the results are about the user's document, which stays open.
 	// (A test build says when the gate turned one away - the thread test counts them: a test that never saw one has
@@ -219,9 +220,9 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KFCUndoFollow::ForgetDocument(closingDocRef);
 		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
-		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit - spec
-		// F9: the panel draws every row a list holds, so this rebuild is not reached now - kept for a cap that ever
-		// differs again.)
+		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit -
+		// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9: the panel draws every row a
+		// list holds, so this rebuild is not reached now - kept for a cap that ever differs again.)
 		const bool overCap = KFCResultModel::GetTotalHitCount() > KFCResultModel::kKFCDisplayHitLimit;
 		if (!overCap)
 			KFCNotifyChapterRowGoes(closingChapter);

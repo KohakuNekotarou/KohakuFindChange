@@ -300,8 +300,8 @@ void KFCBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	if (theChange != kCloseBookCmdBoss)
 		return;
 
-	// The main thread only (kModelPlugIn - the split's design, section 6): the results and the
-	// timer below are the session's, and a background task's thread has no business with either.
+	// The main thread only (kModelPlugIn - docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 6):
+	// the results and the timer below are the session's, and a background task's thread has no business with either.
 	if (!IDThreading::IsMainThreadDomain())
 		return;
 

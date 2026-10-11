@@ -27,9 +27,9 @@
 //
 //    * the panel's actions (KFCActionComponent, the UI half - through IKFCRuns): UpdateActionStates
 //      greys everything out, and RefusedWhileRunning turns away a command that arrives anyway;
-//    * each run's own front door (KFCSearchEngine, KFCReplaceEngine, KFCQuerySequence), for a caller
-//      that never went through the menu - a script firing an action by ID reaches the engine
-//      whatever the menu says;
+//    * each engine's own front door (KFCSearchEngine, KFCReplaceEngine, KFCChangeAll - Clear Results
+//      too - and KFCQuerySequence), for a caller that never went through the menu - a script firing an
+//      action by ID reaches the engine whatever the menu says;
 //    * the book-close watcher (KFCBookWatch, twice: the deferred callback, and the question it asks -
 //      which the no-timer fallback asks directly), whose question would otherwise release the
 //      chapters a run is walking;
@@ -39,7 +39,9 @@
 //      run (it binds them itself);
 //    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run;
 //    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
-//      which would otherwise load a query into Find/Change while a query run is putting its own there.
+//      which would otherwise load a query into Find/Change while a query run is putting its own there;
+//    * a test build's hidden-document check (KFCDiagHiddenDocs, the UI half), which leaves the chapter a
+//      run is walking to the run.
 //
 //  A run added later is one line in KFCRunGuard.cpp rather than a fault nobody notices in the callers.
 //

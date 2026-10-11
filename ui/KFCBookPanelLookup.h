@@ -31,8 +31,8 @@ namespace KFCBookPanelLookup
 	    the session can already be gone. */
 	IPanelMgr* QueryPanelManager();
 
-	/** THE ONE WALK OF THE BOOK PANELS - GetPanelBookFile, BringBookTabForward and KFCBookPanelPlacement
-	    all go through it rather than writing the loop out. Every panel registered with
+	/** THE ONE WALK OF THE BOOK PANELS - GetPanelBookFile, BringBookTabForward, GetPanelBookSelection and
+	    KFCBookPanelPlacement all go through it rather than writing the loop out. Every panel registered with
 	    panelMgr that is one of InDesign's book panels (IsBookPanel), in the manager's order, is handed to
 	    `visit` with its WidgetID, until `visit` answers true. InDesign makes one book panel per open book
 	    and registers each with IPanelMgr, and the WidgetID is numbered per book at run time - so walking

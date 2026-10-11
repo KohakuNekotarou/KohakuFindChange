@@ -544,7 +544,7 @@ bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 	// kProcess closes NOW; kSchedule closes when the caller has finished. A run asks for the first
 	// (see the header): a scheduled close does not happen until the current tick unwinds, and a run
 	// is that tick - so every chapter it "handed back" would still be open, and still locking its
-	// .indd, until the whole run was over (measured on a four-chapter saving replace).
+	// .indd, until the whole run was over (measured - the header says how).
 	//
 	// AND kProcess IS ONLY LEGAL BECAUSE THE WINDOW TEST ABOVE HAS ALREADY RUN. Closing
 	// a document that HAS a window with kProcess is called out as an error by the only Close
@@ -567,7 +567,7 @@ void KFCBookScope::ReleaseSearchedBook()
 	// is "is OUR book still open" - would have no book left to ask about, and they would keep their
 	// .indd files locked for the rest of the session.
 	//
-	// This covers the second of the two cases KFCBookWatch's header names (a book run followed by a
+	// This covers the second of the two cases KFCBookWatch.cpp's file header names (a book run followed by a
 	// DOCUMENT-scope run), at the moment the results are dropped, rather than leaving it for a book
 	// close that may never come.
 	ReleaseHeldDocs();
@@ -923,10 +923,9 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 	if (docList == nil)
 		return;
 
-	// THE SEARCHED BOOK'S CHAPTERS ONLY (the author's call of 2026-10-08 - until then every clean window went, the 09-26
-	// decision R-2). A document outside that book - the reference the user keeps open beside it, a chapter saved under
-	// another name - is no previous chapter, whatever the jump. A chapter the user opened is one (the 2026-07-18 decision
-	// stands). Each document is matched to the chapters as a FILE (KFCDocumentLivesInFile - a conversion of an older
+	// THE SEARCHED BOOK'S CHAPTERS ONLY (the author's call - every clean window used to go). A document outside that
+	// book - the reference the user keeps open beside it, a chapter saved under another name - is no previous chapter,
+	// whatever the jump. A chapter the user opened is one, as it always was. Each document is matched to the chapters as a FILE (KFCDocumentLivesInFile - a conversion of an older
 	// InDesign's chapter included, the same match a run reuses an open chapter by). No book open by that path: nothing is
 	// a previous chapter, and nothing is closed.
 	SysFileList chapterFiles;
@@ -959,7 +958,7 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		//
 		// THE UNTITLED DOCUMENT. This loop walks EVERY open document, so it meets the one kind that has never
 		// been saved at all: the untitled document the user just made. Since the sweep took the book's chapters
-		// only (2026-10-08) it stops at the chapter test above - it has no file to be a chapter by - but this test
+		// only, it stops at the chapter test above - it has no file to be a chapter by - but this test
 		// was the one that kept it until then, and stays the one that says so: IsModified() reads it as clean,
 		// and asked that way this would close it without a prompt (measured) - hence the shared question is
 		// IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
@@ -999,8 +998,8 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		// against. There, a chapter whose close was refused would fall off the one list that could
 		// ever hand it back and sit windowless with its .indd locked; here
 		// a refusal leaves a document the user can see and close themselves. (KESCL's sweep takes the
-		// OPPOSITE order - handler and CanClose first, KESCLBookScope.cpp:272-278 - because it can take
-		// windowless documents as well; this one cannot.)
+		// OPPOSITE order - handler and CanClose first, KESCLBookScope.cpp's CloseDocsIfCleanImpl - because it
+		// can take windowless documents as well; this one cannot.)
 		KFCBookScope::ForgetHeldDoc(toClose[i]);
 
 		InterfacePtr<IDocFileHandler> docFileHandler(Utils<IDocumentUtils>()->QueryDocFileHandler(toClose[i]));
