@@ -16,7 +16,7 @@
 #include "IDataBase.h"
 #include "IDocument.h"
 #include "IDocumentList.h"
-#include "IFindChangeOptions.h"		// kObjectSearch - an Object query (1.4.0)
+#include "IFindChangeOptions.h"		// kObjectSearch - an Object query
 #include "IWalkerScopeFactoryUtils.h"	// kDocumentScope - a book or All Documents writes each document whole
 
 // General includes:
@@ -38,8 +38,8 @@
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCID.h"				// kKFCRunQueriesStepKey
 #include "KFCLoc.h"
-#include "KFCObjectReplace.h"	// ReplaceAllInDoc - an Object query's write, a document at a time (1.4.0)
-#include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front (1.4.0)
+#include "KFCObjectReplace.h"	// ReplaceAllInDoc - an Object query's write, a document at a time
+#include "KFCObjectSearch.h"	// HasChangeObjectFormat, the shared walker aimed back at the front
 #include "KFCProgressBar.h"		// the run's one bar - the UI half's, asked for through IKFCUIServices
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"
@@ -58,10 +58,10 @@ struct RunningFlagGuard
 	~RunningFlagGuard()	{ gRunning = false; }
 };
 
-// EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the spec's D7 - FindChangeByList.jsx empties the strings and the formats
-// after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on a live run
-// (docs/ai-notes/kfc-query-sequence-engine-2026-10-04.md, M2): the four strings (Text and GREP, find and change) come
-// back empty, and the dialog's Query box reads [Custom]. Outside the run's sequence: a Ctrl+Z of the run must not
+// EDIT > FIND/CHANGE EMPTIED AFTER THE RUN (the query-sequence spec's D7 - FindChangeByList.jsx empties the strings
+// and the formats after every query). kClearFindChangeOptionsCmdBoss (TextWalkerServiceProviderID.h:109) - measured on
+// a live run (docs/ai-notes/kfc-query-sequence-engine-2026-10-04.md, M2): the four strings (Text and GREP, find and
+// change) come back empty, and the dialog's Query box reads [Custom]. Outside the run's sequence: a Ctrl+Z of the run must not
 // bring the last query back.
 void ClearFindChange()
 {
@@ -233,12 +233,12 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	}
 	recorder.ReadStories(targets);
 
-	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the spec's D5).
+	// ===== ONE SEQUENCE AROUND EVERY QUERY (one Ctrl+Z - the query-sequence spec's D5).
 	std::vector<int32> perQuery(queries.size(), -1);
 	// The queries skipped, by the reason the message gives: nothing to find - a Colour query included (the spec map's
 	// QRY-22), and an Object query with no Find Object Format - and, apart from those, a file InDesign's query reader could
-	// not read (the final audit's D18-1, 2026-10-09: it read "nothing to find" too). Since 1.4.0 (spec O14) also an Object
-	// query on a run over part of a document, and one with nothing to change to.
+	// not read (it read "nothing to find" too). And (O14 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md)
+	// an Object query on a run over part of a document, and one with nothing to change to.
 	std::vector<PMString> skippedNothing;
 	std::vector<PMString> skippedUnread;
 	std::vector<PMString> skippedPart;		// an Object query on a run over part of a document
@@ -293,7 +293,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 				runBar.SetPosition(unit);
 				continue;
 			}
-			// AN OBJECT QUERY (1.4.0, spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
+			// AN OBJECT QUERY (spec O14) writes WHOLE DOCUMENTS with InDesign's object Change All: the object walker has
 			// no story, and a text Selection names no page item - so on a run over part of the front document it is skipped
 			// and said; and one with nothing to change to is skipped as Change All in Book refuses it.
 			const bool objectQuery = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
@@ -426,7 +426,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	seq = nil;
 	if (objectRan)
 		KFCObjectSearch::AimSharedWalkerAtFront();		// O7 - the walker named the run's documents
-	ClearFindChange();		// outside the sequence (the spec's section 5)
+	ClearFindChange();		// outside the sequence (the query-sequence spec's section 5)
 
 	if (cancelled || failed)
 	{
@@ -467,15 +467,15 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			unclosed.push_back(targets[i].shortName);
 	}
 
-	// ===== NO LIST (F7 - the spec's section 5: the panel is left EMPTY). No header either: a book's row would read "(0)"
-	// over a run that wrote hundreds. NoteRun keeps the panel's icon on "a command ran".
+	// ===== NO LIST (F7 - the no-track spec's section 5: the panel is left EMPTY). No header either: a book's row would
+	// read "(0)" over a run that wrote hundreds. NoteRun keeps the panel's icon on "a command ran".
 	KFCResultModel::Clear();
 	KFCSearchEngine::ForgetSearchedFindFormat();
 	KFCResultModel::NoteRun();
 	KFCResultModel::NoteChangeAllWrote(replaced > 0);		// the panel's pencil cat (KFCPanelIcon): each query is a Change All
 	recorder.Keep();
 
-	// ===== THE MESSAGE (the spec's section 4).
+	// ===== THE MESSAGE (the no-track spec's section 5).
 	outSummary.Append("Ran ");
 	outSummary.AppendNumber(static_cast<int32>(queries.size()));
 	outSummary.Append(queries.size() == 1 ? " query: " : " queries: ");

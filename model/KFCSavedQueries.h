@@ -8,8 +8,9 @@
 //  section 2-2). What the query dialog's left list offers, and what a path in its run order is called: the user's
 //  queries (FileUtils::GetAppRoamingDataFolder(.., "Find-Change Queries")\<kind>\*.xml) and InDesign's own
 //  (FileUtils::GetPresetsFolder(.., "Find-Change Queries\<kind>", the UI language)\*.xml - InDesign's put the language's
-//  folder UNDER the kind's). Five kinds - Text, GREP, Glyph, Object (since 1.4.0 - spec O14), Transliterate: the query run
-//  skips Color (KFCQuerySequence), so the dialog does not offer it. The one place that knows how those folders are laid out.
+//  folder UNDER the kind's). Five kinds - Text, GREP, Glyph, Object (docs/superpowers/specs/2026-10-09-kfc-object-search-design.md
+//  O14), Transliterate: the query run skips Color (KFCQuerySequence), so the dialog does not offer it. The one place that
+//  knows how those folders are laid out.
 //
 //========================================================================================
 
@@ -33,7 +34,7 @@ namespace KFCSavedQueries
 	    and whether it is there now. A path in no kind's folder answers mode -1. */
 	void Describe(const IDFile& file, KFCSavedQuery& out);
 
-	/** "Text", "GREP", "Glyph", "Object" (1.4.0), "Transliterate" - the kinds' folder names - or "?" for any other mode. */
+	/** "Text", "GREP", "Glyph", "Object", "Transliterate" - the kinds' folder names - or "?" for any other mode. */
 	const char* KindName(int32 mode);
 
 	/** Put one saved query into Edit > Find/Change, whole - its tab, strings, switches and formats - with the SDK's

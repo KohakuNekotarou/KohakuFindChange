@@ -45,8 +45,8 @@ namespace
 		int32		mode;
 	};
 
-	// The five, in the order the dialog lists them. Object since 1.4.0 (spec O14 - the run writes it with InDesign's object
-	// Change All, a document at a time). Color is not here: the query run skips it (KFCQuerySequence), so offering it would
+	// The five, in the order the dialog lists them. Object too (spec O14 - the run writes it with InDesign's object Change
+	// All, a document at a time). Color is not here: the query run skips it (KFCQuerySequence), so offering it would
 	// offer a query that does nothing.
 	const QueryKind kKinds[] =
 	{
@@ -220,7 +220,7 @@ bool KFCSavedQueries::LoadIntoFindChange(const IDFile& file)
 	const ErrorCode err = CmdUtils::ProcessCommand(cmd);
 	const ErrorCode standing = ErrorUtils::PMGetGlobalErrorCode();
 	const bool ok = (err == kSuccess && standing == kSuccess);
-	// (Test builds: what the reader answered - a broken file's answer was not measured until the final audit, 2026-10-09.)
+	// (Test builds: what the reader answered - a broken file's answer included.)
 	KFC_DIAG_LOG("QUERYLOAD err=%d standing=%d ok=%d", static_cast<int>(err), static_cast<int>(standing), ok ? 1 : 0);
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	return ok;
