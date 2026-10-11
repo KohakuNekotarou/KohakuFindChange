@@ -197,7 +197,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_ITREEVIEWHIERARCHYADAPTER, kKFCResultListAdapterImpl,
 			IID_ITREEVIEWWIDGETMGR, kKFCResultListWidgetMgrImpl,
-			/* The selection rules (1.4.0, O17): hit rows of one kind selected together, of any story, spread or
+			/* The selection rules: hit rows of one kind selected together, of any story, spread or
 			   document - the stock controller made a multiple-selection one, with KFC's rule on top
 			   (KFCResultTreeController.cpp). Persistent, as the stock one it replaces is (CREATE_PERSIST_PMINTERFACE - a
 			   non-persistent implementation over an inherited persistent one fails as the resource is read). */
@@ -206,7 +206,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			   that row's action - see KFCResultTreeEH.cpp. A book search comes up with every
 			   chapter closed, and the stock keys walk visible rows only.
 			   NOTE: this line alone does not create the handler. Implementations are made on first
-			   QueryInterface, and the one that asks is KFCResultNodeEH's key-focus hand-off. */
+			   QueryInterface, and the first to ask is a row click's key-focus hand-off (KFCResultNodeEH,
+			   through KFCResultTree::TakeKeyboard). */
 			IID_IEVENTHANDLER, kKFCResultTreeEHImpl,
 		}
 	},
@@ -512,7 +513,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		// separators' names are in the order they were added, not the order they appear in - the
 		// first one written was the rule above About, which is why it is Separator1 down at 10.0.
 
-		// --- Block 1: Find/Change - the search, then the one command that rewrites the documents ---
+		// --- Block 1: the commands - Find/Change, the search, and the two that write to the documents ---
 
 		// Open Find/Change... (the author's call): InDesign's own Find/Change dialog, opened from here -
 		// with no document open as well, where the Edit menu greys it out. Open, type the query, then search.
@@ -654,7 +655,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 
 		// ----- A hit row's right-click menu -----
 		// Popped by KFCResultNodeEH::RButtonDn over a hit row: Replace replaces that row - or the rows selected
-		// together, when it is one of them (1.4.0) - with no prompt.
+		// together, when it is one of them - with no prompt.
 		kKFCReplaceHitActionID,
 		kKFCResultHitMenuName
 		kKFCReplaceHitMenuItemPosition,
@@ -676,7 +677,7 @@ resource MenuDef (kSDKDefMenuResourceID)
 		kKFCSearchDocumentAgainMenuItemPosition,
 		kSDKDefIsNotDynamicMenuFlag,
 
-		// ----- Select All Rows: the book, document and story rows' menus (the author's call of 2026-10-11) -----
+		// ----- Select All Rows: the book, document and story rows' menus (the author's call) -----
 		// Every hit row under the row right-clicked selected, for Return to replace them all together
 		// (KFCResultTree::SelectAllRows).
 		kKFCSelectAllRowsActionID,
@@ -867,8 +868,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Change All in Book (No List). kCustomEnabling: UpdateActionStates greys it (Book Scope off - F18 -, a list on
-		// the panel, no book to run on, the Colour tab, nothing to find - on the Object tab an empty Find Object Format,
-		// 1.4.0). In the Keyboard Shortcuts editor under Palette Menus, like Find.
+		// the panel, no book to run on, the Colour tab, nothing to find - on the Object tab an empty Find Object Format).
+		// In the Keyboard Shortcuts editor under Palette Menus, like Find.
 		kKFCActionComponentBoss,
 		kKFCChangeAllActionID,
 		kKFCChangeAllMenuKey,			// "Change All in Book (No List)"
@@ -911,7 +912,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Search This Story Again - a story row's right-click menu (the author's call of 2026-10-09).
+		// Search This Story Again - a story row's right-click menu (the author's call).
 		// kCustomEnabling: UpdateActionStates greys it while no story row is stashed or a run is up.
 		kKFCActionComponentBoss,
 		kKFCSearchStoryAgainActionID,
@@ -922,7 +923,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Search This Document Again - a document row's right-click menu (the author's call of 2026-10-10).
+		// Search This Document Again - a document row's right-click menu (the author's call).
 		// kCustomEnabling: UpdateActionStates greys it while no document row is stashed or a run is up.
 		kKFCActionComponentBoss,
 		kKFCSearchDocumentAgainActionID,
@@ -933,7 +934,7 @@ resource ActionDef (kSDKDefActionResourceID)
 		kInvalidInterfaceID,
 		kSDKDefInvisibleInKBSCEditorFlag,
 
-		// Select All Rows - a book, document or story row's right-click menu (the author's call of 2026-10-11).
+		// Select All Rows - a book, document or story row's right-click menu (the author's call).
 		// kCustomEnabling: UpdateActionStates greys it while no such row is stashed or a run is up.
 		kKFCActionComponentBoss,
 		kKFCSelectAllRowsActionID,
@@ -1200,8 +1201,8 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// measure again - the rule is the remainder, not the number 48.
 		//
 		// DRAWN BY HAND (KFCStatusTextView.cpp), not a StaticMultiLineTextWidget: the stock widget
-		// cannot draw two colours in one box, and this box shows a replaced row's text as it was BEFORE
-		// the replace, where the question is "which characters were replaced". The same move KCM made
+		// cannot draw two colours in one box, and this box shows a selected GREP row's Preview Text - what
+		// its Replace would write, at full colour between the row's context faded. The same move KCM made
 		// with its own message area (kKCMStatusTextWidgetBoss). The WidgetID, the Frame, the binding and
 		// the way messages arrive (KFCResultTree::ShowStatus) are the stock widget's, so KFCPanelMetrics'
 		// 72px and the illustrations sitting on the block's bottom edge did not move.
@@ -1268,7 +1269,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		),
 
 		// Result tree: the result rows, filling the rest of the panel and bound to all four
-		// edges so it grows with the window. Root hidden, multiple selection (1.4.0 - below), vertical
+		// edges so it grows with the window. Root hidden, multiple selection (below), vertical
 		// scroll bar only; scroll increments = one 19px row.
 		KFCResultListWidget
 		(
@@ -1287,7 +1288,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCResultRowHeight,			// fVThumbScrollIncrement
 			kKFCResultRowHeight,			// fHScrollButtonIncrement (unused, no H bar)
 			kKFCResultRowHeight,			// fHThumbScrollIncrement
-			2,								// Items selectable: 2 = multiple selection (1.4.0 - hit rows together,
+			2,								// Items selectable: 2 = multiple selection (hit rows together,
 											// KFCResultTreeController.cpp, which sets the same three again)
 			kTrue,							// Allow children from multiple parents to be selected: yes - the rows of
 											// two stories or two documents (KFC's own rule keeps one kind)

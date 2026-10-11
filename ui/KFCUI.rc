@@ -34,8 +34,8 @@
 // *It affects nothing but the string Windows shows under file Properties > Details. It is here
 //  because this plug-in is submitted to Adobe Exchange, and because the SDK's own text was never
 //  meant to say that.
-// *KCM's and KIDMCP's two halves carry the same line. KESCL and KT still carry the fault - they
-//  share this template.
+// *The other Kohaku plug-ins' .rc files come from the same template: whether one carries this line is
+//  a grep for code_page away (KCM's and KIDMCP's halves do).
 #pragma code_page(1252)
 
 #include "WinRezFlags.h"
