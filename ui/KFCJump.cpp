@@ -845,7 +845,8 @@ void ArmScopeKeep()
 // The Type tool, because a selected match is an invitation to EDIT - a click's, since 1.4.0: Edit > Find/Change's Find
 // Next selects what it found and puts the Type tool on, and the author asked for the same (2026-10-10). A text
 // selection made while the Selection tool is active is not somewhere the user can start typing. ! This CHANGES THE
-// USER'S ACTIVE TOOL - deliberately, and it is written down in How to Use for that reason.
+// USER'S ACTIVE TOOL - deliberately. (How to Use does not say so since the author's own text of 2026-10-11, f64e142 - the
+// spec map's PNL-17 notes it.)
 //
 // IsToolOfType(kTextSelectionTool), NOT IsTextTool(). ITool.h:178-183 says IsTextTool "could be
 // more accurately called DoesToolDeactivateTextEditor" and that the Zoom, Gradient and Hand tools

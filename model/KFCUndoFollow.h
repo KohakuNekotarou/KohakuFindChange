@@ -106,9 +106,11 @@ namespace KFCUndoFollow
 	    Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it is then is
 	    copied whole (what an Undo puts back). ReadStories = every text model's version in the run's documents, before
 	    a character is written. Keep = the run went through: kept as kStepRunQueries, in the result set the list is
-	    now. RestoreBefore = the run was taken back (cancelled, failed): the list goes back as it was - as the same
-	    result set, so the writes kept for it are still followed - and nothing is kept. While one stands nothing is
-	    followed. */
+	    now AND the one it found - its Undo puts that list back as that result set, and the writes kept for it are
+	    followed again (2026-10-11, U-1: they were dropped at the Keep, so a Replace made before the run read "Changed"
+	    after both Ctrl+Z's, and a second run's Undo could not reach the first run's). RestoreBefore = the run was taken
+	    back (cancelled, failed): the list goes back as it was - as the same result set, so the writes kept for it are
+	    still followed - and nothing is kept. While one stands nothing is followed. */
 	class RunRecorder
 	{
 	public:

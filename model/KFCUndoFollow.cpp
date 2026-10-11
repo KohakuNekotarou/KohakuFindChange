@@ -83,6 +83,7 @@ struct Step
 	KFCUndoFollow::StepKind			kind;
 	bool							done;			// the write stands (false: an Undo took it back)
 	uint32							resultSet;		// KFCResultModel::GetResultSetId when it was made
+	uint32							resultSetBefore;	// a whole set's: the one it found - its Undo goes back to it (U-1)
 	bool							whole;			// it reshaped the result set (a query run - RunRecorder)
 	uint32							layoutBefore;	// the layout the row indices named before it...
 	uint32							layoutAfter;	// ...and after it (the same, for a write of rows)
@@ -94,7 +95,8 @@ struct Step
 	std::vector<size_t>				frozenBefore;	// a whole set's book chapters closed since, as indexes into before's
 	std::vector<size_t>				frozenAfter;	// and after's chapters: kept as the panel has them when that set is
 													// put back (KFCUndoFollow::ForgetBookChapter)
-	Step() : kind(KFCUndoFollow::kStepReplace), done(true), resultSet(0), whole(false), layoutBefore(0), layoutAfter(0) {}
+	Step() : kind(KFCUndoFollow::kStepReplace), done(true), resultSet(0), resultSetBefore(0), whole(false), layoutBefore(0),
+		layoutAfter(0) {}
 };
 
 // The kept writes, oldest first.
@@ -191,13 +193,59 @@ void ResolveDocs()
 	}
 }
 
-// The writes kept for another result set name rows that are gone (a search, a query run, Clear Results, a close).
-void DropOtherResultSets()
+// The writes kept for another result set name rows that are gone (a search, Clear Results, a close) - ALL BUT THE ONES A
+// KEPT QUERY RUN LEADS BACK TO (2026-10-11, the full re-check U-1). A run's Undo puts back the list it found, as that list's
+// result set (Follow), so the writes made on that list before the run are Ctrl+Z's to take back next, and an earlier run's
+// the one after (UNDO-10: the last three runs are kept, with what came before them). Dropped here at the run's Keep, the
+// Replace before it read "Changed" over its text after both Ctrl+Z's (case xq-done-undo), and two runs' second Ctrl+Z left
+// the list empty (xq-two-runs-undo) - the cancelled run's twin, fixed by ReturnToResultSet (xq-cancel-undo).
+// So a set reached from the one the panel shows through kept runs stays - each run joins the set it found and the set it
+// left - and every other set's writes go. `incoming` = a write about to be kept (KeepStep): its sets count as reached.
+void DropOtherResultSets(const Step* incoming = nil)
 {
-	const uint32 current = KFCResultModel::GetResultSetId();
+	std::set<uint32> reached;
+	reached.insert(KFCResultModel::GetResultSetId());
+	if (incoming != nil && incoming->whole)
+		reached.insert(incoming->resultSetBefore);
+	for (bool grew = true; grew; )
+	{
+		grew = false;
+		for (size_t i = 0; i < gSteps.size(); ++i)
+		{
+			const Step& s = gSteps[i];
+			if (!s.whole || (reached.count(s.resultSet) == 0 && reached.count(s.resultSetBefore) == 0))
+				continue;
+			if (reached.insert(s.resultSet).second)
+				grew = true;
+			if (reached.insert(s.resultSetBefore).second)
+				grew = true;
+		}
+	}
 	for (size_t i = gSteps.size(); i-- > 0; )
-		if (gSteps[i].resultSet != current)
+		if (reached.count(gSteps[i].resultSet) == 0)
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
+}
+
+// A CLOSING DOCUMENT'S CHAPTERS IN A LIST A KEPT QUERY RUN HOLDS (U-1): a write of rows kept for a list the panel does not
+// show - the one a run found (its `before`) - names its rows in THAT list, so a chapter's index there is read from the
+// run's copy of it, found by its file as the panel's chapters are (ForgetBookChapter). Nothing when no kept run holds it.
+void ChaptersOfDocInKeptSet(uint32 set, IDataBase* db, std::vector<int32>& out)
+{
+	out.clear();
+	for (size_t i = 0; i < gSteps.size(); ++i)
+	{
+		const Step& w = gSteps[i];
+		if (!w.whole || (w.resultSetBefore != set && w.resultSet != set))
+			continue;
+		const KFCResultModel::ModelSnapshot& list = (w.resultSetBefore == set) ? w.before : w.after;
+		for (size_t c = 0; c < list.chapters.size(); ++c)
+		{
+			UIDRef found = list.chapters[c].docRef;
+			if (KFCBookScope::FindOpenChapterDoc(list.chapters[c].file, found) && found.GetDataBase() == db)
+				out.push_back(static_cast<int32>(c));
+		}
+		return;		// one copy of a set is as good as another
+	}
 }
 
 // A CLOSING CHAPTER'S ROWS OFF A KEPT WRITE OF ROWS (2026-10-11 - the pre-Exchange re-check, D6b-1). Since 1.4.0 a write of
@@ -394,9 +442,9 @@ void DiagSteps(const char* when)
 	for (size_t i = 0; i < gSteps.size(); ++i)
 	{
 		const Step& s = gSteps[i];
-		KFC_DIAG_LOG("    [%u] kind=%d done=%d whole=%d set=%u layout=%u->%u stories=%u items=%u", (unsigned)i, (int)s.kind,
-			s.done ? 1 : 0, s.whole ? 1 : 0, s.resultSet, s.layoutBefore, s.layoutAfter, (unsigned)s.stories.size(),
-			(unsigned)s.items.size());
+		KFC_DIAG_LOG("    [%u] kind=%d done=%d whole=%d set=%u<-%u layout=%u->%u stories=%u items=%u", (unsigned)i, (int)s.kind,
+			s.done ? 1 : 0, s.whole ? 1 : 0, s.resultSet, s.resultSetBefore, s.layoutBefore, s.layoutAfter,
+			(unsigned)s.stories.size(), (unsigned)s.items.size());
 		for (size_t k = 0; k < s.stories.size(); ++k)
 		{
 			const StoryMoved& m = s.stories[k];
@@ -462,7 +510,7 @@ const char* KindName(KFCUndoFollow::StepKind kind)
 // Keep a write: the documents' histories it cut, and the old ones past the limit, go.
 void KeepStep(Step& step)
 {
-	DropOtherResultSets();
+	DropOtherResultSets(&step);		// (a run being kept joins the set it found - the writes on it stay)
 	ResolveDocs();
 	// A NEW STEP IN A DOCUMENT THROWS ITS REDO AWAY (InDesign's own rule): an undone write sharing a
 	// document with this one can never be done again. (An undone query run shares with every write - ShareDoc -
@@ -729,6 +777,7 @@ void KFCUndoFollow::RunRecorder::Keep()
 	step.kind = kStepRunQueries;
 	step.whole = true;
 	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
+	step.resultSetBefore = gPendingResultSet;				// ...and the one it found, which its Undo puts back (U-1)
 	step.layoutBefore = gPendingLayout;
 	// The stories it moved - and no items: a query run records none (an Object query's Change All names none of what it
 	// changed), so a run of Object queries alone is not followed (the spec map's OBJ-11).
@@ -737,7 +786,7 @@ void KFCUndoFollow::RunRecorder::Keep()
 	KFCResultModel::TakeModelSnapshot(step.after);
 	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
 	CloseRecording();
-	KFC_DIAG_LOG("KEEP RUN moved=%u set=%u", (unsigned)step.stories.size(), step.resultSet);
+	KFC_DIAG_LOG("KEEP RUN moved=%u set=%u<-%u", (unsigned)step.stories.size(), step.resultSet, step.resultSetBefore);
 	if (step.stories.empty())
 		return;
 	KeepStep(step);
@@ -820,6 +869,8 @@ bool KFCUndoFollow::Follow()
 				KeepFrozenAsTheyAre(set, frozen);
 				KFCResultModel::RestoreModelSnapshot(set);
 			}
+			// ...AS THAT LIST'S RESULT SET (U-1 - DropOtherResultSets): the writes kept for it are followed next.
+			KFCResultModel::ReturnToResultSet(undo ? step.resultSetBefore : step.resultSet);
 			reshaped = true;
 		}
 		else
@@ -995,6 +1046,13 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 		if (KFCBookScope::FindOpenChapterDoc(chapterFile, found) && found.GetDataBase() == db)
 			closing.push_back(c);
 	}
+	// ...and, for a write of rows kept for a list a query run put away (U-1 - DropOtherResultSets), the chapter in THAT list:
+	// its rows are numbered there. Read before any write goes below - a run's step can go with its stories.
+	const uint32 current = KFCResultModel::GetResultSetId();
+	std::vector<std::vector<int32> > closingInSet(gSteps.size());
+	for (size_t i = 0; i < gSteps.size(); ++i)
+		if (!gSteps[i].whole && gSteps[i].resultSet != current)
+			ChaptersOfDocInKeptSet(gSteps[i].resultSet, db, closingInSet[i]);
 	// ...then its stories come off every write. A write of rows of this chapter alone goes whole; one of several chapters
 	// (rows selected together - 1.4.0) keeps the others' stories and lets this chapter's rows go (DropChapterRows).
 	for (size_t i = gSteps.size(); i-- > 0; )
@@ -1010,8 +1068,11 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 		if (stories.empty() && items.empty())
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!gSteps[i].whole)
-			for (size_t c = 0; c < closing.size(); ++c)
-				DropChapterRows(gSteps[i], closing[c]);
+		{
+			const std::vector<int32>& chapters = (gSteps[i].resultSet == current) ? closing : closingInSet[i];
+			for (size_t c = 0; c < chapters.size(); ++c)
+				DropChapterRows(gSteps[i], chapters[c]);
+		}
 	}
 	KFC_DIAG_STEPS("chapter closing");
 }

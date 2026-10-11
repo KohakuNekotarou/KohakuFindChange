@@ -118,4 +118,5 @@ git log -p -- docs/spec-map/        # コミット済みの書き込み
 **2026-10-08 の追記の基準**: branch `feat/2026-10-08-kfc-replace-next-book-hide`（main `f37b128` の上に、Shift+Return＝置換して次へ・Hide Previous Chapter をブックの章だけに）。GEN-02・GEN-11・SCOPE-17・JMP-26・JMP-28・REP-32・REP-32b はこの基準で書いた。
 **2026-10-10 の追記の基準**: branch `feat/2026-10-09-kfc-object-search`（main `0958109` の上に、オブジェクトの検索と、行のクリックで一致を選ぶ形 S）。版数 `1.4.0`。第17章と、末尾に（1.4.0）の付いた項目はこの基準で書いた。
 **2026-10-11 の追記の基準**: branch `chore/2026-10-10-kfc140-recheck` `9249878`（main `f64e142` の上に、検索形式の記憶が閉じる DB を忘れる直し）。版数 `1.4.0`。`59f615b` 以降の Search This Document Again（REP-37）・あふれの物の行と SaveAll の指紋（OBJ-08・09・10・12）・行のまとめ選択とまとめ置換・文書をまたぐ1段・Select All Rows（ROW-32・34〜38・REP-36・OBJ-16〜18・SET-10・11）・How to Use の作者の文面（PNL-17）・スレッド安全の試験（LIFE-08b）・検索形式の記憶（LIFE-07）はこの基準で書いた。
+同じ日の午後の全コード再検査（`ef5dbe4` の上の直し＝クエリ連続実行の取り消しの後も前の書き込みを追う U-1・ブックの行の右クリックの控え C-2）で UNDO-10・UNDO-11・ROW-38 と、第9章・第11章の未確認の行を書き足した。
 ソースのクラス名・ファイル名・フォルダー名も **KFC**（2026-10-04 に旧名 KBS から改名・`chore/2026-10-04-kfc-rename`）。古いノート・memory の `KBS` は `KFC` と読み替える。

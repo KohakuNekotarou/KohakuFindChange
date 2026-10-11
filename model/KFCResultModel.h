@@ -776,14 +776,16 @@ namespace KFCResultModel
 	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
 
 	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
-	    a write kept for an Undo belongs to one, and means nothing to the next. */
+	    a write kept for an Undo belongs to one, and means nothing to the next unless a kept query run leads back to it
+	    (its Undo puts that set back - KFCUndoFollow's DropOtherResultSets, 2026-10-11). */
 	uint32 GetResultSetId();
 
-	/** A RUN THAT DID NOT HAPPEN LEAVES THE RESULT SET IT FOUND. A query run clears the list at its commit point (a new
-	    number); cancelled or refused after it, the list is put back (KFCUndoFollow::RunRecorder::RestoreBefore) - and with
-	    this the number too, so the writes kept for that list are followed again (measured - case xq-cancel-undo: a
-	    Ctrl+Z of a row's Replace made before a cancelled run went unfollowed, the row still reading "Changed"). Not for
-	    an Undo of a run that went through: its own step names the result set it left. */
+	/** A LIST PUT BACK TAKES ITS OWN RESULT SET AGAIN. A query run clears the list at its commit point (a new number);
+	    cancelled or refused after it, the list is put back (KFCUndoFollow::RunRecorder::RestoreBefore) - and with this
+	    the number too, so the writes kept for that list are followed again (measured - case xq-cancel-undo: a Ctrl+Z of a
+	    row's Replace made before a cancelled run went unfollowed, the row still reading "Changed"). The same for a run
+	    that went through, as its Undo or Redo puts a list back (KFCUndoFollow::Follow - 2026-10-11, U-1: the run's step
+	    names both sets, the one it found and the one it left; cases xq-done-undo, xq-two-runs-undo). */
 	void ReturnToResultSet(uint32 resultSetId);
 
 	/** Which layout of the result set the row indices name: a new number with every Clear;

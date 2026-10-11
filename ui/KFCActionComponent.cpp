@@ -123,7 +123,11 @@ NodeID SelectAllRowsTarget()
 		return KFCResultNodeID::CreateFont(chapter, group);
 	if (KFCResults()->GetContextMenuChapter(chapter))
 		return KFCResultNodeID::Create(chapter);
-	if (KFCResultTree::GetContextMenuBook())
+	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW (2026-10-11, the full re-check C-2). It is the UI
+	// half's own flag, which a new list does not clear as it clears the model's three: the book row right-clicked, its
+	// menu closed unpressed, then a document search - and the action fired by its ActionID from a script selected every
+	// row of a list with no book row in it (case ctx-book-stash-docsearch).
+	if (KFCResultTree::GetContextMenuBook() && KFCResults()->IsFromBook())
 		return KFCResultNodeID::CreateBook();
 	return NodeID();
 }
