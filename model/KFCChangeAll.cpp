@@ -128,6 +128,10 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	int32& outCount)
 {
 	outCount = 0;
+	// Nothing processed over an error already standing (KFCReplaceEngine's RunWalkerCmd says why): a failure - the caller's
+	// step goes back by it.
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		return false;
 	InterfacePtr<IFindChangeOptions> opts(QuerySessionPreferences<IFindChangeOptions>());
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
 	InterfacePtr<IK2ServiceProvider> provider(registry != nil

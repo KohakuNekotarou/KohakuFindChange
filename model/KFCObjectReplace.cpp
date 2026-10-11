@@ -741,6 +741,10 @@ bool KFCObjectReplace::ReplaceAllInDoc(const UIDRef& docRef, int32& outReplaced,
 {
 	outReplaced = 0;
 	outPartially = 0;
+	// Nothing processed over an error already standing (KFCReplaceEngine's RunWalkerCmd says why): a failure - the caller's
+	// step goes back by it.
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		return false;
 	InterfacePtr<IFindChangeService> svc(KFCObjectSearch::CreateFindChangeService());
 	InterfacePtr<IObjectWalker> shared(KFCObjectSearch::QuerySharedWalker());
 	if (svc == nil || shared == nil || docRef.GetDataBase() == nil)

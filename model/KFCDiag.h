@@ -94,6 +94,9 @@
 //    clean-after-write  KFCReplaceEngine.cpp's row Replace takes each written document's "unsaved" flag down after the
 //                write - a close would then throw the write away unasked: the case that shows the written-document check
 //                catching it (written-cleaned-armed)
+//    queries-error-stands  KFCQuerySequence::Run raises the global error code after its last step, reporting nothing - the
+//                run must take itself back and say "Stopped", and process no command over the error on its way out
+//                (ClearFindChange - a command processed over it is InDesign's protective shutdown) (xq-error-stands)
 //    landing-return  (UI half) ui/KFCJump.cpp's JumpToHit replaces its own row through the panel's door
 //                (KFCResultTree::ReplaceRows) once its window is in front - the Return a landing's message loop can
 //                dispatch: the door must turn it away (landing-return)

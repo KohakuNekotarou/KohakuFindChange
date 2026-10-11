@@ -67,6 +67,10 @@ struct RunningFlagGuard
 // bring the last query back.
 void ClearFindChange()
 {
+	// Never processed over an error left standing (a command processed while the global error code is set is InDesign's
+	// protective shutdown - CmdUtils.h): this runs once the run's sequence has ended, and what stands then is the run's own,
+	// taken back and said already.
+	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kClearFindChangeOptionsCmdBoss));
 	if (cmd != nil)
 		CmdUtils::ProcessCommand(cmd);
@@ -422,6 +426,12 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		}
 	}
 
+#ifdef KFC_DIAG
+	// (Fault switch queries-error-stands, a test build's only - KFCDiag.h: an error left standing by the run's last step with
+	// nothing reported - the road the line below takes back. Raised after the loop, so no command of the loop meets it.)
+	if (!cancelled && !failed && KFC_DIAG_FAULT("queries-error-stands"))
+		ErrorUtils::PMSetGlobalErrorCode(kFailure);
+#endif
 	// A standing error is a failure nothing reported (Change All in Book's rule too, KFCChangeAll.cpp): taken back, and said.
 	if (!cancelled && !failed && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 	{
@@ -435,7 +445,15 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 			if (wroteTo[t] && KFCBookScope::IsDocStillOpen(targets[t].docRef))
 				KFCUndoFollow::MarkWrite(targets[t].docRef.GetDataBase());
 	if (cancelled || failed)
+	{
 		CmdUtils::AbortCommandSequence(seq);
+		// NO ERROR LEFT STANDING PAST THE ABORT - before ClearFindChange below, which PROCESSES A COMMAND: one processed while
+		// the global error code is set brings on InDesign's protective shutdown (CmdUtils.h, ProcessCommand). The run that
+		// failed on a standing error (above) has taken its words already (why); every other road out of the loop cleared
+		// its own. The same line every other abort of KFC's has straight after it (KFCReplaceEngine, KFCObjectReplace,
+		// KFCChangeAll) - here it stood below ClearFindChange (the 2026-10-12 re-check).
+		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	}
 	else
 		CmdUtils::EndCommandSequence(seq);
 	seq = nil;
@@ -445,7 +463,6 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 
 	if (cancelled || failed)
 	{
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 		for (size_t i = 0; i < targets.size(); ++i)
 		{
 			if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))

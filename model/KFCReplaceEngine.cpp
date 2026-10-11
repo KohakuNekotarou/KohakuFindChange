@@ -106,6 +106,13 @@ IFindChangeService::FindChangeResult RunWalkerCmd(const ClassID& cmdBoss, ITextW
 	outStart = kInvalidTextIndex;
 	outEnd = kInvalidTextIndex;
 
+	// NOTHING PROCESSED OVER AN ERROR ALREADY STANDING (MarkWrite's rule): a command processed while the global error code is
+	// set is InDesign's protective shutdown (CmdUtils.h, ProcessCommand) - and a find that answered kSuccess is not cleared
+	// below. The error is not this function's to clear: it is answered as a walk that broke off, and the step it is in
+	// ends by it and goes back.
+	if (ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
+		return IFindChangeService::kFailure;
+
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
 	if (cmd == nil)
 		return IFindChangeService::kFailure;

@@ -564,8 +564,11 @@ namespace
 					if (diff > PMReal(0.001))
 					{
 						InterfacePtr<ICommand> zoomCmd(Utils<ILayoutUIUtils>()->MakeZoomCmd(destView, srcZoom));
-						if (zoomCmd != nil)
-							CmdUtils::ProcessCommand(zoomCmd);	// carried over as a courtesy; never fatal
+						// Carried over as a courtesy; never fatal - so never processed over an error the switch above left
+						// standing (MakeActive reports nothing): a command processed while the global error code is set is
+						// InDesign's protective shutdown (CmdUtils.h, ProcessCommand). The preserver puts the caller's back.
+						if (zoomCmd != nil && ErrorUtils::PMGetGlobalErrorCode() == kSuccess)
+							CmdUtils::ProcessCommand(zoomCmd);
 					}
 				}
 			}
