@@ -77,7 +77,7 @@
 //    RestoreDocked), and beside another column by the user.
 //    ! Seen twice (the user): the Book panel's icon drawn as KFC's own. KFC writes
 //      no palette icon anywhere, so the suspicion is OWL's icon strip after a reparent - not confirmed,
-//      and left there with the user's agreement (it is only how the icon looks).
+//      and left there with the author's agreement (it is only how the icon looks).
 //
 //========================================================================================
 
@@ -1359,7 +1359,7 @@ void KFCBookPanelPlacement::ToggleAndSave(PMString& outStatus)
 	else
 		UninstallCmdWatch();
 
-	// The toggle's key, and nothing else (the user's rule).
+	// The toggle's key, and nothing else (the author's rule).
 	std::vector<std::pair<std::string, std::string> > keys;
 	keys.push_back(std::make_pair(std::string(kKeyToggle), BoolValue(gOn)));
 	bool repaired = false;
@@ -1630,7 +1630,9 @@ public:
 	// thread is the base class's answer for a provider in a UI plug-in (CServiceProvider.h:54-56), so
 	// GetThreadingPolicy is not overridden.
 	virtual InstancePerX GetInstantiationPolicy() { return IK2ServiceProvider::kInstancePerSession; }
-	// SetCString, not SetKey: an internal name that never reaches the UI, so it is no string-table key.
+	// The one-argument SetCString IS SetKey (PMString.h:1009-1021: "This is the same as SetKey" - translatable,
+	// not translated). Harmless here: an internal name that never reaches the UI, so nothing looks it up. (The
+	// header's recipe for a string that is no key is SetCString with an encoding.)
 	virtual void GetName(PMString* pName) { pName->SetCString("KFCBookPanelService\0"); }
 };
 

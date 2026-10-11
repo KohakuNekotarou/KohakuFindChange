@@ -68,7 +68,7 @@ namespace KFCBookPanelPlacement
 	bool IsOn();
 
 	/** The flyout's "Remember Book Panel Placement": flip the flag, put the command interceptor in or
-	    take it out with it, write THAT ONE KEY to the settings file (the user's rule), and
+	    take it out with it, write THAT ONE KEY to the settings file (the author's rule), and
 	    hand back the line for the panel's status line - the new state and, like "Save Panel
 	    Settings", where the file is. */
 	void ToggleAndSave(PMString& outStatus);
