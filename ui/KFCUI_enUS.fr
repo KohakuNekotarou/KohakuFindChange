@@ -63,8 +63,9 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
 
                 // ----- Panel/dialog strings
                 kKFCPanelTitleKey,				kKFCDisplayName,
-                // The query dialog (Run Saved Queries...): its title (the spec's D11 name), the lists'
-                // headings, the buttons between them, Run and Close.
+                // The query dialog (Run Saved Queries...): its title (the name its design gave it - D11 of
+                // docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md),
+                // the lists' headings, the buttons between them, Run and Close.
                 kKFCQueryDialogTitleKey,		"Kohaku Find/Change Queries",
                 kKFCQuerySavedLabelKey,			"Saved Queries:",
                 kKFCQueryOrderLabelKey,			"Run Order:",

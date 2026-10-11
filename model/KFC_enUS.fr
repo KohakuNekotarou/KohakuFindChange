@@ -32,7 +32,8 @@ resource StringTable (kSDKDefStringsResourceID + index_enUS)
         {
                 // The model half's strings: what the model writes itself. Every other string is the UI
                 // half's (ui/KFCUI_enUS.fr). The Japanese for these is KFCLoc.h's.
-                // What Edit > Undo calls a row's Replace.
+                // What Edit > Undo calls KFC's writes: a row's Replace (rows replaced together too), the
+                // query run, and Change All in Book.
                 kKFCReplaceStepKey,				"Replace",
                 kKFCRunQueriesStepKey,			"Run Queries",
                 kKFCChangeAllStepKey,			"Change All",

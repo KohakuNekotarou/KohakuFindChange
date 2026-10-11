@@ -67,7 +67,8 @@ namespace KFCLoc
 // enUS table (KFC_enUS.fr) - they ARE the English path.
 namespace KFCJa
 {
-	// What Edit > Undo calls a row's Replace (the plug-in author's call).
+	// What Edit > Undo calls KFC's writes: a row's Replace and rows replaced together (one name - the plug-in
+	// author's call), the query run, and Change All in Book.
 	const wchar_t kReplaceStep[]            = L"置換";
 	const wchar_t kRunQueriesStep[]         = L"クエリの連続実行";
 	const wchar_t kChangeAllStep[]          = L"すべてを置換";		// InDesign's own word for its Change All
