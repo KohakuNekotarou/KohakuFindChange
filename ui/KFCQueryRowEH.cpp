@@ -9,10 +9,10 @@
 //  call: "double click", the dialog "opened to show"); KFCQueryDialogShowInFindChange is what happens. A single click
 //  only selects, as before, and the run order's rows - the right list - keep the stock handling alone.
 //
-//  THE DOUBLE CLICK'S ONE BIT OF STATE - the result list's rows' (KFCResultNodeEH.cpp, the note of that name) and KCM's
-//  book dialog rows' (KCMBookRowEH.cpp): a double click arrives as LButtonDn, LButtonUp, ButtonDblClk, LButtonUp, so
-//  ButtonDblClk only raises a flag and the trailing up acts on it, after the stock handler has finished the click. The
-//  flag is cleared on every down, so one never consumed cannot turn a later single click into a load.
+//  THE DOUBLE CLICK'S ONE BIT OF STATE - KCM's book dialog rows' (KCMBookRowEH.cpp; the result list's rows no longer
+//  tell a double click apart - KFCResultNodeEH.cpp): a double click arrives as LButtonDn, LButtonUp, ButtonDblClk,
+//  LButtonUp, so ButtonDblClk only raises a flag and the trailing up acts on it, after the stock handler has finished
+//  the click. The flag is cleared on every down, so one never consumed cannot turn a later single click into a load.
 //
 //  The keyboard is left alone, as in KCM's dialog rows: the dialog's own machinery has it.
 //

@@ -65,8 +65,8 @@ namespace
 	}
 
 	// An order file's "kind" as a SearchMode - the model's own names for the five (KFCSavedQueries::KindName); -1 = none.
-	// (Object since 1.4.0 - without it an Object entry whose file had moved was never found again by its kind and name:
-	// case obj-qd-load-by-name.)
+	// (Object too - without it an Object entry whose file had moved was never found again by its kind and name: case
+	// obj-qd-load-by-name.)
 	int32 ModeOfKind(const std::string& kind)
 	{
 		const int32 modes[] = { IFindChangeOptions::kTextSearch, IFindChangeOptions::kGrepSearch,

@@ -301,7 +301,7 @@ namespace
 	    an existing window a minimize box (a modeless dialog's controls are the close box alone - IWindow.h), so it is
 	    put on with Win32, as KCM's book dialog has it: WS_MINIMIZEBOX alone shows nothing - the box appears only once
 	    WS_EX_TOOLWINDOW is off (Windows draws none on a tool window's frame) - and WS_EX_APPWINDOW puts the minimized
-	    dialog on the taskbar rather than leaving a stub at the screen's bottom left (KCM, measured 2026-08-12). The
+	    dialog on the taskbar rather than leaving a stub at the screen's bottom left (KCM, measured). The
 	    window is ours - made by KFCQueryDialogOpen and destroyed when the dialog closes - so nothing is put back.
 	    Open() on a dialog that sits minimized does not bring it back (KCM, measured): ShowWindow(SW_RESTORE) does. */
 	void PrepareWindow(IDialog* dialog)
@@ -481,25 +481,25 @@ void KFCQueryDialogRefreshScope()
 	ShowRunScope(gOpenPanel);		// nil while no dialog is open - nothing then
 }
 
-// THE LOADED QUERY CHOSEN IN FIND/CHANGE'S OWN QUERY MENU TOO (2026-10-08, the author: take the name and choose that
-// query in the official Find/Change dialog). Loaded through kFCQueryXMLReaderCmdBoss alone, the menu went on reading
+// THE LOADED QUERY CHOSEN IN FIND/CHANGE'S OWN QUERY MENU TOO (the author: take the name and choose that query in the
+// official Find/Change dialog). Loaded through kFCQueryXMLReaderCmdBoss alone, the menu went on reading
 // [Custom] - the strings were the query's and the menu did not say so (measured, docs/ai-notes/kfc-full-test-2026-10-08.md
 // section 1). Returns whether the menu now names it; outWhy says why not, otherwise.
 // *BY NAME, the one handle the menu offers: its entries are strings (IStringListControlData). What it keeps beside them
 //  (IID_IFCINTLISTDATA, kFCIntListDataImpl) has no public interface, and KFC is on Exchange - no guessed vtable (the author
 //  also asked whether an ID would do; there is none to use).
-// *ONE MENU FOR EVERY KIND, IN GROUPS. Measured 2026-10-08 (work/kbs-regress case qd-dblclick-query-menu, FCMENU): the
+// *ONE MENU FOR EVERY KIND, IN GROUPS. Measured (work/kbs-regress case qd-dblclick-query-menu, FCMENU): the
 //  menu lists the Text queries, then the GREP ones, then the Object ones, the groups parted by "-" entries (disabled) and
 //  [Custom] last - not refilled per tab - and each name as the file is named, bundled ones in English on a Japanese UI
 //  too. So a Text query and a GREP query of one name are two entries alike.
-// *NAME AND PLACE, THEN (the author, the same day: name + order?): the name is looked for, and when more than one group
+// *NAME AND PLACE, THEN (the author: name + order?): the name is looked for, and when more than one group
 //  carries it, each such group is weighed against the names KFC knows of the query's own kind - one point for an entry
 //  that is one of them, one off for an entry that is not - and the highest is the query's. Weighed rather than taken by
-//  position, because the menu can group queries KFC does not list (the Object ones did, before 1.4.0) and so KFC cannot
-//  count the groups before it. InDesign's own queries make the Text and GREP groups unlike; only groups as alike as that can tie,
-//  and then nothing is chosen and the line says why.
+//  position, because the menu can group queries KFC does not list (the Object ones did, before KFC listed them) and so
+//  KFC cannot count the groups before it. InDesign's own queries make the Text and GREP groups unlike; only groups as
+//  alike as that can tie, and then nothing is chosen and the line says why.
 // *TOLD, AS A PERSON'S PICK IS (notifyOfChange = kTrue): the dialog loads it the way it loads a query picked in that menu
-//  (the same file the command above just read). Measured the same day with kFalse, a pick it was not told of: the menu
+//  (the same file the command above just read). Measured with kFalse, a pick it was not told of: the menu
 //  named the query and its delete button stayed grey (FCWIDGET 0x497b, kFCQueryDeleteButtonWidgetID, 0/0).
 static bool16 IsMenuSeparator(IStringListControlData* entries, int32 i)
 {
