@@ -79,9 +79,9 @@ namespace KFCPanelMetrics
 	    that is 4 x 18.0 = 72 (KCM measured the 18.0). When the font cannot be asked, the .fr's own
 	    block (48) stands.
 
-	    WHY FOUR. The line a stopped replace leaves is 128 characters, and three lines cut it off
-	    (measured); the block holds four and the messages are cut to fit four at the floor's width -
-	    see KFCPanelMetrics.cpp over kMessageLines.
+	    WHY FOUR. A 128-character message was cut off at three lines (measured); the block holds
+	    four and the messages are cut to fit four at the floor's width - see KFCPanelMetrics.cpp over
+	    kMessageLines.
 	    THE SAME FACT IS STATED ELSEWHERE - change them together. The message widget's
 	    note in KFCUI.fr ("if this number changes, change that one too"), kMessageLines and its note
 	    in KFCPanelMetrics.cpp, and KFCPanelView::ConstrainDimensions, which explains why it

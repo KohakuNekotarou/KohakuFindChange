@@ -89,8 +89,8 @@ public:
 	virtual PMPoint ConstrainDimensions(const PMPoint& dimensions) const;
 
 	/** The panel as the stock view draws it - then THE KEYBOARD FRAME: while the result list holds InDesign's
-		keyboard, a frame in the theme's selection colour around the list, in the strip the panel leaves round it (1.4.0
-		- the author's call of 2026-10-10, after the down arrow moved a page item the user meant to walk the list with).
+		keyboard, a frame in the theme's selection colour around the list, in the strip the panel leaves round it (the
+		author's call, after the down arrow moved a page item the user meant to walk the list with).
 		Who holds the keyboard is asked as it is drawn (KFCResultTree::ListHoldsKeyboard); the list has the strip drawn
 		again when it takes the keyboard or lets it go (KFCResultTree::RedrawKeyboardFrame).
 		DV_Draw, not Draw: a palette panel is drawn through Drover's drawbot, and DVErasablePanelView keeps Draw private
@@ -156,8 +156,8 @@ PMPoint KFCPanelView::ConstrainDimensions(const PMPoint& desiredDimen) const
 	//   sets area). This one SUBTRACTS instead - the panel's current height less the tree's - and
 	//   the difference is deliberate. The fixed part of this panel is the message block, and its
 	//   height DEPENDS ON THE UI LANGUAGE (four of the palette font's lines - 72px on a Japanese UI;
-	//   KFCPanelMetrics asks the font and moves the tree to match). Adding it up here would state that fact a second time, in a
-	//   second place, in a way that has to be kept in step by hand. The tree is the only widget
+	//   KFCPanelMetrics asks the font and moves the tree to match). Adding it up here would state that
+	//   fact a second time, in a second place, in a way that has to be kept in step by hand. The tree is the only widget
 	//   that stretches, so what is left when it is taken away IS the fixed part, whatever the
 	//   language made it.
 	const PMReal nonListHeight = this->GetFrame().Height() - treeView->GetFrame().Height();

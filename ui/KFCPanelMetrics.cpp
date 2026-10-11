@@ -36,11 +36,12 @@ namespace
 // FOUR, NOT THREE - AND THE THIRD WAS NOT A ROUNDING ERROR. Three lines (54 = 18x3 on a Japanese UI)
 // were sized against the OPENING message, which draws 535px wide on a Japanese UI and so takes 2.8
 // lines in the 217px box the floor gives it. A longer message takes a fourth line, and the fourth was
-// clipped: MEASURED on the running panel (PrintWindow over the status widget), the line a stopped
-// replace leaves - "Replace cancelled - nothing was changed. The results have been cleared - the
-// document has changed since the search. Search again." - drew three lines and STOPPED AT "the
-// document has". What the user lost was the end of the sentence, which is the part that says what to
-// do about it. 128 characters against a box that holds about 88.
+// clipped: MEASURED on the running panel (PrintWindow over the status widget), the line a cancelled
+// Change Checked used to leave (the command is gone; the measurement stands) - "Replace cancelled -
+// nothing was changed. The results have been cleared - the document has changed since the search.
+// Search again." - drew three lines and STOPPED AT "the document has". What the user lost was the end
+// of the sentence, which is the part that says what to do about it. 128 characters against a box that
+// holds about 88.
 //
 // So both halves were fixed together (the author's call): this block holds four lines, and every
 // refusal that has to be read whole is cut to fit four - about 117 characters at the floor. The
@@ -74,8 +75,8 @@ const int32 kGapUnderMessageBlock = 3;
 //     box 251 (panel 300) -> 3 lines      <- what the panel opens at
 //     box 217 (panel 266) -> 3 lines      <- the floor, and MEASURED there: the opening message
 //                                            drew three 18px lines with nothing clipped (Japanese
-//                                            UI). THAT IS THE OPENING MESSAGE AND ONLY IT - a
-//                                            stopped replace's 128-character line needs five at
+//                                            UI). THAT IS THE OPENING MESSAGE AND ONLY IT - the
+//                                            measured 128-character line (above) needs five at
 //                                            this width, which is why the block holds four and
 //                                            the messages are cut to fit them
 //     box 216 (panel 265) -> 4 lines      <- where the clipping was reported back when the

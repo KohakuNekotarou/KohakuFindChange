@@ -403,10 +403,11 @@ static void KFCJsonSalvagePairs(const std::string& text, KFCJsonPairs& out)
 // The whole file, or false when it could not be read in full. *A read that stopped part way through
 // must not be used: what would then be restored is "the settings that happened to be in the part that
 // arrived", the rest silently left at their defaults. All or nothing instead (KCM's fix). Through the
-// SDK's file stream (see the top of this file), the way the SDK's samples read a whole file: the size first - Seek to the end answers where it got to -
-// then exactly that many bytes from the start (textimportfilter/TxtImpFilter.cpp:602-611,
-// pdfvt/PDFVTUtils.cpp:141-147). The read never asks past the end of the file, so a short count, or the
-// stream in kStreamStateFailure, can only be a read that broke off.
+// SDK's file stream (see the top of this file), in the shape the SDK's samples read a file's bytes with: the size
+// first - Seek to the end answers where it got to - then that many bytes (textimportfilter/TxtImpFilter.cpp:602-611
+// reads the whole length so, from where its stream stood; pdfvt/PDFVTUtils.cpp:141-147 at most 4096 bytes of the
+// head). Here from the start: the read never asks past the end of the file, so a short count, or the stream in
+// kStreamStateFailure, can only be a read that broke off.
 static bool KFCReadWholeFile(const IDFile& file, std::string& out)
 {
 	out.clear();

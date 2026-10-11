@@ -13,7 +13,7 @@
 // Interface includes:
 #include "IControlView.h"
 #include "IPanelControlData.h"
-#include "IPalettePanelUtils.h"		// QueryPanelByWidgetID - the same reach Rebuild uses
+#include "IPalettePanelUtils.h"		// QueryPanelByWidgetID - the same reach KFCResultTree::Rebuild uses
 
 // General includes:
 #include "Utils.h"

@@ -255,8 +255,8 @@ void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const Wid
     AN ActiveSelectionObserver, NOT A PLAIN CObserver. The tab names Search: as the selection makes it,
     and a selection changed with the Find/Change dialog CLOSED changes no setting - so an observer of the
     settings alone hears nothing, and the tab goes on naming a scope the next search would not use (while
-    the flyout, asked when it opens, already says the other). The shape is the SDK's own for a panel observer that also hears its widgets:
-    strokeweightmutator/StrMutSelectionObserver.cpp - the base attached FIRST in AutoAttach and
+    the flyout, asked when it opens, already says the other). The shape is the SDK's own for a panel observer
+    that also hears its widgets: strokeweightmutator/StrMutSelectionObserver.cpp - the base attached FIRST in AutoAttach and
     detached LAST in AutoDetach, and the widgets' (and here the settings') messages taken in
     HandleSelectionUpdate after the base has seen them; Update itself is the base's
     (SelectionObserver.h: "Do NOT override Update w/o a very good reason"). */
@@ -375,7 +375,7 @@ protected:
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 			KFCPanelTitle::Update();
-			// ...and Search: re-picked by Edit > Find/Change in answer to a row's click goes back (1.4.0).
+			// ...and Search: re-picked by Edit > Find/Change in answer to a row's click goes back.
 			KFCJump::KeepSearchScopeAfterClick();
 			return;
 		}
@@ -384,8 +384,8 @@ protected:
 		// (linksui/ProblemLinksDialogObserver.cpp:80 "Only respond when the button is going up"),
 		// and every product button observer tests this one message and nothing else
 		// (linksui/ToggleLinkInfoButtonObserver.cpp:99, conditionaltextui's four button observers).
-		// *A TOGGLE would also want kFalseStateMessage - conditionaltextui/ConditionTagEyeball
-		//  Observer.cpp:100 takes both - but these pictures are not toggles.
+		// *A TOGGLE would also want kFalseStateMessage - conditionaltextui/ConditionTagEyeballObserver.cpp:100
+		//  takes both - but these pictures are not toggles.
 		if (theChange != kTrueStateMessage || theSubject == nil)
 			return;
 

@@ -1195,9 +1195,9 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// falls back to this 48 when the font cannot be asked. If this number changes, change
 		// kMessageHeightResource there too - the two are stated against each other.
 		//
-		// FOUR LINES, NOT THREE: the line a stopped replace leaves is 128 characters, and three lines
-		// drew it only as far as "the document has", losing the sentence that says what to do (see
-		// KFCPanelMetrics.cpp, which carries the measurement). If the palette font ever changes size,
+		// FOUR LINES, NOT THREE: a 128-character message drew only as far as "the document has" in
+		// three lines, losing the sentence that says what to do (see KFCPanelMetrics.cpp, which carries
+		// the measurement). If the palette font ever changes size,
 		// measure again - the rule is the remainder, not the number 48.
 		//
 		// DRAWN BY HAND (KFCStatusTextView.cpp), not a StaticMultiLineTextWidget: the stock widget
