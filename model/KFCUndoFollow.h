@@ -81,8 +81,8 @@ namespace KFCUndoFollow
 	{
 	public:
 		explicit StepRecorder(int32 chapterIdx);
-		/** One write over the rows of SEVERAL documents (1.4.0 - O18, rows of several documents replaced together in one
-		    undo step, as Change Checked's ticked rows were): every chapter's stories read, one row backup. */
+		/** One write over the rows of SEVERAL documents (rows of several documents replaced together, in one undo step):
+		    every chapter's stories read, one row backup. */
 		explicit StepRecorder(const std::vector<int32>& chapterIdxs);
 		~StepRecorder();
 
@@ -90,7 +90,7 @@ namespace KFCUndoFollow
 		    moved none has nothing an Undo could take back). */
 		void Keep(StepKind kind);
 
-		/** AN OBJECT ROW'S ITEM (1.4.0, spec O11): read its fingerprint now, before the write - an object Replace moves no
+		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object Replace moves no
 		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". */
 		void RecordItem(int32 chapterIdx, UID item);
 
@@ -107,10 +107,10 @@ namespace KFCUndoFollow
 	    copied whole (what an Undo puts back). ReadStories = every text model's version in the run's documents, before
 	    a character is written. Keep = the run went through: kept as kStepRunQueries, in the result set the list is
 	    now AND the one it found - its Undo puts that list back as that result set, and the writes kept for it are
-	    followed again (2026-10-11, U-1: they were dropped at the Keep, so a Replace made before the run read "Changed"
-	    after both Ctrl+Z's, and a second run's Undo could not reach the first run's). RestoreBefore = the run was taken
-	    back (cancelled, failed): the list goes back as it was - as the same result set, so the writes kept for it are
-	    still followed - and nothing is kept. While one stands nothing is followed. */
+	    followed again (dropped at the Keep, a Replace made before the run read "Changed" after both Ctrl+Z's, and a
+	    second run's Undo could not reach the first run's - cases xq-done-undo, xq-two-runs-undo). RestoreBefore = the
+	    run was taken back (cancelled, failed): the list goes back as it was - as the same result set, so the writes
+	    kept for it are still followed - and nothing is kept. While one stands nothing is followed. */
 	class RunRecorder
 	{
 	public:
@@ -143,7 +143,7 @@ namespace KFCUndoFollow
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
 	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
 	    write - a write left with none is dropped, as one of a closed document always was; a write of rows of
-	    several documents (rows selected together - 1.4.0) keeps the others' and lets this one's rows go - and its
+	    several documents (rows selected together) keeps the others' and lets this one's rows go - and its
 	    chapter is emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
 	    documents) puts back the other documents' rows and not this one's. Without it the whole write would be
 	    dropped at the next follow (a document of it no longer open), and an Undo in the documents still open
@@ -153,9 +153,9 @@ namespace KFCUndoFollow
 
 	/** A CHAPTER OF A BOOK'S LIST IS CLOSING. A book's rows stay when a chapter closes (KFCCloseDocResponder),
 	    so its chapter is not emptied as ForgetDocument's is: the writes of rows in it alone go (its history goes
-	    with it); a write of rows of several chapters (rows selected together - 1.4.0) is still followed in the
-	    others and lets this chapter's rows go, so an Undo there does not put back rows its file does not read as
-	    (2026-10-11); its stories come off every write of a whole result set (a query run) - which is then still
+	    with it); a write of rows of several chapters (rows selected together) is still followed in the others and
+	    lets this chapter's rows go, so an Undo there does not put back rows its file does not read as (case
+	    sel-book-close-undo); its stories come off every write of a whole result set (a query run) - which is then still
 	    followed in the chapters left open (an Undo there goes through: the same as All Documents) - and a kept whole
 	    result set holding it marks it FROZEN where that write, or one after it, wrote the chapter: when that set
 	    is put back, the chapter keeps the rows the panel has for it at that moment, since nothing an Undo in
@@ -166,7 +166,8 @@ namespace KFCUndoFollow
 	void ForgetBookChapter(const UIDRef& docRef);
 
 	/** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS. The observer attached to it is taken off while the
-	    document is still whole - what is attached is detached. Called by KFCCloseDocResponder for every close, ahead of its other exits. */
+	    document is still whole - what is attached is detached. Called by KFCCloseDocResponder for every close,
+	    ahead of its other exits. */
 	void DocumentClosing(const UIDRef& docRef);
 
 	/** Application shutdown: the kept writes hold rows (PMStrings) - release them. */
