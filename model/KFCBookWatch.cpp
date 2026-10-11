@@ -193,12 +193,11 @@ void RetireBookResultsIfGone()
 
 /** Timer callback. Raw function pointer - it must never outlive this plug-in (see the detach).
 
-    NOTHING is released in here. The callback runs as the timer object's own idle task, so
-    releasing it from inside drops the last reference to the very object whose RunTask is still on
-    the stack - it would then read this function's return value out of a destroyed object. And
-    nil-ing the global first throws away the only handle a teardown StopTimer could use to stop a
-    callback that has gone wrong. So the timer is released in ONE place, and it is not here (KCM's
-    timer keeps the same rule: KCMPanelAlpha.cpp releases it in KCMShutdownPanelAlpha only). */
+    NOTHING is released in here. The timer object is made once and reused - ArmRetireTimer starts
+    the same one again, and the return value below re-arms it - and nil-ing the global would throw
+    away the only handle a teardown StopTimer could use to stop a callback that has gone wrong. So the
+    timer is released in ONE place, and it is not here (KCM's timer keeps the same rule:
+    KCMPanelAlpha.cpp releases it in KCMShutdownPanelAlpha only). */
 uint32 RetireTimerCallback(void* /*refPtr*/)
 {
 	// A run of ours is walking the very chapters this would hand back - wait it out by returning a

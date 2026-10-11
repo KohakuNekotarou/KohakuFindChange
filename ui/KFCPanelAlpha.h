@@ -4,8 +4,8 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The "Translucent Panel" flyout toggle. Ported from KCM's panel translucency (KCMPanelAlpha, shipped
-//  in its 1.2.0) - the mechanism is not specific to which panel it is pointed at.
+//  The "Translucent Panel" flyout toggle. Ported from KCM's panel translucency (KCMPanelAlpha) - the
+//  mechanism is not specific to which panel it is pointed at.
 //
 //  *Windows only. The alpha is put on the panel's window with Win32's
 //    SetLayeredWindowAttributes; on Mac the three calls below still exist but
@@ -54,7 +54,7 @@ void	KFCSetPanelTranslucent(bool16 on);
 //    docked", rather than leaving a click with no visible result unexplained.
 bool16	KFCApplyPanelTranslucency();
 
-// (2026-10-10) Does the SYSTEM send the keys to the window this panel is on now - is the root of ::GetFocus() the root
+// Does the SYSTEM send the keys to the window this panel is on now - is the root of ::GetFocus() the root
 // of the panel's window (OWL.Dock while it floats, the main frame while docked)? The keyboard frame's second question
 // (KFCResultTree::ListHoldsKeyboard): a click on Find/Change's title bar takes the system's keyboard to the dialog and
 // leaves InDesign's on the result list, and a key then goes to the dialog. Here because this file finds the panel's
@@ -123,7 +123,7 @@ typedef struct HWND__* HWND;
 
 HWND	KFCQueryFindChangeWindow();
 
-// (2026-10-08) One of the Find/Change dialog's own widgets, by its WidgetID - its Query menu
+// One of the Find/Change dialog's own widgets, by its WidgetID - its Query menu
 // (kFindQueryDropDownWidgetID), which KFCQueryDialog.cpp chooses a loaded query in. Found the way the window is (the
 // dialog whose panel answers kFindChangeParentWidgetID), then IPanelControlData::FindWidget on that panel - so the
 // IWindow still stays private. nil when the dialog is not open, or is open with no panel yet.

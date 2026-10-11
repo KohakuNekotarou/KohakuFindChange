@@ -97,7 +97,7 @@
 // ---- The tuning constants ----
 
 // The alpha the panel is drawn with while the toggle is ON (0 = invisible, 255 = opaque).
-// *77 is about 30% - the user's figure, settled on in KCM after 128 (50%) read as too solid.
+// *77 is about 30% - the author's figure, settled on in KCM after 128 (50%) read as too solid.
 // Putting the pointer on the panel brings it back to opaque, so the resting state can afford to be
 // faint. There is no slider and no steps: changing how faint it is means changing this one line.
 // **...but not to 0, and not to anything near it (Microsoft's contract): "hit
@@ -199,7 +199,7 @@ static bool KFCCursorOverWindow(HWND target)
 // *The alpha that SHOULD be on the window: faint only while the toggle is ON and the pointer is
 //   elsewhere. Keep this in one place - both the applying side and the hook's test read it.
 //   *While OFF it does not even look at where the pointer is (this feature does nothing at all when
-//   it is off - the user's rule).
+//   it is off - the author's rule).
 //   Not defined on Mac, where nothing applies an alpha at all (an unused-function warning otherwise).
 static uint8 KFCEffectiveAlpha(HWND target)
 {
@@ -561,7 +561,7 @@ bool16 KFCPanelHasSystemKeyboard()
 #ifdef WINDOWS
 	// The root of the system's keyboard window against the root of the panel's own (KFCQueryPaletteWindow - the same
 	// OWL.Palette the translucency aims at; GA_ROOT is OWL.Dock while it floats, the main frame while docked, as
-	// KFCQueryTranslucentTarget measured). Measured 2026-10-10 (run.ps1's osfocus beside the trace's os=): while the list
+	// KFCQueryTranslucentTarget measured). Measured (run.ps1's osfocus beside the trace's os=): while the list
 	// walked on the arrows the system's keyboard was the panel's OWL.Dock; after Find/Change's title bar was clicked it
 	// was the dialog, with InDesign's keyboard still on the list - and the down arrow moved the page item.
 	const HWND focus = ::GetFocus();
@@ -961,8 +961,8 @@ static uint32 KFCReapplyTimerProc(void* /*refPtr*/)
 {
 	--sReapplyLeft;
 
-	// *Do not Release here (releasing itself from inside RunTask is self-destruction). Releasing is
-	//   in KFCShutdownPanelAlpha(), and nowhere else.
+	// *Not Released here: the timer is made once and reused (the return value below re-arms it), so it
+	//   is Released in KFCShutdownPanelAlpha() and nowhere else.
 	if (!KFCGetPanelTranslucent())
 	{
 		sReapplyLeft = 0;		// turned OFF - stop chasing
