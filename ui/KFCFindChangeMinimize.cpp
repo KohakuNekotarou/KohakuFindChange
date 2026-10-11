@@ -280,8 +280,8 @@ static uint32 KFCFindChangeChaseProc(void* /*refPtr*/)
 {
 	--sRetriesLeft;
 
-	// *Do not Release here (releasing itself from inside RunTask is self-destruction). Releasing is
-	//   in KFCShutdownFindChangeMinimize(), and nowhere else.
+	// *Not Released here: the timer is made once and reused (the return value below re-arms it), so it
+	//   is Released in KFCShutdownFindChangeMinimize() and nowhere else.
 	if (!KFCAnyFindChangeToggleOn())
 	{
 		sRetriesLeft = 0;		// both turned OFF while we were waiting - stop

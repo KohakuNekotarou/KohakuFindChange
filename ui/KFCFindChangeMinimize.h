@@ -23,7 +23,7 @@
 //  drawing, not something InDesign paints - which is why setting the bits is enough.
 //  Full record = memory/window-minimize-presentation-system.md
 //
-//  WS_EX_APPWINDOW is added as well, so the minimised dialog lands on the TASKBAR (the user's
+//  WS_EX_APPWINDOW is added as well, so the minimised dialog lands on the TASKBAR (the author's
 //  choice). Without it Windows leaves a 160x28 title-bar-only window at the bottom left of the
 //  screen - the owned-popup behaviour, measured at L=0 T=700 R=160 B=728.
 //
