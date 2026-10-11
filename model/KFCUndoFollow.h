@@ -165,10 +165,10 @@ namespace KFCUndoFollow
 	    Called by KFCCloseDocResponder for every close while a book's list is up - a run's own hand-backs too. */
 	void ForgetBookChapter(const UIDRef& docRef);
 
-	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - LIFE-14): its chapters in the kept whole result sets take
-	    its new name too, as KFCResultModel::RenameDocumentChapters renames the list's - an Undo or a Redo of a query run
-	    puts a kept list back, and would bring the old name back with it. Found by the binding, as ForgetDocument finds
-	    them; a chapter with a file (a book's) keeps its name. */
+	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the spec map's LIFE-14): its chapter in each kept whole
+	    result set takes its new name too, as KFCResultModel::RenameDocumentChapters renames the list's - an Undo or a Redo
+	    of a query run puts a kept list back, and would bring the old name back with it. Found by the binding, as
+	    ForgetDocument finds them; a set of a book's list keeps its names (ModelSnapshot::fromBook). */
 	void RenameDocument(const UIDRef& docRef, const PMString& newName);
 
 	/** A DOCUMENT IS CLOSING, WHATEVER THE LIST SHOWS. The observer attached to it is taken off while the

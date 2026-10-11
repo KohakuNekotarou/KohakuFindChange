@@ -22,7 +22,6 @@
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
 
 // Project includes:
-#include "KFCBookScope.h"	// ChapterHasFile - a chapter with a file is a book's (RenameDocumentChapters leaves it)
 #include "KFCDiag.h"	// KFC_DIAG_LOG - a row's outcome as it is set, in a test build (compiled out of a shipping one)
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
@@ -794,11 +793,13 @@ void KFCResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 
 int32 KFCResultModel::RenameDocumentChapters(const UIDRef& docRef, const PMString& newName)
 {
+	if (IsFromBook())
+		return 0;
 	int32 renamed = 0;
 	for (size_t i = 0; i < gChapters.size(); ++i)
 	{
 		Chapter& c = gChapters[i];
-		if (c.docRef != docRef || KFCBookScope::ChapterHasFile(c.file) || c.name.IsEqual(newName))
+		if (c.docRef != docRef || c.name.IsEqual(newName))
 			continue;
 		c.name = newName;
 		c.name.SetTranslatable(kFalse);

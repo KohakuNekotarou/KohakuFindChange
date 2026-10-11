@@ -91,7 +91,8 @@ DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 // highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
 // The "a document has been saved as another file" responder (KFCSaveAsDocResponder.cpp): a document-scope list's rows
-// take the document's new name (the author's call, 2026-10-11 - LIFE-14). + 25: the next after the highest spent.
+// take the document's new name (the author's call, 2026-10-11 - the spec map's LIFE-14). + 25: the next after the
+// highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
 
 

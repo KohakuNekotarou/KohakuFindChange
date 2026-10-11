@@ -425,10 +425,12 @@ namespace KFCResultModel
 	    replace - later calls must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
-	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the author's call, 2026-10-11, LIFE-14): every chapter
-	    bound to it that has no file - a document-scope list's - takes its new name, the row's and the status lines' that
-	    name it (a close's). A chapter with a file - a book's - keeps its name: it stands for the book's chapter, still the
-	    file the book lists. The UIDRef is compared, never dereferenced (IsDocStillOpen's rule). Returns how many it renamed. */
+	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the author's call, 2026-10-11, the spec map's LIFE-14):
+	    the chapter of a document-scope list bound to it takes its new name - the row's, and a status line's that names it
+	    (a close's). A book's list keeps its names: its rows stand for the book's chapters, still the files the book lists.
+	    Asked of the list (IsFromBook), as KFCCloseDocResponder asks it - not of a chapter's file, which a book's entry can
+	    lack too (KFCBookScope::ChapterDoc). The UIDRef is compared, never dereferenced (IsDocStillOpen's rule). Returns
+	    how many it renamed. */
 	int32 RenameDocumentChapters(const UIDRef& docRef, const PMString& newName);
 
 	/** A story's VERSION where KFC last knew the chapter's rows in it to stand:

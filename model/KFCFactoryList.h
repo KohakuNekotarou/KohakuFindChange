@@ -28,7 +28,8 @@ REGISTER_PMINTERFACE(KFCStartupShutdown, kKFCStartupShutdownImpl)
 REGISTER_PMINTERFACE(KFCCloseDocResponder, kKFCCloseDocResponderImpl)
 // The rows' text foci for a chapter the user opens again themselves (KFCOpenDocResponder.cpp).
 REGISTER_PMINTERFACE(KFCOpenDocResponder, kKFCOpenDocResponderImpl)
-// A document-scope list's rows take their document's new name after a Save As (KFCSaveAsDocResponder.cpp - LIFE-14).
+// A document-scope list's rows take their document's new name after a Save As (KFCSaveAsDocResponder.cpp - the spec
+// map's LIFE-14).
 REGISTER_PMINTERFACE(KFCSaveAsDocResponder, kKFCSaveAsDocResponderImpl)
 // Result invalidation: retire a book-scope result set when its book closes.
 REGISTER_PMINTERFACE(KFCBookWatch, kKFCBookWatchImpl)

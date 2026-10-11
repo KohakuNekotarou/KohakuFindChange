@@ -246,8 +246,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 
 	/*
 	 * Save-As responder boss: a document-scope list's rows take their document's new name when it is saved as another file
-	 * (KFCSaveAsDocResponder.cpp - the author's call, LIFE-14). One signal, so the API's own provider implementation, as
-	 * the close responder.
+	 * (KFCSaveAsDocResponder.cpp - the author's call, the spec map's LIFE-14). One signal, so the API's own provider
+	 * implementation, as the close responder.
 	 */
 	Class
 	{
