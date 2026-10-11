@@ -39,6 +39,11 @@
 #include "KFCHitMarker.h"
 #include "KFCDiag.h"		// KFC_DIAG_LOG - test builds only
 
+#ifdef KFC_DIAG
+#include <atomic>
+#include "IDThreadingPrimitives.h"	// IDThreading::IsMainThreadDomain - a test build counts the asks from another thread
+#endif
+
 namespace
 {
 
@@ -62,6 +67,23 @@ UID             gStory    = kInvalidUID;
 TextIndex       gStart    = 0;
 TextIndex       gEnd      = 0;
 bool16          gShutdown = kFalse;
+
+#ifdef KFC_DIAG
+// A TEST BUILD SAYS WHEN THE ADORNMENT IS ASKED OFF THE MAIN THREAD (the thread test - an export's background thread draws
+// the text too, and the state above is read there). Asked once per parcel, so not every ask is written: the 1st, 10th and
+// 100th of the session, then every 250th (so a later run in the same session still writes some), with whether a marker was
+// up and whether the ask was for paper or an export.
+void KFCHitMarkerNoteOffMain(int32 iShapeFlags)
+{
+	if (IDThreading::IsMainThreadDomain())
+		return;
+	static std::atomic<int> asks(0);
+	const int n = ++asks;
+	if (n == 1 || n == 10 || n == 100 || n % 250 == 0)
+		KFC_DIAG_LOG("MARKER asked off the main thread n=%d mark=%d printing=%d", n, gHasMark ? 1 : 0,
+			(iShapeFlags & IShape::kPrinting) != 0 ? 1 : 0);
+}
+#endif
 
 // How far the inversion reaches above and below the baseline, as a fraction of the type size, and
 // how wide the bar for a zero-width hit is. The same figures as KCM's marker (KCMStoryMarker.cpp),
@@ -212,6 +234,9 @@ public:
 	virtual bool16 GetCheckIsActive() { return kTrue; }
 	virtual bool16 GetIsActive(const IParcelShape*, const ITextOptions*, int32 iShapeFlags)
 	{
+#ifdef KFC_DIAG
+		KFCHitMarkerNoteOffMain(iShapeFlags);
+#endif
 		if (!gHasMark)
 			return kFalse;
 		// Never on paper or in an export. kPreviewMode is NOT refused here - the screen's preview modes

@@ -293,8 +293,8 @@ void KFCBookWatch::Update(const ClassID& theChange, ISubject* /*theSubject*/,
 	// DEBUG build's Spy (the file header); a release build has no Spy.
 	// ! What this hears is the session's IID_IBOOKCONTENT protocol and nothing else (KFCBookWatchAttach), so
 	//   a command with no line here may still have broadcast - elsewhere. No line is not "nothing was sent".
-	KFC_DIAG_LOG("BOOKWATCH change=0x%x protocol=0x%x changedBy=%p", (unsigned int)theChange.Get(),
-		(unsigned int)protocol.Get(), changedBy);
+	KFC_DIAG_LOG("BOOKWATCH change=0x%x protocol=0x%x changedBy=%p main=%d", (unsigned int)theChange.Get(),
+		(unsigned int)protocol.Get(), changedBy, IDThreading::IsMainThreadDomain() ? 1 : 0);
 
 	// One cue, one question - see the file header.
 	if (theChange != kCloseBookCmdBoss)

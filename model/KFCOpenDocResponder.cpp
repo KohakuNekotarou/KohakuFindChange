@@ -26,6 +26,7 @@
 
 // Project includes:
 #include "KFCBookScope.h"		// ChapterHasFile, FindOpenChapterDoc - a chapter is matched by its FILE
+#include "KFCDiag.h"			// KFC_DIAG_LOG - the gate's refusals, in a test build (compiled out of a shipping one)
 #include "KFCID.h"
 #include "KFCResultModel.h"
 #include "KFCRunGuard.h"		// a run of ours binds its own chapters
@@ -45,7 +46,15 @@ CREATE_PMINTERFACE(KFCOpenDocResponder, kKFCOpenDocResponderImpl)
 
 void KFCOpenDocResponder::Respond(ISignalMgr* signalMgr)
 {
-	if (signalMgr == nil || !IDThreading::IsMainThreadDomain() || KFCRunGuard::IsAnyRunning())
+	if (signalMgr == nil)
+		return;
+	// (A test build says when the main-thread gate turned one away, as KFCCloseDocResponder does.)
+	if (!IDThreading::IsMainThreadDomain())
+	{
+		KFC_DIAG_LOG("OPEN off the main thread - a background task's copy, left alone");
+		return;
+	}
+	if (KFCRunGuard::IsAnyRunning())
 		return;
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)

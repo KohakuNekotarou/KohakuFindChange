@@ -97,8 +97,13 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// The main thread only (kModelPlugIn - the split's design, section 6). A model plug-in's
 	// responder is also called on a background task's thread, where the document "closing" is the task's
 	// own copy (an export's clone) - and the results are about the user's document, which stays open.
+	// (A test build says when the gate turned one away - the thread test counts them: a test that never saw one has
+	// not tried the gate.)
 	if (!IDThreading::IsMainThreadDomain())
+	{
+		KFC_DIAG_LOG("CLOSE off the main thread - a background task's copy, left alone");
 		return;
+	}
 
 	// GetDocument hands back the document's UIDRef (not an IDocument*), and the type allows gNull,
 	// so it is tested before it is compared. NO CASE IS KNOWN TO PRODUCE THE NIL - not an unsaved
