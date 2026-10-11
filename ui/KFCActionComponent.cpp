@@ -193,6 +193,11 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// No re-entry test here: the ENGINE has one (and so does every other run of ours), and
 			// it puts a reason on the status line. A command reaching here while a run is up - the
 			// bar pumps events, so it can - says why instead of looking broken. See KFCRunGuard.
+			// A LANDING IS THE UI HALF'S, AND THE ENGINE CANNOT SEE IT (KFCJump::IsLanding): its message loop can dispatch this
+			// command (a shortcut, the Application Bar's Return), and the search's commit point closes the windowless chapter
+			// the landing is giving a window. Dropped, as a second click is.
+			if (KFCJump::IsLanding())
+				break;
 
 			// Before the search rather than after: the progress bar is modal, and the tab stays in
 			// view behind it. This is also what puts the name back when the panel has been closed
@@ -217,6 +222,9 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// Change All in Book (No List) (the author's calls - F6 and F18): InDesign's own Change All over
 			// the book's chapters, no list. The engine keeps its own doors and says why on a refusal (KFCChangeAll::Run).
+			// Not while a landing is under way - Find's reason (KFCJump::IsLanding).
+			if (KFCJump::IsLanding())
+				break;
 			KFCPanelTitle::Update();
 			PMString summary;
 			(void)KFCRuns()->ChangeAll(summary);
@@ -239,7 +247,8 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		{
 			// Clear Results: the list emptied, so Change All can run (C8 of
 			// docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md). The documents are not touched.
-			if (KFCResultTree::RefusedWhileRunning())
+			// Not while a landing is under way either (KFCJump::IsLanding): the rows it is landing on would go from under it.
+			if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning())
 				break;
 			PMString status;
 			(void)KFCRuns()->ClearResults(status);

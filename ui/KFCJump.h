@@ -45,6 +45,15 @@ namespace KFCJump
 	    @param hitIdx the hit index, or -1 when the row is not a hit row. */
 	void ActivateNode(int32 chapterIdx, int32 hitIdx);
 
+	/** IS A LANDING UNDER WAY - ActivateNode's, or an object row's Replace's (both hold the one-activation guard)?
+	    A landing opens documents and windows, and opening one RUNS THE MESSAGE LOOP: a key, a click or a menu command can
+	    be dispatched in the middle of it. Nothing of the panel's own that writes, walks or closes may start then - each
+	    door asks this and does nothing (as ActivateNode drops a second click): a Return or a right-click Replace (a write
+	    inside the landing's dirty guard would be marked clean when the landing ends, and the next Hide Previous Chapter
+	    would close it unsaved), Search This Story / Document Again, and the commands that start a run (Find, Change All,
+	    Clear Results, the query dialog's Run - a run's commit point closes the windowless chapter the landing is opening). */
+	bool IsLanding();
+
 	/** A Find/Change setting changed (KFCPanelTitle's observer, IID_IFINDCHANGEOPTIONS). If a row was activated a
 	    moment ago (ActivateNode - a click, the arrow walk) and Edit > Find/Change has re-picked Search: in answer to
 	    the selection or the front document that changed, Search: is put back as it was before the activation, when

@@ -94,6 +94,13 @@
 //    clean-after-write  KFCReplaceEngine.cpp's row Replace takes each written document's "unsaved" flag down after the
 //                write - a close would then throw the write away unasked: the case that shows the written-document check
 //                catching it (written-cleaned-armed)
+//    landing-return  (UI half) ui/KFCJump.cpp's JumpToHit replaces its own row through the panel's door
+//                (KFCResultTree::ReplaceRows) once its window is in front - the Return a landing's message loop can
+//                dispatch: the door must turn it away (landing-return)
+//    landing-guard-off  (UI half) KFCJump::IsLanding answers no, the old way: with landing-return the write goes in inside
+//                the landing's dirty guard, is marked clean when the landing ends, and the next landing's Hide Previous
+//                Chapter sweep closes it unsaved - the case that shows the written-document check catching it
+//                (landing-return-armed)
 //    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
 //    qd-order-file  (UI half) the file's first line is the file Save Order... and Load Order... use, in place of

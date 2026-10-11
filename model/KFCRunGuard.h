@@ -4,9 +4,13 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because three different things
-//  can be running - a search, a Change All in Book (KFCChangeAll) and a query run (KFCQuerySequence) - and every
-//  guard has to know about all of them. (A hit row's Replace is one undo step with no bar, never a run.)
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
+//  can be running - a search, a Change All in Book (KFCChangeAll), a query run (KFCQuerySequence) and a row's Replace
+//  (KFCReplaceEngine::IsReplacing) - and every guard has to know about all of them.
+//  A ROW'S REPLACE COUNTS THOUGH IT HAS NO BAR (the 2026-10-12 re-check): reopening a closed chapter and giving a written one
+//  its window run the message loop as surely as a bar does (KFCJump.cpp's gActivating says so of a landing's opens), and
+//  what that loop dispatches - a click's landing and its Hide Previous Chapter sweep, a second Return, a run - must wait
+//  for it like for any run. (Until then it was "one undo step with no bar, never a run".)
 //
 //  WHY THIS IS NEEDED AT ALL
 //
@@ -40,6 +44,8 @@
 //    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run;
 //    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
 //      which would otherwise load a query into Find/Change while a query run is putting its own there;
+//    * a row's landing (KFCJump::ActivateNode, the UI half - through IKFCRuns), whose Hide Previous Chapter sweep
+//      would otherwise schedule the close of a chapter a Replace is about to write;
 //    * a test build's hidden-document check (KFCDiagHiddenDocs, the UI half), which leaves the chapter a
 //      run is walking to the run.
 //

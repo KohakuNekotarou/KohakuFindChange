@@ -1090,6 +1090,15 @@ bool JumpToHit(int32 chapterIdx, int32 hitIdx, NotSelected& outWhy)
 		KFCHitMarkerView::Hide();
 		return false;
 	}
+#ifdef KFC_DIAG
+	// (Fault switch landing-return, a test build's only - KFCDiag.h: the Return a landing's message loop can dispatch, made
+	// here - the window in front, the dirty guard standing. The panel's door must turn it away: KFCJump::IsLanding.)
+	if (KFC_DIAG_FAULT("landing-return"))
+	{
+		const bool wrote = KFCResultTree::ReplaceRows(KFCRowsByChapter(1, std::make_pair(chapterIdx, std::vector<int32>(1, hitIdx))));
+		KFC_DIAG_LOG("FAULT landing-return: the row's Replace inside the landing wrote=%d", wrote ? 1 : 0);
+	}
+#endif
 
 	// A CLICK LEAVES ITS ROW'S MATCH SELECTED, OR NOTHING (the author's call: whatever Search: is, as Find Next does).
 	// What was selected goes first; the match is selected below when it can be, and otherwise the marker alone points.
@@ -1448,7 +1457,10 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 
 	// A previous landing is still inside its own document-open - the click is dropped, exactly as
 	// the keyboard walk drops its key (see gActivating above JumpToHit).
-	if (gActivating)
+	// ...AND SO WHILE A WRITE OR A RUN OF THE MODEL'S IS UNDER WAY (KFCRunGuard - a row's Replace counts): it can be standing
+	// inside its own message loop - reopening a closed chapter, giving one a window - and this landing's Hide Previous
+	// Chapter sweep would schedule the close of a chapter that write is about to write, the K-3 shape.
+	if (gActivating || KFCRuns()->IsAnyRunning())
 		return;
 	ActivationGuard activationGuard;
 
@@ -1492,6 +1504,17 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 		else if (chapterIdx == -1)
 			ShowBook();
 	}
+}
+
+bool KFCJump::IsLanding()
+{
+#ifdef KFC_DIAG
+	// (Fault switch landing-guard-off, a test build's only - KFCDiag.h: no landing is said to be under way, the old way -
+	// what the doors that ask this stop, shown with landing-return.)
+	if (KFC_DIAG_FAULT("landing-guard-off"))
+		return false;
+#endif
+	return gActivating;
 }
 
 void KFCJump::KeepSearchScopeAfterClick()

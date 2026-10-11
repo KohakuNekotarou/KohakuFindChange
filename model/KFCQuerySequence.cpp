@@ -366,6 +366,17 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 					break;
 				}
 
+				// A DOCUMENT GONE SINCE THE RUN TOOK IT IS NOT WRITTEN: its docRef would be followed into a database that is no
+				// longer there. InDesign closes one of the run's documents by itself - the document a placed .indd keeps open
+				// behind its frame, which All Documents takes as one of the user's (memory placed-indd-headless-document), goes
+				// about a quarter of a second after anything is written into it, and the run's bar lets idle work through
+				// (KFCRunGuard.h). Asked by comparing alone (KFCBookScope::IsDocStillOpen - nothing is read through the address).
+				if (!KFCBookScope::IsDocStillOpen(targets[d].docRef))
+				{
+					KFC_DIAG_LOG("QUERYRUN step %d: %s is no longer open - not written", unit, targets[d].shortName.GetUTF8String().c_str());
+					continue;
+				}
+
 				// EACH DOCUMENT WITH InDesign's OWN CHANGE ALL (F7 - docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md
 				// section 5): no rows collected, no limit. A book or All Documents writes each document whole; Story / To End
 				// of Story / Selection write that part of the front document (the one target).
@@ -417,10 +428,11 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		failed = true;
 		why = ErrorUtils::PMGetGlobalErrorString();
 	}
-	// THE MARK - inside the sequence, so the run's Undo and Redo are heard (KFCUndoFollow::MarkWrite).
+	// THE MARK - inside the sequence, so the run's Undo and Redo are heard (KFCUndoFollow::MarkWrite). Not on a document
+	// gone since it was written (the step above says how one goes): MarkWrite reads the database it is handed.
 	if (!cancelled && !failed)
 		for (size_t t = 0; t < targets.size(); ++t)
-			if (wroteTo[t])
+			if (wroteTo[t] && KFCBookScope::IsDocStillOpen(targets[t].docRef))
 				KFCUndoFollow::MarkWrite(targets[t].docRef.GetDataBase());
 	if (cancelled || failed)
 		CmdUtils::AbortCommandSequence(seq);
@@ -458,7 +470,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	// (Test builds: every document written, noted before any of them is left as the loop below leaves it -
 	// KFCDiagWrittenDocs.h.)
 	for (size_t i = 0; i < targets.size(); ++i)
-		if (wroteTo[i])
+		if (wroteTo[i] && KFCBookScope::IsDocStillOpen(targets[i].docRef))
 			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
 
 	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back.

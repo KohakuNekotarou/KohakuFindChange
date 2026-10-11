@@ -61,6 +61,16 @@
 namespace
 {
 
+// A ROW'S REPLACE UNDER WAY (KFCReplaceEngine::IsReplacing - KFCRunGuard counts it). A depth, not a flag: ReplaceHits hands
+// one row to ReplaceHit, and the inner one's end must not say the outer one is over.
+int32 gReplacingDepth = 0;
+
+struct ReplacingScope
+{
+	ReplacingScope() { ++gReplacingDepth; }
+	~ReplacingScope() { --gReplacingDepth; }
+};
+
 // Run one find/change walker command and hand back WHAT IT ANSWERED, not merely whether it landed
 // on something. Only kSuccess fills the story and range; every other answer leaves them invalid,
 // which is the header's own contract (IFindChangeService.h:46-49) rather than a convention here:
@@ -1739,8 +1749,14 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	return true;
 }
 
+bool KFCReplaceEngine::IsReplacing()
+{
+	return gReplacingDepth > 0;
+}
+
 bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outStatus)
 {
+	const ReplacingScope replacing;		// counted by KFCRunGuard from the door to the hand-back (IsReplacing)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	if (!CanReplaceHit(chapterIdx, hitIdx))
@@ -1760,6 +1776,7 @@ bool KFCReplaceEngine::ReplaceHit(int32 chapterIdx, int32 hitIdx, PMString& outS
 
 bool KFCReplaceEngine::ReplaceHits(const KFCRowsByChapter& rowsByChapter, PMString& outStatus)
 {
+	const ReplacingScope replacing;		// (IsReplacing - ReplaceHit's)
 	outStatus.Clear();
 	outStatus.SetTranslatable(kFalse);
 	int32 firstChapter = -1, firstHit = -1;

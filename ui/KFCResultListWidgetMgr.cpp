@@ -975,6 +975,11 @@ bool KFCResultTree::CanReplaceAny(const KFCRowsByChapter& rows)
 
 bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus)
 {
+	// NOT WHILE A LANDING IS UNDER WAY (KFCJump::IsLanding - its message loop can dispatch a Return or a menu item): a write
+	// inside the landing's dirty guard is marked clean when the landing ends, and the next Hide Previous Chapter sweep then
+	// closes the document unsaved. Dropped without a word, as an object row's Replace always was (ReplaceObjectRow(s)).
+	if (KFCJump::IsLanding())
+		return false;
 	int32 shownChapter = -1, shownHit = -1;
 	if (!LastSelectedHit(rows, shownChapter, shownHit) || RefusedWhileRunning())
 		return false;
@@ -1029,7 +1034,7 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	else
 		Rebuild();
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the repaint focus=%s", DiagKeyFocus().c_str());
-	if (!status.IsEmpty())		// (an object row dropped while a landing is under way says nothing; a text row always does)
+	if (!status.IsEmpty())		// (empty only from a door that refused without a word - a landing under way is turned away above)
 		ShowStatus(status);
 	KFC_DIAG_LOG("RETFOCUS ReplaceRows after the status focus=%s", DiagKeyFocus().c_str());
 	if (outStatus != nil)
@@ -1039,7 +1044,9 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 
 bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
 {
-	if (RefusedWhileRunning())
+	// Not while a landing is under way (KFCJump::IsLanding): the walk reopens the story's chapter and hands it back - closed
+	// on the spot - which can be the very document the landing is giving a window.
+	if (KFCJump::IsLanding() || RefusedWhileRunning())
 		return false;
 	PMString status;
 	const bool done = KFCRuns()->SearchStoryAgain(chapterIdx, groupIdx, status);
@@ -1052,7 +1059,8 @@ bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
 
 bool KFCResultTree::SearchDocumentAgain(int32 chapterIdx)
 {
-	if (RefusedWhileRunning())
+	// Not while a landing is under way - Search This Story Again's reason.
+	if (KFCJump::IsLanding() || RefusedWhileRunning())
 		return false;
 	PMString status;
 	const bool done = KFCRuns()->SearchDocumentAgain(chapterIdx, status);

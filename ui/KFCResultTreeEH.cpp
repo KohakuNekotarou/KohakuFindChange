@@ -266,9 +266,10 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 		HoldAfterReturn();
 		return kTrue;
 	}
-	// A previous landing is still opening a document - see gWalking. The key is taken, and nothing is written from a
-	// half-made selection.
-	if (gWalking)
+	// A previous landing is still opening a document - see gWalking - or a click's is (KFCJump::IsLanding: a click lands
+	// outside any walk, and the Return its message loop dispatches would write inside the landing's dirty guard, which marks
+	// the write clean when the landing ends). The key is taken, and nothing is written from a half-made selection.
+	if (gWalking || KFCJump::IsLanding())
 	{
 		HoldAfterReturn();
 		return kTrue;

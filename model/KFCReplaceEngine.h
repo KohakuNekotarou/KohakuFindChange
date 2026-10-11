@@ -109,6 +109,13 @@ namespace KFCReplaceEngine
 	    outcome - WhyGreyed answering kGreyedNot. */
 	bool CanReplaceHit(int32 chapterIdx, int32 hitIdx);
 
+	/** IS A ROW'S REPLACE UNDER WAY - ReplaceHit or ReplaceHits, text rows or object rows, from the door to the last
+	    chapter's hand-back? KFCRunGuard counts it. It has no bar, but reopening a closed chapter and giving a written one
+	    its window RUN THE MESSAGE LOOP, and what that dispatches must not start inside it: a landing (its Hide Previous
+	    Chapter sweep would schedule the close of a chapter this is about to write), a second Replace, a run (its commit
+	    point would close the chapter this reopened), the book watcher's release, the Undo follow. */
+	bool IsReplacing();
+
 	/** WHY A ROW'S REPLACE IS GREYED - the one place the reasons are asked (CanReplaceHit is this answering kGreyedNot) -
 	    as its row shows it - Changed, Missing, locked, refused -
 	    for the rows left by a Replace of rows selected together, counted by reason (the author's call: "1 already
