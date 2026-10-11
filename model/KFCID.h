@@ -90,6 +90,9 @@ DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 // rows' text foci (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T6 c). + 24: the next after the
 // highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
+// The "a document has been saved as another file" responder (KFCSaveAsDocResponder.cpp): a document-scope list's rows
+// take the document's new name (the author's call, 2026-10-11 - LIFE-14). + 25: the next after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
 
 
 // InterfaceIDs:
@@ -156,6 +159,8 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDocUndoObserverImpl, kKFCPrefix + 41)
 DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 // The open-document responder's IResponder (KFCOpenDocResponder.cpp). + 43: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCOpenDocResponderImpl, kKFCPrefix + 43)
+// The save-as responder's IResponder (KFCSaveAsDocResponder.cpp). + 44: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCSaveAsDocResponderImpl, kKFCPrefix + 44)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI

@@ -40,7 +40,7 @@
 #include "BuildNumber.h"
 #include "PlugInModel_UIAttributes.h"
 #include "TextID.h"			// kGlobalTextAdornmentServiceImpl / IID_IGLOBALTEXTADORNMENT - the jump marker
-#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl / kAfterOpenDocSignalRespServiceImpl - the close- and open-document responders
+#include "DocumentID.h"		// kBeforeCloseDocSignalRespServiceImpl / kAfterOpenDocSignalRespServiceImpl / kAfterSaveAsDocSignalRespServiceImpl - the close-, open- and save-as-document responders
 
 // Project includes:
 #include "KFCID.h"
@@ -241,6 +241,21 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		{
 			IID_IK2SERVICEPROVIDER, kAfterOpenDocSignalRespServiceImpl,
 			IID_IRESPONDER,         kKFCOpenDocResponderImpl,
+		}
+	},
+
+	/*
+	 * Save-As responder boss: a document-scope list's rows take their document's new name when it is saved as another file
+	 * (KFCSaveAsDocResponder.cpp - the author's call, LIFE-14). One signal, so the API's own provider implementation, as
+	 * the close responder.
+	 */
+	Class
+	{
+		kKFCSaveAsDocResponderBoss,
+		kInvalidClass,
+		{
+			IID_IK2SERVICEPROVIDER, kAfterSaveAsDocSignalRespServiceImpl,
+			IID_IRESPONDER,         kKFCSaveAsDocResponderImpl,
 		}
 	},
 

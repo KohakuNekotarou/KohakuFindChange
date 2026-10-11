@@ -1,6 +1,6 @@
 # 10. 文書・ブックを閉じたとき
 
-> コード地図での位置: ブロック **11**（`model/KFCCloseDocResponder.cpp`・`model/KFCBookWatch.*`・`model/KFCBookScope.*`）と **13**（起動と終了＝`model/KFCStartupShutdown.cpp`・`ui/KFCUIStartupShutdown.cpp`）。
+> コード地図での位置: ブロック **11**（`model/KFCCloseDocResponder.cpp`・`model/KFCBookWatch.*`・`model/KFCBookScope.*`・別名で保存の名前＝`model/KFCSaveAsDocResponder.cpp`〈2026-10-11 夜〉）と **13**（起動と終了＝`model/KFCStartupShutdown.cpp`・`ui/KFCUIStartupShutdown.cpp`）。
 > KFC が開いた章の閉じ方・残し方は第3章 §5、取り消しの追従を捨てるときは第9章 UNDO-11。
 > 訂正の書き方は [00-index.md](00-index.md)。
 
@@ -82,6 +82,13 @@
 ## 3. 保存したとき
 
 - **LIFE-14** 文書やブックを**保存しても、結果は何も変わらない**（KFC は保存に何もしない）。
+  ★ただし**文書を別名で保存すると、その文書の行の名前が、その場で新しいファイル名になる**（2026-10-11 夜の作者の決定・`KFCSaveAsDocResponder`＝InDesign の「別名で保存の後」の知らせ）。
+  行はそれまでも文書そのもの（データベース）を指していて、置換・Search This Document Again・閉じたときの文もその文書のもの＝名前だけが検索のときのままだった
+  （B.indd を C.indd に別名で保存し、B.indd を開き直すと、「B.indd」の行が C.indd に書いていた＝正しい文書に、紛らわしい名前で）。
+  閉じたときの文（LIFE-02）も新しい名前で言う。一度も保存していない文書を初めて保存したときも同じ（名前の無い文書 → ファイル名）。
+  **「コピーを保存」では変えない**（文書は元のファイルのまま）。**ブックの結果の章の行は変えない**（行はブックに載った章のファイルのもの・章を別名で保存した写しは章ではない＝xs3-e-saveas-jump-replace）。
+  クエリの連続実行の取り消しのために取ってある一覧の写しも同じ名前にする（取り消しで古い名前が戻らない）。KFC の実行の最中には変えない（実行が自分の一覧を出す）。
+  回帰＝`doc-saveas-replace`／`doc-saveas-docagain-name`／`doc-untitled-save-name`／`doc-saveacopy-keeps-name`／`ad-saveas-open-replace`／`ad-saveas-reopen-replace`。
   - 訂正:
 
 ---
@@ -107,4 +114,5 @@
 - LIFE-11：0.3秒後に「まだ開いている」と答える遅いマシンがあるかは測っていない（その場合は次のブックの閉じる知らせまで消えない）。
 - LIFE-13：ブックを別名で保存した後に、そのブック自身を閉じたとき一覧が消えるかは、この章のためには確かめていない（パスが古いので、閉じる前から「開いていない」と答える見込み）。
 - LIFE-06：復帰の保護停止（InDesign が落ちた件）は KFC が原因ではないと分かっているが、復帰と KFC の組み合わせは数回しか試していない。
-- ✅（2026-10-11 全件の点検で確かめた）文書を**別名で保存**しても、その文書の行は置換できる（回帰 `doc-saveas-replace`）。文書の行の名前は検索したときのまま（`saveasA.indd`）＝直すかは作者。
+- ✅（2026-10-11 全件の点検で確かめた）文書を**別名で保存**しても、その文書の行は置換できる（回帰 `doc-saveas-replace`）。文書の行の名前は検索したときのまま（`saveasA.indd`）だった＝同じ日の夜、作者の決定で**別名で保存の時に新しい名前にする**ようにした（LIFE-14）。
+- ✅（2026-10-11 夜・作者の問い「すべてのドキュメントで検索した後に、別名で保存や文書を開くと、置換で不具合がおきない？」）All Documents の結果は、検索の後で**文書を開いても・別名で保存しても・元のファイルを開き直しても・1つ閉じて同じ作りの文書を作っても**、行は検索した文書に書き、関係ない文書は変わらない（閉じた文書の行は結び付きごと切れる＝LIFE-07）。回帰＝`ad-open-replace`／`ad-saveas-open-replace`／`ad-saveas-reopen-replace`／`ad-close-new-replace`。

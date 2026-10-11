@@ -1077,6 +1077,25 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	KFC_DIAG_STEPS("chapter closing");
 }
 
+void KFCUndoFollow::RenameDocument(const UIDRef& docRef, const PMString& newName)
+{
+	// Its chapters in the kept whole result sets - by the binding, as ForgetDocument finds them; a book's keeps its name
+	// (the rule of KFCResultModel::RenameDocumentChapters, which renames the list on screen).
+	for (size_t i = 0; i < gSteps.size(); ++i)
+	{
+		KFCResultModel::ModelSnapshot* const sets[2] = { &gSteps[i].before, &gSteps[i].after };
+		for (size_t s = 0; s < 2; ++s)
+			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
+			{
+				KFCResultModel::Chapter& chapter = sets[s]->chapters[c];
+				if (chapter.docRef != docRef || KFCBookScope::ChapterHasFile(chapter.file))
+					continue;
+				chapter.name = newName;
+				chapter.name.SetTranslatable(kFalse);
+			}
+	}
+}
+
 void KFCUndoFollow::ShutdownCleanup()
 {
 	// Assigning fresh vectors releases the storage too (the KESCL ShutdownCleanup rule): the kept writes
