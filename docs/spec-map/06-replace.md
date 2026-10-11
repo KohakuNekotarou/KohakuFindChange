@@ -234,6 +234,6 @@
 
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
 
-- REP-01：置換形式（Change Format）が書かれるか。本体の置換のコマンドに任せているので書かれるはずだが、この章のためには測っていない（GEN の未確認と同じ）。
+- ✅（2026-10-11 全件の点検で確かめた）REP-01：置換形式（Change Format）は書かれる＝回帰 `hd-cf-char`・`hd-cf-formatonly`・`hd-cf-formatonly-undo`（本体の「すべてを置換」と同じ結果）。
 - REP-16：英語 UI の取り消しの名前 `Replace` は文字列表の値で、実機の「編集」メニューで見てはいない。
-- REP-32：矢印キーで行を歩いてから Return で置換する流れは、試験の道具（KIDMCP の `send_input`）が矢印を拡張キーとして送らないため、自動では回せていない（Return だけの流れは実機で確認済み＝回帰 `ret-*`）。
+- ✅（2026-10-11 全件の点検で確かめた）REP-32：矢印キーで行を歩いてから Return で置換する流れは、回帰 `ret-walk`（`click:1;key:ENTER;key:DOWN;key:ENTER`）・`ret-book-walk`・`ret-walk-item` で回っていて合格している（KIDMCP の `send_input` は矢印を送れる）。
