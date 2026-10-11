@@ -137,10 +137,11 @@ PMString KFCTail(const PMString& s, int32 n)
 	return out;
 }
 
-/* Move a cut position off the middle of a surrogate pair, so neither side of the cut holds half a
-   character. It cuts BEFORE the pair, whichever side is kept (KFCHead keeps [0, pos), KFCTail keeps
-   [pos, end)). KCM carries the same three lines for the same doubt: PMString counts characters, so
-   this may never fire - but it is correct either way. */
+/* Meant to move a cut position off the middle of a surrogate pair, cutting BEFORE the pair whichever side
+   is kept (KFCHead keeps [0, pos), KFCTail keeps [pos, end)). IT NEVER FIRES, and is kept as harmless:
+   PMString's positions are whole characters - CharCount, Truncate and Remove count characters - so no cut
+   falls inside a pair, and GetChar answers the PLATFORM character at a position (PMString.cpp:2338-2347),
+   never half a pair. KCM carries the same three lines. */
 int32 KFCSafeCut(const PMString& s, int32 pos)
 {
 	const int32 total = s.CharCount();

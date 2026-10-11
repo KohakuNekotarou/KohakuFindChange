@@ -55,9 +55,13 @@ namespace KFCResultTree
 
 	/** ONE DOCUMENT ROW IS ABOUT TO GO (All Documents: a document was closed). Tells
 	    the tree BEFORE the model empties the chapter (KFCResultModel::CloseChapter) - ITreeViewMgr's
-	    BeforeNodeDeleted, the way the conditional text panel takes a row out - so only that row and its
-	    children leave, and every other row keeps its place and whether it is open (a Rebuild would close
-	    them all again). Safe when the panel is closed. */
+	    BeforeNodeDeleted - so only that row and its children leave, and every other row keeps its place and
+	    whether it is open (a Rebuild would close them all again).
+	    BEFORE, AND IT HAS TO BE: ITreeViewMgr.h:78 asks for the call before the object is deleted (so the tree
+	    can still get its size), and this tree's adapter reads the model, where an emptied chapter is no longer a
+	    row. (The conditional text panel takes one row out with the same call, but after its list has changed,
+	    from a lazy notification - its rows are named by a condition's UID, which names the row still.)
+	    Safe when the panel is closed. */
 	void BeforeChapterRowGoes(int32 chapterIdx);
 
 	/** Write a message to the panel's message area (drawn by hand - KFCStatusTextView). Safe
@@ -70,13 +74,12 @@ namespace KFCResultTree
 	    false = no preview for this row (not a GREP search, replaced, the query or the story changed, its document
 	    closed...) - then DropRowPreview. Not kept as the last message: a preview is the row's, not a report.
 	    @param notSelectedWhy  a word or two on why the click did not select the row's match ("no width", "overset",
-	           "hidden layer" - 1.4.0, the author's call of 2026-10-10), put in the heading: "Preview Text (not
-	           selected - no width):". nil when it was selected. */
+	           "hidden layer" - the author's call), put in the heading: "Preview Text (not selected - no width):". nil
+	           when it was selected. */
 	bool ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* notSelectedWhy = nil);
 
-	/** A ROW'S OWN NOTE on the message area (1.4.0): why a click did not select the row's match or item - and, for rows
-	    selected together, why a row was not added. Like a preview
-	    it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
+	/** A ROW'S OWN NOTE on the message area: why a click did not select the row's match or item - and, for rows
+	    selected together, why a row was not added. Like a preview it is the row's, not a report - not kept as the last message, and taken away by DropRowPreview when the next row
 	    is landed on (else walking on with the arrows from a locked row would leave its reason standing beside a row
 	    that was selected). Safe when the panel is closed. */
 	void ShowRowNote(const PMString& note);
@@ -86,41 +89,39 @@ namespace KFCResultTree
 	void DropRowPreview();
 
 	/** REPLACE THE ROWS (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F16 / F17 for one row;
-	    O18 - the author's calls of 2026-10-10 - for rows selected together: hit rows of one kind, of one document or
-	    several - Change Checked's ticked rows, made by selecting). Return
-	    on the selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a
-	    run of ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question
-	    the row menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and
-	    Redo - object rows through KFCJump::ReplaceObjectRows (the document of the row selected last in front, its item
-	    left selected - LastSelectedHit), text
-	    rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the status line set. True = something
-	    written. outStatus, when given, gets the status line it set - Shift+Return adds to it when there is no row below to
-	    go on to (KFCResultTreeEH). */
+	    the author's calls for rows selected together: hit rows of one kind, of one document or several). Return on the
+	    selected rows and a hit row's right-click Replace (RowsOfRightClick) both come here. Writes nothing while a run of
+	    ours is up (RefusedWhileRunning says so) or when none of them can be replaced (CanReplaceAny - the question the row
+	    menu greys Replace by); then their Replace in one undo step, no prompt, the panel following Ctrl+Z and Redo -
+	    object rows through KFCJump::ReplaceObjectRows (the document of the row selected last in front, its item left
+	    selected - LastSelectedHit), text rows through the model (IKFCRuns::ReplaceRows) - the rows repainted and the
+	    status line set. True = something written. outStatus, when given, gets the status line it set - Shift+Return adds
+	    to it when there is no row below to go on to (KFCResultTreeEH). */
 	bool ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatus = nil);
 
 	/** Can the Replace run on these rows - can any of them be replaced (KFCRuns()->CanReplaceHit)? The one question the
 	    row menu greys Replace by (KFCActionComponent) and ReplaceRows asks first. */
 	bool CanReplaceAny(const KFCRowsByChapter& rows);
 
-	/** THE HIT ROWS SELECTED TOGETHER now (O17): by document, in the order drawn; outObjects (optional) = object rows
+	/** THE HIT ROWS SELECTED TOGETHER now: by document, in the order drawn; outObjects (optional) = object rows
 	    rather than text rows. false when nothing is selected, or a story, document or book row is
 	    (KFCResultTreeController.cpp). */
 	bool GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjects = nil);
 
-	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES (O18): every row selected together, by document in the order drawn, when
+	/** THE ROWS A RIGHT-CLICK'S REPLACE WRITES: every row selected together, by document in the order drawn, when
 	    the hit row right-clicked is one of several selected; else that row alone. Asked by the menu's grey state and by
 	    the Replace itself (KFCActionComponent) - one answer for both. */
 	KFCRowsByChapter RowsOfRightClick(int32 chapterIdx, int32 hitIdx);
 
-	/** SELECT ALL ROWS (a book, document or story row's right-click menu - the author's call of 2026-10-11): every hit row
+	/** SELECT ALL ROWS (a book, document or story row's right-click menu - the author's call): every hit row
 	    under `row` selected - its rows expanded first, as a run walks what is drawn - for Return to replace them all
-	    together (O18). The page does not jump (the rows are the list's selection, not the page's); the message area says
+	    together. The page does not jump (the rows are the list's selection, not the page's); the message area says
 	    how many were selected. false = none under it. */
 	bool SelectAllRows(const NodeID& row);
 
 	/** Is there a hit row under `row` for SelectAllRows to select - the rows it walks, the first of them enough? The one
-	    question the row menu disables Select All Rows by (KFCActionComponent - the author's call of 2026-10-11 on a row
-	    with none under it, a document row Search This Document Again left at (0/0) or a book search's that found nothing:
+	    question the row menu disables Select All Rows by (KFCActionComponent - the author's call on a row with none
+	    under it, a document row Search This Document Again left at (0/0) or a book search's that found nothing:
 	    disabled rather than doing nothing; InDesign leaves a disabled item out of a right-click menu). */
 	bool CanSelectAllRows(const NodeID& row);
 
@@ -134,25 +135,25 @@ namespace KFCResultTree
 	    right-click does not move it (KFCResultNodeEH::RButtonDn takes no row). */
 	bool LastSelectedHit(const KFCRowsByChapter& rows, int32& outChapter, int32& outHit);
 
-	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH, O17): the page follows - the row added jumped to as a
+	/** A SHIFT / CTRL CLICK'S BUTTON-UP on a row (KFCResultNodeEH): the page follows - the row added jumped to as a
 	    click jumps (KFCJump::ActivateNode: the page shows the row selected last, a text row's match or an object row's
 	    item, its document in front), a row taken away leaving the page as it is. Nothing for a story, document or book
 	    row. */
 	void FollowModifiedClick(const NodeID& clicked);
 
-	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH, O17 - the author's calls of 2026-10-10): the run of hit rows grown or
+	/** SHIFT+DOWN / SHIFT+UP (KFCResultTreeEH - the author's calls): the run of hit rows grown or
 	    shrunk by one row at its moving end - the run's other end stays where it began; story, document and book rows are
 	    passed over, into the next story's and the next document's rows - and the page following (the moving end's jump,
 	    text and object rows alike). false = not a run of hit
 	    rows: the key is not this function's. */
 	bool ExtendSelection(ITreeViewController* controller, bool down);
 
-	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call of 2026-10-09): nothing while a run of
+	/** SEARCH THIS STORY AGAIN (a story row's right-click menu - the author's call): nothing while a run of
 	    ours is up (RefusedWhileRunning); then the story walked again (KFCRuns()->SearchStoryAgain), the tree rebuilt
 	    when its rows were put back (their places in the list moved) and the status line set either way. True = done. */
 	bool SearchStoryAgain(int32 chapterIdx, int32 groupIdx);
 
-	/** SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call of 2026-10-10): as
+	/** SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call): as
 	    SearchStoryAgain, over the whole document (KFCRuns()->SearchDocumentAgain). True = done. */
 	bool SearchDocumentAgain(int32 chapterIdx);
 
@@ -162,7 +163,7 @@ namespace KFCResultTree
 	    Does nothing while the panel is closed. True = the list holds the keyboard. */
 	bool TakeKeyboard();
 
-	/** THE KEYBOARD FRAME (1.4.0 - the author's call of 2026-10-10: "make it plain that the list has the keyboard"):
+	/** THE KEYBOARD FRAME (the author's call: "make it plain that the list has the keyboard"):
 	    do the keys go to the result list now - IKeyBoard's focus is the list's own handler, AND the system sends the keys
 	    to the panel's window (KFCPanelHasSystemKeyboard - a click on Find/Change's title bar moves the second and not the
 	    first)? Asked when the panel draws the frame around the list (KFCPanelView::DV_Draw). false while the panel is
@@ -194,8 +195,8 @@ namespace KFCResultTree
 	bool RefusedWhileRunning();
 
 	/** Put the status read-out back to what THIS session last had on it - the last message - or, when
-	    nothing has run since launch, to the opening message (the string table's kKFCStaticTextKey). Called from the panel's AutoAttach, and only
-	    from there.
+	    nothing has run since launch, to the opening message (the string table's kKFCStaticTextKey). Called from the
+	    panel's AutoAttach, and only from there.
 
 	    Why it is needed: a widget's string is persisted in the WORKSPACE, so a rebuilt panel comes
 	    back carrying the last message of whatever session wrote it, including yesterday's - while
@@ -219,7 +220,7 @@ namespace KFCResultTree
 	std::string DiagKeyFocus();
 
 	/** (Test builds only.) The window the SYSTEM sends the keys to - the root of ::GetFocus(), by its title, and the
-	    active window - for the trace beside DiagKeyFocus (2026-10-10: after Find/Change's title bar was clicked the
+	    active window - for the trace beside DiagKeyFocus (made when, after Find/Change's title bar was clicked, the
 	    list still held InDesign's keyboard, yet the down arrow moved the page item). Defined in KFCResultTreeEH.cpp. */
 	std::string DiagSystemFocus();
 #endif

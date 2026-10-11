@@ -20,13 +20,13 @@
 //                      go, is not a request to go anywhere.
 //    * !result       - the base returns kTrue for what it handled itself (a drag, an expander).
 //                      Jumping on top of that would be a second action from one click.
-//    * no Shift/Cmd  - those are selection modifiers, not "take me there". Since 1.4.0 they select hit
-//                      rows together (O17 - KFCResultTreeController.cpp), and their button-up makes the
-//                      page follow the selection (KFCResultTree::FollowModifiedClick).
+//    * no Shift/Cmd  - those are selection modifiers, not "take me there". They select hit rows
+//                      together (KFCResultTreeController.cpp), and their button-up makes the page
+//                      follow the selection (KFCResultTree::FollowModifiedClick).
 //    * IsSelected    - the row the click actually landed on. The press already set the selection,
 //                      so an ordinary click on a hit row still passes and still jumps.
 //
-//  A DOUBLE click is not told apart (1.4.0 - the author's call of 2026-10-10): the click selects the match with
+//  A DOUBLE click is not told apart (the author's call): the click selects the match with
 //  the Type tool on (or marks it, when it cannot be selected - KFCJump.h), so the double click's own selection,
 //  which gave the keyboard to the text, went. Each of its clicks is a click: the jump again, the keyboard left on
 //  the list. THE MARKER COMES UP AT ONCE, on the button-up - the beat KCM's Story-mode jump keeps, which the user
@@ -106,7 +106,7 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 		return result;
 	if (e->ShiftKeyDown() || e->CmdKeyDown())
 	{
-		// SHIFT / CTRL - ROWS SELECTED TOGETHER (O17 - the author's calls of 2026-10-10, the Layers panel's way): the press
+		// SHIFT / CTRL - ROWS SELECTED TOGETHER (the author's calls, the Layers panel's way): the press
 		// has made the selection (KFCResultTreeController); the page follows it - the row added jumped to as a click jumps
 		// (the page shows the row selected last), a row taken away leaving the page as it is
 		// (KFCResultTree::FollowModifiedClick). A story, document or book row selected this way is selected alone, with no
@@ -157,15 +157,15 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 	// AFTER the jump, deliberately: acquiring first and jumping second leaves the arrows stranded
 	// in the document. KESCL hit exactly this and settled on the same order (KESCLResultNodeEH.cpp).
 	//
-	// THROUGH THE PANEL'S DOORS, EVERY CLICK (2026-10-10 - the author's report: Find/Change's title bar clicked, then a
-	// row, and the down arrow moved the selected page item instead of walking the list). At that click the list still
+	// THROUGH THE PANEL'S DOORS, EVERY CLICK (the user's report: Find/Change's title bar clicked, then a row, and the down
+	// arrow moved the selected page item instead of walking the list). At that click the list still
 	// held InDesign's keyboard ("focus=tree" in the trace), so the hand-off - IKeyBoard alone, and only when it named
 	// another holder - did nothing, and the arrow never reached the list. KFCResultTree::TakeKeyboard makes the panel the
 	// active one with the keyboard given to it (IPanelMgr::ShowPanelByWidgetID), then the list - what the arrows' walk
 	// does after each landing.
 	bool acquireOnly = false;
 #ifdef KFC_DIAG
-	// (Test builds only) Fault switch click-acquire-only: the hand-off as it was before 2026-10-10 - the case that shows
+	// (Test builds only) Fault switch click-acquire-only: the hand-off the old way, IKeyBoard alone - the case that shows
 	// what the panel's doors add (click-arrow-after-title).
 	acquireOnly = KFC_DIAG_FAULT("click-acquire-only");
 #endif
@@ -185,7 +185,7 @@ bool16 KFCResultNodeEH::LButtonUp(IEvent* e)
 
 #ifdef KFC_DIAG
 // (Test builds only) The press, for the CLICKFOCUS trace: who held the keyboard - InDesign's and the system's - as the
-// click began (2026-10-10, Find/Change's title bar).
+// click began (made for the case of Find/Change's title bar clicked first).
 bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 {
 	KFC_DIAG_LOG("CLICKFOCUS row LButtonDn focus=%s", KFCResultTree::DiagKeyFocus().c_str());
@@ -193,26 +193,28 @@ bool16 KFCResultNodeEH::LButtonDn(IEvent* e)
 }
 #endif
 
-// Right-click on a HIT row: pop its menu - Replace, about THIS row (the user's call; about all of them when it is one of
-// several rows selected together - O18, KFCActionComponent) - at the cursor (PopRowMenu).
+// Right-click on a HIT row: pop its menu - Replace, about THIS row (the author's call; about all of them when it is one
+// of several rows selected together - KFCActionComponent) - at the cursor (PopRowMenu).
 // Same machinery as the real Links and Layers panel row menus (LinksUITreeRowPanelEH and friends) and as
 // KESCL's own report rows, which this is copied from (KESCLResultNodeEH::RButtonDn): HandlePopupMenu pops a
 // MenuDef subtree by its name (KFCUI.fr), and the item the user picks fires through the ordinary action
-// component. The clicked row is stashed FIRST - the action is handed no widget context of its own, so the
-// model's context-menu row (KFCResultModel::GetContextMenuHit) is how it learns what the menu was about.
+// component. The clicked row is stashed FIRST, in the model (KFCResultModel::GetContextMenuHit): that is what the
+// action reads to learn what the menu was about. (The widget handed to HandlePopupMenu - this row - does reach the
+// action's widget argument, which is how the product's layer panel reads its row - LayerPanelMenuComponent.cpp,
+// ITreeNodeIDData; KFC's actions read the stash instead.)
 //
-// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call of 2026-10-09), stashed the same
-// way (KFCResultModel::GetContextMenuStory); a DOCUMENT row's, Search This Document Again (the author's call of
-// 2026-10-10 - KFCResultModel::GetContextMenuChapter). The story and document menus hold Select All Rows as well, and the
-// BOOK row has a menu of its own for it (the author's call of 2026-10-11 - KFCResultTree::SetContextMenuBook: the book's
-// rows are every row of the list, so the UI half's own flag is all the stash it needs).
+// A STORY row's right-click pops ITS menu - Search This Story Again (the author's call), stashed the same way
+// (KFCResultModel::GetContextMenuStory); a DOCUMENT row's, Search This Document Again (the author's call -
+// KFCResultModel::GetContextMenuChapter). The story and document menus hold Select All Rows as well, and the BOOK row has
+// a menu of its own for it (the author's call - KFCResultTree::SetContextMenuBook: the book's rows are every row of the
+// list, so the UI half's own flag is all the stash it needs).
 //
 // Deliberately NOT calling the stock handler and NOT changing the selection: the selection is what
 // the arrow keys walk from, and a right-click that is only asking for a menu should not move the
 // user's place in the tree. (KESCL had a sharper version of the same rule - there a selection change
-// drove the jump.) Since 1.4.0 it keeps rows selected together as well: the stock press would collapse them to the row
-// right-clicked (KFCResultTreeController's IgnoreIfNodeIsSelected says no with several selected), and the right-click
-// Replace on one of them - meant for all of them (O18) - would write that row alone.
+// drove the jump.) It keeps rows selected together as well: the stock press would collapse them to the row right-clicked
+// (KFCResultTreeController's IgnoreIfNodeIsSelected says no with several selected), and the right-click Replace on one of
+// them - meant for all of them - would write that row alone.
 bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 {
 	InterfacePtr<ITreeNodeIDData> nodeData(this, UseDefaultIID());
@@ -224,9 +226,9 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 
 	// Every row's right-click is consumed - no stock handling, so the row is not selected and nothing jumps.
 	// EVERY stash is cleared first, so a menu item fired later (a script invoking its ActionID - none of the items is
-	// offered for a shortcut) cannot act on a row nobody right-clicked this time. (Until 2026-10-09 only the story's
-	// was: a hit row right-clicked, then a story row, and the Replace action invoked by a script wrote the hit row -
-	// measured, case ctx-hit-stash-story-rclick.)
+	// offered for a shortcut) cannot act on a row nobody right-clicked this time. (With only the story's cleared, a hit
+	// row right-clicked, then a story row, and the Replace action invoked by a script wrote the hit row - measured, case
+	// ctx-hit-stash-story-rclick.)
 	KFCResults()->SetContextMenuHit(-1, -1);
 	KFCResults()->SetContextMenuStory(-1, -1);
 	KFCResults()->SetContextMenuChapter(-1);
@@ -238,19 +240,19 @@ bool16 KFCResultNodeEH::RButtonDn(IEvent* e)
 	}
 	else if (nodeID->IsFontRow() && KFCResults()->IsStoryGroup(nodeID->GetChapter(), nodeID->GetFont()))
 	{
-		// A STORY row: its own menu (Search This Story Again - the author's call of 2026-10-09).
+		// A STORY row: its own menu (Search This Story Again; Select All Rows).
 		KFCResults()->SetContextMenuStory(nodeID->GetChapter(), nodeID->GetFont());
 		PopRowMenu(kKFCResultStoryMenuName, e, this);
 	}
 	else if (nodeID->IsDocumentRow())
 	{
-		// A DOCUMENT row: its own menu (Search This Document Again - the author's call of 2026-10-10; Select All Rows).
+		// A DOCUMENT row: its own menu (Search This Document Again; Select All Rows).
 		KFCResults()->SetContextMenuChapter(nodeID->GetChapter());
 		PopRowMenu(kKFCResultDocumentMenuName, e, this);
 	}
 	else if (nodeID->IsBookRow())
 	{
-		// The BOOK row: its own menu (Select All Rows - the author's call of 2026-10-11).
+		// The BOOK row: its own menu (Select All Rows).
 		KFCResultTree::SetContextMenuBook(true);
 		PopRowMenu(kKFCResultBookMenuName, e, this);
 	}

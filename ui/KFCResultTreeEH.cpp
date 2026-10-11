@@ -19,11 +19,11 @@
 //       row activates its book.
 //    3. RETURN / ENTER ON A HIT ROW REPLACES IT (spec F17) - see KeyDown. With the arrows,
 //       the keyboard alone walks the rows and replaces where the match is right. SHIFT+RETURN
-//       replaces it and goes on to the next row below that can be replaced (the author's call of
-//       2026-10-08 - InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
-//       Rows selected together are replaced together (O18 - 1.4.0).
-//    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together (O17 - 1.4.0), the
-//       page following - see HandleUpDownKey and KFCResultTreeController.cpp.
+//       replaces it and goes on to the next row below that can be replaced (the author's call -
+//       InDesign's own Change/Find for the list) - see GoOnToNextReplaceableRow.
+//       Rows selected together are replaced together.
+//    4. SHIFT+DOWN / SHIFT+UP GROW OR SHRINK A RUN OF HIT ROWS selected together, the page
+//       following - see HandleUpDownKey and KFCResultTreeController.cpp.
 //
 //  WHY THE STOCK HANDLER MOVES, NOT A WALK OF OUR OWN
 //
@@ -42,9 +42,9 @@
 //  model's counts: it can only reach a row the tree has.
 //
 //  NOTE: THIS CLASS ONLY EXISTS IF SOMETHING ASKS FOR IT. Interface implementations are created on
-//  first QueryInterface, so naming it in KFCUI.fr is not enough - KFCResultNodeEH's key-focus
-//  hand-off is what brings it into being (and what puts the arrows here at all). See the long
-//  comment there before removing that call.
+//  first QueryInterface, so naming it in KFCUI.fr is not enough - a row click's key-focus hand-off
+//  (KFCResultNodeEH, through KFCResultTree::TakeKeyboard) is what brings it into being (and what puts
+//  the arrows here at all). See the long comment in KFCResultNodeEH before removing that call.
 //
 //========================================================================================
 
@@ -157,8 +157,7 @@ NodeID NextRowInTreeOrder(const ITreeViewHierarchyAdapter* adapter, const NodeID
 	}
 }
 
-// SHIFT+RETURN GOES ON (the author's call of 2026-10-08 - InDesign's own Change/Find, "replace, then find the next", for the
-// list). After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
+// SHIFT+RETURN GOES ON (the author's call - InDesign's own Change/Find, "replace, then find the next", for the list). After the row it wrote, the next HIT row below it that can be replaced is selected, brought into view and landed
 // on the way the arrows land on a row (HandleUpDownKey): its action - the jump, and a GREP row's Preview Text - then the
 // keyboard taken back. Rows that cannot be replaced are stepped over (already replaced, locked, not a match of Find/Change:
 // KFCRuns()->CanReplaceHit, the question the row menu greys Replace by), and a closed row above the one landed on is opened
@@ -196,10 +195,10 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 	}
 	for (auto it = above.rbegin(); it != above.rend(); ++it)
 		treeMgr->ExpandNode(*it, kFalse /*expandAllDescendants*/);
-	// THE WRITTEN ROWS' SELECTION OFF FIRST. Select does not move a selection: in the one-row list of 1.3 it refused while
-	// a row was selected (ITreeViewController::SelectCode eSingleItemAlreadySelected; measured: the next row was jumped to
-	// while the written one stayed selected), and in the list of 1.4.0, which selects rows together (O17 -
-	// KFCResultTreeController), it would add to them.
+	// THE WRITTEN ROWS' SELECTION OFF FIRST. Select does not move a selection: in a one-row list it refuses while a row
+	// is selected (ITreeViewController::SelectCode eSingleItemAlreadySelected; measured: the next row was jumped to while
+	// the written one stayed selected), and in this list, which selects rows together (KFCResultTreeController), it would
+	// add to them.
 	// The official re-selection (docs/ai-notes/api-official-examples.md, "select a tree row again"): the deselect tells
 	// nobody - only the row that ends selected is announced - and both repaint.
 	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
@@ -218,11 +217,11 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 }
 
 // RETURN ON THE SELECTED HIT ROW (spec F17), one place for the two that take it: the list's own KeyDown and the Return
-// filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or several together - O18): they are
+// filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or several together): they are
 // replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing happens when none can be
 // replaced), the list keeps the keyboard, and the key is taken whole. kFalse = not a Return this list acts on: the caller
 // passes it on.
-// WITH SHIFT (2026-10-08), the same, and then - only when the row was written - on to the next row below that can be
+// WITH SHIFT, the same, and then - only when the row was written - on to the next row below that can be
 // replaced (GoOnToNextReplaceableRow); with none below, the status line says so after its own sentence. Ctrl and Alt
 // still make it not a Return of ours.
 //  - The KeyCmd a Return's character makes next is removed, first - the official shape for a list that acts on Return
@@ -243,8 +242,8 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	const bool goOn = e->ShiftKeyDown() ? true : false;
 	if (controller == nil)
 		return kFalse;
-	// The rows this Return writes: the hit row selected - or the rows selected together (O18 - the author's calls of
-	// 2026-10-10, object rows and then text rows, of one document or several), in the order they are drawn. `last` is the
+	// The rows this Return writes: the hit row selected - or the rows selected together (the author's calls - object
+	// rows, then text rows, of one document or several), in the order they are drawn. `last` is the
 	// row Shift+Return goes on from: the lowest of them (a hit row's NodeID is its chapter, story and hit - the same row
 	// the tree draws).
 	KFCRowsByChapter rows;
@@ -253,12 +252,11 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 	const NodeID last(KFCResultNodeID::Create(rows.back().first, rows.back().second.back()));
 	Utils<IEventUtils>()->RemoveNextKeyCmd(e);
 	KFC_DIAG_LOG("RETFOCUS Return taken focus=%s repeat=%d", KFCResultTree::DiagKeyFocus().c_str(), e->IsRepeatKey() ? 1 : 0);
-	// A RETURN HELD DOWN WRITES ONCE (2026-10-09 - the header re-read 52's proposal, the author's yes). Windows repeats a key
-	// held down, and each repeat was one more replace and, with Shift, one more row on (one second of Shift+Return: a dozen
-	// rows). A repeat (IEvent::IsRepeatKey - IEvent.h) is taken and writes nothing, as the application bar's search field
-	// takes a held Return once (KFCAppBarSearchEnter.cpp); many rows at once are Change All's. (Fault switch
-	// return-repeat, a test build's only - KFCDiag.h: the repeat goes through as before, the case that shows what this
-	// stops.)
+	// A RETURN HELD DOWN WRITES ONCE (the author's call). Windows repeats a key held down, and each repeat was one more
+	// replace and, with Shift, one more row on (one second of Shift+Return: a dozen rows). A repeat (IEvent::IsRepeatKey -
+	// IEvent.h) is taken and writes nothing, as the application bar's search field takes a held Return once
+	// (KFCAppBarSearchEnter.cpp); many rows at once are Change All's. (Fault switch return-repeat, a test build's only -
+	// KFCDiag.h: the repeat goes through, the case that shows what this stops.)
 	bool repeatGoesThrough = false;
 #ifdef KFC_DIAG
 	repeatGoesThrough = KFC_DIAG_FAULT("return-repeat");
@@ -529,8 +527,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 		return kTrue;
 	WalkGuard walkGuard;
 
-	// SHIFT+DOWN / SHIFT+UP (O17 - the author's calls of 2026-10-10: "Shift+Down to add rows to the selection", for object
-	// rows and then for text rows): the run of hit rows grown or shrunk by one row, the page following
+	// SHIFT+DOWN / SHIFT+UP (the author's calls: "Shift+Down to add rows to the selection", for object rows and then for
+	// text rows): the run of hit rows grown or shrunk by one row, the page following
 	// (KFCResultTree::ExtendSelection) - not the stock's own Shift move, whose rules know nothing of the story and document
 	// rows between. On a story, document or book row it does nothing: those are selected one at a time.
 	if (e->ShiftKeyDown() && !e->CmdKeyDown() && !e->OptionAltKeyDown())
@@ -567,8 +565,8 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	if (!node->IsHitRow())
 		treeMgr->ExpandNode(selected[0], kFalse /*expandAllDescendants*/);
 
-	// The row's action - the same one a click on it would run, its selection or marker and all (1.4.0:
-	// the match selected, or marked when it cannot be - they come up at once - see KFCJump.h).
+	// The row's action - the same one a click on it would run, its selection or marker and all (the
+	// match selected, or marked when it cannot be - they come up at once - see KFCJump.h).
 	KFCJump::ActivateNode(node->GetChapter(), node->GetHit());
 
 	// That action activated a document window - or, on a book row, the Book panel - which took the
@@ -703,7 +701,7 @@ bool KFCResultTree::ListHoldsKeyboard()
 	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
 	if (listEH == nil || keyBoard == nil || keyBoard->GetKeyFocus() != listEH)
 		return false;
-	// ...AND THE SYSTEM SENDS THE KEYS TO THE LIST'S WINDOW (measured 2026-10-10, red-obj-arrow-dialog-first): a click on
+	// ...AND THE SYSTEM SENDS THE KEYS TO THE LIST'S WINDOW (measured - case obj-arrow-dialog-first): a click on
 	// Find/Change's title bar made the dialog the system's keyboard window and left InDesign's keyboard on the list, and
 	// the down arrow then went to the dialog and moved the page item. InDesign's holder alone said "the list" all through.
 	return KFCPanelHasSystemKeyboard() != kFalse;

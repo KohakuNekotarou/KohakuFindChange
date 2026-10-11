@@ -57,7 +57,7 @@ public:
 		if (nodeID->IsHitRow())
 		{
 			// A hit hangs off its story ("font") row - and off the document row when it names no group: an
-			// object row (1.4.0), which has no story (KFCResultModel's BuildFontGroups).
+			// object row, which has no story (KFCResultModel's BuildFontGroups).
 			const int32 font = nodeID->GetFont();
 			if (font >= 0)
 				return KFCResultNodeID::CreateFont(nodeID->GetChapter(), font);

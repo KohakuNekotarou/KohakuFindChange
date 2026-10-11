@@ -4,17 +4,16 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE RESULT LIST'S SELECTION (1.4.0 - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O17, the author's
-//  calls of 2026-10-10: several rows selected at once, the way the Layers panel selects several rows - Shift for a run of
-//  rows, Ctrl to add one or take it away, Shift+Up / Shift+Down to grow or shrink the run. Object rows first - so
-//  InDesign's own Align, Group, Transform or an object style can be applied to all of their items at once - then text
-//  rows as well; either kind's rows are replaced together - O18, KFCResultTree::ReplaceRows).
+//  THE RESULT LIST'S SELECTION (the author's calls: several rows selected at once, the way the Layers panel selects
+//  several rows - Shift for a run of rows, Ctrl to add one or take it away, Shift+Up / Shift+Down to grow or shrink the
+//  run. Object rows first - so InDesign's own Align, Group, Transform or an object style can be applied to all of their
+//  items at once - then text rows as well; either kind's rows are replaced together - KFCResultTree::ReplaceRows).
 //
 //  The list's controller is the tree's own (CTreeViewController, public/includes) made a multiple-selection one, with
 //  KFC's rule on top: ROWS ARE SELECTED TOGETHER WHEN THEY ARE HIT ROWS OF ONE KIND - text rows of any story, object rows
-//  of any spread, of any document (the author's calls of 2026-10-10: until that night rows were kept to one document,
-//  and object rows to one spread, as InDesign selects in one document and page items on one spread at a time; now they
-//  are Change Checked's ticked rows made by selecting, replaced together in one undo step - KFCResultTree::ReplaceRows).
+//  of any spread, of any document (the author's calls: NOT kept to one document, nor object rows to one spread, though
+//  InDesign selects in one document and page items on one spread at a time - the rows selected together are replaced
+//  together in one undo step, KFCResultTree::ReplaceRows).
 //  THE PAGE SHOWS THE ROW SELECTED LAST, as a click does - its match, or its item, selected alone (FollowModifiedClick,
 //  ExtendSelection): the rows selected together are the list's, not the page's.
 //  A story, document or book row is always selected alone.
@@ -59,7 +58,7 @@
 namespace
 {
 
-// Can two rows be selected together (O17)? The first answer is the only yes.
+// Can two rows be selected together? The first answer is the only yes.
 enum JoinAnswer
 {
 	kJoins = 0,
@@ -190,7 +189,7 @@ bool16 KFCResultTreeController::IgnoreIfNodeIsSelected() const
 void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidgetUID, bool16 notifyOfChange)
 {
 	// A PRESS ONLY. The stock rules act on a button going down and nothing else (CTreeViewController::ProcessSelectionRules);
-	// a click asks this once, on its press (measured 2026-10-10 in a test build's trace: one call per click, kLButtonDn).
+	// a click asks this once, on its press (measured in a test build's trace: one call per click, kLButtonDn).
 	// Anything else goes to the stock rules untouched, and KFC's record - the run's end - with it.
 	InterfacePtr<IControlView> nodeView(::GetDataBase(this), nodeWidgetUID, UseDefaultIID());
 	InterfacePtr<ITreeNodeIDData> data(nodeView, UseDefaultIID());
@@ -222,7 +221,7 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& node, bool16 notifyOfChange,
 	bool16 changeHilite)
 {
-	// NOT WITH THESE ROWS (O17): a row that cannot join the selection is turned away whoever asks - a click, a run of
+	// NOT WITH THESE ROWS: a row that cannot join the selection is turned away whoever asks - a click, a run of
 	// rows, a key. The stock answer for "not with the selection" (eSingleParentOnly) - nothing of KFC's reads it.
 	if (!IsSelected(node) && !fSelectedNodes.empty() && Join(fSelectedNodes[0], node) != kJoins)
 		return eSingleParentOnly;
@@ -385,11 +384,10 @@ void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 {
 	TreeNodePtr<KFCResultNodeID> nodeID(clicked);
 	if (nodeID == nil || !nodeID->IsHitRow())
-		return;		// a story, document or book row with Shift / Ctrl: selected alone, and no jump (as before 1.4.0)
+		return;		// a story, document or book row with Shift / Ctrl: selected alone, and no jump
 	// A ROW ADDED: its jump, as a click makes it - a text row's match selected with the Type tool on, an object row's item
 	// selected (or marked, and why it could not be selected), its document in front: THE PAGE SHOWS THE ROW SELECTED LAST
-	// (the author's call of 2026-10-10 night - object rows as text rows, rows of any document). A row taken away leaves
-	// the page as it is.
+	// (the author's call - object rows as text rows, rows of any document). A row taken away leaves the page as it is.
 	KFCRowsByChapter rows;
 	if (!GetSelectedHitRows(rows))
 		return;
@@ -429,7 +427,7 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	if (treeMgr == nil)
 		return false;
 	// The next HIT row the end can move to - story, document and book rows passed over, so a run goes on into the next
-	// story's rows and the next document's (the author's call of 2026-10-10 night: rows of several documents together).
+	// story's rows and the next document's (the author's call: rows of several documents together).
 	// The rows drawn are the ones walked: a collapsed document's are not.
 	TreeNodeTraverser walk(end, treeMgr, kTrue /*expandedNodesOnly*/,
 		down ? TreeNodeTraverser::eForward : TreeNodeTraverser::eReverse);

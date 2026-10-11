@@ -59,7 +59,7 @@
 #include "KFCResultNodeID.h"
 #include "KFCModelAccess.h"		// the model half, through its session interfaces
 #include "KFCResultTree.h"
-#include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace (1.4.0)
+#include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
 #include "KFCPanelIcon.h"		// the illustration follows the status line
@@ -86,9 +86,8 @@ namespace
 	const PMReal kRowInset = 2.0;
 	const PMReal kExpanderZone = 16.0;
 	// How much further right than its chapter row a hit row's content starts. ZERO: it begins exactly where
-	// the chapter row's expander arrow ends, so the two line up down the left edge (the author's call, from
-	// a screen shot - "put the check where the arrow is" - while the row still began with its check box, which
-	// went with spec F16; the colour cell now starts kHitCellStep further right).
+	// the chapter row's expander arrow ends, so the two line up down the left edge (the author's call; the colour
+	// cell starts kHitCellStep further right).
 	const PMReal kHitExtraIndent = 0.0;
 	// The hit row's colour cell starts this far right of the row's content: 8px, the step the book and story
 	// levels already use, which makes the whole tree one even staircase (the author's call - "make it a nice
@@ -96,13 +95,11 @@ namespace
 	const PMReal kHitCellStep = 8.0;
 	// A BOOK row sits above the documents when the results came from a book search, and its
 	// children step right by this much. 8px, not a full expander zone: the horizontal room in this
-	// panel was fought for once already (see kHitExtraIndent), and half a zone is enough to read
-	// the hierarchy. A document search has no book row and no shift, so its tree is unchanged.
+	// panel is short, and half a zone is enough to read the hierarchy. A document search has no book row
+	// and no shift, so its tree is unchanged.
 	const PMReal kBookLevelIndent = 8.0;
 	// A STORY ("font") row sits between a document and its hits; its children step right by this much.
-	// The same 8px the book level uses,
-	// and for the same reason: half an expander zone is enough to read the hierarchy, and this panel's
-	// width has been fought over once already (see kHitExtraIndent).
+	// The same 8px the book level uses, and for the same reason.
 	const PMReal kFontLevelIndent = 8.0;
 
 	// Every row of this tree is this tall. THE NUMBER IS NOT HERE: it is kKFCResultRowHeight in
@@ -267,8 +264,8 @@ public:
 		// ApplyNodeIDToWidget calls it on every row (CTreeViewWidgetMgr.cpp:212-218) - and it moves
 		// TWO kinds of child: the ones bound on BOTH sides (the hit row's colour cell, the chapter
 		// row's label) and the ones bound on NEITHER (this row's expander arrow, kBindNone in
-		// KFCUI.fr). Only a child bound on one side alone is left where it is - no row has one since the
-		// hit row's check box went (spec F16). What makes the framework indent invisible in this panel is NOT that it is switched
+		// KFCUI.fr). Only a child bound on one side alone is left where it is - no row has one. What makes
+		// the framework indent invisible in this panel is NOT that it is switched
 		// off: it is that the Apply*Row methods run AFTER it and set every one of those frames
 		// themselves - they are called from ApplyDataToWidget, the base's last step (see there).
 		//
@@ -295,7 +292,7 @@ private:
 	}
 
 	// How far right this chapter's HIT rows sit because of the levels above them: one step for the story row every TEXT
-	// hit sits under; none for an OBJECT chapter (1.4.0), whose rows hang off the document row directly.
+	// hit sits under; none for an OBJECT chapter, whose rows hang off the document row directly.
 	PMReal FontShift(int32 chapterIdx) const
 	{
 		return (KFCResults()->GetDisplayFontCount(chapterIdx) > 0) ? kFontLevelIndent : PMReal(0.0);
@@ -392,14 +389,14 @@ private:
 				label.Append(" (no window)");
 		}
 		AppendCounts(label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
-		// (No "cancelled" note: a cancel puts the WHOLE run back, so no chapter is left half-reached.)
+		// (No "cancelled" note: a write that does not go through is put back WHOLE, so no chapter is left half-reached.)
 
 		this->LayOutBranchRow(node, widget, rowData, this->LevelShift(), label);
 	}
 
-	// A STORY row (the code calls the level FONT - see the head of the file): the story's first words and how many rows sit under it. The same shape
-	// as a document row - an expander and a label - so it shares the branch layout and the chapter row's
-	// resource, one step further right.
+	// A STORY row (the code calls the level FONT - see the head of the file): the story's first words and how
+	// many rows sit under it. The same shape as a document row - an expander and a label - so it shares the
+	// branch layout and the chapter row's resource, one step further right.
 	void ApplyFontRow(const TreeNodePtr<KFCResultNodeID>& nodeID, const NodeID& node,
 		IControlView* widget, IPanelControlData* rowData) const
 	{
@@ -663,7 +660,7 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 // again (RestoreStatusOnPanelShow).
 static PMString gLastStatus;
 
-// The message area shows a row's own note (ShowRowNote - 1.4.0): what DropRowPreview takes away, as it takes a preview.
+// The message area shows a row's own note (ShowRowNote): what DropRowPreview takes away, as it takes a preview.
 // Set by ShowRowNote after it writes; every other write - WriteMessage, a preview - clears it.
 static bool gRowNoteShown = false;
 
@@ -792,7 +789,7 @@ void KFCResultTree::ShowStatus(const PMString& message)
 //----------------------------------------------------------------------------------------
 
 // The heading of a preview - and how the area is known to be showing one (DropRowPreview: a heading that starts with the
-// stem - "Preview Text:", or "Preview Text (not selected - no width):" when the click could not select the match, 1.4.0).
+// stem - "Preview Text:", or "Preview Text (not selected - no width):" when the click could not select the match).
 static const char* const kPreviewLabel = "Preview Text:";
 static const char* const kPreviewLabelStem = "Preview Text";
 
@@ -831,7 +828,9 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	const int32 kPreviewMaxChars = 300;
 	if (shown.CharCount() > kPreviewMaxChars)
 	{
-		// Not through the middle of a surrogate pair (the doubt KFCStatusTextView's KFCSafeCut carries).
+		// (A surrogate test that never fires, kept as harmless: PMString's positions are whole characters, so a cut by
+		// CharCount falls between characters, and GetChar answers the PLATFORM character there - PMString.cpp:2338-2347 -
+		// never half a surrogate pair. KFCStatusTextView's KFCSafeCut has the same.)
 		int32 keep = kPreviewMaxChars;
 		const uint32 at = shown.GetChar(keep).GetValue();
 		if (at >= 0xDC00 && at <= 0xDFFF)
@@ -846,8 +845,8 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	KFCResults()->MarkUpBreaksForDisplay(pre);
 	KFCResults()->MarkUpBreaksForDisplay(shown);
 	KFCResults()->MarkUpBreaksForDisplay(post);
-	// WHY THE CLICK DID NOT SELECT THE MATCH, in the heading (1.4.0 - the author's call of 2026-10-10: the reason and the
-	// preview both): "Preview Text (not selected - no width):". The heading owns its line(s) and wraps like the rest.
+	// WHY THE CLICK DID NOT SELECT THE MATCH, in the heading (the author's call: the reason and the preview both):
+	// "Preview Text (not selected - no width):". The heading owns its line(s) and wraps like the rest.
 	PMString label(kPreviewLabel);
 	if (notSelectedWhy != nil && *notSelectedWhy != '\0')
 	{
@@ -867,7 +866,7 @@ void KFCResultTree::DropRowPreview()
 {
 	// A row with no preview (replaced, a Text search's, a branch row...) must not leave the last row's standing beside
 	// it: the area goes back to the last ordinary message (gLastStatus - a preview is never kept there). Nor the last
-	// row's note (ShowRowNote - 1.4.0): its reason is about that row alone.
+	// row's note (ShowRowNote): its reason is about that row alone.
 	IControlView* textView = nil;
 	InterfacePtr<IKFCStatusTextData> textData(QueryStatusTextData(textView));
 	if (textData == nil)
@@ -894,7 +893,7 @@ bool KFCResultTree::RefusedWhileRunning()
 #ifdef KFC_DIAG
 std::string KFCResultTree::DiagKeyFocus()
 {
-	// InDesign's holder, then the system's keyboard window beside it (DiagSystemFocus - 2026-10-10).
+	// InDesign's holder, then the system's keyboard window beside it (DiagSystemFocus).
 	std::string holder;
 	InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 	InterfacePtr<IKeyBoard> keyBoard(app, UseDefaultIID());
@@ -934,7 +933,7 @@ bool KFCResultTree::TakeKeyboard()
 	//  2. the panel holding the list gives it the keyboard - IPanelControlData::SetKeyboardFocus, which wants "one of
 	//     its children" (IPanelControlData.h), so the list's own parent panel; Adobe's Links panel hands its caption
 	//     rows the keyboard the same way (open/components/linksui/AddDeleteCaptionRowButtonObserver.cpp).
-	//  3. checked - and taken by IKeyBoard::AcquireKeyFocus, as before, if the panel's doors did not land it there.
+	//  3. checked - and taken by IKeyBoard::AcquireKeyFocus if the panel's doors did not land it there.
 	InterfacePtr<IPanelMgr> panelMgr(KFCBookPanelLookup::QueryPanelManager());
 	if (panelMgr == nil || !panelMgr->IsPanelWithWidgetIDShown(kKFCPanelWidgetID))
 		return false;
@@ -959,7 +958,7 @@ bool KFCResultTree::TakeKeyboard()
 	if (keyBoard->GetKeyFocus() != listEH)
 		keyBoard->AcquireKeyFocus(listEH);
 	// The keyboard frame drawn again: the panel's doors can bring the system's keyboard back to the panel's window with
-	// InDesign's holder unchanged (a row clicked after Find/Change's title bar - measured 2026-10-10), and then nothing
+	// InDesign's holder unchanged (measured: a row clicked after Find/Change's title bar), and then nothing
 	// else asks the frame again (KFCResultTreeEH's PostGetKeyFocus does it when the holder changes).
 	RedrawKeyboardFrame();
 	return keyBoard->GetKeyFocus() == listEH;
@@ -994,7 +993,7 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 			if (KFCResults()->GetHitFlags(rows[c].first, rows[c].second[k], replaced, locked) && !replaced)
 				notYet.push_back(std::make_pair(rows[c].first, rows[c].second[k]));
 		}
-	// OBJECT ROWS (1.4.0) are replaced through the jump's machinery - their document fronted around the write (KFCJump);
+	// OBJECT ROWS are replaced through the jump's machinery - their document fronted around the write (KFCJump);
 	// text rows go straight to the model. One row takes each side's one-row door (ReplaceObjectRows hands it to
 	// ReplaceObjectRow, the model's ReplaceRows to ReplaceHit).
 	const bool wrote = (KFCResults()->GetHitItem(shownChapter, shownHit) != kInvalidUID)
