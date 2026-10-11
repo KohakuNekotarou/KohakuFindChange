@@ -89,13 +89,13 @@ namespace
 	}
 
 	// Which HIT row the result tree's right-click menu was popped over, for its menu (Replace) - KFCResultNodeEH
-	// stashes it just before HandlePopupMenu. -1 = none. (The only row with a menu - spec F16.)
+	// stashes it just before HandlePopupMenu. -1 = none.
 	int32 gContextMenuHitChapter = -1;
 	int32 gContextMenuHit = -1;
-	// ...and which STORY row it was popped over, for its menu (Search This Story Again). -1 = none.
+	// ...and which STORY row it was popped over, for its menu (Search This Story Again, Select All Rows). -1 = none.
 	int32 gContextMenuStoryChapter = -1;
 	int32 gContextMenuStoryGroup = -1;
-	// ...and which DOCUMENT row (Search This Document Again - 2026-10-10). -1 = none.
+	// ...and which DOCUMENT row (Search This Document Again, Select All Rows). -1 = none.
 	int32 gContextMenuChapter = -1;
 
 	// Every right-click target forgotten - the chapters and rows they index have just gone (Clear,
@@ -168,10 +168,10 @@ namespace
 
 	// GROUP A CHAPTER'S HITS BY STORY (the author's call) - the tree's middle level.
 	// One group per story in first-appearance (page) order - so the stories read in the order their
-	// first matches stand - and every hit given its group. The row reads "ID <the story's UID>: <the story's
-	// first words>" (2026-10-09, the author: a story can run through threaded frames, so the page of its first
-	// match - "P2" for a story that begins on page 1, measured - does not name it; it read "P<page>  " /
-	// "overset  " before). The UID is the number the scripting DOM gives the story (Story.id). (The "font" in
+	// first matches stand - and every hit given its group. The row reads "ID<the story's UID>: <the story's
+	// first words>" (the author: a story can run through threaded frames, so the page of its first match - "P2"
+	// for a story that begins on page 1, measured - does not name it). The UID is the number the scripting DOM
+	// gives the story (Story.id). (The "font" in
 	// the names is the level's old name: it held the fonts of Find Missing Glyphs, since removed; the level is
 	// the story's alone.)
 	//
@@ -187,7 +187,7 @@ namespace
 		for (size_t i = 0; i < chapter.hits.size(); ++i)
 		{
 			KFCResultModel::Hit& hit = chapter.hits[i];
-			// AN OBJECT ROW (1.4.0) has no story: it hangs off its document row directly (the adapter's branch for a
+			// AN OBJECT ROW has no story: it hangs off its document row directly (the adapter's branch for a
 			// chapter with no groups, KFCResultListAdapter.cpp).
 			if (hit.itemUID != kInvalidUID)
 			{
@@ -364,7 +364,7 @@ void KFCResultModel::EmptyChapter(Chapter& chapter)
 	std::vector<Hit>().swap(chapter.hits);
 	std::vector<FontGroup>().swap(chapter.fontGroups);
 	chapter.storyVersions.clear();
-	// ...and the searched parts of its stories (SearchedRange - 2026-10-09): they describe the rows that just went.
+	// ...and the searched parts of its stories (SearchedRange): they describe the rows that just went.
 	chapter.searchedRanges.clear();
 	chapter.docRef = UIDRef(nil, kInvalidUID);
 	chapter.file = IDFile();
@@ -580,10 +580,10 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
 	if (group == nil)
 		return false;
-	// THE STORY ROW'S TEXT - "ID260: first words..." - made from its rows' storyLead NOW, not kept beside them (1.4.0 -
-	// the author's call of 2026-10-10): a Replace reads the story's first words into its rows again (SetStoryLead), and
-	// a rollback, an Undo or a Redo puts the rows back with theirs, so the row says what the story says. No space after
-	// "ID" (the author's call of the same day, as an object row reads "ID259:<name>").
+	// THE STORY ROW'S TEXT - "ID260: first words..." - made from its rows' storyLead NOW, not kept beside them (the
+	// author's call): a Replace reads the story's first words into its rows again (SetStoryLead), and a rollback, an
+	// Undo or a Redo puts the rows back with theirs, so the row says what the story says. No space after "ID" (the
+	// author's call, as an object row reads "ID259:<name>").
 	outName = PMString("ID");
 	outName.AppendNumber(static_cast<int32>(group->story.Get()));
 	outName.Append(": ");
@@ -687,13 +687,13 @@ static const UTF32TextChar kKFCReturnArrow = 0x21B5;
 // EXCEPT THE TABLE'S ANCHOR - it is shown as kKFCTableSign (the author: "the way KCM does it, a table
 // sign"). Its continuations (one per row after the first) are still dropped: a table is one sign however
 // many rows it has.
-// ONE SET FOR EVERY ROW (2026-10-09 - the header re-read 50's proposal, the author's yes): it named seven of
-// these, and End Nested Style Here (0x03), Indent to Here (0x07), the Right Indent Tab (0x08) and an index
-// marker (kTextChar_IndexMarker - in a story's text, though TextChar.h files it with the find-only codes:
-// KIDMCP measured it there) came through a hit row as boxes, where a story row (StoryLeadText) drops them -
-// so it is every control character now, as there, but the breaks and the tab (marks and white space, above)
-// and the table's anchor (its sign), and the non-Roman special glyph (0x1A): a glyph with no code of its own
-// stands on it, and a Glyph search's match can be that very character - dropped, the match would read empty.
+// ONE SET FOR EVERY ROW (the author's call): a hit row drops what a story row (StoryLeadText) drops - every
+// control character - but the breaks and the tab (marks and white space, above), the table's anchor (its sign)
+// and the non-Roman special glyph (0x1A): a glyph with no code of its own stands on it, and a Glyph search's
+// match can be that very character - dropped, the match would read empty. (A list of the characters one by one
+// let End Nested Style Here (0x03), Indent to Here (0x07), the Right Indent Tab (0x08) and an index marker
+// (kTextChar_IndexMarker - in a story's text, though TextChar.h files it with the find-only codes: KIDMCP
+// measured it there) through a hit row as boxes.)
 // (StoryLeadText also drops UnicodeClass::IsIgnoredCharacter's characters - variation selectors, special glyphs
 // - which a story row's first words can do without, and a hit row cannot: its match may be one of them.)
 bool KFCResultModel::IsMarkerNotShown(UTF32TextChar c)
@@ -1053,10 +1053,10 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 
 	if (hit.itemUID != kInvalidUID)
 	{
-		// AN OBJECT ROW (1.4.0, O8): "pasteboard" for an item on no page, else the page and its place on it; then where the
+		// AN OBJECT ROW (O8): "pasteboard" for an item on no page, else the page and its place on it; then where the
 		// item stands - master, grouped, inline, anchored - each spelled out (ROW-14). hidden / locked follow, as for text.
 		// An item no spread holds - an inline in overset text - reads "overset" as a text row's overset match does (with
-		// its page when one is named), not "pasteboard" (2026-10-10 night).
+		// its page when one is named), not "pasteboard".
 		if (hit.isOverset && (hit.onPasteboard || hit.pageString.IsEmpty()))
 			hit.locator.Append("overset");
 		else if (hit.onPasteboard || hit.pageString.IsEmpty())
@@ -1128,8 +1128,8 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	// it was locked, which is not why the jump landed on different text. Missing and refused do exclude
 	// each other: outcome holds one value.
 	//
-	// "Missing" FIRST, IN THE ROW'S OWN COLOUR (the author's call of 2026-10-08 - it was the last word, in the
-	// accent colour): it stands where "Changed" stands on a replaced row (the UI half's ApplyHitRow puts that one
+	// "Missing" FIRST, IN THE ROW'S OWN COLOUR (the author's call - not the last word in the accent colour, as it
+	// was): it stands where "Changed" stands on a replaced row (the UI half's ApplyHitRow puts that one
 	// there), so a row's state is the first thing read on it, and the label a reader walks starts with it. The two
 	// never meet: SetHitOutcome turns a replaced row away.
 	// "refused" stays a run of its own in the theme's accent colour; the space in front of it belongs to that run
@@ -1174,8 +1174,7 @@ void KFCResultModel::OrderHitsByPage(std::vector<Hit>& hits)
 			const int32 pb = (b.pageIndex < 0) ? kMaxInt32 : b.pageIndex;
 			return pa < pb;
 		});
-	// The within-page ordinals and the locators, numbered the way a replace's report numbers what it
-	// keeps - one definition for both.
+	// The within-page ordinals and the locators (NumberHitsWithinPages - their one definition).
 	NumberHitsWithinPages(hits);
 }
 
