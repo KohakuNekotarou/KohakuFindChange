@@ -690,7 +690,7 @@ const char* KFCWriteFileSafely(const IDFile& file, const std::string& text)
 	// file is in InDesign's folder and is simply written over by the next save; this one sits in a folder the person
 	// chose - a read-only file to replace leaves it standing otherwise.)
 	if (failure != nil && FileUtils::DoesFileExist(side))
-		(void)::DeleteFile(side.GrabTString());
+		(void)side.Delete();		// the file object's own (AFile::Delete)
 	return failure;
 }
 
