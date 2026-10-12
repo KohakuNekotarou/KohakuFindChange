@@ -82,6 +82,15 @@
 //                (work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
 //    object-walk-miss  an object row's Replace (KFCObjectReplace.cpp) takes InDesign's walk as never coming to the row's
 //                item - the row must say it no longer matches, nothing written (work\kbs-regress\oca-cases.tsv, oca-walk-miss)
+//    object-prints-stale  an object write (KFCObjectReplace.cpp's FollowRowsTheWriteMoved) leaves the other rows' fingerprints
+//                as they were, the old way: the text frame an inline written hangs in is then refused as "changed since the
+//                search" (obj-f2-inline-armed)
+//    object-prints-unbacked  KFCResultModel::SetHitItemPrint sets a row's print with no copy aside: an Undo of the write
+//                leaves the row at the write's print while the item goes back, and the row is refused
+//                (obj-f2-undo-frame-armed)
+//    object-prints-blind  KFCObjectReplace.cpp's RowsTheWriteCanMove takes every row the write can reach, without asking
+//                whether it read as its row held it before the write: an edit of someone else's is then given the write's
+//                print, and the row's Replace writes over it (obj-f2-edited-refused-armed)
 //    return-repeat  (UI half) ui/KFCResultTreeEH.cpp's TakeReturn lets a held Return's repeats through, the old way
 //                - each one a write: the case that shows what taking the repeat stops (ret-shift-held-armed)
 //    return-filter-holder-only  (UI half) ui/KFCResultTreeEH.cpp's Return filter asks InDesign's keyboard holder alone,

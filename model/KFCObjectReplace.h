@@ -35,7 +35,9 @@ namespace KFCObjectReplace
 	bool CheckRowNow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
 
 	/** An object row's Replace (O10 steps 1-5, 7, 8, 10, 11): the doors again, then the walk to the item and ReplaceObject,
-	    one undo step ("Replace") with KFC's undo mark in it; the row Changed with the item's new fingerprint;
+	    one undo step ("Replace") with KFC's undo mark in it; the row Changed with the item's new fingerprint, and every other
+	    row whose fingerprint the write moved (the text frame of the story an inline written hangs in, the group holding the
+	    item) given the print the write left - when it read as its row held it before the write (spec OBJ-12);
 	    "Replaced ID:<uid>." on success. The selection InDesign leaves (step 9) is the UI half's to settle: the row's
 	    item selected (the author's call). */
 	bool ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus);
@@ -46,7 +48,8 @@ namespace KFCObjectReplace
 	    document (InDesign's own matching, its replace on each row's item as the walk stands on it) and ONE undo step with
 	    KFC's undo mark in it for every document written - one document's a plain sequence, several documents' one
 	    abortable sequence around them all (KFCReplaceEngine.cpp, ReplaceRowsNow's note); each written row Changed with its
-	    item's new fingerprint; a chapter of ours written is given a window, one not written handed back.
+	    item's new fingerprint, the other rows the write moved given theirs as ReplaceRow gives them; a chapter of ours
+	    written is given a window, one not written handed back.
 	    outStatus: "Replaced 3 objects: ID:259, ID:260, ID:261." - or "Replaced 3 of 5 objects: ... Left as they were:
 	    1 locked, 1 changed since the search." / "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd
 	    ID:12."; a refusal when none could be written. One row = ReplaceRow. True when something was written. */

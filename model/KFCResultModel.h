@@ -140,8 +140,9 @@ namespace KFCResultModel
 		bool		isInline;		// an inline or above-line object in text
 		bool		isAnchored;		// an anchored object with a custom position
 		// Its FINGERPRINT (O12, KFCObjectSearch::Fingerprint): its own persistent data's hash and length, with what it holds
-		// and a text frame's story's version - taken by the search, and again by each Replace of KFC's own. A row's Replace
-		// refuses an item that no longer reads this way.
+		// and a text frame's story's version - taken by the search, and again by each write of KFC's own that moves it: the
+		// row's own Replace (MarkItemReplaced), or one of another row's (SetHitItemPrint). A row's Replace refuses an item that
+		// no longer reads this way.
 		uint64		itemPrint;
 		uint32		itemPrintLength;
 
@@ -480,6 +481,12 @@ namespace KFCResultModel
 	    item's fingerprint as the write left it. Backed up like every change a write makes (BeginRowBackup), so an Undo
 	    puts the row and its fingerprint back together. */
 	void MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength);
+
+	/** An object row a write of KFC's own did NOT replace, but whose item's fingerprint the write moved - the text frame of
+	    the story an inline written hangs in, the group holding an item written (KFCObjectSearch::WriteReach): its fingerprint
+	    as the write left it, the row otherwise as it was. Backed up as MarkItemReplaced is, so an Undo puts the print back
+	    with the item. */
+	void SetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength);
 
 	/** The two flags that say the match IS in the document but is out of the user's reach there:
 	    LOCKED (a locked layer or a locked story - InDesign can search locked content but offers no

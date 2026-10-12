@@ -1420,4 +1420,17 @@ void KFCResultModel::MarkItemReplaced(int32 chapterIdx, int32 hitIdx, uint64 new
 	h->itemPrintLength = newLength;
 }
 
+void KFCResultModel::SetHitItemPrint(int32 chapterIdx, int32 hitIdx, uint64 newPrint, uint32 newLength)
+{
+	Hit* h = HitAt(chapterIdx, hitIdx);
+	if (h == nil || h->itemUID == kInvalidUID)
+		return;
+	// (A test build's fault switch: the print set with no copy aside - an Undo then leaves the row at the write's print
+	//  while the item goes back - case obj-f2-undo-frame-armed.)
+	if (!KFC_DIAG_FAULT("object-prints-unbacked"))
+		BackUpRow(chapterIdx, hitIdx, *h);
+	h->itemPrint = newPrint;
+	h->itemPrintLength = newLength;
+}
+
 // End, KFCResultModel.cpp.

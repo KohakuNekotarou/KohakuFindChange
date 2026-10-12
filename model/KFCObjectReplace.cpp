@@ -231,6 +231,72 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
+// THE ROWS A WRITE OF KFC'S OWN MOVES BESIDES ITS OWN (spec OBJ-12; 2026-10-12, the author's call). A fingerprint holds more
+// than its item (KFCObjectSearch::WriteReach), so a write moved the print of rows it did not write - the text frame an inline
+// written hangs in, the group holding an item written - and their Replace then refused them as "changed since the
+// search", the change being KFC's own. BEFORE the write: the rows of the chapter the write can reach that read now as their
+// row holds them - the rows to be written among them, which CheckItem has just read so. AFTER it, each of them not written
+// takes the print the write left (FollowRowsTheWriteMoved). A row that read otherwise before the write was changed by
+// someone else, and its Replace refuses it still.
+typedef std::vector<std::pair<int32, UID> > RowItems;		// (the row, its item)
+
+void RowsTheWriteCanMove(int32 chapterIdx, IDataBase* db, const std::set<UID>& toWrite, RowItems& out)
+{
+	out.clear();
+	if (db == nil)
+		return;
+	KFCObjectSearch::WriteReach reach;
+	KFCObjectSearch::ReachOfWrite(db, toWrite, reach);
+	const int32 rows = KFCResultModel::GetHitCount(chapterIdx);
+	for (int32 h = 0; h < rows; ++h)
+	{
+		const UID item = KFCResultModel::GetHitItem(chapterIdx, h);
+		if (item == kInvalidUID || !RowIsReplaceable(chapterIdx, h))
+			continue;
+		if (toWrite.count(item) > 0)
+		{
+			out.push_back(std::make_pair(h, item));		// as its row holds it: CheckItem has just asked
+			continue;
+		}
+		if (!KFCObjectSearch::WriteReaches(db, reach, item))
+			continue;
+		uint64 was = 0, now = 0;
+		uint32 wasLength = 0, nowLength = 0;
+		// (A test build's fault switch: every row the write can reach taken, changed or not - an edit of someone else's
+		//  would then be given the write's print and written over - case obj-f2-edited-refused-armed.)
+		if (KFC_DIAG_FAULT("object-prints-blind")
+			|| (KFCResultModel::GetHitItemPrint(chapterIdx, h, was, wasLength)
+				&& KFCObjectSearch::Fingerprint(UIDRef(db, item), now, nowLength) && was == now && wasLength == nowLength))
+			out.push_back(std::make_pair(h, item));
+	}
+	KFC_DIAG_LOG("OBJPRINTS before chapter=%d writing=%u holders=%u stories=%u watched=%u", chapterIdx,
+		(unsigned)toWrite.size(), (unsigned)reach.items.size(), (unsigned)reach.stories.size(), (unsigned)out.size());
+}
+
+void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& rows, const std::set<UID>& written)
+{
+	// (A test build's fault switch: the other rows left as they were, the old way - case obj-f2-inline-armed.)
+	if (db == nil || KFC_DIAG_FAULT("object-prints-stale"))
+		return;
+	int32 followed = 0;
+	for (size_t k = 0; k < rows.size(); ++k)
+	{
+		if (written.count(rows[k].second) > 0)
+			continue;		// Changed, with its own new print (MarkItemReplaced)
+		uint64 was = 0, now = 0;
+		uint32 wasLength = 0, nowLength = 0;
+		// Nothing of the item can be read now: the row keeps its print, and its Replace refuses it as before.
+		if (!KFCResultModel::GetHitItemPrint(chapterIdx, rows[k].first, was, wasLength)
+			|| !KFCObjectSearch::Fingerprint(UIDRef(db, rows[k].second), now, nowLength))
+			continue;
+		if (now == was && nowLength == wasLength)
+			continue;
+		KFCResultModel::SetHitItemPrint(chapterIdx, rows[k].first, now, nowLength);
+		++followed;
+	}
+	KFC_DIAG_LOG("OBJPRINTS after chapter=%d followed=%d", chapterIdx, followed);
+}
+
 // A chapter of ours that a check reopened goes back when the check refuses (KFCBookScope::HandBackIfHeld - the UI half's
 // landings hand back the same way). The writes are reached only through the UI half's landing, which has brought the
 // chapter's window forward first - the chapter is then the user's, no longer held - and which hands back on its own way
@@ -273,6 +339,11 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		Refuse(outStatus, "InDesign's object search could not be reached - nothing was changed.");
 		return false;
 	}
+	// The rows the write can move besides its own, read before it (RowsTheWriteCanMove).
+	std::set<UID> toWrite;
+	toWrite.insert(item);
+	RowItems watched;
+	RowsTheWriteCanMove(chapterIdx, db, toWrite, watched);
 	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (O11): the row backup starts here, the item's fingerprint is read.
 	KFCUndoFollow::StepRecorder recorder(chapterIdx);
 	recorder.RecordItem(chapterIdx, item);
@@ -334,11 +405,13 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		Refuse(outStatus, RowSentence(reached ? kRefusedNotWritten : (walkFailed ? kRefusedWalkFailed : kRefusedNotReached)));
 		return false;
 	}
-	// 10. The row Changed, with the item as the write left it; the message names the item (REP-22's form).
+	// 10. The row Changed, with the item as the write left it, and the rows the write moved besides; the message names the
+	// item (REP-22's form).
 	uint64 print = 0;
 	uint32 length = 0;
 	(void)KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length);
 	KFCResultModel::MarkItemReplaced(chapterIdx, hitIdx, print, length);
+	FollowRowsTheWriteMoved(chapterIdx, db, watched, toWrite);
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	KFC_DIAG_NOTE_WRITE(docRef);
 	outStatus = "Replaced ID:";
@@ -360,6 +433,7 @@ struct ObjectChapterWrite
 	bool								wasModified;	// its "unsaved" flag before the step
 	std::vector<std::pair<int32, UID> >	todo;			// (the row, its item)
 	std::set<UID>						written;
+	RowItems							watched;		// the rows its write can move, read before it (RowsTheWriteCanMove)
 	ObjectChapterWrite() : chapterIdx(-1), wasModified(false) {}
 };
 
@@ -509,6 +583,17 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		Refuse(outStatus, "InDesign's object search could not be reached - nothing was changed.");
 		return false;
 	}
+	// The rows each document's write can move besides its own, read before it (RowsTheWriteCanMove).
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		ObjectChapterWrite& chapter = chapters[c];
+		if (chapter.todo.empty())
+			continue;
+		std::set<UID> toWrite;
+		for (size_t k = 0; k < chapter.todo.size(); ++k)
+			toWrite.insert(chapter.todo[k].second);
+		RowsTheWriteCanMove(chapter.chapterIdx, chapter.docRef.GetDataBase(), toWrite, chapter.watched);
+	}
 	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (O11): one step, every item's fingerprint read before the write - of
 	// every document it writes.
 	std::vector<int32> chapterIdxs;
@@ -649,7 +734,8 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		outStatus.SetTranslatable(kFalse);
 		return false;
 	}
-	// 10. Each written row Changed, with its item as the write left it; the message names the items (REP-22's form).
+	// 10. Each written row Changed, with its item as the write left it, and the rows the write moved besides; the message
+	// names the items (REP-22's form).
 	for (size_t c = 0; c < chapters.size(); ++c)
 	{
 		const ObjectChapterWrite& chapter = chapters[c];
@@ -664,7 +750,10 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 			KFCResultModel::MarkItemReplaced(chapter.chapterIdx, chapter.todo[k].first, print, length);
 		}
 		if (!chapter.written.empty())
+		{
+			FollowRowsTheWriteMoved(chapter.chapterIdx, db, chapter.watched, chapter.written);
 			KFC_DIAG_NOTE_WRITE(chapter.docRef);
+		}
 	}
 	recorder.Keep(KFCUndoFollow::kStepReplace);
 	LeaveObjectChapters(chapters);

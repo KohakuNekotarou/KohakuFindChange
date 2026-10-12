@@ -18,6 +18,7 @@
 #include "IFindChangeService.h"
 #include "IGraphicFrameData.h"		// a text frame's columns - its story (the fingerprint, O12)
 #include "IHierarchy.h"
+#include "IInlineData.h"			// the story an inline or anchored item hangs in (WriteReach)
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ILayoutUtils.h"			// GetOwnerPageUID / IsAMaster
@@ -383,6 +384,39 @@ void PrintStory(const IMultiColumnTextFrame* columns, Print& print)
 	print.AddNumber(model->GetChangeCount());
 }
 
+// THE COLUMNS OBJECT A STORY IS SHOWN BY: a text frame's (IGraphicFrameData), and text on a path's (IMainItemTOPData) -
+// an item can have both. nil when it shows none. The fingerprint prints the story of each (PrintStory); a write's reach
+// is told by them (AddStoriesShown).
+IMultiColumnTextFrame* QueryFrameColumns(IDataBase* db, UID uid)
+{
+	InterfacePtr<IGraphicFrameData> frameData(db, uid, UseDefaultIID());
+	return (frameData != nil) ? frameData->QueryMCTextFrame() : nil;
+}
+
+IMultiColumnTextFrame* QueryPathColumns(IDataBase* db, UID uid)
+{
+	InterfacePtr<IMainItemTOPData> path(db, uid, UseDefaultIID());
+	return (path != nil) ? path->QueryTOPMCTextFrame() : nil;
+}
+
+// The stories an item shows (QueryFrameColumns, QueryPathColumns), added to out.
+void AddStoriesShown(IDataBase* db, UID uid, std::set<UID>& out)
+{
+	InterfacePtr<IMultiColumnTextFrame> columns(QueryFrameColumns(db, uid));
+	if (columns != nil)
+		out.insert(columns->GetTextModelUID());
+	InterfacePtr<IMultiColumnTextFrame> pathColumns(QueryPathColumns(db, uid));
+	if (pathColumns != nil)
+		out.insert(pathColumns->GetTextModelUID());
+}
+
+// The item holding this one (IHierarchy) - kInvalidUID at the top.
+UID HolderOf(IDataBase* db, UID uid)
+{
+	InterfacePtr<IHierarchy> hier(db, uid, UseDefaultIID());
+	return (hier != nil) ? hier->GetParentUID() : kInvalidUID;
+}
+
 }	// anonymous namespace
 
 IObjectWalker* KFCObjectSearch::QuerySharedWalker()
@@ -591,11 +625,9 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 	if (!PrintTree(db, item.GetUID(), print))
 		return false;
 	PrintAnchor(db, item.GetUID(), print);
-	InterfacePtr<IGraphicFrameData> frameData(item, UseDefaultIID());
-	InterfacePtr<IMultiColumnTextFrame> columns((frameData != nil) ? frameData->QueryMCTextFrame() : nil);
+	InterfacePtr<IMultiColumnTextFrame> columns(QueryFrameColumns(db, item.GetUID()));
 	PrintStory(columns, print);
-	InterfacePtr<IMainItemTOPData> path(item, UseDefaultIID());
-	InterfacePtr<IMultiColumnTextFrame> pathColumns((path != nil) ? path->QueryTOPMCTextFrame() : nil);
+	InterfacePtr<IMultiColumnTextFrame> pathColumns(QueryPathColumns(db, item.GetUID()));
 	PrintStory(pathColumns, print);
 	outHash = print.Hash();
 	outLength = print.Length();
@@ -605,6 +637,55 @@ bool KFCObjectSearch::Fingerprint(const UIDRef& item, uint64& outHash, uint32& o
 		std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count());
 #endif
 	return true;
+}
+
+void KFCObjectSearch::ReachOfWrite(IDataBase* db, const std::set<UID>& toWrite, WriteReach& out)
+{
+	out = WriteReach();
+	out.written = toWrite;
+	if (db == nil)
+		return;
+	for (std::set<UID>::const_iterator w = toWrite.begin(); w != toWrite.end(); ++w)
+	{
+		// Up from the item, the item first. A walk that comes to an item already met stops: the rest is in.
+		for (UID uid = *w; uid != kInvalidUID && db->IsValidUID(uid) && out.items.insert(uid).second; uid = HolderOf(db, uid))
+		{
+			AddStoriesShown(db, uid, out.stories);		// a text frame or path: its own story
+			InterfacePtr<IInlineData> anchor(db, uid, UseDefaultIID());
+			if (anchor != nil)
+				out.stories.insert(anchor->GetTextModelUID());		// an inline's or anchored item's anchor: the story it hangs in
+			InterfacePtr<ITextFrameColumn> column(db, uid, UseDefaultIID());
+			if (column != nil)
+				out.stories.insert(column->GetTextModelUID());		// a frame's column: the story composed in it
+		}
+	}
+	out.stories.erase(kInvalidUID);
+}
+
+bool KFCObjectSearch::WriteReaches(IDataBase* db, const WriteReach& reach, UID item)
+{
+	if (db == nil || item == kInvalidUID || !db->IsValidUID(item))
+		return false;
+	// One to be written, or one holding it: its print holds the item (PrintTree).
+	if (reach.items.count(item) > 0)
+		return true;
+	// A text frame or path showing a story the write reaches: its print holds the story's version (PrintStory).
+	if (!reach.stories.empty())
+	{
+		std::set<UID> shown;
+		AddStoriesShown(db, item, shown);
+		for (std::set<UID>::const_iterator s = shown.begin(); s != shown.end(); ++s)
+			if (reach.stories.count(*s) > 0)
+				return true;
+	}
+	// Held by one to be written - a group's member, a frame's image: a write to the holder can reach into it. (A holder met
+	// twice ends the walk, as in ReachOfWrite.)
+	std::set<UID> met;
+	for (UID uid = HolderOf(db, item); uid != kInvalidUID && db->IsValidUID(uid) && met.insert(uid).second;
+		uid = HolderOf(db, uid))
+		if (reach.written.count(uid) > 0)
+			return true;
+	return false;
 }
 
 bool KFCObjectSearch::IsOnSpread(const UIDRef& item)

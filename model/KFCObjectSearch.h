@@ -29,6 +29,7 @@
 #include "UIDRef.h"
 #include "ObjectWalkerScopeOptions.h"
 
+#include <set>
 #include <vector>
 
 #include "KFCBookScope.h"		// ChapterDoc, SkippedChapter - a run's targets
@@ -106,6 +107,21 @@ namespace KFCObjectSearch
 	    it took the place of the item's snippet, which was 20 to 100 times slower and crashed InDesign on an inline in
 	    overset text). false = nothing of the item could be read. */
 	bool Fingerprint(const UIDRef& item, uint64& outHash, uint32& outLength);
+
+	/** WHAT A WRITE OF KFC'S OWN CAN MOVE BESIDES THE ITEMS IT WRITES (spec OBJ-12, 2026-10-12). A fingerprint holds more
+	    than its item: a group's holds its members, a text frame's (and a path's) its story's version - and a change to an
+	    inline or an anchored item moves the version of the story it hangs in. So a write can move the print of an item
+	    holding one it writes, of an item one it writes holds, and of a text frame or path showing a story one it writes
+	    shows or hangs in. ReachOfWrite reads that around the items to be written, before the write; WriteReaches asks it
+	    of one item. */
+	struct WriteReach
+	{
+		std::set<UID>	written;	// the items to be written
+		std::set<UID>	items;		// ...and every item holding one of them (IHierarchy, up to the top)
+		std::set<UID>	stories;	// the stories they show, hang in or are composed in
+	};
+	void ReachOfWrite(IDataBase* db, const std::set<UID>& toWrite, WriteReach& out);
+	bool WriteReaches(IDataBase* db, const WriteReach& reach, UID item);
 
 	/** Does a spread hold the item now - is it laid out (IPasteboardUtils::QuerySpread)? No for an item in text that is
 	    not composed - an inline in OVERSET text: nothing of it can be shown or selected, and its row's Replace is refused
