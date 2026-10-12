@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The model half's three session interfaces (IKFCResults.h / IKFCRuns.h / IKFCChapters.h), each method
+//  The model half's session interfaces (IKFCResults.h / IKFCRuns.h / IKFCChapters.h), each method
 //  forwarding to the function it names - nothing is decided here (the model/UI split) - and the boundary
 //  stamp the UI half checks before it calls any of them (IKFCBoundary.h).
 //  EDITED BY HAND. First generated from one table with the headers

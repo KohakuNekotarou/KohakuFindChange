@@ -35,9 +35,9 @@
 //  NIL IS AN ANSWER. On a background thread, and under InDesign Server, the UI plug-in is not
 //  there and the Query comes back nil - "the system behaves as if the plug-in were missing and returns a
 //  nil pointer. It is critical that you write model code that expects to be able to receive nil pointers"
-//  (vol1-07, "Rules for thread safety"). Every caller in the model half reads nil as "no UI": no bar, no
-//  window, no Book panel. The model half asks through KFCQueryUIServices (below), which answers nil for a UI
-//  half of another build as well.
+//  (vol1-07, "Rules for thread safety"). Every caller in the model half reads nil as "no UI" and does
+//  without. The model half asks through KFCQueryUIServices, which answers nil for a UI half of another
+//  build as well.
 //
 //  What the model DECIDES stays in the model - the rules, the wording, the order. What crosses is only
 //  the showing.
@@ -59,8 +59,9 @@
 #include "IKFCBoundary.h"		// KFCOtherHalfIsThisBuild - KFCQueryUIServices
 #include "KFCBoundaryID.h"		// IID_IKFCUISERVICES
 
-/** One progress bar the UI half has put up for the model half - RangeProgressBar's four calls that the
-    engines make, and nothing else. Deleted by the model half when its run is over (KFCProgressBar). */
+/** One progress bar the UI half has put up for the model half - the RangeProgressBar calls the engines make,
+    and nothing else. Deleted by the model half when its run is over (KFCProgressBar). Its slots cross the boundary
+    as a door's do: a change to them moves kKFCBoundaryRevision up by one (KFCBoundaryID.h). */
 class KFCProgressBarUI
 {
 public:
@@ -99,7 +100,7 @@ public:
 	// promise to every built caller). One taken out moves every slot below it, so both halves are built
 	// together then (nothing outside KFC calls this door). Either way kKFCBoundaryRevision goes up by one
 	// (KFCBoundaryID.h): a model half that finds another build's UI half then asks this door nothing
-	// (KFCQueryUIServices, below).
+	// (KFCQueryUIServices).
 	/** The documents selected in the Book panel that shows this book (Find/Change Selected Documents
 	    (Book)). true only for a PART of the book - none or all selected answers false, the product's rule
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
@@ -116,8 +117,8 @@ public:
 	    as nothing to do, so the object search asks this before its walk and clears what the walk selected when the
 	    answer was no - without it an object search left an object selected (the user's report). */
 	virtual bool				HasAnySelection() = 0;
-	/** Nothing selected in the front view - DeselectAll on the active selection, when there is one (KFCJump's
-	    ClearSelection, the SDK's way in SnpSelectShape.cpp). */
+	/** Nothing selected in the front view - DeselectAll on the active selection, when there is one
+	    (KFCJump::ClearFrontSelection, the SDK's way in SnpSelectShape.cpp). */
 	virtual void				ClearSelection() = 0;
 	/** IS A ROW'S LANDING UNDER WAY in the panel (KFCJump::IsLanding - a click's, an arrow's, an object row's Replace's)?
 	    A landing opens documents and windows and runs the message loop while it does, and the model's own deferred work
@@ -126,7 +127,7 @@ public:
 	virtual bool				IsLanding() = 0;
 };
 
-/** HOW THE MODEL HALF ASKS FOR THE SERVICES ABOVE - the only way. IKFCUIServices has no kDefaultIID, so a Query of its
+/** HOW THE MODEL HALF ASKS FOR IKFCUIServices - the only way. IKFCUIServices has no kDefaultIID, so a Query of its
     own by UseDefaultIID() does not compile, and IID_IKFCUISERVICES is spelled here alone. The UI half that is loaded
     has to be this build's (KFCOtherHalfIsThisBuild, IKFCBoundary.h), or the services are taken for absent and nil
     comes back, as with no UI half at all - another build's slots would put each call in another method

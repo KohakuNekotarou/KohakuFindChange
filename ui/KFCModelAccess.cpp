@@ -46,9 +46,10 @@ namespace
 	}
 
 	// THE STAND-INS. Every door answered the way "nothing here, and a run already standing" reads - counts 0, finds
-	// false, outs emptied, a run's words the reason - so the panel's commands are grey (KFCActionComponent's
-	// UpdateActionStates greys all of them while IsAnyRunning) and a command that is tried anyway says why on the message
-	// line (KFCResultTree::RefusedWhileRunning shows BusyMessage). Statics, so AddRef and Release count nothing.
+	// false, outs emptied (an IDFile out left as it is: it is read only after a true), a run's words the reason - so
+	// the panel's commands are grey (KFCActionComponent's UpdateActionStates greys all of them while IsAnyRunning)
+	// and a command that is tried anyway says why on the message line (KFCResultTree::RefusedWhileRunning shows
+	// BusyMessage). Statics, so AddRef and Release count nothing.
 	// A METHOD ADDED TO A DOOR IS ADDED HERE TOO - the stand-in is abstract, and so does not compile, until it is.
 
 	class KFCResultsStandInImpl : public IKFCResults

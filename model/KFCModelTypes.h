@@ -5,13 +5,13 @@
 //  KohakuFindChange (KFC)
 //
 //  The model half's PLAIN TYPES that the UI half reads as well (the model/UI split).
-//  Structs, enums and constants only: no function is declared here, so a UI file that includes this
-//  cannot reach into the model plug-in's code by accident - every call goes through the session
+//  Structs, enums, constants and inline helpers on them only: nothing of the model plug-in's code is declared
+//  here, so a UI file that includes this cannot reach into it by accident - every call goes through the session
 //  interfaces (IKFCResults / IKFCRuns / IKFCChapters). The namespaces are the ones these types always
 //  had, so KFCResultModel::RowDisplay is still spelled KFCResultModel::RowDisplay.
 //  A type here that changes its layout moves kKFCBoundaryRevision up by one (KFCBoundaryID.h), as a door does.
-//  Only what crosses stands here: a type the UI half does not read lives in KFCResultModel.h /
-//  KFCSearchEngine.h (Hit, Chapter, the groups, the Undo copies, HitDetail).
+//  Only what crosses stands here: a type the UI half does not read lives with the model code that uses it (the
+//  result model's - Hit, Chapter and the rest - in KFCResultModel.h).
 //
 //========================================================================================
 

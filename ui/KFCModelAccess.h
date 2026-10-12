@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  How the UI half reaches the model half (the model/UI split): the three session interfaces the model
+//  How the UI half reaches the model half (the model/UI split): the session interfaces the model
 //  puts on kSessionBoss, one line each. The UI half includes THIS and the shared types - never a model
 //  header that declares the model's functions, which another plug-in cannot link to.
 //

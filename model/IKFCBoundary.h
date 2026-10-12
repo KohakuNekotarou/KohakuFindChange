@@ -13,7 +13,8 @@
 //  for absent (KFCQueryUIServices, IKFCUIServices.h).
 //
 //  Their own IIDs rather than a method at the end of a door: the question has to be answerable by a half that
-//  knows nothing of it, and a nil Query is that answer.
+//  knows nothing of it - a nil Query is that answer, where a slot past the end of an older half's vtable would be a
+//  call into nothing.
 //  NEVER CHANGES SHAPE. Every other door may move with kKFCBoundaryRevision; this one is what tells the two
 //  halves they moved, so its one method stays as it is.
 //  Asked for by its IID only - there is no kDefaultIID: a default would name one of the two stamps, and in the model

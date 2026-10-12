@@ -4,24 +4,25 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  IKFCResults - one of the three doors the UI half reaches the model half through (the model/UI split;
+//  IKFCResults - one of the doors the UI half reaches the model half through (the model/UI split;
 //  docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 4.1).
 //
 //  The RESULT SET - KFCResultModel's questions and the few changes the panel makes to it (the row a
 //  right-click menu was popped over, and what a jump learns of a row - its document rebound, its outcome).
 //  Each method is the KFCResultModel function of the same name; the contract is written there.
 //
-//  ON kSessionBoss, NOT A FACADE ON kUtilsBoss. What is behind it is session STATE (the results, the held
-//  chapters, the marker), and the guide's facades keep no global or static state (gs-04); the session is
-//  where InDesign keeps its own session state (IBookManager, IClipboardController). The UI half reaches it
-//  with KFCResults() (KFCModelAccess.h).
-//  EDITED BY HAND. The three doors and their implementation (KFCModelServices.cpp) were first generated from
-//  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
-//  which the table does not know, so the generator is a record only and refuses to write. A new method goes
-//  at the END of its interface - a vtable slot is a promise to every built caller. One taken out moves every
-//  slot below it, so both halves are built together then (nothing outside KFC calls these doors). Either way
-//  kKFCBoundaryRevision goes up by one (KFCBoundaryID.h) - a UI half built against the old slots then stands in
-//  for the doors instead of calling them - and the stand-in (ui/KFCModelAccess.cpp) takes the new method too.
+//  ON kSessionBoss, NOT A FACADE ON kUtilsBoss - this note is all the doors' (IKFCRuns.h and IKFCChapters.h point
+//  here). What is behind them is session STATE (the results, the held chapters, the marker), and the guide's
+//  facades keep no global or static state (gs-04); the session is where InDesign keeps its own session state
+//  (IBookManager, IClipboardController). The UI half reaches this door with KFCResults() (KFCModelAccess.h).
+//  EDITED BY HAND. The doors IKFCResults / IKFCRuns / IKFCChapters and their implementation (KFCModelServices.cpp)
+//  were first generated from one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been
+//  added by hand since, which the table does not know, so the generator is a record only and refuses to write. A
+//  new method goes at the END of its interface - a vtable slot is a promise to every built caller. One taken out
+//  moves every slot below it, so both halves are built together then (nothing outside KFC calls these doors).
+//  Either way kKFCBoundaryRevision goes up by one (KFCBoundaryID.h) - a UI half built against the old slots then
+//  stands in for the doors instead of calling them - and the stand-in (ui/KFCModelAccess.cpp) takes the new method
+//  too.
 //
 //========================================================================================
 

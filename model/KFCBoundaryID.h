@@ -26,7 +26,7 @@
 #define kKFCCompanyValue	"KohakuNekotarou"	// Company name displayed externally.
 
 // Plug-in:
-#define kKFCPluginName	"KohakuBookSearch"			// Internal name: the ID system and the .rc InternalName. NEVER change it. It is NOT what the .pln on disk is called - that is kKFCFileName below - and the .fr never spells it out either (PluginVersion carries kKFCPluginID, and the ExtraPluginInfo that documents do store is the company, the URL and the alert text), so the file on disk can be renamed without it moving. Same split as KCM's kKCMPluginName.
+#define kKFCPluginName	"KohakuBookSearch"			// Internal name: the ID system and the .rc InternalName. NEVER change it. It is NOT what the .pln on disk is called - that is kKFCFileName (KFCID.h) - and the .fr never spells it out either (PluginVersion carries kKFCPluginID, and the ExtraPluginInfo that documents do store is the company, the URL and the alert text), so the file on disk can be renamed without it moving. Same split as KCM's kKCMPluginName.
 #define kKFCDisplayName	"Kohaku Find/Change"		// Display name: the About menu item, the About box, the panel and its tab, and the .rc FileDescription. THE one definition - the UI half's string table (KFCUI_enUS.fr, the one table that has the key) puts it under kKFCPanelTitleKey and KFCPanelTitle.cpp restores the tab from it, so the copies cannot drift apart. The slash is safe here and ONLY here: menu paths are delimited with ":" (SDKDef.h kSDKDefDelimitMenuPath) and this string is a string table VALUE, never a path segment - the menu paths (KFCUIID.h) are built from kKFCPanelTitleKey and friends, which are prefix-number keys. Do not put a ":" or a bare "&" in it.
 #define kKFCPrefixNumber	0x1EA600 		// Unique prefix number for this plug-in(*Must* be obtained from Adobe Developer Support).
 													// Issued by Adobe: 0x1EA600 - 0x1EA6FF, 256 ids in every id space. The band is shared the way
@@ -58,30 +58,30 @@ DECLARE_PMID(kMessageIDSpace, kKFCModelChangedMessage, kKFCPrefix + 0)
 // The protocol the model half's notifications travel under (KFCModelNotify.h) - and the IID the UI half's
 // observer is AddIn'd on kSessionBoss with (KFCModelObserver.cpp).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCMODELOBSERVER, kKFCPrefix + 3)
-// The three session interfaces the UI half reaches the model half through (IKFCResults.h / IKFCRuns.h /
+// The session interfaces the UI half reaches the model half through (IKFCResults.h / IKFCRuns.h /
 // IKFCChapters.h, on kSessionBoss).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCRESULTS, kKFCPrefix + 4)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCRUNS, kKFCPrefix + 5)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCCHAPTERS, kKFCPrefix + 6)
-// The UI services the model half asks for and does without when they are not there (IKFCUIServices.h,
-// implemented by the UI half on kSessionBoss: the progress bar, the windows, the Book panel).
+// The UI services the model half asks for and does without when they are not there (IKFCUIServices.h, which lists
+// them; implemented by the UI half on kSessionBoss).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUISERVICES, kKFCPrefix + 7)
-// Which build of the boundary each half was compiled with (IKFCBoundary.h - kKFCBoundaryStamp below): the model half's
-// answer, and the UI half's. Their own IIDs, not slots at the end of a door: a half older than the stamp has no such
-// interface and answers nil, where a slot past the end of its vtable would be a call into nothing. + 13 and + 14: the
-// next after the highest spent (+ 3 ... + 7 are full).
+// Which build of the boundary each half was compiled with (kKFCBoundaryStamp): the model half's answer, and the UI
+// half's. IIDs of their own, not slots at the end of a door - IKFCBoundary.h says why. + 13 and + 14: the next after
+// the highest spent (+ 3 ... + 7 are full).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCBOUNDARY, kKFCPrefix + 13)
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
 
-// THE BOUNDARY STAMP - what each half checks the other against before it calls the other's door (the UI half:
-// ui/KFCModelAccess.cpp; the model half: KFCQueryUIServices, IKFCUIServices.h).
-// The doors are vtables (IKFCResults.h / IKFCRuns.h / IKFCChapters.h / IKFCUIServices.h) and the types they carry are
-// layouts (KFCModelTypes.h): two halves built from different revisions of them load together all the same - the
-// UI half's PluginDependency (KFCUI.fr) asks for the SDK's version only - and a call then lands in another method's
-// slot (an old UI half's CheckObjectReplace on a new model half's ReplaceRows: memory
-// facade-vtable-slot-append-only, where KCM's two halves did exactly that). So a UI half that does not find its own
-// stamp in the model half calls nothing at all, and a model half that does not find its own in the UI half takes it
-// for no UI half.
+// THE BOUNDARY STAMP - what each half checks the other against before it calls the other's door: the one question,
+// KFCOtherHalfIsThisBuild (IKFCBoundary.h), asked by the UI half in ui/KFCModelAccess.cpp and by the model half in
+// KFCQueryUIServices (IKFCUIServices.h).
+// The doors are vtables (IKFCResults.h / IKFCRuns.h / IKFCChapters.h / IKFCUIServices.h - and the progress bar
+// IKFCUIServices hands over, KFCProgressBarUI) and the types they carry are layouts (KFCModelTypes.h): two halves
+// built from different revisions of them load together all the same - the UI half's PluginDependency (KFCUI.fr) asks
+// for the SDK's version only - and a call then lands in another method's slot (an old UI half's CheckObjectReplace on
+// a new model half's ReplaceRows: memory facade-vtable-slot-append-only, where KCM's two halves did exactly that). So
+// a UI half that does not find its own stamp in the model half calls nothing at all, and a model half that does not
+// find its own in the UI half takes it for no UI half.
 // kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
 // its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
 #define kKFCBoundaryRevision	"1"

@@ -4,11 +4,10 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  The UI half's side of IKFCUIServices.h (the model/UI split): the progress bar, the windows and the Book
-//  panel the model half asks for. AddIn'd on kSessionBoss from the UI half's resource, so a
-//  background thread - which loads no UI plug-in - finds nothing there and the model does without. Each
-//  answer is what KFCBookScope / the engines did themselves before the split, carried over unchanged; the
-//  notes are theirs.
+//  The UI half's side of IKFCUIServices.h (the model/UI split): what the model half asks the UI half for.
+//  AddIn'd on kSessionBoss from the UI half's resource, so a background thread - which loads no UI plug-in -
+//  finds nothing there and the model does without. The bar, the windows and the Book panel are what
+//  KFCBookScope / the engines did themselves before the split, carried over unchanged; the notes are theirs.
 //
 //========================================================================================
 
@@ -48,13 +47,13 @@
 
 namespace
 {
-	/** One RangeProgressBar, held for the model half. Its four calls are the bar's own - while the manager holds the bar.
+	/** One RangeProgressBar, held for the model half. Its calls are the bar's own - while the manager holds the bar.
 
 	    A BAR THE MANAGER TURNED AWAY IS NOT DRIVEN. Another bar's DisableChildProgressBars makes the manager refuse a new
 	    one (ProgressBar.h, WasRegisterSuccessful) - KFC's own searches set it on theirs, and any bar standing when a run
 	    starts may have. A refused bar never comes on screen, so its calls give up nothing the user could see; what they
 	    would do is call through a bar the manager does not hold. Asked once, as the bar is made - the guard KCM
-	    (KCMProgressBar.h) and KIDMCP put in on 2026-09-09: KIDMCP after a crash on its own bar's path (seen once; the
+	    (KCMProgressBar.h) and KIDMCP put in: KIDMCP after a crash on its own bar's path (seen once; the
 	    refusal as its cause is a guess, not a diagnosis), KCM after a refusal that showed only as a missing bar. */
 	class KFCUIProgressBar : public KFCProgressBarUI
 	{
@@ -207,6 +206,8 @@ public:
 
 	virtual bool HasTextSelection()
 	{
+		// The layout's text selection only: a caret in the Story Editor (kGalleyTextSelectionBoss) or in a note
+		// (kNoteTextSelectionBoss) is not counted - whether Find/Change's own Find counts it is not measured.
 		return ActiveSelectionExists(kTextSelectionBoss);	// the text concrete selection boss's own answer
 	}
 

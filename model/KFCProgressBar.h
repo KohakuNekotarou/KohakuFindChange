@@ -5,7 +5,7 @@
 //  KohakuFindChange (KFC)
 //
 //  The engines' progress bar (the model/UI split). It stands where a RangeProgressBar stood
-//  - on the run's stack, with the same four calls - but the bar itself belongs to the UI half: this asks
+//  - on the run's stack, with the same calls - but the bar itself belongs to the UI half: this asks
 //  IKFCUIServices for one, and without the UI (a background thread, InDesign Server) there is no bar,
 //  nothing to cancel, and every call is a no-op. Not a link matter - RangeProgressBar is PUBLIC_DECL and
 //  a model plug-in could call it - but KFC counts the modal bar among the dialogs the guide lists as user-
