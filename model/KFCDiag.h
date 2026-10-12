@@ -193,16 +193,24 @@ inline void KFCDiagLog(const char* fmt, ...)
 
 #define KFC_DIAG_LOG(...) KFCDiagLog(__VA_ARGS__)
 
-// Is the fault switch <name> on - does %TEMP%\kbs-diag-fault-<name> exist? (See the header.)
-inline bool KFCDiagFault(const char* name)
+// The file of the fault switch <name>: %TEMP%\kbs-diag-fault-<name> (see the header). False when TEMP is not set.
+inline bool KFCDiagFaultPath(const char* name, char (&path)[600])
 {
 	char* temp = nullptr;
 	size_t len = 0;
 	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
 		return false;
-	char path[600] = { 0 };
 	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
 	free(temp);
+	return true;
+}
+
+// Is the fault switch <name> on - does its file exist?
+inline bool KFCDiagFault(const char* name)
+{
+	char path[600] = { 0 };
+	if (!KFCDiagFaultPath(name, path))
+		return false;
 	FILE* f = nullptr;
 	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
 		return false;
@@ -215,14 +223,9 @@ inline bool KFCDiagFault(const char* name)
 // Turn the fault switch <name> off - its file removed (a one-shot switch the code itself takes away once acted on).
 inline void KFCDiagFaultOff(const char* name)
 {
-	char* temp = nullptr;
-	size_t len = 0;
-	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
-		return;
 	char path[600] = { 0 };
-	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
-	free(temp);
-	(void)remove(path);
+	if (KFCDiagFaultPath(name, path))
+		(void)remove(path);
 }
 
 // The fault switch <name>'s file as text (UTF-8, its first line - a CR or LF ends it, a BOM is passed over) - false when
@@ -231,13 +234,9 @@ inline void KFCDiagFaultOff(const char* name)
 inline bool KFCDiagFaultText(const char* name, std::string& out)
 {
 	out.clear();
-	char* temp = nullptr;
-	size_t len = 0;
-	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
-		return false;
 	char path[600] = { 0 };
-	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
-	free(temp);
+	if (!KFCDiagFaultPath(name, path))
+		return false;
 	FILE* f = nullptr;
 	if (fopen_s(&f, path, "rb") != 0 || f == nullptr)
 		return false;
@@ -259,13 +258,9 @@ inline bool KFCDiagFaultText(const char* name, std::string& out)
 // switch is off, or holds fewer numbers, or one that is not a number.
 inline int KFCDiagFaultValue(const char* name, int nth, int fallback)
 {
-	char* temp = nullptr;
-	size_t len = 0;
-	if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
-		return fallback;
 	char path[600] = { 0 };
-	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\kbs-diag-fault-%s", temp, name);
-	free(temp);
+	if (!KFCDiagFaultPath(name, path))
+		return fallback;
 	FILE* f = nullptr;
 	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
 		return fallback;
