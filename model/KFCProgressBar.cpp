@@ -22,12 +22,13 @@ KFCProgressBar::KFCProgressBar(const PMString& title, int32 startRange, int32 en
 {
 	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
 	if (ui != nil)
-		fBar = ui->NewProgressBar(title, startRange, endRange, showImmediate, showCancel);
+		fBar.reset(ui->NewProgressBar(title, startRange, endRange, showImmediate, showCancel));
 }
 
+// Out of line on purpose: KFCProgressBarUI is whole only here (IKFCUIServices.h), and fBar deletes through it.
 KFCProgressBar::~KFCProgressBar()
 {
-	delete fBar;	// the bar comes down here, as a RangeProgressBar did leaving its scope
+	// fBar deletes the bar here, and it comes down, as a RangeProgressBar did leaving its scope.
 }
 
 void KFCProgressBar::SetTaskText(const PMString& text, bool16 forceRedraw)

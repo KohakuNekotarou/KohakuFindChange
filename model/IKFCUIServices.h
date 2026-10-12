@@ -74,7 +74,9 @@ public:
 	enum { kDefaultIID = IID_IKFCUISERVICES };
 
 	/** A modal RangeProgressBar with these arguments (ProgressBar.h), or nil when one could not be made.
-	    The caller owns it and deletes it when the run is over - the bar comes down with it. */
+	    The caller owns it and deletes it when the run is over - the bar comes down with it. A bar the manager
+	    turned away (another bar's DisableChildProgressBars) comes back all the same and does nothing - its
+	    WasCancelled is false (KFCUIServices.cpp). */
 	virtual KFCProgressBarUI*	NewProgressBar(const PMString& title, int32 startRange, int32 endRange,
 									bool8 showImmediate, bool8 showCancel) = 0;
 

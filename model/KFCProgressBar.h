@@ -12,7 +12,8 @@
 //  interface components (vol1-06, "UI component content"); the author's call (IKFCUIServices.h says more).
 //
 //  The calls behave exactly as RangeProgressBar's did, because they ARE its calls: the UI half's object
-//  wraps a real one (KFCUIServices.cpp). So the modal bar still lets events in while it is up - which is
+//  wraps a real one (KFCUIServices.cpp) - a bar the manager turned away excepted, which it does not drive
+//  at all. So the modal bar still lets events in while it is up - which is
 //  what KFCRunGuard exists for (which of its calls does it is not measured: KFCAdvanceProgress).
 //
 //========================================================================================
@@ -20,6 +21,7 @@
 #ifndef __KFCProgressBar_h__
 #define __KFCProgressBar_h__
 
+#include "K2SmartPtr.h"		// K2::scoped_ptr - the SDK's own owning pointer
 #include "PMString.h"
 
 class KFCProgressBarUI;
@@ -41,7 +43,7 @@ private:
 	KFCProgressBar(const KFCProgressBar&);
 	KFCProgressBar& operator=(const KFCProgressBar&);
 
-	KFCProgressBarUI*	fBar;	// the UI half's bar, or nil when there is no UI
+	K2::scoped_ptr<KFCProgressBarUI>	fBar;	// the UI half's bar, or nil when there is no UI
 };
 
 /** "<noun> <index + 1> / <count> - <name>" on the bar ("Chapter 3 / 12 - ch03.indd") - the line every search's bar shows

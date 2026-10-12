@@ -47,21 +47,45 @@
 
 namespace
 {
-	/** One RangeProgressBar, held for the model half. Its four calls are the bar's own. */
+	/** One RangeProgressBar, held for the model half. Its four calls are the bar's own - while the manager holds the bar.
+
+	    A BAR THE MANAGER TURNED AWAY IS NOT DRIVEN. Another bar's DisableChildProgressBars makes the manager refuse a new
+	    one (ProgressBar.h, WasRegisterSuccessful) - KFC's own searches set it on theirs, and any bar standing when a run
+	    starts may have. A refused bar never comes on screen, so its calls give up nothing the user could see; what they
+	    would do is call through a bar the manager does not hold. Asked once, as the bar is made - the guard KCM
+	    (KCMProgressBar.h) and KIDMCP put in on 2026-09-09: KIDMCP after a crash on its own bar's path (seen once; the
+	    refusal as its cause is a guess, not a diagnosis), KCM after a refusal that showed only as a missing bar. */
 	class KFCUIProgressBar : public KFCProgressBarUI
 	{
 	public:
 		KFCUIProgressBar(const PMString& title, int32 startRange, int32 endRange, bool8 showImmediate, bool8 showCancel)
-			: fBar(title, startRange, endRange, showImmediate, showCancel) {}
+			: fBar(title, startRange, endRange, showImmediate, showCancel), fRegistered(fBar.WasRegisterSuccessful() != kFalse) {}
 		virtual ~KFCUIProgressBar() {}
 
-		virtual void	SetTaskText(const PMString& text, bool16 forceRedraw)	{ fBar.SetTaskText(text, forceRedraw); }
-		virtual void	SetPosition(int32 newPosition)							{ fBar.SetPosition(newPosition); }
-		virtual bool16	WasCancelled(bool8 setGlobalErrorState)					{ return fBar.WasCancelled(setGlobalErrorState); }
-		virtual void	DisableChildProgressBars(bool16 disable)				{ fBar.DisableChildProgressBars(disable); }
+		virtual void	SetTaskText(const PMString& text, bool16 forceRedraw)
+		{
+			if (fRegistered)
+				fBar.SetTaskText(text, forceRedraw);
+		}
+		virtual void	SetPosition(int32 newPosition)
+		{
+			if (fRegistered)
+				fBar.SetPosition(newPosition);
+		}
+		/** False for a refused bar: nobody can have pressed a Cancel that was never on screen. */
+		virtual bool16	WasCancelled(bool8 setGlobalErrorState)
+		{
+			return fRegistered ? fBar.WasCancelled(setGlobalErrorState) : kFalse;
+		}
+		virtual void	DisableChildProgressBars(bool16 disable)
+		{
+			if (fRegistered)
+				fBar.DisableChildProgressBars(disable);
+		}
 
 	private:
-		RangeProgressBar	fBar;
+		RangeProgressBar	fBar;			// declared first: fRegistered reads it as it is made
+		const bool			fRegistered;	// the manager took the bar (WasRegisterSuccessful)
 	};
 
 	/** Does the front view's selection hold one of this concrete selection boss - kInvalidClass = of any
