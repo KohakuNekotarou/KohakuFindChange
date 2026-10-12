@@ -450,9 +450,8 @@ static bool KFCReadWholeFile(const IDFile& file, std::string& out)
 // MoveFileEx with MOVEFILE_REPLACE_EXISTING replaces in one step on one volume.
 // side = the side file, in the same folder as `file` (one volume: MoveFileEx's one-step replace) - the settings file's
 // is kKFCPanelStateSideFileName; a file of ours at a path the person chose has "<its path>.tmp" (KFCWriteFileSafely).
-static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const IDFile& sideFile)
+static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text, const IDFile& side)
 {
-	IDFile side(sideFile);		// GrabTString is not const
 	{
 		InterfacePtr<IPMStream> stream(StreamUtil::CreateFileStreamWrite(side, kOpenOut | kOpenTrunc));
 		if (stream == nil)
@@ -468,8 +467,7 @@ static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text
 	std::string readBack;
 	if (!KFCReadWholeFile(side, readBack) || readBack != text)
 		return "write";
-	IDFile target(file);	// GrabTString is not const
-	if (!::MoveFileEx(side.GrabTString(), target.GrabTString(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	if (!::MoveFileEx(side.GrabTString(), file.GrabTString(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 		return "replace";
 	return nil;
 }
