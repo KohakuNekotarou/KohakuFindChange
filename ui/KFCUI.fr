@@ -124,12 +124,10 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		}
 	},
 
-    /*
-	 * This boss class inherits from an API panel boss class, and
-	 * adds an interface to control a pop-up menu on the panel.
-	 * The implementation for this interface is provided by the API.
-     *
-	 * 
+	/*
+	 * The panel: the API's palette panel boss with interfaces of ours on it - the flyout menu's data (the
+	 * API's implementation), the panel's observer, its view and its roll-over (each line below says what).
+	 *
 	 * @ingroup kohakubooksearch
 	 */
 	Class
@@ -138,8 +136,8 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kPalettePanelWidgetBoss,
 		{
 			/*
-			 * The plug-in's implementation of ITextControlData with an exotic IID of IID_IPANELMENUDATA.
-			 * Implementation provided by the API.
+			 * The flyout menu's data (IPanelMenuData): the name of the menu the panel pops - kKFCInternalPopupMenuNameKey,
+			 * the last field of the panel's resource below. The API's implementation (CPanelMenuData).
 			 */
 			IID_IPANELMENUDATA, kCPanelMenuDataImpl,
 			/*
@@ -186,9 +184,9 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	},
 
 	/*
-	 * Result tree list: the tree-view widget carrying our hierarchy adapter and row
-	 * widget manager. The framework provides the default event handling (expand/collapse); the
-	 * row-click jump handler is the row's (kKFCResultNodeWidgetBoss, below).
+	 * Result tree list: the tree-view widget with our hierarchy adapter, row widget manager, selection
+	 * controller and key handler (each line below says what it adds). A row's click is the row's own
+	 * handler (kKFCResultNodeWidgetBoss, below).
 	 */
 	Class
 	{
@@ -937,7 +935,8 @@ resource ActionDef (kSDKDefActionResourceID)
 		kSDKDefInvisibleInKBSCEditorFlag,
 
 		// Select All Rows - a book, document or story row's right-click menu (the author's call).
-		// kCustomEnabling: UpdateActionStates greys it while no such row is stashed or a run is up.
+		// kCustomEnabling: UpdateActionStates greys it while no such row is stashed, while that row has no hit
+		// row under it, or while a run is up.
 		kKFCActionComponentBoss,
 		kKFCSelectAllRowsActionID,
 		kKFCSelectAllRowsMenuKey,		// "Select All Rows"

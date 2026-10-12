@@ -25,8 +25,9 @@
 #include "VCPlugInHeaders.h"
 
 // THE MODEL HALF'S RESOURCES.
-// The search and replace engines, the results, the undo mark, the jump marker's adornment and the
-// observers that keep the results true are declared here; everything the panel needs - its bosses,
+// The model half's bosses are declared here - the doors the UI half reaches the results and the runs
+// through, the jump marker's adornment, the undo mark, the observers and responders that keep the results
+// true, the startup service and the test build's command counter; everything the panel needs - its bosses,
 // menus, actions, views, pictures and strings - is in ui/KFCUI.fr, the UI half's resource. The
 // strings this half writes itself (what Edit > Undo calls a KFC write) stay in KFC_enUS.fr.
 
