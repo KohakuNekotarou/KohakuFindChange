@@ -482,7 +482,7 @@ public:
 		if (protocol == IID_IFINDCHANGEOPTIONS)
 		{
 #ifdef KFC_DIAG
-			++KFCDiagCounter(1);	// how often this runs during a search or a write (UIOBS, KFCActionComponent)
+			++KFCDiagCounter(kKFCDiagFieldMirrors);	// how often this runs during a search (UIOBS, KFCActionComponent)
 #endif
 			sRemirrorHeld = false;		// the dialog changed: writing back over InDesign's own text is allowed again
 			MirrorFindChangeIntoField();

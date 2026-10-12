@@ -207,11 +207,13 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			PMString summary;
 #ifdef KFC_DIAG
 			// how often the UI half's observers ran while the search did (guide vol2-15: not per match, one hopes)
-			const int titleBefore = KFCDiagCounter(0), mirrorBefore = KFCDiagCounter(1);
+			const int titleBefore = KFCDiagCounter(kKFCDiagTitleRecomputes);
+			const int mirrorBefore = KFCDiagCounter(kKFCDiagFieldMirrors);
 #endif
 			KFCRuns()->SearchBook(summary);
 #ifdef KFC_DIAG
-			KFC_DIAG_LOG("UIOBS search title=%d mirror=%d", KFCDiagCounter(0) - titleBefore, KFCDiagCounter(1) - mirrorBefore);
+			KFC_DIAG_LOG("UIOBS search title=%d mirror=%d", KFCDiagCounter(kKFCDiagTitleRecomputes) - titleBefore,
+				KFCDiagCounter(kKFCDiagFieldMirrors) - mirrorBefore);
 #endif
 			KFCResultTree::Rebuild();
 			KFCResultTree::ShowStatus(summary);

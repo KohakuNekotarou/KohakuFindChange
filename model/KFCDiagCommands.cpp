@@ -99,11 +99,11 @@ public:
 
 CREATE_PMINTERFACE(KFCDiagCmdCount, kKFCDiagCmdCountImpl)
 
-void KFCDiagCommands::Arm()
+bool KFCDiagCommands::Arm()
 {
 #ifdef KFC_DIAG
 	if (gInstalled != nil || !KFC_DIAG_FAULT("perf-commands"))
-		return;
+		return false;
 	ISession* const session = GetExecutionContextSession();
 	InterfacePtr<ICommandProcessor> processor(session != nil ? session->QueryCommandProcessor() : nil);
 	InterfacePtr<ICommandInterceptor> counter(
@@ -111,7 +111,7 @@ void KFCDiagCommands::Arm()
 	if (processor == nil || counter == nil)
 	{
 		KFC_DIAG_LOG("COMMANDS could not arm (processor=%p counter=%p)", (void*)processor.get(), (void*)counter.get());
-		return;
+		return false;
 	}
 	{
 		std::lock_guard<std::mutex> lock(gMutex);
@@ -121,12 +121,17 @@ void KFCDiagCommands::Arm()
 	counter->AddRef();				// the processor keeps a raw pointer: this file holds the reference for it
 	gInstalled = counter;
 	processor->InstallInterceptor(counter);
+	return true;
+#else
+	return false;
 #endif
 }
 
 int KFCDiagCommands::Count()
 {
 #ifdef KFC_DIAG
+	if (gInstalled == nil)
+		return 0;			// not counting - gTotal keeps the last run's total until the next Arm
 	std::lock_guard<std::mutex> lock(gMutex);
 	return gTotal;
 #else

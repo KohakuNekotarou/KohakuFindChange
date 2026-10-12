@@ -144,6 +144,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <io.h>							// _access_s (KFCDiagFault)
 #include <chrono>
 #include <mutex>
 #include <string>						// KFCDiagFaultText
@@ -205,17 +206,13 @@ inline bool KFCDiagFaultPath(const char* name, char (&path)[600])
 	return true;
 }
 
-// Is the fault switch <name> on - does its file exist?
+// Is the fault switch <name> on - does its file exist? Asked of the file's attributes, not by opening it: fopen_s
+// shares a file it reads for reading only, so for that moment a test deleting or writing the switch would be
+// refused, and a switch the test is still writing would read as off.
 inline bool KFCDiagFault(const char* name)
 {
 	char path[600] = { 0 };
-	if (!KFCDiagFaultPath(name, path))
-		return false;
-	FILE* f = nullptr;
-	if (fopen_s(&f, path, "r") != 0 || f == nullptr)
-		return false;
-	fclose(f);
-	return true;
+	return KFCDiagFaultPath(name, path) && _access_s(path, 0) == 0;
 }
 
 #define KFC_DIAG_FAULT(name) KFCDiagFault(name)
@@ -358,12 +355,17 @@ private:
 #define KFC_DIAG_PHASE(var, name) const KFCDiagPhase var(name)
 
 // Counters a test build bumps where something may run more often than it should (guide vol2-15 "do not
-// update the user interface from an observer"): 0 = the panel's tab name recomputed (KFCPanelTitle::Update), 1 = the
-// app bar's mirror of the Find/Change field (KFCAppBarSearchEnter). One set per plug-in (both are the UI half's).
-inline int& KFCDiagCounter(int which)
+// update the user interface from an observer"). One set per plug-in (both are the UI half's).
+enum KFCDiagCounterSlot
 {
-	static int counters[8] = { 0 };
-	return counters[(which >= 0 && which < 8) ? which : 7];
+	kKFCDiagTitleRecomputes = 0,	// the panel's tab name recomputed (KFCPanelTitle::Update)
+	kKFCDiagFieldMirrors,			// the app bar's mirror of the Find/Change field (KFCAppBarSearchEnter)
+	kKFCDiagCounterSlotCount
+};
+inline int& KFCDiagCounter(KFCDiagCounterSlot which)
+{
+	static int counters[kKFCDiagCounterSlotCount] = { 0 };
+	return counters[which];
 }
 
 #else

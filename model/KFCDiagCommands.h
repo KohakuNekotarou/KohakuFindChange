@@ -24,24 +24,31 @@
 
 namespace KFCDiagCommands
 {
-	/** Start counting (a no-op without KFC_DIAG, or with the switch off, or if already counting). */
-	void Arm();
+	/** Start counting - true when this call started it (false without KFC_DIAG, with the switch off, or when already
+	    counting). */
+	bool Arm();
 	/** Commands processed since Arm (0 when not counting). */
 	int Count();
 	/** Write "COMMANDS <what> total=<n> <class name>=<count> ..." (the most frequent first) and stop counting. */
 	void DisarmAndLog(const char* what);
 
-	/** Counting for the life of the object, whichever way the scope is left. ONE per run (a search, a query run):
-	    an inner one would end the outer one's count. Nothing without KFC_DIAG. */
+	/** Counting for the life of the object, whichever way the scope is left (a search, a query run). Only the scope
+	    that started the count ends it and writes its line: one opened inside another's count adds to it and writes
+	    nothing of its own. Nothing without KFC_DIAG. */
 	class Scope
 	{
 	public:
-		explicit Scope(const char* what) : fWhat(what) { Arm(); }
-		~Scope() { DisarmAndLog(fWhat); }
+		explicit Scope(const char* what) : fWhat(what), fArmed(Arm()) {}
+		~Scope()
+		{
+			if (fArmed)
+				DisarmAndLog(fWhat);
+		}
 	private:
 		Scope(const Scope&);
 		Scope& operator=(const Scope&);
-		const char* fWhat;
+		const char*	fWhat;
+		const bool	fArmed;
 	};
 }
 
