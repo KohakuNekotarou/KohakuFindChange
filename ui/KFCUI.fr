@@ -1241,13 +1241,16 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * widget here and a row there. All but the first come up HIDDEN; KFCPanelIcon writes the real
 		 * answer when the panel appears, because these widgets are rebuilt on every show and a
 		 * default written here would otherwise outrank the actual state.
+		 * ONE frame for the three, named once below: KFCPanelMetrics::Update moves each down for the UI language
+		 * keeping its own left, right and height, so frames that drifted apart would show the pictures apart.
 		 */
+#define kKFCIconFrame Frame(260, 22, 292, 54)	// 4px clear of the text, 8px in from the panel's edge
 		KFCIconWidget
 		(
 			kKFCIconWidgetID,
 			kKFCIconResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 22, 292, 54),		// 4px clear of the text, 8px in from the panel's edge
+			kKFCIconFrame,
 			kTrue, kTrue,
 			kADBEIconSuiteButtonType,
 		),
@@ -1256,7 +1259,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCIconFoundWidgetID,
 			kKFCIconFoundResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 22, 292, 54),		// SAME frame as the one above - they are alternatives
+			kKFCIconFrame,
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),
@@ -1265,7 +1268,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCIconChangedWidgetID,
 			kKFCIconChangedResID, kKFCUIPluginID,
 			kBindRight | kBindTop,
-			Frame(260, 22, 292, 54),		// SAME frame again
+			kKFCIconFrame,
 			kFalse, kTrue,
 			kADBEIconSuiteButtonType,
 		),
