@@ -21,8 +21,8 @@
 //  (KFCModelAccess.cpp), because the real door would take every call to whatever method sits in that slot in
 //  the other build. A stand-in has a run always "already in progress", with the reason as its message: every
 //  command of the panel is grey and the message line says what to do.
-//  These three are the only way in: the doors have no kDefaultIID, so a Query of its own does not compile, and
-//  each door's IID is spelled here alone.
+//  KFCResults() / KFCRuns() / KFCChapters() are the only way in: the doors have no kDefaultIID, so a Query of its
+//  own does not compile, and each door's IID is spelled here alone.
 //
 //========================================================================================
 

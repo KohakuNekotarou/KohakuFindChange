@@ -74,7 +74,7 @@ public:
 class IKFCUIServices : public IPMUnknown
 {
 public:
-	// No kDefaultIID, on purpose: the model half asks through KFCQueryUIServices (below) and nowhere else.
+	// No kDefaultIID, on purpose: the model half asks through KFCQueryUIServices and nowhere else.
 
 	/** A modal RangeProgressBar with these arguments (ProgressBar.h), or nil when one could not be made.
 	    The caller owns it and deletes it when the run is over - the bar comes down with it. A bar the manager
