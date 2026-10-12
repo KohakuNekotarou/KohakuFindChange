@@ -230,6 +230,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCIconTip.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCJump.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.cpp"/>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelAccess.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelAlpha.cpp"/>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCPanelIcon.cpp"/>

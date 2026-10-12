@@ -5,7 +5,8 @@
 //  KohakuFindChange (KFC)
 //
 //  The model half's three session interfaces (IKFCResults.h / IKFCRuns.h / IKFCChapters.h), each method
-//  forwarding to the function it names - nothing is decided here (the model/UI split).
+//  forwarding to the function it names - nothing is decided here (the model/UI split) - and the boundary
+//  stamp the UI half checks before it calls any of them (IKFCBoundary.h).
 //  EDITED BY HAND. First generated from one table with the headers
 //  (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); a method appended to a header since is forwarded
 //  here by hand, and the table does not know it - the generator is a record only and refuses to write.
@@ -17,6 +18,7 @@
 #include "CPMUnknown.h"
 
 #include "KFCID.h"				// the implementation ids
+#include "IKFCBoundary.h"
 #include "IKFCChapters.h"
 #include "IKFCResults.h"
 #include "IKFCRuns.h"
@@ -144,5 +146,16 @@ public:
 };
 
 CREATE_PMINTERFACE(KFCChaptersSession, kKFCChaptersImpl)
+
+/** This half's boundary stamp (IKFCBoundary.h) - compiled in, so it says which doors this .pln was built with. */
+class KFCBoundarySession : public CPMUnknown<IKFCBoundary>
+{
+public:
+	KFCBoundarySession(IPMUnknown* boss) : CPMUnknown<IKFCBoundary>(boss) {}
+
+	virtual const char* GetBoundaryStamp() { return kKFCBoundaryStamp; }
+};
+
+CREATE_PMINTERFACE(KFCBoundarySession, kKFCBoundaryImpl)
 
 // End, KFCModelServices.cpp.

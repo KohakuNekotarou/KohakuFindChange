@@ -117,6 +117,10 @@
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
 //    qd-order-file  (UI half) the file's first line is the file Save Order... and Load Order... use, in place of
 //                Windows' own dialogs, which a test cannot press (ui/KFCQueryOrderFile.cpp; KFCDiagFaultText below)
+//    boundary-mismatch  (both halves) each half reads the other's boundary stamp as another build's: the UI half stands
+//                in for the model's doors - every command grey, the message line saying why (ui/KFCModelAccess.cpp) -
+//                and the model half takes the UI half for absent (KFCQueryUIServices, IKFCUIServices.h). The UI half
+//                reads it once, at its first door: set it before InDesign starts (boundary-mismatch)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

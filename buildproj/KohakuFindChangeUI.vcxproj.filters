@@ -57,6 +57,9 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCMarkerExpiryIdleTask.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelAccess.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCModelObserver.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>

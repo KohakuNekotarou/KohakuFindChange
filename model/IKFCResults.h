@@ -19,7 +19,9 @@
 //  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
 //  which the table does not know, so the generator is a record only and refuses to write. A new method goes
 //  at the END of its interface - a vtable slot is a promise to every built caller. One taken out moves every
-//  slot below it, so both halves are built together then (nothing outside KFC calls these doors).
+//  slot below it, so both halves are built together then (nothing outside KFC calls these doors). Either way
+//  kKFCBoundaryRevision goes up by one (KFCBoundaryID.h) - a UI half built against the old slots then stands in
+//  for the doors instead of calling them - and the stand-in (ui/KFCModelAccess.cpp) takes the new method too.
 //
 //========================================================================================
 

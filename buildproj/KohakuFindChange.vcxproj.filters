@@ -107,6 +107,9 @@
       </ClCompile>
    </ItemGroup>
    <ItemGroup>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCBoundary.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h">
          <Filter>Header Files</Filter>
       </ClInclude>

@@ -735,6 +735,14 @@ void WriteMessage(const PMString& message, bool16 forceRedraw)
     what a freshly installed panel says. */
 PMString InitialMessage()
 {
+	// The two plug-in files are not one build's: the doors are stood in for (KFCModelAccess.h), so what a freshly
+	// installed panel would say is untrue - say why nothing will run instead.
+	if (!KFCBoundaryMatches())
+	{
+		PMString why(KFCBoundaryMismatchText());
+		why.SetTranslatable(kFalse);
+		return why;
+	}
 	PMString initial(kKFCStaticTextKey);
 	initial.Translate();
 	return initial;

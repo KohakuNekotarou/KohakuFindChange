@@ -225,7 +225,7 @@ WalkEnd WalkDoc(IFindChangeService* svc, IObjectWalker* shared, const UIDRef& do
 #ifdef KFC_DIAG
 		{
 			// (Test builds only) Each step's answer and what it left selected - the trace behind WalkAftercare's NOTHING SELECTED.
-			InterfacePtr<IKFCUIServices> diagUi(GetExecutionContextSession(), UseDefaultIID());
+			InterfacePtr<IKFCUIServices> diagUi(KFCQueryUIServices());
 			KFC_DIAG_LOG("OBJWALK step=%d result=%d current=%u selected=%d", static_cast<int>(step), static_cast<int>(result),
 				static_cast<unsigned>(shared->GetCurrentItem().GetUID().Get()),
 				(diagUi != nil && diagUi->HasAnySelection()) ? 1 : 0);
@@ -472,14 +472,14 @@ bool KFCObjectSearch::HasChangeObjectFormat()
 void KFCObjectSearch::SelectedPageItems(UIDList& out)
 {
 	out.Clear();
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	if (ui != nil)
 		(void)ui->GetSelectedPageItems(out);
 }
 
 bool KFCObjectSearch::CursorInText()
 {
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	return ui != nil && ui->HasTextSelection();
 }
 

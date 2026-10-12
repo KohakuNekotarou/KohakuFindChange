@@ -38,7 +38,8 @@ REGISTER_PMINTERFACE(KFCBookWatch, kKFCBookWatchImpl)
 REGISTER_PMINTERFACE(KFCUndoMarkCmd, kKFCUndoMarkCmdImpl)
 REGISTER_PMINTERFACE(KFCDocUndoObserver, kKFCDocUndoObserverImpl)
 REGISTER_PMINTERFACE(KFCDiagCmdCount, kKFCDiagCmdCountImpl)
-// The model half's three session interfaces (KFCModelServices.cpp).
+// The model half's three session interfaces and its boundary stamp (KFCModelServices.cpp).
 REGISTER_PMINTERFACE(KFCResultsSession, kKFCResultsImpl)
 REGISTER_PMINTERFACE(KFCRunsSession, kKFCRunsImpl)
 REGISTER_PMINTERFACE(KFCChaptersSession, kKFCChaptersImpl)
+REGISTER_PMINTERFACE(KFCBoundarySession, kKFCBoundaryImpl)

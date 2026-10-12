@@ -15,6 +15,13 @@
 //  The model plug-in is a dependency of the UI plug-in, so on the main thread - the only thread the UI
 //  half runs on - these are always there.
 //
+//  ONLY A MODEL HALF OF THIS BUILD IS CALLED. The first time a door is asked for, the model half's boundary
+//  stamp (IKFCBoundary.h) is compared with this half's own (KFCBoundaryID.h, kKFCBoundaryStamp). When they
+//  differ - or the model half is too old to have one - each door answers from a stand-in that calls nothing
+//  (KFCModelAccess.cpp), because the real door would take every call to whatever method sits in that slot in
+//  the other build. A stand-in has a run always "already in progress", with the reason as its message: every
+//  command of the panel is grey and the message line says what to do.
+//
 //========================================================================================
 
 #ifndef __KFCModelAccess_h__
@@ -27,18 +34,33 @@
 #include "IKFCRuns.h"
 #include "KFCModelTypes.h"
 
+/** Is the model half that is loaded the one this UI half was built with? Asked once a session (KFCModelAccess.cpp). */
+bool			KFCBoundaryMatches();
+/** Why the doors are stood in for, as the message line says it (empty while KFCBoundaryMatches() is true). */
+const char*		KFCBoundaryMismatchText();
+/** The doors' stand-ins: statics that count no references, so an InterfacePtr may hold one and Release it. */
+IKFCResults*	KFCResultsStandIn();
+IKFCRuns*		KFCRunsStandIn();
+IKFCChapters*	KFCChaptersStandIn();
+
 inline InterfacePtr<IKFCResults> KFCResults()
 {
+	if (!KFCBoundaryMatches())
+		return InterfacePtr<IKFCResults>(KFCResultsStandIn());
 	return InterfacePtr<IKFCResults>(GetExecutionContextSession(), UseDefaultIID());
 }
 
 inline InterfacePtr<IKFCRuns> KFCRuns()
 {
+	if (!KFCBoundaryMatches())
+		return InterfacePtr<IKFCRuns>(KFCRunsStandIn());
 	return InterfacePtr<IKFCRuns>(GetExecutionContextSession(), UseDefaultIID());
 }
 
 inline InterfacePtr<IKFCChapters> KFCChapters()
 {
+	if (!KFCBoundaryMatches())
+		return InterfacePtr<IKFCChapters>(KFCChaptersStandIn());
 	return InterfacePtr<IKFCChapters>(GetExecutionContextSession(), UseDefaultIID());
 }
 

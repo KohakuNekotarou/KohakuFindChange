@@ -35,7 +35,7 @@ bool KFCRunGuard::IsAnyRunning()
 bool KFCRunGuard::IsLandingUnderWay()
 {
 	// No UI half (a background thread, InDesign Server) has no panel and no landing.
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	return ui != nil && ui->IsLanding();
 }
 

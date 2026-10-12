@@ -20,7 +20,7 @@
 KFCProgressBar::KFCProgressBar(const PMString& title, int32 startRange, int32 endRange, bool8 showImmediate, bool8 showCancel)
 	: fBar(nil)
 {
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	if (ui != nil)
 		fBar.reset(ui->NewProgressBar(title, startRange, endRange, showImmediate, showCancel));
 }

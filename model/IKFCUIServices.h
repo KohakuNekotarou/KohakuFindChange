@@ -36,7 +36,8 @@
 //  there and the Query comes back nil - "the system behaves as if the plug-in were missing and returns a
 //  nil pointer. It is critical that you write model code that expects to be able to receive nil pointers"
 //  (vol1-07, "Rules for thread safety"). Every caller in the model half reads nil as "no UI": no bar, no
-//  window, no Book panel.
+//  window, no Book panel. The model half asks through KFCQueryUIServices (below), which answers nil for a UI
+//  half of another build as well.
 //
 //  What the model DECIDES stays in the model - the rules, the wording, the order. What crosses is only
 //  the showing.
@@ -47,14 +48,18 @@
 #define __IKFCUIServices_h__
 
 #include "IPMUnknown.h"
+#include "ISession.h"			// KFCQueryUIServices
 #include "IDFile.h"
 #include "PMString.h"
 #include "UIDRef.h"
 #include "UIDList.h"
 
+#include <cstring>				// strcmp - KFCQueryUIServices
 #include <vector>
 
-#include "KFCBoundaryID.h"	// IID_IKFCUISERVICES
+#include "IKFCBoundary.h"		// the UI half's stamp - KFCQueryUIServices
+#include "KFCBoundaryID.h"		// IID_IKFCUISERVICES
+#include "KFCDiag.h"			// KFCDiagFault - the test build's boundary-mismatch
 
 /** One progress bar the UI half has put up for the model half - RangeProgressBar's four calls that the
     engines make, and nothing else. Deleted by the model half when its run is over (KFCProgressBar). */
@@ -94,7 +99,9 @@ public:
 	virtual bool				GetPanelBookFile(IDFile& outFile) = 0;
 	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
 	// promise to every built caller). One taken out moves every slot below it, so both halves are built
-	// together then (nothing outside KFC calls this door).
+	// together then (nothing outside KFC calls this door). Either way kKFCBoundaryRevision goes up by one
+	// (KFCBoundaryID.h): a model half that finds another build's UI half then asks this door nothing
+	// (KFCQueryUIServices, below).
 	/** The documents selected in the Book panel that shows this book (Find/Change Selected Documents
 	    (Book)). true only for a PART of the book - none or all selected answers false, the product's rule
 	    (AcquireCurrentBook::AllOrNoneSelected) - and false too when no panel shows this book. outContents = the
@@ -120,5 +127,29 @@ public:
 	    The model cannot see the UI half's flag; this is how it asks. */
 	virtual bool				IsLanding() = 0;
 };
+
+/** HOW THE MODEL HALF ASKS FOR THE SERVICES ABOVE - never by a Query of its own. The UI half that is loaded has to be
+    this build's: its stamp (IKFCBoundary.h, under IID_IKFCUIBOUNDARY) must be this half's kKFCBoundaryStamp, or the
+    services are taken for absent and nil comes back, as with no UI half at all - another build's slots would put each
+    call in another method (KFCBoundaryID.h). Not only a run asks: the book watcher asks IsLanding on every book close
+    of the session (KFCRunGuard::IsLandingUnderWay). Asked every time, not kept - a background thread's session has no
+    UI half, the main thread's does. AddRef'd, or nil. (The test build's boundary-mismatch switch, KFCDiag.h, makes the
+    stamps differ - set it before InDesign starts, as the UI half reads it once.) */
+inline IKFCUIServices* KFCQueryUIServices()
+{
+	ISession* const session = GetExecutionContextSession();
+	if (session == nil)
+		return nil;
+	InterfacePtr<IKFCBoundary> stamp(session, IID_IKFCUIBOUNDARY);
+	bool same = (stamp != nil) && std::strcmp(stamp->GetBoundaryStamp(), kKFCBoundaryStamp) == 0;
+#ifdef KFC_DIAG
+	if (KFCDiagFault("boundary-mismatch"))
+		same = false;
+#endif
+	if (!same)
+		return nil;
+	InterfacePtr<IKFCUIServices> ui(session, UseDefaultIID());
+	return ui.forget();
+}
 
 #endif // __IKFCUIServices_h__

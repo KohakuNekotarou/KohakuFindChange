@@ -97,8 +97,8 @@ DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
 
 
 // InterfaceIDs:
-// (+ 3 ... + 7 - the boundary's notification protocol, session interfaces and UI services - and the
-//  MessageID are in KFCBoundaryID.h: the UI half queries them too.)
+// (+ 3 ... + 7 - the boundary's notification protocol, session interfaces and UI services - + 13, the boundary
+//  stamp, and the MessageID are in KFCBoundaryID.h: the UI half queries them too.)
 // The session-attached observer that retires a book-scope result set when its book closes. Its own
 // IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCBOOKWATCH, kKFCPrefix + 1)
@@ -162,6 +162,9 @@ DECLARE_PMID(kImplementationIDSpace, kKFCDiagCmdCountImpl, kKFCPrefix + 42)
 DECLARE_PMID(kImplementationIDSpace, kKFCOpenDocResponderImpl, kKFCPrefix + 43)
 // The save-as responder's IResponder (KFCSaveAsDocResponder.cpp). + 44: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCSaveAsDocResponderImpl, kKFCPrefix + 44)
+// The boundary stamp the UI half checks before it calls a door (IKFCBoundary.h, KFCModelServices.cpp). + 45: the next
+// after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCBoundaryImpl, kKFCPrefix + 45)
 
 
 // StringKeys - the model half's (KFC_enUS.fr): what Edit > Undo calls a KFC write. Every other key is the UI

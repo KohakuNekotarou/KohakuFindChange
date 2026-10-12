@@ -9,9 +9,10 @@
 //  who publishes the plug-in, what it is called, which version it is, where it lives, the prefix
 //  and the string-key prefix, the model's PluginID (the UI half depends on it), and the ids the
 //  UI half uses to reach the model half - its session interfaces, the UI services the model asks
-//  for, and the notification. KCM keeps the same header for the same reason (KCMBoundaryID.h):
-//  a UI plug-in that named its own version and company once went through four tasks reporting
-//  SDK template values (memory model-ui-separation-verification).
+//  for, the notification, and the stamp that tells the two halves are one build's. KCM keeps the
+//  same header for the same reason (KCMBoundaryID.h): a UI plug-in that named its own version and
+//  company once went through four tasks reporting SDK template values (memory
+//  model-ui-separation-verification).
 //
 //========================================================================================
 
@@ -65,5 +66,25 @@ DECLARE_PMID(kInterfaceIDSpace, IID_IKFCCHAPTERS, kKFCPrefix + 6)
 // The UI services the model half asks for and does without when they are not there (IKFCUIServices.h,
 // implemented by the UI half on kSessionBoss: the progress bar, the windows, the Book panel).
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUISERVICES, kKFCPrefix + 7)
+// Which build of the boundary each half was compiled with (IKFCBoundary.h - kKFCBoundaryStamp below): the model half's
+// answer, and the UI half's. Their own IIDs, not slots at the end of a door: a half older than the stamp has no such
+// interface and answers nil, where a slot past the end of its vtable would be a call into nothing. + 13 and + 14: the
+// next after the highest spent (+ 3 ... + 7 are full).
+DECLARE_PMID(kInterfaceIDSpace, IID_IKFCBOUNDARY, kKFCPrefix + 13)
+DECLARE_PMID(kInterfaceIDSpace, IID_IKFCUIBOUNDARY, kKFCPrefix + 14)
+
+// THE BOUNDARY STAMP - what each half checks the other against before it calls the other's door (the UI half:
+// ui/KFCModelAccess.cpp; the model half: KFCQueryUIServices, IKFCUIServices.h).
+// The doors are vtables (IKFCResults.h / IKFCRuns.h / IKFCChapters.h / IKFCUIServices.h) and the types they carry are
+// layouts (KFCModelTypes.h): two halves built from different revisions of them load together all the same - the
+// UI half's PluginDependency (KFCUI.fr) asks for the SDK's version only - and a call then lands in another method's
+// slot (an old UI half's CheckObjectReplace on a new model half's ReplaceRows: memory
+// facade-vtable-slot-append-only, where KCM's two halves did exactly that). So a UI half that does not find its own
+// stamp in the model half calls nothing at all, and a model half that does not find its own in the UI half takes it
+// for no UI half.
+// kKFCBoundaryRevision GOES UP BY ONE whenever a door gains, loses or reorders a method, or a type that crosses changes
+// its layout; kKFCVersion is in the stamp too, so two releases never pass for one.
+#define kKFCBoundaryRevision	"1"
+#define kKFCBoundaryStamp		kKFCVersion "/" kKFCBoundaryRevision
 
 #endif // __KFCBoundaryID_h__

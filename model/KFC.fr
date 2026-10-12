@@ -148,7 +148,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * The three doors the UI half reaches the model half through (IKFCResults.h / IKFCRuns.h /
 	 * IKFCChapters.h, forwarding in KFCModelServices.cpp). On the session
 	 * because what is behind them is session state; the model's own implementations, so they are this
-	 * half's.
+	 * half's. And the boundary stamp the UI half checks before it calls any of them (IKFCBoundary.h).
 	 */
 	AddIn
 	{
@@ -158,6 +158,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 			IID_IKFCRESULTS, kKFCResultsImpl,
 			IID_IKFCRUNS, kKFCRunsImpl,
 			IID_IKFCCHAPTERS, kKFCChaptersImpl,
+			IID_IKFCBOUNDARY, kKFCBoundaryImpl,
 		}
 	},
 

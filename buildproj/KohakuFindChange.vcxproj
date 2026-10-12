@@ -255,6 +255,7 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\model\KFCObjectReplace.cpp"/>
    </ItemGroup>
    <ItemGroup>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCBoundary.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCChapters.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCResults.h"/>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\IKFCRuns.h"/>

@@ -40,7 +40,8 @@
 #include <new>					// std::nothrow
 
 // Project includes:
-#include "KFCUIID.h"				// kKFCUIServicesImpl
+#include "KFCUIID.h"				// kKFCUIServicesImpl, kKFCUIBoundaryImpl
+#include "IKFCBoundary.h"
 #include "IKFCUIServices.h"
 #include "KFCBookPanelLookup.h"
 #include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
@@ -226,5 +227,17 @@ public:
 };
 
 CREATE_PMINTERFACE(KFCUIServices, kKFCUIServicesImpl)
+
+/** This half's boundary stamp (IKFCBoundary.h), under IID_IKFCUIBOUNDARY - what the model half checks before it asks
+    the services above for anything (KFCQueryUIServices). Compiled in, so it says which doors this .pln was built with. */
+class KFCUIBoundary : public CPMUnknown<IKFCBoundary>
+{
+public:
+	KFCUIBoundary(IPMUnknown* boss) : CPMUnknown<IKFCBoundary>(boss) {}
+
+	virtual const char* GetBoundaryStamp() { return kKFCBoundaryStamp; }
+};
+
+CREATE_PMINTERFACE(KFCUIBoundary, kKFCUIBoundaryImpl)
 
 // End, KFCUIServices.cpp.

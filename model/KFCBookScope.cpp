@@ -202,7 +202,7 @@ namespace
 	    (a background thread, InDesign Server) has no window to show a document in: false. */
 	bool DocHasAnyWindow(const UIDRef& docRef)
 	{
-		InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 		return ui != nil && ui->DocHasAnyWindow(docRef);
 	}
 
@@ -256,7 +256,7 @@ namespace
 		// interface). No UI - a background thread, InDesign Server - is "no panel", and the fallback below
 		// answers, the same as an iconised panel always has.
 		IDFile panelBookFile;
-		InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 		if (ui != nil && ui->GetPanelBookFile(panelBookFile))
 		{
 			SDKFileHelper panelHelper(panelBookFile);
@@ -292,7 +292,7 @@ namespace
 		std::vector<UID> taken;
 		if (!gSelectedDocumentsOn || book == nil)
 			return taken;
-		InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 		std::vector<UID> picked;
 		int32 rows = 0;
 		if (ui == nil || !ui->GetPanelBookSelection(book->GetBookFileSpec(), picked, rows))
@@ -862,7 +862,7 @@ bool KFCBookScope::ShowChapterWindow(const UIDRef& docRef)
 	if (KFC_DIAG_FAULT("no-window"))
 		return false;
 #endif
-	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
 	if (ui == nil || !ui->OpenLayoutWindow(docRef))
 		return false;
 

@@ -9,6 +9,7 @@
 //  cannot reach into the model plug-in's code by accident - every call goes through the session
 //  interfaces (IKFCResults / IKFCRuns / IKFCChapters). The namespaces are the ones these types always
 //  had, so KFCResultModel::RowDisplay is still spelled KFCResultModel::RowDisplay.
+//  A type here that changes its layout moves kKFCBoundaryRevision up by one (KFCBoundaryID.h), as a door does.
 //  Only what crosses stands here: a type the UI half does not read lives in KFCResultModel.h /
 //  KFCSearchEngine.h (Hit, Chapter, the groups, the Undo copies, HitDetail).
 //
