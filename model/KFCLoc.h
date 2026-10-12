@@ -35,8 +35,7 @@ namespace KFCLoc
 	}
 
 	/** The Japanese text when the UI is Japanese, the enUS string-table entry otherwise.
-	    Either way the result is FINISHED text that will not be translated again - parameters (^1)
-	    are still replaced by ::ReplaceStringParameters afterwards, exactly as before. */
+	    Either way the result is FINISHED text that will not be translated again. */
 	inline PMString Text(const char* englishKey, const wchar_t* japanese)
 	{
 		if (JapaneseUI())
