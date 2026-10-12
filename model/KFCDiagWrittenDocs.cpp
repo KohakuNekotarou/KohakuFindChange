@@ -13,8 +13,11 @@
 #ifdef KFC_DIAG
 
 // Interface includes:
+#include "ICmdHistory.h"			// GetUndoStepCount - was the write undone since
+#include "ICommandProcessor.h"		// only to reach the boss ICmdHistory lives on (ISession::QueryCommandProcessor)
 #include "IDataBase.h"
 #include "IDocument.h"
+#include "ISession.h"
 
 // General includes:
 #include "PMString.h"
@@ -39,7 +42,8 @@ namespace
 		std::string			name;		// the document's name at the write (UTF-8)
 		std::string			path;		// its file then ("" = none: an untitled document, or a conversion)
 		unsigned long long	fileTime;	// that file's last write time then (0 = none)
-		Written() : fileTime(0) {}
+		int32				undoSteps;	// the document's undo steps just after the write - the write the newest (-1 = unread)
+		Written() : fileTime(0), undoSteps(-1) {}
 	};
 	std::vector<Written> gWritten;
 
@@ -119,6 +123,32 @@ namespace
 		return db != nil && db->IsModified() != kFalse;
 	}
 
+	// How many undo steps the document has now - ICmdHistory on the session's command processor, the route KIDMCP's
+	// KIDMCPPencilUndo.cpp reads it by (a document's target is its root). -1 when it cannot be read.
+	int32 UndoSteps(const UIDRef& docRef)
+	{
+		IDataBase* const db = docRef.GetDataBase();
+		ISession* const session = GetExecutionContextSession();
+		if (db == nil || session == nil)
+			return -1;
+		InterfacePtr<ICommandProcessor> processor(session->QueryCommandProcessor());
+		InterfacePtr<ICmdHistory> history(processor, UseDefaultIID());
+		if (history == nil)
+			return -1;
+		return history->GetUndoStepCount(UIDRef(db, db->GetRootUID()));
+	}
+
+	// THE WRITE TAKEN BACK BY AN UNDO: fewer undo steps now than just after the write. Measured 2026-10-12 (case
+	// qs-book-undo): a query run's Ctrl+Z puts the chapters back AND InDesign takes their "unsaved" flag down - they are as
+	// their files are - so a close then loses nothing, and is not the flag gone down over a write that CLEANED means. (A flag
+	// taken down over a write that stands - the fault switches clean-after-write and landing-guard-off - leaves the steps
+	// where they were, and is still CLEANED.)
+	bool Undone(const Written& w)
+	{
+		const int32 now = UndoSteps(w.doc);
+		return w.undoSteps >= 0 && now >= 0 && now < w.undoSteps;
+	}
+
 	int32 WrittenIndex(const UIDRef& docRef)
 	{
 		for (size_t i = 0; i < gWritten.size(); ++i)
@@ -137,6 +167,7 @@ void KFCDiagWrittenDocs::NoteWrite(const UIDRef& docRef)
 	Written w;
 	w.doc = docRef;
 	ReadDoc(docRef, w.name, w.path, w.fileTime);
+	w.undoSteps = UndoSteps(docRef);		// every caller notes a write after its step has ended (KFCDiagWrittenDocs.h)
 	// The file as it is at this write: written before it, it was saved before every write on the list.
 	const int32 at = WrittenIndex(docRef);
 	if (at >= 0)
@@ -190,6 +221,7 @@ void KFCDiagWrittenDocs::Closing(const UIDRef& docRef)
 	const bool unsaved = IsUnsaved(docRef);
 	const bool written = (at >= 0);
 	const bool savedSince = written && SavedSince(gWritten[static_cast<size_t>(at)]);
+	const bool undone = written && Undone(gWritten[static_cast<size_t>(at)]);
 	if (askedByKFC && unsaved)
 	{
 		// KFC asked only once nothing in it was unsaved - something was written between the asking and the close, and the
@@ -197,15 +229,16 @@ void KFCDiagWrittenDocs::Closing(const UIDRef& docRef)
 		KFC_DIAG_LOG("WRITTENDOCS LOST %s by=kfc written=%d askedMsAgo=%.0f file=%s", name.c_str(), written ? 1 : 0,
 			askedMsAgo, path.c_str());
 	}
-	else if (written && !savedSince && !unsaved)
+	else if (written && !savedSince && !unsaved && !undone)
 	{
-		// Written by KFC, the file not written since, and nothing unsaved: the flag went down over the write.
+		// Written by KFC, the file not written since, the write not undone, and nothing unsaved: the flag went down over the
+		// write.
 		KFC_DIAG_LOG("WRITTENDOCS CLEANED %s at=close by=%s file=%s", name.c_str(), askedByKFC ? "kfc" : "other", path.c_str());
 	}
 	else
 	{
-		KFC_DIAG_LOG("WRITTENDOCS closed %s by=%s unsaved=%d written=%d saved=%d", name.c_str(), askedByKFC ? "kfc" : "other",
-			unsaved ? 1 : 0, written ? 1 : 0, savedSince ? 1 : 0);
+		KFC_DIAG_LOG("WRITTENDOCS closed %s by=%s unsaved=%d written=%d saved=%d undone=%d", name.c_str(),
+			askedByKFC ? "kfc" : "other", unsaved ? 1 : 0, written ? 1 : 0, savedSince ? 1 : 0, undone ? 1 : 0);
 	}
 	if (written)
 		gWritten.erase(gWritten.begin() + static_cast<size_t>(at));
@@ -239,10 +272,11 @@ KFCDiagWrittenDocs::Check::~Check()
 			continue;
 		}
 		const bool unsaved = IsUnsaved(w.doc);
-		if (!unsaved)
+		const bool undone = !unsaved && Undone(w);
+		if (!unsaved && !undone)
 			KFC_DIAG_LOG("WRITTENDOCS CLEANED %s at=%s file=%s", w.name.c_str(), fWhere, w.path.c_str());
 		++docs;
-		listed = " [" + w.name + (unsaved ? "|unsaved]" : "|CLEAN]") + listed;
+		listed = " [" + w.name + (unsaved ? "|unsaved]" : (undone ? "|undone]" : "|CLEAN]")) + listed;
 	}
 	KFC_DIAG_LOG("WRITTENDOCS %s docs=%d%s", fWhere, static_cast<int>(docs), listed.c_str());
 }
