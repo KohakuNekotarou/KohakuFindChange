@@ -41,6 +41,7 @@
 //      result model a run is still filling;
 //    * the document-open responder (KFCOpenDocResponder), which leaves the chapters a run opens to the
 //      run (it binds them itself);
+//    * the Save As responder (KFCSaveAsDocResponder), which leaves the list's names to the run that owns the list;
 //    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run;
 //    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
 //      which would otherwise load a query into Find/Change while a query run is putting its own there;
@@ -58,7 +59,7 @@
 
 namespace KFCRunGuard
 {
-	/** Is a search, a Change All or a query run running right now? */
+	/** Is a search, a Change All, a query run or a row's Replace running right now? */
 	bool IsAnyRunning();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not

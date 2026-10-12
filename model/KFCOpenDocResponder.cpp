@@ -9,9 +9,9 @@
 //  and its rows get their text foci (KFCResultModel::RebindChapterDoc -> KFCRowFoci::AttachChapter;
 //  docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T6 c). Without this, what the user typed between
 //  opening it and the first jump into it would not be followed.
-//  KFC's runs (a search, Change All, a query run) bind their chapters themselves - skipped; a jump's reopen, or a row's
-//  Replace's (not a run - KFCRunGuard.h), lands here too, and binding it twice is a no-op. The main thread only (a background task
-//  opens its own copies - an export's clone).
+//  KFC's runs (a search, Change All, a query run, and a row's Replace - KFCRunGuard.h counts it since the 2026-10-12
+//  re-check) bind their chapters themselves - skipped; a jump's reopen lands here too, and binding it twice is a no-op. The
+//  main thread only (a background task opens its own copies - an export's clone).
 //
 //========================================================================================
 

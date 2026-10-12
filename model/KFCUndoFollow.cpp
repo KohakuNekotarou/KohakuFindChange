@@ -811,7 +811,8 @@ bool KFCUndoFollow::Follow()
 	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording ? 1 : 0, (unsigned)gSteps.size(),
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
 	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, Change
-	// All in Book or a query run pumps events behind its bar - KFCRunGuard counts all three).
+	// All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it opens a
+	// chapter or a window - KFCRunGuard counts all four).
 	if (gRecording || gSteps.empty() || KFCRunGuard::IsAnyRunning())
 		return false;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
