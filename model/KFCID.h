@@ -91,14 +91,14 @@ DECLARE_PMID(kClassIDSpace, kKFCDiagCmdCountBoss, kKFCPrefix + 23)
 // highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCOpenDocResponderBoss, kKFCPrefix + 24)
 // The "a document has been saved as another file" responder (KFCSaveAsDocResponder.cpp): a document-scope list's rows
-// take the document's new name (the author's call, 2026-10-11 - the spec map's LIFE-14). + 25: the next after the
+// take the document's new name (the author's call - the spec map's LIFE-14). + 25: the next after the
 // highest spent.
 DECLARE_PMID(kClassIDSpace, kKFCSaveAsDocResponderBoss, kKFCPrefix + 25)
 
 
 // InterfaceIDs:
-// (+ 3 ... + 7 - the boundary's notification protocol, session interfaces and UI services - + 13, the boundary
-//  stamp, and the MessageID are in KFCBoundaryID.h: the UI half queries them too.)
+// (+ 3 ... + 7 - the boundary's notification protocol, session interfaces and UI services - + 13 and + 14, the two
+//  halves' boundary stamps, and the MessageID are in KFCBoundaryID.h: the UI half queries them too.)
 // The session-attached observer that retires a book-scope result set when its book closes. Its own
 // IID because it is an AddIn onto kSessionBoss, which already carries observers of its own.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCBOOKWATCH, kKFCPrefix + 1)

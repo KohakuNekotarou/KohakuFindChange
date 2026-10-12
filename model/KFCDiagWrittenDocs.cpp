@@ -141,7 +141,7 @@ namespace
 	}
 
 	// THE WRITE TAKEN BACK BY AN UNDO: fewer undo steps now than just after the write, and more redo steps. Measured
-	// 2026-10-12 (case qs-book-undo): a query run's Ctrl+Z puts the chapters back AND InDesign takes their "unsaved" flag
+	// (case qs-book-undo): a query run's Ctrl+Z puts the chapters back AND InDesign takes their "unsaved" flag
 	// down - they are as their files are - so a close then loses nothing, and is not the flag gone down over a write that
 	// CLEANED means. (A flag taken down over a write that stands - the fault switches clean-after-write and
 	// landing-guard-off - leaves the steps where they were, and is still CLEANED.) Fewer undo steps ALONE is not an undo:

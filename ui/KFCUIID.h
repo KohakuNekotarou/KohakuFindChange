@@ -95,9 +95,9 @@ DECLARE_PMID(kClassIDSpace, kKFCQueryRowWidgetBoss, kKFCUIPrefix + 26)
 
 
 // InterfaceIDs:
-// (The boundary's - the notification protocol, the session interfaces and the UI services - and the
-//  MessageID are at kKFCPrefix + 3 ... + 7 in KFCBoundaryID.h. kKFCUIPrefix + 3 ... + 7 have never been
-//  used.)
+// (The boundary's - the notification protocol, the session interfaces and the UI services at kKFCPrefix + 3 ... + 7,
+//  the two halves' boundary stamps at kKFCPrefix + 13 and + 14 - and the MessageID are in KFCBoundaryID.h.
+//  kKFCUIPrefix + 3 ... + 7 have never been used.)
 // Per-row draw data for a hit line's colour cell: the three text segments (before / matched /
 // after) the cell paints, the match segment in a highlight colour.
 DECLARE_PMID(kInterfaceIDSpace, IID_IKFCROWDATA, kKFCUIPrefix + 0)

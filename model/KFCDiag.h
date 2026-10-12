@@ -45,9 +45,8 @@
 //                mode 2 from where the last write ended, mode 3 from the top of the story - with a new walker, client and
 //                scope (docs/ai-notes/kfc-speedup-ideas-2026-10-05.md: is the find's slowing down kept in the
 //                walk?). Throwaway documents only.
-//    perf-commands  every command InDesign processes is counted, by class, over a search, a row's Replace and a query
-//                run (KFCDiagCommands.h - "COMMANDS" lines, and cmds= on WALKSTEP). The count itself costs time:
-//                not on a timing run.
+//    perf-commands  every command InDesign processes is counted, by class, over a search and over a query run
+//                (KFCDiagCommands.h - "COMMANDS" lines). The count itself costs time: not on a timing run.
 //    perf-backward  KFCReplaceEngine.cpp's WriteBackward answers yes: every write walks backward (the same study:
 //                what the direction does to the find's time). Throwaway documents only.
 //    tree-expand  (UI half) the file holds "<mode>": KFCResultTree::Rebuild opens the rows another way - mode 1 one
@@ -76,7 +75,7 @@
 //    click-acquire-only  (UI half) ui/KFCResultNodeEH.cpp's row click hands the keyboard to the list the old way
 //                - IKeyBoard alone, and only when it names another holder - not through the panel's doors
 //                (KFCResultTree::TakeKeyboard): the case that shows what the doors add after Find/Change's title bar was
-//                clicked (work\kbs-regress\cases\fault-click-acquire-only-on.jsx)
+//                clicked (work\kbs-regress\archive\cases\fault-click-acquire-only-on.jsx)
 //    objsearch-cancel  the file holds "<n>": the Object tab's search (KFCObjectSearch.cpp's WalkDoc) takes Cancel as pressed
 //                once a document's walk has listed its nth item - heard inside the document, where the bar is asked
 //                (work\kbs-regress\ms-cases.tsv, cases\fault-objsearch-cancel-on.jsx / -off.jsx)
@@ -97,7 +96,7 @@
 //                the old way - not the window the system sends the keys to as well: the case that shows what the second
 //                question stops, a Return pressed after Find/Change's title bar was clicked (ret-after-fc-title-armed)
 //    object-rows-sweep  (UI half) ui/KFCJump.cpp's ReplaceObjectRows fronts the shown row's chapter WITH the "Hide Previous
-//                Chapter" sweep. Since P-C (2026-10-12) the sweep is decided at the end of the operation, after the write,
+//                Chapter" sweep. The sweep is decided at the end of the operation (P-C), after the write,
 //                and keeps the written chapters (sel-book-objects-open-hide-deferred); with sweep-at-once as well it is
 //                scheduled in the middle, the old way - the other chapters it is about to write are closed after the write,
 //                the write in them: the case that shows the written-document check (KFCDiagWrittenDocs.h) catching it
@@ -129,7 +128,8 @@
 //    boundary-mismatch  (both halves) each half reads the other's boundary stamp as another build's: the UI half stands
 //                in for the model's doors - every command grey, the message line saying why (ui/KFCModelAccess.cpp) -
 //                and the model half takes the UI half for absent (KFCQueryUIServices, IKFCUIServices.h). The UI half
-//                reads it once, at its first door: set it before InDesign starts (boundary-mismatch)
+//                reads it once, at its first door: set it before InDesign starts (the steps:
+//                docs/ai-notes/new-knowledge-sweep.md)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

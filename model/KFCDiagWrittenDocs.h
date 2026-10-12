@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  THE WRITTEN-DOCUMENT CHECK (test builds only - the author, 2026-10-11 night, after a Replace's chapter was closed with
+//  THE WRITTEN-DOCUMENT CHECK (test builds only - the author, after a Replace's chapter was closed with
 //  the Replace in it: "check that the documents a replace wrote are still open - by name or ID, not by count: the user
 //  has documents of their own open"). Every document a write of KFC's went into is listed with its name and its file
 //  (NoteWrite), and every close KFC asks InDesign for is noted (NoteCloseAsked). Then, in the test build's trace
@@ -13,7 +13,7 @@
 //      WRITTENDOCS LOST <name> by=kfc ...      a close KFC asked for found work unsaved in the document - thrown away
 //                                              (KFC asks to close a document only when nothing in it is unsaved, so
 //                                              something was written between the asking and the close - the shape of the
-//                                              Replace whose chapter closed with it, 2026-10-11)
+//                                              Replace whose chapter closed with it)
 //      WRITTENDOCS CLEANED <name> at=<where>   a document KFC wrote reads "nothing unsaved" although its file has not
 //                                              been written since: its "unsaved" flag was taken down over the write, so
 //                                              any close - the user's included - throws the write away without asking.
@@ -21,7 +21,7 @@
 //                                              just after it - ICmdHistory; fewer undo steps alone is also what
 //                                              InDesign's memory purge leaves): an Undo back to the save point takes the
 //                                              flag down as well, rightly, the document then being as its file is
-//                                              (measured 2026-10-12, qs-book-undo) - that close is "closed ... undone=1"
+//                                              (measured: qs-book-undo) - that close is "closed ... undone=1"
 //      WRITTENDOCS <where> docs=<n> [<name>|unsaved, undone or CLEAN] ...   at the end of every write: each document
 //                                              KFC wrote that is still open and not saved since, by name
 //      WRITTENDOCS closed <name> by=<kfc|other> ...                 a written document closing: the user's or a
