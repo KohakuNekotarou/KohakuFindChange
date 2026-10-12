@@ -17,10 +17,11 @@
 //      WRITTENDOCS CLEANED <name> at=<where>   a document KFC wrote reads "nothing unsaved" although its file has not
 //                                              been written since: its "unsaved" flag was taken down over the write, so
 //                                              any close - the user's included - throws the write away without asking.
-//                                              NOT when the write was UNDONE (fewer undo steps than just after it -
-//                                              ICmdHistory): an Undo back to the save point takes the flag down as well,
-//                                              rightly, the document then being as its file is (measured 2026-10-12,
-//                                              qs-book-undo) - that close is "closed ... undone=1"
+//                                              NOT when the write was UNDONE (fewer undo steps and more redo steps than
+//                                              just after it - ICmdHistory; fewer undo steps alone is also what
+//                                              InDesign's memory purge leaves): an Undo back to the save point takes the
+//                                              flag down as well, rightly, the document then being as its file is
+//                                              (measured 2026-10-12, qs-book-undo) - that close is "closed ... undone=1"
 //      WRITTENDOCS <where> docs=<n> [<name>|unsaved, undone or CLEAN] ...   at the end of every write: each document
 //                                              KFC wrote that is still open and not saved since, by name
 //      WRITTENDOCS closed <name> by=<kfc|other> ...                 a written document closing: the user's or a

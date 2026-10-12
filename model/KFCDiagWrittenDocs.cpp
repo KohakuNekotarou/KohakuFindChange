@@ -13,7 +13,7 @@
 #ifdef KFC_DIAG
 
 // Interface includes:
-#include "ICmdHistory.h"			// GetUndoStepCount - was the write undone since
+#include "ICmdHistory.h"			// GetUndoStepCount / GetRedoStepCount - was the write undone since
 #include "ICommandProcessor.h"		// only to reach the boss ICmdHistory lives on (ISession::QueryCommandProcessor)
 #include "IDataBase.h"
 #include "IDocument.h"
@@ -43,7 +43,8 @@ namespace
 		std::string			path;		// its file then ("" = none: an untitled document, or a conversion)
 		unsigned long long	fileTime;	// that file's last write time then (0 = none)
 		int32				undoSteps;	// the document's undo steps just after the write - the write the newest (-1 = unread)
-		Written() : fileTime(0), undoSteps(-1) {}
+		int32				redoSteps;	// ...and its redo steps then (-1 = unread)
+		Written() : fileTime(0), undoSteps(-1), redoSteps(-1) {}
 	};
 	std::vector<Written> gWritten;
 
@@ -123,9 +124,9 @@ namespace
 		return db != nil && db->IsModified() != kFalse;
 	}
 
-	// How many undo steps the document has now - ICmdHistory on the session's command processor, the route KIDMCP's
-	// KIDMCPPencilUndo.cpp reads it by (a document's target is its root). -1 when it cannot be read.
-	int32 UndoSteps(const UIDRef& docRef)
+	// How many undo (or redo) steps the document has now - ICmdHistory on the session's command processor, the route
+	// KIDMCP's KIDMCPPencilUndo.cpp reads it by (a document's target is its root). -1 when it cannot be read.
+	int32 HistorySteps(const UIDRef& docRef, bool redo)
 	{
 		IDataBase* const db = docRef.GetDataBase();
 		ISession* const session = GetExecutionContextSession();
@@ -135,18 +136,23 @@ namespace
 		InterfacePtr<ICmdHistory> history(processor, UseDefaultIID());
 		if (history == nil)
 			return -1;
-		return history->GetUndoStepCount(UIDRef(db, db->GetRootUID()));
+		const UIDRef target(db, db->GetRootUID());
+		return redo ? history->GetRedoStepCount(target) : history->GetUndoStepCount(target);
 	}
 
-	// THE WRITE TAKEN BACK BY AN UNDO: fewer undo steps now than just after the write. Measured 2026-10-12 (case
-	// qs-book-undo): a query run's Ctrl+Z puts the chapters back AND InDesign takes their "unsaved" flag down - they are as
-	// their files are - so a close then loses nothing, and is not the flag gone down over a write that CLEANED means. (A flag
-	// taken down over a write that stands - the fault switches clean-after-write and landing-guard-off - leaves the steps
-	// where they were, and is still CLEANED.)
+	// THE WRITE TAKEN BACK BY AN UNDO: fewer undo steps now than just after the write, and more redo steps. Measured
+	// 2026-10-12 (case qs-book-undo): a query run's Ctrl+Z puts the chapters back AND InDesign takes their "unsaved" flag
+	// down - they are as their files are - so a close then loses nothing, and is not the flag gone down over a write that
+	// CLEANED means. (A flag taken down over a write that stands - the fault switches clean-after-write and
+	// landing-guard-off - leaves the steps where they were, and is still CLEANED.) Fewer undo steps ALONE is not an undo:
+	// InDesign's memory purge drops old undo steps too (1525 down to 6 - docs/ai-notes/kidmcp-verify-v2-live-2026-10-12.md)
+	// and makes nothing redoable - with the flag down over a write that stands, that is the CLEANED this check is for.
 	bool Undone(const Written& w)
 	{
-		const int32 now = UndoSteps(w.doc);
-		return w.undoSteps >= 0 && now >= 0 && now < w.undoSteps;
+		const int32 undoNow = HistorySteps(w.doc, false);
+		const int32 redoNow = HistorySteps(w.doc, true);
+		return w.undoSteps >= 0 && w.redoSteps >= 0 && undoNow >= 0 && redoNow >= 0
+			&& undoNow < w.undoSteps && redoNow > w.redoSteps;
 	}
 
 	int32 WrittenIndex(const UIDRef& docRef)
@@ -167,7 +173,8 @@ void KFCDiagWrittenDocs::NoteWrite(const UIDRef& docRef)
 	Written w;
 	w.doc = docRef;
 	ReadDoc(docRef, w.name, w.path, w.fileTime);
-	w.undoSteps = UndoSteps(docRef);		// every caller notes a write after its step has ended (KFCDiagWrittenDocs.h)
+	w.undoSteps = HistorySteps(docRef, false);	// every caller notes a write after its step has ended (KFCDiagWrittenDocs.h)
+	w.redoSteps = HistorySteps(docRef, true);
 	// The file as it is at this write: written before it, it was saved before every write on the list.
 	const int32 at = WrittenIndex(docRef);
 	if (at >= 0)
