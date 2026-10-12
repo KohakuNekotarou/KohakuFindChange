@@ -34,7 +34,15 @@
 
 namespace KFCResultModel
 {
-	/** THE WHOLE-RUN CEILING - the same number the panel draws (kKFCDisplayHitLimit, KFCModelTypes.h - F9 of
+	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9 - the
+	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit
+	    is this number). More than this is not a list to walk and replace row by row - a Change All writes any number
+	    without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's counts, the close
+	    responder's rebuild) stays: with one number it never cuts a row. Not in KFCModelTypes.h: the UI half reads the
+	    counts the cap leaves (IKFCResults), never the cap. */
+	const int32 kKFCDisplayHitLimit = 300;
+
+	/** THE WHOLE-RUN CEILING - the same number the panel draws (kKFCDisplayHitLimit - F9 of
 	    docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): a search stops collecting there and
 	    says so ("Stopped at the 300 limit - narrow the search, or use ..."), so no query can pile up rows nobody
 	    will replace one by one. Counted in ROWS. */
@@ -107,7 +115,7 @@ namespace KFCResultModel
 		// --- what the replace wrote ---
 		// The WHOLE text a replace wrote at the row's place, taken as it was written (not capped for drawing like
 		// matchText): a replaced row that an edit has moved is looked for again by it
-		// (KFCSearchEngine::RelocateStaleRow). Empty until the row is replaced.
+		// (KFCSearchEngine::LocateRow). Empty until the row is replaced.
 		PMString	replacedText;
 		// The first characters of the match's STORY: what a story row of
 		// the tree reads, taken when the hit is built - the search closes a chapter it opened as soon
@@ -407,10 +415,10 @@ namespace KFCResultModel
 	// (RowDisplay - everything a hit row needs to draw itself, see GetHitRow: KFCModelTypes.h.)
 
 	/** One row's worth of everything, in a single call.
-	    Its own getter so that a row does not ask the model four separate times to draw itself - the
-	    display strings, the flags, the outcome and the accent word - each one walking to the same
+	    Its own getter so that a row does not ask the model once for each thing it draws - the
+	    display strings, the replaced flag and the accent word - each one walking to the same
 	    hit to hand back one part of it. Only the rows on screen are ever laid out, so that would
-	    not be expensive; it is simply four questions where the row has one.
+	    not be expensive; it is simply several questions where the row has one.
 	    @return false for an index out of range, leaving out untouched. */
 	bool GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out);
 

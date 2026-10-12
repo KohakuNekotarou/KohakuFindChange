@@ -19,7 +19,8 @@
 //  EDITED BY HAND. The three doors and their implementation (KFCModelServices.cpp) were first generated from
 //  one table (work/sdd/2026-10-01-kbs-model-ui-split/gen_ifaces.py); methods have been added by hand since,
 //  which the table does not know, so the generator is a record only and refuses to write. A new method goes
-//  at the END of its interface - a vtable slot is a promise to every built caller.
+//  at the END of its interface - a vtable slot is a promise to every built caller. One taken out moves every
+//  slot below it, so both halves are built together then (nothing outside KFC calls these doors).
 //
 //========================================================================================
 
@@ -73,10 +74,6 @@ public:
 	virtual bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos) = 0;
 	/** = KFCFindOversetLocator. */
 	virtual KFCOversetLoc FindOversetLocator(const UIDRef& storyRef, TextIndex pos) = 0;
-	/** = KFCSearchEngine::RowReadsAsFound. */
-	virtual bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db) = 0;
-	/** = KFCSearchEngine::RelocateStaleRow. */
-	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) = 0;
 	// Added by hand from here on - a new method goes below the last one, never between (a vtable slot is a
 	// promise to every built caller).
 	/** = KFCSearchEngine::SetQuery. */

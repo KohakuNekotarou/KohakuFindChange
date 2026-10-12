@@ -24,7 +24,7 @@
 #include "ILayoutHitTestSuite.h"	// ...reached through the active layout hit-test suite
 #include "ILayoutTarget.h"		// GetUIDList(kStripStandoffs) - the selected page items
 #include "ISelectionUtils.h"	// QueryActiveLayoutHitTestSuite
-#include "ISelectionManager.h"	// HasTextSelection - SelectionExists on the text CSB
+#include "ISelectionManager.h"	// ActiveSelectionExists - SelectionExists by the CSB's class
 #include "TextEditorID.h"		// kTextSelectionBoss
 
 // General includes:
@@ -63,6 +63,18 @@ namespace
 	private:
 		RangeProgressBar	fBar;
 	};
+
+	/** Does the front view's selection hold one of this concrete selection boss - kInvalidClass = of any
+	    (ISelectionManager::SelectionExists, public; the class names the CSB, ISelectionManager.h)? */
+	bool ActiveSelectionExists(const ClassID& csb)
+	{
+		Utils<ISelectionUtils> selectionUtils;
+		if (!selectionUtils.Exists())
+			return false;
+		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
+		return selectionManager != nil
+			&& selectionManager->SelectionExists(csb, ISelectionManager::kAnySelection) != kFalse;
+	}
 }
 
 class KFCUIServices : public CPMUnknown<IKFCUIServices>
@@ -170,25 +182,12 @@ public:
 
 	virtual bool HasTextSelection()
 	{
-		// The text concrete selection boss's own answer, asked through the active selection manager by its class
-		// (ISelectionManager::SelectionExists - public; the class names the CSB, ISelectionManager.h).
-		Utils<ISelectionUtils> selectionUtils;
-		if (!selectionUtils.Exists())
-			return false;
-		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
-		return selectionManager != nil
-			&& selectionManager->SelectionExists(kTextSelectionBoss, ISelectionManager::kAnySelection) != kFalse;
+		return ActiveSelectionExists(kTextSelectionBoss);	// the text concrete selection boss's own answer
 	}
 
 	virtual bool HasAnySelection()
 	{
-		// Every concrete selection asked at once (kInvalidClass, kAnySelection - ISelectionManager.h).
-		Utils<ISelectionUtils> selectionUtils;
-		if (!selectionUtils.Exists())
-			return false;
-		ISelectionManager* const selectionManager = selectionUtils->GetActiveSelection();
-		return selectionManager != nil
-			&& selectionManager->SelectionExists(kInvalidClass, ISelectionManager::kAnySelection) != kFalse;
+		return ActiveSelectionExists(kInvalidClass);		// every concrete selection asked at once
 	}
 
 	virtual void ClearSelection()

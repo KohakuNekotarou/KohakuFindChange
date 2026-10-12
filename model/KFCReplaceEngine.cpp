@@ -609,7 +609,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				lastStart = writtenStart;
 				lastEnd = writtenEnd;
 				// WHAT IT WROTE, TAKEN HERE - once (Hit::replacedText): the jump looks for a moved row by it
-				// (KFCSearchEngine::RelocateStaleRow). The text written now is the text the row holds at the end: no
+				// (KFCSearchEngine::LocateRow). The text written now is the text the row holds at the end: no
 				// later replace of the run writes inside it, since every other row is carried outside it and a match
 				// there is none of theirs (stepped over, above).
 				KFC_CLOCK(cTexts);
@@ -682,7 +682,7 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 // found (KFCSearchEngine::RowReadsAsFound - the jump's own test). An edit made since can have moved the rest -
 // reading such a row back at its old place takes the line AND the hash from the wrong characters, so a click
 // then selects them (measured: "ZZkitt"); left alone, its jump looks for it again
-// (KFCSearchEngine::RelocateStaleRow) and says it is no longer here when no one place is found.
+// (KFCSearchEngine::LocateRow) and says it is no longer here when no one place is found.
 bool StoryAsKFCLeftIt(int32 chapterIdx, IDataBase* db, UID story);	// below, with the story versions
 bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 {
@@ -697,7 +697,7 @@ bool RowStillStands(int32 chapterIdx, int32 hitIdx, IDataBase* db)
 	{
 		// A REPLACED ROW STANDS WHERE ITS STORED PLACE STILL HOLDS WHAT ITS REPLACE WROTE (Hit::replacedText). One
 		// that does not - an edit since, which KFC does not follow - is left as it is; its jump looks for it again
-		// (KFCSearchEngine::RelocateStaleRow).
+		// (KFCSearchEngine::LocateRow).
 		PMString written;
 		if (!haveIdentity || !KFCResultModel::GetHitWrittenText(chapterIdx, hitIdx, written))
 			return false;

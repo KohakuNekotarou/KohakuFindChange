@@ -429,11 +429,11 @@ namespace KFCSearchEngine
 	    place - the same story, position and length, and the whole match by its hash
 	    (MatchIsSameOccurrence, in the .cpp) - AND the line around it: the three drawn segments read
 	    again the way the search read them (ReadHitText, RereadRowText's own reading) and compared with
-	    what the row holds. The line is what RelocateStaleRow already asks of a candidate ("the same text
-	    with the same line around it"). The answer is how the panel can say "the replacement is no
-	    longer here" instead of scrolling to whatever took its place, how a click refuses to hand the
-	    user a selection over text they never searched for, and how a row whose text was edited is not
-	    written.
+	    what the row holds. The line is what LocateRow asks of a candidate when it looks the story
+	    through again ("the same text with the same line around it"). The answer is how the panel can
+	    say "the replacement is no longer here" instead of scrolling to whatever took its place, how a
+	    click refuses to hand the user a selection over text they never searched for, and how a row
+	    whose text was edited is not written.
 
 	    Why the line as well: a row's place is carried past every change KFC makes - and past an Undo
 	    or a Redo of one (KFCUndoFollow puts the rows back with it) - but never
@@ -449,23 +449,15 @@ namespace KFCSearchEngine
 	    edit that is not followed.)
 
 	    False when the row, its story or its place cannot be read. Asked by the verify walk and
-	    RowStillStands (KFCReplaceEngine), and by the jump through IKFCRuns; the jump reads a row the same
-	    way at each place LocateRow tries (RowReadsAsFoundAt). */
+	    RowStillStands (KFCReplaceEngine); the jump reads a row the same way at each place LocateRow tries
+	    (RowReadsAsFoundAt). */
 	bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db);
 
-	/** A ROW WHOSE PLACE HAS MOVED UNDER IT, LOOKED FOR AGAIN (the author's call). Before the jump gives up
-	    on a row that does not read as found, the row's story is walked again under the same query, and the
-	    row moves to the ONE match with the same text and the same line around it that no other row stands
-	    on. Rows not replaced only. In the model half because it is a walk and the rows put right - the jump
-	    (KFCJump.cpp) asks it through IKFCRuns; the notes are at the definition. True = the row was moved,
-	    and ioStart / ioEnd are its new place. */
-	bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
-		TextIndex& ioStart, TextIndex& ioEnd);
-
 	/** Where the row is now (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md T2 / T3 / T14) - its
-	    stored place, its text focus, the story looked through again.
-	    kRowMoved = the row was moved (RelocateStaleRow's rule); kRowElsewhere = found for this jump only - the row's
-	    stored place is unchanged. ioStart / ioEnd = the place to go to (unchanged for kRowAtPlace / kRowNotFound). */
+	    stored place, its text focus, the story looked through again. The jump asks it through IKFCRuns.
+	    kRowMoved = the row was moved to the one free look-alike (OneFreePlace's rule, in the .cpp); kRowElsewhere =
+	    found for this jump only - the row's stored place is unchanged. ioStart / ioEnd = the place to go to
+	    (unchanged for kRowAtPlace / kRowNotFound). */
 	KFCResultModel::RowLocation LocateRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, TextIndex& ioStart,
 		TextIndex& ioEnd);
 

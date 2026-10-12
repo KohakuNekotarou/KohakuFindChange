@@ -97,8 +97,6 @@ public:
 	virtual UID EditableFrameForMatch(const UIDRef& storyRef, TextIndex pos) { return KFCSearchEngine::EditableFrameForMatch(storyRef, pos); }
 	virtual bool IsPositionOverset(const UIDRef& storyRef, TextIndex pos) { return KFCSearchEngine::IsPositionOverset(storyRef, pos); }
 	virtual KFCOversetLoc FindOversetLocator(const UIDRef& storyRef, TextIndex pos) { return KFCFindOversetLocator(storyRef, pos); }
-	virtual bool RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase* db) { return KFCSearchEngine::RowReadsAsFound(chapterIdx, hitIdx, db); }
-	virtual bool RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID, TextIndex& ioStart, TextIndex& ioEnd) { return KFCSearchEngine::RelocateStaleRow(chapterIdx, hitIdx, docRef, storyUID, ioStart, ioEnd); }
 	virtual bool SetQuery(const PMString& text, int32 mode) { return KFCSearchEngine::SetQuery(text, mode); }
 	virtual int32 ChangeAll(PMString& outSummary) { return KFCChangeAll::Run(outSummary); }
 	virtual bool ClearResults(PMString& outStatus) { return KFCChangeAll::ClearResults(outStatus); }

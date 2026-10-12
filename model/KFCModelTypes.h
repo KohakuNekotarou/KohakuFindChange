@@ -28,13 +28,6 @@
 
 namespace KFCResultModel
 {
-	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9 - the
-	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit,
-	    KFCResultModel.h, is this number). More than this is not a list to walk and replace row by row - a Change All
-	    writes any number without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's
-	    counts, the close responder's rebuild) stays: with one number it never cuts a row. */
-	const int32 kKFCDisplayHitLimit = 300;
-
 	/** What became of a hit when a replace ran over it. Only ever set on rows the replace actually
 	    reached; everything else stays kOutcomeNone. Drawn as a word on the locator - "Missing" first,
 	    the others after it (KFCResultModel::BuildHitLocator). */
@@ -52,7 +45,7 @@ namespace KFCResultModel
 	{
 		kRowNotFound = 0,	// nowhere that can be told - the jump says "Not found"
 		kRowAtPlace,		// at its stored place
-		kRowMoved,			// moved to the one free candidate (RelocateStaleRow's rule) - the row stands there now
+		kRowMoved,			// moved to the one free candidate (OneFreePlace's rule) - the row stands there now
 		kRowElsewhere		// found through its text focus or by order - for this jump only (spec T3)
 	};
 
@@ -76,10 +69,8 @@ namespace KFCResultModel
 		PMString		matchText;
 		PMString		postText;
 		bool			replaced;
-		bool			locked;
-		ChangeOutcome	outcome;
 
-		RowDisplay() : replaced(false), locked(false), outcome(kOutcomeNone) {}
+		RowDisplay() : replaced(false) {}
 	};
 }
 

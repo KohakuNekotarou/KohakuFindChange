@@ -669,8 +669,6 @@ bool KFCResultModel::GetHitRow(int32 chapterIdx, int32 hitIdx, RowDisplay& out)
 	out.matchText = h.matchText;
 	out.postText = h.postText;
 	out.replaced = h.replaced;
-	out.locked = h.isLocked;
-	out.outcome = h.outcome;
 	return true;
 }
 

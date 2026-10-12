@@ -84,7 +84,7 @@ namespace KFCReplaceEngine
 	    still describe the search the results came from. The tab is stated as RefuseChangedQuery
 	    states it - a walk after this runs in it - and NOTHING IS CLEARED whatever the answer. For a
 	    caller that only has to know (the jump's look for a row an Undo moved -
-	    KFCSearchEngine::RelocateStaleRow - is one), where RefuseChangedQuery would clear the whole result
+	    KFCSearchEngine::LocateRow - is one), where RefuseChangedQuery would clear the whole result
 	    set in the middle of the caller's work on a changed query. Same rule as RefuseChangedQuery: outside
 	    any command sequence. */
 	bool QueryUnchangedSinceSearch();

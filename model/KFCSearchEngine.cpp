@@ -92,7 +92,7 @@
 #include "KFCRowFoci.h"			// the rows' text foci - attached when a search ends, read and put back by LocateRow
 #include "KFCRunGuard.h"		// is anything ELSE of ours running? (the modal bar pumps events)
 #include "KFCOversetLocator.h"	// the "+" page for an overset hit (locator + sort key)
-#include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - RelocateStaleRow looks again only under its own query
+#include "KFCReplaceEngine.h"	// QueryUnchangedSinceSearch - a look again runs only under the search's own query
 #include "KFCDiag.h"			// the fault switch queries-run (SearchBook's head)
 #include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
@@ -1506,9 +1506,9 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 // Every match of the current query in one story of an open document, as the search's walk meets them
 // there, with the given scope switches - each with its place, its line and its hash (kHitPlaceAndText):
-// what RelocateStaleRow compares a row with. The story scope is the one the replace's walks take
-// (IWalkerScopeFactoryUtils::QueryStoryWalkerScope). Read-only (the walk's own dirty guard). False = it
-// could not be walked.
+// what a row looked for again is compared with (StaleRowPlaces). The story scope is the one the replace's
+// walks take (IWalkerScopeFactoryUtils::QueryStoryWalkerScope). Read-only (the walk's own dirty guard).
+// False = it could not be walked.
 bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	std::vector<KFCResultModel::Hit>& outHits)
 {
@@ -3711,42 +3711,25 @@ bool PickByOrder(int32 chapterIdx, int32 hitIdx, const Places& places, TextIndex
 }
 }	// anonymous namespace
 
-// HERE, NOT IN THE JUMP (KFCJump.cpp): walking a story and putting a row right is the model half's work.
-// The jump asks it through IKFCRuns.
-// A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (the author's call).
-// The rows keep their places themselves, and follow every change KFC makes - and an Edit > Undo / Redo
-// of a write of KFC's own (KFCUndoFollow). Not the edits that are not followed: typing, an Undo of
-// anything else, the Track Changes panel, a script - which move the text without telling them, so a
-// row's stored place can be off although its text has not been touched. (Measured before Undo was
-// followed: an edit before the second of two matches, taken back by Ctrl+Z - the row's place was one
-// character off, and the jump called it "missing".)
+// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes - HERE, NOT IN THE JUMP
+// (KFCJump.cpp): walking a story and putting a row right is the model half's work; the jump asks it through IKFCRuns.
+// The row's stored place and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them:
+// that one. Both, at different places (look-alikes - one reached by a focus an Undo left behind, or a stored place
+// another look-alike slid under): the look-alikes now are counted against the rows - the same count, by order (an
+// Undo left the focus behind); not the same, the focus (one came or went before the row, and the focus followed that
+// edit). Neither: the story looked through again - the one free candidate moves the row there (OneFreePlace), else
+// the order rule.
 //
-// So before a jump gives up on a row, the story is walked again under the same query, and the row moves
-// to the ONE match that is the same text with the same line around it (the three segments the row
-// drew) and that no other row stands on - OneFreePlace; MoveRowTo moves its focus with it. None, or more
-// than one, and it is not moved: more than one is the jump's to decide by order (LocateRow - spec T14),
-// for that jump only. A replaced row is looked for by what it wrote (ReplacedRowPlaces): the query no
-// longer finds it. True = the row was moved; ioStart / ioEnd are its new place.
-bool KFCSearchEngine::RelocateStaleRow(int32 chapterIdx, int32 hitIdx, const UIDRef& docRef, UID storyUID,
-	TextIndex& ioStart, TextIndex& ioEnd)
-{
-	Places places;
-	TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
-	if (!LookAlikePlacesNow(chapterIdx, hitIdx, docRef, storyUID, places)
-		|| !OneFreePlace(chapterIdx, hitIdx, storyUID, places, s, e))
-		return false;
-	MoveRowTo(chapterIdx, hitIdx, UIDRef(docRef.GetDataBase(), storyUID), s, e);
-	ioStart = s;
-	ioEnd = e;
-	return true;
-}
-
-// WHERE IS THIS ROW NOW? (spec T2) One question for the jump and the selection a click makes. The row's stored place
-// and its text focus's place are both read against the row (RowReadsAsFoundAt). One of them: that one. Both, at
-// different places (look-alikes - one reached by a focus an Undo left behind, or a stored place another look-alike
-// slid under): the look-alikes now are counted against the rows - the same count, by order (an Undo left the focus
-// behind); not the same, the focus (one came or went before the row, and the focus followed that edit). Neither: the
-// story looked through again - one free candidate moves the row there (RelocateStaleRow's rule), else the order rule.
+// A ROW WHOSE PLACE HAS MOVED UNDER IT IS LOOKED FOR AGAIN (the author's call). The rows keep their places themselves,
+// and follow every change KFC makes - and an Edit > Undo / Redo of a write of KFC's own (KFCUndoFollow). Not the edits
+// that are not followed: typing, an Undo of anything else, the Track Changes panel, a script - which move the text
+// without telling them, so a row's stored place can be off although its text has not been touched. (Measured before
+// Undo was followed: an edit before the second of two matches, taken back by Ctrl+Z - the row's place was one
+// character off, and the jump called it "missing".) So before the jump gives up on a row, the story is walked again
+// under the same query, and the row moves to the ONE match that is the same text with the same line around it (the
+// three segments the row drew) and that no other row stands on - OneFreePlace; MoveRowTo moves its focus with it.
+// None, or more than one, and it is not moved: more than one is decided by order (spec T14), for that jump only. A
+// replaced row is looked for by what it wrote (ReplacedRowPlaces): the query no longer finds it.
 //
 // A PLACE FOUND THROUGH THE FOCUS OR BY ORDER IS THE JUMP'S ONLY (spec T3, 3rd edition): the row's stored place stays.
 // The Replace trusts that place whenever the story is at the version KFC recorded, and an Undo of the user's edit
@@ -3804,7 +3787,7 @@ KFCResultModel::RowLocation KFCSearchEngine::LocateRow(int32 chapterIdx, int32 h
 		TextIndex s = kInvalidTextIndex, e = kInvalidTextIndex;
 		if (OneFreePlace(chapterIdx, hitIdx, story, places, s, e))
 		{
-			MoveRowTo(chapterIdx, hitIdx, UIDRef(db, story), s, e);		// RelocateStaleRow's rule - the row moves
+			MoveRowTo(chapterIdx, hitIdx, UIDRef(db, story), s, e);		// OneFreePlace's rule - the row moves
 			ioStart = s;
 			ioEnd = e;
 			return KFCResultModel::kRowMoved;
@@ -3864,7 +3847,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		outStatus.Append("the searched part cannot be searched again on its own (separate stretches) - search again.");
 		return false;
 	}
-	// Asked, not refused (QueryUnchangedSinceSearch - RelocateStaleRow's note): nothing is cleared, and the tab the walk
+	// Asked, not refused (QueryUnchangedSinceSearch - StaleRowPlaces' note): nothing is cleared, and the tab the walk
 	// below runs in is stated.
 	if (!KFCReplaceEngine::QueryUnchangedSinceSearch())
 	{
