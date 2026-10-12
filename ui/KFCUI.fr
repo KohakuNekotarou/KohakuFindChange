@@ -77,8 +77,10 @@ resource ExtraPluginInfo(1)
 /*
  * This half does not stand on its own: the panel's rows, its commands and its status all come from
  * the model half through the three session interfaces (IKFCResults / IKFCRuns / IKFCChapters). Guide
- * gs-03 - a UI plug-in makes no sense without its model half - so say so and let InDesign enforce the
- * load order and report the missing half. The SDK's shape (transparencyeffectui/TranFxUI.fr), and KCM's.
+ * gs-03 - a UI plug-in makes no sense without its model half - so say so here. What InDesign then does with
+ * the declaration (whether it enforces the load order, how it reports a missing half) is written neither in
+ * the guide nor in the resource type (objectmodeltypes.fh), and has not been measured here: the declaration
+ * is kept because it states the dependency. The SDK's shape (transparencyeffectui/TranFxUI.fr), and KCM's.
  * The dependency is ONE-WAY: the model half declares none, and has to keep working on its own.
  */
 resource PluginDependency(kSDKDefPluginDependencyResourceID)
