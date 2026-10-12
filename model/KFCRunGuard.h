@@ -62,6 +62,14 @@ namespace KFCRunGuard
 	/** Is a search, a Change All, a query run or a row's Replace running right now? */
 	bool IsAnyRunning();
 
+	/** IS A ROW'S LANDING UNDER WAY in the panel (the UI half's KFCJump::IsLanding, asked through IKFCUIServices)?
+	    NOT part of IsAnyRunning, on purpose: the doors IsAnyRunning answers for - the GREP row's preview, an object row's
+	    Replace - are themselves reached from inside a landing, and would turn themselves away. Asked by the model's own
+	    deferred work that must not run under a landing - the book watcher's retire (KFCBookWatch, the 2026-10-12
+	    proposal P-A): a landing opens documents and windows and runs the message loop, and a retire landing in it would
+	    empty the results the landing is reading and hand back the chapter it is opening. No UI half = no landing. */
+	bool IsLandingUnderWay();
+
 	/** What to put on the status line when a run is turned away because another one is up. Not
 	    translatable - the panel's status line is English throughout, echoing the Find/Change
 	    wording. Deliberately does not name WHICH run: the callers that use it are the ones whose own

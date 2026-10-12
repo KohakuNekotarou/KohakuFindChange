@@ -112,6 +112,11 @@ public:
 	/** Nothing selected in the front view - DeselectAll on the active selection, when there is one (KFCJump's
 	    ClearSelection, the SDK's way in SnpSelectShape.cpp). */
 	virtual void				ClearSelection() = 0;
+	/** IS A ROW'S LANDING UNDER WAY in the panel (KFCJump::IsLanding - a click's, an arrow's, an object row's Replace's)?
+	    A landing opens documents and windows and runs the message loop while it does, and the model's own deferred work
+	    (KFCBookWatch's retire - KFCRunGuard::IsLandingUnderWay) must not empty the results or hand chapters back under it.
+	    The model cannot see the UI half's flag; this is how it asks. */
+	virtual bool				IsLanding() = 0;
 };
 
 #endif // __IKFCUIServices_h__

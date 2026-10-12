@@ -43,7 +43,7 @@
 #include "KFCUIID.h"				// kKFCUIServicesImpl
 #include "IKFCUIServices.h"
 #include "KFCBookPanelLookup.h"
-#include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door
+#include "KFCJump.h"				// ClearFrontSelection - ClearSelection's door; IsLanding - IsLanding's
 
 namespace
 {
@@ -194,6 +194,11 @@ public:
 	virtual void ClearSelection()
 	{
 		KFCJump::ClearFrontSelection();
+	}
+
+	virtual bool IsLanding()
+	{
+		return KFCJump::IsLanding();
 	}
 };
 

@@ -17,8 +17,8 @@
 //  text, went with the click's). THE MARKER COMES UP AT ONCE (the author's
 //  call: on the same beat as KCM's Story-mode jump, which raises its flash straight away). With
 //  "Hide Previous Chapter" ON, every other
-//  displayed clean chapter of the searched book is closed as the jump lands (a document outside the
-//  book stays). Ported from KESCL's jump machinery (KESCL
+//  displayed clean chapter of the searched book is closed once the landing is over - decided then, its closes
+//  scheduled (a document outside the book stays). Ported from KESCL's jump machinery (KESCL
 //  left untouched), simplified to a static snapshot (no match-list navigation, no edit-repair, no
 //  reverse mode).
 //

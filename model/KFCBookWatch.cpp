@@ -140,7 +140,11 @@ void RetireBookResultsIfGone()
 	//
 	// ANY run - not the search alone: the replace is the worst run to interrupt, since it holds an open
 	// command sequence over the documents this would close. See KFCRunGuard.
-	if (KFCRunGuard::IsAnyRunning())
+	// ...NOR WHILE A ROW'S LANDING IS UNDER WAY in the panel (the 2026-10-12 proposal P-A, the author: "fix it if you can"):
+	// a landing opens the row's chapter and its window and runs the message loop while it does, so an idle callback can
+	// land in it too - and this would empty the results the landing is reading and hand back the chapter it is opening,
+	// still windowless (KFCRunGuard::IsLandingUnderWay - the UI half's flag, asked across the split).
+	if (KFCRunGuard::IsAnyRunning() || KFCRunGuard::IsLandingUnderWay())
 		return;
 
 	// Which book are the results from? Read the path BEFORE releasing anything -
@@ -227,7 +231,8 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// the worst case is a book's results left on the panel, and any chapter that refused to close left
 	// locked, until the next search - not a permanent strand. Named rather than assumed, because a
 	// fallback nobody has written down is one the next change can remove without noticing.
-	if (KFCRunGuard::IsAnyRunning())
+	// ...and a row's landing is waited out the same way (RetireBookResultsIfGone says why).
+	if (KFCRunGuard::IsAnyRunning() || KFCRunGuard::IsLandingUnderWay())
 		return kKFCBookRetireDelayMs;
 
 	RetireBookResultsIfGone();

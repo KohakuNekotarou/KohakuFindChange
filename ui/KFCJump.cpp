@@ -715,6 +715,47 @@ private:
 	HandBackChaptersOnExit& operator=(const HandBackChaptersOnExit&);
 };
 
+// THE "HIDE PREVIOUS CHAPTER" SWEEP IS DECIDED WHEN THE OPERATION IS OVER, NOT IN ITS MIDDLE (the author's call, 2026-10-12 -
+// the fatal-path re-check's proposal P-C). FrontChapter asks for the sweep as it brings the row's document forward; which
+// chapters need no save and have a window is asked, and their closes scheduled, by this object's destructor - once everything
+// the operation does is done: the landing's dirty guard put back, its chapter handed back, a GREP row's preview, an object
+// row's write. A write anywhere in the operation has made its document one that needs a save BEFORE the sweep looks, so the
+// shape of the 10-11 night K-3 - a sweep scheduled, then the same operation writing a chapter it named, and the close
+// throwing the write away - cannot be built any more. The closes stay scheduled (kSchedule): what the user sees is the same,
+// InDesign carries them out before the next input.
+// One per operation, declared at its top right after its ActivationGuard (ActivateNode, ReplaceObjectRow, ReplaceObjectRows),
+// so it ends after everything else of the operation and while the landing guard still stands. With none standing,
+// FrontChapter sweeps at once, as before.
+class SweepAtEnd;
+SweepAtEnd* gSweepAtEnd = nil;
+
+class SweepAtEnd
+{
+public:
+	SweepAtEnd() : fRequested(false), fOuter(gSweepAtEnd) { gSweepAtEnd = this; }
+	~SweepAtEnd()
+	{
+		gSweepAtEnd = fOuter;
+		// Asked again, not taken from the asking: the results may have gone during the operation (a book closed - the
+		// model's book watcher waits for the landing, KFCRunGuard::IsLandingUnderWay - or the toggle flipped).
+		if (fRequested && ShouldHidePreviousChapter())
+			KFCChapters()->CloseDisplayedDocsIfClean(fExcept);
+	}
+	// The document the operation brought forward - the one the sweep spares. A later request replaces it: the sweep spares
+	// the document the operation left in front.
+	void Request(const UIDRef& exceptDoc)
+	{
+		fExcept = exceptDoc;
+		fRequested = true;
+	}
+private:
+	bool fRequested;
+	UIDRef fExcept;
+	SweepAtEnd* fOuter;
+	SweepAtEnd(const SweepAtEnd&);
+	SweepAtEnd& operator=(const SweepAtEnd&);
+};
+
 // Does a row name a place in its story? Every row the search makes does, and nothing in KFC takes one away -
 // asked anyway, because what follows (the overset test, the spread, the wax rectangle) must never be handed -1.
 bool RowHasPlace(TextIndex start, TextIndex end)
@@ -775,15 +816,16 @@ void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 }
 
 // Bring the chapter's window to the front - saying so when it cannot be done, because a click that
-// moves nothing must not appear to do nothing - and then, with "Hide Previous Chapter" ON, close every
-// other displayed clean chapter of the searched book (scheduled; the landed-in document is the exception;
-// a document outside the book stays; book results only - see ShouldHidePreviousChapter). Shared by
+// moves nothing must not appear to do nothing - and then, with "Hide Previous Chapter" ON, ask for the sweep that
+// closes every other displayed clean chapter of the searched book (the landed-in document is the exception;
+// a document outside the book stays; book results only - see ShouldHidePreviousChapter). The operation's
+// SweepAtEnd runs it once the operation is over (P-C); with none standing it runs here, at once. Shared by
 // JumpToHit and ShowChapter.
 // hidePreviousChapters = false: the window alone, no sweep - for a landing that WRITES other chapters after it
-// (KFCJump::ReplaceObjectRows): the sweep's closes are scheduled and run once the write is over, by which time the
-// chapters they name hold the write, and a close without UI throws it away (measured - the 1.3 -> 1.4 re-check of
+// (KFCJump::ReplaceObjectRows): a sweep scheduled in the middle ran its closes once the write was over, by which time the
+// chapters they named held the write, and a close without UI threw it away (measured - the 1.3 -> 1.4 re-check of
 // 2026-10-11 night, case sel-book-objects-open-hide: "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as
-// before the Replace).
+// before the Replace). Since P-C the sweep is decided at the end (SweepAtEnd), which that shape cannot get past.
 bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 {
 	if (!EnsureDocFrontmost(docRef))
@@ -794,7 +836,15 @@ bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 		return false;
 	}
 	if (hidePreviousChapters && ShouldHidePreviousChapter())
-		KFCChapters()->CloseDisplayedDocsIfClean(docRef);
+	{
+		// (Fault switch sweep-at-once, a test build's only - KFCDiag.h: the sweep scheduled here, in the middle of the
+		// operation, the way it was before P-C - with object-rows-sweep, the case that shows a write thrown away.)
+		const bool atOnce = KFC_DIAG_FAULT("sweep-at-once");
+		if (gSweepAtEnd != nil && !atOnce)
+			gSweepAtEnd->Request(docRef);
+		else
+			KFCChapters()->CloseDisplayedDocsIfClean(docRef);
+	}
 	return true;
 }
 
@@ -1466,6 +1516,9 @@ void KFCJump::ActivateNode(int32 chapterIdx, int32 hitIdx)
 	if (gActivating || KFCRuns()->IsAnyRunning())
 		return;
 	ActivationGuard activationGuard;
+	// The "Hide Previous Chapter" sweep this landing asks for runs when all of it is over - the jump, its hand-back, a GREP
+	// row's preview (SweepAtEnd, P-C).
+	SweepAtEnd sweepAtEnd;
 
 	// Search: as it is BEFORE this activation fronts a document or changes the selection - put back if Edit >
 	// Find/Change re-picks it in answer (ScopeKeep, above JumpToHit).
@@ -1557,6 +1610,9 @@ bool KFCJump::ReplaceObjectRow(int32 chapterIdx, int32 hitIdx, PMString& outStat
 	if (gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
+	// The sweep FrontChapter asks for runs after the write and the item's selection (SweepAtEnd, P-C) - the written document
+	// is spared by name besides, and needs a save by then.
+	SweepAtEnd sweepAtEnd;
 	// (The check below can reopen the chapter windowless - it is handed back on every way out that leaves it without its
 	//  window: HandBackChapterOnExit, before the dirty guard below.)
 	const HandBackChapterOnExit handBack(chapterIdx);
@@ -1597,6 +1653,9 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 	if (total == 0 || gActivating)
 		return false;		// a landing is still opening a document (see gActivating) - the next press will land
 	ActivationGuard activationGuard;
+	// (No sweep is asked for here - below. One a test build's fault switch puts back runs after the write all the same:
+	//  SweepAtEnd, P-C.)
+	SweepAtEnd sweepAtEnd;
 	// (As one row's: the check below can reopen a chapter windowless - every document's, the shown row's among them -
 	// HandBackChaptersOnExit. The write hands back what it reached and did not write - KFCObjectReplace::ReplaceRows.)
 	const HandBackChaptersOnExit handBack(rows);
@@ -1614,12 +1673,15 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		// O10 step 6 for the rows: the document of the row selected last in front - InDesign's replace selects what it
 		// writes in the FRONT document (another document's walk selects in this one, put right below) - and the view on
 		// that row's item (the one the page shows).
-		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE: its closes run after the write, and the rows' other chapters are what the
-		// write goes on to write - a clean one with a window would be closed with the write in it, thrown away
-		// (FrontChapter's hidePreviousChapters - measured, case sel-book-objects-open-hide). One row's Replace keeps the
-		// sweep: it spares the one document that row writes (ReplaceObjectRow).
-		// (Fault switch object-rows-sweep, a test build's only - KFCDiag.h: the sweep put back, as before that fix - the case
-		// that shows the test build's written-document check catching the close, KFCDiagWrittenDocs.h.)
+		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE (the 10-11 night K-3): asked in the middle, its closes ran after the write,
+		// and the rows' other chapters are what the write goes on to write - a clean one with a window was closed with the
+		// write in it, thrown away (FrontChapter's hidePreviousChapters - measured, case sel-book-objects-open-hide). One
+		// row's Replace keeps the sweep: it spares the one document that row writes (ReplaceObjectRow). Since P-C a sweep
+		// asked here would run at the end (SweepAtEnd) and find the written chapters needing a save - kept off all the same:
+		// whether rows replaced together close the other chapters is a behaviour of its own, not decided here.
+		// (Fault switch object-rows-sweep, a test build's only - KFCDiag.h: the sweep asked for here - deferred by SweepAtEnd
+		// now, case sel-book-objects-open-hide-deferred; with sweep-at-once as well, scheduled in the middle as before K-3 -
+		// the case that shows the test build's written-document check catching the close, KFCDiagWrittenDocs.h.)
 		const bool sweep = KFC_DIAG_FAULT("object-rows-sweep");
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		if (!FrontChapter(docRef, sweep /*hidePreviousChapters*/))

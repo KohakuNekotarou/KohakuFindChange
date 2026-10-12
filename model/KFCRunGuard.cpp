@@ -10,12 +10,16 @@
 
 #include "VCPlugInHeaders.h"
 
+// Interface includes:
+#include "ISession.h"
+
 // Project includes:
 #include "KFCRunGuard.h"
 #include "KFCSearchEngine.h"
 #include "KFCQuerySequence.h"
 #include "KFCChangeAll.h"
 #include "KFCReplaceEngine.h"
+#include "IKFCUIServices.h"		// IsLanding - the UI half's landing, asked across the split
 
 bool KFCRunGuard::IsAnyRunning()
 {
@@ -26,6 +30,13 @@ bool KFCRunGuard::IsAnyRunning()
 		|| KFCChangeAll::IsRunning()			// Change All in Book (No List)
 		|| KFCQuerySequence::IsRunning()		// the query run: every query's Change All under one sequence
 		|| KFCReplaceEngine::IsReplacing();		// a row's Replace - no bar, but its opens run the message loop (the header)
+}
+
+bool KFCRunGuard::IsLandingUnderWay()
+{
+	// No UI half (a background thread, InDesign Server) has no panel and no landing.
+	InterfacePtr<IKFCUIServices> ui(GetExecutionContextSession(), UseDefaultIID());
+	return ui != nil && ui->IsLanding();
 }
 
 const char* KFCRunGuard::BusyMessage()
