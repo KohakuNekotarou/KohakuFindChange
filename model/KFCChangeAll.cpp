@@ -241,7 +241,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	}
 	// THE OBJECT TAB (spec O13): InDesign's object Change All over each chapter. Refused with nothing to find - an
 	// empty Find Object Format would change every frame of the Type in the book - or nothing to change to. (The menu greys
-	// the item with nothing to find - HasFindQueryNow - so these doors are for a caller that never went through the menu.)
+	// the item with nothing to find - HasFindQueryNow - so that door is for a caller that never went through the menu; with
+	// nothing to change to the menu still offers it - O13 greys by the text tabs' conditions, which have no such one - and
+	// this door is what answers.)
 	const bool objectTab = (KFCSearchEngine::CurrentSearchMode() == IFindChangeOptions::kObjectSearch);
 	if (objectTab && !KFCObjectSearch::HasFindObjectFormat())
 	{

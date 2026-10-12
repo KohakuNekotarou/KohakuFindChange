@@ -30,7 +30,8 @@
 //  naming the engines one at a time. By name, because a count goes stale where a list does not:
 //
 //    * the panel's actions (KFCActionComponent, the UI half - through IKFCRuns): UpdateActionStates
-//      greys everything out, and RefusedWhileRunning turns away a command that arrives anyway;
+//      greys out every kCustomEnabling one, and RefusedWhileRunning turns away a command that arrives anyway
+//      (Save Panel Settings, which no grey reaches, asks it first);
 //    * each engine's own front door (KFCSearchEngine, KFCReplaceEngine, KFCChangeAll - Clear Results
 //      too - and KFCQuerySequence), for a caller that never went through the menu - a script firing an
 //      action by ID reaches the engine whatever the menu says;

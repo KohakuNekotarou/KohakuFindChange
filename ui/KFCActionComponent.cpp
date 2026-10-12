@@ -96,11 +96,10 @@ CREATE_PMINTERFACE(KFCActionComponent, kKFCActionComponentImpl)
 
 namespace
 {
-// One of the three Windows-only appearance toggles (Translucent Panel, Translucent Find/Change,
-// Minimizable Find/Change): flipped, put on whatever window it can reach, and the status line says
-// which it came to. The wording follows whether a window was actually reached - ticking one with
-// nothing to put it on (the panel docked, the dialog closed) is legitimate, so that case is stated
-// in words (notReached) rather than left looking broken.
+// A Windows-only toggle that acts on one of InDesign's windows (each case below that calls this): flipped, put on
+// whatever window it can reach, and the status line says which it came to. The wording follows whether a window was
+// actually reached - ticking one with nothing to put it on (the panel docked, the dialog closed, the search field
+// hidden) is legitimate, so that case is stated in words (notReached) rather than left looking broken.
 void FlipAppearanceToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*apply)(),
 	const char* name, const char* notReached)
 {
@@ -476,9 +475,10 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 			// FIND, not "Search": Adobe's verb for this is Find - the dialog this
 			// command takes its query from is Find/Change, its buttons are Find Next and Change All -
 			// while "Search" is the label on that dialog's SCOPE popup ("Search: Document"). The
-			// action's resource name stays "Search": that is the handle a script reaches this by
-			// (app.menuActions.itemByName("Search")), and it is never what the user sees, because this
-			// line renames it before the menu is drawn.
+			// action's resource name stays "Search" - the menu shows it only while this line has not run (a run's grey,
+			// above, leaves the names as they were). The new name is the action's own, not this drawing's (measured), so
+			// a script reaches this by its ActionID, as the regression does - app.menuActions.itemByName("Search") finds
+			// it only until the menu is first drawn or its state first read.
 			PMString name(KFCRuns()->FindCommandName(KFCChapters()->IsBookScopeOn()));
 			name.SetTranslatable(kFalse);
 			listToUpdate->SetNthActionName(i, name);

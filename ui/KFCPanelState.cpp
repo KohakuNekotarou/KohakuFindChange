@@ -554,6 +554,13 @@ static void KFCPanelStateSayFailed(const char* what)
 
 void KFCSavePanelState()
 {
+	// NOT WHILE A RUN OF OURS STANDS - nor over a model half of another build, whose stand-in answers "a run standing"
+	// and says why (KFCModelAccess.cpp): the file would keep the stand-in's "off" for Find/Change Selected Documents
+	// (Book), which the model half holds, over an "on" saved before. This item is not kCustomEnabling, so the grey
+	// KFCActionComponent::UpdateActionStates puts on the others meanwhile never reaches it: the door is asked here.
+	if (KFCResultTree::RefusedWhileRunning())
+		return;
+
 	IDFile file;
 	if (!KFCPanelStateFile(file))
 	{
