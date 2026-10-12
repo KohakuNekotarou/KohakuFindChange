@@ -53,6 +53,8 @@
 - **SET-04** 検索・置換・Change All が**走っている間は、灰色にできる項目はすべて灰色**（GEN-33）。
   `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-In...` の4つはこの確かめを受けないが、
   走っている間は進捗バーがモーダルなので、フライアウトそのものが開けない（2026-08-03 実測）。
+  メニューを通らずに届いたとき（スクリプトが ID で押す）も、Save Panel Settings は走っている間は書かず、メッセージ欄が理由を言う
+  （2026-10-13＝ほかの命令と同じ扉。灰色の項目もスクリプトから押せば実行まで来る＝それぞれの扉が断る）。
   - 訂正:
 
 - **SET-05** `Find in …` ＝範囲に対象が無い（Book Scope ON でブックが無い・章の無いブック／OFF で文書が無い）か、検索と置換のタブが Colour のとき灰色（FIND-17）。
@@ -76,6 +78,8 @@
   - 訂正:
 
 - **SET-08** `Open Find/Change...`・`Save Panel Settings`・`How to Use...`・`About This Plug-In...` は、いつも押せる（Open Find/Change は文書が0でも開く＝GEN-04）。
+  ただし Save Panel Settings は、検索・置換・Change All が走っている間と、2本のプラグインが同じビルドでないとき（GEN-42）は、
+  押しても何も書かず、メッセージ欄が理由を言う（2026-10-13）。
   - 訂正:
 
 - **SET-09** 窓とアプリケーションバーのトグルを押すと、メッセージ欄にどうなったかを書く ―― `Translucent panel: on.`／`Translucent panel: off.`。
