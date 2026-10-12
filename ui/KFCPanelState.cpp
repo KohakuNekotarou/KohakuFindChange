@@ -472,6 +472,24 @@ static const char* KFCWriteWholeFile(const IDFile& file, const std::string& text
 	return nil;
 }
 
+// THE SETTINGS FILE WRITTEN FROM ITS PAIRS - how both writers end ("Save Panel Settings" and
+// KFCPanelStateWriteKeys), so the side file and the version line are stated once. "version" leads the file when the
+// pairs carry none (no file yet, or a repaired one that lost it): written but not read - it is there so a future
+// format change has something to test, and writing it costs nothing now.
+static const char* KFCPanelStateWritePairs(const IDFile& file, KFCJsonPairs& pairs)
+{
+	bool haveVersion = false;
+	for (size_t i = 0; i < pairs.size() && !haveVersion; ++i)
+		haveVersion = (pairs[i].first == "version");
+	if (!haveVersion)
+		pairs.insert(pairs.begin(), KFCJsonPair("version", "1"));
+
+	IDFile side;
+	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName)))
+		return "folder";
+	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs), side);
+}
+
 const char* KFCPanelStateWriteKeys(const KFCJsonPairs& keyValues, bool* outRepaired)
 {
 	if (outRepaired != nil)
@@ -494,13 +512,6 @@ const char* KFCPanelStateWriteKeys(const KFCJsonPairs& keyValues, bool* outRepai
 				*outRepaired = true;
 		}
 	}
-	// No file yet - or a repaired one that lost it: the same "version" line "Save Panel Settings" opens with.
-	bool haveVersion = false;
-	for (size_t i = 0; i < pairs.size() && !haveVersion; ++i)
-		haveVersion = (pairs[i].first == "version");
-	if (!haveVersion)
-		pairs.insert(pairs.begin(), KFCJsonPair("version", "1"));
-
 	for (size_t u = 0; u < keyValues.size(); ++u)
 	{
 		bool replaced = false;
@@ -516,11 +527,7 @@ const char* KFCPanelStateWriteKeys(const KFCJsonPairs& keyValues, bool* outRepai
 		if (!replaced)
 			pairs.push_back(keyValues[u]);
 	}
-
-	IDFile side;
-	if (!FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName)))
-		return "folder";
-	return KFCWriteWholeFile(file, KFCJsonFlatText(pairs), side);
+	return KFCPanelStateWritePairs(file, pairs);
 }
 
 bool KFCPanelStateFilePath(PMString& outPath)
@@ -554,10 +561,8 @@ void KFCSavePanelState()
 		return;
 	}
 
-	// The current settings. "version" is written but not read: it is there so a future format change
-	// has something to test, and writing it costs nothing now.
+	// The current settings (the version line is KFCPanelStateWritePairs').
 	KFCJsonPairs pairs;
-	pairs.push_back(KFCJsonPair("version", "1"));
 	pairs.push_back(KFCJsonPair("translucentPanel",      KFCBoolLiteral(KFCGetPanelTranslucent())));
 	pairs.push_back(KFCJsonPair("translucentFindChange", KFCBoolLiteral(KFCGetFindChangeTranslucent())));
 	pairs.push_back(KFCJsonPair("minimizableFindChange", KFCBoolLiteral(KFCGetFindChangeMinimizable())));
@@ -577,9 +582,7 @@ void KFCSavePanelState()
 	// *A partial write on a full disk must not be reported as a save, with a path that suggests the
 	// settings are safe: the byte count is checked, and the side file is read back before it is put in
 	// place. See KFCWriteWholeFile.
-	IDFile side;
-	const char* failure = FileUtils::GetAppRoamingDataFolder(&side, PMString(kKFCPanelStateSideFileName))
-		? KFCWriteWholeFile(file, KFCJsonFlatText(pairs), side) : "folder";
+	const char* failure = KFCPanelStateWritePairs(file, pairs);
 	if (failure != nil)
 	{
 		std::string say("Save failed (");

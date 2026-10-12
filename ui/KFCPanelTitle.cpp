@@ -227,9 +227,12 @@ void AttachToWidget(IPanelControlData* panelData, IObserver* observer, const Wid
 	if (subject == nil)
 		return;
 
-	if (attach)
+	// Asked first, as AttachToFindChangeOptions asks: an attach that finds the observer there already does nothing,
+	// so a picture's click cannot reach it twice.
+	const bool attached = subject->IsAttached(observer, ITriStateControlData::kDefaultIID) != kFalse;
+	if (attach && !attached)
 		subject->AttachObserver(observer, ITriStateControlData::kDefaultIID);
-	else
+	else if (!attach && attached)
 		subject->DetachObserver(observer, ITriStateControlData::kDefaultIID);
 }
 
