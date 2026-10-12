@@ -18,13 +18,13 @@
 #include "IFindChangeService.h"
 #include "IGraphicFrameData.h"		// a text frame's columns - its story (the fingerprint, O12)
 #include "IHierarchy.h"
-#include "IInlineData.h"			// the story an inline or anchored item hangs in (WriteReach)
 #include "IK2ServiceProvider.h"
 #include "IK2ServiceRegistry.h"
 #include "ILayoutUtils.h"			// GetOwnerPageUID / IsAMaster
 #include "IMainItemTOPData.h"		// text on a path - its story (the fingerprint)
 #include "IMultiColumnTextFrame.h"	// QueryTextModel - the story a text frame holds
 #include "IObjectWalker.h"
+#include "IPageItemAdapter.h"		// the wrapper of an item placed in text or in a table - its story (WriteReach)
 #include "IPageItemNameFacade.h"	// a row's item by the name the Layers panel shows
 #include "IPageList.h"				// GetPageString / GetPageIndex
 #include "IPasteboardUtils.h"		// QuerySpread - the spread an item stands on
@@ -53,6 +53,7 @@
 #include "Utils.h"
 
 #include <set>
+#include <string>
 #include <utility>
 
 // Project includes:
@@ -647,17 +648,36 @@ void KFCObjectSearch::ReachOfWrite(IDataBase* db, const std::set<UID>& toWrite, 
 		return;
 	for (std::set<UID>::const_iterator w = toWrite.begin(); w != toWrite.end(); ++w)
 	{
+#ifdef KFC_DIAG
+		std::string chain;		// the classes the walk met, for the trace
+#endif
 		// Up from the item, the item first. A walk that comes to an item already met stops: the rest is in.
 		for (UID uid = *w; uid != kInvalidUID && db->IsValidUID(uid) && out.items.insert(uid).second; uid = HolderOf(db, uid))
 		{
 			AddStoriesShown(db, uid, out.stories);		// a text frame or path: its own story
-			InterfacePtr<IInlineData> anchor(db, uid, UseDefaultIID());
-			if (anchor != nil)
-				out.stories.insert(anchor->GetTextModelUID());		// an inline's or anchored item's anchor: the story it hangs in
 			InterfacePtr<ITextFrameColumn> column(db, uid, UseDefaultIID());
 			if (column != nil)
 				out.stories.insert(column->GetTextModelUID());		// a frame's column: the story composed in it
+			// THE WRAPPER OF AN ITEM PLACED IN TEXT OR IN A TABLE - an inline's or anchored item's anchor (kInlineBoss), a
+			// graphic cell's adapter (kCellPageItemAdapterBoss), where the walk up from such an item ends (measured - cases
+			// obj-f2-inline, obj-f2-cell): the story it is placed in, a table's for a cell (IPageItemAdapter.h - "always
+			// available on such objects"). Asked of the wrapper alone: ITableUtils::QueryCellContentfromPlacedItem asked of an
+			// inline brought InDesign down - a read of address 0 inside TABLE MODEL.RPLN (2026-10-12, case obj-f2-inline).
+			InterfacePtr<IPageItemAdapter> adapter(db, uid, UseDefaultIID());
+			InterfacePtr<ITextModel> placedIn((adapter != nil) ? adapter->QueryTextModel() : nil);
+			if (placedIn != nil)
+				out.stories.insert(::GetUID(placedIn));
+#ifdef KFC_DIAG
+			char step[24];
+			_snprintf_s(step, sizeof(step), _TRUNCATE, "%s0x%x", chain.empty() ? "" : ">",
+				static_cast<unsigned>(db->GetClass(uid).Get()));
+			chain += step;
+#endif
 		}
+#ifdef KFC_DIAG
+		KFC_DIAG_LOG("OBJREACH item=%u up=%s stories=%u", static_cast<unsigned>(w->Get()), chain.c_str(),
+			static_cast<unsigned>(out.stories.size()));
+#endif
 	}
 	out.stories.erase(kInvalidUID);
 }

@@ -110,15 +110,15 @@ namespace KFCObjectSearch
 
 	/** WHAT A WRITE OF KFC'S OWN CAN MOVE BESIDES THE ITEMS IT WRITES (spec OBJ-12, 2026-10-12). A fingerprint holds more
 	    than its item: a group's holds its members, a text frame's (and a path's) its story's version - and a change to an
-	    inline or an anchored item moves the version of the story it hangs in. So a write can move the print of an item
-	    holding one it writes, of an item one it writes holds, and of a text frame or path showing a story one it writes
-	    shows or hangs in. ReachOfWrite reads that around the items to be written, before the write; WriteReaches asks it
-	    of one item. */
+	    inline, an anchored item or a graphic cell's item moves the version of the story it hangs in (its table's). So a
+	    write can move the print of an item holding one it writes, of an item one it writes holds, and of a text frame or
+	    path showing a story one it writes shows or hangs in. ReachOfWrite reads that around the items to be written,
+	    before the write; WriteReaches asks it of one item. */
 	struct WriteReach
 	{
 		std::set<UID>	written;	// the items to be written
 		std::set<UID>	items;		// ...and every item holding one of them (IHierarchy, up to the top)
-		std::set<UID>	stories;	// the stories they show, hang in or are composed in
+		std::set<UID>	stories;	// the stories they show, are composed in, or are placed in (in text, or in a table)
 	};
 	void ReachOfWrite(IDataBase* db, const std::set<UID>& toWrite, WriteReach& out);
 	bool WriteReaches(IDataBase* db, const WriteReach& reach, UID item);
