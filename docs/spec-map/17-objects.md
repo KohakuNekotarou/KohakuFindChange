@@ -175,6 +175,8 @@
   文書ごとに本体のオブジェクトの検索で1回歩き、選んだ物に着くたびにその物だけを置換する（本体の「置換して次を検索」を物ごとに）。
   断る行（ロック・あふれの中・検索の後で変わった〈指紋〉・もう無い・歩きが着かなかった・本体が置き換えなかった）は書かずに理由ごとに数え、ほかは書く。
   全部で**取り消しの1段**（文書をまたいでも1段＝REP-36）。最後に選んだ行の文書を前に出し、その物を選んだままにする（OBJ-10 ⑨）。
+  ★**書いた後に、最後に選んだ行の文書をもう一度前に出す**（2026-10-11 夜の再検査の K-2）＝閉じていた章に書くと、その章に窓が付いて前に出るため（それまでは別の章の窓が前に残り、何も選ばれていなかった）。前に出し直すときは拡大率を引き継がない（その窓の拡大率のまま）。回帰＝`sel-book-objects-front`。
+  ★**Hide Previous Chapter の掃除はしない**（JMP-26c・K-3）＝掃除の close は予約で、書き込みの後に走るので、これから書く章を書き込みごと保存せずに閉じた。回帰＝`sel-book-objects-open-hide`。
   文＝`Replaced 3 objects: ID:259, ID:260, ID:261.`／`Replaced 3 of 5 objects: ... Left as they were: 1 locked, 1 changed since the search.`／`Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12.`。
   選んだ行のどれも確かめ（OBJ-10 の③〜⑤）を通らなければ、窓を出す前に `Replace: none of the 5 selected rows can be replaced - 2 locked, 3 changed since the search.`（理由ごとの数）。
   歩いて1つも書けなければ `Replace: nothing was changed - <数えた理由>.`。本体がエラーで止まったら段ごと戻す（`Replace: InDesign's replace stopped with an error - nothing was changed.`・歩きのエラーなら `... search stopped ...`）。（1.4.0）

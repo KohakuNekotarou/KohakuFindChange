@@ -194,6 +194,11 @@
   KFC が開いたのに閉じられなかった章。名前は3つまで、それ以上は `...`。
   - 訂正:
 
+- **FIND-36b** ★**探す所の無い文書は「最後まで探して一致が無かった」と数える**（2026-10-12・実機で見つけた N-4）＝テキストフレームが1つも無い文書（写真だけの章など）・マスターページにだけ文字があり Include Master Pages が OFF（既定）の文書。
+  本体の検索はそうした文書にエラー無しで「失敗」と答え、それまでは `2 chapter(s) stopped with a search error (...) - the rest of each was never searched.` と**誤って**書いていた（探す所が無いだけで、止まったのではない）。
+  今は止まった章に数えず、`N hit(s) in M of T chapter(s)` の T には入る。回帰＝`sc-alldocs-notext`（All Documents・注が付かない）／`-armed`（テスト用ビルドの故障スイッチ `scope-walk-off` で昔の形＝注が付く）。
+  - 訂正:
+
 - **FIND-37** ★上限（**300 行**・GEN-34）で止まったときは ` Stopped at the 300 limit - narrow the search, or use Change All in InDesign's Find/Change.` を書き足す
   （ブックの検索は `… or use Change All in Book (No List).`＝F9・F18）。上限で止まると、それより先の章・文書は歩かない。
   集める＝描くなので、` Showing first … in the panel.` の文は無い（2026-10-06）。
