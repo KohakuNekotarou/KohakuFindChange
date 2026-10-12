@@ -140,7 +140,7 @@ KFCActionComponent::KFCActionComponent(IPMUnknown* boss)
 
 /* DoAction
 */
-void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoint mousePoint, IPMUnknown* widget)
+void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
 	KFC_DIAG_HIDDEN_DOCS_CHECK("action");		// (test builds only - a document left with no window when the action is over)
 	switch (actionID.Get())
@@ -169,6 +169,9 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			// for one, and a panel item has its own. It runs the product's action through the action
 			// manager, the way linksui's buttons run theirs (LinksUIButtonObserver.cpp) - so the dialog
 			// opens exactly as Edit > Find/Change opens it, and nothing of InDesign's own menu is changed.
+			// The context and the action alone, as every product caller passes them: the flyout's mouse point
+			// and widget are not the dialog's (IActionManager.h - kInvalidMousePoint when not relevant, and a
+			// widget never assumed to be the receiver's own).
 			// (Not an IActionFilter taking the "needs a document" bit off the Edit menu's action: the
 			// author's call - KFC leaves InDesign's menu alone.)
 			// *A MINIMISED DIALOG IS BROUGHT BACK, NOT CLOSED (the author's call): that action is a toggle,
@@ -178,7 +181,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 			InterfacePtr<IApplication> app(GetExecutionContextSession()->QueryApplication());
 			InterfacePtr<IActionManager> actionMgr(app != nil ? app->QueryActionManager() : nil);
 			if (actionMgr != nil)
-				actionMgr->PerformAction(ac, kFindDialogActionID, mousePoint, widget);
+				actionMgr->PerformAction(ac, kFindDialogActionID);
 			break;
 		}
 
