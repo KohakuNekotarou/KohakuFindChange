@@ -1313,7 +1313,7 @@ CREATE_PMINTERFACE(KFCPanelRollOver, kKFCPanelRollOverImpl)
 //   *Where the guard belongs: **in the callers, not inside KFCApplyPanelTranslucency** - the same
 //     conclusion KCM reached. Switching the toggle OFF has to write 255 and put the shadow back,
 //     and that is done by calling this very function from the menu handler (KFCActionComponent's
-//     FlipAppearanceToggle). A guard inside would kill the restore. Every other caller asks first.
+//     FlipWindowToggle). A guard inside would kill the restore. Every other caller asks first.
 void KFCPanelRollOver::MouseEnter(const PMPoint& localMousePos)
 {
 	fLastPos = localMousePos;

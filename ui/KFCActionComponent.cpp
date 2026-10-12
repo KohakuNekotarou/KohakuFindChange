@@ -100,7 +100,7 @@ namespace
 // whatever window it can reach, and the status line says which it came to. The wording follows whether a window was
 // actually reached - ticking one with nothing to put it on (the panel docked, the dialog closed, the search field
 // hidden) is legitimate, so that case is stated in words (notReached) rather than left looking broken.
-void FlipAppearanceToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*apply)(),
+void FlipWindowToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*apply)(),
 	const char* name, const char* notReached)
 {
 	const bool16 on = !isOn();
@@ -302,7 +302,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// looks different - the flag is set, and it applies the moment the panel floats again (that
 		// following is done by the observer in KFCPanelAlpha.cpp, on kPaletteVisibilityChangedMessage).
 		case kKFCTranslucentPanelActionID:
-			FlipAppearanceToggle(KFCGetPanelTranslucent, KFCSetPanelTranslucent, KFCApplyPanelTranslucency,
+			FlipWindowToggle(KFCGetPanelTranslucent, KFCSetPanelTranslucent, KFCApplyPanelTranslucency,
 				"Translucent panel", ": on - has no effect while the panel is docked.");
 			break;
 
@@ -312,7 +312,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// The dialog is found through the SDK's window list (never by its title, which is translated),
 		// so this works whatever language InDesign is running in. See KFCPanelAlpha.cpp.
 		case kKFCTranslucentFindChangeActionID:
-			FlipAppearanceToggle(KFCGetFindChangeTranslucent, KFCSetFindChangeTranslucent, KFCApplyFindChangeTranslucency,
+			FlipWindowToggle(KFCGetFindChangeTranslucent, KFCSetFindChangeTranslucent, KFCApplyFindChangeTranslucency,
 				"Translucent Find/Change", ": on - applies when the Find/Change dialog is open.");
 			break;
 
@@ -322,7 +322,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// What it takes is two bits - see KFCFindChangeMinimize.h for why one of them is not the
 		// obvious one.
 		case kKFCMinimizableFindChangeActionID:
-			FlipAppearanceToggle(KFCGetFindChangeMinimizable, KFCSetFindChangeMinimizable, KFCApplyFindChangeMinimizable,
+			FlipWindowToggle(KFCGetFindChangeMinimizable, KFCSetFindChangeMinimizable, KFCApplyFindChangeMinimizable,
 				"Minimizable Find/Change", ": on - applies when the Find/Change dialog is open.");
 			break;
 
@@ -333,7 +333,7 @@ void KFCActionComponent::DoAction(IActiveContext* ac, ActionID actionID, GSysPoi
 		// Everything - what was measured, the hook, why that field's own menu could not take an item - is in
 		// KFCAppBarSearchEnter.h.
 		case kKFCAppBarSearchEnterActionID:
-			FlipAppearanceToggle(KFCGetAppBarSearchEnter, KFCSetAppBarSearchEnter, KFCApplyAppBarSearchEnter,
+			FlipWindowToggle(KFCGetAppBarSearchEnter, KFCSetAppBarSearchEnter, KFCApplyAppBarSearchEnter,
 				"Application Bar link", ": on - works while the Application Bar's search field is shown.");
 			break;
 
@@ -468,177 +468,200 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	{
 		const ActionID action = listToUpdate->GetNthAction(i);
 
-		if (action == kKFCSearchBookActionID)
+		switch (action.Get())
 		{
-			// The command's own name carries the scope, so it is visible BEFORE running it:
-			// "Find in Book" while Book Scope is ON; with it off, the Search: of Edit > Find/Change it
-			// follows ("Find in Document", "Find in Story", "Find to End of Story" ...).
-			// No check mark - this is the KESCL Start/Stop pattern (a name swap, not a state mark).
-			//
-			// FIND, not "Search": Adobe's verb for this is Find - the dialog this
-			// command takes its query from is Find/Change, its buttons are Find Next and Change All -
-			// while "Search" is the label on that dialog's SCOPE popup ("Search: Document"). The
-			// action's resource name stays "Search" - the menu shows it only while this line has not run (a run's grey,
-			// above, leaves the names as they were). The new name is the action's own, not this drawing's (measured), so
-			// a script reaches this by its ActionID, as the regression does - app.menuActions.itemByName("Search") finds
-			// it only until the menu is first drawn or its state first read.
-			PMString name(KFCRuns()->FindCommandName(KFCChapters()->IsBookScopeOn()));
-			name.SetTranslatable(kFalse);
-			listToUpdate->SetNthActionName(i, name);
-			// The name is written whether or not it can run, so a greyed-out item still says which
-			// scope it would have used.
-			// ...and grey on the Colour tab too (the author's call): it finds by colour, which this panel
-			// does not list (the Object tab's page items it does). The same question the search asks
-			// (CanSearchTab).
-			const bool canRun = haveTarget
-				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
-			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCChangeAllActionID)
-		{
-			// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
-			// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
-			// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with
-			// Book Scope off, while the panel holds a list (Clear Results first), with no book or chapter to run on
-			// (haveTarget), on the Colour tab, and with nothing to find (on the Object tab: an empty Find Object
-			// Format) - the spec's section 4; a run standing up greys everything above.
-			const bool canRun = KFCChapters()->IsBookScopeOn()
-				&& haveTarget
-				&& KFCResults()->GetTotalHitCount() <= 0
-				&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
-				&& KFCRuns()->HasFindQueryNow();
-			listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
-			PMString name(KFCRuns()->ChangeAllCommandName());
-			name.SetTranslatable(kFalse);
-			listToUpdate->SetNthActionName(i, name);
-		}
-		else if (action == kKFCRunSavedQueriesActionID)
-		{
-			// Run Saved Queries...: always - putting queries in an order needs no document, and the dialog
-			// itself says what Run would run on. (A run standing greys it with everything else, above.)
-			listToUpdate->SetNthActionState(i, kEnabledAction);
-		}
-		else if (action == kKFCClearResultsActionID)
-		{
-			// Clear Results: while the panel holds a list.
-			listToUpdate->SetNthActionState(i, (KFCResults()->GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCScopeBookActionID)
-		{
-			int16 actionState = kEnabledAction;
-			if (KFCChapters()->IsBookScopeOn())
-				actionState |= kSelectedAction;		// ON: show the check mark (OFF is the default)
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCSelectedDocumentsActionID)
-		{
-			// Find/Change Selected Documents (Book): it narrows Book Scope, so it is offered only with Book Scope
-			// on (the author: it takes effect only then). Its check mark stays visible while it is grey, as Hide Previous
-			// Chapter's does, so a setting kept for the next book run is not hidden.
-			int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
-			if (KFCChapters()->IsSelectedDocumentsOn())
-				actionState |= kSelectedAction;
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCHidePrevChapterActionID)
-		{
-			// Reachable whenever the sweep it gates can RUN - which is the sweep's own question,
-			// KFCJump's ShouldHidePreviousChapter, asked of the results on screen (IsFromBook) -
-			// and also while Book Scope is on, so it can be set up before the search. Not
-			// IsBookScopeOn() ALONE: after a book search with the scope since switched off, the
-			// sweep would keep closing documents on every jump while the menu that stops it sat
-			// grey (the lock-out KFCJump.cpp's ShouldHidePreviousChapter describes). The check mark
-			// stays visible through the lock
-			// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
-			const bool reachable = KFCChapters()->IsBookScopeOn() || KFCResults()->IsFromBook();
-			int16 actionState = reachable ? kEnabledAction : kDisabled_Unselected;
-			if (KFCJump::IsHidePreviousChapterOn())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCTranslucentPanelActionID)
-		{
-			// *Selectable even while the panel is docked - deliberately NOT greyed out (the author's
-			// call, in KCM). Where the click has no visible result, DoAction says so on
-			// the status line instead.
-			int16 actionState = kEnabledAction;
-			if (KFCGetPanelTranslucent())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCTranslucentFindChangeActionID)
-		{
-			// Selectable whether or not the Find/Change dialog is open, for the same reason the
-			// panel's toggle stays selectable while docked: what is being set is the preference, and
-			// it applies the moment the window exists. DoAction says which case it was.
-			int16 actionState = kEnabledAction;
-			if (KFCGetFindChangeTranslucent())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCMinimizableFindChangeActionID)
-		{
-			// Selectable whether or not the dialog is open, exactly like the toggle above: what is
-			// being set is the preference, and it applies the moment the window exists.
-			int16 actionState = kEnabledAction;
-			if (KFCGetFindChangeMinimizable())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCAppBarSearchEnterActionID)
-		{
-			// Selectable whether or not the field is shown, like the toggles above: the flag is what is being set.
-			int16 actionState = kEnabledAction;
-			if (KFCGetAppBarSearchEnter())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCRememberBookPanelActionID)
-		{
-			// Selectable with no book open, like the toggles above: the flag is what is being set,
-			// and it acts the next time a book panel closes or appears.
-			int16 actionState = kEnabledAction;
-			if (KFCBookPanelPlacement::IsOn())
-				actionState |= kSelectedAction;		// show the check mark when ON
-			listToUpdate->SetNthActionState(i, actionState);
-		}
-		else if (action == kKFCReplaceHitActionID)
-		{
-			// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
-			// with nothing said about it (KFCReplaceEngine::CanReplaceHit).
-			// Several rows selected together, the right-clicked among them: while any of them can be - the rows and the
-			// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
-			int32 chapter = -1, hit = -1;
-			const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
-				&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCSearchStoryAgainActionID)
-		{
-			// A story row's menu: Search This Story Again while a story row is stashed (a run standing greys everything,
-			// above). What the engine refuses (a changed query, a search over part of a story) it says on the status line
-			// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
-			int32 chapter = -1, group = -1;
-			const bool enable = KFCResults()->GetContextMenuStory(chapter, group);
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCSearchDocumentAgainActionID)
-		{
-			// A document row's menu: Search This Document Again while a document row is stashed - its refusals (a changed
-			// query, a search over part of a document) said on the status line, as the story row's are
-			// (KFCSearchEngine::SearchDocumentAgain).
-			int32 chapter = -1;
-			const bool enable = KFCResults()->GetContextMenuChapter(chapter);
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
-		}
-		else if (action == kKFCSelectAllRowsActionID)
-		{
-			// A book, document or story row's menu: Select All Rows while one of those rows is stashed and has a hit row
-			// under it - disabled on one with none (a document row Search This Document Again left at (0/0), a book search's
-			// that found nothing) rather than doing nothing: the author's call.
-			const NodeID row(SelectAllRowsTarget());
-			const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
-			listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+			case kKFCSearchBookActionID:
+			{
+				// The command's own name carries the scope, so it is visible BEFORE running it:
+				// "Find in Book" while Book Scope is ON; with it off, the Search: of Edit > Find/Change it
+				// follows ("Find in Document", "Find in Story", "Find to End of Story" ...).
+				// No check mark - this is the KESCL Start/Stop pattern (a name swap, not a state mark).
+				//
+				// FIND, not "Search": Adobe's verb for this is Find - the dialog this
+				// command takes its query from is Find/Change, its buttons are Find Next and Change All -
+				// while "Search" is the label on that dialog's SCOPE popup ("Search: Document"). The
+				// action's resource name stays "Search" - the menu shows it only while this line has not run (a run's grey,
+				// above, leaves the names as they were). The new name is the action's own, not this drawing's (measured), so
+				// a script reaches this by its ActionID, as the regression does - app.menuActions.itemByName("Search") finds
+				// it only until the menu is first drawn or its state first read.
+				PMString name(KFCRuns()->FindCommandName(KFCChapters()->IsBookScopeOn()));
+				name.SetTranslatable(kFalse);
+				listToUpdate->SetNthActionName(i, name);
+				// The name is written whether or not it can run, so a greyed-out item still says which
+				// scope it would have used.
+				// ...and grey on the Colour tab too (the author's call): it finds by colour, which this panel
+				// does not list (the Object tab's page items it does). The same question the search asks
+				// (CanSearchTab).
+				const bool canRun = haveTarget
+					&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode());
+				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCChangeAllActionID:
+			{
+				// Change All in Book (No List): the book's alone (F18 - a document's Change All is InDesign's own dialog's).
+				// Its name says when the run takes only the Book panel's selected documents - "Change All in Selected
+				// Documents (No List)" (the query dialog's spec, section 4-4) - from the model, as Find's is. Grey with
+				// Book Scope off, while the panel holds a list (Clear Results first), with no book or chapter to run on
+				// (haveTarget), on the Colour tab, and with nothing to find (on the Object tab: an empty Find Object
+				// Format) - the spec's section 4; a run standing up greys everything above.
+				const bool canRun = KFCChapters()->IsBookScopeOn()
+					&& haveTarget
+					&& KFCResults()->GetTotalHitCount() <= 0
+					&& KFCRuns()->CanSearchTab(KFCRuns()->CurrentSearchMode())
+					&& KFCRuns()->HasFindQueryNow();
+				listToUpdate->SetNthActionState(i, canRun ? kEnabledAction : kDisabled_Unselected);
+				PMString name(KFCRuns()->ChangeAllCommandName());
+				name.SetTranslatable(kFalse);
+				listToUpdate->SetNthActionName(i, name);
+				break;
+			}
+			case kKFCRunSavedQueriesActionID:
+			{
+				// Run Saved Queries...: always - putting queries in an order needs no document, and the dialog
+				// itself says what Run would run on. (A run standing greys it with everything else, above.)
+				listToUpdate->SetNthActionState(i, kEnabledAction);
+				break;
+			}
+			case kKFCClearResultsActionID:
+			{
+				// Clear Results: while the panel holds a list.
+				listToUpdate->SetNthActionState(i, (KFCResults()->GetTotalHitCount() > 0) ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCScopeBookActionID:
+			{
+				int16 actionState = kEnabledAction;
+				if (KFCChapters()->IsBookScopeOn())
+					actionState |= kSelectedAction;		// ON: show the check mark (OFF is the default)
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCSelectedDocumentsActionID:
+			{
+				// Find/Change Selected Documents (Book): it narrows Book Scope, so it is offered only with Book Scope
+				// on (the author: it takes effect only then). Its check mark stays visible while it is grey, as Hide Previous
+				// Chapter's does, so a setting kept for the next book run is not hidden.
+				int16 actionState = KFCChapters()->IsBookScopeOn() ? kEnabledAction : kDisabled_Unselected;
+				if (KFCChapters()->IsSelectedDocumentsOn())
+					actionState |= kSelectedAction;
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCHidePrevChapterActionID:
+			{
+				// Reachable whenever the sweep it gates can RUN - which is the sweep's own question,
+				// KFCJump's ShouldHidePreviousChapter, asked of the results on screen (IsFromBook) -
+				// and also while Book Scope is on, so it can be set up before the search. Not
+				// IsBookScopeOn() ALONE: after a book search with the scope since switched off, the
+				// sweep would keep closing documents on every jump while the menu that stops it sat
+				// grey (the lock-out KFCJump.cpp's ShouldHidePreviousChapter describes). The check mark
+				// stays visible through the lock
+				// (kSelectedAction without kEnabledAction), like KESCL's locked "Search book".
+				const bool reachable = KFCChapters()->IsBookScopeOn() || KFCResults()->IsFromBook();
+				int16 actionState = reachable ? kEnabledAction : kDisabled_Unselected;
+				if (KFCJump::IsHidePreviousChapterOn())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCTranslucentPanelActionID:
+			{
+				// *Selectable even while the panel is docked - deliberately NOT greyed out (the author's
+				// call, in KCM). Where the click has no visible result, DoAction says so on
+				// the status line instead.
+				int16 actionState = kEnabledAction;
+				if (KFCGetPanelTranslucent())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCTranslucentFindChangeActionID:
+			{
+				// Selectable whether or not the Find/Change dialog is open, for the same reason the
+				// panel's toggle stays selectable while docked: what is being set is the preference, and
+				// it applies the moment the window exists. DoAction says which case it was.
+				int16 actionState = kEnabledAction;
+				if (KFCGetFindChangeTranslucent())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCMinimizableFindChangeActionID:
+			{
+				// Selectable whether or not the dialog is open, exactly like the toggle above: what is
+				// being set is the preference, and it applies the moment the window exists.
+				int16 actionState = kEnabledAction;
+				if (KFCGetFindChangeMinimizable())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCAppBarSearchEnterActionID:
+			{
+				// Selectable whether or not the field is shown, like the toggles above: the flag is what is being set.
+				int16 actionState = kEnabledAction;
+				if (KFCGetAppBarSearchEnter())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCRememberBookPanelActionID:
+			{
+				// Selectable with no book open, like the toggles above: the flag is what is being set,
+				// and it acts the next time a book panel closes or appears.
+				int16 actionState = kEnabledAction;
+				if (KFCBookPanelPlacement::IsOn())
+					actionState |= kSelectedAction;		// show the check mark when ON
+				listToUpdate->SetNthActionState(i, actionState);
+				break;
+			}
+			case kKFCReplaceHitActionID:
+			{
+				// A hit row's menu: Replace while the row is a Find/Change match not yet replaced, not locked and
+				// with nothing said about it (KFCReplaceEngine::CanReplaceHit).
+				// Several rows selected together, the right-clicked among them: while any of them can be - the rows and the
+				// question the Replace itself takes (RowsOfRightClick, CanReplaceAny).
+				int32 chapter = -1, hit = -1;
+				const bool enable = KFCResults()->GetContextMenuHit(chapter, hit)
+					&& KFCResultTree::CanReplaceAny(KFCResultTree::RowsOfRightClick(chapter, hit));
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSearchStoryAgainActionID:
+			{
+				// A story row's menu: Search This Story Again while a story row is stashed (a run standing greys everything,
+				// above). What the engine refuses (a changed query, a search over part of a story) it says on the status line
+				// rather than greying the item, so the user learns why (KFCSearchEngine::SearchStoryAgain).
+				int32 chapter = -1, group = -1;
+				const bool enable = KFCResults()->GetContextMenuStory(chapter, group);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSearchDocumentAgainActionID:
+			{
+				// A document row's menu: Search This Document Again while a document row is stashed - its refusals (a changed
+				// query, a search over part of a document) said on the status line, as the story row's are
+				// (KFCSearchEngine::SearchDocumentAgain).
+				int32 chapter = -1;
+				const bool enable = KFCResults()->GetContextMenuChapter(chapter);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			case kKFCSelectAllRowsActionID:
+			{
+				// A book, document or story row's menu: Select All Rows while one of those rows is stashed and has a hit row
+				// under it - disabled on one with none (a document row Search This Document Again left at (0/0), a book search's
+				// that found nothing) rather than doing nothing: the author's call.
+				const NodeID row(SelectAllRowsTarget());
+				const bool enable = row.IsValid() && KFCResultTree::CanSelectAllRows(row);
+				listToUpdate->SetNthActionState(i, enable ? kEnabledAction : kDisabled_Unselected);
+				break;
+			}
+			default:
+			{
+				break;
+			}
 		}
 	}
 }
