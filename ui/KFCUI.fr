@@ -17,7 +17,6 @@
 #include "MenuDef.fh"
 #include "ActionDef.fh"
 #include "ActionDefs.h"
-#include "AdobeMenuPositions.h"
 #include "LocaleIndex.h"
 #include "PMLocaleIds.h"
 #include "StringTable.fh"
@@ -39,7 +38,6 @@
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
-#include "AppFrameworkID.h"
 #include "TipsID.h"			// IID_ITIP - the tooltip on the panel's illustration
 
 // Project includes:
