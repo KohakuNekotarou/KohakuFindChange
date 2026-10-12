@@ -112,7 +112,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * has. That shape runs, but it is missing the second interface, and the product's form gives both
 	 * without spelling either out.
 	 *
-	 * @ingroup kohakubooksearch
+	 * @ingroup KFC
 	 */
 	Class
 	{
@@ -128,7 +128,7 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 	 * The panel: the API's palette panel boss with interfaces of ours on it - the flyout menu's data (the
 	 * API's implementation), the panel's observer, its view and its roll-over (each line below says what).
 	 *
-	 * @ingroup kohakubooksearch
+	 * @ingroup KFC
 	 */
 	Class
 	{

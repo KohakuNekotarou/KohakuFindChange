@@ -67,7 +67,7 @@
 
 /** The panel's view: PalettePanelView with a minimum size and row-height rounding.
 
-	@ingroup kohakubooksearch
+	@ingroup KFC
 */
 class KFCPanelView : public PalettePanelView
 {

@@ -29,7 +29,7 @@
 #include "CActionComponent.h"
 #include "CAlert.h"
 #include "IActionManager.h"		// PerformAction - Open Find/Change runs InDesign's own Edit > Find/Change
-#include "IActionStateList.h"	// UpdateActionStates: check mark for the Hide Previous Chapter toggle
+#include "IActionStateList.h"	// UpdateActionStates: the items' states, check marks and names
 #include "IApplication.h"		// QueryActionManager
 #include "FindChangeID.h"		// kFindDialogActionID - Edit > Find/Change
 
@@ -54,7 +54,7 @@
 	menu items are selected.
 
 	
-	@ingroup kohakubooksearch
+	@ingroup KFC
 
 */
 class KFCActionComponent : public CActionComponent
@@ -79,7 +79,7 @@ public:
 			*/
 		virtual void DoAction(IActiveContext* ac, ActionID actionID, GSysPoint mousePoint, IPMUnknown* widget);
 
-			/** Custom-enabled actions get their state here - the toggles their check marks, the search its name. */
+			/** Custom-enabled actions get their state here - the toggles their check marks, Find and Change All their names. */
 			virtual void UpdateActionStates(IActiveContext* ac, IActionStateList* listToUpdate, GSysPoint mousePoint, IPMUnknown* widget);
 
 	private:
@@ -112,9 +112,9 @@ void FlipWindowToggle(bool16 (*isOn)(), void (*setOn)(bool16), bool16 (*apply)()
 	KFCResultTree::ShowStatus(msg);
 }
 
-// The row Select All Rows is for: the book, document or story row whose right-click stashed itself - one of the three,
-// as KFCResultNodeEH::RButtonDn clears them all first; an empty NodeID when nobody right-clicked one of those rows. The
-// menu's enabled state and the action ask it - one answer for both.
+// The row Select All Rows is for: the book, document or story row whose right-click stashed itself - never more than
+// one, as KFCResultNodeEH::RButtonDn clears them all first; an empty NodeID when nobody right-clicked one of those rows.
+// The menu's enabled state and the action ask it - one answer for both.
 NodeID SelectAllRowsTarget()
 {
 	int32 chapter = -1, group = -1;
@@ -122,9 +122,10 @@ NodeID SelectAllRowsTarget()
 		return KFCResultNodeID::CreateFont(chapter, group);
 	if (KFCResults()->GetContextMenuChapter(chapter))
 		return KFCResultNodeID::Create(chapter);
-	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW. It is the UI half's own flag, which a new list does not clear as it clears the model's three: the book row right-clicked, its
-	// menu closed unpressed, then a document search - and the action fired by its ActionID from a script selected every
-	// row of a list with no book row in it (case ctx-book-stash-docsearch).
+	// THE BOOK ROW'S STASH IS ONLY GOOD WHILE THE LIST HAS A BOOK ROW. It is the UI half's own flag, which a new list
+	// does not clear as it clears the model's stashes: the book row right-clicked, its menu closed unpressed, then a
+	// document search - and the action fired by its ActionID from a script selected every row of a list with no book row
+	// in it (case ctx-book-stash-docsearch).
 	if (KFCResultTree::GetContextMenuBook() && KFCResults()->IsFromBook())
 		return KFCResultNodeID::CreateBook();
 	return NodeID();
@@ -439,11 +440,10 @@ void KFCActionComponent::DoAbout()
 */
 void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionStateList* listToUpdate, GSysPoint /*mousePoint*/, IPMUnknown* /*widget*/)
 {
-	// A run of ours is standing behind its modal progress bar. The bar pumps events, so this list
-	// can be asked for its states from inside the run: lock everything until it returns.
-	//
-	// Every run, through KFCRunGuard - the search, Change All in Book and the query run: each works behind a
-	// modal bar that pumps events, and a second walk underneath one would Halt() its walker mid-walk.
+	// A run of ours is standing - which ones count is KFCRunGuard::IsAnyRunning's to say (a row's Replace among them,
+	// with no bar of its own). Each runs the message loop - a modal progress bar pumps events, a chapter being opened
+	// does too - so this list can be asked for its states from inside the run: lock everything until it returns. A
+	// second walk underneath one would Halt() its walker mid-walk.
 	if (KFCRuns()->IsAnyRunning())
 	{
 		for (int32 i = 0; i < listToUpdate->Length(); i++)
@@ -452,8 +452,8 @@ void KFCActionComponent::UpdateActionStates(IActiveContext* /*ac*/, IActionState
 	}
 
 	// Is there anything for the current scope to run on at all - the target book, with a chapter in it,
-	// while Book Scope is ON, the active document (IActiveContext) while it is OFF? The command that STARTS a
-	// run - Find - asks it, so it is taken once here. See
+	// while Book Scope is ON, the active document (IActiveContext) while it is OFF? The commands below that start a
+	// run - Find, and Change All in Book - ask it, so it is taken once here. See
 	// KFCBookScope::HasScopeTarget: it asks what the engines themselves ask, so a command that is offered
 	// can always run and one that cannot is visibly grey rather than reporting "No open document to
 	// search." after the fact (the author's call).
