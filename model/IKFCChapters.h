@@ -44,7 +44,8 @@ class IDataBase;
 class IKFCChapters : public IPMUnknown
 {
 public:
-	enum { kDefaultIID = IID_IKFCCHAPTERS };
+	// No kDefaultIID, on purpose: the UI half reaches this door through KFCChapters() alone, which checks the boundary
+	// stamp first (KFCModelAccess.h) - a Query of its own by UseDefaultIID() does not compile.
 
 	/** = KFCBookScope::IsBookScopeOn. */
 	virtual bool IsBookScopeOn() = 0;

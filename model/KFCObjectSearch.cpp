@@ -113,7 +113,7 @@ private:
 class WalkAftercare
 {
 public:
-	WalkAftercare() : fUi(GetExecutionContextSession(), UseDefaultIID()), fNothingSelected(fUi != nil && !fUi->HasAnySelection()) {}
+	WalkAftercare() : fUi(KFCQueryUIServices()), fNothingSelected(fUi != nil && !fUi->HasAnySelection()) {}
 	~WalkAftercare()
 	{
 		fKeep.GiveBack();

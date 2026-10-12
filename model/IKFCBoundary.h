@@ -16,6 +16,8 @@
 //  knows nothing of it, and a nil Query is that answer.
 //  NEVER CHANGES SHAPE. Every other door may move with kKFCBoundaryRevision; this one is what tells the two
 //  halves they moved, so its one method stays as it is.
+//  Asked for by its IID only - there is no kDefaultIID: a default would name one of the two stamps, and in the model
+//  half the wrong one (its own, which always matches).
 //
 //========================================================================================
 
@@ -23,16 +25,33 @@
 #define __IKFCBoundary_h__
 
 #include "IPMUnknown.h"
+#include "ISession.h"
+
+#include <cstring>			// strcmp - KFCOtherHalfIsThisBuild
 
 #include "KFCBoundaryID.h"	// IID_IKFCBOUNDARY / IID_IKFCUIBOUNDARY, kKFCBoundaryStamp
+#include "KFCDiag.h"		// KFC_DIAG_FAULT - the test build's boundary-mismatch
 
 class IKFCBoundary : public IPMUnknown
 {
 public:
-	enum { kDefaultIID = IID_IKFCBOUNDARY };	// the model half's; the UI half's is asked for by IID_IKFCUIBOUNDARY
-
 	/** kKFCBoundaryStamp as this half was built ("<version>/<boundary revision>"). */
 	virtual const char* GetBoundaryStamp() = 0;
 };
+
+/** IS THE OTHER HALF OF THIS BUILD? - the one question both halves ask before they call the other's door: the UI half
+    once a session (KFCBoundaryMatches, ui/KFCModelAccess.cpp), the model half every time (KFCQueryUIServices,
+    IKFCUIServices.h). otherStampIID = the other half's stamp: IID_IKFCBOUNDARY for the model half's, IID_IKFCUIBOUNDARY
+    for the UI half's. A half with no stamp - one older than it - is not of this build. outOtherStamp, when asked for,
+    gets the other half's stamp or nil; it points into the other .pln, so it is copied, not kept. The test build's
+    boundary-mismatch switch (KFCDiag.h) answers no on both sides. */
+inline bool KFCOtherHalfIsThisBuild(ISession* session, const PMIID& otherStampIID, const char** outOtherStamp = nil)
+{
+	InterfacePtr<IKFCBoundary> stamp(session, otherStampIID);
+	const char* const theirs = (stamp != nil) ? stamp->GetBoundaryStamp() : nil;
+	if (outOtherStamp != nil)
+		*outOtherStamp = theirs;
+	return theirs != nil && std::strcmp(theirs, kKFCBoundaryStamp) == 0 && !KFC_DIAG_FAULT("boundary-mismatch");
+}
 
 #endif // __IKFCBoundary_h__

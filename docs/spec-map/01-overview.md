@@ -83,6 +83,7 @@
   パネルのメニューは**全部灰色**、メッセージ欄は
   `Kohaku Find/Change cannot run: its two plug-in files are not from the same build (KohakuFindChange.pln <印>, KohakuFindChangeUI.pln <印>). Quit InDesign and install both files again, from the same release.`
   model は、UI の印が違うと**「UI なし」（GEN-14）として動く**（本を閉じるたびの見張りも UI に聞かない）。
+  UI は、model の**知らせ**（GEN-13 ①）も印が同じときだけ読む（知らせの中身の形も版で変わりうる。印が違うときは検索も置換も走らないので、知らせはそもそも来ない＝2026-10-12 に守りだけ足した）。
   ⇒ 片方だけ別のビルドを入れても、口の枠がずれて**別の機能が走ることは無い**。
   ★口（`IKFCResults`／`IKFCRuns`／`IKFCChapters`／`IKFCUIServices`）や渡す型を変えたら、改訂番号を1つ上げる。
   - 訂正:

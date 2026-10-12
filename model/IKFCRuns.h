@@ -44,7 +44,8 @@ class IDataBase;
 class IKFCRuns : public IPMUnknown
 {
 public:
-	enum { kDefaultIID = IID_IKFCRUNS };
+	// No kDefaultIID, on purpose: the UI half reaches this door through KFCRuns() alone, which checks the boundary
+	// stamp first (KFCModelAccess.h) - a Query of its own by UseDefaultIID() does not compile.
 
 	/** = KFCSearchEngine::SearchBook. */
 	virtual int32 SearchBook(PMString& outSummary) = 0;

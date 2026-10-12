@@ -43,7 +43,8 @@ class IDataBase;
 class IKFCResults : public IPMUnknown
 {
 public:
-	enum { kDefaultIID = IID_IKFCRESULTS };
+	// No kDefaultIID, on purpose: the UI half reaches this door through KFCResults() alone, which checks the boundary
+	// stamp first (KFCModelAccess.h) - a Query of its own by UseDefaultIID() does not compile.
 
 	/** = KFCResultModel::GetTotalHitCount. */
 	virtual int32 GetTotalHitCount() = 0;

@@ -54,12 +54,10 @@
 #include "UIDRef.h"
 #include "UIDList.h"
 
-#include <cstring>				// strcmp - KFCQueryUIServices
 #include <vector>
 
-#include "IKFCBoundary.h"		// the UI half's stamp - KFCQueryUIServices
+#include "IKFCBoundary.h"		// KFCOtherHalfIsThisBuild - KFCQueryUIServices
 #include "KFCBoundaryID.h"		// IID_IKFCUISERVICES
-#include "KFCDiag.h"			// KFCDiagFault - the test build's boundary-mismatch
 
 /** One progress bar the UI half has put up for the model half - RangeProgressBar's four calls that the
     engines make, and nothing else. Deleted by the model half when its run is over (KFCProgressBar). */
@@ -76,7 +74,7 @@ public:
 class IKFCUIServices : public IPMUnknown
 {
 public:
-	enum { kDefaultIID = IID_IKFCUISERVICES };
+	// No kDefaultIID, on purpose: the model half asks through KFCQueryUIServices (below) and nowhere else.
 
 	/** A modal RangeProgressBar with these arguments (ProgressBar.h), or nil when one could not be made.
 	    The caller owns it and deletes it when the run is over - the bar comes down with it. A bar the manager
@@ -128,27 +126,20 @@ public:
 	virtual bool				IsLanding() = 0;
 };
 
-/** HOW THE MODEL HALF ASKS FOR THE SERVICES ABOVE - never by a Query of its own. The UI half that is loaded has to be
-    this build's: its stamp (IKFCBoundary.h, under IID_IKFCUIBOUNDARY) must be this half's kKFCBoundaryStamp, or the
-    services are taken for absent and nil comes back, as with no UI half at all - another build's slots would put each
-    call in another method (KFCBoundaryID.h). Not only a run asks: the book watcher asks IsLanding on every book close
-    of the session (KFCRunGuard::IsLandingUnderWay). Asked every time, not kept - a background thread's session has no
-    UI half, the main thread's does. AddRef'd, or nil. (The test build's boundary-mismatch switch, KFCDiag.h, makes the
-    stamps differ - set it before InDesign starts, as the UI half reads it once.) */
+/** HOW THE MODEL HALF ASKS FOR THE SERVICES ABOVE - the only way. IKFCUIServices has no kDefaultIID, so a Query of its
+    own by UseDefaultIID() does not compile, and IID_IKFCUISERVICES is spelled here alone. The UI half that is loaded
+    has to be this build's (KFCOtherHalfIsThisBuild, IKFCBoundary.h), or the services are taken for absent and nil
+    comes back, as with no UI half at all - another build's slots would put each call in another method
+    (KFCBoundaryID.h). Not only a run asks: the book watcher asks IsLanding on every book close of the session
+    (KFCRunGuard::IsLandingUnderWay). Asked every time, not kept - a background thread's session has no UI half, the
+    main thread's does. AddRef'd, or nil. (The test build's boundary-mismatch switch, KFCDiag.h, makes the stamps
+    differ - set it before InDesign starts, as the UI half reads it once.) */
 inline IKFCUIServices* KFCQueryUIServices()
 {
 	ISession* const session = GetExecutionContextSession();
-	if (session == nil)
+	if (session == nil || !KFCOtherHalfIsThisBuild(session, IID_IKFCUIBOUNDARY))
 		return nil;
-	InterfacePtr<IKFCBoundary> stamp(session, IID_IKFCUIBOUNDARY);
-	bool same = (stamp != nil) && std::strcmp(stamp->GetBoundaryStamp(), kKFCBoundaryStamp) == 0;
-#ifdef KFC_DIAG
-	if (KFCDiagFault("boundary-mismatch"))
-		same = false;
-#endif
-	if (!same)
-		return nil;
-	InterfacePtr<IKFCUIServices> ui(session, UseDefaultIID());
+	InterfacePtr<IKFCUIServices> ui(session, IID_IKFCUISERVICES);
 	return ui.forget();
 }
 

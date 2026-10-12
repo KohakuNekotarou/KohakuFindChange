@@ -14,12 +14,10 @@
 #include "ISession.h"
 
 // General includes:
-#include <cstring>				// strcmp
 #include <string>
 
 // Project includes:
-#include "IKFCBoundary.h"
-#include "KFCDiag.h"			// KFCDiagFault - the test build's boundary-mismatch
+#include "IKFCBoundary.h"		// KFCOtherHalfIsThisBuild
 #include "KFCModelAccess.h"
 
 namespace
@@ -186,15 +184,10 @@ bool KFCBoundaryMatches()
 	if (session == nil)
 		return true;
 
-	InterfacePtr<IKFCBoundary> boundary(session, UseDefaultIID());
-	const char* const modelStamp = (boundary != nil) ? boundary->GetBoundaryStamp() : nil;
-	bool same = (modelStamp != nil) && std::strcmp(modelStamp, kKFCBoundaryStamp) == 0;
-#ifdef KFC_DIAG
-	// The test build's stand-in for a model half of another build (KFCDiag.h, boundary-mismatch). Read here only, so
-	// it takes effect from the first door of a session.
-	if (KFCDiagFault("boundary-mismatch"))
-		same = false;
-#endif
+	// Asked once, so the test build's boundary-mismatch switch (KFCDiag.h) is read once too - it takes effect from the
+	// first door of a session.
+	const char* modelStamp = nil;
+	const bool same = KFCOtherHalfIsThisBuild(session, IID_IKFCBOUNDARY, &modelStamp);
 	if (!same)
 		BuildMismatchText(modelStamp);
 	gBoundary = same ? 1 : 0;

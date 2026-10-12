@@ -21,6 +21,8 @@
 //  (KFCModelAccess.cpp), because the real door would take every call to whatever method sits in that slot in
 //  the other build. A stand-in has a run always "already in progress", with the reason as its message: every
 //  command of the panel is grey and the message line says what to do.
+//  These three are the only way in: the doors have no kDefaultIID, so a Query of its own does not compile, and
+//  each door's IID is spelled here alone.
 //
 //========================================================================================
 
@@ -47,21 +49,21 @@ inline InterfacePtr<IKFCResults> KFCResults()
 {
 	if (!KFCBoundaryMatches())
 		return InterfacePtr<IKFCResults>(KFCResultsStandIn());
-	return InterfacePtr<IKFCResults>(GetExecutionContextSession(), UseDefaultIID());
+	return InterfacePtr<IKFCResults>(GetExecutionContextSession(), IID_IKFCRESULTS);
 }
 
 inline InterfacePtr<IKFCRuns> KFCRuns()
 {
 	if (!KFCBoundaryMatches())
 		return InterfacePtr<IKFCRuns>(KFCRunsStandIn());
-	return InterfacePtr<IKFCRuns>(GetExecutionContextSession(), UseDefaultIID());
+	return InterfacePtr<IKFCRuns>(GetExecutionContextSession(), IID_IKFCRUNS);
 }
 
 inline InterfacePtr<IKFCChapters> KFCChapters()
 {
 	if (!KFCBoundaryMatches())
 		return InterfacePtr<IKFCChapters>(KFCChaptersStandIn());
-	return InterfacePtr<IKFCChapters>(GetExecutionContextSession(), UseDefaultIID());
+	return InterfacePtr<IKFCChapters>(GetExecutionContextSession(), IID_IKFCCHAPTERS);
 }
 
 #endif // __KFCModelAccess_h__

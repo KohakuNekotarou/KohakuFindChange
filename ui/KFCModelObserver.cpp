@@ -20,6 +20,7 @@
 
 // Project includes:
 #include "KFCUIID.h"
+#include "KFCModelAccess.h"		// KFCBoundaryMatches
 #include "KFCModelObserver.h"
 #include "KFCModelTypes.h"		// KFCNotifyPayload
 #include "KFCResultTree.h"
@@ -40,6 +41,12 @@ void KFCModelObserver::Update(const ClassID& theChange, ISubject* /*theSubject*/
 {
 	// Only what was sent under our own protocol: the session's subject carries InDesign's notifications too.
 	if (theChange != kKFCModelChangedMessage || protocol != IID_IKFCMODELOBSERVER || changedBy == nil)
+		return;
+	// And only from a model half of this build: the payload is a layout, which moves with kKFCBoundaryRevision as the
+	// doors' slots do (KFCBoundaryID.h). Such a model half has nothing to report today - every sender speaks of results
+	// or of KFC's steps, and its runs start at the doors, which stand in - so this only makes the third crossing hold
+	// as the other two do.
+	if (!KFCBoundaryMatches())
 		return;
 	const KFCNotifyPayload* payload = static_cast<const KFCNotifyPayload*>(changedBy);
 	switch (payload->kind)
