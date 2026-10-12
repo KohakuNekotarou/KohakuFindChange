@@ -1265,6 +1265,17 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		return;
 	}
 
+	// NOTHING TO WALK IS A WALK TO THE END THAT FOUND NOTHING (KFCSearchEngine::ScopeHasNothingToWalk - a document with no
+	// text frame, or with master-page text only and Include Master Pages off). The find would answer kFailure, and the loop
+	// below would call this chapter a walk that broke off ("stopped with a search error" - measured 2026-10-12, case
+	// sc-alldocs-notext). Past Initialize, so the walker is stopped as the bottom of this function stops it.
+	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
+	{
+		if (walker->IsWalking())
+			walker->Halt();
+		return;		// kChapterWalked, no hits
+	}
+
 	// Required critical section around text-walker selection changes, HELD FOR THE WHOLE WALK.
 	//
 	// Adobe's own examples all wrap a SINGLE ProcessCommand instead (SnpFindAndReplace.cpp:788,
@@ -3309,6 +3320,31 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		return false;
 	outWalker.reset(mine.forget());
 	return true;
+}
+
+bool KFCSearchEngine::ScopeHasNothingToWalk(ITextWalkerScope* scope)
+{
+	// (See the header.) The cursor is read the way ListScopePieces reads one - a cursor of the scope's own, its range not
+	// AddRef'd, the cursor given back - and only to see whether there is a first stretch at all.
+	if (scope == nil)
+		return false;
+	const bool empty = (scope->IsEmpty() != kFalse);
+	bool noStretch = false;
+	if (!empty)
+	{
+		void* const cursor = scope->GetNewCursor(nil);
+		if (cursor != nil)
+		{
+			noStretch = (scope->GetCursorRange(cursor, nil, nil) == nil);
+			scope->ReleaseCursor(cursor);
+		}
+	}
+	KFC_DIAG_LOG("SCOPEWALK empty=%d chars=%d noStretch=%d", empty ? 1 : 0, (int)scope->GetCharTotal(), noStretch ? 1 : 0);
+	// (Fault switch scope-walk-off, a test build's only - KFCDiag.h: no scope is said to be empty, the old way - the walk
+	// meets InDesign's kFailure again - the armed cases.)
+	if (KFC_DIAG_FAULT("scope-walk-off"))
+		return false;
+	return empty || noStretch;
 }
 
 bool KFCSearchEngine::IsSearching()

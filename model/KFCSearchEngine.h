@@ -28,6 +28,7 @@
 #include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
 class ITextWalker;			// AcquireWalker
+class ITextWalkerScope;		// ScopeHasNothingToWalk
 class ITextWalkerSelectionUtils;
 
 /** KFC SEARCHES AND REPLACES FORWARD ONLY (the author's call). The results are a list, so a direction
@@ -502,6 +503,18 @@ namespace KFCSearchEngine
 	    kBasicTextWalkerBoss, :318-319 takes the section on the shared walker). False = no walker at all; outSelUtils
 	    can still be nil - each caller keeps its own gate on it. */
 	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils);
+
+	/** A WALK SCOPE WITH NOTHING IN IT TO WALK - no story the walker would visit: a document with no text frame at all, or
+	    one whose only text the options leave out (a master page's, with Include Master Pages off). InDesign's walker answers
+	    such a scope kFailure, the find (kFindTextCmdBoss) and the Change All (kReplaceAllTextCmdBoss) alike, with no error
+	    raised - measured 2026-10-12 (a document with an EMPTY text frame, one story with no characters, answers
+	    kReplaceAllCompleted with 0 as any document without a match does). Read as an error, that put "stopped with a search
+	    error" on the line for a document with nothing in it to search, and stopped a Change All in Book or a query run whole
+	    - every chapter taken back - at a chapter of pictures, while InDesign's own Change All (app.changeText) goes past such
+	    a document. So the search and the Change All ask this after the walker has the scope (where ListScopePieces reads
+	    it) and take a yes as a walk to the end that met nothing. Asked of the scope itself: IsEmpty, then whether a cursor
+	    of its own has a first stretch. */
+	bool ScopeHasNothingToWalk(ITextWalkerScope* scope);
 
 	/** Let go of the module's static storage during InDesign's controlled shutdown, so every static
 	    destructor at DLL unload finds nothing left to do.

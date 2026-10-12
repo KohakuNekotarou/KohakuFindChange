@@ -148,6 +148,18 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	if (walker->IsWalking())
 		walker->Halt();
 	walker->Initialize(client, scope, opts, nil);
+	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or with
+	// master-page text only and Include Master Pages off): the command would answer kFailure, read below as a failed Change
+	// All, and the caller would take its whole step back - a book stopped at its chapter of pictures, while InDesign's own
+	// Change All goes past it (measured 2026-10-12 - cases xq-notext-doc, xq-masteronly-doc, ca-book-notext-chapters). Done,
+	// with nothing changed.
+	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
+	{
+		KFC_DIAG_LOG("CHANGEALL doc=%p scope=%d nothing to walk - nothing to change", (void*)docRef.GetDataBase(), (int)selectionScope);
+		if (walker->IsWalking())
+			walker->Halt();
+		return true;
+	}
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kReplaceAllTextCmdBoss));
 	InterfacePtr<IFindChangeCmdData> cmdData(cmd, UseDefaultIID());

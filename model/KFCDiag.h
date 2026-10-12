@@ -104,6 +104,10 @@
 //                the landing's dirty guard, is marked clean when the landing ends, and the next landing's Hide Previous
 //                Chapter sweep closes it unsaved - the case that shows the written-document check catching it
 //                (landing-return-armed)
+//    scope-walk-off  KFCSearchEngine::ScopeHasNothingToWalk answers no, the old way: a document with no story to walk (no
+//                text frame, or master-page text only with Include Master Pages off) meets InDesign's kFailure again - the
+//                search says it "stopped with a search error" and Change All in Book / a query run stops whole
+//                (sc-alldocs-notext-armed, ca-book-notext-chapters-armed)
 //    qd-order-reset  (UI half) the query dialog starts from an empty run order and takes the switch off again - one
 //                case's order not carried into the next (ui/KFCQueryDialog.cpp; the qd cases)
 //    qd-order-file  (UI half) the file's first line is the file Save Order... and Load Order... use, in place of
