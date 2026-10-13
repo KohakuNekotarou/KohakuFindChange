@@ -58,7 +58,7 @@
 #include "IEventHandler.h"
 #include "IEventUtils.h"			// RemoveNextKeyCmd - a Return taken whole (TakeReturn)
 #include "IKeyBoard.h"				// who holds the keyboard - the filter acts only while the list does
-#include "IPalettePanelUtils.h"		// QueryPanelByWidgetID - the list, reached through its panel (the filter)
+#include "IPalettePanelUtils.h"		// QueryPanelByWidgetID - the panel, for the keyboard frame's strips (RedrawKeyboardFrame)
 #include "IPanelControlData.h"
 #include "ISession.h"
 #include "ITreeViewController.h"
@@ -216,6 +216,14 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 	return true;
 }
 
+// RETURN, OR THE KEYPAD'S ENTER: the key the list and its filter act on, asked the same way at every step of it - the
+// filter's KeyDown, KeyCmd and KeyUp, and the list's own - so the filter never takes a Return's KeyDown and lets its
+// KeyCmd or KeyUp go by.
+bool IsReturnKey(const VirtualKey& key)
+{
+	return key == kVirtualReturnKey || key == kVirtualEnterKey;
+}
+
 // RETURN ON THE SELECTED HIT ROW (spec F17), one place for the two that take it: the list's own KeyDown and the Return
 // filter below. Return or the keypad's Enter, no modifier, HIT rows selected (one, or several together): they are
 // replaced through the right-click Replace's own door (KFCResultTree::ReplaceRows - nothing happens when none can be
@@ -235,8 +243,7 @@ bool GoOnToNextReplaceableRow(ITreeViewController* controller, const NodeID& fro
 //    on another it cannot. Hence the filter: a Return taken there never reaches the widget layer at all.
 bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 {
-	const VirtualKey key = e->GetVirtualKey();
-	if ((!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey)) || e->CmdKeyDown() || e->OptionAltKeyDown())
+	if (!IsReturnKey(e->GetVirtualKey()) || e->CmdKeyDown() || e->OptionAltKeyDown())
 		return kFalse;
 	KFC_DIAG_HIDDEN_DOCS_CHECK("return");		// (test builds only - a document left with no window when the Return is over)
 	const bool goOn = e->ShiftKeyDown() ? true : false;
@@ -300,13 +307,6 @@ bool16 TakeReturn(IEvent* e, ITreeViewController* controller)
 IEventHandler* gReturnFilter = nil;
 bool gFilterPushed = false;
 bool gFilterShutDown = false;
-
-// The result list's view, reached through its panel - nil while the panel is closed.
-IControlView* ResultListView()
-{
-	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
-	return (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
-}
 
 IEventDispatcher* QueryDispatcher()
 {
@@ -508,7 +508,7 @@ bool16 KFCResultTreeEH::WillingToGiveUpKeyFocus()
 bool16 KFCResultTreeEH::KeyUp(IEvent* e)
 {
 	const VirtualKey key = e->GetVirtualKey();
-	if (key == kVirtualReturnKey || key == kVirtualEnterKey)
+	if (IsReturnKey(key))
 		gHolding = false;
 	KFC_DIAG_LOG("RETFOCUS list KeyUp vk=%d focus=%s", static_cast<int>(key.GetDVKeyCode()),
 		KFCResultTree::DiagKeyFocus().c_str());
@@ -633,15 +633,14 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 {
 	fTook = false;
 	// Every key the application dispatches passes here while the filter is on the stack, so the cheap question first.
-	const VirtualKey key = e->GetVirtualKey();
-	if (!(key == kVirtualReturnKey) && !(key == kVirtualEnterKey))
+	if (!IsReturnKey(e->GetVirtualKey()))
 		return kFalse;
 	// Only while the result list holds the keyboard - a Return anywhere else (a document, a dialog) is not ours. ASKED AS THE
 	// KEYBOARD FRAME ASKS IT (KFCResultTree::ListHoldsKeyboard - the spec map's PNL-20): InDesign's holder AND the window
 	// the system sends the keys to. Find/Change's title bar clicked leaves InDesign's holder on the list and sends the keys
 	// to the dialog (JMP-33): the frame goes away, and a Return then is the dialog's - with the holder alone asked here, it
 	// replaced the rows selected in the list instead (the 1.3 -> 1.4 re-check of 2026-10-11 night).
-	IControlView* listView = ResultListView();
+	IControlView* listView = KFCResultTree::ResultListView();
 	if (listView == nil)
 		return kFalse;
 	bool holds = KFCResultTree::ListHoldsKeyboard();
@@ -672,14 +671,12 @@ bool16 KFCReturnFilterEH::KeyDown(IEvent* e)
 
 bool16 KFCReturnFilterEH::KeyCmd(IEvent* e)
 {
-	const VirtualKey key = e->GetVirtualKey();
-	return (fTook && (key == kVirtualReturnKey || key == kVirtualEnterKey)) ? kTrue : kFalse;
+	return (fTook && IsReturnKey(e->GetVirtualKey())) ? kTrue : kFalse;
 }
 
 bool16 KFCReturnFilterEH::KeyUp(IEvent* e)
 {
-	const VirtualKey key = e->GetVirtualKey();
-	if (!fTook || !(key == kVirtualReturnKey || key == kVirtualEnterKey))
+	if (!fTook || !IsReturnKey(e->GetVirtualKey()))
 		return kFalse;
 	fTook = false;
 	gHolding = false;		// the Return is over; the keyboard is the user's to move again (gHolding)

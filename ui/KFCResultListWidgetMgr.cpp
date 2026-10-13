@@ -150,6 +150,16 @@ namespace
 		label.AppendNumber(hits);
 		label.Append(")");
 	}
+
+	// A DOCUMENT WITH NO WINDOW: the chapter's document is open and no window shows it. The one question the document
+	// row's "(no window)" and the status line after a Replace ("still hidden") both ask.
+	bool ChapterHasNoWindow(int32 chapterIdx)
+	{
+		UIDRef docRef;
+		IDFile file;
+		return KFCResults()->GetChapterLocation(chapterIdx, docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
+			&& !KFCChapters()->HasWindow(docRef);
+	}
 }
 
 /** Builds and fills the result tree's row widgets (chapter rows and hit rows). */
@@ -381,14 +391,8 @@ private:
 		// InDesign's own does; a replace there leaves it hidden (the user may hide a heavy one on purpose) and
 		// only a jump opens a window - so its row says so. Asked as the row is drawn: a jump that opens one
 		// takes the note away at the next repaint.
-		if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments)
-		{
-			UIDRef docRef;
-			IDFile file;
-			if (KFCResults()->GetChapterLocation(nodeID->GetChapter(), docRef, file)
-				&& KFCChapters()->IsDocStillOpen(docRef) && !KFCChapters()->HasWindow(docRef))
-				label.Append(" (no window)");
-		}
+		if (KFCResults()->GetSearchScope() == KFCResultModel::kScopeAllDocuments && ChapterHasNoWindow(nodeID->GetChapter()))
+			label.Append(" (no window)");
 		AppendCounts(label, KFCResults()->GetChapterReplacedCount(nodeID->GetChapter()), fullCount);
 		// (No "cancelled" note: a write that does not go through is put back WHOLE, so no chapter is left half-reached.)
 
@@ -471,19 +475,20 @@ private:
 
 CREATE_PMINTERFACE(KFCResultListWidgetMgr, kKFCResultListWidgetMgrImpl)
 
+IControlView* KFCResultTree::ResultListView()
+{
+	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
+	return (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+}
+
 namespace
 {
 // The panel's result tree, reached through the panel - nil when the panel is closed, which is an ordinary
 // state: Rebuild, RefreshRows and BeforeChapterRowGoes then do nothing.
 ITreeViewMgr* QueryResultTreeMgr()
 {
-	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
-	if (panelData == nil)
-		return nil;
-	IControlView* listView = panelData->FindWidget(kKFCResultListWidgetID);
-	if (listView == nil)
-		return nil;
-	return InterfacePtr<ITreeViewMgr>(listView, UseDefaultIID()).forget();
+	IControlView* const listView = KFCResultTree::ResultListView();
+	return (listView != nil) ? InterfacePtr<ITreeViewMgr>(listView, UseDefaultIID()).forget() : nil;
 }
 }
 
@@ -929,8 +934,7 @@ bool KFCResultTree::TakeKeyboard()
 		return false;
 	panelMgr->ShowPanelByWidgetID(kKFCPanelWidgetID, kTrue);
 
-	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
-	IControlView* listView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+	IControlView* const listView = ResultListView();
 	if (listView == nil)
 		return false;
 	InterfacePtr<const IWidgetParent> listParent(listView, UseDefaultIID());
@@ -1008,12 +1012,7 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	}
 	bool hidden = false;
 	for (size_t c = 0; c < written.size() && !hidden; ++c)
-	{
-		UIDRef docRef;
-		IDFile file;
-		hidden = KFCResults()->GetChapterLocation(written[c], docRef, file) && KFCChapters()->IsDocStillOpen(docRef)
-			&& !KFCChapters()->HasWindow(docRef);
-	}
+		hidden = ChapterHasNoWindow(written[c]);
 	if (hidden)
 		status.Append(written.size() == 1 ? " The document has no window - still hidden." : " A document written has no window - still hidden.");
 	// Repainted in place - or the tree rebuilt, when the write threw the results away: a refusal on a changed
@@ -1032,33 +1031,35 @@ bool KFCResultTree::ReplaceRows(const KFCRowsByChapter& rows, PMString* outStatu
 	return wrote;
 }
 
-bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
+namespace
 {
-	// Not while a landing is under way (KFCJump::IsLanding): the walk reopens the story's chapter and hands it back - closed
-	// on the spot - which can be the very document the landing is giving a window.
-	if (KFCJump::IsLanding() || RefusedWhileRunning())
+// SEARCH ... AGAIN, THE STEPS AROUND THE WALK - one place for the story's and the document's. Not while a landing is under
+// way (KFCJump::IsLanding): the walk reopens the chapter and hands it back - closed on the spot - which can be the very
+// document the landing is giving a window; nor while a run of ours is up (RefusedWhileRunning). Then the walk; the tree
+// REBUILT, not repainted, when its rows were put back - every row after them has another place, the document's another
+// number of them and another order; the status line either way.
+template <typename Walk>
+bool SearchAgain(Walk walk)
+{
+	if (KFCJump::IsLanding() || KFCResultTree::RefusedWhileRunning())
 		return false;
 	PMString status;
-	const bool done = KFCRuns()->SearchStoryAgain(chapterIdx, groupIdx, status);
-	// Rebuilt, not repainted: the story's rows were put back, and every row after them in the chapter has another place.
+	const bool done = walk(status);
 	if (done)
-		Rebuild();
-	ShowStatus(status);
+		KFCResultTree::Rebuild();
+	KFCResultTree::ShowStatus(status);
 	return done;
+}
+}	// anonymous namespace
+
+bool KFCResultTree::SearchStoryAgain(int32 chapterIdx, int32 groupIdx)
+{
+	return SearchAgain([&](PMString& status) { return KFCRuns()->SearchStoryAgain(chapterIdx, groupIdx, status); });
 }
 
 bool KFCResultTree::SearchDocumentAgain(int32 chapterIdx)
 {
-	// Not while a landing is under way - Search This Story Again's reason.
-	if (KFCJump::IsLanding() || RefusedWhileRunning())
-		return false;
-	PMString status;
-	const bool done = KFCRuns()->SearchDocumentAgain(chapterIdx, status);
-	// Rebuilt, not repainted: the document's rows were put back - another number of them, another order.
-	if (done)
-		Rebuild();
-	ShowStatus(status);
-	return done;
+	return SearchAgain([&](PMString& status) { return KFCRuns()->SearchDocumentAgain(chapterIdx, status); });
 }
 
 // End, KFCResultListWidgetMgr.cpp.

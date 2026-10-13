@@ -32,8 +32,6 @@
 // Interface includes:
 #include "IControlView.h"
 #include "IEvent.h"
-#include "IPalettePanelUtils.h"		// QueryPanelByWidgetID - the list, reached through its panel
-#include "IPanelControlData.h"
 #include "ITreeNodeIDData.h"
 #include "ITreeViewController.h"
 #include "ITreeViewHierarchyAdapter.h"
@@ -43,7 +41,6 @@
 #include "CTreeViewController.h"	// the stock controller (public/includes) - DV_WidgetBin
 #include "CTreeViewMgr.h"			// AboveOrBelow - which way a run of rows goes
 #include "TreeNodeTraverser.h"		// the rows in the order they are drawn
-#include "Utils.h"
 
 #include <algorithm>
 #include <vector>
@@ -58,27 +55,19 @@
 namespace
 {
 
-// Can two rows be selected together? The first answer is the only yes.
-enum JoinAnswer
-{
-	kJoins = 0,
-	kNotHitRows			// either is a story, document or book row, or the two are of two kinds: always alone
-};
-
 bool IsObjectRow(const KFCResultNodeID* node)
 {
 	return node != nil && node->IsHitRow() && KFCResults()->GetHitItem(node->GetChapter(), node->GetHit()) != kInvalidUID;
 }
 
-JoinAnswer Join(const NodeID& a, const NodeID& b)
+// CAN TWO ROWS BE SELECTED TOGETHER? Only as hit rows of one kind: a story, document or book row is always alone, and so
+// is a row of the other kind. Any story, spread or document - the page shows the row selected last.
+bool Joins(const NodeID& a, const NodeID& b)
 {
 	TreeNodePtr<KFCResultNodeID> first(a), second(b);
 	if (first == nil || second == nil || !first->IsHitRow() || !second->IsHitRow())
-		return kNotHitRows;
-	const bool objects = IsObjectRow(first);
-	if (objects != IsObjectRow(second))
-		return kNotHitRows;		// (a list holds one kind - a search is on one tab; asked anyway)
-	return kJoins;			// any story, spread or document: the page shows the row selected last
+		return false;
+	return IsObjectRow(first) == IsObjectRow(second);		// (a list holds one kind - a search is on one tab; asked anyway)
 }
 
 // A row named by its chapter and hit - kept as two numbers rather than a NodeID, which owns a heap object (a static
@@ -91,6 +80,15 @@ struct RowRef
 	RowRef(int32 c, int32 h) : chapter(c), hit(h) {}
 	bool IsValid() const { return chapter >= 0 && hit >= 0; }
 };
+
+// Is the row (chapter, hit) one of these rows?
+bool RowsHold(const KFCRowsByChapter& rows, int32 chapter, int32 hit)
+{
+	for (size_t k = 0; k < rows.size(); ++k)
+		if (rows[k].chapter == chapter && std::find(rows[k].hits.begin(), rows[k].hits.end(), hit) != rows[k].hits.end())
+			return true;
+	return false;
+}
 
 // THE MOVING END OF A RUN: the row the last click or Shift+arrow left the run at - Shift+Up / Shift+Down move it, while
 // the run's other end stays where the run began (the controller's master item - CTreeViewController's fFirstSelected).
@@ -105,8 +103,7 @@ RowRef RowOf(const NodeID& node)
 // The result list's controller - nil while the panel is closed.
 ITreeViewController* QueryListController()
 {
-	InterfacePtr<IPanelControlData> panelData(Utils<IPalettePanelUtils>()->QueryPanelByWidgetID(kKFCPanelWidgetID));
-	IControlView* const listView = (panelData != nil) ? panelData->FindWidget(kKFCResultListWidgetID) : nil;
+	IControlView* const listView = KFCResultTree::ResultListView();
 	return (listView != nil) ? InterfacePtr<ITreeViewController>(listView, UseDefaultIID()).forget() : nil;
 }
 
@@ -161,7 +158,7 @@ private:
 	// controller keeps its mode with the panel's saved state (CTreeViewController::ReadWrite): a panel saved by 1.3,
 	// one row at a time, would otherwise come back that way whatever KFCUI.fr now says. Several parents: a text row hangs
 	// off its story row (KFCResultListAdapter), and the rows of two stories - or of two documents - are selected
-	// together; Join keeps them to one kind.
+	// together; Joins keeps them to one kind.
 	void ForceMultipleSelection()
 	{
 		fNumSelectableItems = eAllowMultipleSelection;
@@ -203,8 +200,7 @@ void KFCResultTreeController::ProcessSelectionRules(IEvent* event, UID nodeWidge
 	const bool modified = (event->GetType() == IEvent::kLButtonDn) && (event->ShiftKeyDown() || event->CmdKeyDown());
 	if (modified && !IsSelected(node) && !fSelectedNodes.empty())
 	{
-		const JoinAnswer answer = Join(fSelectedNodes[0], node);
-		if (answer == kNotHitRows)
+		if (!Joins(fSelectedNodes[0], node))
 		{
 			// A ROW OF ANOTHER KIND - a story, document or book row clicked, or a hit row while one of those is selected:
 			// that row alone (the Layers panel's rule - rows of one kind together; the newly clicked kind stays).
@@ -223,7 +219,7 @@ ITreeViewController::SelectCode KFCResultTreeController::Select(const NodeID& no
 {
 	// NOT WITH THESE ROWS: a row that cannot join the selection is turned away whoever asks - a click, a run of
 	// rows, a key. The stock answer for "not with the selection" (eSingleParentOnly) - nothing of KFC's reads it.
-	if (!IsSelected(node) && !fSelectedNodes.empty() && Join(fSelectedNodes[0], node) != kJoins)
+	if (!IsSelected(node) && !fSelectedNodes.empty() && !Joins(fSelectedNodes[0], node))
 		return eSingleParentOnly;
 	return CTreeViewController::Select(node, notifyOfChange, changeHilite);
 }
@@ -271,12 +267,8 @@ bool KFCResultTree::GetSelectedHitRows(KFCRowsByChapter& outRows, bool* outObjec
 KFCRowsByChapter KFCResultTree::RowsOfRightClick(int32 chapterIdx, int32 hitIdx)
 {
 	KFCRowsByChapter rows;
-	if (GetSelectedHitRows(rows) && (rows.size() >= 2 || rows[0].hits.size() >= 2))
-	{
-		for (size_t k = 0; k < rows.size(); ++k)
-			if (rows[k].chapter == chapterIdx && std::find(rows[k].hits.begin(), rows[k].hits.end(), hitIdx) != rows[k].hits.end())
-				return rows;		// one of several selected together: all of them
-	}
+	if (GetSelectedHitRows(rows) && (rows.size() >= 2 || rows[0].hits.size() >= 2) && RowsHold(rows, chapterIdx, hitIdx))
+		return rows;		// one of several selected together: all of them
 	return KFCRowsByChapter(1, KFCChapterRows(chapterIdx, hitIdx));
 }
 
@@ -347,14 +339,12 @@ bool KFCResultTree::LastSelectedHit(const KFCRowsByChapter& rows, int32& outChap
 {
 	// Where the last click or Shift+arrow left the selection (the run's moving end), while it is one of these rows - else
 	// the last of them in the list's order (a Ctrl+click took the row it was at away).
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k].chapter == gRunEnd.chapter
-			&& std::find(rows[k].hits.begin(), rows[k].hits.end(), gRunEnd.hit) != rows[k].hits.end())
-		{
-			outChapter = gRunEnd.chapter;
-			outHit = gRunEnd.hit;
-			return true;
-		}
+	if (RowsHold(rows, gRunEnd.chapter, gRunEnd.hit))
+	{
+		outChapter = gRunEnd.chapter;
+		outHit = gRunEnd.hit;
+		return true;
+	}
 	for (size_t k = rows.size(); k-- > 0; )
 		if (!rows[k].hits.empty())
 		{
@@ -376,15 +366,8 @@ void KFCResultTree::FollowModifiedClick(const NodeID& clicked)
 	// selected (or marked, and why it could not be selected), its document in front: THE PAGE SHOWS THE ROW SELECTED LAST
 	// (the author's call - object rows as text rows, rows of any document). A row taken away leaves the page as it is.
 	KFCRowsByChapter rows;
-	if (!GetSelectedHitRows(rows))
-		return;
-	for (size_t k = 0; k < rows.size(); ++k)
-		if (rows[k].chapter == nodeID->GetChapter()
-			&& std::find(rows[k].hits.begin(), rows[k].hits.end(), nodeID->GetHit()) != rows[k].hits.end())
-		{
-			KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
-			return;
-		}
+	if (GetSelectedHitRows(rows) && RowsHold(rows, nodeID->GetChapter(), nodeID->GetHit()))
+		KFCJump::ActivateNode(nodeID->GetChapter(), nodeID->GetHit());
 }
 
 bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
@@ -429,7 +412,7 @@ bool KFCResultTree::ExtendSelection(ITreeViewController* controller, bool down)
 	}
 	if (!next.IsValid())
 		return true;		// the list's end: nothing to add
-	if (Join(anchor, next) != kJoins)
+	if (!Joins(anchor, next))
 		return true;		// (never - a list holds one kind; asked anyway)
 	SelectRun(controller, anchor, next);
 	gRunEnd = RowOf(next);

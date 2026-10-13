@@ -21,11 +21,11 @@
 #include "PMRect.h"
 #include "PMString.h"
 #include "KFCModelTypes.h"		// KFCRowsByChapter - the rows selected together, by document
-#include <vector>
 #ifdef KFC_DIAG
 #include <string>
 #endif
 
+class IControlView;
 class ITreeViewController;
 class NodeID;
 
@@ -151,6 +151,12 @@ namespace KFCResultTree
 	/** SEARCH THIS DOCUMENT AGAIN (a document row's right-click menu - the author's call): as
 	    SearchStoryAgain, over the whole document (KFCRuns()->SearchDocumentAgain). True = done. */
 	bool SearchDocumentAgain(int32 chapterIdx);
+
+	/** The result list's view, reached through its panel - nil while the panel is closed. Not counted (the panel holds
+	    it): use it at once. Asked by whatever outside the panel wants the list alone - the tree's manager, its controller,
+	    the keyboard's questions, the Return filter. (RedrawKeyboardFrame wants the panel's view as well, and asks the
+	    panel for both.) */
+	IControlView* ResultListView();
 
 	/** THE LIST TAKES THE KEYBOARD, THE PANEL MADE ACTIVE: IPanelMgr::ShowPanelByWidgetID with giveKeyFocus,
 	    then the panel's IPanelControlData::SetKeyboardFocus on the list - and IKeyBoard::AcquireKeyFocus if those did not
