@@ -382,13 +382,12 @@ using KFCPageItemFacts::StoryLeadText;
 // text edited since - typed just before a search, or written by KFC itself just before the next row's lock test - is
 // composed only when something asks for it: InDesign's background composition is an idle task, and a windowless chapter
 // has no view to want it. The find on the session's shared walker composed the text it found, a frame at a time (measured
-// 2026-10-05, the speed-up study - most likely because the find/change client selects what it finds through the walker's
-// ITextWalkerSelectionUtils, which a kBasicTextWalkerBoss does not carry: the spelling panel's copy of that client,
-// SpellCheckWalker.cpp's SuspendWalkAt - not measured); KFC's own walker (2026-10-06) does not, so a row read its page, its
-// "overset" and its locks off the composition from before the edit. So the frames up to the position are composed first
-// when any of them is damaged: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the jump's RecomposeIfDamaged takes
-// it) carried only as far as the position (RecomposeThruTextIndex), the way InDesign's find took it - not the story to its
-// end per row a Replace writes.
+// 2026-10-05, the speed-up study - why is not known; not by selecting it: the find does not select what it finds, the SDK's
+// snippet selects it itself after the find, SnpFindAndReplace.cpp:798-807); KFC's own walker (2026-10-06) does not, so a
+// row read its page, its "overset" and its locks off the composition from before the edit. So the frames up to the
+// position are composed first when any of them is damaged: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the
+// jump's RecomposeIfDamaged takes it) carried only as far as the position (RecomposeThruTextIndex), the way InDesign's
+// find took it - not the story to its end per row a Replace writes.
 // Every caller holds a SaveRestoreModifiedState guard or is writing anyway (composing dirties a document).
 void ComposeThrough(ITextModel* textModel, TextIndex pos)
 {
