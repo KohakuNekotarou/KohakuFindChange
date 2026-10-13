@@ -128,8 +128,8 @@
 //    boundary-mismatch  (both halves) each half reads the other's boundary stamp as another build's: the UI half stands
 //                in for the model's doors - every command grey, the message line saying why (ui/KFCModelAccess.cpp) -
 //                and the model half takes the UI half for absent (KFCQueryUIServices, IKFCUIServices.h). The UI half
-//                reads it once, at its first door: set it before InDesign starts (the steps:
-//                docs/ai-notes/new-knowledge-sweep.md)
+//                reads it once, at its first door: set it before InDesign starts (the steps: KN-3 in
+//                docs/ai-notes/new-knowledge-sweep-kfc-b0-b5-2026-10-13.md)
 //    ordinal-runs  KFCResultModel.cpp's NumberHitsWithinPages takes a run of one pageIndex for one page, the old way: the
 //                rows of two parent pages (and the pasteboard's) are numbered as one page's, and a parent page's rows with
 //                another place's between them are not numbered (row-ordinal-pageless-armed)
