@@ -19,6 +19,7 @@
 #include "ILayerUtils.h"
 #include "ILayoutUtils.h"
 #include "ILockPosition.h"
+#include "IOwnedItem.h"				// GetFrameRef - the frame an inline's anchor is composed into (AnchorLayerUID)
 #include "IPageItemVisibilityFacade.h"
 #include "IPageList.h"
 #include "ISpreadLayer.h"
@@ -30,11 +31,13 @@
 #include "InCopySharedID.h"
 #include "PersistUtils.h"
 #include "TextChar.h"
+#include "TextID.h"					// kInlineBoss
 #include "UnicodeClass.h"
 #include "Utils.h"
 #include "WideString.h"
 
 // Project includes:
+#include "KFCDiag.h"			// the fault switch inline-layer-off (AnchorLayerUID)
 #include "KFCPageItemFacts.h"
 #include "KFCResultModel.h"
 #include "KFCTextCut.h"			// KFCIsAttachedMark - a mark goes with its character (StoryLeadText)
@@ -112,12 +115,57 @@ bool GetFramePageString(const UIDRef& docRef, UID frameUID, PMString& outPage, i
 // test and then IPageItemVisibilityFacade::IsHidden, and states in its own comment that it is the
 // same code as FindChangeClient.cpp - i.e. this is what the Find/Change dialog itself reports.
 //
+// THE LAYER OF AN ITEM PLACED IN TEXT - an inline or anchored frame, and the text frame column inside one - IS ITS
+// ANCHOR'S. The guide (sol-02, "Acquiring a reference to a spread layer"): an inline frame's hierarchy (kInlineBoss)
+// answers kInvalidUID for its layer - find the page item in the layout hierarchy first. Found here by calls already
+// measured: up the item's hierarchy to the kInlineBoss it hangs from, whose owned item (IOwnedItem - kInlineBoss
+// carries it) names the frame column its anchor is composed into (GetFrameRef) - the frame it is drawn with, whose
+// layer this is; out again while that frame is itself in text. kInvalidUID when the item does not hang in text, or
+// its anchor stands in overset text (composed into no frame) - as for any item on no layer. (Not the guide's own
+// IPageItemUtils::QueryInlineParentPageItem: no caller in the SDK, and a utility asked about an item of a kind it was
+// not written for has brought InDesign down before - memory facade-not-safe-for-every-item.)
+UID AnchorLayerUID(IDataBase* db, UID item)
+{
+	const int32 kClimbAtMost = 16;		// steps up one hierarchy, and inlines inside inlines - far more than layouts use
+	UID at = item;
+	for (int32 nest = 0; nest < kClimbAtMost && at != kInvalidUID; ++nest)
+	{
+		UID inlineUID = kInvalidUID;
+		UID up = at;
+		for (int32 step = 0; step < kClimbAtMost && up != kInvalidUID && db->IsValidUID(up); ++step)
+		{
+			if (db->GetClass(up) == kInlineBoss)
+			{
+				inlineUID = up;
+				break;
+			}
+			InterfacePtr<IHierarchy> h(db, up, UseDefaultIID());
+			up = (h != nil) ? h->GetParentUID() : kInvalidUID;
+		}
+		if (inlineUID == kInvalidUID)
+			return kInvalidUID;		// not in text
+		InterfacePtr<IOwnedItem> owned(db, inlineUID, UseDefaultIID());
+		const UIDRef anchorFrame = (owned != nil) ? owned->GetFrameRef() : UIDRef::gNull;
+		if (anchorFrame.GetDataBase() != db || anchorFrame.GetUID() == kInvalidUID)
+			return kInvalidUID;		// the anchor stands in overset text
+		InterfacePtr<IHierarchy> anchorHier(anchorFrame, UseDefaultIID());
+		const UID layer = (anchorHier != nil) ? Utils<ILayerUtils>()->GetLayerUID(anchorHier) : kInvalidUID;
+		if (layer != kInvalidUID)
+			return layer;
+		at = anchorFrame.GetUID();	// that frame hangs in text too: out again
+	}
+	return kInvalidUID;
+}
+
 // The layer is found the one way both tests below need it: the frame's SPREAD layer (one per
 // spread) points at the DOCUMENT layer that carries the switches - the Layers panel's row. nil when
 // any step cannot be resolved.
 IDocumentLayer* QueryDocLayerOf(IDataBase* db, IHierarchy* frameHier)
 {
-	const UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
+	UID spreadLayerUID = Utils<ILayerUtils>()->GetLayerUID(frameHier);
+	// (Fault switch inline-layer-off, a test build's only - KFCDiag.h: an item in text reads as on no layer, the old way.)
+	if (spreadLayerUID == kInvalidUID && !KFC_DIAG_FAULT("inline-layer-off"))
+		spreadLayerUID = AnchorLayerUID(db, ::GetUID(frameHier));
 	if (spreadLayerUID == kInvalidUID)
 		return nil;
 	InterfacePtr<ISpreadLayer> spreadLayer(db, spreadLayerUID, UseDefaultIID());

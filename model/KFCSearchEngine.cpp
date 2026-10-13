@@ -50,6 +50,10 @@
 #include "ITextParcelList.h"		// GetParcelContaining - the parcel a position is in
 #include "IParcelList.h"			// GetParcelFrameUID - is that parcel placed in a frame?
 #include "ParcelKey.h"				// ParcelKey::IsValid
+#include "IWaxStrand.h"				// the story's frame list (ComposeThrough)
+#include "IFrameList.h"				// GetFirstDamagedFrameIndex
+#include "IFrameListComposer.h"		// RecomposeThruTextIndex
+#include "TextID.h"					// kFrameListBoss
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 
@@ -374,14 +378,42 @@ using KFCPageItemFacts::IsFrameOnLockedLayer;
 using KFCPageItemFacts::IsPageItemLockedForEdit;
 using KFCPageItemFacts::StoryLeadText;
 
-// The frame a text position is composed into: position -> parcel -> frame. kInvalidUID for an
-// overset position (composed but placed in no frame) and for the query failures around it, which
-// read the same to every caller: this position has no frame of its own.
+// THE COMPOSITION UP TO A POSITION, BROUGHT UP TO DATE BEFORE IT IS READ. The parcels answer from the last composition, and
+// text edited since - typed just before a search, or written by KFC itself just before the next row's lock test - is
+// composed only when something asks for it: InDesign's background composition is an idle task, and a windowless chapter
+// has no view to want it. The find on the session's shared walker composed the text it found, a frame at a time (measured
+// 2026-10-05, the speed-up study - most likely because the find/change client selects what it finds through the walker's
+// ITextWalkerSelectionUtils, which a kBasicTextWalkerBoss does not carry: the spelling panel's copy of that client,
+// SpellCheckWalker.cpp's SuspendWalkAt - not measured); KFC's own walker (2026-10-06) does not, so a row read its page, its
+// "overset" and its locks off the composition from before the edit. So the frames up to the position are composed first
+// when any of them is damaged: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the jump's RecomposeIfDamaged takes
+// it) carried only as far as the position (RecomposeThruTextIndex), the way InDesign's find took it - not the story to its
+// end per row a Replace writes.
+// Every caller holds a SaveRestoreModifiedState guard or is writing anyway (composing dirties a document).
+void ComposeThrough(ITextModel* textModel, TextIndex pos)
+{
+	// (Fault switch frame-read-uncomposed, a test build's only - KFCDiag.h: the parcels read as they stand, the way before
+	// 2026-10-14.)
+	if (KFC_DIAG_FAULT("frame-read-uncomposed"))
+		return;
+	InterfacePtr<IWaxStrand> waxStrand(static_cast<IWaxStrand*>(textModel->QueryStrand(kFrameListBoss, IID_IWAXSTRAND)));
+	InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
+	if (frameList == nil || frameList->GetFirstDamagedFrameIndex() == -1)
+		return;
+	InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
+	if (composer != nil)
+		composer->RecomposeThruTextIndex(pos);
+}
+
+// The frame a text position is composed into: position -> parcel -> frame, from the composition as it stands now
+// (ComposeThrough). kInvalidUID for an overset position (composed but placed in no frame) and for the query failures
+// around it, which read the same to every caller: this position has no frame of its own.
 UID FrameUIDForPosition(const UIDRef& storyRef, TextIndex pos)
 {
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
 		return kInvalidUID;
+	ComposeThrough(textModel, pos);
 	InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
 	if (tpl == nil)
 		return kInvalidUID;
@@ -1568,11 +1600,20 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 #endif
 }
 
+// HOW MANY MATCHES ONE STORY'S LOOK AGAIN LISTS AT MOST (CollectStoryHits) - a number of its own, not the list's
+// (kKFCCollectHitLimit, the rows the panel draws - spec F9). The row looked for can stand past its story's 300th match once
+// matches were added in front of it by an edit KFC did not follow, and a walk cut at 300 then lists every candidate but the
+// row's own: the row is called missing - or moved onto a look-alike (OneFreePlace), which a Replace then writes once an Undo
+// has brought the story's version back. 10000 is the ceiling this walk had from its first day (2026-09-29) until the list's
+// limit went to 300 (2026-10-06), when it took that constant with it. Reaching it is "cannot tell", never a list.
+const size_t kKFCLookAgainMatchCeiling = 10000;
+
 // Every match of the current query in one story of an open document, as the search's walk meets them
 // there, with the given scope switches - each with its place, its line and its hash (kHitPlaceAndText):
 // what a row looked for again is compared with (StaleRowPlaces). The story scope is the one the replace's
 // walks take (IWalkerScopeFactoryUtils::QueryStoryWalkerScope). Read-only (the walk's own dirty guard).
-// False = it could not be walked.
+// False = it could not be walked, or it holds more matches than one look again lists (kKFCLookAgainMatchCeiling) -
+// the row's own may stand past them, so nothing can be told from the list.
 bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOptions,
 	std::vector<KFCResultModel::Hit>& outHits)
 {
@@ -1582,9 +1623,13 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 		return false;
 	bool capped = false;
 	ChapterWalkResult result = kChapterWalked;
-	CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit),
+	// (Fault switch look-again-list-limit, a test build's only - KFCDiag.h: the walk cut at the list's limit and the cut not
+	// heard, the way before 2026-10-14.)
+	const bool listLimit = KFC_DIAG_FAULT("look-again-list-limit");
+	CollectHitsInDoc(UIDRef(db, db->GetRootUID()),
+		listLimit ? static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit) : kKFCLookAgainMatchCeiling,
 		scopeOptions, kHitPlaceAndText, outHits, capped, result, WalkBar(), storyRef);
-	return result == kChapterWalked;
+	return result == kChapterWalked && (listLimit || !capped);
 }
 
 // The session's search direction for one tab, through the command the dialog's own radio button
@@ -3282,7 +3327,9 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 	outSelUtils.reset(selUtils.forget());
 	// KFC'S OWN WALKER (the speed-up's S1 - taken: 20-35 % off the writing walk of the time, Change Checked's (since
 	// removed), the per-find composition gone, the answer unchanged; docs/ai-notes/kfc-speedup-ideas-2026-10-05.md
-	// section 12).
+	// section 12). (Unchanged on text that was composed; on text edited and not yet composed, the frame a row is read
+	// from comes from the composition before the edit - so FrameUIDForPosition composes up to the row first, ComposeThrough,
+	// since 2026-10-14.)
 	// Nothing watches it and nobody else walks it, so the dialog's Find Next is left where it was (measured,
 	// s1-findnext2.ps1: the shared walker sent Find Next back to the match it had just found; KFC's own let it go on
 	// to the next). Change All (KFCChangeAll::WriteDocument) walks the shared one, as the dialog's own Change All does.
@@ -3542,7 +3589,8 @@ bool ReplacedRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, P
 // A ROW NOT REPLACED IS LOOKED FOR AGAIN UNDER ITS QUERY: the row's own story walked again (forward, as the search
 // was, with the scope switches), each match given its line and hash, and taken only with the row's own - the same
 // text, the same length, the same line. Every candidate, in position order (the walk meets a table's cells in reading
-// order - memory walker-scope-options-and-hidden-layers). False when the story cannot be walked: another query would
+// order - memory walker-scope-options-and-hidden-layers). False when the story cannot be walked or holds more matches
+// than one look again lists (CollectStoryHits), and when the query changed since the search: another query would
 // find other matches, nothing to compare with - ASKED, NOT REFUSED: QueryUnchangedSinceSearch is RefuseChangedQuery's
 // question without its consequences - it states the tab the walk runs in, and clears nothing. (RefuseChangedQuery
 // itself would, on a changed query, clear the whole result set and hand the chapters back in the middle of a jump,

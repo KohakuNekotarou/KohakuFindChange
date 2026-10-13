@@ -146,6 +146,15 @@
 //    ordinal-runs  KFCResultModel.cpp's NumberHitsWithinPages takes a run of one pageIndex for one page, the old way: the
 //                rows of two parent pages (and the pasteboard's) are numbered as one page's, and a parent page's rows with
 //                another place's between them are not numbered (row-ordinal-pageless-armed)
+//    look-again-list-limit  KFCSearchEngine.cpp's CollectStoryHits walks a story only as far as the list's limit (300
+//                matches) and takes a walk cut there for a whole one, the old way: a row whose match stands past its story's
+//                300th is called missing when it is looked for again (look-again-past-limit-armed)
+//    inline-layer-off  KFCPageItemFacts.cpp's QueryDocLayerOf reads an item placed in text (an inline or anchored frame) as on
+//                no layer, the old way: a hit in an anchored frame whose anchor stands on a locked or hidden layer is listed as
+//                neither (layer-anchored-locked-armed, layer-anchored-hidden-armed, obj-anchored-locked-armed)
+//    frame-read-uncomposed  KFCSearchEngine.cpp's FrameUIDForPosition reads the parcels as they stand, the way before
+//                2026-10-14 (ComposeThrough does nothing): a match pushed into overset by an edit not yet composed is listed
+//                in the frame it stood in before the edit (overset-after-edit-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.
