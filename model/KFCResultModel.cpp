@@ -37,15 +37,23 @@ namespace
 	// The rows copied aside before a write of ours changed them - see KFCResultModel::BeginRowBackup.
 	// RowCopy, the same struct the panel's following of Undo hands out.
 	//
-	// Only true while a write of ours is running; empty at every other moment.
-	bool gBackingUpRows = false;
-	std::vector<KFCResultModel::RowCopy> gRowBackup;
-	std::set<std::pair<int32, int32> > gRowsBackedUp;	// (chapter, hit) already in gRowBackup
-	// ...and the story versions it recorded (SetStoryVersion), the same way: an Undo of the
-	// write puts the story back at the version before it, and the record has to follow or the next
-	// write refuses the story as "changed since the search".
-	std::vector<KFCResultModel::VersionCopy> gVersionBackup;
-	std::set<std::pair<int32, UID> > gVersionsBackedUp;	// (chapter, story) already in gVersionBackup
+	// ONE STRUCT, as the list's header is (ListHeader): starting it and forgetting it each take all of it in one
+	// statement (BeginRowBackup, ForgetRowBackup), and so does handing it over once its copies are out (TakeRowBackup) -
+	// a container added here goes with them. On only while a write of ours is running; off and empty at every other
+	// moment.
+	struct RowBackup
+	{
+		bool										on;
+		std::vector<KFCResultModel::RowCopy>		rows;
+		std::set<std::pair<int32, int32> >			rowsCopied;		// (chapter, hit) already in rows
+		// ...and the story versions it recorded (SetStoryVersion), the same way: an Undo of the
+		// write puts the story back at the version before it, and the record has to follow or the next
+		// write refuses the story as "changed since the search".
+		std::vector<KFCResultModel::VersionCopy>	versions;
+		std::set<std::pair<int32, UID> >			versionsCopied;	// (chapter, story) already in versions
+		RowBackup() : on(false) {}
+	};
+	RowBackup gBackup;
 
 	// Which result set and which layout of it the row indices name - KFCResultModel::GetResultSetId /
 	// GetLayoutGeneration. Both are drawn from one counter, so no two values ever repeat.
@@ -59,13 +67,13 @@ namespace
 	// SetHitSegments - and a copy per change would only be overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KFCResultModel::Hit& row)
 	{
-		if (!gBackingUpRows || !gRowsBackedUp.insert(std::make_pair(chapterIdx, hitIdx)).second)
+		if (!gBackup.on || !gBackup.rowsCopied.insert(std::make_pair(chapterIdx, hitIdx)).second)
 			return;
 		KFCResultModel::RowCopy saved;
 		saved.chapter = chapterIdx;
 		saved.hit = hitIdx;
 		saved.row = row;
-		gRowBackup.push_back(saved);
+		gBackup.rows.push_back(saved);
 	}
 
 	// Stop remembering and release the copies - the rows they name have been put back, or are gone: a rollback's end
@@ -74,11 +82,7 @@ namespace
 	// forgot them would leave its Undo nothing to put back.
 	void ForgetRowBackup()
 	{
-		gBackingUpRows = false;
-		std::vector<KFCResultModel::RowCopy>().swap(gRowBackup);	// swapped with a temporary: the storage goes too
-		gRowsBackedUp.clear();
-		std::vector<KFCResultModel::VersionCopy>().swap(gVersionBackup);
-		gVersionsBackedUp.clear();
+		gBackup = RowBackup();	// a fresh one in its place: off, and the storage goes too, not just the contents
 	}
 
 	// Does the tree show this chapter? Rows, or searched again with none (Chapter::shownEmpty) - the one question
@@ -201,6 +205,27 @@ namespace
 				chapter.hits[static_cast<size_t>(order[k])].storyOrdinal = static_cast<int32>(k);
 		}
 	}
+
+	// WHAT A CHAPTER'S ROWS ARE INDEXED BY, built from the rows as they stand: the story groups (each row's group and its
+	// place in it) and each story's order. Both in one call, on every road that puts rows in or lays them out again
+	// (AppendChapter, RowsLaidOutAgain), so no road builds the one and leaves the other naming rows that have moved.
+	void IndexRows(KFCResultModel::Chapter& chapter)
+	{
+		BuildFontGroups(chapter);
+		NumberHitsWithinStories(chapter);
+	}
+
+	// A CHAPTER'S ROWS LAID OUT AGAIN (ReplaceStoryRows, ReplaceChapterRows - each lets the chapter's foci go before its
+	// rows move): indexed again, and whatever names the rows by their old places let go - a kept write (a new layout
+	// generation: KFCUndoFollow drops a write whose layout is not the list's, UNDO-14) and the row backup - with the
+	// chapter's foci back on the rows as they stand now. The one list of those, for both.
+	void RowsLaidOutAgain(int32 chapterIdx, KFCResultModel::Chapter& chapter)
+	{
+		IndexRows(chapter);
+		gLayoutGeneration = ++gIdCounter;
+		ForgetRowBackup();
+		KFCRowFoci::AttachChapter(chapterIdx);
+	}
 }
 
 void KFCResultModel::AppendChapter(Chapter&& chapter)
@@ -209,10 +234,9 @@ void KFCResultModel::AppendChapter(Chapter&& chapter)
 	// holds its texts as PMStrings, so copying the vector in here would double the cost of filling the
 	// model for nothing: every caller builds a Chapter, hands it over and drops it.
 	gChapters.push_back(std::move(chapter));
-	// Grouped on the way in, on the chapter the model now owns: the groups index the hits they are
+	// Indexed on the way in, on the chapter the model now owns: the groups index the hits they are
 	// built from, so they have to be built where those hits are going to live.
-	BuildFontGroups(gChapters.back());
-	NumberHitsWithinStories(gChapters.back());
+	IndexRows(gChapters.back());
 }
 
 void KFCResultModel::Clear()
@@ -298,16 +322,14 @@ void KFCResultModel::CloseChapter(int32 chapterIdx)
 
 void KFCResultModel::EmptyChapter(Chapter& chapter)
 {
-	// Swapped with fresh vectors rather than cleared, so the rows' strings are released now rather than at
+	// A FRESH CHAPTER IN ITS PLACE, ITS NAME KEPT: rows, story groups, story versions, searched parts, binding (no docRef,
+	// no file) and the "shown empty" mark - a closed document's chapter is not shown - all back to nothing in one
+	// statement, so a field added to Chapter is emptied here without a line of its own. (Emptied field by field, the
+	// searched parts were once left behind, describing rows that had gone.) The old storage goes now, rather than at
 	// the next search.
-	std::vector<Hit>().swap(chapter.hits);
-	std::vector<FontGroup>().swap(chapter.fontGroups);
-	chapter.storyVersions.clear();
-	// ...and the searched parts of its stories (SearchedRange): they describe the rows that just went.
-	chapter.searchedRanges.clear();
-	chapter.docRef = UIDRef::gNull;
-	chapter.file = IDFile();
-	chapter.shownEmpty = false;		// a closed document's chapter is not shown (CloseChapter)
+	const PMString name(chapter.name);
+	chapter = Chapter();
+	chapter.name = name;
 }
 
 int32 KFCResultModel::GetShownChapter(int32 nth)
@@ -716,8 +738,8 @@ void KFCResultModel::SetStoryVersion(int32 chapterIdx, UID story, uint32 version
 	if (c == nil)
 		return;
 	// Copied aside like a row, once, as the write found it.
-	if (gBackingUpRows && gVersionsBackedUp.insert(std::make_pair(chapterIdx, story)).second)
-		gVersionBackup.push_back(VersionNow(chapterIdx, story));
+	if (gBackup.on && gBackup.versionsCopied.insert(std::make_pair(chapterIdx, story)).second)
+		gBackup.versions.push_back(VersionNow(chapterIdx, story));
 	c->storyVersions[story] = version;
 }
 
@@ -1074,15 +1096,10 @@ int32 KFCResultModel::ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<
 	storyHits.clear();
 	OrderHitsByPage(hits);
 	c->hits.swap(hits);
-	BuildFontGroups(*c);
-	NumberHitsWithinStories(*c);
 	c->storyVersions[story] = storyVersion;
-	// THE ROWS' PLACES IN THE LIST CHANGED, so whatever names them by index goes: a kept write (a new layout generation -
-	// KFCUndoFollow drops a write whose layout is not the list's, UNDO-14) and the row backup. The chapter's foci come
-	// back on the rows as they stand now.
-	gLayoutGeneration = ++gIdCounter;
-	ForgetRowBackup();
-	KFCRowFoci::AttachChapter(chapterIdx);
+	// THE ROWS' PLACES IN THE LIST CHANGED: indexed again, and whatever names them by index let go, the chapter's foci
+	// back on them (RowsLaidOutAgain).
+	RowsLaidOutAgain(chapterIdx, *c);
 	int32 count = 0;
 	for (size_t i = 0; i < c->hits.size(); ++i)
 		if (c->hits[i].storyUID == story)
@@ -1096,20 +1113,17 @@ int32 KFCResultModel::ReplaceChapterRows(int32 chapterIdx, std::vector<Hit>& doc
 	if (c == nil)
 		return -1;
 	// ReplaceStoryRows' steps over the whole chapter: its foci let go (they name rows by index), the walk's rows in, in
-	// page order, grouped and numbered as the search's are (AppendChapter), and what indexes the rows forgotten.
+	// page order, and the end ReplaceStoryRows has (RowsLaidOutAgain - indexed as the search's are, what names the rows
+	// by index let go).
 	KFCRowFoci::DetachChapter(chapterIdx);
 	OrderHitsByPage(docHits);
 	c->hits.swap(docHits);
 	std::vector<Hit>().swap(docHits);
-	BuildFontGroups(*c);
-	NumberHitsWithinStories(*c);
 	c->storyVersions.swap(storyVersions);
 	storyVersions.clear();
 	c->searchedRanges.clear();
 	c->shownEmpty = c->hits.empty();
-	gLayoutGeneration = ++gIdCounter;
-	ForgetRowBackup();
-	KFCRowFoci::AttachChapter(chapterIdx);
+	RowsLaidOutAgain(chapterIdx, *c);
 	return static_cast<int32>(c->hits.size());
 }
 
@@ -1130,38 +1144,36 @@ void KFCResultModel::SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome
 
 void KFCResultModel::BeginRowBackup()
 {
-	gRowBackup.clear();
-	gRowsBackedUp.clear();
-	gVersionBackup.clear();
-	gVersionsBackedUp.clear();
-	gBackingUpRows = true;
+	gBackup = RowBackup();
+	gBackup.on = true;
 }
 
 void KFCResultModel::RollBackRows()
 {
-	gBackingUpRows = false;
+	gBackup.on = false;
 
 	// One copy per row (BackUpRow), so the direction of this loop decides nothing.
-	for (size_t i = gRowBackup.size(); i > 0; --i)
+	for (size_t i = gBackup.rows.size(); i > 0; --i)
 	{
-		const RowCopy& saved = gRowBackup[i - 1];
+		const RowCopy& saved = gBackup.rows[i - 1];
 		if (Hit* h = HitAt(saved.chapter, saved.hit))	// nil: the result set changed underneath
 			*h = saved.row;
 	}
 	// The recorded versions too - every caller records them only once its write has gone
 	// through, so there is normally nothing here.
-	for (size_t i = 0; i < gVersionBackup.size(); ++i)
-		PutVersionBack(gVersionBackup[i]);
+	for (size_t i = 0; i < gBackup.versions.size(); ++i)
+		PutVersionBack(gBackup.versions[i]);
 
 	ForgetRowBackup();
 }
 
 void KFCResultModel::TakeRowBackup(RowStep& out)
 {
-	gBackingUpRows = false;
 	out = RowStep();
 	// "before" is the copy BackUpRow took as the write first changed the row; "after" is the row now.
-	out.before.swap(gRowBackup);
+	out.before.swap(gBackup.rows);
+	out.versionsBefore.swap(gBackup.versions);
+	gBackup = RowBackup();	// off and empty: the copies are the step's now
 	out.after.reserve(out.before.size());
 	for (size_t i = 0; i < out.before.size(); ++i)
 	{
@@ -1175,11 +1187,8 @@ void KFCResultModel::TakeRowBackup(RowStep& out)
 		now.row = *h;
 		out.after.push_back(now);
 	}
-	out.versionsBefore.swap(gVersionBackup);
 	for (size_t i = 0; i < out.versionsBefore.size(); ++i)
 		out.versionsAfter.push_back(VersionNow(out.versionsBefore[i].chapter, out.versionsBefore[i].story));
-	gRowsBackedUp.clear();
-	gVersionsBackedUp.clear();
 }
 
 void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
