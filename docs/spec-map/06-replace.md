@@ -241,5 +241,5 @@
 この章を書くにあたって**確かめていない**もの。「書いていない＝そういう決まりが無い」ではない。
 
 - ✅（2026-10-11 全件の点検で確かめた）REP-01：置換形式（Change Format）は書かれる＝回帰 `hd-cf-char`・`hd-cf-formatonly`・`hd-cf-formatonly-undo`（本体の「すべてを置換」と同じ結果）。
-- REP-16：英語 UI の取り消しの名前 `Replace` は文字列表の値で、実機の「編集」メニューで見てはいない。
+- ✅（2026-10-13 実機で確かめた）REP-16：取り消しの名前は日本語 UI でも `Replace`（行の Replace の後の `app.activeDocument.undoName`＝探りの表 `work/kbs-regress/archive/probe-undoname-1013.tsv`）。「編集」メニューの絵では見ていない。Change All・Run Queries の名前と進捗バーの題は同じ仕組み（文字列表のキー）で、実機では読んでいない。
 - ✅（2026-10-11 全件の点検で確かめた）REP-32：矢印キーで行を歩いてから Return で置換する流れは、回帰 `ret-walk`（`click:1;key:ENTER;key:DOWN;key:ENTER`）・`ret-book-walk`・`ret-walk-item` で回っていて合格している（KIDMCP の `send_input` は矢印を送れる）。
