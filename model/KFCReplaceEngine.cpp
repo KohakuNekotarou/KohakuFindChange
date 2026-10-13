@@ -1454,6 +1454,19 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		// Its flag read before anything here touches it: a step rolled back, or a refusal below, has it put back.
 		docsAfter.Reached(c.docRef, true);
 	}
+	// EVERY DOCUMENT STILL OPEN ONCE THE LAST IS REACHED: reaching a closed chapter opens it, and opening runs the message
+	// loop (KFCRunGuard keeps KFC's own doors shut there, not InDesign's) - a close dispatched there would leave a document
+	// reached before it behind its docRef (not measured). Asked by comparing alone (KFCBookScope::IsDocStillOpen), as the
+	// query run asks before each write.
+	for (size_t k = 0; acrossDocuments && k < chapters.size(); ++k)
+	{
+		if (!KFCBookScope::IsDocStillOpen(chapters[k].docRef))
+		{
+			StartStatus(outStatus);
+			outStatus.Append("a document of the selected rows has been closed - nothing was changed.");
+			return false;
+		}
+	}
 	WalkerScopeOptions scopeOptions;
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 	// THE VERIFY WALK'S THREE QUESTIONS, OVER THESE ROWS. Each one's story at the version KFC last recorded, the row

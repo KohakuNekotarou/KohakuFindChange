@@ -21,6 +21,9 @@
 #include "PMString.h"
 #include "UIDRef.h"
 #include "WalkerScopeOptions.h"
+#include "KFCBookScope.h"		// ChapterDoc - a run's documents (LeaveRunDocuments, PutRunDocumentsBack)
+
+#include <vector>
 
 namespace KFCChangeAll
 {
@@ -47,6 +50,24 @@ namespace KFCChangeAll
 	    (IFindChangeCmdData::GetReplacementCount; 0 when it says nothing). False = the walk could not start or the
 	    command failed - answered kFailure, or left the error state raised; the error state is left clear. */
 	bool WriteDocument(const UIDRef& docRef, int32 selectionScope, const WalkerScopeOptions& scopeOptions, int32& outCount);
+
+	/** WHAT EACH DOCUMENT OF A RUN IS LEFT AS once the run's step is kept - the one rule for Change All in Book and the query
+	    run (KFCQuerySequence). targets = the run's documents, opened (a closed chapter windowless and held) before its step;
+	    wasModified = each one's "unsaved" flag then; wroteTo = whether the run wrote to it.
+	      - WRITTEN: a held chapter gets its window, so the write can be seen and saved; one whose window could not be
+	        opened stays held and windowless with the write in it, and is named in outUnclosed ("left open with no window").
+	        A document another target wrote is left as that one leaves it (a book listing one file twice).
+	      - NOT WRITTEN: it comes out as it went in - one that was clean is made clean again, since a walk can mark a
+	        database modified without changing a character - and is handed back; one that could not be is named.
+	    (Test builds: each written document still open is noted first - KFCDiagWrittenDocs.h; one gone since is not read
+	    through its address.) */
+	void LeaveRunDocuments(const std::vector<KFCBookScope::ChapterDoc>& targets, const std::vector<bool>& wasModified,
+		const std::vector<bool>& wroteTo, std::vector<PMString>& outUnclosed);
+
+	/** A RUN TAKEN BACK (cancelled, or failed): the abort puts the text back and leaves the "unsaved" flag up, so every
+	    document of the run that was clean is made clean again, and the held chapters are released
+	    (KFCBookScope::ReleaseHeldDocs). */
+	void PutRunDocumentsBack(const std::vector<KFCBookScope::ChapterDoc>& targets, const std::vector<bool>& wasModified);
 
 	/** Clear Results: the panel's list emptied (KFCSearchEngine::DropResults - the rows, the searched book's held
 	    chapters and the find format), so Change All can run. The documents are not touched; a Ctrl+Z afterwards does

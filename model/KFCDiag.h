@@ -161,6 +161,12 @@
 //                shared walker - the way before the author's call for the shared one (the speed-up's S1): its find
 //                composes nothing, and the dialog's Find Next is left where it was (overset-after-edit-armed, with
 //                frame-read-uncomposed)
+//    run-dirty-unwritten  KFCChangeAll::WriteDocument leaves a document it changed nothing in marked modified, as a walk
+//                can - Change All in Book and the query run must make it clean again and hand it back
+//                (xq-book-dirty-unwritten, xq-doc-dirty-unwritten, ca-book-dirty-unwritten). Throwaway documents only.
+//    run-leave-no-flag  KFCChangeAll::LeaveRunDocuments leaves a document not written as the walk left it, the query
+//                run's old way: with run-dirty-unwritten, a chapter not written stays open with no window and named, and a
+//                document of the user's stays "unsaved" (xq-book-dirty-unwritten-armed, xq-doc-dirty-unwritten-armed)
 //
 //  AND TIMERS: KFC_CLOCK / KFC_SPENT add up the milliseconds a stretch of code takes, and KFCDiagPhase
 //  writes "PHASE <name> begin" and "PHASE <name> end <ms>" around a scope - all of it nothing without KFC_DIAG.

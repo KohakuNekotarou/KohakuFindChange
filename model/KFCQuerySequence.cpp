@@ -27,7 +27,6 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <set>			// the documents written - a book listing one file twice
 #include <string>
 #include <vector>
 
@@ -462,15 +461,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 
 	if (cancelled || failed)
 	{
-		for (size_t i = 0; i < targets.size(); ++i)
-		{
-			if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))
-				continue;
-			IDataBase* const db = targets[i].docRef.GetDataBase();
-			if (db != nil)
-				db->SetModified(kFalse);
-		}
-		KFCBookScope::ReleaseHeldDocs();
+		KFCChangeAll::PutRunDocumentsBack(targets, wasModified);		// the flags the abort left up, the held chapters released
 		recorder.RestoreBefore();
 		if (cancelled)
 			outSummary.Append("Cancelled - nothing was changed.");
@@ -483,34 +474,13 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		return 0;
 	}
 
-	// (Test builds: every document written, noted before any of them is left as the loop below leaves it -
-	// KFCDiagWrittenDocs.h.)
-	for (size_t i = 0; i < targets.size(); ++i)
-		if (wroteTo[i] && KFCBookScope::IsDocStillOpen(targets[i].docRef))
-			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
-
-	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back.
-	// A document another target wrote is left as that target leaves it (a book listing one file twice - Change All in
-	// Book's note, KFCChangeAll.cpp): not handed back from under its write, nor named as left open.
-	std::set<IDataBase*> writtenDBs;
-	for (size_t i = 0; i < targets.size(); ++i)
-		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)
-			writtenDBs.insert(targets[i].docRef.GetDataBase());
+	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back - Change All in Book's rule
+	// (KFCChangeAll::LeaveRunDocuments), a document not written made clean again first when it was clean: a walk can mark a
+	// database modified without changing a character, and handed back as it is, such a chapter stays open with no window
+	// and a document of the user's stays "unsaved" with nothing in it changed (cases xq-book-dirty-unwritten,
+	// xq-doc-dirty-unwritten).
 	std::vector<PMString> unclosed;
-	for (size_t i = 0; i < targets.size(); ++i)
-	{
-		if (wroteTo[i])
-		{
-			// a window that could not be opened is said, as Change All in Book says it (case xq-qs-nowindow)
-			if (KFCBookScope::IsHeldDoc(targets[i].docRef) && !KFCBookScope::ShowChapterWindow(targets[i].docRef)
-				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
-				unclosed.push_back(targets[i].shortName);
-		}
-		else if (writtenDBs.count(targets[i].docRef.GetDataBase()) > 0)
-			continue;
-		else if (!KFCBookScope::HandBackHeldDocNow(targets[i].docRef))
-			unclosed.push_back(targets[i].shortName);
-	}
+	KFCChangeAll::LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 
 	// ===== NO LIST (F7 - the no-track spec's section 5: the panel is left EMPTY). No header either: a book's row would
 	// read "(0)" over a run that wrote hundreds. NoteRun keeps the panel's icon on "a command ran".

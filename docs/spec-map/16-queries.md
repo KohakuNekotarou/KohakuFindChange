@@ -213,3 +213,4 @@
 - QRY-21：「検索と置換」の設定を空にした後、クエリの欄が何を出すかは実機で見ていない。
 - QRY-15・QRY-16：回帰の試験は、テスト用ビルドの故障スイッチ `qd-order-file` でファイルの場所を渡す（Windows の画面は試験から押せない）。本物の「名前を付けて保存」「開く」の画面の題名・種類・置き換えの確認は、試験では押していない。
 - QRY-14：InDesign を終了して起動し直すと並びが空になることは、作りから読んだもの（並びは UI 側の静的な一覧で、ファイルに書かない）。
+- QRY-20（2026-10-14・ブロック9の不具合の再検査 D9-1）：**書かなかった文書が「変更あり」になっていたら、入る前に変更なしだったものは変更なしに戻してから返す**＝Change All in Book と同じ規則（`KFCChangeAll::LeaveRunDocuments` を共有）。それまでのクエリの実行は戻さなかった＝歩きが文字を変えずに印を立てた章は閉じられず窓なしで残り（`left open with no window`）、利用者の文書は何も変わらないのに「変更あり」になる見込み（実機ではまだ起きたことが無い＝`xq-book-nomatch`・`xq-doc-nomatch` は合格）。⬜実機＝全件の回で `xq-book-dirty-unwritten`／`-armed`・`xq-doc-dirty-unwritten`／`-armed`・`ca-book-dirty-unwritten`（テスト用ビルドの故障スイッチ `run-dirty-unwritten`＝歩きが印を立てる・`run-leave-no-flag`＝前の形）。

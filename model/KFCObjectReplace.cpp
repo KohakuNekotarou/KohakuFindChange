@@ -552,6 +552,17 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		SayNoneReplaceable(outStatus, total, counts);
 		return false;
 	}
+	// EVERY DOCUMENT TO WRITE STILL OPEN once the last row is checked - the text rows' rule (KFCReplaceEngine.cpp,
+	// ReplaceRowsNow): checking a row of a closed chapter reopens it, and a close the message loop dispatches there would
+	// leave a document checked before it behind its docRef (not measured). Asked by comparing alone.
+	for (size_t c = 0; c < chapters.size(); ++c)
+	{
+		if (!chapters[c].todo.empty() && !KFCBookScope::IsDocStillOpen(chapters[c].docRef))
+		{
+			Refuse(outStatus, "a document of the selected rows has been closed - nothing was changed.");
+			return false;
+		}
+	}
 	InterfacePtr<IFindChangeService> svc(KFCObjectSearch::CreateFindChangeService());
 	InterfacePtr<IObjectWalker> shared(KFCObjectSearch::QuerySharedWalker());
 	if (svc == nil || shared == nil)

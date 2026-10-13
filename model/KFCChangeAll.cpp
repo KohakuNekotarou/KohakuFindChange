@@ -181,7 +181,64 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 		}
 	}
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	// (Fault switch run-dirty-unwritten, a test build's only - KFCDiag.h: a walk that changed nothing leaves its database
+	// marked modified, as a walk can - what LeaveRunDocuments has to put back on a document that was clean.)
+	if (ok && outCount == 0 && KFC_DIAG_FAULT("run-dirty-unwritten") && docRef.GetDataBase() != nil)
+		docRef.GetDataBase()->SetModified(kTrue);
 	return ok;
+}
+
+void KFCChangeAll::LeaveRunDocuments(const std::vector<KFCBookScope::ChapterDoc>& targets,
+	const std::vector<bool>& wasModified, const std::vector<bool>& wroteTo, std::vector<PMString>& outUnclosed)
+{
+	// (Test builds: every document written, noted before any of them is left as the loop below leaves it -
+	// KFCDiagWrittenDocs.h. Not one gone since: the note reads the document.)
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i] && KFCBookScope::IsDocStillOpen(targets[i].docRef))
+			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
+	std::set<IDataBase*> writtenDBs;
+	for (size_t i = 0; i < targets.size(); ++i)
+		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)
+			writtenDBs.insert(targets[i].docRef.GetDataBase());
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		if (wroteTo[i])
+		{
+			// A WINDOW THAT COULD NOT BE OPENED IS SAID: the chapter stays held and windowless with what was written in it,
+			// which is "left open with no window" (measured with the fault switch no-window - cases xq-ca-nowindow,
+			// xq-qs-nowindow: it stood open in silence). Not a chapter closed since: that one is not left open.
+			if (KFCBookScope::IsHeldDoc(targets[i].docRef) && !KFCBookScope::ShowChapterWindow(targets[i].docRef)
+				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
+				outUnclosed.push_back(targets[i].shortName);
+			continue;
+		}
+		if (writtenDBs.count(targets[i].docRef.GetDataBase()) > 0)
+			continue;
+		// (Fault switch run-leave-no-flag, a test build's only - KFCDiag.h: the flag left as the walk left it, the way the
+		// query run left it before it took this rule - cases xq-book-dirty-unwritten-armed, xq-doc-dirty-unwritten-armed.)
+		if (!wasModified[i] && KFCBookScope::IsDocStillOpen(targets[i].docRef) && !KFC_DIAG_FAULT("run-leave-no-flag"))
+		{
+			IDataBase* const db = targets[i].docRef.GetDataBase();
+			if (db != nil)
+				db->SetModified(kFalse);
+		}
+		if (!KFCBookScope::HandBackHeldDocNow(targets[i].docRef))
+			outUnclosed.push_back(targets[i].shortName);
+	}
+}
+
+void KFCChangeAll::PutRunDocumentsBack(const std::vector<KFCBookScope::ChapterDoc>& targets,
+	const std::vector<bool>& wasModified)
+{
+	for (size_t i = 0; i < targets.size(); ++i)
+	{
+		if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))
+			continue;
+		IDataBase* const db = targets[i].docRef.GetDataBase();
+		if (db != nil)
+			db->SetModified(kFalse);
+	}
+	KFCBookScope::ReleaseHeldDocs();
 }
 
 bool KFCChangeAll::ClearResults(PMString& outStatus)
@@ -370,6 +427,15 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 				cancelled = true;
 				break;
 			}
+			// A DOCUMENT GONE SINCE THE RUN TOOK IT IS NOT WRITTEN - the query run's rule (KFCQuerySequence.cpp): its docRef
+			// would be followed into a database that is no longer there. The closed chapters were opened one after another,
+			// and opening one runs the message loop: a close dispatched there would take away a chapter the user has open in
+			// a window (not measured). Asked by comparing alone (KFCBookScope::IsDocStillOpen).
+			if (!KFCBookScope::IsDocStillOpen(targets[d].docRef))
+			{
+				KFC_DIAG_LOG("CHANGEALL %s is no longer open - not written", targets[d].shortName.GetUTF8String().c_str());
+				continue;
+			}
 			int32 count = 0, partial = 0;
 			const bool wrote = objectTab
 				? KFCObjectReplace::ReplaceAllInDoc(targets[d].docRef, count, partial)
@@ -408,17 +474,9 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	if (cancelled || failed)
 	{
-		// the text is back; the "unsaved" flag is put back by hand (AbortCommandSequence leaves it - the replace's rule)
+		// the text is back; the "unsaved" flags are put back by hand (AbortCommandSequence leaves them - PutRunDocumentsBack)
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		for (size_t i = 0; i < targets.size(); ++i)
-		{
-			if (wasModified[i] || !KFCBookScope::IsDocStillOpen(targets[i].docRef))
-				continue;
-			IDataBase* const db = targets[i].docRef.GetDataBase();
-			if (db != nil)
-				db->SetModified(kFalse);
-		}
-		KFCBookScope::ReleaseHeldDocs();
+		PutRunDocumentsBack(targets, wasModified);
 		KFCResultModel::NoteChangeAllWrote(false);		// the panel's pencil cat: nothing was written
 		if (cancelled)
 			outSummary.Append("Cancelled - nothing was changed.");
@@ -431,45 +489,10 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 		return 0;
 	}
 
-	// (Test builds: every chapter written, noted before any of them is left as the loop below leaves it -
-	// KFCDiagWrittenDocs.h.)
-	for (size_t i = 0; i < targets.size(); ++i)
-		if (wroteTo[i])
-			KFC_DIAG_NOTE_WRITE(targets[i].docRef);
-
-	// ===== AFTER THE SEQUENCE: a window for each held chapter written to, the rest handed back (the replace's rule).
-	// A DOCUMENT ANOTHER TARGET WROTE IS WRITTEN: a book listing one file twice gives two targets one document, and the
-	// second - nothing left to change - must not take its "unsaved" flag down over the first one's write
-	// (KFCReplaceEngine::DocsAfterWrite says why). It is left as the target that wrote it leaves it.
-	std::set<IDataBase*> writtenDBs;
-	for (size_t i = 0; i < targets.size(); ++i)
-		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)
-			writtenDBs.insert(targets[i].docRef.GetDataBase());
+	// ===== AFTER THE SEQUENCE: a window for each held chapter written to, the rest handed back - LeaveRunDocuments, the
+	// query run's rule too.
 	std::vector<PMString> unclosed;
-	for (size_t i = 0; i < targets.size(); ++i)
-	{
-		if (!wroteTo[i] && writtenDBs.count(targets[i].docRef.GetDataBase()) > 0)
-			continue;
-		if (wroteTo[i])
-		{
-			// A WINDOW THAT COULD NOT BE OPENED IS SAID: the chapter stays held and windowless with what was written in it,
-			// which is "left open with no window" (measured with the fault switch no-window - case xq-ca-nowindow: it
-			// stood open in silence). Not a chapter closed since: that one is not left open.
-			if (KFCBookScope::IsHeldDoc(targets[i].docRef) && !KFCBookScope::ShowChapterWindow(targets[i].docRef)
-				&& KFCBookScope::IsDocStillOpen(targets[i].docRef))
-				unclosed.push_back(targets[i].shortName);
-			continue;
-		}
-		// nothing written: it comes out as it went in (a walk can mark a database modified without changing a character)
-		if (!wasModified[i] && KFCBookScope::IsDocStillOpen(targets[i].docRef))
-		{
-			IDataBase* const db = targets[i].docRef.GetDataBase();
-			if (db != nil)
-				db->SetModified(kFalse);
-		}
-		if (!KFCBookScope::HandBackHeldDocNow(targets[i].docRef))
-			unclosed.push_back(targets[i].shortName);
-	}
+	LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 
 	// ===== THE MESSAGE (the spec's section 4; the selected documents' form - the query dialog's spec, section 4-4).
 	if (replaced == 0 && selection.selected > 0)
