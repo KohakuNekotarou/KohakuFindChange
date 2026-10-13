@@ -197,8 +197,9 @@ namespace
 	    held.
 
 	    ASKED OF THE UI HALF (the model/UI split). Presentations are user interface
-	    (IDocumentUIUtils); the all-presentations search and its notes - and the local predicate Adobe
-	    asks for - are IKFCUIServices::DocHasAnyWindow's (KFCUIServices.cpp). No UI
+	    (IDocumentUIUtils); the all-presentations search and its notes - and the SDK's own any-presentation
+	    predicate it asks with, FindPresCriteria::accept_all, whose implementation is in WidgetBin - are
+	    IKFCUIServices::DocHasAnyWindow's (KFCUIServices.cpp). No UI
 	    (a background thread, InDesign Server) has no window to show a document in: false. */
 	bool DocHasAnyWindow(const UIDRef& docRef)
 	{

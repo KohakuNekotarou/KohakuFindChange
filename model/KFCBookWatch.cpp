@@ -222,7 +222,7 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// StartTimer it (:645-658). So the one example that exists exercises the "remove me" return and
 	// nothing else, and the positive-value re-arm below is used by nobody but this plug-in.
 	// (CTracker's timers are ITrackerTimer, a different interface, and are not evidence either way.
-	// KFCPanelAlpha's re-apply chain rests on the same inference.)
+	// KFCPanelAlpha's re-apply chain rests on the same observation.)
 	//
 	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's
 	// chapters are not handed back HERE - but the next search or query run calls ReleaseSearchedBook

@@ -24,6 +24,7 @@
 
 // General includes:
 #include "FileUtils.h"			// IsEqual - a panel's book and the searched book, compared as files
+#include "K2SmartPtr.h"			// K2::scoped_ptr - GetSelectedBookContents' list is the caller's to delete
 #include "PaletteRefUtils.h"	// IsPaletteVisible - the front tab is decided on the container
 #include "PersistUtils.h"		// ::GetClass / ::GetDataBase
 #include "SDKFileHelper.h"
@@ -258,13 +259,14 @@ namespace
 			if (panelData == nil)
 				return true;		// this book's panel, but not readable: the whole book
 			K2Vector<int32> rows;
-			UIDList* selected = nil;
-			(void)Utils<IBookUIUtils>()->GetSelectedBookContents(rows, selected, panelData);
+			UIDList* made = nil;
+			(void)Utils<IBookUIUtils>()->GetSelectedBookContents(rows, made, panelData);
+			// Made by the callee, deleted by the caller (AcquireCurrentBook's destructor) - on every way out.
+			const K2::scoped_ptr<UIDList> selected(made);
 			outTotal = Utils<IBookUIUtils>()->GetListItems(panelData);
 			if (selected != nil)
 				for (int32 i = 0; i < selected->Length(); ++i)
 					outContents.push_back(selected->At(i));
-			delete selected;		// made by the callee, deleted by the caller (AcquireCurrentBook's destructor)
 			read = true;
 			return true;
 		});
