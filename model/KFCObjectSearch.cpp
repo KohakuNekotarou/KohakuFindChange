@@ -67,9 +67,11 @@
 
 namespace
 {
-// THE USER'S SELECTION, GIVEN BACK (O6). The text walker service's snapshot - the spelling panel's, which InDesign's own
-// search takes the same way (ITextWalkerSelectionUtils.h, SaveSelectionsSnapshot / RestoreSelectionsSnapshot); measured
-// with an object search over a windowless document and over the front one (KT - the object search plan's Task 1 M4,
+// THE USER'S SELECTION, GIVEN BACK (O6). The text walker service's snapshot (ITextWalkerSelectionUtils.h,
+// SaveSelectionsSnapshot / RestoreSelectionsSnapshot). No worked example in the SDK: the header names
+// SpellPanelObserver::Update as their caller, and the open spellpanel source has both calls commented out
+// (SpellPanelObserver.cpp:338, :350). So the shape is the header's and the proof is measured - with an object search over
+// a windowless document and over the front one (KT - the object search plan's Task 1 M4,
 // docs/superpowers/plans/2026-10-09-kfc-object-search.md: five selection states, the selection and the active layer the
 // same before and after). Never around a write: see the header.
 class SelectionKeeper
