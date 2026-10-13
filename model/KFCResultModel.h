@@ -35,18 +35,16 @@
 namespace KFCResultModel
 {
 	/** THE LIMIT, ONE NUMBER (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9 - the
-	    author's call): a search collects this many rows and the panel draws every one of them (kKFCCollectHitLimit
-	    is this number). More than this is not a list to walk and replace row by row - a Change All writes any number
-	    without one (KFC's for a book, InDesign's own otherwise). The cap's machinery (the adapter's counts, the close
-	    responder's rebuild) stays: with one number it never cuts a row. Not in KFCModelTypes.h: the UI half reads the
-	    counts the cap leaves (IKFCResults), never the cap. */
-	const int32 kKFCDisplayHitLimit = 300;
+	    author's call): a list holds at most this many rows, and the panel draws every one of them. More than this is
+	    not a list to walk and replace row by row - a Change All writes any number without one (KFC's for a book,
+	    InDesign's own otherwise). Counted in ROWS.
 
-	/** THE WHOLE-RUN CEILING - the same number the panel draws (kKFCDisplayHitLimit - F9 of
-	    docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md): a search stops collecting there and
-	    says so ("Stopped at the 300 limit - narrow the search, or use ..."), so no query can pile up rows nobody
-	    will replace one by one. Counted in ROWS. */
-	const int32 kKFCCollectHitLimit = kKFCDisplayHitLimit;
+	    Every road that adds rows stops at it - the search's walks, which say so ("Stopped at the 300 limit - narrow
+	    the search, or use ..."), Search This Story / Document Again (the room the rest of the list leaves) and the
+	    object search - so the counts the tree is built from (GetDisplayChapterCount and the rest) are the counts the
+	    list holds, with no cap of their own. Not in KFCModelTypes.h: the UI half reads those counts (IKFCResults),
+	    never this number. */
+	const int32 kKFCCollectHitLimit = 300;
 
 	/** One match on one line of one chapter. The three text segments are the line split around
 	    the match; the jump anchors point back at the exact occurrence. */
@@ -157,8 +155,8 @@ namespace KFCResultModel
 	/** One STORY of a chapter's hits - one story row in the tree. The struct keeps the name it had when
 	    this level held the fonts of Find Missing Glyphs (since removed).
 
-	    hitIndices index the chapter's own hits vector, ASCENDING, which is what lets the display cap
-	    be applied to a group with a lower_bound rather than a scan. */
+	    hitIndices index the chapter's own hits vector, ASCENDING - the chapter's own (page) order, the order the
+	    tree lists the story's rows in (GetFontGroupHit). */
 	struct FontGroup
 	{
 		// (Its row's text - "ID260: first words..." - is made from its rows' storyLead as it is read: GetFontDisplay.)
@@ -264,9 +262,8 @@ namespace KFCResultModel
 	    (KFCUndoFollow::ForgetDocument): its rows, groups, versions and searched parts gone, no docRef, no file. */
 	void EmptyChapter(Chapter& chapter);
 
-	/** The nth chapter the tree SHOWS - the chapters with rows (and one searched again with none - Chapter::shownEmpty),
-	    under the display cap - as a chapter index;
-	    -1 = none. With no emptied chapter the nth shown is chapter nth. */
+	/** The nth chapter the tree SHOWS - the chapters with rows, and one searched again with none (Chapter::shownEmpty) -
+	    as a chapter index; -1 = none. With no emptied chapter the nth shown is chapter nth. */
 	int32 GetShownChapter(int32 nth);
 
 	/** The reverse: chapter 'chapterIdx''s place among the shown chapters; -1 = not shown. */
@@ -347,48 +344,41 @@ namespace KFCResultModel
 	/** Application-shutdown cleanup: release the vectors' storage, no UI. */
 	void ShutdownCleanup();
 
-	/** The number of chapters in the model (uncapped) - a chapter CloseChapter emptied, and one searched again with no
-	    match (Chapter::shownEmpty), included: indexes run 0 .. this - 1. (What the tree shows: GetDisplayChapterCount.) */
+	/** The number of chapters in the model - a chapter CloseChapter emptied, and one searched again with no match
+	    (Chapter::shownEmpty), included: indexes run 0 .. this - 1. (What the tree shows: GetDisplayChapterCount.) */
 	int32 GetChapterCount();
 
-	/** The number of hits under chapter 'chapterIdx' (uncapped, the full stored count). */
+	/** The number of hits under chapter 'chapterIdx'. */
 	int32 GetHitCount(int32 chapterIdx);
 
-	/** The total number of hits across ALL chapters (uncapped) - for the status summary. */
+	/** The total number of hits across ALL chapters - for the status summary. */
 	int32 GetTotalHitCount();
 
-	/** The number of chapters the tree shows - those with at least one DISPLAYED hit, and one searched again with none
-	    (Chapter::shownEmpty) - the tree root's child count under the display cap. Chapters past the cap are not shown,
-	    and neither is one CloseChapter emptied - so the nth of them is GetShownChapter(nth), not chapter nth. */
+	/** The number of chapters the tree shows - those with a row, and one searched again with none (Chapter::shownEmpty):
+	    the tree root's child count. One CloseChapter emptied is not shown - so the nth of them is GetShownChapter(nth),
+	    not chapter nth. */
 	int32 GetDisplayChapterCount();
 
-	/** The number of hits DISPLAYED under chapter 'chapterIdx' - capped in book order so the whole
-	    tree shows at most kKFCDisplayHitLimit hit rows. The chapter still STORES every hit. */
+	/** The number of rows the tree shows under chapter 'chapterIdx' - every row it holds (GetHitCount): the list never
+	    holds more than kKFCCollectHitLimit, so the tree has nothing to cut. */
 	int32 GetDisplayHitCount(int32 chapterIdx);
 
 	/** A chapter node's display: its name and its hit count. false = index out of range. */
 	bool GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount);
 
-	/** How many STORY rows this chapter shows - the groups that still have a displayed hit under the
-	    panel's cap. ("Font" in the names below is the level's old name - it held the fonts of Find
-	    Missing Glyphs, since removed.)
-
-	    The groups that lose everything to the cap are the LAST ones (they are in first-appearance
-	    order, and the cap keeps a prefix of the chapter's hits), so the displayed groups are the
-	    first N - which is why GetNthChild can ask for one by position. */
+	/** How many STORY rows this chapter shows - every story group (each holds a row). ("Font" in the names below is
+	    the level's old name - it held the fonts of Find Missing Glyphs, since removed.) */
 	int32 GetDisplayFontCount(int32 chapterIdx);
 
-	/** How many hits are DISPLAYED under one font group - its share of the chapter's own display
-	    cap. 0 for an index out of range, and for a group the cap cut off entirely. */
+	/** How many rows the tree shows under one story group - every row it holds. 0 for an index out of range. */
 	int32 GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx);
 
-	/** A story row's display: its text ("ID260: first words...") and its FULL hit count - uncapped, like
-	    every other number the tree reads out: what a row holds, not what the panel drew of it.
+	/** A story row's display: its text ("ID260: first words...") and its hit count - what the row holds.
 	    false = index out of range. */
 	bool GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& outName, int32& outHitCount);
 
 	/** HOW MANY OF THEM THIS LIST HAS REPLACED (Hit::replaced) - the R of a branch row's "(R/M)" (the author's call:
-	    a document row and a story row say how many of their hits have been replaced, "1/3"). Uncapped like M: every hit
+	    a document row and a story row say how many of their hits have been replaced, "1/3"). Counted like M: every hit
 	    the row holds. An Undo of a replace puts the hit back as found, so the count follows it. 0 out of range. */
 	int32 GetChapterReplacedCount(int32 chapterIdx);
 	int32 GetFontReplacedCount(int32 chapterIdx, int32 fontIdx);
@@ -629,12 +619,6 @@ namespace KFCResultModel
 	    from the row's outcome exclude each other, being values of one field: missing and refused. */
 	void BuildHitLocator(Hit& hit);
 
-	/** Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The
-	    hits must already stand in page order: a run of equal pageIndex is one page, the ordinal is
-	    the place in that run, and a page holding ONE row shows none, since there is nothing to tell
-	    apart. Called by OrderHitsByPage, its one caller. */
-	void NumberHitsWithinPages(std::vector<Hit>& hits);
-
 	/** One chapter's hits put in PAGE order - overset matches (pageIndex -1) to the end, a stable sort, so the hits on
 	    one page keep the order they stand in - and numbered within their pages (NumberHitsWithinPages). One ordering
 	    for every list: a search's finishing pass, the text search's and the object search's alike, and a search again. */
@@ -700,20 +684,15 @@ namespace KFCResultModel
 	    describing replacements that no longer exist, so the two have to be put back together: this is
 	    the panel's half.
 
-	    Exactly one of RollBackRows (the write was taken back) or ForgetRowBackup (it committed) must
-	    follow, or the copies stay alive until the next replace.
-	    EVERY WRITE OF ROWS STARTS IT THROUGH KFCUndoFollow::StepRecorder, and the one that commits hands
-	    the copies over with TakeRowBackup (the "before" of an Undo) instead of forgetting them. The story
-	    versions a write records (SetStoryVersion) are copied the same way. */
+	    Exactly one of RollBackRows (the write was taken back) or TakeRowBackup (it committed - the copies become the
+	    "before" of its Undo) must follow, or the copies stay alive until the next write. EVERY WRITE OF ROWS STARTS
+	    IT THROUGH KFCUndoFollow::StepRecorder, which ends it one way or the other. The story versions a write records
+	    (SetStoryVersion) are copied the same way. */
 	void BeginRowBackup();
 
 	/** Put every remembered row back the way it was and stop remembering. A row is remembered once, as
 	    the run found it, however many times the run changes it. */
 	void RollBackRows();
-
-	/** Stop remembering and release the copies: the replace committed, so the rows keep what they
-	    were given. */
-	void ForgetRowBackup();
 
 	// THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "the panel should come back with it, the way KCM's
 	// does"). A write of KFC's own is one undo step, and what it did to the rows is kept beside it
@@ -752,8 +731,8 @@ namespace KFCResultModel
 		std::vector<VersionCopy>	versionsAfter;
 	};
 
-	/** Stop remembering, as ForgetRowBackup does, and hand the copies over: every row and recorded
-	    version changed since BeginRowBackup, as it was when it was first changed and as it stands now. */
+	/** Stop remembering and hand the copies over: every row and recorded version changed since
+	    BeginRowBackup, as it was when it was first changed and as it stands now. */
 	void TakeRowBackup(RowStep& out);
 
 	/** Put a step's rows and recorded versions back - its "after" copies (after = true) or its "before"

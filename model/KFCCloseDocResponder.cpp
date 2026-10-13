@@ -224,16 +224,11 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		KFCResultModel::GetChapterDisplay(closingChapter, closedName, closedCount);
 		KFC_DIAG_LOG("CLOSE - All Documents: chapter %d's %d row(s) go, the others stay", closingChapter, closedCount);
 		KFCUndoFollow::ForgetDocument(closingDocRef);
-		// Over the display cap, taking one out can bring rows past the cap into view, which only a rebuild
-		// draws; under it, only that row goes and the others stay as they are (open or closed). (One limit -
-		// docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9: the panel draws every row a
-		// list holds, so this rebuild is not reached now - kept for a cap that ever differs again.)
-		const bool overCap = KFCResultModel::GetTotalHitCount() > KFCResultModel::kKFCDisplayHitLimit;
-		if (!overCap)
-			KFCNotifyChapterRowGoes(closingChapter);
+		// Only that row goes, and the others stay as they are (open or closed): the panel draws every row a list
+		// holds (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F9), so taking one out
+		// brings no other into view.
+		KFCNotifyChapterRowGoes(closingChapter);
 		KFCResultModel::CloseChapter(closingChapter);
-		if (overCap)
-			KFCNotifyRebuild();
 		PMString msg(closedName);
 		msg.SetTranslatable(kFalse);
 		msg.Append(" was closed - its rows are gone. The other documents' rows stay.");

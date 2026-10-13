@@ -122,9 +122,8 @@ public:
 			return KFCResultNodeID::Create(nodeID->GetChapter(), hit);
 		}
 
-		// A document row. The groups the display cap wipes out are the LAST ones (they are in
-		// first-appearance order and the cap keeps a prefix of the chapter's hits), so the nth
-		// displayed group is simply the nth group.
+		// A document row. Every story group shows (GetDisplayFontCount), so the nth displayed group
+		// is simply the nth group.
 		const int32 fonts = KFCResults()->GetDisplayFontCount(nodeID->GetChapter());
 		if (fonts > 0)
 		{

@@ -16,7 +16,7 @@
 // General includes:
 #include "TextChar.h"	// kTextChar_CR / kTextChar_LF / kTextChar_PilchrowSign and the hidden markers - see MarkUpBreaksForDisplay
 
-#include <algorithm>	// std::lower_bound - where the display cap falls inside one font group; std::partition_point - the groups it leaves shown; std::sort
+#include <algorithm>	// std::stable_sort - the page order and each story's order (OrderHitsByPage, NumberHitsWithinStories)
 #include <set>			// the rows already copied aside - see BackUpRow
 #include <iterator>		// std::make_move_iterator - ReplaceStoryRows hands the walked story's hits over
 #include <utility>		// std::move - the thinning below hands whole hits over instead of copying
@@ -88,8 +88,21 @@ namespace
 		gRowBackup.push_back(saved);
 	}
 
-	// Does the tree show this chapter (the cap aside)? Rows, or searched again with none (Chapter::shownEmpty) - the one
-	// question GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask.
+	// Stop remembering and release the copies - the rows they name have been put back, or are gone: a rollback's end
+	// (RollBackRows), a list laid out again (ReplaceStoryRows, ReplaceChapterRows, RestoreModelSnapshot) and the
+	// shutdown. Not public: a write that commits hands its copies to its Undo instead (TakeRowBackup), and one that
+	// forgot them would leave its Undo nothing to put back.
+	void ForgetRowBackup()
+	{
+		gBackingUpRows = false;
+		std::vector<KFCResultModel::RowCopy>().swap(gRowBackup);	// swapped with a temporary: the storage goes too
+		gRowsBackedUp.clear();
+		std::vector<KFCResultModel::VersionCopy>().swap(gVersionBackup);
+		gVersionsBackedUp.clear();
+	}
+
+	// Does the tree show this chapter? Rows, or searched again with none (Chapter::shownEmpty) - the one question
+	// GetDisplayChapterCount, GetShownChapter and GetShownChapterPos ask.
 	bool ChapterShown(const KFCResultModel::Chapter& c)
 	{
 		return !c.hits.empty() || c.shownEmpty;
@@ -207,18 +220,6 @@ namespace
 			for (size_t k = 0; k < order.size(); ++k)
 				chapter.hits[static_cast<size_t>(order[k])].storyOrdinal = static_cast<int32>(k);
 		}
-	}
-
-	// Hits stored in the chapters BEFORE 'chapterIdx' (book order). The display cap is applied in
-	// book order, and every chapter before the boundary chapter is shown in full, so counting full
-	// hits here is the budget consumed before this chapter.
-	int32 HitsBeforeChapter(int32 chapterIdx)
-	{
-		int32 sum = 0;
-		const int32 n = static_cast<int32>(gChapters.size());
-		for (int32 i = 0; i < chapterIdx && i < n; ++i)
-			sum += static_cast<int32>(gChapters[i].hits.size());
-		return sum;
 	}
 }
 
@@ -339,18 +340,14 @@ int32 KFCResultModel::GetShownChapter(int32 nth)
 	if (nth < 0)
 		return -1;
 	// GetDisplayChapterCount's walk, naming the chapter it reaches
-	int32 before = 0;
 	int32 shown = 0;
 	for (size_t i = 0; i < gChapters.size(); ++i)
 	{
-		if (before >= kKFCDisplayHitLimit)
-			break;
 		if (!ChapterShown(gChapters[i]))
 			continue;
 		if (shown == nth)
 			return static_cast<int32>(i);
 		++shown;
-		before += static_cast<int32>(gChapters[i].hits.size());
 	}
 	return -1;
 }
@@ -364,7 +361,7 @@ int32 KFCResultModel::GetShownChapterPos(int32 chapterIdx)
 	for (int32 i = 0; i < chapterIdx; ++i)
 		if (ChapterShown(gChapters[i]))
 			++pos;
-	return (pos < GetDisplayChapterCount()) ? pos : -1;
+	return pos;
 }
 
 bool KFCResultModel::IsWorkOutcome(ChangeOutcome outcome)
@@ -452,33 +449,16 @@ int32 KFCResultModel::GetTotalHitCount()
 
 int32 KFCResultModel::GetDisplayChapterCount()
 {
-	// The displayed chapters are the book-order prefix whose hits fit under the cap: a chapter is
-	// shown when the hits before it have not already used up the whole budget.
-	int32 before = 0;
 	int32 shown = 0;
 	for (size_t i = 0; i < gChapters.size(); ++i)
-	{
-		if (before >= kKFCDisplayHitLimit)
-			break;
-		if (!ChapterShown(gChapters[i]))
-			continue;	// a chapter CloseChapter emptied - kept in place, not shown
-		++shown;
-		before += static_cast<int32>(gChapters[i].hits.size());
-	}
+		if (ChapterShown(gChapters[i]))		// not a chapter CloseChapter emptied - kept in place, not shown
+			++shown;
 	return shown;
 }
 
 int32 KFCResultModel::GetDisplayHitCount(int32 chapterIdx)
 {
-	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil)
-		return 0;
-	const int32 before = HitsBeforeChapter(chapterIdx);
-	if (before >= kKFCDisplayHitLimit)
-		return 0;	// the cap ran out before this chapter
-	const int32 remaining = kKFCDisplayHitLimit - before;
-	const int32 full = static_cast<int32>(c->hits.size());
-	return (full < remaining) ? full : remaining;
+	return GetHitCount(chapterIdx);
 }
 
 bool KFCResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int32& outHitCount)
@@ -495,35 +475,16 @@ bool KFCResultModel::GetChapterDisplay(int32 chapterIdx, PMString& outName, int3
 int32 KFCResultModel::GetDisplayFontHitCount(int32 chapterIdx, int32 fontIdx)
 {
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
-	if (group == nil)
-		return 0;
-
-	// The chapter's own share of the cap, then this group's share of that. hitIndices is ascending,
-	// so the count is simply where the cap falls inside it.
-	const int32 shown = GetDisplayHitCount(chapterIdx);
-	const std::vector<int32>& idx = group->hitIndices;
-	return static_cast<int32>(std::lower_bound(idx.begin(), idx.end(), shown) - idx.begin());
+	return (group != nil) ? static_cast<int32>(group->hitIndices.size()) : 0;
 }
 
 int32 KFCResultModel::GetDisplayFontCount(int32 chapterIdx)
 {
+	// Every group: BuildFontGroups makes one at the first hit of its story, so each holds a row. One number, not a walk -
+	// the tree asks it for every child of a document row (KFCResultListAdapter::GetNthChild) and for every story row a
+	// rebuild opens.
 	const Chapter* c = ChapterAt(chapterIdx);
-	if (c == nil)
-		return 0;
-
-	// FOUND BY HALVING, NOT GROUP BY GROUP (the speed-up study). The tree asks this for EVERY child of a
-	// document row (KFCResultListAdapter::GetNthChild) and for every story row the rebuild opens, so counting group by
-	// group cost the groups squared per rebuild - 25 million group counts for a document of 5000 one-hit stories.
-	//
-	// A group shows while its FIRST hit is under the cap (its hitIndices ascend - GetDisplayFontHitCount). BuildFontGroups
-	// makes a group at the first hit of its story, scanning the hits in order, so every group holds a hit and the groups'
-	// first hits ascend with the group index: the groups that show are a PREFIX, and its length is the first group whose
-	// first hit is not under the cap.
-	const int32 shown = GetDisplayHitCount(chapterIdx);
-	const std::vector<FontGroup>& groups = c->fontGroups;
-	const std::vector<FontGroup>::const_iterator end = std::partition_point(groups.begin(), groups.end(),
-		[shown](const FontGroup& group) { return !group.hitIndices.empty() && group.hitIndices.front() < shown; });
-	return static_cast<int32>(end - groups.begin());
+	return (c != nil) ? static_cast<int32>(c->fontGroups.size()) : 0;
 }
 
 bool KFCResultModel::IsStoryGroup(int32 chapterIdx, int32 groupIdx)
@@ -979,6 +940,22 @@ void KFCResultModel::SetHitSegments(int32 chapterIdx, int32 hitIdx, const PMStri
 	h.matchHash = newMatchHash;
 }
 
+// The page words of a row that names its page - a text row's and an object row's alike (BuildHitLocator): "P<page>",
+// "(<n>)" when the page holds more than one row (Hit::pageOrdinal), and " overset" after them for an overset match.
+static void AppendPageWords(KFCResultModel::Hit& hit)
+{
+	hit.locator.Append("P");
+	hit.locator.Append(hit.pageString);
+	if (hit.pageOrdinal > 0)
+	{
+		hit.locator.Append("(");
+		hit.locator.AppendNumber(hit.pageOrdinal);
+		hit.locator.Append(")");
+	}
+	if (hit.isOverset)
+		hit.locator.Append(" overset");
+}
+
 void KFCResultModel::BuildHitLocator(Hit& hit)
 {
 	hit.locator.Clear();
@@ -997,18 +974,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		else if (hit.onPasteboard || hit.pageString.IsEmpty())
 			hit.locator.Append("pasteboard");
 		else
-		{
-			hit.locator.Append("P");
-			hit.locator.Append(hit.pageString);
-			if (hit.pageOrdinal > 0)
-			{
-				hit.locator.Append("(");
-				hit.locator.AppendNumber(hit.pageOrdinal);
-				hit.locator.Append(")");
-			}
-			if (hit.isOverset)
-				hit.locator.Append(" overset");
-		}
+			AppendPageWords(hit);
 		if (hit.isMaster)
 			hit.locator.Append(" master");
 		if (hit.isGrouped)
@@ -1026,16 +992,7 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 	{
 		// An overset hit carries the "+" indicator's page and sorts by it; a trailing " overset"
 		// (after the page and ordinal) marks it as overset -> e.g. "P1(2) overset".
-		hit.locator.Append("P");
-		hit.locator.Append(hit.pageString);
-		if (hit.pageOrdinal > 0)
-		{
-			hit.locator.Append("(");
-			hit.locator.AppendNumber(hit.pageOrdinal);
-			hit.locator.Append(")");
-		}
-		if (hit.isOverset)
-			hit.locator.Append(" overset");
+		AppendPageWords(hit);
 	}
 	// What the row cannot show any other way, each separated by a space. The tests below ARE the list -
 	// two kinds of word, kept in two strings:
@@ -1080,7 +1037,10 @@ void KFCResultModel::BuildHitLocator(Hit& hit)
 		hit.accentFlag.Append("refused");	// its own run, in the accent colour
 }
 
-void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
+// Number one chapter's hits within their pages and rebuild each locator (BuildHitLocator). The hits must already stand
+// in page order - OrderHitsByPage, its one caller, puts them there: a run of equal pageIndex is one page, the ordinal is
+// the place in that run, and a page holding ONE row shows none, since there is nothing to tell apart.
+static void NumberHitsWithinPages(std::vector<KFCResultModel::Hit>& hits)
 {
 	size_t runStart = 0;
 	while (runStart < hits.size())
@@ -1092,7 +1052,7 @@ void KFCResultModel::NumberHitsWithinPages(std::vector<Hit>& hits)
 		for (size_t k = runStart; k < runEnd; ++k)
 		{
 			hits[k].pageOrdinal = (runCount > 1) ? (static_cast<int32>(k - runStart) + 1) : 0;
-			BuildHitLocator(hits[k]);
+			KFCResultModel::BuildHitLocator(hits[k]);
 		}
 		runStart = runEnd;
 	}
@@ -1221,20 +1181,7 @@ void KFCResultModel::RollBackRows()
 	for (size_t i = 0; i < gVersionBackup.size(); ++i)
 		PutVersionBack(gVersionBackup[i]);
 
-	// Swapping against a temporary releases the storage as well as the contents.
-	std::vector<RowCopy>().swap(gRowBackup);
-	gRowsBackedUp.clear();
-	std::vector<VersionCopy>().swap(gVersionBackup);
-	gVersionsBackedUp.clear();
-}
-
-void KFCResultModel::ForgetRowBackup()
-{
-	gBackingUpRows = false;
-	std::vector<RowCopy>().swap(gRowBackup);
-	gRowsBackedUp.clear();
-	std::vector<VersionCopy>().swap(gVersionBackup);
-	gVersionsBackedUp.clear();
+	ForgetRowBackup();
 }
 
 void KFCResultModel::TakeRowBackup(RowStep& out)

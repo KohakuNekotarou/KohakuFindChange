@@ -580,20 +580,6 @@ void KFCResultTree::Rebuild()
 		KFC_DIAG_LOG("TREETIME hits=%d chapters=%d expands=%d mode=%d %.0f ms %s", (int)KFCResults()->GetTotalHitCount(),
 			(int)chapters, (int)expandCalls, expandMode, tTree, counters);
 	}
-	// THE COUNTS THE TREE IS BUILT FROM, CHECKED THE OLD WAY (test builds). GetDisplayFontCount finds
-	// the shown groups by halving now; here every group is counted one by one, as they were before, after the timing
-	// above. A difference is logged as DISPCOUNT MISMATCH - the regression runs grep for it.
-	for (int32 n = 0; n < chapters; ++n)
-	{
-		const int32 c = KFCResults()->GetShownChapter(n);
-		int32 fontsByGroup = 0;
-		for (int32 g = 0; KFCResults()->IsStoryGroup(c, g); ++g)
-			if (KFCResults()->GetDisplayFontHitCount(c, g) > 0)
-				++fontsByGroup;
-		const int32 fontsNow = KFCResults()->GetDisplayFontCount(c);
-		if (fontsNow != fontsByGroup)
-			KFC_DIAG_LOG("DISPCOUNT MISMATCH chapter=%d fonts now=%d by group=%d", (int)c, (int)fontsNow, (int)fontsByGroup);
-	}
 #endif
 }
 
@@ -645,7 +631,7 @@ void KFCResultTree::BeforeChapterRowGoes(int32 chapterIdx)
 	InterfacePtr<ITreeViewMgr> treeMgr(QueryResultTreeMgr());
 	if (treeMgr == nil)
 		return;
-	// A row the tree never showed (past the display cap) is nothing to take out.
+	// A row the tree does not show is nothing to take out.
 	if (KFCResults()->GetShownChapterPos(chapterIdx) < 0)
 		return;
 	treeMgr->BeforeNodeDeleted(KFCResultNodeID::Create(chapterIdx));
