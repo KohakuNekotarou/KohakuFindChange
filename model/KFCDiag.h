@@ -129,7 +129,7 @@
 //                land-click-closed-armed)
 //    home-end-stock  (UI half) the result list's Home / End / PageUp / PageDown move the selection alone, the old way
 //                (ui/KFCResultTreeEH.cpp's StockMoveThenLand): the list on the row they reach, the page left on the row before
-//                (click-end-lands-armed, click-pgdn-lands-armed)
+//                (click-end-lands-armed, click-home-lands-armed)
 //    scope-walk-off  KFCSearchEngine::ScopeHasNothingToWalk answers no, the old way: a document with no story to walk (no
 //                text frame, or master-page text only with Include Master Pages off) meets InDesign's kFailure again - the
 //                search says it "stopped with a search error" and Change All in Book / a query run stops whole

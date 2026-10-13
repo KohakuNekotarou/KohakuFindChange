@@ -573,10 +573,12 @@ bool16 KFCResultTreeEH::HandleUpDownKey(IEvent* e, const VirtualKey& key)
 	return StockMoveThenLand(e, key);
 }
 
-// HOME / END / PAGEUP / PAGEDOWN LAND AS THE ARROWS DO (the author's call, 2026-10-13 - they moved the selection alone, the
-// page left on the row before). The stock moves - to the first or the last row, or a screenful up or down - and the row it
-// reached is opened and landed on (StockMoveThenLand). With a modifier the stock's own move is left as it is, and a single
-// row it leaves selected is landed on - as for the arrows with Ctrl or Alt.
+// HOME / END / PAGEUP / PAGEDOWN LAND AS THE ARROWS DO (the author's call, 2026-10-13 - Home and End moved the selection
+// alone, the page left on the row before). The stock moves - Home to the first row, End to the last - and the row it reached
+// is opened and landed on (StockMoveThenLand), only when the selection moved: PageUp / PageDown scroll the list and leave the
+// selection where it is (measured 2026-10-13: forty rows, row 1 clicked, two PageDowns - row 1 still selected), and a
+// landing on the row left selected would open it, were it a closed row, and run its action again - for a scroll. With a
+// modifier the stock's own move is left as it is, and a single row it moves the selection to is landed on.
 bool16 KFCResultTreeEH::HandleHomeKey(IEvent* e)
 {
 	KFC_DIAG_LOG("RETFOCUS list home walking=%d", gWalking ? 1 : 0);
@@ -611,6 +613,16 @@ bool16 KFCResultTreeEH::HandlePageUpDownKey(IEvent* e, const VirtualKey& key)
 
 bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 {
+	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());
+	InterfacePtr<ITreeViewMgr> treeMgr(this, UseDefaultIID());
+
+	// Home / End / PageUp / PageDown land only where they moved the selection (see HandleHomeKey): the selection before.
+	// The arrows land wherever they leave one row selected, as they always have.
+	const bool arrow = key == kVirtualDownArrowKey || key == kVirtualUpArrowKey;
+	NodeIDList before;
+	if (controller != nil && !arrow)
+		controller->GetSelectedItems(before);
+
 	// The stock handler owns the movement: it knows which rows are on screen, how the selection
 	// scrolls, and it can only ever land on a row the tree really has.
 	bool16 handled = kFalse;
@@ -624,13 +636,10 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 		handled = TreeViewEventHandler::HandleUpDownKey(e, key);
 #ifdef KFC_DIAG
 	// (Test builds only) Fault switch home-end-stock: Home / End / PageUp / PageDown move the selection alone, the old way -
-	// the case that shows what the landing adds (click-end-lands-armed).
-	if (KFC_DIAG_FAULT("home-end-stock") && !(key == kVirtualDownArrowKey) && !(key == kVirtualUpArrowKey))
+	// the cases that show what the landing adds (click-end-lands-armed, click-home-lands-armed).
+	if (KFC_DIAG_FAULT("home-end-stock") && !arrow)
 		return handled;
 #endif
-
-	InterfacePtr<ITreeViewController> controller(this, UseDefaultIID());
-	InterfacePtr<ITreeViewMgr> treeMgr(this, UseDefaultIID());
 	if (controller == nil || treeMgr == nil)
 		return handled;
 
@@ -640,6 +649,8 @@ bool16 KFCResultTreeEH::StockMoveThenLand(IEvent* e, const VirtualKey& key)
 	controller->GetSelectedItems(selected);
 	if (selected.size() != 1)
 		return handled;
+	if (!arrow && before.size() == 1 && before[0] == selected[0])
+		return handled;		// the selection did not move (a PageUp / PageDown's scroll, Home on the first row)
 
 	TreeNodePtr<KFCResultNodeID> node(selected[0]);
 	if (node == nil || node->IsRoot())
