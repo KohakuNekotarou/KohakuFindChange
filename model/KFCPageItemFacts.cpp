@@ -37,6 +37,7 @@
 // Project includes:
 #include "KFCPageItemFacts.h"
 #include "KFCResultModel.h"
+#include "KFCTextCut.h"			// KFCIsAttachedMark - a mark goes with its character (StoryLeadText)
 
 namespace KFCPageItemFacts
 {
@@ -214,6 +215,8 @@ bool IsPageItemLockedForEdit(IDataBase* db, UID frameUID)
 // that show, each run of white space read as one space, InDesign's own marker characters (a table's
 // anchor, a footnote's reference, an anchored object, a zero-width mark...) left out, and the cut mark
 // when the story goes on. Read from the first 200 characters, which is plenty for 24 that show.
+// A mark that belongs to the character before it (a combining voiced mark, an accent) goes with that
+// character and is not one of the 24, so the cut never falls between the two (KFCTextCut.h's rule).
 //
 // IN THE OFFICIAL TERMS. Read through
 // IComposeScanner::CopyText, like every other read in this file (and codesnippets/
@@ -306,6 +309,16 @@ PMString StoryLeadText(const UIDRef& storyRef)
 			if (UnicodeClass::IsWhiteSpace(c) || v == kTextChar_IdeographicSpace)
 			{
 				pendingSpace = (shown > 0 && pendingBreaks.CharCount() == 0);	// after a break: an indent
+				continue;
+			}
+			// A MARK THAT BELONGS TO THE CHARACTER JUST SHOWN goes on with it, uncounted (KFCIsAttachedMark): the 24
+			// counts what shows, and a cut between the two would draw the bare character - a different glyph. Only
+			// the combining marks get here: IsIgnoredCharacter's set drops the variation selectors above, by design
+			// (kIgnoreUnicodeVariation), and keeps the combining marks (measured against Public.dll outside
+			// InDesign: yes to the five selectors tried, IVS among them; no to the seven marks, U+3099 among them).
+			if (shown > 0 && pendingBreaks.CharCount() == 0 && !pendingSpace && KFCIsAttachedMark(c))
+			{
+				lead.Append(c);
 				continue;
 			}
 			// A visible character: the breaks before it go in first, each one of the 24.

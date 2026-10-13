@@ -63,7 +63,7 @@
 #include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
-#include "KFCPanelTextDraw.h"	// KFCSafeCut - where the box's text may be cut
+#include "KFCTextCut.h"			// KFCSafeCut - where the box's text may be cut (the rows' own rule, model/)
 #include "KFCPanelIcon.h"		// the illustration follows the status line
 #include "KFCDiag.h"			// TREETIME and the tree-expand fault switch - test builds only
 #include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
@@ -839,7 +839,7 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	const int32 kPreviewMaxChars = 300;
 	if (shown.CharCount() > kPreviewMaxChars)
 	{
-		// (Not in front of a mark that belongs to the character before it - KFCSafeCut, the box's own rule.)
+		// (Not in front of a mark that belongs to the character before it - KFCSafeCut, the rule every shown text is cut by.)
 		const int32 keep = KFCSafeCut(shown, kPreviewMaxChars);
 		shown.Truncate(shown.CharCount() - keep);
 		shown.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));

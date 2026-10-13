@@ -78,6 +78,7 @@
 #include "KFCUIID.h"
 #include "KFCPanelTextDraw.h"	// the context's fade, the '&' flags and the bar - shared with the hit rows
 #include "KFCPanelMetrics.h"	// the font and its line - the same answer the box's height is made of
+#include "KFCTextCut.h"			// KFCSafeCut - where a line or a context is cut (the rows' own rule, model/)
 
 // Std includes:
 #include <vector>

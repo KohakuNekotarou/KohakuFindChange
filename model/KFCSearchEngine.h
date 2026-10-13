@@ -403,7 +403,10 @@ namespace KFCSearchEngine
 	    carry at most fifty characters BETWEEN THEM: the match takes what it needs up to the whole
 	    budget, and what is left is split evenly between the two contexts, a side with less to say
 	    than its half handing the remainder to the other. So a paragraph with no breaks in it cannot
-	    make every hit carry the whole paragraph.
+	    make every hit carry the whole paragraph. No cut falls in front of a mark that belongs to the
+	    character before it - an IVS, a combining voiced mark (KFCSafeCut, KFCTextCut.h): the cut moves
+	    back in front of that character, which the pre then keeps and the post and a capped match leave
+	    out, so a line comes out a character or two either side of fifty.
 
 	    EVERY CUT END IS MARKED with an ellipsis. The pre at its head (it keeps its
 	    TAIL, the end nearest the match, which is the end the cell keeps when it ellipsizes); the

@@ -13,8 +13,11 @@
 //  paragraph (IComposeScanner::FindSurroundingParagraph + CopyText) and splits it into the three
 //  segments the colour cell paints. The offsets are TextIndex throughout, and a TextIndex counts
 //  CODE POINTS - a surrogate pair is ONE, the same unit WideString::CharCount counts in (measured
-//  on the running application). So a match boundary cannot land inside a pair and no
-//  character is ever cut in half.
+//  on the running application). So no boundary can land inside a pair. A character the reader sees
+//  can still be MORE than one code point - a kanji with its variation selector (an IVS), a kana with
+//  a combining voiced mark - and the cuts the line budget makes keep such a character whole, marks
+//  and all (KFCSafeCut, KFCTextCut.h - in SplitLineWithScanner). A match's own ends are the finder's
+//  and are never moved.
 //
 //========================================================================================
 
@@ -98,6 +101,7 @@
 #include "KFCQuerySequence.h"	// RunFromDiagSwitch - the test build's way into the query run
 #include "KFCChangeAll.h"		// CommandName - the limit's note names Change All in Book (No List) (F18)
 #include "KFCObjectSearch.h"	// the Object tab's listing, its Search: and its query
+#include "KFCTextCut.h"			// KFCSafeCut - where a row's line may be cut (the rule the panel's own cuts follow)
 
 namespace
 {
@@ -485,6 +489,10 @@ struct WalkCache
 // side with less to say than its half hands the remainder to the other side. Every cut end is
 // marked with an ellipsis (kTextChar_Ellipse), so a line that was CUT is never mistaken for a
 // line that ENDS. The arithmetic lives in SplitLineWithScanner and nowhere else.
+// No cut falls in front of a mark that belongs to the character before it (KFCSafeCut, KFCTextCut.h):
+// the cut moves back in front of that character - the pre then keeps it, a character or two over its
+// share, and the post and a capped match leave it out - so a line can come out a character or two
+// either side of fifty.
 //
 // NOT THE MATCH'S OWN TEST. The same-occurrence test reads none of the three segments - it compares the
 // match WHOLE, through a hash taken with no cap at all (HashMatchText) - so a row clipped for drawing
@@ -492,14 +500,19 @@ struct WalkCache
 // read again by this same budget, so like is compared with like.)
 const int32 kKFCMaxLineChars = 50;
 
+// How far back a cut pre looks for the character a mark at its head belongs to (SplitLineWithScanner). Real
+// text gives a character one mark or a few - an IVS is one; a character carrying more than this is cut inside
+// its marks, where the look stopped.
+const int32 kKFCMarkLookBack = 32;
+
 // (The cut mark is the SDK's kTextChar_Ellipse, TextChar.h:188 - what the product uses for this very
 //  job: ConditionalTextTips.cpp:117-126 reads a story through IComposeScanner::CopyText, stops at a
 //  character limit, and appends kTextChar_Ellipse if it stopped early. A named constant also keeps the
 //  file ASCII: a bare UTF-8 symbol in it is garbled to CP932 noise.)
 
-// Where the drawn match stops. Capped at the SAME number the whole line is budgeted with: a match
-// that long owns the entire line, and the contexts' arithmetic in SplitLineWithScanner then comes
-// out at zero by itself.
+// Where the drawn match stops - before SplitLineWithScanner looks at what stands at the cut. Capped at
+// the SAME number the whole line is budgeted with: a match that long owns the entire line, contexts and
+// all.
 TextIndex KFCCapMatchEnd(TextIndex start, TextIndex end)
 {
 	if (end < start)
@@ -544,11 +557,11 @@ uint64 HashOfWideString(const WideString& text)
 // KFCSearchEngine::RereadRowText, whose segments this makes (and the search's own, through ReadHitText).
 //
 // outMatchWide hands the matched characters back as they were read, so a caller that also wants
-// them hashed does not have to copy them out of the story a second time. It is the CAPPED match,
-// and NEVER carries the cut mark (the mark goes on the drawn PMString alone - a mark in here
-// would hash a character the document does not hold): equal to (end - start) characters only
-// when the match fitted inside kKFCMaxLineChars, which is exactly the test a caller has to make
-// before hashing it.
+// them hashed does not have to copy them out of the story a second time. It is the CAPPED match -
+// the characters drawn, never the one read past the cap to look at it - and NEVER carries the cut
+// mark (the mark goes on the drawn PMString alone - a mark in here would hash a character the
+// document does not hold): equal to (end - start) characters only when the match fitted inside
+// kKFCMaxLineChars, which is exactly the test a caller has to make before hashing it.
 //
 // A nil scanner is allowed and answers like an unreadable position: all three segments empty.
 void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex end,
@@ -583,21 +596,38 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	// paragraphs and the break between them replaced by one word, joining what was left to the
 	// paragraph below). The breaks inside the match are drawn as marks - a pilcrow for CR, a return
 	// arrow for a forced line break (KFCResultModel::MarkUpBreaksForDisplay).
-	const TextIndex matchEnd = KFCCapMatchEnd(start, end);
+	TextIndex matchEnd = KFCCapMatchEnd(start, end);
+	const bool capped = (matchEnd != end);
 
 	// ----- the match first: it owns the line budget -----
 	if (matchEnd > start)
 	{
-		// Read into the caller's buffer, so the hash can be taken from these very characters.
-		scanner->CopyText(start, static_cast<int32>(matchEnd - start), &outMatchWide);
+		// Read into the caller's buffer, so the hash can be taken from these very characters. A CAPPED
+		// match is read one character past the cap, to see what stands at the cut: a mark that belongs to
+		// the character before it (an IVS, a combining voiced mark) moves the cut back in front of that
+		// character (KFCSafeCut), which goes on, marks and all, with the part of the match not drawn. The
+		// buffer is then cut to what is drawn.
+		scanner->CopyText(start, static_cast<int32>(matchEnd - start) + (capped ? 1 : 0), &outMatchWide);
 		outMatch = PMString(outMatchWide);
+		if (capped)
+		{
+			int32 keep = KFCSafeCut(outMatch, kKFCMaxLineChars);
+			if (keep <= 0)
+				keep = kKFCMaxLineChars;	// one character carrying the whole budget in marks: cut inside them rather than draw no match
+			if (keep < outMatch.CharCount())
+			{
+				outMatch.Remove(keep, kMaxInt32);		// kMaxInt32: everything from keep on
+				outMatchWide.Remove(keep, kMaxInt32);
+			}
+			matchEnd = start + keep;
+		}
 		outMatch.SetTranslatable(kFalse);
 	}
 	// A capped match was CUT, and the row says so. The mark goes on the drawn string ONLY, never
 	// into outMatchWide - that buffer is the hash shortcut's material and has to stay exactly the
 	// characters read. It is drawn in the match's own colour, which is the truth being told:
 	// what follows the mark is more MATCH.
-	if (matchEnd != end)
+	if (capped)
 		outMatch.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
 
 	// ----- then the two contexts, out of what the match left -----
@@ -614,12 +644,11 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 	//
 	// !NONE when the match was capped. Past the cap, what follows matchEnd is more
 	// of the MATCH - and this segment is drawn in the normal colour, so writing it here would show
-	// the rest of the match as though it were text lying outside it. (The budget arithmetic below
-	// comes out at zero for a capped match anyway - KFCCapMatchEnd caps at the very number the
-	// line is budgeted with - but the reason is kept apart from the arithmetic: it is about what
-	// a post MEANS, not about how much room is left.)
+	// the rest of the match as though it were text lying outside it. (The budget below is zero for a
+	// capped match as well - but the reason is kept apart from the arithmetic: it is about what a post
+	// MEANS, not about how much room is left.)
 	int32 postAvail = 0;
-	if (matchEnd == end)
+	if (!capped)
 	{
 		int32 endParaLen = 0;
 		const TextIndex probe = (matchEnd > start) ? matchEnd - 1 : start;
@@ -628,9 +657,11 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 			postAvail = static_cast<int32>(endParaStart + endParaLen - matchEnd);
 	}
 
+	// A capped match owns the whole line - said here, not left to the arithmetic: a match capped in front
+	// of a mark (above) stops a character or two short of the budget, which would hand that much to the pre.
 	int32 remaining = kKFCMaxLineChars - static_cast<int32>(matchEnd - start);
-	if (remaining < 0)
-		remaining = 0;	// unreachable while KFCCapMatchEnd caps at kKFCMaxLineChars; kept so the two cannot come apart in silence
+	if (capped || remaining < 0)
+		remaining = 0;
 	int32 preBudget = remaining / 2;
 	int32 postBudget = remaining - preBudget;
 	if (preAvail < preBudget)
@@ -651,24 +682,48 @@ void SplitLineWithScanner(IComposeScanner* scanner, TextIndex start, TextIndex e
 		// THE TAIL IS KEPT, NOT THE HEAD. What survives is the text nearest the match,
 		// which is the end the reader actually uses - and the end the cell keeps anyway, because an
 		// overflowing pre is ellipsized from the beginning (kEllipsizeBeginning in KFCColorTextView).
-		// Safe to cut at an arbitrary index: a TextIndex counts code points, so the cut cannot land
-		// inside a surrogate pair (the note at the head of this file).
-		const TextIndex preFrom = start - preBudget;
+		// The cut at its head is a TextIndex, so it cannot land inside a surrogate pair (the note at the
+		// head of this file) - but it can land on a mark that belongs to the character before it, and
+		// then it moves back in front of that character (KFCSafeCut): the character comes along with its
+		// marks. Looked into only when the first character read IS such a mark - then the few characters
+		// before the cut are read as well, to find the one it belongs to.
+		TextIndex preFrom = start - preBudget;
 		WideString w;
 		scanner->CopyText(preFrom, preBudget, &w);
+		PMString pre(w);
+		if (preFrom > paraStart && pre.CharCount() > 0 && KFCIsAttachedMark(pre.GetWChar(0)))
+		{
+			const TextIndex from = (preFrom - paraStart > kKFCMarkLookBack) ? preFrom - kKFCMarkLookBack : paraStart;
+			WideString wider;
+			scanner->CopyText(from, static_cast<int32>(start - from), &wider);
+			pre = PMString(wider);
+			const int32 cut = KFCSafeCut(pre, static_cast<int32>(preFrom - from));
+			pre.Remove(0, cut);
+			preFrom = from + cut;
+		}
 		if (preFrom > paraStart)
 			outPre.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));	// cut at its head, marked at its head
-		outPre.Append(PMString(w));
+		outPre.Append(pre);
 		outPre.SetTranslatable(kFalse);
 	}
 
 	if (postBudget > 0)
 	{
-		// The HEAD is kept here - the mirror of the pre above, for the mirrored reason.
+		// The HEAD is kept here - the mirror of the pre above, for the mirrored reason. A post that is cut
+		// is read one character past its budget, for the capped match's look at what stands at the cut: a
+		// mark there moves the cut back in front of its character, which goes with the part not drawn.
+		const bool postCut = (postBudget < postAvail);
 		WideString p;
-		scanner->CopyText(matchEnd, postBudget, &p);
-		outPost.Append(PMString(p));
-		if (postBudget < postAvail)
+		scanner->CopyText(matchEnd, postBudget + (postCut ? 1 : 0), &p);
+		PMString post(p);
+		if (postCut)
+		{
+			const int32 keep = KFCSafeCut(post, postBudget);
+			if (keep < post.CharCount())
+				post.Remove(keep, kMaxInt32);
+		}
+		outPost.Append(post);
+		if (postCut)
 			outPost.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));	// cut at its tail, marked at its tail
 		outPost.SetTranslatable(kFalse);
 	}
@@ -2206,7 +2261,8 @@ bool KFCSearchEngine::RowReadsAsFound(int32 chapterIdx, int32 hitIdx, IDataBase*
 
 bool KFCSearchEngine::ReadStoryVersion(IDataBase* db, UID story, uint32& outVersion)
 {
-	// IsValidUID first: a story an earlier replace deleted (an anchored frame's) must not be instantiated.
+	// IsValidUID first, for a story an earlier replace deleted (an anchored frame's): the same answer the
+	// InterfacePtr below would give - Instantiate returns nil for a deleted UID (IDataBase.h) - said early.
 	if (db == nil || story == kInvalidUID || !db->IsValidUID(story))
 		return false;
 	InterfacePtr<ITextModel> model(db, story, UseDefaultIID());

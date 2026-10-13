@@ -194,6 +194,9 @@
       <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCDiagWrittenDocs.h">
          <Filter>Header Files</Filter>
       </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\model\KFCTextCut.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
    </ItemGroup>
    <ItemGroup>
       <CustomBuild Include="..\..\..\source\sdksamples\KFC\model\KFC.fr">

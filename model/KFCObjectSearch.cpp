@@ -63,6 +63,7 @@
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
 #include "KFCProgressBar.h"
+#include "KFCTextCut.h"				// KFCSafeCut - where a long item name is cut
 
 namespace
 {
@@ -737,7 +738,8 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	// source/open): the user's name when one was given; else InDesign's default for the item, translated, in < >; and
 	// in [ ] for an item that takes no name of the user's. Cut at kMaxItemNameChars, as a row's text is kept short
 	// (ROW-16) - never through a surrogate pair: a PMString counts and cuts in code points (UnicodeSavvyString.h -
-	// CharCount, and GetUTF32TextChar's "position (in code points)").
+	// CharCount, and GetUTF32TextChar's "position (in code points)"); and never in front of a mark that belongs to
+	// the character before it (KFCSafeCut, KFCTextCut.h) - a text frame's default name is its first words.
 	PMString name;
 	Utils<Facade::IPageItemNameFacade> nameFacade;
 	if (nameFacade.Exists())
@@ -766,7 +768,7 @@ void KFCObjectSearch::BuildObjectHit(const UIDRef& docRef, UID item, KFCResultMo
 	const int32 kMaxItemNameChars = 40;
 	if (name.CharCount() > kMaxItemNameChars)
 	{
-		name.Truncate(name.CharCount() - kMaxItemNameChars);		// Truncate(n) takes n characters off the end
+		name.Remove(KFCSafeCut(name, kMaxItemNameChars), kMaxInt32);	// kMaxInt32: everything from the cut on
 		name.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
 	}
 	out.matchText = "ID";
