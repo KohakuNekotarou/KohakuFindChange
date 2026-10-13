@@ -30,7 +30,6 @@
 #include "SDKFileHelper.h"
 #include "UIDList.h"			// GetSelectedBookContents' answer
 #include "Utils.h"
-#include "WideString.h"
 
 #include <string>
 #include <vector>
@@ -180,6 +179,10 @@ bool KFCBookPanelLookup::GetPanelBookFile(IDFile& outFile)
 		// "Visible state 1" in the measurement - while only the front tab's kTabPanelContainerType
 		// is visible. Asking panelView->IsVisible() here would match every book panel and pick
 		// whichever came first.
+		// (Not IPanelMgr::IsPanelWithWidgetIDShown, the panel manager's own question: it asks whether the panel's
+		// CONTENT is shown, and answers false for a minimised palette (IPanelMgr.h:157-165) whose tab strip still
+		// shows which tab is in front - the question here. The two agree for a front tab, a tab behind another and
+		// an iconised column, measured; for a minimised palette the container's answer is not.)
 		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
 		if (!container.IsValid() || !PaletteRefUtils::IsPaletteVisible(container))
 			return false;
@@ -301,11 +304,7 @@ namespace
 			InterfacePtr<IBookContent> content(bookDB, contentUID, UseDefaultIID());
 			if (content == nil)
 				continue;
-			PMString shortName;
-			WideString wide = content->GetShortName();
-			const UTF16TextChar* buf = wide.GrabUTF16Buffer(nil);
-			if (buf != nil)
-				shortName.AppendW(buf);
+			const PMString shortName(content->GetShortName());		// as ListBookChapters reads it (KFCBookScope.cpp)
 			for (size_t n = 1; n < lines.size(); ++n)
 			{
 				PMString wanted;

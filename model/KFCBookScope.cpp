@@ -39,7 +39,6 @@
 #include "SysFileList.h"		// the searched book's chapter files - the Hide Previous Chapter sweep
 #include "Utils.h"
 #include "PMString.h"
-#include "WideString.h"
 
 #include <algorithm>			// std::find - is this chapter one of the Book panel's selected ones
 
@@ -1275,15 +1274,13 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 			chapter.file = IDFile();
 
 		// The chapter's file name for the read-out, built HERE rather than at open time: a chapter
-		// that cannot be opened still has to be named in the report. Via the UTF-16 buffer
-		// (AppendW), so a Japanese chapter name survives - the PMString(char*) conversions do not.
+		// that cannot be opened still has to be named in the report. PMString's own constructor from the
+		// WideString GetShortName returns - the snippets' way (SnpExportBookAsPDF.cpp:381) - keeps every
+		// character: measured outside InDesign against the UTF-16 buffer appended by hand, the same code
+		// units for kanji, kana, an IVS, surrogate pairs and combining marks
+		// (work/note-scripts/2026-10-14-knowledge-sweep-b11/t_pmstring_widestring.cpp).
+		chapter.shortName = PMString(content->GetShortName());
 		chapter.shortName.SetTranslatable(kFalse);
-		{
-			WideString shortName = content->GetShortName();
-			const UTF16TextChar* buf = shortName.GrabUTF16Buffer(nil);
-			if (buf != nil)
-				chapter.shortName.AppendW(buf);
-		}
 
 		// docRef is left null: nothing is opened here. The run opens each chapter when its turn
 		// comes (OpenChapterDoc) and hands it back as soon as it has walked it (ReleaseHeldDoc).
