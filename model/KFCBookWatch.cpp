@@ -45,9 +45,9 @@
 //  chapters back in the same breath. So when this gate is false, what is left open is only what
 //  REFUSED to be handed back: ReleaseHeldDocs puts a chapter back on the held list when it holds
 //  unsaved work or when its close is refused, and those two outlive the path that named their book.
-//  Nothing is stranded by it: the next search or query run calls ReleaseSearchedBook on its way in
-//  (KFCSearchEngine::DropResults) and tries them again, and a chapter kept for unsaved work is one a
-//  replace has already reported to the user.
+//  Nothing is stranded by it: whatever next throws the results away - a search, a query run, a Change All,
+//  Clear Results: the callers of KFCSearchEngine::DropResults - calls ReleaseSearchedBook and tries them
+//  again, and a chapter kept for unsaved work is one a write has already reported to the user.
 //
 //  (Not about the HELD CHAPTERS either: a run closes each chapter as soon as it has walked it, so the
 //  held list is empty almost always and a gate on it would never arm the timer at all.)
@@ -62,12 +62,12 @@
 //  moved the active book, so no cue ever arrived and the result set was never retired.
 //
 //  kCloseBookCmdBoss can look "useless on its own" for two reasons, and neither survives contact
-//  with the design above: it does not identify the book (irrelevant -
-//  one question, asked about OUR book) and at broadcast time the closing book still reports
-//  IsOpen() (handled - the question is deferred, see below). Measured on a debug build to fire once
-//  per close, for the last remaining book as much as for any other, and confirmed on the release
-//  build. Listening to both messages was tried first and also worked; it was trimmed back to this
-//  one because this is the cue that actually means "a book closed".
+//  with the design above: it does not identify the book (irrelevant - one question, asked about OUR
+//  book) and at broadcast time the closing book still reports IsOpen() (handled - the question is
+//  deferred, see below). Measured on a debug build to fire once per close, for the last remaining
+//  book as much as for any other, and confirmed on the release build. Listening to both messages
+//  was tried first and also worked; it was trimmed back to this one because this is the cue that
+//  actually means "a book closed".
 //
 //  WHY THE ANSWER IS NOT ASKED IMMEDIATELY
 //
@@ -127,8 +127,8 @@ const uint32 kKFCBookRetireDelayMs = 300;
     released from inside itself. */
 ICallbackTimer* gRetireTimer = nil;
 
-/** Must the retire wait - is a run of ours, or a row's landing in the panel, under way? ONE question for both places
-    that ask it, the retire itself and the timer callback that waits it out: a guard added to one and not the other
+/** Must the retire wait - is a run of ours, or a row's landing in the panel, under way? ONE question for the places
+    that ask it - the retire itself and the timer callback that waits it out: a guard added to one and not another
     would retire under the very thing it was added for. Why each is waited for: RetireBookResultsIfGone. */
 bool RetireMustWait()
 {
@@ -143,12 +143,12 @@ void RetireBookResultsIfGone()
 	// NEVER while ANY run of ours is going. This clears the result model and hands the held chapters
 	// back, and every run is walking exactly those chapters - their progress bars pump events while
 	// they are up, so an idle callback CAN land in the middle of one. (Reachable in practice: close
-	// a book, then start a run inside the wait below.) The caller re-arms, so the cue is deferred
+	// a book, then start a run inside the wait below.) The timer callback re-arms, so the cue is deferred
 	// rather than dropped, and the book will still be gone when it is finally asked.
 	//
-	// ANY run - not the search alone: the replace is the worst run to interrupt, since it holds an open
+	// ANY run - not the search alone: a write is the worst to interrupt, since it holds an open
 	// command sequence over the documents this would close. See KFCRunGuard.
-	// ...NOR WHILE A ROW'S LANDING IS UNDER WAY in the panel (the 2026-10-12 proposal P-A, the author: "fix it if you can"):
+	// ...NOR WHILE A ROW'S LANDING IS UNDER WAY in the panel (the author's call):
 	// a landing opens the row's chapter and its window and runs the message loop while it does, so an idle callback can
 	// land in it too - and this would empty the results the landing is reading and hand back the chapter it is opening,
 	// still windowless (KFCRunGuard::IsLandingUnderWay - the UI half's flag, asked across the split).
@@ -233,12 +233,13 @@ uint32 RetireTimerCallback(void* /*refPtr*/)
 	// KFCPanelAlpha's re-apply chain rests on the same observation.)
 	//
 	// WHAT CATCHES IT IF THE RE-ARM DOES NOT HAPPEN. The cue is dropped and this book's
-	// chapters are not handed back HERE - but the next search or query run calls ReleaseSearchedBook
-	// on its way in and hands them back then (KFCSearchEngine::DropResults, at its commit point). A
-	// REPLACE does not: it keeps the searched book on purpose, its results being still on the panel. So
-	// the worst case is a book's results left on the panel, and any chapter that refused to close left
-	// locked, until the next search - not a permanent strand. Named rather than assumed, because a
-	// fallback nobody has written down is one the next change can remove without noticing.
+	// chapters are not handed back HERE - but whatever next throws the results away (the callers of
+	// KFCSearchEngine::DropResults - a search, a query run or a Change All at its commit point, Clear Results) calls
+	// ReleaseSearchedBook and hands them back then. A row's Replace keeps the searched book on purpose, its
+	// results being still on the panel. So the worst case is a book's results left on the panel, and any
+	// chapter that refused to close left locked, until the next of those - not a permanent strand. Named
+	// rather than assumed, because a fallback nobody has written down is one the next change can remove
+	// without noticing.
 	// ...and a row's landing is waited out the same way (RetireBookResultsIfGone says why).
 	if (RetireMustWait())
 		return kKFCBookRetireDelayMs;

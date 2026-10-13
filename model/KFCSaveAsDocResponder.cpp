@@ -5,8 +5,8 @@
 //  KohakuFindChange (KFC)
 //
 //  "A document has been saved as another file" (kAfterSaveAsDocSignalRespServiceImpl, KFC.fr): the rows of a
-//  document-scope list take the document's new name there and then (the author's call, 2026-10-11 - the spec map's
-//  LIFE-14). The rows always followed the document itself - its UIDRef, and a Save As keeps the database - but showed
+//  document-scope list take the document's new name there and then (the author's call - the spec map's LIFE-14).
+//  The rows always followed the document itself - its UIDRef, and a Save As keeps the database - but showed
 //  the name the search read: with B.indd saved as C.indd and B.indd's file opened again, the row "B.indd" wrote into
 //  C.indd, the right document under the wrong name (measured before this responder - case ad-saveas-reopen-replace).
 //  A book's list keeps its names: its rows stand for the book's chapters (KFCResultModel::RenameDocumentChapters).

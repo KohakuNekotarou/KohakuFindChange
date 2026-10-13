@@ -11,7 +11,8 @@
 //
 //  The rule this implements, for the DOCUMENT scope only:
 //
-//      the user closes the searched document -> the panel goes back to empty.
+//      the user closes a searched document -> its rows go, and the panel goes back to empty when they
+//      were the list's last (an All Documents list keeps the other documents' rows - Respond).
 //
 //  Book scope is deliberately left alone here - for the RESULTS. A book chapter carries its .indd
 //  file, so it can be reopened (KFCBookScope::ReopenChapterDoc) and dropping twenty chapters'
@@ -20,7 +21,8 @@
 //
 //  Some bookkeeping DOES run for every close, whatever the scope: everything that holds the closing
 //  document by address lets it go (the held-chapter list, the jump marker, the rows' text foci, the
-//  Undo follow, the remembered Find Format) - LetGoOfClosingDocument, ahead of every exit in Respond.
+//  Undo follow, the remembered Find Format) - LetGoOfClosingDocument, ahead of every exit in Respond
+//  bar the main-thread gate and a signal that names no document.
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
@@ -69,7 +71,7 @@
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under a run of ours
 #include "KFCSearchEngine.h"	// DropResults - the rows, the searched book and the find format, together; ForgetSearchedFindFormatOf
-#include "KFCUndoFollow.h"		// ForgetBookChapter / ForgetClosingDocument - the kept writes let a closing document go
+#include "KFCUndoFollow.h"		// DocumentClosing, ForgetBookChapter, ForgetClosingDocument - a closing document let go
 
 /** Retires a document-scope result set when its document is closed.
 
@@ -89,7 +91,7 @@ public:
 
 CREATE_PMINTERFACE(KFCCloseDocResponder, kKFCCloseDocResponderImpl)
 
-// EVERY CLOSE, WHATEVER THE SCOPE: everything that holds the closing document by address lets it go - the five the file
+// EVERY CLOSE, WHATEVER THE SCOPE: everything that holds the closing document by address lets it go - what the file
 // header names, in one place. Respond calls it ahead of every exit it has (only the main-thread gate and a document the
 // signal does not name come first): a reused address can hand any of them the next document opened in this one's place.
 static void LetGoOfClosingDocument(const UIDRef& closingDocRef)
@@ -127,9 +129,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 
 	// The main thread only (kModelPlugIn - docs/superpowers/specs/2026-10-01-kbs-model-ui-split-design.md section 6).
-	// A model plug-in's
-	// responder is also called on a background task's thread, where the document "closing" is the task's
-	// own copy (an export's clone) - and the results are about the user's document, which stays open.
+	// A model plug-in's responder is also called on a background task's thread, where the document "closing" is the
+	// task's own copy (an export's clone) - and the results are about the user's document, which stays open.
 	// (A test build says when the gate turned one away - the thread test counts them: a test that never saw one has
 	// not tried the gate.)
 	if (!IDThreading::IsMainThreadDomain())
@@ -143,7 +144,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// document either: measured, a never-saved document closed unsaved arrived here with a valid
 	// UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
 	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md). Were it otherwise, its document-scope results
-	// would outlive their document, and the replace would ask IsDocStillOpen of a dead UIDRef (the
+	// would outlive their document, and a row's Replace would ask IsDocStillOpen of a dead UIDRef (the
 	// address-reuse fault, memory uidref-reuse-after-close).
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)
@@ -164,7 +165,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - a document of
 	// any other list, or of none, is let go below, its chapter emptied: ForgetClosingDocument). Ahead of the run guard
 	// below: a query run closes the chapters it holds at its commit point, before it clears the list, and a write kept
-	// from before it may have written one of them (saved since, so it closes). (The chapters a run hands back at its end
+	// from before it may have written one of them (saved since, so it closes). (The chapters a query run hands back at its end
 	// close after the list is cleared - IsFromBook is false by then. A write kept from before it wrote none of them, short
 	// of a window that could not be opened: KFC gives a chapter it writes a window, and a chapter with a window is no
 	// longer held - KFCBookScope::ShowChapterWindow.)
@@ -173,12 +174,12 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 
 	// NEVER while a run of ours is going. This throws the result model away, and a run is filling
 	// that model chapter by chapter - and the closes a run makes ON THE SPOT land here from inside it:
-	// each chapter it hands back as it goes (KFCBookScope::HandBackHeldDocNow) and the held chapters the
-	// search and the query run close at their commit point (ReleaseHeldDocs(true)). (A SCHEDULED close lands
-	// only once the current tick has unwound - ReleaseHeldDocs from DropResults after the run, and the Hide
-	// Previous Chapter sweep, which is a jump's and never inside a run at all.) The run
-	// puts its own results up when it finishes, so nothing stale survives being skipped here. Same rule as
-	// the book-close watcher's, asked the same way (KFCRunGuard).
+	// each chapter it hands back as it goes (KFCBookScope::HandBackHeldDocNow) and the held chapters it
+	// closes on the spot (ReleaseHeldDocs(true) - at its commit point, and where nothing could be run). (A
+	// SCHEDULED close lands only once the current tick has unwound - ReleaseHeldDocs from DropResults after the
+	// run, and the Hide Previous Chapter sweep, which is a jump's and never inside a run at all.) The run puts
+	// its own results up when it finishes, so nothing stale survives being skipped here. Same rule as the
+	// book-close watcher's, asked the same way (KFCRunGuard).
 	if (KFCRunGuard::IsAnyRunning())
 	{
 		KFC_DIAG_LOG("CLOSE - a run of ours is up: the results are left to it");
@@ -193,12 +194,12 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	}
 
 	// THE KEPT WRITES LET IT GO, WHATEVER THE LIST SHOWS (the author's call - the spec map's UNDO-12 for a query
-	// run): All Documents, one document, or no list at all - a query run leaves it empty (F7) while its write, kept, still
-	// names this document. Its stories and items come off every write and its chapter is emptied in every kept list
-	// (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept book's list is frozen instead), so an Undo in a document
-	// still open is still followed. Until then they let it go only while the list showed its rows (case
-	// xq-alldocs-close-undo). Past the run guard, not ahead of it: the chapters a query run hands back close before the
-	// run is kept, and nothing would yet lead back from the list it leaves to the writes kept for the list it found.
+	// run): All Documents, one document, or no list at all - a query run leaves it empty (NO LIST in KFCQuerySequence.cpp)
+	// while its write, kept, still names this document. Its stories and items come off every write and its chapter is
+	// emptied in every kept list (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept book's list is frozen
+	// instead), so an Undo in a document still open is still followed (case xq-alldocs-close-undo). Past the run guard,
+	// not ahead of it: the chapters a query run hands back close before the run is kept, and nothing would yet lead back
+	// from the list it leaves to the writes kept for the list it found.
 	KFCUndoFollow::ForgetClosingDocument(closingDocRef);
 
 	// Nothing on display, nothing to retire. This signal fires for every document close in the
@@ -256,8 +257,8 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// went - a panel that empties itself without a word reads as a crash.
 	//
 	// DropResults, without exception: a document-scope result set has no book behind it, so its
-	// ReleaseSearchedBook finds nothing to do every time it runs here - it is one rule with no
-	// exceptions to remember.
+	// ReleaseSearchedBook finds no book to let go here (a chapter an earlier book run had to keep is tried
+	// again, as at every DropResults) - it is one rule with no exceptions to remember.
 	KFC_DIAG_LOG("CLOSE - chapter %d was the list's last: the results are dropped", closingChapter);
 	KFCSearchEngine::DropResults();
 	KFCNotifyRebuild();

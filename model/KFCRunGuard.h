@@ -4,7 +4,7 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
+//  "Is this plug-in in the middle of a long run?" - ONE definition, because several different things
 //  can be running - a search, a Change All in Book (KFCChangeAll), a query run (KFCQuerySequence) and a row's Replace
 //  (KFCReplaceEngine::IsReplacing) - and every guard has to know about all of them.
 //  A ROW'S REPLACE COUNTS THOUGH IT HAS NO BAR: reopening a closed chapter and giving a written one its window run the
@@ -29,7 +29,8 @@
 //
 //  Guarding each run against ITSELF does not cover either case: both need two DIFFERENT runs. So
 //  the question is asked HERE, about all of them at once, and every caller asks this instead of
-//  naming the engines one at a time. By name, because a count goes stale where a list does not:
+//  naming the engines one at a time. The callers of KFCRunGuard::IsAnyRunning and IKFCRuns::IsAnyRunning are
+//  the list; here they are with what each would otherwise do:
 //
 //    * the panel's actions (KFCActionComponent, the UI half - through IKFCRuns): UpdateActionStates
 //      greys out every kCustomEnabling one, and RefusedWhileRunning turns away a command that arrives anyway
@@ -37,9 +38,9 @@
 //    * each engine's own front door (KFCSearchEngine, KFCReplaceEngine, KFCChangeAll - Clear Results
 //      too - and KFCQuerySequence), for a caller that never went through the menu - a script firing an
 //      action by ID reaches the engine whatever the menu says;
-//    * the book-close watcher (KFCBookWatch, twice: the deferred callback, and the question it asks -
-//      which the no-timer fallback asks directly), whose question would otherwise release the
-//      chapters a run is walking;
+//    * the book-close watcher (KFCBookWatch's RetireMustWait, asked by the deferred callback and by the
+//      question itself - which the no-timer fallback asks directly), whose question would otherwise release
+//      the chapters a run is walking;
 //    * the document-close responder (KFCCloseDocResponder), which would otherwise throw away the
 //      result model a run is still filling;
 //    * the document-open responder (KFCOpenDocResponder), which leaves the chapters a run opens to the
@@ -50,6 +51,12 @@
 //      which would otherwise load a query into Find/Change while a query run is putting its own there;
 //    * a row's landing (KFCJump::ActivateNode, the UI half - through IKFCRuns), whose Hide Previous Chapter sweep
 //      would otherwise schedule the close of a chapter a Replace is about to write;
+//    * the result list's own doors (the UI half - through IKFCRuns): a row's Replace - from Return as well as the
+//      menu - and Search This Story / Document Again (KFCResultTree::ReplaceRows and SearchAgain, through
+//      RefusedWhileRunning), which would otherwise write a row, or walk a story or a document again, under a
+//      run; a click's press (KFCResultTreeController::ProcessSelectionRules) and the keys that move the selection
+//      (MoveUnderWay in KFCResultTreeEH.cpp), which would otherwise select a row whose landing is turned away -
+//      the page left on the row before, and the next Return writing a row the page does not show;
 //    * a test build's hidden-document check (KFCDiagHiddenDocs, the UI half), which leaves the chapter a
 //      run is walking to the run.
 //
@@ -68,9 +75,9 @@ namespace KFCRunGuard
 	/** IS A ROW'S LANDING UNDER WAY in the panel (the UI half's KFCJump::IsLanding, asked through IKFCUIServices)?
 	    NOT part of IsAnyRunning, on purpose: the doors IsAnyRunning answers for - the GREP row's preview, an object row's
 	    Replace - are themselves reached from inside a landing, and would turn themselves away. Asked by the model's own
-	    deferred work that must not run under a landing - the book watcher's retire (KFCBookWatch, the 2026-10-12
-	    proposal P-A): a landing opens documents and windows and runs the message loop, and a retire landing in it would
-	    empty the results the landing is reading and hand back the chapter it is opening. No UI half = no landing. */
+	    deferred work that must not run under a landing - the book watcher's retire (KFCBookWatch's RetireMustWait): a
+	    landing opens documents and windows and runs the message loop, and a retire landing in it would empty the results
+	    the landing is reading and hand back the chapter it is opening. No UI half = no landing. */
 	bool IsLandingUnderWay();
 
 	/** What to put on the status line when a run is turned away because another one is up. Not

@@ -103,7 +103,7 @@ namespace
 
 	    Handing the panel itself in is the whole point: with a real widget IBookUIUtils resolves that
 	    panel's book, where a nil widget falls through to QueryActiveBookPanel - the active book, which
-	    is precisely the value both callers exist to avoid.
+	    is precisely the value its callers exist to avoid.
 
 	    An empty result is refused here rather than passed on, because further up it would read as
 	    "no book at all" instead of "this panel could not be asked". */
@@ -123,7 +123,7 @@ namespace
 	/** Does THIS panel show that book - in front or not? Its book (GetBookFileFromPanelView) and the one asked for are
 	    compared as FILES, not as path strings: FileUtils::IsEqual, the rule KFCBookScope's KFCDocumentLivesInFile keeps
 	    (the model half's MakeBookActive asks IBookManager::FindOpenBookByName with the same IDFile). One place for the
-	    two walks that look for a book's panel (BringBookTabForward, ReadPanelSelection). */
+	    walks that look for a book's panel (BringBookTabForward, ReadPanelSelection). */
 	bool PanelShowsBook(IControlView* panelView, const IDFile& book)
 	{
 		IDFile panelBookFile;
@@ -192,7 +192,7 @@ bool KFCBookPanelLookup::GetPanelBookFile(IDFile& outFile)
 		// (Not IPanelMgr::IsPanelWithWidgetIDShown, the panel manager's own question: it asks whether the panel's
 		// CONTENT is shown, and answers false for a minimised palette (IPanelMgr.h:157-165) whose tab strip still
 		// shows which tab is in front - the question here. The two agree for a front tab, a tab behind another and
-		// an iconised column, measured; for a minimised palette the container's answer is not.)
+		// an iconised column, measured; what the container answers for a minimised palette is not measured.)
 		const PaletteRef container = panelMgr->GetPaletteRefContainingPanel(panelView);
 		if (!container.IsValid() || !PaletteRefUtils::IsPaletteVisible(container))
 			return false;

@@ -60,7 +60,7 @@ namespace
 	// suggest a partnership that is not there.
 	K2Vector<UIDRef> gHeldDocs;
 
-	// Where this document is on the held list, or -1 (and -1 for gNull) - THE walk of it, for both questions that look a
+	// Where this document is on the held list, or -1 (and -1 for gNull) - THE walk of it, for the questions that look a
 	// document up there: IsHeldDoc (is it ours?) and ReleaseHeldDoc (which entry goes?). The pair is compared, never
 	// followed: a chapter closed since may still be on the list.
 	int32 HeldIndexOf(const UIDRef& docRef)
@@ -79,7 +79,7 @@ namespace
 	// chapters for": every run closes each chapter as soon as it is done with it,
 	// so the held list is empty most of the time while a full result set is still on screen.
 	//
-	// Read from OUTSIDE through GetSearchedBookPath, by two callers, and both ask about the RESULTS:
+	// Read from OUTSIDE through GetSearchedBookPath, and every caller asks about the RESULTS:
 	//   * KFCBookWatch - "the book these results name has been closed, retire them"
 	//   * KFCJump's ShowBook (the UI half, through IKFCChapters) - "the book row was clicked, bring
 	//     that book forward"
@@ -122,7 +122,7 @@ namespace
 	    offers to save "if uiFlags allow" (IDocFileHandler.h:97-101), so a modified document closed
 	    with kSuppressUI loses what is in it silently - no prompt, no undo, no file on disk. The
 	    hide-previous-chapter sweep (CloseDisplayedDocsIfClean) and the held-chapter releases both ask
-	    it (through HasUnsavedWork): without it, a replace that the user chose NOT to save disappears
+	    it (through HasUnsavedWork): without it, a write that the user chose NOT to save disappears
 	    when the next run reclaims the chapter it was in.
 
 	    ASKED THE WAY THE SDK ASKS IT - CanSave, NOT IDataBase::IsModified. Those are two different
@@ -211,8 +211,8 @@ namespace
 	    ASKED OF THE UI HALF (the model/UI split). Presentations are user interface
 	    (IDocumentUIUtils); the all-presentations search and its notes - and the SDK's own any-presentation
 	    predicate it asks with, FindPresCriteria::accept_all, whose implementation is in WidgetBin - are
-	    IKFCUIServices::DocHasAnyWindow's (KFCUIServices.cpp). No UI
-	    (a background thread, InDesign Server) has no window to show a document in: false. */
+	    IKFCUIServices::DocHasAnyWindow's (KFCUIServices.cpp). No UI (a background thread, InDesign
+	    Server) has no window to show a document in: false. */
 	bool DocHasAnyWindow(const UIDRef& docRef)
 	{
 		InterfacePtr<IKFCUIServices> ui(KFCQueryUIServices());
@@ -254,12 +254,13 @@ namespace
 	/** The book a book-scope run would be against: the book the BOOK PANEL is showing, and failing
 	    that the active book. Nil when neither can be had.
 
-	    ONE DEFINITION, because two callers have to give the SAME answer. The run resolves its book
-	    here (ListBookChapters) and the menu's grey state asks whether there would be one
-	    (GetTargetBook); if those two ever disagree, either a command greys out over a book the run
-	    could have searched or it starts a run that reports "no book" - which is the shape this
-	    plug-in keeps being bitten by. (Two spellings of these same two steps came out differently
-	    within a day: one dropped an active book that was already closing, the other did not.) */
+	    ONE DEFINITION, because its callers have to give the SAME answer. The run resolves its book
+	    here (ListBookChapters), the menu's grey state asks whether there would be one
+	    (GetTargetBook) and the words that name a run say which (DescribeTargetBook). If they ever
+	    disagree, a command greys out over a book the run could have searched, or starts a run that
+	    reports "no book", or names a book the run does not take - which is the shape this plug-in keeps
+	    being bitten by. (Two spellings of these same two steps came out differently within a day: one
+	    dropped an active book that was already closing, the other did not.) */
 	IBook* ResolveTargetBook()
 	{
 		// The panel's book first. Selecting a book's tab switches the panel but does NOT make that
@@ -298,8 +299,8 @@ namespace
 	    book: the toggle off, no UI half (a background thread, InDesign Server), no panel showing this book, none or all
 	    of it selected (the UI half's answer, by the product's rule - AcquireCurrentBook::AllOrNoneSelected), or a
 	    selection none of whose UIDs is one of this book's chapters. ListBookChapters (the run) and DescribeTargetBook
-	    (the names and the Runs on: line) both ask here, so what a run takes and what the words say cannot differ.
-	    Book Scope is the callers' to have asked: both are reached for a book run only. Nothing is recorded. */
+	    (the names and the Runs on: line) ask here, so what a run takes and what the words say cannot differ.
+	    Book Scope is the callers' to have asked: they are reached for a book run only. Nothing is recorded. */
 	std::vector<UID> SelectedChapterContents(IBook* book)
 	{
 		std::vector<UID> taken;
@@ -336,9 +337,9 @@ void KFCBookScope::SetBookScopeOn(bool on)
 {
 	// Just the flag. Nothing is closed and nothing is cleared here: KESCL's first shape closed the
 	// held chapters right inside the toggle and crashed (see KESCLBookScope::SetBookSearchOn). The
-	// held chapters are released by the next search (either scope) or query run at its commit
-	// point, or when their book closes - not at shutdown, which only forgets them (ShutdownCleanup) -
-	// and a jump into a chapter the user closed meanwhile goes through ReopenChapterDoc anyway.
+	// held chapters are released when the results are next thrown away (ReleaseSearchedBook), or when
+	// their book closes - not at shutdown, which only forgets them (ShutdownCleanup) - and a jump into a
+	// chapter the user closed meanwhile goes through ReopenChapterDoc anyway.
 	gBookScopeOn = on;
 }
 
@@ -371,7 +372,7 @@ bool KFCBookScope::IsDocStillOpen(const UIDRef& docRef)
 		return false;
 
 	// The document list's own lookup by database (IDocumentList.h:71-76), which is how the rest of this
-	// plug-in asks this (the UI half's KFCHitMarkerView.cpp) and how KCM asks it everywhere.
+	// plug-in asks this (KFCRowFoci.cpp, the UI half's KFCHitMarkerView.cpp) and how KCM asks it everywhere.
 	//
 	// THE DATABASE POINTER IS COMPARED, NEVER DEREFERENCED. For a chapter closed since
 	// its UIDRef was taken that pointer is dangling, and asking it anything is undefined behaviour -
@@ -391,10 +392,10 @@ void KFCBookScope::ReleaseHeldDocs(bool closeNow)
 {
 	// NOTE: the searched-book path is NOT cleared here. Closing the chapters says nothing about
 	// which book the panel is showing - and since every run closes its chapters as it goes, doing
-	// so would blank the path while a full result set is still up (which would break both readers
+	// so would blank the path while a full result set is still up (which would break the readers
 	// named on gSearchedBookPath).
 	//
-	// EACH ONE THROUGH ReleaseHeldDoc, ON A SCHEDULE - not the same four questions and the same close
+	// EACH ONE THROUGH ReleaseHeldDoc, ON A SCHEDULE - not the same questions and the same close
 	// written out a second time here ("the same function written twice, and only one of them covered").
 	// Every verdict is that function's: no longer open = dropped, a window = dropped and left to the user, unsaved work
 	// or a refused close = kept on the list for a later call, otherwise closed (kSchedule - this runs
@@ -453,9 +454,9 @@ KFCBookScope::HeldRelease KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, boo
 	// is not this function's to decide - and the clear in front of the close keeps one chapter's failure
 	// from shadowing the next.
 	//
-	// IT COVERS THE THREE TESTS BELOW AS WELL, not just the close. They are not silent
+	// IT COVERS THE TESTS BELOW AS WELL, not just the close. They are not silent
 	// readings: DocHasAnyWindow goes through IDocumentUIUtils (in the UI half) and
-	// HasUnsavedChanges through QueryDocFileHandler + CanSave, and NONE of the three reports a failure
+	// HasUnsavedChanges through QueryDocFileHandler + CanSave, and NONE of them reports a failure
 	// back, which is the very property the preserver exists for.
 	GlobalErrorStatePreserver closeErrorState;
 
@@ -494,7 +495,7 @@ KFCBookScope::HeldRelease KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, boo
 
 	// Unsaved work in it? Then it is not ours to close. Asked BEFORE it comes off the list, so it
 	// stays held and a later call can hand it back once it has been saved. Reached when a chapter this
-	// plug-in opened has been written to and not saved - which is known to mean ONE thing: a replace
+	// plug-in opened has been written to and not saved - which is known to mean ONE thing: a write
 	// landed in it and its window would not open (the window test just above drops anything a user
 	// could type into). The whole of it is in ReleaseHeldDocs' header. See HasUnsavedChanges - and
 	// HasUnsavedWork, which asks it of a converted chapter by what was WRITTEN rather than by "has
@@ -560,7 +561,7 @@ void KFCBookScope::ReleaseSearchedBook()
 	// is "is OUR book still open" - would have no book left to ask about, and they would keep their
 	// .indd files locked for the rest of the session.
 	//
-	// This covers the second of the two cases KFCBookWatch.cpp's file header names (a book run followed by a
+	// This covers the second of the two cases the file header of KFCBookWatch.cpp names (a book run followed by a
 	// DOCUMENT-scope run), at the moment the results are dropped, rather than leaving it for a book
 	// close that may never come.
 	ReleaseHeldDocs();
@@ -631,7 +632,7 @@ bool KFCBookScope::ChapterHasFile(const IDFile& file)
 }
 
 // The open document living in a chapter's file, or gNull - OPENS NOTHING. ReopenChapterDoc's first half,
-// and FindOpenChapterDoc's whole - one place for both. See ReopenChapterDoc for why the answer is
+// and FindOpenChapterDoc's whole - asked in one place. See ReopenChapterDoc for why the answer is
 // checked against the file and why conversions are walked for.
 static UIDRef KFCOpenDocOfChapterFile(const IDFile& file)
 {
@@ -693,7 +694,6 @@ bool KFCBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	if (!ChapterHasFile(file))
 		return false;	// a document-scope entry carries no file - nothing to reopen
 
-
 	// Is it open already - because the user reopened it, or because an earlier chapter of this very
 	// run is still standing? Rebind to THAT document and do NOT hold it: closing something somebody
 	// else opened would surprise them.
@@ -725,9 +725,9 @@ bool KFCBookScope::ReopenChapterDoc(const IDFile& file, UIDRef& outDocRef)
 	// ! NOT the only way to ask: the document list has a lookup for exactly this case -
 	//   FindDocFromPreviousVersion, "Search the open documents to see if one is already open (document
 	//   could be previous version)" (IDocumentList.h:78-82), which nothing in the SDK calls. MEASURED on
-	//   the CC 2017 chapter (a test build's PREVVERSION line, work/kbs-regress/b11-a1-*.ps1): with ONE
-	//   conversion open - the user's, in a window, or one this
-	//   module holds windowless - it names the same document as the walk. With TWO open it does not: the walk
+	//   the CC 2017 chapter (a test build's PREVVERSION line, work/kbs-regress/archive/b11-a1-*.ps1): with ONE
+	//   conversion open - the user's, in a window, or one this module holds windowless - it names the same
+	//   document as the walk. With TWO open it does not: the walk
 	//   took the copy opened first (the one the results were already bound to), the call the copy opened
 	//   later - so a jump or a replace would have moved to the copy that holds none of this plug-in's
 	//   writes. So the walk stays, on purpose. (Which of two copies is "the" chapter is not something
@@ -917,11 +917,11 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 	if (docList == nil)
 		return;
 
-	// THE SEARCHED BOOK'S CHAPTERS ONLY (the author's call - every clean window used to go). A document outside that
-	// book - the reference the user keeps open beside it, a chapter saved under another name - is no previous chapter,
-	// whatever the jump. A chapter the user opened is one, as it always was. Each document is matched to the chapters as a FILE (KFCDocumentLivesInFile - a conversion of an older
-	// InDesign's chapter included, the same match a run reuses an open chapter by). No book open by that path: nothing is
-	// a previous chapter, and nothing is closed.
+	// THE SEARCHED BOOK'S CHAPTERS ONLY (the author's call - not every clean window). A document outside that book - the
+	// reference the user keeps open beside it, a chapter saved under another name - is no previous chapter, whatever the
+	// jump. A chapter the user opened is one, as it always was. Each document is matched to the chapters as a FILE
+	// (KFCDocumentLivesInFile - a conversion of an older InDesign's chapter included, the same match a run reuses an open
+	// chapter by). No book open by that path: nothing is a previous chapter, and nothing is closed.
 	SysFileList chapterFiles;
 	if (!KFCSearchedBookChapterFiles(chapterFiles) || chapterFiles.GetFileCount() == 0)
 		return;
@@ -951,13 +951,12 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 		// through the same question the held-chapter releases ask.
 		//
 		// THE UNTITLED DOCUMENT. This loop walks EVERY open document, so it meets the one kind that has never
-		// been saved at all: the untitled document the user just made. Since the sweep took the book's chapters
-		// only, it stops at the chapter test above - it has no file to be a chapter by - but this test
-		// was the one that kept it until then, and stays the one that says so: IsModified() reads it as clean,
-		// and asked that way this would close it without a prompt (measured) - hence the shared question is
-		// IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
+		// been saved at all: the untitled document the user just made. The chapter test above already stops
+		// it - it has no file to be a chapter by - and this test keeps it as well: IsModified() reads it as
+		// clean, and asked that way this would close it without a prompt (measured) - hence the shared
+		// question is IDocFileHandler::CanSave, "modified OR unsaved" - see HasUnsavedChanges.
 		//
-		// ASKED THROUGH HasUnsavedWork, like the two releases. CanSave calls every conversion of an
+		// ASKED THROUGH HasUnsavedWork, like the held-chapter releases. CanSave calls every conversion of an
 		// older InDesign's chapter "unsaved", so by CanSave alone a converted chapter a jump had opened
 		// in a window would be the one window this sweep never closes. HasUnsavedWork asks a
 		// conversion what was WRITTEN to it and leaves every other document to CanSave, so the
@@ -966,8 +965,8 @@ void KFCBookScope::CloseDisplayedDocsIfClean(const UIDRef& exceptDoc)
 			continue;
 
 		// Only documents that HAVE a window go: a windowless held chapter is not this sweep's to close
-		// (the releases take it). Runs close chapters as they go, so one is left only when a jump or a
-		// replace could not give it a window.
+		// (the releases take it). Runs close chapters as they go, so one is left only by a failure - a
+		// window that did not appear, a close that could not go through.
 		if (!DocHasAnyWindow(ref))
 			continue;	// windowless - keep it held
 
@@ -1048,7 +1047,7 @@ bool KFCBookScope::DescribeTargetBook(PMString& outBookName, BookSelection& outS
 
 bool KFCBookScope::HasScopeTarget()
 {
-	// The same two questions the search asks when it resolves its scope (KFCSearchEngine.cpp, SearchBook),
+	// The same two questions a run asks when it resolves its target (KFCSearchEngine::ResolveRunTarget),
 	// asked here so the menu can go grey BEFORE a run that would only report that there was nothing to
 	// run on - an empty book included.
 	if (IsBookScopeOn())
@@ -1160,8 +1159,8 @@ bool KFCBookScope::MakeBookActive(const PMString& bookPath)
 
 	// TWO separate states, and they really are separate: selecting a tab in the book panel does
 	// NOT change IBookManager's current active book, and setting the active book does not move the
-	// tab (measured; docs/ai-notes/book-panel-active-tab.md). The user asked for both,
-	// so both are set here.
+	// tab (measured; docs/ai-notes/book-panel-active-tab.md). The user who clicks a book row asks for
+	// both: this sets the first, and the caller asks the UI half for the second (2. below).
 
 	// 1. The active book - what every book API answers about. Set directly, the way Adobe's own
 	//    AcquireCurrentBook does (source/open/includes/layout/AcquireCurrentBook.h:72,87), which is
@@ -1289,17 +1288,17 @@ bool KFCBookScope::ListBookChapters(std::vector<ChapterDoc>& outDocs, PMString& 
 	// names - but it means "the panel is showing THIS book's results", and a caller that gets false
 	// here puts nothing on the panel at all (every run answers "That book has no chapters."
 	// and returns). Leaving the path standing would leave that statement true about a book with no
-	// results behind it, which is the one thing the two readers of this value - KFCBookWatch and
+	// results behind it, which is the one thing the readers of this value - KFCBookWatch and
 	// KFCJump's ShowBook - are not allowed to be told.
 	//
 	// Cleared rather than restored to what it was: the callers all clear it through
 	// ReleaseSearchedBook immediately before calling this, so there is no earlier value to go back
 	// to, and "no results, no book" is the honest state either way.
 	//
-	// A SAFETY NET. The callers ask GetTargetBook at their front
-	// door, before their commit point, and an empty book is refused THERE with the previous results
-	// still standing. What can still reach this is a book that counted chapters none of which could be
-	// read (an entry that is not there, or not a chapter) - and that run's results are already gone.
+	// A SAFETY NET. The callers ask GetTargetBook at their front door, before their commit point, and
+	// an empty book is refused THERE with the previous results still standing. What can still reach
+	// this is a book that counted chapters none of which could be read (an entry that is not there, or
+	// not a chapter) - and that run's results are already gone.
 	if (outDocs.empty())
 	{
 		gSearchedBookPath.Clear();

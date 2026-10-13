@@ -4,11 +4,14 @@
 //
 //  KohakuFindChange (KFC)
 //
-//  InDesign's Book panel, OBSERVED - the UI half's part of "which book" (the model/UI split).
-//  Reading the panels needs IBookUIUtils, IPanelMgr and PaletteRefUtils (WidgetBin), which a model plug-in
-//  may not reach, so the walks live here and not in KFCBookScope. The DECISION stays with the
+//  InDesign's Book panel, OBSERVED - the UI half's part of "which book" and "which of its documents" (the
+//  model/UI split). Reading the panels needs IBookUIUtils, IPanelMgr and PaletteRefUtils (WidgetBin), which a
+//  model plug-in may not reach, so the walks live here and not in KFCBookScope. The DECISIONS stay with the
 //  model: KFCBookScope asks for the front tab's book (through IKFCUIServices::GetPanelBookFile) and falls
-//  back to the active book when there is none - KCM's KCMBookPanelLookup is the same split.
+//  back to the active book when there is none, and for the documents selected in that book's panel
+//  (GetPanelBookSelection) - KCM's KCMBookPanelLookup is the same split. Also here: a book row's tab brought
+//  forward (BringBookTabForward, KFCJump's) and the one walk of the book panels (ForEachBookPanel, IsBookPanel -
+//  KFCBookPanelPlacement's too).
 //
 //========================================================================================
 
@@ -45,7 +48,9 @@ namespace KFCBookPanelLookup
 	    IBookManager::GetCurrentActiveBook: selecting a book's tab switches the panel but does not make
 	    that book active - only touching a chapter inside it does (measured).
 	    Found by walking IPanelMgr: InDesign creates one book panel per open book, and the front tab is
-	    the one whose containing palette is visible (docs/ai-notes/book-panel-active-tab.md).
+	    the one whose containing palette is visible (docs/ai-notes/book-panel-active-tab.md). Two book panels in
+	    front at once (a book's tab dragged off into a palette of its own): the first in the panel manager's order
+	    is taken, not necessarily the one the user is looking at - not measured (the spec map's SCOPE-04).
 	    @return false when no book panel is frontmost - the panel is iconised, its palette is closed, or
 	            no book is open - leaving outFile untouched. */
 	bool GetPanelBookFile(IDFile& outFile);
