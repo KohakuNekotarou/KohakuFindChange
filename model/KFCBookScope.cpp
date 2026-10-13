@@ -578,10 +578,11 @@ void KFCBookScope::ReleaseSearchedBook()
 
 void KFCBookScope::ShutdownCleanup()
 {
-	// State only, no closing, no UI: this runs while InDesign is tearing down. Clear() releases
-	// the vector's storage too, so the static destructor at DLL unload finds nothing to do.
-	gHeldDocs.clear();
-	gSearchedBookPath.Clear();
+	// State only, no closing, no UI: this runs while InDesign is tearing down. FRESH VALUES, so the storage goes now and
+	// the static destructor at DLL unload finds nothing to do: clear() and Clear() would empty them and keep it (a
+	// vector's capacity stays; PMString's Clear() is clear() - "Capacity stays the same", UnicodeSavvyString.h).
+	K2Vector<UIDRef>().swap(gHeldDocs);
+	gSearchedBookPath = PMString();
 	gBookScopeOn = false;
 	gSelectedDocumentsOn = false;
 }
