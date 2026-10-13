@@ -47,13 +47,10 @@
 #include "IStoryList.h"				// GetUserAccessibleStoryCount - how many stories a walk will visit
 // For the frame a match is composed into (FrameUIDForPosition - what the frame says, its page, its layer and its
 // locks, is KFCPageItemFacts'):
-#include "ITextParcelList.h"		// GetParcelContaining - the parcel a position is in
+#include "ITextParcelList.h"		// GetParcelContaining - the parcel a position is in; GetFirstDamagedParcel
+#include "ITextParcelListComposer.h"	// RecomposeThruTextIndex - that parcel list composed up to the position (ComposeThrough)
 #include "IParcelList.h"			// GetParcelFrameUID - is that parcel placed in a frame?
 #include "ParcelKey.h"				// ParcelKey::IsValid
-#include "IWaxStrand.h"				// the story's frame list (ComposeThrough)
-#include "IFrameList.h"				// GetFirstDamagedFrameIndex
-#include "IFrameListComposer.h"		// RecomposeThruTextIndex
-#include "TextID.h"					// kFrameListBoss
 // For refusing to rewrite locked text the way the Find/Change dialog does ("Search Only"):
 #include "IItemLockData.h"			// GetInsertLock - the story's own "content cannot be edited"
 
@@ -386,21 +383,28 @@ using KFCPageItemFacts::StoryLeadText;
 // selecting it: the find does not select what it finds, the SDK's snippet selects it itself after the find,
 // SnpFindAndReplace.cpp:798-807). A walker of one's own does not, and from 2026-10-06 to 2026-10-14 KFC walked one: a row
 // read its page, its "overset" and its locks off the composition from before the edit. So, as the reading's own guard,
-// the frames up to the position are composed first when any of them is damaged - nothing to do where the find composed
-// them: the SDK's recipe (SnpInspectTextModel.cpp:724-733, as the jump's RecomposeIfDamaged takes it) carried only as far
-// as the position (RecomposeThruTextIndex) - not the story to its end per row a Replace writes.
+// the position's parcels are composed first when any of them is damaged - nothing to do where the find composed them.
+// THE OFFICIAL SHAPE: composed through the parcel list the position is then read from - a table cell's or a footnote's as
+// well as the frames' (SnpTextModelHelper::QueryParcelContaining, :467-484: GetFirstDamagedParcel, then
+// ITextParcelListComposer), only as far as the position (the guide, sol-03 "Recomposing text": the parcel list
+// composer's RecomposeThruTextIndex is "the most general approach", for text "displayed in a frame or a table cell") -
+// not the story to its end per row a Replace writes. NOT THE FRAME LIST'S COMPOSER: its TextIndex is the primary
+// thread's alone (the guide's own example guards it with GetPrimaryStoryThreadSpan; ITextParcelListComposer.h, the
+// TextIndex "MUST be part of the TextStoryThread mapped to the ParcelList"), and a table cell's position handed to the
+// frame list brought InDesign down in KCM (IFrameList::QueryFrameContaining, 2026-09-12). A note's or a deletion's
+// parcel list composes nothing: text "never composed for display" (the same section), its parcel interfaces empty
+// implementations (the guide's figures on Track Changes and on InCopy notes, vol2 chapters 3 and 20).
 // Every caller holds a SaveRestoreModifiedState guard or is writing anyway (composing dirties a document).
-void ComposeThrough(ITextModel* textModel, TextIndex pos)
+void ComposeThrough(ITextModel* textModel, ITextParcelList* tpl, TextIndex pos)
 {
 	// (Fault switch frame-read-uncomposed, a test build's only - KFCDiag.h: the parcels read as they stand, the way before
 	// 2026-10-14.)
 	if (KFC_DIAG_FAULT("frame-read-uncomposed"))
 		return;
-	InterfacePtr<IWaxStrand> waxStrand(static_cast<IWaxStrand*>(textModel->QueryStrand(kFrameListBoss, IID_IWAXSTRAND)));
-	InterfacePtr<IFrameList> frameList(waxStrand, UseDefaultIID());
-	if (frameList == nil || frameList->GetFirstDamagedFrameIndex() == -1)
+	// A position the text model holds (the guide's check), in a parcel list with damage (the snippet's).
+	if (pos < 0 || pos >= textModel->TotalLength() || !tpl->GetFirstDamagedParcel().IsValid())
 		return;
-	InterfacePtr<IFrameListComposer> composer(frameList, UseDefaultIID());
+	InterfacePtr<ITextParcelListComposer> composer(tpl, UseDefaultIID());
 	if (composer != nil)
 		composer->RecomposeThruTextIndex(pos);
 }
@@ -413,10 +417,10 @@ UID FrameUIDForPosition(const UIDRef& storyRef, TextIndex pos)
 	InterfacePtr<ITextModel> textModel(storyRef, UseDefaultIID());
 	if (textModel == nil)
 		return kInvalidUID;
-	ComposeThrough(textModel, pos);
 	InterfacePtr<ITextParcelList> tpl(textModel->QueryTextParcelList(pos));
 	if (tpl == nil)
 		return kInvalidUID;
+	ComposeThrough(textModel, tpl, pos);
 	const ParcelKey key = tpl->GetParcelContaining(pos);
 	if (!key.IsValid())
 		return kInvalidUID;
