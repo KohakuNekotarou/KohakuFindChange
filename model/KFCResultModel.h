@@ -75,10 +75,11 @@ namespace KFCResultModel
 								// draws nothing, so the row has to say why the page looks empty.
 
 		int32		fontGroup;	// which of its chapter's fontGroups (its STORY group) this hit belongs
-		int32		fontGroupPos;	// to, and where it sits inside that group. -1 before AppendChapter
-								// groups it, and on an object row, which has no story (every text hit
-								// has a group). Filled by AppendChapter; the tree reads them to answer
-								// "who is my parent" and "which child am I" without searching.
+		int32		fontGroupPos;	// to, and where it sits inside that group. -1 until the model groups
+								// the chapter's rows (AppendChapter, and a chapter a search again lays out
+								// anew - IndexRows in the .cpp), and on an object row, which has no story
+								// (every text hit has a group). The tree reads them to answer "who is my
+								// parent" and "which child am I" without searching.
 
 		UID			storyUID;	// the story the match lives in (within its chapter's database)
 		TextIndex	textStart;	// the match's start position in that story
@@ -123,8 +124,9 @@ namespace KFCResultModel
 								// show one". Kept as a number rather than only baked into the
 								// locator string, so the locator can be rebuilt at any time.
 		int32		storyOrdinal;	// this hit's place among its STORY's hits as the search found them - ordered by
-								// textStart then (the spec's T14: a row among look-alikes is found again by its
-								// order). Set by AppendChapter; never changed after (a row that moves keeps it).
+								// textStart then (docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md
+								// T14: a row among look-alikes is found again by its order). Set where the rows are
+								// grouped (as fontGroup); a row a write moves keeps it.
 
 		// --- an OBJECT row (the Object tab - docs/superpowers/specs/2026-10-09-kfc-object-search-design.md O8) ---
 		// A row for a PAGE ITEM rather than a match in a story. storyUID stays kInvalidUID on it, so every text door - the
@@ -200,8 +202,9 @@ namespace KFCResultModel
 		std::map<UID, uint32>	storyVersions;
 		// A search over part of a story: the part of each story holding a row (SearchedRange). Empty otherwise.
 		std::map<UID, SearchedRange>	searchedRanges;
-		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again - the author's call): shown with no rows, (0/0), so it can be searched again after the next edit. A chapter with no rows is otherwise not shown - a
-		// search lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
+		// SEARCHED AGAIN AND NOTHING FOUND (Search This Document Again - the author's call): shown with no rows, (0/0),
+		// so it can be searched again after the next edit. A chapter with no rows is otherwise not shown - a search
+		// lists only documents that hold a match, and CloseChapter empties a closed one in place (ChapterShown).
 		bool					shownEmpty;
 
 		// (No "not reached" mark per chapter: rows of several documents replaced together are written in one
@@ -212,8 +215,9 @@ namespace KFCResultModel
 
 
 	/** Append one chapter to the model - the ONE way results get in. The search clears the model and
-	    then appends each chapter as it finishes. Only chapters with >=1 hit should be appended (empty
-	    branches are never shown).
+	    then appends each chapter as it finishes. Only chapters with >=1 hit are appended: a search lists
+	    only the documents that hold a match (one shown with none is Search This Document Again's -
+	    Chapter::shownEmpty).
 
 	    This is also where the chapter's STORY GROUPS are built, from the hits' own stories - so a
 	    caller fills in nothing but the hits, and no result can reach the tree ungrouped. (One entry
@@ -341,7 +345,7 @@ namespace KFCResultModel
 	void SetBookName(const PMString& name);
 	PMString GetBookName();
 
-	/** Application-shutdown cleanup: release the vectors' storage, no UI. */
+	/** Application-shutdown cleanup: release the vectors' and the strings' storage, no UI. */
 	void ShutdownCleanup();
 
 	/** The number of chapters in the model - a chapter CloseChapter emptied, and one searched again with no match
@@ -425,7 +429,7 @@ namespace KFCResultModel
 	    replace - later calls must use the live database, not the dead one from search time. */
 	void RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef);
 
-	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the author's call, 2026-10-11, the spec map's LIFE-14):
+	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the author's call, the spec map's LIFE-14):
 	    the chapter of a document-scope list bound to it takes its new name - the row's, and a status line's that names it
 	    (a close's). A book's list keeps its names: its rows stand for the book's chapters, still the files the book lists.
 	    Asked of the list (IsFromBook), as KFCCloseDocResponder asks it - not of a chapter's file, which a book's entry can
@@ -442,8 +446,8 @@ namespace KFCResultModel
 	bool GetStoryVersion(int32 chapterIdx, UID story, uint32& outVersion);
 	void SetStoryVersion(int32 chapterIdx, UID story, uint32 version);
 
-	/** The stories holding a row of the chapter - one answer for the replace and KFCUndoFollow alike.
-	    Empty for an index out of range. */
+	/** The stories holding a row of the chapter - KFCUndoFollow reads each one's version before a write of the
+	    chapter's rows (the stories the write can move). Empty for an index out of range. */
 	void GetChapterStories(int32 chapterIdx, std::set<UID>& outStories);
 
 	/** The part of the story a search over part of a story walked (SearchedRange) - false when none is recorded (a
@@ -671,8 +675,9 @@ namespace KFCResultModel
 
 	/** Record why a hit was not replaced. Rebuilds the row's locator so the word shows up at once,
 	    and the row is not offered again (IsWorkOutcome).
-	    Called by the replace pass, and by the jump when it finds the text at a row's position is no
-	    longer the text the row describes. Ignored for a hit that WAS replaced. */
+	    Set by the replace pass, and by the jump when it finds the text at a row's position is no
+	    longer the text the row describes; taken off again (kOutcomeNone) when a row said Missing is
+	    found after all (KFCSearchEngine::LocateRow). Ignored for a hit that WAS replaced. */
 	void SetHitOutcome(int32 chapterIdx, int32 hitIdx, ChangeOutcome outcome);
 
 	/** Start remembering every row a replace changes, so a write taken back can be put back on the panel too.
@@ -691,7 +696,12 @@ namespace KFCResultModel
 	void BeginRowBackup();
 
 	/** Put every remembered row back the way it was and stop remembering. A row is remembered once, as
-	    the run found it, however many times the run changes it. */
+	    the run found it, however many times the run changes it.
+
+	    The rows' text foci are NOT put back here (ApplyRowStep puts back its rows' foci; this does not): a
+	    rolled-back write moved them with the text and the rollback leaves them where it moved them, so a
+	    caller that wrote text puts the foci of the stories it wrote back on their rows itself
+	    (KFCRowFoci::ReanchorStory - every row of those stories, the ones never copied aside as well). */
 	void RollBackRows();
 
 	// THE PANEL FOLLOWS AN UNDO AND A REDO (the author: "the panel should come back with it, the way KCM's

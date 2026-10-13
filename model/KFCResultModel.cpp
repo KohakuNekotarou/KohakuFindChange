@@ -5,7 +5,7 @@
 //  KohakuFindChange (KFC)
 //
 //  Result model implementation. See KFCResultModel.h for the contract. All state is file-static, in
-//  the anonymous namespace below - the vector of chapters, the flags recorded beside it, the row
+//  the anonymous namespace below - the vector of chapters, the list's header beside it, the row
 //  backup and the result-set / layout ids; the getters are bounds-checked so a repaint racing a
 //  rebuild (or a stale node id) reads "nothing" rather than crashing.
 //
@@ -19,10 +19,11 @@
 #include <algorithm>	// std::stable_sort - the page order and each story's order (OrderHitsByPage, NumberHitsWithinStories)
 #include <set>			// the rows already copied aside - see BackUpRow
 #include <iterator>		// std::make_move_iterator - ReplaceStoryRows hands the walked story's hits over
-#include <utility>		// std::move - the thinning below hands whole hits over instead of copying
+#include <utility>		// std::move - chapters and hits handed over instead of copied (AppendChapter, ReplaceStoryRows)
 
 // Project includes:
-#include "KFCDiag.h"	// KFC_DIAG_LOG - a row's outcome as it is set, in a test build (compiled out of a shipping one)
+#include "KFCDiag.h"	// KFC_DIAG_LOG / KFC_DIAG_FAULT - a row's outcome as it is set, and the fault switches, in a test
+						// build (compiled out of a shipping one)
 #include "KFCResultModel.h"
 #include "KFCRowFoci.h"	// the rows' text foci - attached where a chapter is bound, let go with the rows
 
@@ -63,8 +64,8 @@ namespace
 
 	// Copy a row aside before it is first written to, if a replace is running - ONCE per row: the copy
 	// taken first is the row as the run found it, and it is the one a rollback has to put back. (A
-	// replaced row is written four times over - MarkHitReplaced, SetHitWrittenText, SetHitRange,
-	// SetHitSegments - and a copy per change would only be overwritten unread.)
+	// replaced row is written several times over - MarkHitReplaced, SetHitWrittenText, SetHitRange,
+	// SetHitSegments, SetStoryLead - and a copy per change would only be overwritten unread.)
 	void BackUpRow(int32 chapterIdx, int32 hitIdx, const KFCResultModel::Hit& row)
 	{
 		if (!gBackup.on || !gBackup.rowsCopied.insert(std::make_pair(chapterIdx, hitIdx)).second)
@@ -191,9 +192,10 @@ namespace
 		}
 	}
 
-	// Each story's hits numbered in the order their text stands (spec T14): a group's hits sorted by where they
-	// started when the search found them. Not the hits' own order - that is page order, and the walk's order inside
-	// a table is reading order (memory walker-scope-options-and-hidden-layers), neither of which is the text's.
+	// Each story's hits numbered in the order their text stands (the text-focus spec's T14 - its path is at
+	// Hit::storyOrdinal in the header): a group's hits sorted by where they started when the search found them. Not
+	// the hits' own order - that is page order, and the walk's order inside a table is reading order (memory
+	// walker-scope-options-and-hidden-layers), neither of which is the text's.
 	void NumberHitsWithinStories(KFCResultModel::Chapter& chapter)
 	{
 		for (size_t g = 0; g < chapter.fontGroups.size(); ++g)
@@ -700,8 +702,9 @@ void KFCResultModel::RebindChapterDoc(int32 chapterIdx, const UIDRef& newDocRef)
 	if (Chapter* c = ChapterAt(chapterIdx))
 	{
 		c->docRef = newDocRef;
-		// THE ONE PLACE A CHAPTER'S ROWS GET THEIR FOCI AFTER A (RE)OPEN (spec T6): every road that binds a chapter
-		// to an open document comes here - a jump's or a replace's reopen, and the user's own open (KFCOpenDocResponder).
+		// THE ONE PLACE A CHAPTER'S ROWS GET THEIR FOCI AFTER A (RE)OPEN (the text-focus spec's T6): every road that
+		// binds a chapter to an open document comes here - a jump's or a replace's reopen, and the user's own open
+		// (KFCOpenDocResponder).
 		KFCRowFoci::AttachChapter(chapterIdx);
 	}
 }
@@ -1234,8 +1237,9 @@ void KFCResultModel::ApplyRowStep(const RowStep& step, bool after)
 	const std::vector<VersionCopy>& versions = after ? step.versionsAfter : step.versionsBefore;
 	for (size_t i = 0; i < versions.size(); ++i)
 		PutVersionBack(versions[i]);
-	// The foci of the rows put back go back on their places (spec T7): an Undo or a Redo moves text without moving a
-	// focus, and these rows' stored places are exact now - the step is followed only when the story is at its version.
+	// The foci of the rows put back go back on their places (the text-focus spec's T7): an Undo or a Redo moves text
+	// without moving a focus, and these rows' stored places are exact now - the step is followed only when the story
+	// is at its version.
 	for (size_t i = 0; i < rows.size(); ++i)
 		KFCRowFoci::Reanchor(rows[i].chapter, rows[i].hit);
 }
@@ -1249,14 +1253,14 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 {
-	// The rows going away take their foci (the rows put back get theirs at the foot - spec T7).
+	// The rows going away take their foci (the rows put back get theirs at the foot - the text-focus spec's T7).
 	KFCRowFoci::DetachAll();
 	gChapters = snapshot.chapters;
 	gLayoutGeneration = snapshot.layout;
 	gHeader = snapshot.header;
 	// The row backup names rows by index, and these rows were just replaced (ReplaceStoryRows forgets it the same way).
 	ForgetRowBackup();
-	// The list put back - its rows' foci where KFC knows the stories as they stand (spec T7).
+	// The list put back - its rows' foci where KFC knows the stories as they stand (the text-focus spec's T7).
 	KFCRowFoci::AttachOpenChapters();
 }
 

@@ -30,8 +30,8 @@
 //  "Let the stock handler move, then open what it landed on" - not a tree-order walk over the model
 //  working out the next / previous row itself. The stock handler only ever selects rows the tree
 //  actually has; a hand-rolled walk once counted chapters with GetChapterCount() where the tree is
-//  built from GetDisplayChapterCount(), so a result set over the display cap sent it after a node
-//  that does not exist.
+//  built from GetDisplayChapterCount() - the two differ (a chapter a closed document emptied keeps
+//  its place in the model and is not shown) - and was sent after a node that does not exist.
 //
 //  TreeViewEventHandler is the stock base (source/open/includes/widgets; on the CPP.rsp path) and
 //  HandleUpDownKey is virtual precisely for this. Home / End / PageUp / PageDown and the left /
