@@ -6,8 +6,8 @@
 //
 //  What every hand-drawn text widget in this panel has to agree about: how far the CONTEXT around a
 //  match is faded toward the background, how that faded colour is worked out, the two flags every
-//  draw and every measure passes, and the BAR that stands where a change has a place and no
-//  characters.
+//  draw and every measure passes, the BAR that stands where a change has a place and no
+//  characters, and where a shown string may be CUT.
 //
 //  WHY THIS FILE EXISTS. Two widgets draw "the words that matter at full strength, the words around
 //  them faded": a hit row's cell (KFCColorTextView.cpp) and the panel's MESSAGE AREA
@@ -16,8 +16,8 @@
 //  apart the first time one of them was tuned.
 //
 //  THE SAME SHAPE AS KCM's KCMPanelTextDraw.h, which the message area was brought over from (the
-//  author: "the way KCM does it"). Header-only for the reason KCM gives: one constant, a
-//  pure function of three numbers and a few lines of drawing - no state, no SDK object to hold.
+//  author: "the way KCM does it"). Header-only for the reason KCM gives: constants, pure
+//  functions and a few lines of drawing - no state, no SDK object to hold.
 //  ! What is NOT shared is the colour LOOKUP: the row cell asks whether its row is selected and
 //    switches both colours to the selection pair, while the message area is never selected. Each
 //    asks IInterfaceColors its own question.
@@ -34,6 +34,7 @@
 // General includes:
 #include "PMReal.h"
 #include "PMString.h"			// the bar's placeholder
+#include "UnicodeClass.h"		// IsCombiningMark - where a shown string may be cut
 
 /** The two flags every draw and every measure passes, spelled out rather than left to a default.
     THE DEFAULTS IN DrawStringUtils.h DISAGREE WITH EACH OTHER: the draw calls default to kFalse, the
@@ -109,6 +110,26 @@ inline void KFCDrawCaret(IGraphicsPort* gPort, const RealAGMColor& colour,
 	const PMReal left = ::Round(x + (roomW - kKFCCaretWidth) / PMReal(2.0));
 	gPort->setrgbcolor(colour.red, colour.green, colour.blue);
 	gPort->rectfill(left, ::Round(top), kKFCCaretWidth, height);
+}
+
+/** WHERE A SHOWN STRING MAY BE CUT: in front of a character, never in front of a mark that belongs to the
+    character before it - a variation selector (an IVS such as U+E0100 picks the form of the kanji before it)
+    or a combining mark (U+3099 voices the kana before it, U+0301 accents a letter). Cut there, the kept half
+    draws the bare character - a DIFFERENT glyph from the document's, not merely a shorter text - and the mark
+    goes on alone. So the cut moves back to in front of that character, whichever side is kept
+    (KFCStatusTextView.cpp's head keeps [0, pos), its tail [pos, end)).
+    UnicodeClass::IsCombiningMark answers for both: it says yes to the variation selectors as well (measured
+    against Public.dll outside InDesign: U+FE00, U+FE0F, U+E0100, U+E01EF, U+180B; and no to the spacing U+309B
+    and to ZWJ). PMString's positions are whole characters - CharCount, Truncate and Remove count them, GetWChar
+    answers the character at one - so no cut can fall inside a surrogate pair.
+    @return pos, or the position of the character the marks at pos belong to. */
+inline int32 KFCSafeCut(const PMString& s, int32 pos)
+{
+	if (pos >= s.CharCount())
+		return pos;
+	while (pos > 0 && UnicodeClass::IsCombiningMark(s.GetWChar(pos)))
+		--pos;
+	return pos;
 }
 
 #endif // __KFCPanelTextDraw_h__

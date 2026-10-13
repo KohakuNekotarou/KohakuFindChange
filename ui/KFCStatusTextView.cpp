@@ -137,22 +137,6 @@ PMString KFCTail(const PMString& s, int32 n)
 	return out;
 }
 
-/* Meant to move a cut position off the middle of a surrogate pair, cutting BEFORE the pair whichever side
-   is kept (KFCHead keeps [0, pos), KFCTail keeps [pos, end)). IT NEVER FIRES, and is kept as harmless:
-   PMString's positions are whole characters - CharCount, Truncate and Remove count characters - so no cut
-   falls inside a pair, and GetChar answers the PLATFORM character at a position (PMString.cpp:2338-2347),
-   never half a pair. KCM carries the same three lines. */
-int32 KFCSafeCut(const PMString& s, int32 pos)
-{
-	const int32 total = s.CharCount();
-	if (pos <= 0 || pos >= total)
-		return pos;
-	const uchar16 c = s.GetChar(pos).GetValue();
-	if (c >= 0xDC00 && c <= 0xDFFF)		// the second half of a pair: cut in front of the first half
-		return pos - 1;
-	return pos;
-}
-
 /* The cut mark - kTextChar_Ellipse, the one a hit row's cut segment carries (KFCSearchEngine.cpp).
    Taken from TextChar.h rather than written as a glyph, so this file stays plain ASCII. */
 PMString KFCEllipsis()
@@ -292,25 +276,10 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 				continue;
 			}
 
-			if (fit <= 0)
+			if (fit > 0)
 			{
-				// Nothing fits in what is left of this line. Start a fresh one and try again - unless this
-				// line was already fresh, in which case one character has to go down anyway or the loop
-				// would never move.
-				if (x > PMReal(0.0))
-				{
-					++line;
-					x = PMReal(0.0);
-					justWrapped = kTrue;
-					if (line >= maxLines)
-						return !KFCAnythingLeft(runs, r, rest);
-					continue;
-				}
-				fit = 1;
-			}
-			else
-			{
-				// (2) Break at a space if this chunk offers one.
+				// (2) Break at a space if this chunk offers one - otherwise between characters, but not in front
+				// of a mark that belongs to the character before it (KFCSafeCut), which can leave nothing here.
 				int32 space = -1;
 				for (int32 i = fit; i > 0; --i)
 				{
@@ -321,6 +290,23 @@ bool16 KFCLayoutRuns(IGraphicsContext* gc, const InterfaceFontInfo& font,
 					}
 				}
 				fit = (space > 0) ? space : KFCSafeCut(chunk, fit);
+			}
+
+			if (fit <= 0)
+			{
+				// Nothing fits in what is left of this line. Start a fresh one and try again - unless this
+				// line was already fresh, in which case one character has to go down anyway or the loop
+				// would never move (a character that does not fit a whole line with its marks goes without them).
+				if (x > PMReal(0.0))
+				{
+					++line;
+					x = PMReal(0.0);
+					justWrapped = kTrue;
+					if (line >= maxLines)
+						return !KFCAnythingLeft(runs, r, rest);
+					continue;
+				}
+				fit = 1;
 			}
 
 			const PMString head = KFCHead(chunk, fit);

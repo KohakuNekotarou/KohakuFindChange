@@ -375,7 +375,13 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 			drawMatch(match);
 		else
 		{
-			const PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			// ! WHAT PMEllipsizeString HANDS BACK IS A NEW STRING, and the draw TRANSLATES what it is given
+			//   (DrawStringUtils.h: "It will be translated before drawing to screen"). The header does not say the
+			//   new string keeps the "do not translate" its source carries (SetSegments), and a PMString starts out
+			//   translatable (PMString.h) - so it is said again: document text that happens to spell a key of the
+			//   string table is drawn as it is, not translated. The two cuts below are the same.
+			PMString m = StringUtils::PMEllipsizeString(&gc, availWidth, match, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			m.SetTranslatable(kFalse);
 			drawRun(m, kMatchColor);
 		}
 	}
@@ -386,16 +392,23 @@ void KFCColorTextView::Draw(IViewPort* viewPort, SysRgn updateRgn)
 		// so the words just before the match survive with a leading "..."); the TRAILING context
 		// loses its tail (kEllipsizeEnd). Leading context is served first, so the run-up to the
 		// match is preferred over what follows it.
+		// (The cuts are marked "do not translate" again - the match's own cut above says why.)
 		const PMReal rem = availWidth - matchW;
 		PMString preCut = pre;
 		if (!pre.IsEmpty())
+		{
 			preCut = StringUtils::PMEllipsizeString(&gc, rem, pre, fontInfo, kEllipsizeBeginning, nil, kDontConvertAmpersand);
+			preCut.SetTranslatable(kFalse);
+		}
 		const PMReal preCutW = preCut.IsEmpty() ? PMReal(0.0) : StringUtils::PMMeasureString(&gc, preCut, fontInfo, kDontConvertAmpersand).X();
 
 		const PMReal postBudget = rem - preCutW;
 		PMString postCut;
 		if (!post.IsEmpty() && postBudget > PMReal(0.0))
+		{
 			postCut = StringUtils::PMEllipsizeString(&gc, postBudget, post, fontInfo, kEllipsizeEnd, nil, kDontConvertAmpersand);
+			postCut.SetTranslatable(kFalse);
+		}
 
 		drawRun(preCut, kContextColor);
 		drawMatch(match);

@@ -62,6 +62,7 @@
 #include "KFCJump.h"			// ReplaceObjectRows - object rows' Replace
 #include "KFCColorTextView.h"	// IKFCRowData (the hit cell)
 #include "IKFCStatusTextData.h"	// the message area's pieces
+#include "KFCPanelTextDraw.h"	// KFCSafeCut - where the box's text may be cut
 #include "KFCPanelIcon.h"		// the illustration follows the status line
 #include "KFCDiag.h"			// TREETIME and the tree-expand fault switch - test builds only
 #include "KFCBookPanelLookup.h"	// QueryPanelManager - the panel made active (TakeKeyboard)
@@ -822,13 +823,8 @@ bool KFCResultTree::ShowRowPreview(int32 chapterIdx, int32 hitIdx, const char* n
 	const int32 kPreviewMaxChars = 300;
 	if (shown.CharCount() > kPreviewMaxChars)
 	{
-		// (A surrogate test that never fires, kept as harmless: PMString's positions are whole characters, so a cut by
-		// CharCount falls between characters, and GetChar answers the PLATFORM character there - PMString.cpp:2338-2347 -
-		// never half a surrogate pair. KFCStatusTextView's KFCSafeCut has the same.)
-		int32 keep = kPreviewMaxChars;
-		const uint32 at = shown.GetChar(keep).GetValue();
-		if (at >= 0xDC00 && at <= 0xDFFF)
-			--keep;
+		// (Not in front of a mark that belongs to the character before it - KFCSafeCut, the box's own rule.)
+		const int32 keep = KFCSafeCut(shown, kPreviewMaxChars);
 		shown.Truncate(shown.CharCount() - keep);
 		shown.AppendW(static_cast<UTF32TextChar>(kTextChar_Ellipse));
 	}
