@@ -27,11 +27,14 @@
 #include "WalkerScopeOptions.h"
 #include "KFCModelTypes.h"	// KFCResultModel::RowLocation - LocateRow's answer
 
+#include <map>
 #include <vector>
 
 class ITextWalker;			// AcquireWalker
 class ITextWalkerScope;		// ScopeHasNothingToWalk
 class ITextWalkerSelectionUtils;
+namespace KFCBookScope { struct ChapterDoc; }					// FileChapter
+namespace KFCResultModel { struct Hit; struct SearchedRange; }	// FileChapter
 
 /** KFC SEARCHES AND REPLACES FORWARD ONLY (the author's call). The results are a list, so a direction
     means nothing to KFC - and a backward search lists matches a forward replace does not make (GREP
@@ -101,15 +104,29 @@ namespace KFCSearchEngine
 	    run and not handed back. */
 	struct CollectTally
 	{
-		int32					total;
-		int32					chaptersWithHits;
-		bool					truncated;
-		bool					cancelled;
+		int32					total;				// the rows filed (FileChapter)
+		int32					chaptersWithHits;	// ...and the targets that held one
+		bool					truncated;			// the list reached its limit - the targets after it were not walked
+		bool					cancelled;			// the user's Cancel - the caller throws the run away
+		// Targets never searched at all, each already spelled "name: why" for the note. Counted apart from "searched,
+		// no hits": without them a search silently lists fewer documents than it was given, as if they held no matches.
 		std::vector<PMString>	unsearchable;
+		// ...targets whose walk STARTED and then broke off - a sentence of their own: their rows are real and filed, and
+		// what is missing is the part the walk never reached.
 		std::vector<PMString>	brokeOff;
+		// ...and targets the run OPENED and could not hand back - windowless, so the user can neither see them nor close
+		// them, and each holds its .indd locked (KFCBookScope::AppendUnclosedNote).
 		std::vector<PMString>	unclosed;
 		CollectTally() : total(0), chaptersWithHits(0), truncated(false), cancelled(false) {}
 	};
+
+	/** ONE TARGET'S ROWS INTO THE MODEL AS A CHAPTER, AND INTO THE TALLY - the one way both tabs' walks file a target
+	    (CollectTargets in the .cpp, and KFCObjectSearch::CollectTargets): the rows put in page order, each with its
+	    "P<page>(<n>)" locator (KFCResultModel::OrderHitsByPage), handed to the model as the target's chapter
+	    (KFCResultModel::AppendChapter), and counted. The rows - and the stories' versions and searched parts, where
+	    given - are TAKEN, not copied. For a target that holds at least one row. */
+	void FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits, CollectTally& tally,
+		std::map<UID, uint32>* storyVersions = nil, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges = nil);
 
 	/** THE SCOPE DOORS SEARCHBOOK HAS ALWAYS ASKED, IN ONE PLACE (so the query run asks the same):
 	    Book Scope with a Search: other than Document, a Search: this panel cannot follow, no target book, an

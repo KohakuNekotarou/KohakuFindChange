@@ -31,7 +31,7 @@
 #include "IFindChangeCmdData.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
 #include "ICommand.h"
-#include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CommitSearchMode
+#include "IIntData.h"				// kFindSearchModeCmdBoss carries two of these - see CreateFindChangeIntCmd
 #include "IStringData.h"			// kFindStringCmdBoss's string - SetQuery
 #include "IBoolData.h"				// kFindChangeGlyphIDCmdBoss: which side of the glyph search is being set
 #include "IK2ServiceProvider.h"
@@ -331,8 +331,9 @@ bool CommitGlyphID(Text::GlyphID glyphID, bool16 findSide)
 // One of the find/change option commands that carry a single int, made and filled - the shape of
 // SnpFindAndReplace's ProcessFindChangeCommandInt32: the value in the default IIntData, and which
 // mode's settings are being addressed in IID_IFINDCHANGEMODEDATA where the boss carries one
-// (kFindChangeModeCmdBoss does; the two character-type bosses hold only the value - checked
-// against a live object-model dump - so that field is set only when it answers). nil = not made.
+// (kFindSearchModeCmdBoss and kFindChangeModeCmdBoss do, both fields kIntDataImpl; the two character-type
+// bosses hold only the value - checked against a live object-model dump - so that field is set only when it
+// answers). nil = not made.
 ICommand* CreateFindChangeIntCmd(const ClassID& cmdBoss, int32 value, int32 mode)
 {
 	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(cmdBoss));
@@ -1040,17 +1041,25 @@ KFCResultModel::SearchedRange MakeSearchedRange(IDataBase* db, UID story, KFCRes
 	return part;
 }
 
-// A stretch of a story's text as code points - one per TextIndex (memory textindex-counts-code-points).
-std::vector<uint32> CodePointsAt(ITextModel* model, TextIndex at, int32 len)
+// A STRETCH OF A STORY'S TEXT, [at, at+len) - the one read of a range in this file (ReadText, CodePointsAt). The
+// official one-call read (textiterator.h AppendToStringAndIncrement), after the check KCM and KESCL make, that the range
+// starts inside the story; a range running past the end reads up to the end. Empty when it cannot be read.
+WideString ReadStretch(ITextModel* model, TextIndex at, int32 len)
 {
-	std::vector<uint32> out;
-	if (model == nil || len <= 0 || at < 0 || at >= model->TotalLength())
-		return out;
-	const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
 	WideString w;
+	if (model == nil || len <= 0 || at < 0 || at >= model->TotalLength())
+		return w;
+	const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
 	TextIterator it(model, at);
 	it.AppendToStringAndIncrement(&w, n);
-	out.reserve(n);
+	return w;
+}
+
+// Text as code points - one per TextIndex (memory textindex-counts-code-points): a string's, and a stretch of a story's.
+std::vector<uint32> CodePointsOf(const WideString& w)
+{
+	std::vector<uint32> out;
+	out.reserve(w.CharCount());
 	for (WideString::const_iterator c = w.begin(); c != w.end(); ++c)
 		out.push_back(static_cast<uint32>(*c));
 	return out;
@@ -1058,11 +1067,12 @@ std::vector<uint32> CodePointsAt(ITextModel* model, TextIndex at, int32 len)
 
 std::vector<uint32> CodePointsOf(const PMString& s)
 {
-	std::vector<uint32> out;
-	const WideString w(s);
-	for (WideString::const_iterator c = w.begin(); c != w.end(); ++c)
-		out.push_back(static_cast<uint32>(*c));
-	return out;
+	return CodePointsOf(WideString(s));
+}
+
+std::vector<uint32> CodePointsAt(ITextModel* model, TextIndex at, int32 len)
+{
+	return CodePointsOf(ReadStretch(model, at, len));
 }
 
 // WHERE ONE EDGE OF A SEARCHED PART IS NOW: the place nearest `from` - kSearchedEdgeSlack characters either way at most -
@@ -1135,6 +1145,24 @@ bool FindSearchedPartAgain(int32 chapterIdx, IDataBase* db, UID story, KFCResult
 	return outStart >= 0 && outEnd >= outStart;
 }
 
+// WHERE ONE WALK MOVES THE SEARCH'S BAR (CollectHitsInDoc): the run's bar, this walk's slice of it - from `base`, `span`
+// steps long - cut into one piece per story of the document walked, and the position already reported, carried from
+// walk to walk (KFCAdvanceProgress swallows an advance too small to be worth a repaint). The stories are counted when
+// the slice is made, from IStoryList for nothing - so a chapter is asked once it is open, since its size is not
+// knowable before; a document with none is one step (CollectHitsInDoc). WalkBar() = no bar: a walk that looks a row or
+// a story up again, or only asks which story a Search: means, moves nothing.
+struct WalkBar
+{
+	KFCProgressBar*	bar;
+	int32			base;
+	int32			span;
+	int32			stories;
+	int32*			reported;
+	WalkBar() : bar(nil), base(0), span(0), stories(0), reported(nil) {}
+	WalkBar(KFCProgressBar& onBar, int32 sliceBase, int32 sliceSpan, const UIDRef& docRef, int32& ioReported)
+		: bar(&onBar), base(sliceBase), span(sliceSpan), stories(CountSearchableStories(docRef)), reported(&ioReported) {}
+};
+
 // Walk one document with the user's current Find/Change query and collect every match as a Hit.
 // Read-only: the whole walk sits inside a SaveRestoreModifiedState dirty guard, so a windowless
 // chapter can be closed afterwards without wanting a save. NOTHING is set on opts - the walk uses
@@ -1145,11 +1173,8 @@ bool FindSearchedPartAgain(int32 chapterIdx, IDataBase* db, UID story, KFCResult
 // with exactly these, or it meets other matches than the hits list - so reading them here would have
 // been the Find/Change settings asked once per chapter for one answer.
 //
-// progressBar / progressBase: the run's bar and the point on it where this chapter starts.
-// chapterSpan / storiesInDoc: how much of the bar this chapter owns, and how many stories to divide
-// that slice between - asked by the caller once the chapter is open, since a chapter's size is not
-// knowable before then. The walk moves the bar as it goes: a story at a time, each one subdivided
-// by how far into its text the current match sits. nil is allowed for the bar.
+// bar: where this walk moves the run's bar (WalkBar - none by default). The walk moves it as it goes: a story at a
+// time, each one subdivided by how far into its text the current match sits.
 //
 // detail: how much of each hit is filled in (HitDetail) - everything for the search,
 // less for a caller that re-walks a changed document only to find a row's place again. The walk is
@@ -1178,8 +1203,7 @@ bool FindSearchedPartAgain(int32 chapterIdx, IDataBase* db, UID story, KFCResult
 void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOptions& scopeOptions,
 	HitDetail detail, std::vector<KFCResultModel::Hit>& outHits,
 	bool& outCapped, ChapterWalkResult& outResult,
-	KFCProgressBar* progressBar, int32 progressBase, int32 chapterSpan, int32 storiesInDoc,
-	int32& ioProgressReported, const UIDRef& onlyStory = UIDRef::gNull,
+	const WalkBar& bar = WalkBar(), const UIDRef& onlyStory = UIDRef::gNull,
 	IWalkerScopeFactoryUtils::WalkScopeType searchScope = IWalkerScopeFactoryUtils::kEmptyScope,
 	std::vector<IDataBase*>* outHitDBs = nil, std::vector<ScopePiece>* outPieces = nil,
 	ITextWalkerScope* givenScope = nil)
@@ -1456,7 +1480,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 		// story, the position is how far into its text this match sits. Done inside the walker's critical
 		// section; WasCancelled is asked when the walk moves on to another story (below - and between
 		// chapters, see the note on the section above).
-		if (progressBar != nil)
+		if (bar.bar != nil)
 		{
 			if (story != progressStory)
 			{
@@ -1467,7 +1491,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				// "another story" means the next story that holds one. Whether WasCancelled itself lets events
 				// in is not measured (KFCAdvanceProgress); the "safety first" call is in the note on the
 				// critical section above. kFalse = no global error state.
-				if (progressStory.GetDataBase() != nil && progressBar->WasCancelled(kFalse))
+				if (progressStory.GetDataBase() != nil && bar.bar->WasCancelled(kFalse))
 				{
 					outResult = kChapterCancelled;
 					break;
@@ -1480,8 +1504,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				progressStoryLength = (progressModel != nil) ? progressModel->TotalLength() : 0;
 			}
 
-			// This chapter's slice, cut into one piece per story.
-			int32 stepsPerStory = (storiesInDoc > 0) ? (chapterSpan / storiesInDoc) : chapterSpan;
+			// This walk's slice, cut into one piece per story (a document with none: one piece).
+			int32 stepsPerStory = (bar.stories > 0) ? (bar.span / bar.stories) : bar.span;
 			if (stepsPerStory < 1)
 				stepsPerStory = 1;		// more stories than the slice has steps - crawl by ones
 
@@ -1495,14 +1519,14 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 			// Never past this chapter's own slice: with stepsPerStory rounded up (the < 1 guard)
 			// the arithmetic can overshoot, and a bar that runs into the next chapter's slice
 			// jumps backwards when that chapter starts.
-			int32 position = progressBase + storiesDone * stepsPerStory + within;
-			const int32 chapterEnd = progressBase + chapterSpan;
+			int32 position = bar.base + storiesDone * stepsPerStory + within;
+			const int32 chapterEnd = bar.base + bar.span;
 			if (position > chapterEnd)
 				position = chapterEnd;
 
 			// Moving the bar from inside the walk is what keeps the Cancel button answering at all -
 			// see KFCAdvanceProgress.
-			KFCAdvanceProgress(progressBar, ioProgressReported, position);
+			KFCAdvanceProgress(bar.bar, *bar.reported, position);
 		}
 
 		// Whole-search safety ceiling reached: stop collecting. More matches may exist, but the
@@ -1558,9 +1582,8 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 		return false;
 	bool capped = false;
 	ChapterWalkResult result = kChapterWalked;
-	int32 reported = 0;
 	CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit),
-		scopeOptions, kHitPlaceAndText, outHits, capped, result, nil, 0, 0, 1, reported, storyRef);
+		scopeOptions, kHitPlaceAndText, outHits, capped, result, WalkBar(), storyRef);
 	return result == kChapterWalked;
 }
 
@@ -1699,26 +1722,15 @@ bool KFCSearchEngine::CommitSearchMode()
 	const IFindChangeOptions::ChangeMode changeMode = opts->GetChangeMode();
 	const IFindChangeOptions::CharacterType findCharType = opts->GetFindCharacterType();
 
-	InterfacePtr<ICommand> cmd(CmdUtils::CreateCommand(kFindSearchModeCmdBoss));
-	if (cmd == nil)
-		return false;
-
-	// TWO separate int fields on this boss, both kIntDataImpl behind different IIDs (checked against a
-	// live object-model dump): the DEFAULT one is the value being set, and IID_IFINDCHANGEMODEDATA is
-	// which mode's settings are being addressed. For this command they are the same mode - exactly how
-	// SnpFindAndReplace passes it in all four of its find/replace entry points.
-	InterfacePtr<IIntData> value(cmd, UseDefaultIID());
-	InterfacePtr<IIntData> modeData(cmd, IID_IFINDCHANGEMODEDATA);
-	if (value == nil || modeData == nil)
-		return false;
-	value->Set(static_cast<int32>(mode));
-	modeData->Set(static_cast<int32>(mode));
-
+	// The tab, stated at itself: for this command the value and the mode it addresses are the same mode - exactly how
+	// SnpFindAndReplace passes it in all four of its find/replace entry points, and how SetQuery states it
+	// (CreateFindChangeIntCmd says which of the boss's two int fields is which).
+	//
 	// THE CALLER IS TOLD. The walk must NOT go ahead on a failure: it would run in whatever mode was
 	// committed last, which is a tab the user is not looking at, and the results would then be filed
 	// under the tab that IS on screen. The snippet this is modelled on stops too (SnpFindAndReplace.cpp:
 	// 511-516 and :598-603, both on this very command).
-	if (!ProcessFindChangeCmd(cmd))
+	if (!CommitFindChangeInt(kFindSearchModeCmdBoss, static_cast<int32>(mode), static_cast<int32>(mode)))
 		return false;
 
 	// The CHANGE MODE - kChange, or kTransliterate for the CJK character-type conversion - stated
@@ -2117,17 +2129,8 @@ bool KFCSearchEngine::IsPositionOverset(const UIDRef& storyRef, TextIndex pos)
 
 PMString KFCSearchEngine::ReadText(const UIDRef& story, TextIndex at, int32 len)
 {
-	WideString w;
 	InterfacePtr<ITextModel> model(story, UseDefaultIID());
-	// After the same check KCM and KESCL make, that the range starts inside the story. A range running past the
-	// end reads up to the end.
-	if (model != nil && len > 0 && at >= 0 && at < model->TotalLength())
-	{
-		const int32 n = (len < model->TotalLength() - at) ? len : static_cast<int32>(model->TotalLength() - at);
-		TextIterator it(model, at);
-		it.AppendToStringAndIncrement(&w, n);
-	}
-	PMString s(w);
+	PMString s(ReadStretch(model, at, len));
 	s.SetTranslatable(kFalse);
 	return s;
 }
@@ -2256,6 +2259,32 @@ bool KFCSearchEngine::ReadStoryVersion(IDataBase* db, UID story, uint32& outVers
 	return true;
 }
 
+void KFCSearchEngine::FileChapter(const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
+	CollectTally& tally, std::map<UID, uint32>* storyVersions, std::map<UID, KFCResultModel::SearchedRange>* searchedRanges)
+{
+	// Page order and each row's "P<page>(<n>) " locator - the model's one ordering, a search again's too. It needs the
+	// WHOLE target's rows (page order and the within-page ordinal are only known once they are all in), which is why the
+	// unit filed is the target, not a fixed number of rows. Pure string and index work - no recompose, so no dirty guard.
+	//
+	// Into the model only: the tree is drawn ONCE, by the search's caller, when the search returns - the bar is modal,
+	// so while it is up the panel can be neither read nor clicked, and a rebuild per target would be work nobody sees.
+	KFCResultModel::OrderHitsByPage(hits);
+	KFCResultModel::Chapter chapter;
+	chapter.name = target.shortName;
+	chapter.name.SetTranslatable(kFalse);
+	chapter.docRef = target.docRef;
+	chapter.file = target.file;
+	chapter.hits.swap(hits);
+	if (storyVersions != nil)
+		chapter.storyVersions.swap(*storyVersions);
+	if (searchedRanges != nil)
+		chapter.searchedRanges.swap(*searchedRanges);
+	// Counted before the handover: the model takes the rows and leaves this Chapter empty.
+	tally.total += static_cast<int32>(chapter.hits.size());
+	++tally.chaptersWithHits;
+	KFCResultModel::AppendChapter(std::move(chapter));
+}
+
 namespace
 {
 // The part of the document a Search: of Story / To End of Story / Selection searched, as the summary says
@@ -2295,6 +2324,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	IWalkerScopeFactoryUtils::WalkScopeType selectionScope,
 	std::vector<KFCBookScope::SkippedChapter>& unopenable, KFCSearchEngine::CollectTally& out)
 {
+	out = KFCSearchEngine::CollectTally();
+
 	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
 	// everything above, they are the same for every chapter by definition (the replace pass has to
 	// re-walk with exactly these), and nothing can change them while the run is on: the progress bar
@@ -2304,7 +2335,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
 	// model was cleared above; each chapter is APPENDED as it finishes, and the caller draws the
-	// tree once the search returns (see the AppendChapter below).
+	// tree once the search returns (KFCSearchEngine::FileChapter).
 	// The progress bar, shown for EVERY scope (the user's request) - not for a book only: a one-document
 	// search is a single CHAPTER with nothing to cancel between, but the bar is sized in stories, and a
 	// single document with a lot of them takes just as long and would have no way to be stopped.
@@ -2344,50 +2375,28 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	int32 progressBase = 0;
 	int32 progressReported = 0;
 
-	int32 total = 0;
-	int32 chaptersWithHits = 0;
-	bool collectionTruncated = false;
-	bool cancelled = false;
-	// Chapters that could not be searched at all. Counted separately from "searched, no hits":
-	// the summary has to be able to say a chapter was skipped, or a book search silently returns
-	// fewer chapters than the book has and looks like the chapters simply held no matches.
-	// Each entry is already spelled "name: why", ready for the note.
-	std::vector<PMString> unsearchable;
-	// ...and the chapters whose walk STARTED and then broke off. Kept apart from the list above
-	// because they need a different sentence: these chapters were searched, their hits are in the
-	// result set, and what is missing is the part of them the walk never reached.
-	std::vector<PMString> brokeOff;
-	// ...and the chapters this run OPENED and could not hand back - windowless, so the user can
-	// neither see them nor close them, and each holds its .indd locked (KFCBookScope::AppendUnclosedNote).
-	std::vector<PMString> unclosed;
-
-	// One target's hits into the model as a chapter - the book's chapters and the Book Scope OFF walk's
-	// documents alike. Page-orders the hits and bakes the "P<page>(<n>) " locator onto each line: this needs
-	// the WHOLE chapter's hits (page order and the within-page ordinal are only known once it is complete),
-	// which is why the flush unit is the chapter, not a fixed hit count.
-	//
-	// Into the model only. The tree is drawn ONCE, by the caller, when the search returns: the progress bar
-	// is modal, so while it is up the panel cannot be read or clicked and a per-chapter rebuild would be work
-	// nobody sees. Handed over rather than copied: the model takes the hits and leaves the Chapter empty
-	// (the count is taken before the handover).
-	auto fileChapter = [&](const KFCBookScope::ChapterDoc& target, std::vector<KFCResultModel::Hit>& hits,
-		std::map<UID, uint32>& storyVersions, std::map<UID, KFCResultModel::SearchedRange>* parts)
+	// WHAT A WALK THAT DID NOT END CLEANLY OWES THE SUMMARY, named for what was walked - in both loops below, the Book
+	// Scope OFF walks' and a book's chapters' (the tally's lists, KFCSearchEngine.h). One that broke off keeps its hits:
+	// they are real and are filed like any other, and what the summary owes is the other half - the rest was never
+	// looked at. One that never ran is named with its reason, since a skipped document is otherwise indistinguishable
+	// from one with no matches; the colon goes with the reason, so an ending with none of its own (ChapterWalkResultText)
+	// leaves the name standing alone. A cancelled walk says nothing: the run is thrown away.
+	auto noteWalk = [&](const PMString& walkName, ChapterWalkResult walkResult)
 	{
-		// The search's finishing pass: page order and each row's "P<page>(<n>)" locator - the model's one ordering,
-		// the Object tab's and a search again's too. Pure string / index work - no recompose, so no dirty guard here.
-		KFCResultModel::OrderHitsByPage(hits);
-		KFCResultModel::Chapter chapter;
-		chapter.name = target.shortName;
-		chapter.name.SetTranslatable(kFalse);
-		chapter.docRef = target.docRef;
-		chapter.file = target.file;
-		chapter.hits.swap(hits);
-		chapter.storyVersions.swap(storyVersions);
-		if (parts != nil)
-			chapter.searchedRanges.swap(*parts);
-		total += static_cast<int32>(chapter.hits.size());
-		++chaptersWithHits;
-		KFCResultModel::AppendChapter(std::move(chapter));
+		PMString name(walkName);
+		name.SetTranslatable(kFalse);
+		if (walkResult == kChapterWalkFailed)
+			out.brokeOff.push_back(name);
+		else if (walkResult != kChapterWalked && walkResult != kChapterCancelled)
+		{
+			const PMString why(ChapterWalkResultText(walkResult));
+			if (!why.IsEmpty())
+			{
+				name.Append(": ");
+				name.Append(why);
+			}
+			out.unsearchable.push_back(name);
+		}
 	};
 
 	// BOOK SCOPE OFF: THE RANGE IS THE DIALOG'S, THE ORDER IS FROM THE TOP.
@@ -2424,26 +2433,6 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			KFCSetCountedTask(progressBar, "Document", 0, 1, targets[0].shortName);
 		KFCAdvanceProgress(&progressBar, progressReported, 0, true /*force*/);
 
-		// What a walk that did not end cleanly owes the summary, named for what was walked: one that broke off
-		// keeps its hits (they are real, and filed below), one that never ran is named with its reason.
-		auto noteWalk = [&](const PMString& walkName, ChapterWalkResult walkResult)
-		{
-			PMString name(walkName);
-			name.SetTranslatable(kFalse);
-			if (walkResult == kChapterWalkFailed)
-				brokeOff.push_back(name);
-			else if (walkResult != kChapterWalked && walkResult != kChapterCancelled)
-			{
-				const PMString why(ChapterWalkResultText(walkResult));
-				if (!why.IsEmpty())
-				{
-					name.Append(": ");
-					name.Append(why);
-				}
-				unsearchable.push_back(name);
-			}
-		};
-
 		// One list for every walk below, in walk order, each hit with the database it was found in. The ceiling
 		// is the whole search's: CollectHitsInDoc counts what the list already holds.
 		std::vector<KFCResultModel::Hit> hits;
@@ -2456,7 +2445,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 			? KFCResultModel::kScopeToEndOfStory : KFCResultModel::kScopeSelection;
 		std::vector<ScopePiece> partPieces;
 		if (progressBar.WasCancelled(kFalse))
-			cancelled = true;
+			out.cancelled = true;
 		else if (allDocuments)
 		{
 			// A slice of the bar per document, the way the book's chapters share it.
@@ -2467,42 +2456,37 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 				KFCAdvanceProgress(&progressBar, progressReported, base, true /*force*/);
 				if (t > 0 && progressBar.WasCancelled(kFalse))
 				{
-					cancelled = true;
+					out.cancelled = true;
 					break;
 				}
-				int32 storiesInDoc = CountSearchableStories(targets[t].docRef);
-				if (storiesInDoc < 1)
-					storiesInDoc = 1;
 				bool capped = false;
 				ChapterWalkResult walkResult = kChapterWalked;
 				CollectHitsInDoc(targets[t].docRef, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
-					&progressBar, base, kKFCChapterProgressSpan, storiesInDoc, progressReported, UIDRef::gNull,
+					WalkBar(progressBar, base, kKFCChapterProgressSpan, targets[t].docRef, progressReported), UIDRef::gNull,
 					IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
 				if (walkResult == kChapterCancelled)
 				{
-					cancelled = true;
+					out.cancelled = true;
 					break;
 				}
 				noteWalk(targets[t].shortName, walkResult);
 				if (capped)
 				{
-					collectionTruncated = true;		// the list is full: the documents after this one are not walked
+					out.truncated = true;		// the list is full: the documents after this one are not walked
 					break;
 				}
 			}
 		}
 		else
 		{
-			int32 storiesTotal = CountSearchableStories(targets[0].docRef);
-			if (storiesTotal < 1)
-				storiesTotal = 1;
+			// The whole bar is the one document's, cut by its stories.
+			const WalkBar wholeBar(progressBar, 0, progressTotal, targets[0].docRef, progressReported);
 			bool capped = false;
 			ChapterWalkResult walkResult = kChapterWalked;
 			if (selectionScope == IWalkerScopeFactoryUtils::kDocumentScope)
 			{
 				CollectHitsInDoc(targets[0].docRef, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
-					&progressBar, 0, progressTotal, storiesTotal, progressReported, UIDRef::gNull,
-					IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
+					wholeBar, UIDRef::gNull, IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
 			}
 			else if (selectionScope == IWalkerScopeFactoryUtils::kStoryScope)
 			{
@@ -2510,15 +2494,14 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 				std::vector<KFCResultModel::Hit> first;
 				std::vector<IDataBase*> firstDBs;
 				bool firstCapped = false;
-				int32 noBar = 0;
 				CollectHitsInDoc(UIDRef::gNull, 1, scopeOptions, kHitPlaceAndText, first, firstCapped, walkResult,
-					nil, 0, 0, 1, noBar, UIDRef::gNull, IWalkerScopeFactoryUtils::kStoryScope, &firstDBs);
+					WalkBar(), UIDRef::gNull, IWalkerScopeFactoryUtils::kStoryScope, &firstDBs);
 				IDataBase* const storyDB = (!first.empty() && !firstDBs.empty()) ? firstDBs[0] : nil;
 				if (walkResult == kChapterWalked && storyDB != nil)
 				{
 					CollectHitsInDoc(UIDRef(storyDB, storyDB->GetRootUID()), limit, scopeOptions, kHitEverything, hits,
-						capped, walkResult, &progressBar, 0, progressTotal, storiesTotal, progressReported,
-						UIDRef(storyDB, first[0].storyUID), IWalkerScopeFactoryUtils::kEmptyScope, &hitDBs);
+						capped, walkResult, wholeBar, UIDRef(storyDB, first[0].storyUID), IWalkerScopeFactoryUtils::kEmptyScope,
+						&hitDBs);
 				}
 			}
 			else
@@ -2526,19 +2509,18 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 				// To End of Story, Selection: InDesign's stretches too - the part each story's rows came from, kept for
 				// Search This Story Again (MakeSearchedRange, below).
 				CollectHitsInDoc(UIDRef::gNull, limit, scopeOptions, kHitEverything, hits, capped, walkResult,
-					&progressBar, 0, progressTotal, storiesTotal, progressReported, UIDRef::gNull, selectionScope,
-					&hitDBs, overPart ? &partPieces : nil);
+					wholeBar, UIDRef::gNull, selectionScope, &hitDBs, overPart ? &partPieces : nil);
 			}
 			if (capped)
-				collectionTruncated = true;
+				out.truncated = true;
 			if (walkResult == kChapterCancelled)
-				cancelled = true;
+				out.cancelled = true;
 			else
 				noteWalk(targets[0].shortName, walkResult);
 		}
 		KFCAdvanceProgress(&progressBar, progressReported, progressTotal, true /*force*/);
 
-		if (!cancelled)
+		if (!out.cancelled)
 		{
 			std::vector<std::vector<KFCResultModel::Hit> > perTarget(targets.size());
 			for (size_t k = 0; k < hits.size() && k < hitDBs.size(); ++k)
@@ -2573,7 +2555,7 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 						parts[story] = MakeSearchedRange(targets[t].docRef.GetDataBase(), story, partKind, partPieces,
 							scopeOptions);
 				}
-				fileChapter(targets[t], perTarget[t], storyVersions, &parts);
+				KFCSearchEngine::FileChapter(targets[t], perTarget[t], out, &storyVersions, &parts);
 			}
 		}
 	}
@@ -2595,16 +2577,16 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		// commands that come after it.
 		if (progressBar.WasCancelled(kFalse))
 		{
-			cancelled = true;
+			out.cancelled = true;
 			break;
 		}
 
 		// Room left under the whole-search safety ceiling; once it is gone, stop walking further
 		// chapters too (the result set is full).
-		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - total;
+		const int32 remaining = KFCResultModel::kKFCCollectHitLimit - out.total;
 		if (remaining <= 0)
 		{
-			collectionTruncated = true;
+			out.truncated = true;
 			break;
 		}
 
@@ -2623,18 +2605,12 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 
 		const UIDRef chapterDocRef = targets[i].docRef;
 
-		// Now that it is open, ask how many stories this chapter's slice of the bar has to be
-		// divided between. At least one, so a chapter with no stories at all still moves the bar.
-		int32 storiesInDoc = CountSearchableStories(chapterDocRef);
-		if (storiesInDoc < 1)
-			storiesInDoc = 1;
-
+		// The chapter's slice of the bar, cut by its stories - asked now that it is open (WalkBar).
 		std::vector<KFCResultModel::Hit> hits;
 		bool docCapped = false;
 		ChapterWalkResult walkResult = kChapterWalked;
 		CollectHitsInDoc(chapterDocRef, static_cast<size_t>(remaining), scopeOptions, kHitEverything, hits, docCapped,
-			walkResult, &progressBar, progressBase, kKFCChapterProgressSpan, storiesInDoc,
-			progressReported);
+			walkResult, WalkBar(progressBar, progressBase, kKFCChapterProgressSpan, chapterDocRef, progressReported));
 
 		// This chapter is done, whatever it found: put the bar exactly where the next one starts, so
 		// a chapter whose stories the walk left early still hands the bar on at the right place.
@@ -2667,52 +2643,24 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		ReadStoryVersions(chapterDocRef, hits, storyVersions);
 
 		if (!KFCBookScope::HandBackHeldDocNow(chapterDocRef))
-			unclosed.push_back(targets[i].shortName);
+			out.unclosed.push_back(targets[i].shortName);
 
 		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, the
 		// run is thrown away below.
 		if (walkResult == kChapterCancelled)
 		{
-			cancelled = true;
+			out.cancelled = true;
 			break;
 		}
 
 		if (docCapped)
-			collectionTruncated = true;
-		if (walkResult == kChapterWalkFailed)
-		{
-			// The walk ran and then broke off. What it found before that is real, so this does NOT
-			// skip the chapter - it falls through and files the hits like any other. What the
-			// summary owes the user is the other half: the rest of this chapter was never looked at,
-			// and its matches are missing from the list because nobody searched for them.
-			PMString name(targets[i].shortName);
-			name.SetTranslatable(kFalse);
-			brokeOff.push_back(name);
-		}
-		else if (walkResult != kChapterWalked)
-		{
-			// This chapter was never searched at all. Named with its reason, because a skipped
-			// chapter is indistinguishable from a chapter with no matches otherwise - which is
-			// exactly what made this class of failure hard to see.
-			PMString entry(targets[i].shortName);
-			// The colon belongs to the reason, so an ending with no name of its own leaves the
-			// chapter standing on its own rather than "chapter.indd: " with nothing after it.
-			// See ChapterWalkResultText, which answers empty for the two endings this branch
-			// does not handle.
-			PMString why(ChapterWalkResultText(walkResult));
-			if (!why.IsEmpty())
-			{
-				entry.Append(": ");
-				entry.Append(why);
-			}
-			entry.SetTranslatable(kFalse);
-			unsearchable.push_back(entry);
-			continue;
-		}
+			out.truncated = true;
+		// A walk that broke off keeps its hits and is filed below; one that never ran has none (noteWalk).
+		noteWalk(targets[i].shortName, walkResult);
 		if (hits.empty())
 			continue;
 
-		fileChapter(targets[i], hits, storyVersions, nil);
+		KFCSearchEngine::FileChapter(targets[i], hits, out, &storyVersions);
 	}
 
 	// ASK ONCE MORE, now that the loop is over. The test inside the loop sits at the TOP of each
@@ -2720,16 +2668,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 	// in, and the search would finish as though the button had never been touched. Same rule as
 	// Change All in Book's and the query run's (KFCChangeAll.cpp, KFCQuerySequence.cpp). (The walk asks it
 	// too, when it moves on to another story; a Cancel pressed during the LAST story walked is seen here.)
-	if (!cancelled && progressBar.WasCancelled(kFalse))
-		cancelled = true;
-
-	out.total = total;
-	out.chaptersWithHits = chaptersWithHits;
-	out.truncated = collectionTruncated;
-	out.cancelled = cancelled;
-	out.unsearchable.swap(unsearchable);
-	out.brokeOff.swap(brokeOff);
-	out.unclosed.swap(unclosed);
+	if (!out.cancelled && progressBar.WasCancelled(kFalse))
+		out.cancelled = true;
 }
 
 // The run's target sentences: its front doors' (KFCSearchEngine::ResolveRunTarget) and SearchBook's safety nets past its
@@ -3547,6 +3487,17 @@ bool PlaceTakenByAnotherRow(int32 chapterIdx, int32 hitIdx, UID storyUID, TextIn
 	return false;
 }
 
+// WHAT "READS AS THE ROW" MEANS WHEN A ROW IS LOOKED FOR AGAIN (spec T1, T14): the whole match the same - its hash and
+// its length - and the line around it the same, the text before it and after it. The places a row could stand at now
+// (StaleRowPlaces, ReplacedRowPlaces) and the rows that look like it (LookAlikeRows) are told by this one test: the
+// order rule (PickByOrder) compares how many of each there are, so the two counts must never be made by different
+// tests. (A place the row is read AT - RowReadsAsFoundAt - reads the story there instead, MatchIsSameOccurrence's way.)
+bool ReadsAlike(uint64 hash, int32 length, const PMString& pre, const PMString& post, uint64 rowHash, int32 rowLength,
+	const KFCResultModel::RowDisplay& row)
+{
+	return hash == rowHash && length == rowLength && pre == row.preText && post == row.postText;
+}
+
 // A REPLACED ROW IS LOOKED FOR AGAIN BY WHAT ITS REPLACE WROTE
 // (docs/superpowers/specs/_done/2026-10-06-kfc-no-track-change-all-design.md F4). The search's query no longer finds it, so
 // the candidates are the places in its story where the text it wrote stands (Hit::replacedText, whole), each read the
@@ -3580,7 +3531,9 @@ bool ReplacedRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, P
 		const TextIndex at = static_cast<TextIndex>(p);
 		KFCResultModel::Hit cand;
 		ReadHitText(storyRef, at, at + len, cand);
-		if (cand.matchHash == hash && cand.preText == row.preText && cand.postText == row.postText)
+		// (The length on both sides is the written text's: every candidate is that text, and a replaced row's range is
+		// the one its written text was read from - SetHitWrittenText and MarkHitReplaced are handed the one range.)
+		if (ReadsAlike(cand.matchHash, len, cand.preText, cand.postText, hash, len, row))
 			outPlaces.push_back(std::make_pair(at, at + len));
 	}
 	return true;
@@ -3617,8 +3570,8 @@ bool StaleRowPlaces(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, Plac
 	for (size_t h = 0; h < hits.size(); ++h)
 	{
 		const KFCResultModel::Hit& cand = hits[h];
-		if (cand.storyUID == storyRef.GetUID() && cand.matchHash == hash && (cand.textEnd - cand.textStart) == (b - a)
-			&& cand.preText == row.preText && cand.postText == row.postText)
+		if (cand.storyUID == storyRef.GetUID()
+			&& ReadsAlike(cand.matchHash, cand.textEnd - cand.textStart, cand.preText, cand.postText, hash, b - a, row))
 			outPlaces.push_back(std::make_pair(cand.textStart, cand.textEnd));
 	}
 	std::sort(outPlaces.begin(), outPlaces.end());
@@ -3692,8 +3645,8 @@ void LookAlikeRows(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, 
 		TextIndex x = kInvalidTextIndex, y = kInvalidTextIndex;
 		uint64 h = 0;
 		KFCResultModel::RowDisplay r;
-		if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, x, y, h) || s != story || h != hash || (y - x) != (b - a)
-			|| !KFCResultModel::GetHitRow(chapterIdx, i, r) || r.preText != me.preText || r.postText != me.postText
+		if (!KFCResultModel::GetHitMatchIdentity(chapterIdx, i, s, x, y, h) || s != story
+			|| !KFCResultModel::GetHitRow(chapterIdx, i, r) || !ReadsAlike(h, y - x, r.preText, r.postText, hash, b - a, me)
 			|| r.replaced != me.replaced)
 			continue;
 		byOrder.push_back(std::make_pair(KFCResultModel::GetHitStoryOrdinal(chapterIdx, i), i));
@@ -3940,7 +3893,6 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 		KFCForwardSearchScope forward;
 		WalkerScopeOptions scopeOptions;
 		KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
-		int32 reported = 0;
 		// A searched part's own scope - nil for a whole story, which CollectHitsInDoc walks by the story form.
 		TempFocus partFocus;
 		InterfacePtr<ITextWalkerScope> partScope(overPart
@@ -3949,7 +3901,7 @@ bool KFCSearchEngine::SearchStoryAgain(int32 chapterIdx, int32 groupIdx, PMStrin
 			walked = kChapterNoScope;
 		else
 			CollectHitsInDoc(UIDRef(db, db->GetRootUID()), static_cast<size_t>(room > 0 ? room : 0), scopeOptions,
-				kHitEverything, hits, capped, walked, nil, 0, 0, 1, reported, UIDRef(db, story),
+				kHitEverything, hits, capped, walked, WalkBar(), UIDRef(db, story),
 				IWalkerScopeFactoryUtils::kEmptyScope, nil, nil, partScope);
 	}
 	uint32 version = 0;
@@ -4057,12 +4009,9 @@ bool KFCSearchEngine::SearchDocumentAgain(int32 chapterIdx, PMString& outStatus)
 			KFCSetCountedTask(bar, "Document", 0, 1, name);
 			int32 reported = 0;
 			KFCAdvanceProgress(&bar, reported, 0, true /*force*/);
-			int32 stories = CountSearchableStories(docRef);
-			if (stories < 1)
-				stories = 1;
 			ChapterWalkResult result = kChapterWalked;
-			CollectHitsInDoc(docRef, limit, scopeOptions, kHitEverything, hits, capped, result, &bar, 0,
-				kKFCChapterProgressSpan, stories, reported);
+			CollectHitsInDoc(docRef, limit, scopeOptions, kHitEverything, hits, capped, result,
+				WalkBar(bar, 0, kKFCChapterProgressSpan, docRef, reported));
 			cancelled = (result == kChapterCancelled) || bar.WasCancelled(kFalse) != kFalse;
 			walked = (result == kChapterWalked) && !cancelled;
 			if (walked)

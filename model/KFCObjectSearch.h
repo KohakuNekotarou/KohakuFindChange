@@ -62,8 +62,8 @@ namespace KFCObjectSearch
 	bool ResolveObjectRunScope(KFCSearchEngine::RunScope& out, PMString& outRefusal);
 
 	/** SEARCHBOOK'S WALK FOR THE OBJECT TAB: every target walked under one bar, a book's chapters opened and handed back
-	    one at a time, each target's rows into the model as a chapter (page order) - into the tally the text tabs' walk
-	    fills (KFCSearchEngine::CollectTally). The user's selection is given back at
+	    one at a time, each target's rows filed as the text tabs' are (KFCSearchEngine::FileChapter - a chapter in page
+	    order, and the tally the text tabs' walk fills, KFCSearchEngine::CollectTally). The user's selection is given back at
 	    the end (O6) and the shared walker aimed at the front document (O7). selectionScope = RunScope::selectionScope.
 	    CANCEL IS HEARD INSIDE A DOCUMENT (the author's call): the bar is moved and asked at every item
 	    the walk lists, not only between documents; a Cancel ends the run as one between documents does (out.cancelled). */

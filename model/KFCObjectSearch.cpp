@@ -899,18 +899,7 @@ void KFCObjectSearch::CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targ
 			if (capped)
 				out.truncated = true;
 			if (!hits.empty())
-			{
-				KFCResultModel::OrderHitsByPage(hits);
-				KFCResultModel::Chapter chapter;
-				chapter.name = targets[i].shortName;
-				chapter.name.SetTranslatable(kFalse);
-				chapter.docRef = docRef;
-				chapter.file = targets[i].file;
-				chapter.hits.swap(hits);
-				out.total += static_cast<int32>(chapter.hits.size());
-				++out.chaptersWithHits;
-				KFCResultModel::AppendChapter(std::move(chapter));
-			}
+				KFCSearchEngine::FileChapter(targets[i], hits, out);		// the text tabs' filing: page order, the tally
 			if (capped)
 				break;
 		}
