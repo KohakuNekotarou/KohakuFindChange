@@ -59,15 +59,9 @@ class IDataBase;
 
 namespace KFCUndoFollow
 {
-	/** Which write a step is - named on the status line when an Undo or a Redo takes it. */
-	enum StepKind
-	{
-		kStepReplace = 0,	// a hit row's Replace
-		kStepRunQueries		// the query run (KFCQuerySequence) - RunRecorder's
-	};
-
-	/** ONE WRITE, RECORDED - made before a character is written (outside the write's command
-	    sequence, or at its head), kept once the write has gone through AND the rows show it.
+	/** ONE WRITE, RECORDED (a row's Replace - by that name on the status line when an Undo or a Redo takes it) - made
+	    before a character is written (outside the write's command sequence, or at its head), kept once the write has
+	    gone through AND the rows show it.
 
 	    The constructor reads the version of every story holding a row of the chapter (its document must be
 	    open) and starts the row backup (KFCResultModel::BeginRowBackup) - so a caller does not start one
@@ -88,7 +82,7 @@ namespace KFCUndoFollow
 
 		/** The write went through and the rows show it: kept, if a story's version moved (a write that
 		    moved none has nothing an Undo could take back). */
-		void Keep(StepKind kind);
+		void Keep();
 
 		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object Replace moves no
 		    story, so its Undo and Redo are told by the item's fingerprint coming back to "before" or "after". */
@@ -105,7 +99,7 @@ namespace KFCUndoFollow
 	    query has run, and the list it leaves is a new one - an empty one (the spec's F7: each query with InDesign's
 	    Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it is then is
 	    copied whole (what an Undo puts back). ReadStories = every text model's version in the run's documents, before
-	    a character is written. Keep = the run went through: kept as kStepRunQueries, in the result set the list is
+	    a character is written. Keep = the run went through: kept (as "Run Queries"), in the result set the list is
 	    now AND the one it found - its Undo puts that list back as that result set, and the writes kept for it are
 	    followed again (dropped at the Keep, a Replace made before the run read "Changed" after both Ctrl+Z's, and a
 	    second run's Undo could not reach the first run's - cases xq-done-undo, xq-two-runs-undo). RestoreBefore = the

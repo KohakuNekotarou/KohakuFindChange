@@ -81,11 +81,11 @@ struct ItemMoved
 // One kept write.
 struct Step
 {
-	KFCUndoFollow::StepKind			kind;
 	bool							done;			// the write stands (false: an Undo took it back)
 	uint32							resultSet;		// KFCResultModel::GetResultSetId when it was made
 	uint32							resultSetBefore;	// a whole set's: the one it found - its Undo goes back to it
-	bool							whole;			// it reshaped the result set (a query run - RunRecorder)
+	bool							whole;			// it reshaped the result set: a query run (RunRecorder); else a row's
+													// Replace (StepRecorder) - the name on the message line too
 	uint32							layoutBefore;	// the layout the row indices named before it...
 	uint32							layoutAfter;	// ...and after it (the same, for a write of rows)
 	std::vector<StoryMoved>			stories;
@@ -96,8 +96,7 @@ struct Step
 	std::vector<size_t>				frozenBefore;	// a whole set's book chapters closed since, as indexes into before's
 	std::vector<size_t>				frozenAfter;	// and after's chapters: kept as the panel has them when that set is
 													// put back (KFCUndoFollow::ForgetBookChapter)
-	Step() : kind(KFCUndoFollow::kStepReplace), done(true), resultSet(0), resultSetBefore(0), whole(false), layoutBefore(0),
-		layoutAfter(0) {}
+	Step() : done(true), resultSet(0), resultSetBefore(0), whole(false), layoutBefore(0), layoutAfter(0) {}
 };
 
 // The kept writes, oldest first.
@@ -111,20 +110,32 @@ std::vector<Step> gSteps;
 const size_t kMaxSteps = 30;
 const size_t kMaxWholeSteps = 3;
 
-// The recorder standing now (at most one - the writes of KFC never nest): what it read at its start.
-bool gRecording = false;
-std::vector<StoryMoved> gPendingStories;
-std::vector<ItemMoved> gPendingItems;		// the items RecordItem read
-uint32 gPendingResultSet = 0;
-uint32 gPendingLayout = 0;
-KFCResultModel::ModelSnapshot gPendingBefore;
+// THE RECORDING STANDING NOW (at most one - the writes of KFC never nest): what its recorder read at its start. Opened and
+// closed whole, so nothing one recorder read is left for the next.
+struct Recording
+{
+	bool							open;		// a write is being made - nothing is followed until it is kept or let go
+	uint32							resultSet;	// the list's result set at its start (KFCResultModel::GetResultSetId)...
+	uint32							layout;		// ...and its layout generation
+	std::vector<StoryMoved>			stories;	// the stories read, each at its version before the write
+	std::vector<ItemMoved>			items;		// the items RecordItem read
+	KFCResultModel::ModelSnapshot	before;		// a query run's: the whole list before it
+	Recording() : open(false), resultSet(0), layout(0) {}
+};
+Recording gRecording;
 
+// (Assigning a fresh one releases the storage too.)
 void CloseRecording()
 {
-	gRecording = false;
-	std::vector<StoryMoved>().swap(gPendingStories);
-	std::vector<ItemMoved>().swap(gPendingItems);
-	gPendingBefore = KFCResultModel::ModelSnapshot();
+	gRecording = Recording();
+}
+
+void OpenRecording()
+{
+	gRecording = Recording();
+	gRecording.open = true;
+	gRecording.resultSet = KFCResultModel::GetResultSetId();
+	gRecording.layout = KFCResultModel::GetLayoutGeneration();
 }
 
 // The document a story (or an object row's item, or a chapter of a kept list) lives in, if it is open - by its chapter's
@@ -345,9 +356,9 @@ uint64 StoryTextHash(IDataBase* db, UID story)
 // rest cannot tell an Undo of it from anything else.
 void TakeMovedStories(Step& step)
 {
-	for (size_t k = 0; k < gPendingStories.size(); ++k)
+	for (size_t k = 0; k < gRecording.stories.size(); ++k)
 	{
-		StoryMoved s = gPendingStories[k];
+		StoryMoved s = gRecording.stories[k];
 		s.now = DocOf(s);
 		uint32 version = 0;
 		if (s.now == nil || !KFCSearchEngine::ReadStoryVersion(s.now, s.story, version) || version == s.before)
@@ -361,9 +372,9 @@ void TakeMovedStories(Step& step)
 // The items the recording read that the write changed, each with its fingerprint after it, onto the step.
 void TakeMovedItems(Step& step)
 {
-	for (size_t k = 0; k < gPendingItems.size(); ++k)
+	for (size_t k = 0; k < gRecording.items.size(); ++k)
 	{
-		ItemMoved m = gPendingItems[k];
+		ItemMoved m = gRecording.items[k];
 		m.now = DocOf(m);
 		if (m.now == nil || !KFCObjectSearch::Fingerprint(UIDRef(m.now, m.item), m.after, m.afterLength))
 			continue;
@@ -458,7 +469,7 @@ void DiagSteps(const char* when)
 	for (size_t i = 0; i < gSteps.size(); ++i)
 	{
 		const Step& s = gSteps[i];
-		KFC_DIAG_LOG("    [%u] kind=%d done=%d whole=%d set=%u<-%u layout=%u->%u stories=%u items=%u", (unsigned)i, (int)s.kind,
+		KFC_DIAG_LOG("    [%u] done=%d whole=%d set=%u<-%u layout=%u->%u stories=%u items=%u", (unsigned)i,
 			s.done ? 1 : 0, s.whole ? 1 : 0, s.resultSet, s.resultSetBefore, s.layoutBefore, s.layoutAfter,
 			(unsigned)s.stories.size(), (unsigned)s.items.size());
 		for (size_t k = 0; k < s.stories.size(); ++k)
@@ -519,15 +530,11 @@ void WatchDoc(IDataBase* db)
 	}
 }
 
-// A write's name on the message line - the menu item that made it.
-const char* KindName(KFCUndoFollow::StepKind kind)
+// A write's name on the message line - the menu item that made it: the query run is the one write that reshapes the whole
+// list; every other is a row's Replace.
+const char* WriteName(const Step& step)
 {
-	switch (kind)
-	{
-		case KFCUndoFollow::kStepReplace:		return "Replace";
-		case KFCUndoFollow::kStepRunQueries:	return "Run Queries";
-	}
-	return "a change";
+	return step.whole ? "Run Queries" : "Replace";
 }
 
 // Keep a write: the documents' histories it cut, and the old ones past the limit, go.
@@ -689,12 +696,9 @@ KFCUndoFollow::StepRecorder::StepRecorder(const std::vector<int32>& chapterIdxs)
 
 void KFCUndoFollow::StepRecorder::Open(const std::vector<int32>& chapterIdxs)
 {
-	CloseRecording();
-	gRecording = true;
-	gPendingResultSet = KFCResultModel::GetResultSetId();
-	gPendingLayout = KFCResultModel::GetLayoutGeneration();
+	OpenRecording();
 	for (size_t k = 0; k < chapterIdxs.size(); ++k)
-		ReadChapterStories(chapterIdxs[k], gPendingStories);
+		ReadChapterStories(chapterIdxs[k], gRecording.stories);
 	KFCResultModel::BeginRowBackup();
 }
 
@@ -708,23 +712,22 @@ KFCUndoFollow::StepRecorder::~StepRecorder()
 	CloseRecording();
 }
 
-void KFCUndoFollow::StepRecorder::Keep(StepKind kind)
+void KFCUndoFollow::StepRecorder::Keep()
 {
 	if (!fOpen)
 		return;
 	fOpen = false;
 
 	Step step;		// done (the write stands) - a write of rows (whole = false)
-	step.kind = kind;
-	step.resultSet = gPendingResultSet;
-	step.layoutBefore = gPendingLayout;
+	step.resultSet = gRecording.resultSet;
+	step.layoutBefore = gRecording.layout;
 	TakeMovedStories(step);
 	TakeMovedItems(step);
 	KFCResultModel::TakeRowBackup(step.rows);
 	step.layoutAfter = step.layoutBefore;
 	CloseRecording();
 
-	KFC_DIAG_LOG("KEEP kind=%d whole=%d moved=%u items=%u set=%u/%u", (int)kind, step.whole ? 1 : 0,
+	KFC_DIAG_LOG("KEEP whole=%d moved=%u items=%u set=%u/%u", step.whole ? 1 : 0,
 		(unsigned)step.stories.size(), (unsigned)step.items.size(), step.resultSet, KFCResultModel::GetResultSetId());
 	// A write that moved no story and changed no item has nothing an Undo could take back; one that threw the results
 	// away (a refused Replace clears them - KFCReplaceEngine::RefuseChangedQuery) has no rows left to follow.
@@ -748,17 +751,14 @@ void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item)
 	m.now = found.GetDataBase();
 	if (!KFCObjectSearch::Fingerprint(UIDRef(m.now, item), m.before, m.beforeLength))
 		return;
-	gPendingItems.push_back(m);
+	gRecording.items.push_back(m);
 }
 
 KFCUndoFollow::RunRecorder::RunRecorder()
 	: fOpen(true)
 {
-	CloseRecording();
-	gRecording = true;
-	gPendingResultSet = KFCResultModel::GetResultSetId();		// the list as it stands - RestoreBefore goes back to it
-	gPendingLayout = KFCResultModel::GetLayoutGeneration();
-	KFCResultModel::TakeModelSnapshot(gPendingBefore);
+	OpenRecording();		// its result set: the list as it stands - RestoreBefore goes back to it
+	KFCResultModel::TakeModelSnapshot(gRecording.before);
 }
 
 KFCUndoFollow::RunRecorder::~RunRecorder()
@@ -777,7 +777,7 @@ void KFCUndoFollow::RunRecorder::ReadStories(const std::vector<KFCBookScope::Cha
 			continue;
 		const int32 count = storyList->GetAllTextModelCount();
 		for (int32 i = 0; i < count; ++i)
-			NoteStoryBefore(docs[d].file, docs[d].docRef, db, storyList->GetNthTextModelUID(i).GetUID(), gPendingStories);
+			NoteStoryBefore(docs[d].file, docs[d].docRef, db, storyList->GetNthTextModelUID(i).GetUID(), gRecording.stories);
 	}
 }
 
@@ -787,15 +787,14 @@ void KFCUndoFollow::RunRecorder::Keep()
 		return;
 	fOpen = false;
 	Step step;		// done (the run stands)
-	step.kind = kStepRunQueries;
 	step.whole = true;
 	step.resultSet = KFCResultModel::GetResultSetId();		// the list the run left - a new result set
-	step.resultSetBefore = gPendingResultSet;				// ...and the one it found, which its Undo puts back
-	step.layoutBefore = gPendingLayout;
+	step.resultSetBefore = gRecording.resultSet;			// ...and the one it found, which its Undo puts back
+	step.layoutBefore = gRecording.layout;
 	// The stories it moved - and no items: a query run records none (an Object query's Change All names none of what it
 	// changed), so a run of Object queries alone is not followed (the spec map's OBJ-11).
 	TakeMovedStories(step);
-	step.before = std::move(gPendingBefore);	// the list before the run, header and all - moved, not copied
+	step.before = std::move(gRecording.before);	// the list before the run, header and all - moved, not copied
 	KFCResultModel::TakeModelSnapshot(step.after);
 	step.layoutAfter = KFCResultModel::GetLayoutGeneration();
 	CloseRecording();
@@ -810,9 +809,9 @@ void KFCUndoFollow::RunRecorder::RestoreBefore()
 	if (!fOpen)
 		return;
 	fOpen = false;
-	KFCResultModel::RestoreModelSnapshot(gPendingBefore);
+	KFCResultModel::RestoreModelSnapshot(gRecording.before);
 	// ...and as the same result set: the writes kept for the list are followed again (KFCResultModel::ReturnToResultSet).
-	KFCResultModel::ReturnToResultSet(gPendingResultSet);
+	KFCResultModel::ReturnToResultSet(gRecording.resultSet);
 	CloseRecording();
 }
 
@@ -821,12 +820,12 @@ void KFCUndoFollow::RunRecorder::RestoreBefore()
 //========================================================================================
 static void Follow()
 {
-	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording ? 1 : 0, (unsigned)gSteps.size(),
+	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording.open ? 1 : 0, (unsigned)gSteps.size(),
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
 	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, Change
 	// All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it opens a
 	// chapter or a window - KFCRunGuard counts all four).
-	if (gRecording || gSteps.empty() || KFCRunGuard::IsAnyRunning())
+	if (gRecording.open || gSteps.empty() || KFCRunGuard::IsAnyRunning())
 		return;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
 	DropOtherResultSets();
@@ -842,7 +841,7 @@ static void Follow()
 	// three chapters, or a Redo that is not followed until the next notification).
 	int32 undone = 0, redone = 0;
 	bool reshaped = false;
-	KFCUndoFollow::StepKind lastKind = KFCUndoFollow::kStepReplace;
+	const char* lastName = "";		// the name of the write followed last (WriteName)
 	const size_t guard = 2 * gSteps.size() + 2;
 	for (size_t g = 0; g < guard; ++g)
 	{
@@ -894,7 +893,7 @@ static void Follow()
 			++undone;
 		else
 			++redone;
-		lastKind = step.kind;
+		lastName = WriteName(step);
 	}
 	KFC_DIAG_LOG("  followed undone=%d redone=%d", undone, redone);
 	if (undone + redone == 0)
@@ -923,7 +922,7 @@ static void Follow()
 		const int32 count = undo ? undone : redone;
 		msg.Append(undo ? "Undo: " : "Redo: ");
 		if (count == 1)
-			msg.Append(KindName(lastKind));
+			msg.Append(lastName);
 		else
 		{
 			msg.AppendNumber(count);

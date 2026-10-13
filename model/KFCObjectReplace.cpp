@@ -411,7 +411,7 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	(void)KFCObjectSearch::Fingerprint(UIDRef(db, item), print, length);
 	KFCResultModel::MarkItemReplaced(chapterIdx, hitIdx, print, length);
 	FollowRowsTheWriteMoved(chapterIdx, db, watched, toWrite);
-	recorder.Keep(KFCUndoFollow::kStepReplace);
+	recorder.Keep();
 	KFC_DIAG_NOTE_WRITE(docRef);
 	outStatus = "Replaced ID:";
 	outStatus.AppendNumber(static_cast<int32>(item.Get()));
@@ -754,7 +754,7 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 			KFC_DIAG_NOTE_WRITE(chapter.docRef);
 		}
 	}
-	recorder.Keep(KFCUndoFollow::kStepReplace);
+	recorder.Keep();
 	LeaveObjectChapters(chapters);
 	// "Replaced 3 objects: ID:259, ID:260, ID:261." - and, when some were left, "Replaced 3 of 5 objects: ... Left as they
 	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs. Objects of several documents name

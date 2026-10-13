@@ -1643,7 +1643,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			KFCRowFoci::ReanchorStory(c.chapterIdx, *ws);
 	}
 	// Kept AFTER the versions are noted - they are the "after" an Undo's "before" is put back over.
-	recorder.Keep(KFCUndoFollow::kStepReplace);
+	recorder.Keep();
 	for (size_t k = 0; k < chapters.size(); ++k)
 	{
 		chapters[k].wrote = true;		// written to: a chapter of ours has to be seen and saved (ChaptersAfter)
