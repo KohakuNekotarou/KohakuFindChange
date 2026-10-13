@@ -109,11 +109,14 @@ ITreeViewController* QueryListController()
 
 // A RUN OF ROWS selected: anchor to end, in the order the rows are drawn, each through the controller's Select - which
 // turns away a row that cannot join (KFCResultTreeController::Select): a story row between two stories' text rows is
-// passed over. The stock Shift click's own walk (CTreeViewController::ProcessSelectionRules).
+// passed over. The stock Shift click's own walk (CTreeViewController::ProcessSelectionRules), which announces every row
+// it selects; this one announces the selection once, by the row that ends it - the Layers panel's shape (its rules run
+// the stock ones in silence and notify once at the end - LayersPanelTreeViewController.cpp). A Select of a row already
+// selected tells nobody (CTreeViewController::Select returns before it notifies).
 void SelectRun(ITreeViewController* controller, const NodeID& anchor, const NodeID& end)
 {
 	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
-	(void)controller->Select(anchor, kFalse, kTrue);
+	(void)controller->Select(anchor, anchor == end ? kTrue : kFalse, kTrue);
 	if (anchor == end)
 		return;
 	InterfacePtr<ITreeViewHierarchyAdapter> adapter(controller, UseDefaultIID());
@@ -128,7 +131,7 @@ void SelectRun(ITreeViewController* controller, const NodeID& anchor, const Node
 	{
 		next = walk.Next();
 		if (next.IsValid())
-			(void)controller->Select(next, kFalse, kTrue);
+			(void)controller->Select(next, next == end ? kTrue : kFalse, kTrue);
 	}
 }
 
@@ -321,7 +324,7 @@ bool KFCResultTree::SelectAllRows(const NodeID& row)
 	// into an empty selection) and the last its moving end - Shift+Up / Shift+Down go on from there.
 	controller->DeselectAll(kFalse /*notifyOfChange*/, kTrue /*changeHilite*/);
 	for (size_t k = 0; k < rows.size(); ++k)
-		(void)controller->Select(rows[k], kFalse, kTrue);
+		(void)controller->Select(rows[k], (k + 1 == rows.size()) ? kTrue : kFalse /*announced once, by the last*/, kTrue);
 	gRunEnd = RowOf(rows.back());
 	treeMgr->ScrollToNode(rows.front(), ITreeViewMgr::eScrollIntoView);
 	// The keyboard to the list, as a row's click hands it (KFCResultNodeEH::LButtonUp): a right-click's menu leaves it
