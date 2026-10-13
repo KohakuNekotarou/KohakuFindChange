@@ -11,7 +11,8 @@
 //  setting, left as it is (F1). Runs only while the panel holds no list; Clear Results empties it
 //  (docs/superpowers/specs/_done/2026-10-05-kfc-change-all-no-list-design.md C4, C8). What may stand then - a search that found
 //  nothing, a book's "(0/0)" row - is thrown away at the run's commit point, as the query run throws its list away
-//  (Run says why). The query run writes through WriteDocument too, in whatever scope Search: names.
+//  (Run says why). The query run writes through WriteDocument too, in whatever scope Search: names, and leaves its
+//  documents by the same rule (LeaveRunDocuments, PutRunDocumentsBack).
 //
 //========================================================================================
 
@@ -36,7 +37,7 @@ namespace KFCChangeAll
 
 	/** The command's name - "Change All in Book (No List)", or "Change All in Selected Documents (No List)" while
 	    Find/Change Selected Documents (Book) narrows it: the menu's (IKFCRuns::ChangeAllCommandName) and
-	    the one the search's 300 limit names. */
+	    the one the search's row limit (kKFCCollectHitLimit) names. */
 	const char* CommandName();
 
 	/** Is a Change All running (KFCRunGuard counts it)? */
@@ -58,7 +59,10 @@ namespace KFCChangeAll
 	        opened stays held and windowless with the write in it, and is named in outUnclosed ("left open with no window").
 	        A document another target wrote is left as that one leaves it (a book listing one file twice).
 	      - NOT WRITTEN: it comes out as it went in - one that was clean is made clean again, since a walk can mark a
-	        database modified without changing a character - and is handed back; one that could not be is named.
+	        database modified without changing a character (handed back as the walk left it, such a chapter stays open
+	        with no window and is named, and a document of the user's says "unsaved" with nothing in it changed - cases
+	        xq-book-dirty-unwritten, xq-doc-dirty-unwritten, ca-book-dirty-unwritten) - and is handed back; one that could
+	        not be is named.
 	    (Test builds: each written document still open is noted first - KFCDiagWrittenDocs.h; one gone since is not read
 	    through its address.) */
 	void LeaveRunDocuments(const std::vector<KFCBookScope::ChapterDoc>& targets, const std::vector<bool>& wasModified,

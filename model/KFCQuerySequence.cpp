@@ -448,8 +448,8 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		// NO ERROR LEFT STANDING PAST THE ABORT - before ClearFindChange below, which PROCESSES A COMMAND: one processed while
 		// the global error code is set brings on InDesign's protective shutdown (CmdUtils.h, ProcessCommand). The run that
 		// failed on a standing error (above) has taken its words already (why); every other road out of the loop cleared
-		// its own. The same line every other abort of KFC's has straight after it (KFCReplaceEngine, KFCObjectReplace,
-		// KFCChangeAll) - here it stood below ClearFindChange (the 2026-10-12 re-check).
+		// its own. The same line every other abort of KFC's has after it, ahead of any command (KFCReplaceEngine,
+		// KFCObjectReplace, KFCChangeAll).
 		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
 	}
 	else
@@ -475,10 +475,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 	}
 
 	// ===== AFTER THE SEQUENCE: windows for the held chapters written to, the rest handed back - Change All in Book's rule
-	// (KFCChangeAll::LeaveRunDocuments), a document not written made clean again first when it was clean: a walk can mark a
-	// database modified without changing a character, and handed back as it is, such a chapter stays open with no window
-	// and a document of the user's stays "unsaved" with nothing in it changed (cases xq-book-dirty-unwritten,
-	// xq-doc-dirty-unwritten).
+	// (KFCChangeAll::LeaveRunDocuments - its header says why a document not written is made clean again first).
 	std::vector<PMString> unclosed;
 	KFCChangeAll::LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 

@@ -467,7 +467,8 @@ int32 RowOfMatchAnyOrder(IDataBase* db, const std::vector<RowNow>& rowNow, const
 }
 
 // WHAT ONE CHAPTER'S WRITE DID - ReplaceInChapterOneByOne's answer: one value, handed down to the story walks that add
-// to it and added up whole across the chapters of a step (ReplaceRowsNow), not seven OUT parameters summed one by one.
+// to it and added up whole across the chapters of a step (ReplaceRowsNow) - a field added here goes wherever the answer
+// goes.
 struct ChapterOutcome
 {
 	int32		replaced;		// rows written
@@ -523,9 +524,10 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 #ifdef KFC_DIAG
 		// TEST BUILDS ONLY: where a story's walk spends its time (measured when the query run still wrote through this
-		// walk: 6000 rows in two 3000-row stories took 23 minutes; each story was ONE paragraph, which every find recomposed whole - in short
-		// paragraphs a row costs about 7 ms, flat). Summed per phase over one story's walk and written once (WALKTIME); every
-		// 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does something pile up?).
+		// walk: 6000 rows in two 3000-row stories took 23 minutes; each story was ONE paragraph, which every find
+		// recomposed whole - in short paragraphs a row costs about 7 ms, flat). Summed per phase over one story's walk and
+		// written once (WALKTIME); every 100 finds the last 100's time, with the foci the story carries (WALKSTEP - does
+		// something pile up?).
 		double tFind = 0, tMatch = 0, tReplace = 0, tTexts = 0, tCarry = 0;
 		double tFindStep = 0;
 		int32 timedRows = 0, finds = 0;
@@ -694,8 +696,9 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 			storyRef.GetUID().Get(), (int)timedRows, (int)finds, (int)restarts, tFind, tMatch, tReplace, tTexts, tCarry);
 #endif
 	}
-	// The story's first words, read again for its row (the author's call): what this walk wrote can be among them. Each row is backed up before it takes them (KFCResultModel::SetStoryLead), so a preview's rollback,
-	// an Undo and a Redo put the words back with the rows.
+	// The story's first words, read again for its row (the author's call): what this walk wrote can be among them. Each
+	// row is backed up before it takes them (KFCResultModel::SetStoryLead), so a preview's rollback, an Undo and a Redo
+	// put the words back with the rows.
 	KFCSearchEngine::RereadStoryLead(chapterIdx, storyRef);
 	return true;
 }
@@ -1239,11 +1242,12 @@ bool KFCReplaceEngine::QueryUnchangedSinceSearch()
 }
 
 // ======================================================================================================
-// REPLACE ONE ROW, FROM ITS RIGHT-CLICK MENU OR RETURN (the author's call) - the one write from the list (spec
-// F16). No prompt. The list stays a WORK LIST, so the row shows its new text and every other row is carried to
-// where its text now stands, ready for the next Replace. One undo step ("Replace"). Its doors: the query
-// unchanged (RefuseChangedQuery) and the verify walk's three questions (ChapterMovedUnderRows). Nothing is
-// accepted, and nothing recorded of KFC's own (spec F1).
+// REPLACE A ROW - OR THE ROWS SELECTED TOGETHER - FROM ITS RIGHT-CLICK MENU OR RETURN (the author's calls) - the one
+// write from the list (spec F16). No prompt. The list stays a WORK LIST, so a row written shows its new text and every
+// other row is carried to where its text now stands, ready for the next Replace. One undo step ("Replace"). Its doors
+// (ReplaceRowsNow): the query unchanged (RefuseChangedQuery), every document of several still open once the last is
+// reached, and the verify walk's three questions (ChapterMovedUnderRows). Nothing is accepted, and nothing recorded of
+// KFC's own (spec F1).
 // ======================================================================================================
 
 bool KFCReplaceEngine::CanReplaceHit(int32 chapterIdx, int32 hitIdx)
@@ -1553,7 +1557,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		// failure nothing reported, and the step goes back (EndWriteStep - the abortable step by its abort, the plain one
 		// by the error state) with the rows put back and the line saying so. Asked of BOTH: a plain step ends by the error
 		// state whatever `ok` says (CmdUtils.h - SequenceContext), so one left to end by it alone would be taken back by
-		// InDesign under rows marked Changed (the object rows ask the same - KFCObjectReplace's step 8).
+		// InDesign under rows marked Changed (the object rows ask the same - KFCObjectReplace::ReplaceRow and ReplaceRows).
 		if (ok && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			ok = false;
@@ -1569,8 +1573,9 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	if (!ok)
 	{
 		KFCResultModel::RollBackRows();
-		// A write that went in and was rolled back moved the foci of the story without moving them back (spec T13): the
-		// story is as KFC knew it before the write (the check above refuses any other), so the rows' places are exact.
+		// A write that went in and was rolled back moved the foci of the story without moving them back (T13 of
+		// docs/superpowers/specs/2026-10-08-kfc-text-focus-jump-design.md): the story is as KFC knew it before the write
+		// (the check above refuses any other), so the rows' places are exact.
 		for (size_t k = 0; k < chapters.size(); ++k)
 			for (std::set<UID>::const_iterator ws = chapters[k].writtenStories.begin(); ws != chapters[k].writtenStories.end(); ++ws)
 				KFCRowFoci::ReanchorStory(chapters[k].chapterIdx, *ws);
@@ -1630,7 +1635,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 	// (What each row wrote - Hit::replacedText - is taken by the walk that writes it, WalkStoryReplacing.)
 	// WHAT IT DID (spec F16 / F19 / F20): the row's Replace is the one write from the list, one undo step. The
 	// message says nothing of Ctrl+Z (the author's call).
-	// WHICH ROW, IN THE MESSAGE (the author: replacing row after row with Return, every message read the same
+	// WHICH ROW, IN THE MESSAGE (the user's report: replacing row after row with Return, every message read the same
 	// "Replaced." and which one had just happened could not be told). The author's choice: the story's UID and the
 	// hit's place among that story's results - "Replaced ID:262 #3." (the author's spelling) - the story row and its
 	// third hit row in the list (the tree's middle level is one group per story, BuildFontGroups; GetHitFontGroupPos

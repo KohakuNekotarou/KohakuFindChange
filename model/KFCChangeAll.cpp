@@ -151,7 +151,7 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or with
 	// master-page text only and Include Master Pages off): the command would answer kFailure, read below as a failed Change
 	// All, and the caller would take its whole step back - a book stopped at its chapter of pictures, while InDesign's own
-	// Change All goes past it (measured 2026-10-12 - cases xq-notext-doc, xq-masteronly-doc, ca-book-notext-chapters). Done,
+	// Change All goes past it (measured - cases xq-notext-doc, xq-masteronly-doc, ca-book-notext-chapters). Done,
 	// with nothing changed.
 	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
 	{
@@ -347,7 +347,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	// run's book as the searched one (its header asks for ReleaseSearchedBook first): the row then named one book and
 	// KFC watched another - closing the book Change All wrote cleared the row ("Results cleared - the book was closed."),
 	// closing the row's own book left it, and a click on it brought the other book forward (case
-	// ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says why). The UI half draws the empty tree when the run returns (KFCActionComponent).
+	// ca-after-other-book-empty). The chapters held from before go now, not on a schedule (SearchBook says why). The UI
+	// half draws the empty tree when the run returns (KFCActionComponent).
 	// THE PANEL'S PICTURE STAYS WHAT IT WAS (spec map PNL-07 / PNL-08): the results go, the fact that a search has run does
 	// not - DropResults' Clear() takes it away with them, and only a Change All that WROTE changes the picture (the pencil
 	// cat, NoteChangeAllWrote at the end).
@@ -494,7 +495,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	std::vector<PMString> unclosed;
 	LeaveRunDocuments(targets, wasModified, wroteTo, unclosed);
 
-	// ===== THE MESSAGE (the spec's section 4; the selected documents' form - the query dialog's spec, section 4-4).
+	// ===== THE MESSAGE (section 4 of the no-track design KFCChangeAll.h names; the selected documents' form - section 4-4
+	// of docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md).
 	if (replaced == 0 && selection.selected > 0)
 	{
 		outSummary.Append("No match in the ");

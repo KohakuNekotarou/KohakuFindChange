@@ -7,10 +7,12 @@
 //  "Is this plug-in in the middle of a long run?" - ONE definition, because four different things
 //  can be running - a search, a Change All in Book (KFCChangeAll), a query run (KFCQuerySequence) and a row's Replace
 //  (KFCReplaceEngine::IsReplacing) - and every guard has to know about all of them.
-//  A ROW'S REPLACE COUNTS THOUGH IT HAS NO BAR (the 2026-10-12 re-check): reopening a closed chapter and giving a written one
-//  its window run the message loop as surely as a bar does (KFCJump.cpp's gActivating says so of a landing's opens), and
-//  what that loop dispatches - a click's landing and its Hide Previous Chapter sweep, a second Return, a run - must wait
-//  for it like for any run. (Until then it was "one undo step with no bar, never a run".)
+//  A ROW'S REPLACE COUNTS THOUGH IT HAS NO BAR: reopening a closed chapter and giving a written one its window run the
+//  message loop as surely as a bar does (KFCJump.cpp's gActivating says so of a landing's opens), and what that loop
+//  dispatches - a click's landing and its Hide Previous Chapter sweep, a second Return, a run - must wait for it like
+//  for any run. InDesign's own doors - a document closed - are not KFC's to shut: a write that reaches several documents
+//  asks again whether each is still open before it writes (ReplaceRowsNow in KFCReplaceEngine.cpp,
+//  KFCObjectReplace::ReplaceRows, KFCChangeAll::Run, KFCQuerySequence::Run).
 //
 //  WHY THIS IS NEEDED AT ALL
 //

@@ -823,9 +823,9 @@ void ClampIntoStory(const UIDRef& storyRef, TextIndex& start, TextIndex& end)
 // JumpToHit and ShowChapter.
 // hidePreviousChapters = false: the window alone, no sweep - for a landing that WRITES other chapters after it
 // (KFCJump::ReplaceObjectRows): a sweep scheduled in the middle ran its closes once the write was over, by which time the
-// chapters they named held the write, and a close without UI threw it away (measured - the 1.3 -> 1.4 re-check of
-// 2026-10-11 night, case sel-book-objects-open-hide: "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as
-// before the Replace). Since P-C the sweep is decided at the end (SweepAtEnd), which that shape cannot get past.
+// chapters they named held the write, and a close without UI threw it away (measured - case sel-book-objects-open-hide:
+// "Replaced 2 objects in 2 documents", objC1 closed, its file's K1 as before the Replace). Since P-C the sweep is decided
+// at the end (SweepAtEnd), which that shape cannot get past.
 bool FrontChapter(const UIDRef& docRef, bool hidePreviousChapters = true)
 {
 	if (!EnsureDocFrontmost(docRef))
@@ -1673,7 +1673,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		// O10 step 6 for the rows: the document of the row selected last in front - InDesign's replace selects what it
 		// writes in the FRONT document (another document's walk selects in this one, put right below) - and the view on
 		// that row's item (the one the page shows).
-		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE (the 10-11 night K-3): asked in the middle, its closes ran after the write,
+		// NO "HIDE PREVIOUS CHAPTER" SWEEP HERE: asked in the middle, its closes ran after the write,
 		// and the rows' other chapters are what the write goes on to write - a clean one with a window was closed with the
 		// write in it, thrown away (FrontChapter's hidePreviousChapters - measured, case sel-book-objects-open-hide). One
 		// row's Replace keeps the sweep: it spares the one document that row writes (ReplaceObjectRow). Since P-C a sweep
@@ -1696,8 +1696,8 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 		// THE DOCUMENT OF THE ROW SELECTED LAST IN FRONT AGAIN (the spec map's OBJ-18 - the page shows that row). The write
 		// gives a window to each closed chapter it wrote (KFCReplaceEngine::DocsAfterWrite), and a window opened comes
 		// forward: rows of two closed chapters replaced together left the other chapter's window in front and nothing
-		// selected (the 1.3 -> 1.4 re-check of 2026-10-11 night - case sel-book-objects-replace read "active objC1.indd"
-		// over objC2's row). Put back in front with the zoom it has (EnsureDocFrontmost's carryZoom).
+		// selected (measured - case sel-book-objects-replace read "active objC1.indd" over objC2's row). Put back in front
+		// with the zoom it has (EnsureDocFrontmost's carryZoom).
 		if (!LayoutOfDocIsFrontmost(docRef))
 			(void)EnsureDocFrontmost(docRef, false /*carryZoom*/);
 		// 9. THE ITEM OF THE ROW SELECTED LAST LEFT SELECTED (LeaveRowItemSelected). Quietly: the status says what was written.

@@ -30,7 +30,8 @@
 #include "KFCObjectReplace.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
-#include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep)
+#include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep) and
+								// what its documents are left as (DocsAfterWrite)
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// KFCForwardSearchScope
 #include "KFCUndoFollow.h"
@@ -238,7 +239,7 @@ bool CheckRow(int32 chapterIdx, int32 hitIdx, PMString& outStatus, UIDRef& outDo
 	return true;
 }
 
-// THE ROWS A WRITE OF KFC'S OWN MOVES BESIDES ITS OWN (spec OBJ-12; 2026-10-12, the author's call). A fingerprint holds more
+// THE ROWS A WRITE OF KFC'S OWN MOVES BESIDES ITS OWN (spec OBJ-12; the author's call). A fingerprint holds more
 // than its item (KFCObjectSearch::WriteReach), so a write moved the print of rows it did not write - the text frame an inline
 // written hangs in, the group holding an item written - and their Replace then refused them as "changed since the
 // search", the change being KFC's own. BEFORE the write: the rows of the chapter the write can reach that read now as their
@@ -327,9 +328,11 @@ bool NextItemOfWalk(IFindChangeService* svc, IObjectWalker* shared, IDataBase* d
 }
 
 // A chapter of ours that a check reopened goes back when the check refuses (KFCBookScope::HandBackIfHeld - the UI half's
-// landings hand back the same way). The writes are reached only through the UI half's landing, which has brought the
-// chapter's window forward first - the chapter is then the user's, no longer held - and which hands back on its own way
-// out whatever an exit of the write's leaves (KFCJump's HandBackChapterOnExit).
+// landings hand back the same way). The writes are reached only through the UI half's landing (KFCJump::ReplaceObjectRow,
+// ReplaceObjectRows), which has brought the row's chapter forward first - for rows selected together, the chapter of the
+// row selected last - and which hands back on its own way out whatever an exit of the write's leaves
+// (HandBackChapterOnExit, HandBackChaptersOnExit in KFCJump.cpp). The chapter brought forward is then the user's, no
+// longer held; the other chapters rows selected together reach are DocsAfterWrite's (ReplaceRows).
 using KFCBookScope::HandBackIfHeld;
 }	// anonymous namespace
 
@@ -400,9 +403,10 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		if (KFC_DIAG_FAULT("object-walk-miss"))
 			reached = false;
 		// 8. That item alone (ReplaceObject answers kSuccess when it wrote - measured, the object search plan's Task 1 M8,
-		// docs/superpowers/plans/2026-10-09-kfc-object-search.md). Its answer AND the error state: the sequence below ends by the error state (rolled back when one stands), so a write left with an
-		// error standing would be taken back by InDesign under a row marked Changed - the text Replace asks both
-		// (KFCReplaceEngine's walks: the command's ErrorCode and its result).
+		// docs/superpowers/plans/2026-10-09-kfc-object-search.md). Its answer AND the error state: the step ends by the
+		// error state (EndWriteStep, below - rolled back when one stands), so a write left with an error standing would be
+		// taken back by InDesign under a row marked Changed - the text Replace asks both (KFCReplaceEngine's walks: the
+		// command's ErrorCode and its result).
 		if (reached)
 			ok = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess) && ErrorUtils::PMGetGlobalErrorCode() == kSuccess;
 		if (ok)
