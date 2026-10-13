@@ -33,12 +33,10 @@
 #include "ErrorUtils.h"			// GlobalErrorStatePreserver / PMSetGlobalErrorCode - an open or a close
 								// that is allowed to fail must not poison the caller's next command
 #include "PersistUtils.h"		// ::GetUIDRef / ::GetDataBase
-#include "CmdUtils.h"
 #include "K2Vector.h"			// the held-chapter list
 #include "FileUtils.h"		// IsEqual - is this open document that chapter's file
 #include "SDKFileHelper.h"
 #include "SysFileList.h"		// the searched book's chapter files - the Hide Previous Chapter sweep
-#include "UIDList.h"
 #include "Utils.h"
 #include "PMString.h"
 #include "WideString.h"
@@ -62,6 +60,21 @@ namespace
 	// mode on that close; the reasons are at OpenChapterDoc and ReleaseHeldDoc). Using it would
 	// suggest a partnership that is not there.
 	K2Vector<UIDRef> gHeldDocs;
+
+	// Where this document is on the held list, or -1 (and -1 for gNull) - THE walk of it, for both questions that look a
+	// document up there: IsHeldDoc (is it ours?) and ReleaseHeldDoc (which entry goes?). The pair is compared, never
+	// followed: a chapter closed since may still be on the list.
+	int32 HeldIndexOf(const UIDRef& docRef)
+	{
+		if (docRef == UIDRef::gNull)
+			return -1;
+		for (int32 i = 0; i < static_cast<int32>(gHeldDocs.size()); ++i)
+		{
+			if (gHeldDocs[i] == docRef)
+				return i;
+		}
+		return -1;
+	}
 
 	// Which book the RESULTS on the panel came from (its full file path). NOT "which book we hold
 	// chapters for": every run closes each chapter as soon as it is done with it,
@@ -396,19 +409,11 @@ void KFCBookScope::ReleaseHeldDocs(bool closeNow)
 
 bool KFCBookScope::IsHeldDoc(const UIDRef& docRef)
 {
-	if (docRef == UIDRef::gNull)
-		return false;
-
-	// The same walk ReleaseHeldDoc opens with. Kept as its own function rather than folded into that
+	// The walk ReleaseHeldDoc opens with (HeldIndexOf). Kept as its own function rather than folded into that
 	// one's answer because the two questions are asked at different MOMENTS - this one before the
 	// release, that one after - and only the pair of them says whether a failure to close was real.
 	// See the header.
-	for (int32 i = 0; i < static_cast<int32>(gHeldDocs.size()); ++i)
-	{
-		if (gHeldDocs[i] == docRef)
-			return true;
-	}
-	return false;
+	return HeldIndexOf(docRef) >= 0;
 }
 
 void KFCBookScope::HandBackIfHeld(const UIDRef& docRef)
@@ -436,21 +441,10 @@ bool KFCBookScope::HandBackHeldDocNow(const UIDRef& docRef)
 
 bool KFCBookScope::ReleaseHeldDoc(const UIDRef& docRef, bool closeNow)
 {
-	if (docRef == UIDRef::gNull)
-		return false;
-
 	// Ours to close? A chapter the user already had open is not on this list and must stay. That
 	// test lives HERE rather than at every call site: a run walks its chapters without caring who
 	// opened which, and hands every one of them back the same way.
-	int32 heldIndex = -1;
-	for (int32 i = 0; i < static_cast<int32>(gHeldDocs.size()); ++i)
-	{
-		if (gHeldDocs[i] == docRef)
-		{
-			heldIndex = i;
-			break;
-		}
-	}
+	const int32 heldIndex = HeldIndexOf(docRef);
 	if (heldIndex < 0)
 		return false;
 

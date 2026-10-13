@@ -25,8 +25,6 @@
 #include "FileUtils.h"
 #include "TextWalkerServiceProviderID.h"	// kClearFindChangeOptionsCmdBoss
 
-#include <cstdio>
-#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -535,50 +533,23 @@ int32 KFCQuerySequence::RunFiles(const std::vector<IDFile>& files, PMString& out
 int32 KFCQuerySequence::RunFromDiagSwitch(PMString& outSummary)
 {
 	std::vector<QueryItem> queries;
-	char* temp = nullptr;
-	size_t len = 0;
-	if (_dupenv_s(&temp, &len, "TEMP") == 0 && temp != nullptr)
+	std::vector<std::string> lines;
+	(void)KFCDiagFaultLines("queries-run", lines);		// none when the switch is off: an empty run
+	for (size_t n = 0; n < lines.size(); ++n)
 	{
-		const std::string path = std::string(temp) + "\\kbs-diag-fault-queries-run";
-		free(temp);
-		FILE* f = nullptr;
-		if (fopen_s(&f, path.c_str(), "rb") == 0 && f != nullptr)
-		{
-			std::string text;
-			char buffer[512];
-			size_t got = 0;
-			while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 65536)
-				text.append(buffer, got);
-			fclose(f);
-			if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF)
-				text.erase(0, 3);
-			std::string line;
-			text.push_back('\n');
-			for (size_t i = 0; i < text.size(); ++i)
-			{
-				if (text[i] == '\r')
-					continue;
-				if (text[i] != '\n')
-				{
-					line += text[i];
-					continue;
-				}
-				if (!line.empty() && line[0] != '#')		// a line starting "#" is skipped
-				{
-					QueryItem item;
-					PMString p;
-					p.SetUTF8String(line);
-					item.file = FileUtils::PMStringToSysFile(p);
-					std::string base = line.substr(line.find_last_of("\\/") + 1);
-					if (base.size() > 4 && base.compare(base.size() - 4, 4, ".xml") == 0)
-						base.erase(base.size() - 4);
-					item.name.SetUTF8String(base);
-					item.name.SetTranslatable(kFalse);
-					queries.push_back(item);
-				}
-				line.clear();
-			}
-		}
+		const std::string& line = lines[n];
+		if (line[0] == '#')		// a line starting "#" is skipped
+			continue;
+		QueryItem item;
+		PMString p;
+		p.SetUTF8String(line);
+		item.file = FileUtils::PMStringToSysFile(p);
+		std::string base = line.substr(line.find_last_of("\\/") + 1);
+		if (base.size() > 4 && base.compare(base.size() - 4, 4, ".xml") == 0)
+			base.erase(base.size() - 4);
+		item.name.SetUTF8String(base);
+		item.name.SetTranslatable(kFalse);
+		queries.push_back(item);
 	}
 	KFC_DIAG_LOG("queries-run: %d queries from the switch", (int)queries.size());
 	return Run(queries, outSummary);

@@ -113,7 +113,7 @@
 #include "KFCResultModel.h"
 #include "KFCModelNotify.h"		// the panel is told, never called (the model/UI split)
 #include "KFCRunGuard.h"		// never retire results out from under ANY run of ours
-#include "KFCSearchEngine.h"	// ForgetSearchedFindFormat - paired with every result Clear()
+#include "KFCSearchEngine.h"	// DropResults - the rows, the book and the Find Format, together
 
 namespace
 {
@@ -159,8 +159,8 @@ void RetireBookResultsIfGone()
 	if (KFCBookScope::IsBookStillOpen(searchedBookPath))
 		return;
 
-	// Is the panel still showing THAT book's results? Decided before anything is released, because
-	// releasing does not touch the model and clearing the model must not depend on the order.
+	// Is the panel still showing THAT book's results? Decided before anything is let go: DropResults below
+	// empties the model, and IsFromBook would read false after it.
 	// Document-scope results belong to KFCCloseDocResponder instead.
 	//
 	// IsFromBook() ALONE - deliberately not "and it has at least one chapter". A book search that
@@ -172,21 +172,21 @@ void RetireBookResultsIfGone()
 	// to tell from the screen whether the close had even been noticed.)
 	const bool showingThatBooksResults = KFCResultModel::IsFromBook();
 
-	// The chapters go back FIRST, and unconditionally: leaving them open would strand hidden
+	// The chapters go back whatever the panel shows: leaving them open would strand hidden
 	// documents - with their .indd files locked - belonging to a book nobody has open any more. The
 	// closes are scheduled (IDocFileHandler::kSchedule), so doing this from a notification is safe.
-	// ReleaseSearchedBook does the path as well, so the model's Clear below needs no second call.
-	KFCBookScope::ReleaseSearchedBook();
-
-	// The panel is only touched when it was showing this book's results. Anything else on screen
-	// (a document-scope search, or nothing at all) is not ours to wipe.
+	// Anything else on screen (a document-scope search, or nothing at all) is not ours to wipe - only
+	// the book goes then (ReleaseSearchedBook: its path and its chapters).
 	if (!showingThatBooksResults)
+	{
+		KFCBookScope::ReleaseSearchedBook();
 		return;
+	}
 
-	// ForgetSearchedFindFormat alongside, as every Clear() has one: the format the replace's door
-	// compares against belongs to the rows going away here.
-	KFCResultModel::Clear();
-	KFCSearchEngine::ForgetSearchedFindFormat();
+	// The panel is showing this book's results: they go, with all of what describes them - the rows, the
+	// book and its chapters, the Find Format the replace's door compares against (DropResults, as at every
+	// place that throws the results away).
+	KFCSearchEngine::DropResults();
 	KFCNotifyRebuild();
 
 	// A panel that empties itself without a word reads as a crash.

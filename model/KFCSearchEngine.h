@@ -364,8 +364,8 @@ namespace KFCSearchEngine
 	    (ForgetSearchedFindFormat): one fact, so every place that throws the results away calls this
 	    rather than keeping the three in step by hand. Worth having no exceptions to even where a
 	    part has nothing to do - the search's own commit point remembers the format again a moment
-	    later. (KFCBookWatch hands its book back first, unconditionally, and clears the rest only when
-	    the panel shows that book - so it pairs the other two itself.) */
+	    later. (One place still pairs two of them by hand and keeps the book: a query run's end -
+	    KFCQuerySequence::Run, whose list is left empty, F7.) */
 	void DropResults();
 
 	/** The walker scope options EVERY KFC walk uses: the five switches read straight off the

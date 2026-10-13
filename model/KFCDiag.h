@@ -186,6 +186,7 @@
 #include <mutex>
 #include <string>						// KFCDiagFaultText
 #include <thread>
+#include <vector>						// KFCDiagFaultLines
 #include "PerformanceStats.h"			// InDesign's own counters (KFCDiagPerf) - guide vol2-16
 #include "PerformanceMetricsID.h"
 
@@ -286,6 +287,45 @@ inline bool KFCDiagFaultText(const char* name, std::string& out)
 	if (end != std::string::npos)
 		out.erase(end);
 	return !out.empty();
+}
+
+// The fault switch <name>'s file as lines (UTF-8, a BOM passed over; CR LF or LF ends a line, an empty line is left out;
+// read up to 64 KB) - false when the switch is off. For the switches that carry a list: book-selection (the Book panel's
+// selection, KFCBookPanelLookup.cpp) and queries-run (the query files of a run, KFCQuerySequence.cpp).
+inline bool KFCDiagFaultLines(const char* name, std::vector<std::string>& out)
+{
+	out.clear();
+	char path[600] = { 0 };
+	if (!KFCDiagFaultPath(name, path))
+		return false;
+	FILE* f = nullptr;
+	if (fopen_s(&f, path, "rb") != 0 || f == nullptr)
+		return false;
+	std::string text;
+	char buffer[512];
+	size_t got = 0;
+	while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 65536)
+		text.append(buffer, got);
+	fclose(f);
+	if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF && static_cast<unsigned char>(text[1]) == 0xBB
+		&& static_cast<unsigned char>(text[2]) == 0xBF)
+		text.erase(0, 3);
+	std::string line;
+	text.push_back('\n');
+	for (size_t i = 0; i < text.size(); ++i)
+	{
+		if (text[i] == '\r')
+			continue;
+		if (text[i] != '\n')
+		{
+			line += text[i];
+			continue;
+		}
+		if (!line.empty())
+			out.push_back(line);
+		line.clear();
+	}
+	return true;
 }
 
 // The nth whole number (from 0) the fault switch <name>'s file holds, separated by white space - `fallback` when the

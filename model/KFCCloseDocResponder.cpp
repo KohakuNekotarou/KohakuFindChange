@@ -51,7 +51,6 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "IDocument.h"
 #include "IDocumentSignalData.h"
 #include "ISignalMgr.h"
 

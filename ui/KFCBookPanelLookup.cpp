@@ -32,8 +32,6 @@
 #include "Utils.h"
 #include "WideString.h"
 
-#include <cstdio>
-#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -281,37 +279,7 @@ namespace
 	bool ReadDiagSelection(const IDFile& bookFile, std::vector<UID>& outContents, int32& outTotal)
 	{
 		std::vector<std::string> lines;
-		char* temp = nullptr;
-		size_t len = 0;
-		if (_dupenv_s(&temp, &len, "TEMP") != 0 || temp == nullptr)
-			return false;
-		const std::string path = std::string(temp) + "\\kbs-diag-fault-book-selection";
-		free(temp);
-		FILE* f = nullptr;
-		if (fopen_s(&f, path.c_str(), "rb") != 0 || f == nullptr)
-			return false;
-		std::string text;
-		char buffer[512];
-		size_t got = 0;
-		while ((got = fread(buffer, 1, sizeof(buffer), f)) > 0 && text.size() < 65536)
-			text.append(buffer, got);
-		fclose(f);
-		std::string line;
-		text.push_back('\n');
-		for (size_t i = 0; i < text.size(); ++i)
-		{
-			if (text[i] == '\r')
-				continue;
-			if (text[i] != '\n')
-			{
-				line += text[i];
-				continue;
-			}
-			if (!line.empty())
-				lines.push_back(line);
-			line.clear();
-		}
-		if (lines.empty() || lines[0].compare(0, 5, "book=") != 0)
+		if (!KFCDiagFaultLines("book-selection", lines) || lines.empty() || lines[0].compare(0, 5, "book=") != 0)
 			return false;
 		PMString wantedBook;
 		wantedBook.SetUTF8String(lines[0].substr(5));
