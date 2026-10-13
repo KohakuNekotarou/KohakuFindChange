@@ -43,7 +43,7 @@
 //    * the document-open responder (KFCOpenDocResponder), which leaves the chapters a run opens to the
 //      run (it binds them itself);
 //    * the Save As responder (KFCSaveAsDocResponder), which leaves the list's names to the run that owns the list;
-//    * the Undo follow (KFCUndoFollow::Follow), which would otherwise put rows back under a run;
+//    * the Undo follow (KFCUndoFollow.cpp's Follow), which would otherwise put rows back under a run;
 //    * the query dialog's double click (KFCQueryDialogShowInFindChange, the UI half - through IKFCRuns),
 //      which would otherwise load a query into Find/Change while a query run is putting its own there;
 //    * a row's landing (KFCJump::ActivateNode, the UI half - through IKFCRuns), whose Hide Previous Chapter sweep

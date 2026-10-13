@@ -29,7 +29,7 @@
 #include "textiterator.h"			// StoryTextHash
 #include "UIDList.h"
 
-#include <algorithm>		// std::find - the documents watched
+#include <algorithm>		// std::find, std::remove_if, std::any_of - the documents watched, a closing document's part
 #include <set>
 #include <utility>			// std::move - a kept write carries its rows
 
@@ -127,8 +127,9 @@ void CloseRecording()
 	gPendingBefore = KFCResultModel::ModelSnapshot();
 }
 
-// The document a story (or an object row's item) lives in, if it is open - by its chapter's file first, as every door
-// of KFC finds a chapter's document (a UIDRef can outlive its document - KFCBookScope::ReachChapterDoc).
+// The document a story (or an object row's item, or a chapter of a kept list) lives in, if it is open - by its chapter's
+// file first, as every door of KFC finds a chapter's document (a UIDRef can outlive its document -
+// KFCBookScope::ReachChapterDoc).
 IDataBase* DocOfFile(const IDFile& file, const UIDRef& doc)
 {
 	UIDRef found = doc;
@@ -139,33 +140,42 @@ IDataBase* DocOfFile(const IDFile& file, const UIDRef& doc)
 IDataBase* DocOf(const StoryMoved& s) { return DocOfFile(s.file, s.doc); }
 IDataBase* DocOf(const ItemMoved& m) { return DocOfFile(m.file, m.doc); }
 
+// A chapter of the list as it stands: its file, and its document if that is open - found the same way.
+bool ChapterDocNow(int32 chapterIdx, IDFile& outFile, UIDRef& outDoc)
+{
+	return KFCResultModel::GetChapterLocation(chapterIdx, outDoc, outFile)
+		&& KFCBookScope::FindOpenChapterDoc(outFile, outDoc);
+}
+
+// A story's version now, noted as its "before" - a write about to be made may move it. A story that cannot be read (gone)
+// is not noted.
+void NoteStoryBefore(const IDFile& file, const UIDRef& doc, IDataBase* db, UID story, std::vector<StoryMoved>& out)
+{
+	uint32 version = 0;
+	if (!KFCSearchEngine::ReadStoryVersion(db, story, version))
+		return;
+	StoryMoved s;
+	s.file = file;
+	s.doc = doc;
+	s.story = story;
+	s.before = version;
+	s.now = db;
+	out.push_back(s);
+}
+
 // Every story holding a row of the chapter, with the version it has now. A chapter whose document is not
 // open has none to read - and no write reaches it.
 void ReadChapterStories(int32 chapterIdx, std::vector<StoryMoved>& out)
 {
-	UIDRef docRef;
+	UIDRef found;
 	IDFile file;
-	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file))
-		return;
-	UIDRef found = docRef;
-	if (!KFCBookScope::FindOpenChapterDoc(file, found))
+	if (!ChapterDocNow(chapterIdx, file, found))
 		return;
 	IDataBase* const db = found.GetDataBase();
 	std::set<UID> stories;
 	KFCResultModel::GetChapterStories(chapterIdx, stories);
 	for (std::set<UID>::const_iterator story = stories.begin(); story != stories.end(); ++story)
-	{
-		uint32 version = 0;
-		if (!KFCSearchEngine::ReadStoryVersion(db, *story, version))
-			continue;
-		StoryMoved s;
-		s.file = file;
-		s.doc = found;
-		s.story = *story;
-		s.before = version;
-		s.now = db;
-		out.push_back(s);
-	}
+		NoteStoryBefore(file, found, db, *story, out);
 }
 
 // Find every kept write's documents again. A write with a document that is not open any more is dropped:
@@ -240,11 +250,8 @@ void ChaptersOfDocInKeptSet(uint32 set, IDataBase* db, std::vector<int32>& out)
 			continue;
 		const KFCResultModel::ModelSnapshot& list = (w.resultSetBefore == set) ? w.before : w.after;
 		for (size_t c = 0; c < list.chapters.size(); ++c)
-		{
-			UIDRef found = list.chapters[c].docRef;
-			if (KFCBookScope::FindOpenChapterDoc(list.chapters[c].file, found) && found.GetDataBase() == db)
+			if (DocOfFile(list.chapters[c].file, list.chapters[c].docRef) == db)
 				out.push_back(static_cast<int32>(c));
-		}
 		return;		// one copy of a set is as good as another
 	}
 }
@@ -266,6 +273,15 @@ void DropChapterRows(Step& step, int32 chapterIdx)
 		rows.versionsBefore.end());
 	rows.versionsAfter.erase(std::remove_if(rows.versionsAfter.begin(), rows.versionsAfter.end(), versionOf),
 		rows.versionsAfter.end());
+}
+
+// A CLOSING DOCUMENT'S STORIES AND ITEMS OFF A KEPT WRITE (`of` - is it that document's? - is asked of a StoryMoved and of
+// an ItemMoved alike). True when the write is left with none: it goes whole.
+template <class Of> bool TakeDocOff(Step& step, const Of& of)
+{
+	step.stories.erase(std::remove_if(step.stories.begin(), step.stories.end(), of), step.stories.end());
+	step.items.erase(std::remove_if(step.items.begin(), step.items.end(), of), step.items.end());
+	return step.stories.empty() && step.items.empty();
 }
 
 // Do the two writes share a document? (InDesign keeps one history per document, so two that do are
@@ -475,16 +491,25 @@ void DiagSteps(const char* when)
 // Attached at run time, never written into the document; let go of when the document closes (DocumentClosing).
 std::vector<IDataBase*> gWatchedDocs;	// compared, never dereferenced once their document has closed
 
-void WatchDoc(IDataBase* db)
+// THE SUBJECT A WRITE'S MARK IS RAISED ON AND HEARD ON - the document's own, its root's (kDocBoss): KFCUndoMarkCmd's
+// DoNotify raises the mark there, WatchDoc attaches the observer there and DocumentClosing takes it off. nil = no
+// document. The caller owns the reference.
+ISubject* QueryMarkSubject(IDataBase* db)
 {
 	if (db == nil)
-		return;
+		return nil;
 	const UID root = db->GetRootUID();
 	if (root == kInvalidUID)
-		return;
+		return nil;
 	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
-	// Asked for by OUR IID: kDocBoss carries other people's IID_IOBSERVER (KFC.fr).
-	InterfacePtr<IObserver> observer(db, root, IID_IKFCDOCUNDOOBSERVER);
+	return subject.forget();
+}
+
+void WatchDoc(IDataBase* db)
+{
+	InterfacePtr<ISubject> subject(QueryMarkSubject(db));
+	// On the same boss, asked for by OUR IID: kDocBoss carries other people's IID_IOBSERVER (KFC.fr).
+	InterfacePtr<IObserver> observer(subject, IID_IKFCDOCUNDOOBSERVER);
 	if (subject == nil || observer == nil)
 		return;
 	if (!subject->IsAttached(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER))
@@ -566,13 +591,7 @@ CREATE_PMINTERFACE(KFCUndoMarkCmd, kKFCUndoMarkCmdImpl)
 
 void KFCUndoMarkCmd::DoNotify()
 {
-	IDataBase* const db = fItemList.GetDataBase();
-	if (db == nil)
-		return;
-	const UID root = db->GetRootUID();
-	if (root == kInvalidUID)
-		return;
-	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
+	InterfacePtr<ISubject> subject(QueryMarkSubject(fItemList.GetDataBase()));
 	if (subject == nil)
 		return;
 	// A ModelChange, not a Change: only that is replayed on an Undo and a Redo, and only from a subject inside a
@@ -589,6 +608,13 @@ PMString* KFCUndoMarkCmd::CreateName()
 	return name;
 }
 
+/** THE WORK OF THE OBSERVER (defined under "Following"). Every kept write an Undo or a Redo has moved - the newest one
+	first for an Undo, the oldest first for a Redo, never past a write in the same document that has not moved (a query
+	run, which puts the whole list back, counts as in every document) - has its rows put back, and the panel is drawn
+	again and says so on its message line. Called when a write's mark is heard (its Do, Undo or Redo) - the versions say
+	which. */
+static void Follow();
+
 /** The lazy observer AddIn'd on kDocBoss (KFC.fr): a write of KFC's was done, undone or redone in this document. */
 class KFCDocUndoObserver : public CObserver
 {
@@ -600,7 +626,7 @@ public:
 	virtual void Update(const ClassID& theChange, ISubject* theSubject, const PMIID& protocol, void* changedBy) {}
 
 	/** The data is not read: it names neither what changed nor whether it was an Undo, and may be nil. The
-		versions say (KFCUndoFollow::Follow). */
+		versions say (Follow). */
 	virtual void LazyUpdate(ISubject* theSubject, const PMIID& protocol, const LazyNotificationData* data)
 	{
 		KFC_DIAG_LOG("LAZY doc subject=%p proto=0x%x data=%p main=%d", (void*)theSubject, protocol.Get(),
@@ -611,7 +637,7 @@ public:
 		// happen there, and the results it moves are the session's.
 		if (!IDThreading::IsMainThreadDomain())
 			return;
-		(void)KFCUndoFollow::Follow();
+		Follow();
 	}
 };
 
@@ -709,12 +735,9 @@ void KFCUndoFollow::StepRecorder::RecordItem(int32 chapterIdx, UID item)
 {
 	if (!fOpen || item == kInvalidUID)
 		return;
-	UIDRef docRef;
+	UIDRef found;
 	IDFile file;
-	if (!KFCResultModel::GetChapterLocation(chapterIdx, docRef, file))
-		return;
-	UIDRef found = docRef;
-	if (!KFCBookScope::FindOpenChapterDoc(file, found))
+	if (!ChapterDocNow(chapterIdx, file, found))
 		return;
 	ItemMoved m;
 	m.file = file;
@@ -752,19 +775,7 @@ void KFCUndoFollow::RunRecorder::ReadStories(const std::vector<KFCBookScope::Cha
 			continue;
 		const int32 count = storyList->GetAllTextModelCount();
 		for (int32 i = 0; i < count; ++i)
-		{
-			const UID story = storyList->GetNthTextModelUID(i).GetUID();
-			uint32 version = 0;
-			if (!KFCSearchEngine::ReadStoryVersion(db, story, version))
-				continue;
-			StoryMoved s;
-			s.file = docs[d].file;
-			s.doc = docs[d].docRef;
-			s.story = story;
-			s.before = version;
-			s.now = db;
-			gPendingStories.push_back(s);
-		}
+			NoteStoryBefore(docs[d].file, docs[d].docRef, db, storyList->GetNthTextModelUID(i).GetUID(), gPendingStories);
 	}
 }
 
@@ -806,7 +817,7 @@ void KFCUndoFollow::RunRecorder::RestoreBefore()
 //========================================================================================
 // Following.
 //========================================================================================
-bool KFCUndoFollow::Follow()
+static void Follow()
 {
 	KFC_DIAG_LOG("FOLLOW recording=%d steps=%u running=%d", gRecording ? 1 : 0, (unsigned)gSteps.size(),
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
@@ -814,13 +825,13 @@ bool KFCUndoFollow::Follow()
 	// All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it opens a
 	// chapter or a window - KFCRunGuard counts all four).
 	if (gRecording || gSteps.empty() || KFCRunGuard::IsAnyRunning())
-		return false;
+		return;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
 	DropOtherResultSets();
 	ResolveDocs();
 	KFC_DIAG_STEPS("resolved");
 	if (gSteps.empty())
-		return false;
+		return;
 
 	// ONE WRITE AT A TIME, IN THE ORDER INDESIGN TAKES THEM. An Undo takes back the newest write
 	// of a document, a Redo does the oldest undone one again - so a write is followed only when no later
@@ -829,7 +840,7 @@ bool KFCUndoFollow::Follow()
 	// three chapters, or a Redo that is not followed until the next notification).
 	int32 undone = 0, redone = 0;
 	bool reshaped = false;
-	KFCUndoFollow::StepKind lastKind = kStepReplace;
+	KFCUndoFollow::StepKind lastKind = KFCUndoFollow::kStepReplace;
 	const size_t guard = 2 * gSteps.size() + 2;
 	for (size_t g = 0; g < guard; ++g)
 	{
@@ -885,7 +896,7 @@ bool KFCUndoFollow::Follow()
 	}
 	KFC_DIAG_LOG("  followed undone=%d redone=%d", undone, redone);
 	if (undone + redone == 0)
-		return false;
+		return;
 
 	// A reshaped result set is a new tree; rows put back are the same rows drawn again (RefreshRows keeps
 	// what the user had opened and closed).
@@ -920,7 +931,6 @@ bool KFCUndoFollow::Follow()
 		msg.Append(count == 1 ? "it." : "them.");
 	}
 	KFCNotifyStatus(msg);
-	return true;
 }
 
 void KFCUndoFollow::DocumentClosing(const UIDRef& docRef)
@@ -933,9 +943,8 @@ void KFCUndoFollow::DocumentClosing(const UIDRef& docRef)
 		return;
 	gWatchedDocs.erase(watched);
 	// The document is still whole at this signal (BeforeCloseDoc), so its subject can be asked.
-	const UID root = db->GetRootUID();
-	InterfacePtr<ISubject> subject(db, root, IID_ISUBJECT);
-	InterfacePtr<IObserver> observer(db, root, IID_IKFCDOCUNDOOBSERVER);
+	InterfacePtr<ISubject> subject(QueryMarkSubject(db));
+	InterfacePtr<IObserver> observer(subject, IID_IKFCDOCUNDOOBSERVER);
 	if (subject != nil && observer != nil
 		&& subject->IsAttached(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER))
 		subject->DetachObserver(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER);
@@ -964,19 +973,10 @@ void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 				if (sets[s]->chapters[c].docRef == docRef)
 					KFCResultModel::EmptyChapter(sets[s]->chapters[c]);
-		// Its stories. A write of rows of this document alone goes whole (and its rows with it); one of several documents
-		// (rows selected together) keeps the others' stories and lets this one's rows go (DropChapterRows); a query run
-		// keeps the stories of the documents still open.
-		std::vector<StoryMoved>& stories = step.stories;
-		for (size_t k = stories.size(); k-- > 0; )
-			if (stories[k].doc == docRef)
-				stories.erase(stories.begin() + static_cast<std::ptrdiff_t>(k));
-		// ...and its items (an object row's Replace), the same way.
-		std::vector<ItemMoved>& items = step.items;
-		for (size_t k = items.size(); k-- > 0; )
-			if (items[k].doc == docRef)
-				items.erase(items.begin() + static_cast<std::ptrdiff_t>(k));
-		if (stories.empty() && items.empty())
+		// Its stories and items (an object row's Replace). A write of rows of this document alone goes whole (and its rows
+		// with it); one of several documents (rows selected together) keeps the others' and lets this one's rows go
+		// (DropChapterRows); a query run keeps the stories of the documents still open.
+		if (TakeDocOff(step, [&](const auto& x) { return x.doc == docRef; }))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!step.whole && closing >= 0 && step.resultSet == current)	// (row indices name the current list's rows only)
 			DropChapterRows(step, closing);
@@ -996,18 +996,13 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	// `now`; the trace does.
 	DropOtherResultSets();
 	ResolveDocs();
-	// Its stories in each kept write - found as every follow finds them (DocOf, by the chapter's file): the document
-	// is still open at this signal.
-	auto inChapter = [&](const StoryMoved& story) { return story.doc == docRef || DocOf(story) == db; };
-	auto itemInChapter = [&](const ItemMoved& m) { return m.doc == docRef || DocOf(m) == db; };
+	// Its stories and items in each kept write - found as every follow finds them (DocOf, by the chapter's file): the
+	// document is still open at this signal.
+	const auto inChapter = [&](const auto& x) { return x.doc == docRef || DocOf(x) == db; };
 	std::vector<bool> wroteIt(gSteps.size(), false);
 	for (size_t i = 0; i < gSteps.size(); ++i)
-	{
-		for (size_t k = 0; k < gSteps[i].stories.size() && !wroteIt[i]; ++k)
-			wroteIt[i] = inChapter(gSteps[i].stories[k]);
-		for (size_t k = 0; k < gSteps[i].items.size() && !wroteIt[i]; ++k)
-			wroteIt[i] = itemInChapter(gSteps[i].items[k]);
-	}
+		wroteIt[i] = std::any_of(gSteps[i].stories.begin(), gSteps[i].stories.end(), inChapter)
+			|| std::any_of(gSteps[i].items.begin(), gSteps[i].items.end(), inChapter);
 	// FROZEN in a whole result set only where that write, or one after it, wrote the chapter: the set's rows for it
 	// then describe text its file may no longer hold (a write after it that goes now - its history goes with the
 	// chapter - no longer even stands in the way of its Undo). A chapter nothing since wrote reads in the set as it
@@ -1029,8 +1024,7 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 			{
 				const KFCResultModel::Chapter& chapter = sets[s]->chapters[c];
-				UIDRef found = chapter.docRef;
-				if (KFCBookScope::FindOpenChapterDoc(chapter.file, found) && found.GetDataBase() == db
+				if (DocOfFile(chapter.file, chapter.docRef) == db
 					&& std::find(frozen[s]->begin(), frozen[s]->end(), c) == frozen[s]->end())
 					frozen[s]->push_back(c);
 			}
@@ -1039,12 +1033,9 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	std::vector<int32> closing;
 	for (int32 c = 0; c < KFCResultModel::GetChapterCount(); ++c)
 	{
-		UIDRef chapterDoc;
-		IDFile chapterFile;
-		if (!KFCResultModel::GetChapterLocation(c, chapterDoc, chapterFile))
-			continue;
-		UIDRef found = chapterDoc;
-		if (KFCBookScope::FindOpenChapterDoc(chapterFile, found) && found.GetDataBase() == db)
+		UIDRef found;
+		IDFile file;
+		if (ChapterDocNow(c, file, found) && found.GetDataBase() == db)
 			closing.push_back(c);
 	}
 	// ...and, for a write of rows kept for a list a query run put away (DropOtherResultSets), the chapter in THAT list:
@@ -1054,19 +1045,11 @@ void KFCUndoFollow::ForgetBookChapter(const UIDRef& docRef)
 	for (size_t i = 0; i < gSteps.size(); ++i)
 		if (!gSteps[i].whole && gSteps[i].resultSet != current)
 			ChaptersOfDocInKeptSet(gSteps[i].resultSet, db, closingInSet[i]);
-	// ...then its stories come off every write. A write of rows of this chapter alone goes whole; one of several chapters
-	// (rows selected together) keeps the others' stories and lets this chapter's rows go (DropChapterRows).
+	// ...then its stories and items come off every write. A write of rows of this chapter alone goes whole; one of several
+	// chapters (rows selected together) keeps the others' and lets this chapter's rows go (DropChapterRows).
 	for (size_t i = gSteps.size(); i-- > 0; )
 	{
-		std::vector<StoryMoved>& stories = gSteps[i].stories;
-		for (size_t k = stories.size(); k-- > 0; )
-			if (inChapter(stories[k]))
-				stories.erase(stories.begin() + static_cast<std::ptrdiff_t>(k));
-		std::vector<ItemMoved>& items = gSteps[i].items;
-		for (size_t k = items.size(); k-- > 0; )
-			if (itemInChapter(items[k]))
-				items.erase(items.begin() + static_cast<std::ptrdiff_t>(k));
-		if (stories.empty() && items.empty())
+		if (TakeDocOff(gSteps[i], inChapter))
 			gSteps.erase(gSteps.begin() + static_cast<std::ptrdiff_t>(i));
 		else if (!gSteps[i].whole)
 		{

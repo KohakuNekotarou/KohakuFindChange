@@ -791,7 +791,7 @@ namespace KFCResultModel
 	    cancelled or refused after it, the list is put back (KFCUndoFollow::RunRecorder::RestoreBefore) - and with this
 	    the number too, so the writes kept for that list are followed again (measured - case xq-cancel-undo: a Ctrl+Z of a
 	    row's Replace made before a cancelled run went unfollowed, the row still reading "Changed"). The same for a run
-	    that went through, as its Undo or Redo puts a list back (KFCUndoFollow::Follow - the run's step names both sets,
+	    that went through, as its Undo or Redo puts a list back (KFCUndoFollow.cpp's Follow - the run's step names both sets,
 	    the one it found and the one it left; cases xq-done-undo, xq-two-runs-undo). */
 	void ReturnToResultSet(uint32 resultSetId);
 

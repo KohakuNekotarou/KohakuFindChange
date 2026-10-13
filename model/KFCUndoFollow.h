@@ -132,14 +132,6 @@ namespace KFCUndoFollow
 	    user keeps the write). Nothing is processed over an error already standing (the step goes back on it). */
 	void MarkWrite(IDataBase* db);
 
-	/** THE WORK OF THE OBSERVER. Every kept write an Undo or a Redo has moved - the newest one first for an
-	    Undo, the oldest first for a Redo, never past a write in the same document that has not moved (a
-	    query run, which puts the whole list back, counts as in every document) - has its rows put back,
-	    and the panel is drawn again and says so on its message line.
-	    Called when a write's mark is heard (its Do, Undo or Redo) - the versions say which.
-	    @return true when anything was put back. */
-	bool Follow();
-
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
 	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
 	    write - a write left with none is dropped, as one of a closed document always was; a write of rows of
