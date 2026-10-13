@@ -147,6 +147,10 @@ namespace KFCSearchEngine
 	    sentence appended to outRefusal. Touches nothing. */
 	bool ResolveRunTarget(bool fromBook, PMString& outRefusal);
 
+	/** Its refusal of an empty book - and the same words from every run's safety net past its commit point, where
+	    KFCBookScope::ListBookChapters finds no chapters after all (SearchBook, KFCChangeAll::Run, KFCQuerySequence::Run). */
+	const char* const kBookHasNoChapters = "That book has no chapters.";
+
 	/** WHAT A RUN WOULD RUN ON, IN WORDS (docs/superpowers/specs/_done/2026-10-07-kfc-query-dialog-and-selected-documents-design.md
 	    section 4-4): the query dialog's Runs on: line, made from ResolveRunScope's answer so the line and the run
 	    cannot differ. true = "Runs on: the book "<title>" (<n> document(s))." / "Runs on: <n> selected document(s) of the

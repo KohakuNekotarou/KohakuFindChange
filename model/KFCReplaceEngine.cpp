@@ -16,7 +16,7 @@
 #include "IFindChangeCmdData.h"
 #include "IFindChangeOptions.h"
 #include "IFindChangeService.h"		// FindChangeResult enum
-#include "ICommandSequence.h"		// ICommandSequence - the Replace's step; IAbortableCmdSeq - the preview's, thrown away
+#include "ICommandSequence.h"		// the write's undo step (BeginWriteStep) and the preview's, thrown away
 #include "IDataBase.h"				// IsModified / SetModified - putting the flag back after a rollback
 #include "ITextWalker.h"			// also declares ITextWalkerClient
 #include "ITextWalkerScope.h"
@@ -42,7 +42,6 @@
 // Project includes:
 #include "KFCReplaceEngine.h"
 #include "KFCDiag.h"			// KFC_DIAG_LOG - why a write was refused, in a test build (compiled out of a shipping one)
-#include "KFCDiagCommands.h"	// the test build's command count (KFC_DIAG_COMMANDS)
 #include "KFCDiagWrittenDocs.h"	// the test build's written-document check (nothing in a shipping one)
 #include "KFCID.h"				// kKFCReplaceStepKey - the string key the Undo step is named from
 #include "KFCResultModel.h"
@@ -500,7 +499,6 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 		double tFindStep = 0;
 		int32 timedRows = 0, finds = 0;
 		KFCDiagPerf stepPerf;		// InDesign's counters over the last 100 finds (KFCDiag.h)
-		int stepCommands = KFCDiagCommands::Count();	// ...and the commands processed (0 unless perf-commands is on)
 		// The fault switch perf-fresh-walker (KFCDiag.h): the walk started again after every `restartEvery` writes -
 		// forward only (a backward walk's restart point would be the write's START, not measured).
 		const int restartMode = KFCDiagFaultValue("perf-fresh-walker", 0, 0);
@@ -554,16 +552,14 @@ bool WalkStoryReplacing(int32 chapterIdx, const UIDRef& storyRef, const WalkerSc
 				InterfacePtr<IFrameList> stepFrames(stepModel != nil ? stepModel->QueryFrameList() : nil);
 				char stepCounters[300] = { 0 };
 				stepPerf.Since(stepCounters, sizeof(stepCounters));
-				const int commandsNow = KFCDiagCommands::Count();
-				KFC_DIAG_LOG("WALKSTEP story=%u finds=%d rows=%d last100=%.1f ms/find foci=%d length=%d at=%d walker=%p damaged=%d->%d cmds=%d %s",
+				KFC_DIAG_LOG("WALKSTEP story=%u finds=%d rows=%d last100=%.1f ms/find foci=%d length=%d at=%d walker=%p damaged=%d->%d %s",
 					storyRef.GetUID().Get(), (int)finds, (int)timedRows, tFindStep / 100.0,
 					(stepFoci != nil) ? (int)stepFoci->GetFocusCount() : -1,
 					(stepModel != nil) ? (int)stepModel->TotalLength() : -1, (int)start, (void*)walker.get(),
 					(int)damagedBefore, (stepFrames != nil) ? (int)stepFrames->GetFirstDamagedFrameIndex() : -3,
-					commandsNow - stepCommands, stepCounters);
+					stepCounters);
 				tFindStep = 0;
 				stepPerf.Take();
-				stepCommands = commandsNow;
 			}
 #endif
 			if (found != IFindChangeService::kSuccess)
@@ -1289,44 +1285,51 @@ static void StartStatus(PMString& out)
 	out = "Replace: ";
 }
 
-// THE ROW'S REPLACE'S SEQUENCE - ONE UNDO STEP, ROLLED BACK WHOLE ON A FAILURE. A PLAIN sequence: one document's
-// step needs no abort, and its rollback is the SDK's own - raise the error state, end it, clear it (CmdUtils.h,
-// SequenceContext) - EndPlainSequence. (Chosen over an abortable one once KCM saw an ended abortable step take the
-// undo step below it away. That sighting was never told apart from InDesign itself dropping a document's undo
-// history at a script's boundary, and KFC's own abortable steps - Change All in Book, the query run - were measured
-// not to: docs/ai-notes/kfc-shipping-full-test-2026-10-09.md section 3.) Begun with the name the Undo menu shows;
-// nil = InDesign would not start one, and outStatus then says so.
-static ICommandSequence* BeginPlainSequence(const PMString& stepName, PMString& outStatus)
+// ONE UNDO STEP FOR A WRITE FROM THE LIST - see the header (WriteStep): the rule for one document and for several.
+bool KFCReplaceEngine::BeginWriteStep(bool acrossDocuments, WriteStep& outStep)
 {
-	// The caller's name, as KFC's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it).
-	ICommandSequence* sequence = CmdUtils::BeginCommandSequence("KFC Replace");
-	if (sequence == nil)
+	outStep = WriteStep();
+	// The caller's name, as KFC's other sequences pass one (CmdUtils.h: a lost sequence is tracked by it); the name the
+	// Undo menu shows is SetName's.
+	const PMString stepName(kKFCReplaceStepKey);
+	if (acrossDocuments)
 	{
-		StartStatus(outStatus);
-		outStatus.Append("InDesign would not start a command sequence - nothing was changed.");
-		return nil;
+		outStep.across = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
+		if (outStep.across != nil)
+			outStep.across->SetName(stepName);
 	}
-	sequence->SetName(stepName);
-	return sequence;
+	else
+	{
+		outStep.plain = CmdUtils::BeginCommandSequence("KFC Replace");
+		if (outStep.plain != nil)
+			outStep.plain->SetName(stepName);
+	}
+	return outStep.plain != nil || outStep.across != nil;
 }
 
-// A STEP ROLLED BACK LEAVES THE DOCUMENT AS IT FOUND IT - ITS "UNSAVED" FLAG TOO (the author's call). The
-// rollback puts the TEXT back and leaves the database marked modified (measured when a story row still had a
-// Replace of its own: a saved document, its write rolled back whole, came out modified=true with not a
-// character changed, and asked to be saved on close). Change All's cancel puts the flag back
-// (KFCChangeAll); this is the row menu's step's line for it. `wasModified` = the database's flag read
-// before the step began: one the user had already changed is left changed.
-static void EndPlainSequence(ICommandSequence* sequence, bool ok, IDataBase* db, bool wasModified)
+void KFCReplaceEngine::EndWriteStep(WriteStep& step, bool ok)
 {
-	if (!ok)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
+	if (step.across != nil)
+	{
+		// Kept, or taken back whole across the documents - the error state carries no rollback across them.
+		if (ok)
+			CmdUtils::EndCommandSequence(step.across);
+		else
+			CmdUtils::AbortCommandSequence(step.across);
+	}
+	else if (step.plain != nil)
+	{
+		// The SDK's own rollback (CmdUtils.h, SequenceContext): raised, ended, cleared below.
+		if (!ok)
+			ErrorUtils::PMSetGlobalErrorCode(kFailure);
+		CmdUtils::EndCommandSequence(step.plain);
+	}
+	// Taken back or kept, no error is left standing for the application to report again.
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (!ok && !wasModified && db != nil)
-		db->SetModified(kFalse);
+	step = WriteStep();
 }
 
-// The flag EndPlainSequence puts back - read before the step begins.
+// The "unsaved" flag ChaptersAfter puts back - read before the step begins.
 static bool DocIsModified(IDataBase* db)
 {
 	return db != nil && db->IsModified() != kFalse;
@@ -1334,18 +1337,12 @@ static bool DocIsModified(IDataBase* db)
 
 // The rows replaced now, in ONE undo step - a hit row's Replace (its right-click menu or Return - spec F16), or the text
 // rows selected together (the author's call: replaced together, as object rows are) - of one document or of several
-// (one step for every document of them).
+// (one step for every document of them - the header's WriteStep).
 // The caller has asked CanReplaceHit of every row. All or nothing, as one row's has always been: a row the check finds
 // moved refuses them all before a character is written, and a write that does not land on every one is rolled back
 // whole. greyed = the rows selected with them whose Replace was greyed, counted by reason (WhyGreyed - all 0 for one row's
 // Replace): one row's sentences are its own ("this row", "the match"); several rows' say "a selected row", and the rows
 // left are counted by their reason.
-// SEVERAL DOCUMENTS ARE ONE STEP: one ABORTABLE sequence around every document's write, and none inside it (measured
-// when Change Checked wrote several documents the same way - git ee77485^, KFCReplaceEngine.cpp). A sequence per
-// document took the step out of the other documents' histories without putting their text back; a sequence nested inside
-// settled its document, so the outer abort could not take it back; and a plain sequence's rollback by the error state
-// did not reach across documents.
-// One document keeps the plain sequence it has always had (BeginPlainSequence / EndPlainSequence).
 struct ChapterWrite
 {
 	int32			chapterIdx;
@@ -1365,7 +1362,10 @@ struct ChapterWrite
 // author's call), and the status line says so (KFCResultTree::ReplaceRows).
 // NOT WRITTEN (refused, rolled back): nothing of this is in the document, so a flag the check's walk raised is
 // put back on a document that was clean (any document), and a chapter of ours is then handed back - flag
-// first, since a held chapter that says "unsaved" is not closed.
+// first, since a held chapter that says "unsaved" is not closed. A ROLLBACK leaves the flag up too: it puts the TEXT
+// back and leaves the database marked modified (measured when a story row still had a Replace of its own: a saved
+// document, its write rolled back whole, came out modified=true with not a character changed, and asked to be saved on
+// close) - this is where the step's flag goes back, for one document and for several (WriteStep leaves it).
 // (Not a window for every write: ShowChapterWindow asks no IsHeldDoc, so a hidden document of the user's
 // would be shown - measured - and a chapter of ours would get one whether the write went through or not.)
 class ChaptersAfter
@@ -1456,8 +1456,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			return false;
 		}
 		KFCResultModel::RebindChapterDoc(c.chapterIdx, c.docRef);
-		// Read before anything here touches it: a step rolled back puts it back (EndPlainSequence, ChaptersAfter), and so
-		// does a refusal below (ChaptersAfter).
+		// Read before anything here touches it: a step rolled back, or a refusal below, has it put back (ChaptersAfter).
 		c.wasModified = DocIsModified(c.docRef.GetDataBase());
 		c.reached = true;
 	}
@@ -1525,26 +1524,13 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		// backwards with it.
 		const KFCBackwardSearchScope writeDirection(WriteBackward());
 
-		const PMString stepName(kKFCReplaceStepKey);
-		ICommandSequence* sequence = nil;
-		IAbortableCmdSeq* acrossSequence = nil;
-		if (acrossDocuments)
+		KFCReplaceEngine::WriteStep step;
+		if (!KFCReplaceEngine::BeginWriteStep(acrossDocuments, step))
 		{
-			// (The string is tracking data - CmdUtils.h; the step's name is SetName's.)
-			acrossSequence = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
-			if (acrossSequence == nil)
-			{
-				StartStatus(outStatus);
-				outStatus.Append("InDesign would not start an undoable step - nothing was changed.");
-				return false;
-			}
-			acrossSequence->SetName(stepName);
-		}
-		else
-		{
-			sequence = BeginPlainSequence(stepName, outStatus);
-			if (sequence == nil)
-				return false;
+			StartStatus(outStatus);
+			outStatus.Append(acrossDocuments ? "InDesign would not start an undoable step - nothing was changed."
+				: "InDesign would not start a command sequence - nothing was changed.");
+			return false;
 		}
 		// (the row backup was started by the recorder, above)
 		ok = true;
@@ -1569,10 +1555,10 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 			ok = wrote && !chapterFailed && chapterReplaced == static_cast<int32>(c.rows.size());
 		}
 		// THE ERROR STATE AT THE END: a command can report success and still leave it up, so anything standing here is a
-		// failure nothing reported, and the step goes back - the abortable step by its abort, the plain one by
-		// EndPlainSequence - with the rows put back and the line saying so. Asked of BOTH: a plain step ends by
-		// the error state whatever `ok` says (CmdUtils.h - SequenceContext), so one left to end by it alone would be taken
-		// back by InDesign under rows marked Changed (the object rows ask the same - KFCObjectReplace's step 8).
+		// failure nothing reported, and the step goes back (EndWriteStep - the abortable step by its abort, the plain one
+		// by the error state) with the rows put back and the line saying so. Asked of BOTH: a plain step ends by the error
+		// state whatever `ok` says (CmdUtils.h - SequenceContext), so one left to end by it alone would be taken back by
+		// InDesign under rows marked Changed (the object rows ask the same - KFCObjectReplace's step 8).
 		if (ok && ErrorUtils::PMGetGlobalErrorCode() != kSuccess)
 		{
 			ok = false;
@@ -1581,18 +1567,9 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 		if (ok)
 			for (size_t k = 0; k < chapters.size(); ++k)
 				KFCUndoFollow::MarkWrite(chapters[k].docRef.GetDataBase());	// in this step, so its Undo / Redo is heard
-		if (acrossDocuments)
-		{
-			if (ok)
-				CmdUtils::EndCommandSequence(acrossSequence);
-			else
-				CmdUtils::AbortCommandSequence(acrossSequence);
-			// The abort has put every document back and the line below says why: no error left standing for the
-			// application to report again. (The "unsaved" flags: ChaptersAfter - an abort leaves them, KFCChangeAll's note.)
-			ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-		}
-		else
-			EndPlainSequence(sequence, ok, chapters[0].docRef.GetDataBase(), chapters[0].wasModified);
+		// Kept, or taken back whole with nothing left standing - the line below says why; the "unsaved" flags are
+		// ChaptersAfter's.
+		KFCReplaceEngine::EndWriteStep(step, ok);
 	}
 	if (!ok)
 	{

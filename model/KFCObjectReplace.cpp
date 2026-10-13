@@ -11,16 +11,13 @@
 #include "VCPlugInHeaders.h"
 
 // Interface includes:
-#include "ICommandSequence.h"
 #include "IDataBase.h"
 #include "IFindChangeService.h"
 #include "IHierarchy.h"
 #include "IObjectWalker.h"
 
 // General includes:
-#include "CmdUtils.h"
 #include "ErrorUtils.h"
-#include "UIDList.h"
 
 #include <set>
 #include <utility>
@@ -30,11 +27,10 @@
 #include "KFCBookScope.h"
 #include "KFCDiag.h"
 #include "KFCDiagWrittenDocs.h"	// a test build's written-document check (nothing in a shipping one)
-#include "KFCID.h"				// kKFCReplaceStepKey - the key the Undo step is named by
 #include "KFCObjectReplace.h"
 #include "KFCObjectSearch.h"
 #include "KFCPageItemFacts.h"
-#include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit
+#include "KFCReplaceEngine.h"	// RefuseChangedQuery, CanReplaceHit, WhyGreyed; the write's undo step (WriteStep)
 #include "KFCResultModel.h"
 #include "KFCSearchEngine.h"	// KFCForwardSearchScope
 #include "KFCUndoFollow.h"
@@ -123,6 +119,18 @@ void AppendRefusals(PMString& out, const int32 (&counts)[kRefusalCount])
 		out.Append(RefusalWords(static_cast<Refusal>(why)));
 		first = false;
 	}
+}
+
+// "Replace: none of the 5 selected rows can be replaced - 2 locked, 3 changed since the search." - rows selected together
+// of which none would be written (CheckRowsNow asks, ReplaceRows finds).
+void SayNoneReplaceable(PMString& out, size_t total, const int32 (&counts)[kRefusalCount])
+{
+	out = "Replace: none of the ";
+	out.AppendNumber(static_cast<int32>(total));
+	out.Append(" selected rows can be replaced - ");
+	AppendRefusals(out, counts);
+	out.Append(".");
+	out.SetTranslatable(kFalse);
 }
 
 // O10 steps 1-2, asked once for a Replace: the settings the search ran with (a changed query CLEARS the results - the
@@ -296,6 +304,28 @@ void FollowRowsTheWriteMoved(int32 chapterIdx, IDataBase* db, const RowItems& ro
 	KFC_DIAG_LOG("OBJPRINTS after chapter=%d followed=%d", chapterIdx, followed);
 }
 
+// ONE STEP OF A WRITE'S WALK (steps 7-8 - ReplaceRow and ReplaceRows): InDesign's own object search moved on to its next
+// match in the walker's document - true with that item in outItem. False when the walk is over by itself, as the search's
+// ends (spec O5) - InDesign has no more, an item comes round again, or the walker stands in another document - or when it
+// broke off (outWalkFailed): KFCObjectSearch::ReadWalkStep reads any answer with the error state raised so, and the error
+// is left standing for the write's step to end by - nothing is written over it.
+bool NextItemOfWalk(IFindChangeService* svc, IObjectWalker* shared, IDataBase* db, std::set<UID>& seen, UID& outItem,
+	bool& outWalkFailed)
+{
+	UIDRef found;		// stays empty (measured) - the match is the shared walker's current item
+	const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
+	if (at != KFCObjectSearch::kWalkStepOn)
+	{
+		outWalkFailed = (at == KFCObjectSearch::kWalkStepBroke);
+		return false;
+	}
+	const UIDRef current(shared->GetCurrentItem());
+	if (current.GetDataBase() != db || !seen.insert(current.GetUID()).second)
+		return false;
+	outItem = current.GetUID();
+	return true;
+}
+
 // A chapter of ours that a check reopened goes back when the check refuses (KFCBookScope::HandBackIfHeld - the UI half's
 // landings hand back the same way). The writes are reached only through the UI half's landing, which has brought the
 // chapter's window forward first - the chapter is then the user's, no longer held - and which hands back on its own way
@@ -346,33 +376,21 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 	// RECORDED FOR THE PANEL'S FOLLOWING OF UNDO (O11): the row backup starts here, the item's fingerprint is read.
 	KFCUndoFollow::StepRecorder recorder(chapterIdx);
 	recorder.RecordItem(chapterIdx, item);
-	ICommandSequence* const sequence = CmdUtils::BeginCommandSequence("KFC Replace");
-	if (sequence == nil)
+	KFCReplaceEngine::WriteStep step;		// one document's step (KFCReplaceEngine.h)
+	if (!KFCReplaceEngine::BeginWriteStep(false, step))
 	{
 		Refuse(outStatus, "InDesign would not start a command sequence - nothing was changed.");
 		return false;
 	}
-	sequence->SetName(kKFCReplaceStepKey);
 	bool reached = false, walkFailed = false, ok = false;
 	{
-		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item. The walk ends by
-		// itself - InDesign has no more, or an item comes round again (the search's guard, spec O5) - or breaks off
-		// (KFCObjectSearch::ReadWalkStep: nothing is written over an error left standing).
+		// 7. WALK TO IT: InDesign's own matching, from the document's first match to the row's item (NextItemOfWalk).
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(docRef, nil));
 		std::set<UID> seen;
-		for (;;)
+		UID at = kInvalidUID;
+		while (NextItemOfWalk(svc, shared, db, seen, at, walkFailed))
 		{
-			UIDRef found;
-			const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
-			if (at != KFCObjectSearch::kWalkStepOn)
-			{
-				walkFailed = (at == KFCObjectSearch::kWalkStepBroke);
-				break;
-			}
-			const UIDRef current(shared->GetCurrentItem());
-			if (current.GetDataBase() != db || !seen.insert(current.GetUID()).second)
-				break;
-			if (current.GetUID() == item)
+			if (at == item)
 			{
 				reached = true;
 				break;
@@ -390,11 +408,9 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 		if (ok)
 			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
 	}
-	// The plain sequence's end, rolled back on a failure - KFCReplaceEngine's EndPlainSequence.
-	if (!ok)
-		ErrorUtils::PMSetGlobalErrorCode(kFailure);
-	CmdUtils::EndCommandSequence(sequence);
-	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
+	// The step's end, taken back whole on a failure (EndWriteStep) - and the "unsaved" flag with it on a document that was
+	// clean: a rollback puts the item back and leaves the flag up (the text rows' ChaptersAfter puts theirs back the same).
+	KFCReplaceEngine::EndWriteStep(step, ok);
 	if (!ok && !wasModified)
 		db->SetModified(kFalse);
 	KFCObjectSearch::AimSharedWalkerAtFront();		// 11 (O7)
@@ -505,12 +521,7 @@ bool KFCObjectReplace::CheckRowsNow(const KFCRowsByChapter& rows, PMString& outS
 	}
 	for (size_t k = 0; k < reached.size(); ++k)
 		HandBackIfHeld(reached[k]);
-	outStatus = "Replace: none of the ";
-	outStatus.AppendNumber(static_cast<int32>(total));
-	outStatus.Append(" selected rows can be replaced - ");
-	AppendRefusals(outStatus, counts);
-	outStatus.Append(".");
-	outStatus.SetTranslatable(kFalse);
+	SayNoneReplaceable(outStatus, total, counts);
 	return false;
 }
 
@@ -566,12 +577,7 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	if (toWrite == 0)
 	{
 		LeaveObjectChapters(chapters);
-		outStatus = "Replace: none of the ";
-		outStatus.AppendNumber(static_cast<int32>(total));
-		outStatus.Append(" selected rows can be replaced - ");
-		AppendRefusals(outStatus, counts);
-		outStatus.Append(".");
-		outStatus.SetTranslatable(kFalse);
+		SayNoneReplaceable(outStatus, total, counts);
 		return false;
 	}
 	InterfacePtr<IFindChangeService> svc(KFCObjectSearch::CreateFindChangeService());
@@ -603,26 +609,10 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	for (size_t c = 0; c < chapters.size(); ++c)
 		for (size_t k = 0; k < chapters[c].todo.size(); ++k)
 			recorder.RecordItem(chapters[c].chapterIdx, chapters[c].todo[k].second);
-	// ONE STEP. One document keeps the plain sequence its rows have always had; SEVERAL documents are one abortable
-	// sequence around every document's walk and none inside it - the measured rule for a step across documents
-	// (KFCReplaceEngine.cpp, ReplaceRowsNow's note).
-	const bool acrossDocuments = documents > 1;
-	const PMString stepName(kKFCReplaceStepKey);
-	ICommandSequence* sequence = nil;
-	IAbortableCmdSeq* acrossSequence = nil;
-	if (acrossDocuments)
-	{
-		acrossSequence = CmdUtils::BeginAbortableCmdSeq("KFC Replace");
-		if (acrossSequence != nil)
-			acrossSequence->SetName(stepName);
-	}
-	else
-	{
-		sequence = CmdUtils::BeginCommandSequence("KFC Replace");
-		if (sequence != nil)
-			sequence->SetName(stepName);
-	}
-	if (sequence == nil && acrossSequence == nil)
+	// ONE STEP for every document written - the text rows' rule (KFCReplaceEngine.h, WriteStep: one document's plain,
+	// several documents' one abortable sequence around every document's walk and none inside it).
+	KFCReplaceEngine::WriteStep step;
+	if (!KFCReplaceEngine::BeginWriteStep(documents > 1, step))
 	{
 		LeaveObjectChapters(chapters);
 		Refuse(outStatus, "InDesign would not start a command sequence - nothing was changed.");
@@ -644,23 +634,13 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		bool walkFailed = false;		// the walk broke off before every item was met (KFCObjectSearch::ReadWalkStep)
 		// 7-8 FOR EVERY ROW IN ONE WALK of its document: InDesign's own matching from the document's first match, and its
 		// replace on each row's item as the walk stands on it - its own Change/Find, item after item. The walk ends when
-		// every item has been met, or InDesign has no more, or an item comes round again (the search's guard, spec O5) - or
-		// breaks off, nothing written over an error left standing.
+		// every item has been met, or by itself (NextItemOfWalk).
 		shared->Initialize(KFCObjectSearch::WalkerOptionsFor(chapter.docRef, nil));
 		std::set<UID> seen;
-		while (!walkMisses)
+		UID at = kInvalidUID;
+		while (!walkMisses && NextItemOfWalk(svc, shared, db, seen, at, walkFailed))
 		{
-			UIDRef found;
-			const KFCObjectSearch::WalkStep at = KFCObjectSearch::ReadWalkStep(svc->SearchObject(found, kFalse));
-			if (at != KFCObjectSearch::kWalkStepOn)
-			{
-				walkFailed = (at == KFCObjectSearch::kWalkStepBroke);
-				break;
-			}
-			const UIDRef current(shared->GetCurrentItem());
-			if (current.GetDataBase() != db || !seen.insert(current.GetUID()).second)
-				break;
-			if (wanted.count(current.GetUID()) == 0)
+			if (wanted.count(at) == 0)
 				continue;
 			const bool replacedIt = (svc->ReplaceObject(kFalse) == IFindChangeService::kSuccess);
 			// The error state too, as one row's write asks it (ReplaceRow's step 8): the step ends by it, so with one
@@ -671,9 +651,9 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 				break;
 			}
 			if (replacedIt)
-				chapter.written.insert(current.GetUID());
+				chapter.written.insert(at);
 			else
-				refusedByInDesign.insert(current.GetUID());
+				refusedByInDesign.insert(at);
 			if (chapter.written.size() + refusedByInDesign.size() == wanted.size())
 				break;
 		}
@@ -695,25 +675,9 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		for (size_t c = 0; c < chapters.size(); ++c)
 			if (!chapters[c].written.empty())
 				KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());		// in this step, so its Undo / Redo is heard
-	if (acrossDocuments)
-	{
-		// Ended, or taken back whole across the documents (AbortCommandSequence - the error state does not carry a
-		// rollback across them); no error left standing for the application to report again.
-		if (ok)
-			CmdUtils::EndCommandSequence(acrossSequence);
-		else
-			CmdUtils::AbortCommandSequence(acrossSequence);
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	}
-	else
-	{
-		// The plain sequence's end, rolled back when nothing was written or an error stands - KFCReplaceEngine's
-		// EndPlainSequence.
-		if (!ok)
-			ErrorUtils::PMSetGlobalErrorCode(kFailure);
-		CmdUtils::EndCommandSequence(sequence);
-		ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	}
+	// Kept, or taken back whole when nothing was written or an error stands (EndWriteStep); the "unsaved" flags are
+	// LeaveObjectChapters'.
+	KFCReplaceEngine::EndWriteStep(step, ok);
 	KFCObjectSearch::AimSharedWalkerAtFront();		// 11 (O7)
 	if (!ok)
 	{

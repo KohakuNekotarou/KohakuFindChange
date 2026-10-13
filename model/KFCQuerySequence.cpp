@@ -196,7 +196,7 @@ int32 KFCQuerySequence::Run(const std::vector<QueryItem>& queries, PMString& out
 		if (!KFCBookScope::ListBookChapters(listed, bookName, &selection) || listed.empty())
 		{
 			recorder.RestoreBefore();		// the commit point has passed: the list goes back as it was
-			outSummary.Append("That book has no chapters.");
+			outSummary.Append(KFCSearchEngine::kBookHasNoChapters);		// the door's own words (ResolveRunTarget)
 			return 0;
 		}
 		for (size_t i = 0; i < listed.size(); ++i)

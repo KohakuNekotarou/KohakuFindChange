@@ -32,10 +32,10 @@
 #define __KFCReplaceEngine_h__
 
 #include "PMString.h"
-#include "UIDRef.h"
 #include "KFCModelTypes.h"		// KFCRowsByChapter
 
-#include <vector>
+class ICommandSequence;		// WriteStep
+class IAbortableCmdSeq;
 
 namespace KFCReplaceEngine
 {
@@ -103,8 +103,33 @@ namespace KFCReplaceEngine
 	    others are written all or nothing, as ReplaceHit writes one ("Replaced 3 rows: ID:262 #1, ID:262 #3, ID:270 #1." /
 	    "Replaced 2 of 3 rows: ... Left as they were: 1 locked." / "Replaced 3 rows in 2 documents: a.indd ID:262 #1;
 	    b.indd ID:270 #1."; a refusal names "a selected row"). Several documents are one abortable step around every
-	    document's write (ReplaceRowsNow's note). One row = ReplaceHit. */
+	    document's write (WriteStep, below). One row = ReplaceHit. */
 	bool ReplaceHits(const KFCRowsByChapter& rows, PMString& outStatus);
+
+	/** ONE UNDO STEP FOR A WRITE FROM THE LIST ("Replace" - kKFCReplaceStepKey), the one rule for the text rows (ReplaceHit,
+	    ReplaceHits) and the object rows (KFCObjectReplace):
+	      - ONE DOCUMENT: a plain sequence, rolled back on a failure the SDK's own way - the error state raised, the
+	        sequence ended, the state cleared (CmdUtils.h, SequenceContext). Plain rather than abortable since KCM saw an
+	        ended abortable step take the undo step below it away; that sighting was never told apart from InDesign itself
+	        dropping a document's undo history at a script's boundary, and KFC's own abortable steps - Change All in Book,
+	        the query run - were measured not to (docs/ai-notes/kfc-shipping-full-test-2026-10-09.md section 3).
+	      - SEVERAL DOCUMENTS: ONE abortable sequence around every document's write and none inside it, aborted on a
+	        failure (measured when Change Checked wrote several documents the same way - git ee77485^,
+	        KFCReplaceEngine.cpp: a sequence per document took the step out of the other documents' histories without
+	        putting their text back; a sequence nested inside settled its document, so the outer abort could not take it
+	        back; and a plain sequence's rollback by the error state did not reach across documents).
+	    BeginWriteStep outside any other command sequence; false = InDesign would not start one (nothing to end - the
+	    caller says so). EndWriteStep keeps the step when ok and takes it back whole otherwise, and leaves the error state
+	    clear. Neither touches a document's "unsaved" flag: a rollback or an abort puts the text back and leaves the flag
+	    up, so the caller puts it back on a document that was clean (ChaptersAfter in the .cpp, KFCObjectReplace). */
+	struct WriteStep
+	{
+		ICommandSequence*	plain;		// one document's
+		IAbortableCmdSeq*	across;		// several documents'
+		WriteStep() : plain(nil), across(nil) {}
+	};
+	bool BeginWriteStep(bool acrossDocuments, WriteStep& outStep);
+	void EndWriteStep(WriteStep& step, bool ok);
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
 	    outcome - WhyGreyed answering kGreyedNot. */

@@ -2772,9 +2772,9 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 }
 
 // The run's target sentences: its front doors' (KFCSearchEngine::ResolveRunTarget) and SearchBook's safety nets past its
-// commit point, which say the same words.
+// commit point, which say the same words. (The empty book's, kBookHasNoChapters, is the header's: Change All in Book and
+// the query run say it too.)
 const char* const kNoBookOpen = "Book Scope is on, but no book is open.";
-const char* const kBookHasNoChapters = "That book has no chapters.";
 const char* const kNoDocumentToSearch = "No open document to search.";
 
 }	// anonymous namespace

@@ -313,7 +313,7 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 	KFCBookScope::BookSelection selection;		// selected 0 = the whole book (Find/Change Selected Documents (Book))
 	if (!KFCBookScope::ListBookChapters(listed, bookName, &selection) || listed.empty())
 	{
-		outSummary.Append("That book has no chapters.");
+		outSummary.Append(KFCSearchEngine::kBookHasNoChapters);		// the door's own words (ResolveRunTarget)
 		return 0;
 	}
 	for (size_t i = 0; i < listed.size(); ++i)
