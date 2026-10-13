@@ -1365,7 +1365,10 @@ struct ChapterWrite
 // first, since a held chapter that says "unsaved" is not closed. A ROLLBACK leaves the flag up too: it puts the TEXT
 // back and leaves the database marked modified (measured when a story row still had a Replace of its own: a saved
 // document, its write rolled back whole, came out modified=true with not a character changed, and asked to be saved on
-// close) - this is where the step's flag goes back, for one document and for several (WriteStep leaves it).
+// close) - this is where the step's flag goes back, for one document and for several (WriteStep leaves it). It is
+// the product's own shape after an abort - the flag read before, put back only where it was clean
+// (incopyfileactions FileActionsOpenDocResponder.cpp:113-114, 161-171) - and not IDataBase::SaveRestoreModifiedState,
+// the read-only walks' guard, which puts it back whatever happened inside it, a write that went through included.
 // (Not a window for every write: ShowChapterWindow asks no IsHeldDoc, so a hidden document of the user's
 // would be shown - measured - and a chapter of ours would get one whether the write went through or not.)
 class ChaptersAfter

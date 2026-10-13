@@ -109,10 +109,12 @@ namespace KFCReplaceEngine
 	/** ONE UNDO STEP FOR A WRITE FROM THE LIST ("Replace" - kKFCReplaceStepKey), the one rule for the text rows (ReplaceHit,
 	    ReplaceHits) and the object rows (KFCObjectReplace):
 	      - ONE DOCUMENT: a plain sequence, rolled back on a failure the SDK's own way - the error state raised, the
-	        sequence ended, the state cleared (CmdUtils.h, SequenceContext). Plain rather than abortable since KCM saw an
-	        ended abortable step take the undo step below it away; that sighting was never told apart from InDesign itself
-	        dropping a document's undo history at a script's boundary, and KFC's own abortable steps - Change All in Book,
-	        the query run - were measured not to (docs/ai-notes/kfc-shipping-full-test-2026-10-09.md section 3).
+	        sequence ended, the state cleared (CmdUtils.h, SequenceContext). Plain, as the SDK asks: a plain sequence is
+	        the type that meets most needs, and an abortable one is for where it is needed - it carries "a heavy
+	        performance overhead" (ICommandSequence.h). (Not because an ended abortable step was once seen, in KCM, to
+	        take the undo step below it away: that sighting was never told apart from InDesign itself dropping a
+	        document's undo history at a script's boundary, and KFC's own abortable steps - Change All in Book, the query
+	        run - were measured not to: docs/ai-notes/kfc-shipping-full-test-2026-10-09.md section 3.)
 	      - SEVERAL DOCUMENTS: ONE abortable sequence around every document's write and none inside it, aborted on a
 	        failure (measured when Change Checked wrote several documents the same way - git ee77485^,
 	        KFCReplaceEngine.cpp: a sequence per document took the step out of the other documents' histories without
