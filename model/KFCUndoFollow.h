@@ -9,8 +9,9 @@
 //  Every write of KFC's own that leaves a list - a hit row's Replace, and the query run - is ONE undo step. What it
 //  did to the panel's rows is kept beside it: the rows before it and after it (KFCResultModel::RowStep - or the
 //  whole result set, for the query run, which replaces the list), and the VERSION of every story it wrote to
-//  before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion). (Change All in Book
-//  leaves no list, so it has nothing to follow.)
+//  before it and after it (ITextModel::GetChangeCount, KFCSearchEngine::ReadStoryVersion) - for an object row's
+//  Replace, the FINGERPRINT of the item it changed (KFCObjectSearch::Fingerprint). (Change All in Book leaves no
+//  list, so it has nothing to follow.)
 //
 //  An Undo puts a story back at EXACTLY the version it had (measured - memory text-change-counters), a
 //  Redo at exactly the one after. So when every story a write moved is back at its "before", that write was
@@ -80,8 +81,8 @@ namespace KFCUndoFollow
 		explicit StepRecorder(const std::vector<int32>& chapterIdxs);
 		~StepRecorder();
 
-		/** The write went through and the rows show it: kept, if a story's version moved (a write that
-		    moved none has nothing an Undo could take back). */
+		/** The write went through and the rows show it: kept, if a story's version or an item's fingerprint moved
+		    (a write that moved neither has nothing an Undo could take back). */
 		void Keep();
 
 		/** AN OBJECT ROW'S ITEM: read its fingerprint now, before the write - an object Replace moves no
@@ -96,8 +97,8 @@ namespace KFCUndoFollow
 	};
 
 	/** A QUERY RUN, RECORDED (KFCQuerySequence) - not a StepRecorder: the stories it writes are known only once each
-	    query has run, and the list it leaves is a new one - an empty one (the spec's F7: each query with InDesign's
-	    Change All, no list). Made at the run's commit point, BEFORE the list is cleared: the list as it is then is
+	    query has run, and the list it leaves is a new one - an empty one (each query is InDesign's own Change All, and
+	    leaves no list). Made at the run's commit point, BEFORE the list is cleared: the list as it is then is
 	    copied whole (what an Undo puts back). ReadStories = every text model's version in the run's documents, before
 	    a character is written. Keep = the run went through: kept (as "Run Queries"), in the result set the list is
 	    now AND the one it found - its Undo puts that list back as that result set, and the writes kept for it are
@@ -127,8 +128,8 @@ namespace KFCUndoFollow
 	void MarkWrite(IDataBase* db);
 
 	/** A DOCUMENT OF AN ALL DOCUMENTS LIST IS CLOSING. Only its rows leave the panel
-	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories come off every
-	    write - a write left with none is dropped, as one of a closed document always was; a write of rows of
+	    (KFCResultModel::CloseChapter), and the kept writes let it go the same way: its stories and items come off
+	    every write - a write left with none is dropped, as one of a closed document always was; a write of rows of
 	    several documents (rows selected together) keeps the others' and lets this one's rows go - and its
 	    chapter is emptied in every kept whole result set, so an Undo of a query run that also wrote it (it spans
 	    documents) puts back the other documents' rows and not this one's. Without it the whole write would be
@@ -148,7 +149,9 @@ namespace KFCUndoFollow
 	    another chapter does reaches its file. A chapter nothing wrote is put back with the set, as its file reads
 	    the same. Without this the whole write was dropped at the next follow and an Undo in the open chapters
 	    went unfollowed (measured with Change Checked, which wrote whole result sets until it went).
-	    Called by KFCCloseDocResponder for every close while a book's list is up - a run's own hand-backs too. */
+	    Called by KFCCloseDocResponder for every close while a book's list is up - a book search's own hand-backs and a
+	    query run's closes at its commit point too (the chapters a query run hands back at its end close after it has
+	    cleared the list: they do not come here). */
 	void ForgetBookChapter(const UIDRef& docRef);
 
 	/** A DOCUMENT SAVED AS ANOTHER FILE (KFCSaveAsDocResponder - the spec map's LIFE-14): its chapter in each kept whole

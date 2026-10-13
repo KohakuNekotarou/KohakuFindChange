@@ -158,8 +158,11 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// ...and a chapter of a book's list leaves the kept writes, so that a query run that wrote it is still followed
 	// in the chapters left open, the closed one keeping the rows it has (KFCUndoFollow::ForgetBookChapter - All
 	// Documents' ForgetDocument below empties the chapter instead, its rows leaving the list). Ahead of the run guard
-	// below: a run hands back the chapters it left nothing in, closing them inside itself, and a write kept from
-	// before it may have written one of them (saved since, so it closes).
+	// below: a query run closes the chapters it holds at its commit point, before it clears the list, and a write kept
+	// from before it may have written one of them (saved since, so it closes). (The chapters a run hands back at its end
+	// close after the list is cleared - IsFromBook is false by then. A write kept from before it wrote none of them, short
+	// of a window that could not be opened: KFC gives a chapter it writes a window, and a chapter with a window is no
+	// longer held - KFCBookScope::ShowChapterWindow.)
 	if (KFCResultModel::IsFromBook())
 		KFCUndoFollow::ForgetBookChapter(closingDocRef);
 

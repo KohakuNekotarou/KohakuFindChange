@@ -268,11 +268,12 @@ void ChaptersOfDocInKeptSet(uint32 set, IDataBase* db, std::vector<int32>& out)
 }
 
 // A CLOSING CHAPTER'S ROWS OFF A KEPT WRITE OF ROWS. A write of rows can be several documents' (rows selected together,
-// one undo step - KFCReplaceEngine.cpp's ReplaceRowsNow, KFCObjectReplace::ReplaceRows). When one of them closes, the write is still followed in the others, and an Undo or a
-// Redo there takes back or does again their part alone (measured: the case sel-book-close-undo - chapter 1 saved and
-// closed, Ctrl+Z in chapter 2 put chapter 2's text back and left chapter 1's file as written). Put back with them, the
-// closed chapter's rows said it held the text before the Replace while its file held the text after it - so its rows and
-// its recorded versions leave the write, and they stay as the panel has them.
+// one undo step - KFCReplaceEngine.cpp's ReplaceRowsNow, KFCObjectReplace::ReplaceRows). When one of them closes, the
+// write is still followed in the others, and an Undo or a Redo there takes back or does again their part alone (measured:
+// the case sel-book-close-undo - chapter 1 saved and closed, Ctrl+Z in chapter 2 put chapter 2's text back and left
+// chapter 1's file as written). Put back with them, the closed chapter's rows said it held the text before the Replace
+// while its file held the text after it - so its rows and its recorded versions leave the write, and they stay as the
+// panel has them.
 void DropChapterRows(Step& step, int32 chapterIdx)
 {
 	KFCResultModel::RowStep& rows = step.rows;
@@ -824,7 +825,7 @@ static void Follow()
 		KFCRunGuard::IsAnyRunning() ? 1 : 0);
 	// A write of ours is standing (its own mark is heard as its sequence ends), or a run is up (a search, Change
 	// All in Book or a query run pumps events behind its bar, and a row's Replace runs the message loop as it opens a
-	// chapter or a window - KFCRunGuard counts all four).
+	// chapter or a window - KFCRunGuard::IsAnyRunning asks each of them).
 	if (gRecording.open || gSteps.empty() || KFCRunGuard::IsAnyRunning())
 		return;
 	// (Only KFC's own writes leave a mark, so nothing but their Do, Undo and Redo comes here - typing does not.)
