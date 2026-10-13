@@ -42,13 +42,14 @@
 
 // Project includes:
 #include "KFCQueryDialog.h"
-#include "KFCDiag.h"				// the test build's qd-order-reset (Repaint)
+#include "KFCDiag.h"				// the test build's qd-order-reset (Repaint) and its QDPICK line (ShowPickedQuery)
 #include "KFCDiagHiddenDocs.h"		// the hidden-document check after a Run - test builds only
 #include "KFCFindChangeMinimize.h"	// KFCShowFindChangeDialog - a double-clicked query, shown
 #include "KFCJump.h"				// IsLanding - no Run while a landing is under way
 #include "KFCPanelAlpha.h"			// KFCQueryFindChangeWidget - Find/Change's Query menu, found as the dialog is
 #include "KFCModelAccess.h"			// KFCRuns() - the run and the Runs on: line are the model's
 #include "KFCPanelTitle.h"
+#include "KFCQueryContents.h"		// KFCQueryContentsLine - what a picked row's query does
 #include "KFCQueryList.h"
 #include "KFCQueryOrder.h"
 #include "KFCQueryOrderFile.h"		// KFCChooseOrderFile - Save Order... / Load Order...'s file
@@ -118,6 +119,26 @@ namespace
 		PMString words(message);
 		words.SetTranslatable(kFalse);
 		line->SetString(words);
+	}
+
+	/** A ROW PICKED IN EITHER LIST SAYS WHAT ITS QUERY DOES (the author's call), on the dialog's message line alone -
+	    nothing of Find/Change changes; the double click is what loads a query (KFCQueryDialogShowInFindChange). A pick
+	    that leaves no row selected says nothing, and the line keeps what it last said. */
+	void ShowPickedQuery(IPanelControlData* panel, ISubject* listSubject)
+	{
+		InterfacePtr<IControlView> list(listSubject, UseDefaultIID());
+		if (panel == nil || list == nil)
+			return;
+		const WidgetID listID = list->GetWidgetID();
+		const int32 index = KFCQueryListSelectedIndex(panel, listID);
+		const std::vector<KFCSavedQuery>& rows = (listID == kKFCQueryOrderListWidgetID) ? KFCQueryOrder::Order()
+			: KFCQueryOrder::Saved();
+		if (index < 0 || index >= static_cast<int32>(rows.size()))
+			return;
+		const PMString line(KFCQueryContentsLine(rows[static_cast<size_t>(index)]));
+		KFC_DIAG_LOG("QDPICK list=%s row=%d line=%s", (listID == kKFCQueryOrderListWidgetID) ? "order" : "saved",
+			static_cast<int>(index), line.GetUTF8String().c_str());
+		ShowDialogMessage(panel, line);
 	}
 
 	/** One message on both lines - the panel's and the dialog's (the dialog stands with the panel closed) - as Run's
@@ -357,7 +378,8 @@ CREATE_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
     CDialogObserver.cpp itself hears OK and Cancel, and the product's ProblemLinksDialogObserver its Fix Links button;
     MEASURED: attached on IID_ITRISTATECONTROLDATA - basicdialog's ICON button's - the presses never arrived)
     and the two lists' selection (kListSelectionChangedMessage on IID_ITREEVIEWCONTROLLER -
-    the paneltreeview sample's PnlTrvTreeObserver), and says, through gOpenPanel, whether the dialog is open. */
+    the paneltreeview sample's PnlTrvTreeObserver: the buttons' grey, and what a picked row's query does -
+    ShowPickedQuery), and says, through gOpenPanel, whether the dialog is open. */
 class KFCQueryDialogObserver : public CDialogObserver
 {
 public:
@@ -415,6 +437,7 @@ public:
 		if (protocol == IID_ITREEVIEWCONTROLLER && theChange == kListSelectionChangedMessage)
 		{
 			UpdateButtons(panel);
+			ShowPickedQuery(panel, theSubject);
 			return;
 		}
 		if (protocol != IID_IBOOLEANCONTROLDATA || theChange != kTrueStateMessage)

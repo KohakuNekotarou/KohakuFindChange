@@ -33,17 +33,6 @@ namespace
 	std::vector<KFCSavedQuery> gSaved;		// the left list
 	std::vector<KFCSavedQuery> gOrder;		// the right list - the session's (KFCQueryOrder.h)
 
-	/** "<kind>  <name>" - two spaces, so the kind reads as a column of its own. */
-	PMString KindAndName(const KFCSavedQuery& query)
-	{
-		PMString text;
-		text.SetTranslatable(kFalse);
-		text.Append(KFCRuns()->QueryKindName(query.mode));
-		text.Append("  ");
-		text.Append(query.name);
-		return text;
-	}
-
 	PMString NoText()
 	{
 		PMString text;
@@ -226,6 +215,17 @@ void KFCQueryOrder::MoveDown(int32 orderIndex)
 void KFCQueryOrder::Clear()
 {
 	gOrder.clear();
+}
+
+PMString KFCQueryOrder::KindAndName(const KFCSavedQuery& query)
+{
+	// Two spaces, so the kind reads as a column of its own.
+	PMString text;
+	text.SetTranslatable(kFalse);
+	text.Append(KFCRuns()->QueryKindName(query.mode));
+	text.Append("  ");
+	text.Append(query.name);
+	return text;
 }
 
 PMString KFCQueryOrder::SavedRowText(int32 index)

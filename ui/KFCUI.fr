@@ -38,7 +38,8 @@
 #include "TreeViewDefs.h"	// kHideRootNode etc. - the result tree list
 #include "IconRsrcDefs.h"	// kTreeBranchCollapsed/ExpandedRsrcID - the tree's expander arrows
 #include "IconStyleDefs.h"	// kIconNoCentering / kIconRaisedLook - the expander's icon attributes
-#include "TipsID.h"			// IID_ITIP - the tooltip on the panel's illustration
+#include "TipsID.h"			// IID_ITIP - the tooltips on the panel's illustration and on the query dialog's rows
+#include "XMLParserID.h"	// IID_ISAXCONTENTHANDLER - the query dialog's reading of a saved query's file
 
 // Project includes:
 #include "KFCUIID.h"
@@ -468,6 +469,34 @@ resource ClassDescriptionTable(kSDKDefClassDescriptionTableResourceID)
 		kTreeNodeWidgetBoss,
 		{
 			IID_IEVENTHANDLER, kKFCQueryRowEHImpl,
+		}
+	},
+
+	/*
+	 * ...and the row's text cell: the stock cell (an InfoStaticTextWidget's boss) with its tooltip replaced - the whole of
+	 * what the row's query does (KFCQueryRowTip.cpp, which says why the cell and not the row, and why nothing is read
+	 * into what replaces it).
+	 */
+	Class
+	{
+		kKFCQueryRowTextWidgetBoss,
+		kInfoStaticTextWidgetBoss,
+		{
+			IID_ITIP, kKFCQueryRowTipImpl,
+		}
+	},
+
+	/*
+	 * What a picked query does, read off its file (KFCQueryContents.cpp): the content handler InDesign's XML parser calls
+	 * as it reads - created for one parse and let go, the shape of the SDK's own (chlinguistic's
+	 * kCHLUserDictContentHandlerBoss).
+	 */
+	Class
+	{
+		kKFCQueryContentsHandlerBoss,
+		kInvalidClass,
+		{
+			IID_ISAXCONTENTHANDLER, kKFCQueryContentsHandlerImpl,
 		}
 	},
 
@@ -1096,6 +1125,7 @@ type KFCQueryListWidget(kViewRsrcType) : TreeViewWidget(ClassID = kKFCQueryListW
 	WidgetEveInfo;
 };
 type KFCQueryRowWidget(kViewRsrcType) : PrimaryResourcePanelWidget(ClassID = kKFCQueryRowWidgetBoss) { };
+type KFCQueryRowTextWidget(kViewRsrcType) : InfoStaticTextWidget(ClassID = kKFCQueryRowTextWidgetBoss) { };
 type KFCQueryFixedTextWidget(kViewRsrcType) : EVEStaticTextWidget(ClassID = kKFCQueryFixedTextWidgetBoss) { };
 
 /*
@@ -1422,7 +1452,7 @@ resource KFCQueryRowWidget(kKFCQueryRowRsrcID + index_enUS)
 	kTrue, kTrue,							// Visible, Enabled
 	"",										// Panel name
 	{
-		InfoStaticTextWidget
+		KFCQueryRowTextWidget				// the stock cell with the query's tooltip (kKFCQueryRowTextWidgetBoss)
 		(
 			kKFCQueryRowTextWidgetID,		// WidgetId
 			kPMRsrcID_None,					// RsrcId

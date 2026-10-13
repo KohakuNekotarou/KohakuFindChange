@@ -92,6 +92,13 @@ DECLARE_PMID(kClassIDSpace, kKFCReturnFilterBoss, kKFCUIPrefix + 25)
 // A row of the query dialog's two lists: the stock tree row with our event handler, so a saved query double-clicked
 // goes into Find/Change (KFCQueryRowEH.cpp - the author's call).
 DECLARE_PMID(kClassIDSpace, kKFCQueryRowWidgetBoss, kKFCUIPrefix + 26)
+// What a picked query does, read off its file (KFCQueryContents.cpp): the content handler InDesign's XML parser calls as it
+// reads the file - the SDK's shape for reading an XML file (chlinguistic's kCHLUserDictContentHandlerBoss). + 27: the next
+// after the highest spent.
+DECLARE_PMID(kClassIDSpace, kKFCQueryContentsHandlerBoss, kKFCUIPrefix + 27)
+// ...and the text cell of a row of the query dialog's lists: the stock cell with a tooltip of its own - the whole of what
+// the row's query does (KFCQueryRowTip.cpp).
+DECLARE_PMID(kClassIDSpace, kKFCQueryRowTextWidgetBoss, kKFCUIPrefix + 28)
 
 
 // InterfaceIDs:
@@ -189,6 +196,10 @@ DECLARE_PMID(kImplementationIDSpace, kKFCUIBoundaryImpl, kKFCUIPrefix + 48)
 // The result list's row observer: a row CLOSED takes the rows selected under it out of the selection
 // (KFCResultNodeObserver.cpp). + 49: the next after the highest spent.
 DECLARE_PMID(kImplementationIDSpace, kKFCResultNodeObserverImpl, kKFCUIPrefix + 49)
+// What a picked query does: the XML parser's content handler (KFCQueryContents.cpp) and the row cell's tooltip
+// (KFCQueryRowTip.cpp). + 50 and + 51: the next after the highest spent.
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryContentsHandlerImpl, kKFCUIPrefix + 50)
+DECLARE_PMID(kImplementationIDSpace, kKFCQueryRowTipImpl, kKFCUIPrefix + 51)
 
 
 // ActionIDs:

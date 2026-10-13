@@ -33,6 +33,12 @@
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryDialog.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryContents.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
+      <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryRowTip.cpp">
+         <Filter>Source Files</Filter>
+      </ClCompile>
       <ClCompile Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.cpp">
          <Filter>Source Files</Filter>
       </ClCompile>
@@ -150,6 +156,9 @@
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryDialog.h">
+         <Filter>Header Files</Filter>
+      </ClInclude>
+      <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCQueryContents.h">
          <Filter>Header Files</Filter>
       </ClInclude>
       <ClInclude Include="..\..\..\source\sdksamples\KFC\ui\KFCBookPanelPlacement.h">

@@ -63,6 +63,10 @@ namespace KFCQueryOrder
 	void MoveDown(int32 orderIndex);
 	void Clear();
 
+	/** "<kind>  <name>" - how every row names its query, and how the dialog's message line begins what a picked row's
+	    query does (KFCQueryContents.h). */
+	PMString KindAndName(const KFCSavedQuery& query);
+
 	/** A left row's text: "<kind>  <name>". Empty for an index the list does not hold. */
 	PMString SavedRowText(int32 index);
 

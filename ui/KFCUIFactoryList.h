@@ -80,3 +80,7 @@ REGISTER_PMINTERFACE(KFCQueryDialogController, kKFCQueryDialogControllerImpl)
 REGISTER_PMINTERFACE(KFCQueryDialogObserver, kKFCQueryDialogObserverImpl)
 REGISTER_PMINTERFACE(KFCQueryListAdapter, kKFCQueryListAdapterImpl)
 REGISTER_PMINTERFACE(KFCQueryListWidgetMgr, kKFCQueryListWidgetMgrImpl)
+// What a picked query does: the XML parser's content handler and the row cell's tooltip (KFCQueryContents.cpp,
+// KFCQueryRowTip.cpp).
+REGISTER_PMINTERFACE(KFCQueryContentsHandler, kKFCQueryContentsHandlerImpl)
+REGISTER_PMINTERFACE(KFCQueryRowTip, kKFCQueryRowTipImpl)
