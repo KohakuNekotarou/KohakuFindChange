@@ -81,12 +81,10 @@ namespace KFCPanelMetrics
 
 	    WHY FOUR. A 128-character message was cut off at three lines (measured); the block holds
 	    four and the messages are cut to fit four at the floor's width - see KFCPanelMetrics.cpp over
-	    kMessageLines.
-	    THE SAME FACT IS STATED ELSEWHERE - change them together. The message widget's
-	    note in KFCUI.fr ("if this number changes, change that one too"), kMessageLines and its note
-	    in KFCPanelMetrics.cpp, and KFCPanelView::ConstrainDimensions, which explains why it
-	    SUBTRACTS the fixed part instead of adding it up. (The list is by name, not by line: a line
-	    number in this plug-in's own files is wrong the next time either file is edited.) */
+	    kMessageHeightResource.
+	    THE NUMBERS ARE KFCUIID.h's (kKFCMessageLines and the block's frame), read by KFCUI.fr and by
+	    this alike, so the resource and the code cannot drift apart. KFCPanelView::ConstrainDimensions
+	    holds none of them: it SUBTRACTS the fixed part instead of adding it up. */
 	int32 MessageBlockHeight();
 
 	/** The floor under a drag. The width is what the panel measures at its usual size (266,

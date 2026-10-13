@@ -588,6 +588,21 @@ DECLARE_PMID(kWidgetIDSpace, kKFCQueryLoadOrderButtonWidgetID, kKFCUIPrefix + 44
 //   was not laid out for. Adobe's constant is the right SHAPE to copy, not the right VALUE.
 #define kKFCResultRowHeight		19
 
+// THE MESSAGE BLOCK AT THE TOP OF THE PANEL, AND THE EDGE THE ILLUSTRATIONS AND THE TREE LINE UP ON.
+//
+// Read from both sides, as the row height is: KFCUI.fr places the message block, the illustrations and the result
+// tree with these, and KFCPanelMetrics places them again from the same numbers when the panel appears - at the
+// palette font's own line, which is taller than the English one on a Japanese UI (KFCPanelMetrics.h says why).
+//
+// The block is a WHOLE NUMBER of lines - FOUR, in every UI language (KFCPanelMetrics.cpp carries the measurement
+// behind four) - and the .fr rests at the English line, 12px. The illustrations sit ON the block's bottom edge, and
+// the tree starts the gap below it.
+#define kKFCMessageLines		4
+#define kKFCMessageLineHeight	12
+#define kKFCMessageTop			6
+#define kKFCMessageBottom		(kKFCMessageTop + kKFCMessageLines * kKFCMessageLineHeight)
+#define kKFCGapUnderMessage		3
+
 // PNG resource IDs. Their own number space (PNGA/PNGR), so they do not have to dodge the view
 // resource ids above. 1001 is where KCM and KESCL start theirs.
 #define kKFCIconResID			1001	// the illustration shown before anything has been run

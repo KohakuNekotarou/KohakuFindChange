@@ -1479,7 +1479,7 @@ static bool ReplaceRowsNow(std::vector<ChapterWrite>& chapters,
 				// THE STORY, NOT THE ROW (the author's call). An edit anywhere in the story - typing, Undo, the
 				// Track Changes panel, a script - stops it (StoryAsKFCLeftIt), the row's own text untouched or not;
 				// so the line names the story, not "the text of this row".
-				// FOUR LINES AT THE FLOOR (KFCPanelMetrics.cpp, kMessageLines): what to do comes last and has to be read, so
+				// FOUR LINES AT THE FLOOR (KFCPanelMetrics.cpp, kKFCMessageLines): what to do comes last and has to be read, so
 				// the line is kept under about 117 characters, "Replace: " included (with "(edited or undone somewhere in it,
 				// not by KohakuFindChange) - search again, or" it ran to 200, and the panel cut it at "or ri..." - measured,
 				// case msg-story-changed-shot).

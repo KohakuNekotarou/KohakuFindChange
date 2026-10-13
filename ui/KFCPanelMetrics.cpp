@@ -29,9 +29,9 @@
 namespace
 {
 
-// How many lines the message block holds: FOUR, in every UI language. The block is a WHOLE NUMBER
-// of the drawing's lines - a remainder is room for a part-line, drawn as a sliver of chopped-off
-// letters - and the line is asked of the font itself (MessageLineMetrics).
+// How many lines the message block holds (kKFCMessageLines, KFCUIID.h - the .fr places it with the same number):
+// FOUR, in every UI language. The block is a WHOLE NUMBER of the drawing's lines - a remainder is room for a
+// part-line, drawn as a sliver of chopped-off letters - and the line is asked of the font itself (MessageLineMetrics).
 //
 // FOUR, NOT THREE - AND THE THIRD WAS NOT A ROUNDING ERROR. Three lines (54 = 18x3 on a Japanese UI)
 // were sized against the OPENING message, which draws 535px wide on a Japanese UI and so takes 2.8
@@ -55,17 +55,12 @@ namespace
 // draw the Roman one; if a Roman UI is ever seen to clip, this is the number to raise, and the floor
 // moves with it (MinimumPanelHeight).
 //
-// The block and the floor are a pair: the width decides how many lines a message takes, and this
-// decides how many there is room to draw. Narrow the floor without raising this and the last
-// line is clipped.
-const int32 kMessageLines = 4;
+// The block and the floor are a pair: the width decides how many lines a message takes, and kKFCMessageLines
+// decides how many there is room to draw. Narrow the floor without raising it and the last line is clipped.
 
-// The .fr's own block (KFCUI.fr: Frame 6..54, four 12px lines). What stands when the font cannot be
-// asked, and what the floor's height is stated against (kMinimumHeightAtResourceBlock).
-const int32 kMessageHeightResource = 48;
-
-// The gap between the message block and the tree, as the .fr has always had it.
-const int32 kGapUnderMessageBlock = 3;
+// The .fr's own block - the frame KFCUI.fr gives it, from the same constants (four 12px lines, 48px). What stands
+// when the font cannot be asked, and what the floor's height is stated against (kMinimumHeightAtResourceBlock).
+const int32 kMessageHeightResource = kKFCMessageBottom - kKFCMessageTop;
 
 // THE FLOOR. Width, measured on the running panel rather than reasoned about: the opening message
 // DRAWS 535px wide on a Japanese UI (its two lines came out 266px and 265px in a 301px box), and the
@@ -99,7 +94,7 @@ const int32 kGapUnderMessageBlock = 3;
 // Same floor in every language: a smaller palette font draws the same message in shorter lines, so
 // it simply has room to spare rather than a layout of its own.
 //
-// ! It is the WIDTH that decides the line count, and the block above holds kMessageLines of them in
+// ! It is the WIDTH that decides the line count, and the block above holds kKFCMessageLines of them in
 //   any language. The two numbers are a pair - neither is meaningful without the other.
 //
 // Height: stated against the .fr's own block (kMessageHeightResource) so that a taller block simply
@@ -151,7 +146,7 @@ int32 KFCPanelMetrics::MessageBlockHeight()
 		return kMessageHeightResource;	// the .fr's block - the drawing then measures a string instead
 	// Up to a whole pixel: the widgets sit on whole pixels, and less than a pixel over the lines is no
 	// room for a part-line.
-	return ::ToInt32(::Ceiling(lineAdvance * PMReal(kMessageLines)));
+	return ::ToInt32(::Ceiling(lineAdvance * PMReal(kKFCMessageLines)));
 }
 
 /* MinimumPanelWidth
@@ -191,7 +186,7 @@ void KFCPanelMetrics::Update(IPanelControlData* panelData)
 	if (tree != nil)
 	{
 		PMRect treeFrame = tree->GetFrame();
-		const PMReal treeTop = blockBottom + kGapUnderMessageBlock;
+		const PMReal treeTop = blockBottom + kKFCGapUnderMessage;
 		if (treeFrame.Top() != treeTop)
 		{
 			treeFrame.Top(treeTop);

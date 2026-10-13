@@ -1183,18 +1183,18 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		// throws away. Bound left/right/top so it widens with the panel and stays put vertically.
 		//
 		// THE HEIGHT MUST BE A WHOLE NUMBER OF LINES. A line is 12px on an ENGLISH UI (measured off a
-		// screenshot: four baselines 11.8px apart), so 48 = exactly four. The box draws into whatever
-		// room it is given: at four lines and 4px over, narrowing the panel pushed the text to five
-		// lines and the TOP 4px OF THE FIFTH appeared below the fourth, a sliver of chopped-off
-		// letters. A remainder of zero leaves nothing for a part-line to be drawn into.
+		// screenshot: four baselines 11.8px apart), so the block is kKFCMessageLines of them (KFCUIID.h -
+		// 48px). The box draws into whatever room it is given: at four lines and 4px over, narrowing the
+		// panel pushed the text to five lines and the TOP 4px OF THE FIFTH appeared below the fourth, a
+		// sliver of chopped-off letters. A remainder of zero leaves nothing for a part-line to be drawn into.
 		//
 		// AND THE LINE IS NOT 12px IN EVERY LANGUAGE. On a JAPANESE UI the palette font draws 18px
 		// lines (measured on the running panel: baselines at y=218, 236, 254), so a 48px box holds two
 		// and two thirds of them. A resource carries one set of numbers and these are the English set;
 		// KFCPanelMetrics puts the real height on when the panel appears - four of the palette font's
 		// own lines, asked of the font (72 on a Japanese UI), so every language gets FOUR lines - and
-		// falls back to this 48 when the font cannot be asked. If this number changes, change
-		// kMessageHeightResource there too - the two are stated against each other.
+		// falls back to this 48 when the font cannot be asked. The numbers are KFCUIID.h's, and it
+		// reads the same ones, so the resource and the code cannot drift apart.
 		//
 		// FOUR LINES, NOT THREE: a 128-character message drew only as far as "the document has" in
 		// three lines, losing the sentence that says what to do (see KFCPanelMetrics.cpp, which carries
@@ -1218,7 +1218,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 			kKFCStaticTextWidgetID,			 // WidgetId
 			kPMRsrcID_None,					 // RsrcId
 			kBindLeft | kBindRight | kBindTop, // Frame binding
-			Frame(5, 6, 256, 54),			 // Frame: left, top, right, bottom (48px = four 12px lines)
+			Frame(5, kKFCMessageTop, 256, kKFCMessageBottom),	// Frame: left, top, right, bottom (KFCUIID.h)
 			kTrue, kTrue,					 // Visible, Enabled
 			"",								 // Panel name (none)
 			{
@@ -1230,9 +1230,9 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * hears the click). Bound RIGHT so it keeps its place beside the message as the panel is
 		 * resized (KCM's resizable panel binds its own right for the same reason).
 		 *
-		 * 32x32, sitting on the BOTTOM of the message block (top 22 = 54 - 32): a picture hanging
-		 * off the top of a part-empty message box reads as detached from it. The two share a bottom
-		 * edge, and that is the whole of why this number is what it is.
+		 * 32x32, sitting on the BOTTOM of the message block (top = kKFCMessageBottom - 32): a picture
+		 * hanging off the top of a part-empty message box reads as detached from it. The two share a
+		 * bottom edge, and that is the whole of why the top is what it is.
 		 *
 		 * THREE of them, STACKED at one frame: the plain cat until something has been run, the
 		 * searching cat once it has, and the changing cat once a replace has written something.
@@ -1243,7 +1243,7 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		 * ONE frame for the three, named once below: KFCPanelMetrics::Update moves each down for the UI language
 		 * keeping its own left, right and height, so frames that drifted apart would show the pictures apart.
 		 */
-#define kKFCIconFrame Frame(260, 22, 292, 54)	// 4px clear of the text, 8px in from the panel's edge
+#define kKFCIconFrame Frame(260, kKFCMessageBottom - 32, 292, kKFCMessageBottom)	// 4px clear of the text, 8px in from the panel's edge
 		KFCIconWidget
 		(
 			kKFCIconWidgetID,
@@ -1279,8 +1279,8 @@ resource KFCPanelWidget(kSDKDefPanelResourceID + index_enUS)
 		(
 			kKFCResultListWidgetID, kPMRsrcID_None,	// WidgetId, RsrcId
 			kBindAll,						// Frame binding: grow with the panel
-			Frame(4, 57, 296, 356),			// Frame (below the message block to the panel's edges)
-											// 3px under the message block's bottom edge (54).
+			Frame(4, kKFCMessageBottom + kKFCGapUnderMessage, 296, 356),	// Frame (below the message block
+											// to the panel's edges, the gap under it - KFCUIID.h)
 			kTrue, kTrue,					// Visible, Enabled
 			kTrue,							// EraseBeforeDraw
 			kInterfacePaletteFill,			// InterfaceColor
