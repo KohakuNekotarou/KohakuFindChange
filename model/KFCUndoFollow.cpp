@@ -29,7 +29,7 @@
 #include "textiterator.h"			// StoryTextHash
 #include "UIDList.h"
 
-#include <algorithm>		// std::find, std::remove_if, std::any_of - the documents watched, a closing document's part
+#include <algorithm>		// std::find, std::remove_if, std::any_of - a closing document's part of the kept writes
 #include <set>
 #include <utility>			// std::move - a kept write carries its rows
 
@@ -488,8 +488,8 @@ void DiagSteps(const char* when)
 // every Undo the panel had to follow was followed (5 of 5, in four runs) - which is what proved it - but holding
 // the model's objects is not how the product listens; it watches the document, which is not purged while it is
 // open (the layer, links and timing panels attach their lazy observers to the document's subject).
-// Attached at run time, never written into the document; let go of when the document closes (DocumentClosing).
-std::vector<IDataBase*> gWatchedDocs;	// compared, never dereferenced once their document has closed
+// Attached at run time, never written into the document; let go of when the document closes (DocumentClosing). Whether a
+// document is watched is the subject's own answer (IsAttached), asked on both sides - no list of our own to keep with it.
 
 // THE SUBJECT A WRITE'S MARK IS RAISED ON AND HEARD ON - the document's own, its root's (kDocBoss): KFCUndoMarkCmd's
 // DoNotify raises the mark there, WatchDoc attaches the observer there and DocumentClosing takes it off. nil = no
@@ -517,8 +517,6 @@ void WatchDoc(IDataBase* db)
 		subject->AttachObserver(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER);
 		KFC_DIAG_LOG("WATCH doc=%p subject=%p observer=%p", (void*)db, (void*)subject.get(), (void*)observer.get());
 	}
-	if (std::find(gWatchedDocs.begin(), gWatchedDocs.end(), db) == gWatchedDocs.end())
-		gWatchedDocs.push_back(db);
 }
 
 // A write's name on the message line - the menu item that made it.
@@ -579,6 +577,10 @@ class KFCUndoMarkCmd : public Command
 public:
 	KFCUndoMarkCmd(IPMUnknown* boss) : Command(boss) {}
 	virtual ~KFCUndoMarkCmd() {}
+
+	/** kFalse, as the SDK's own commands answer: InDesign checks for low memory before running it - freeing part of the
+		undo history if it must - instead of skipping the check (Command's kTrue, which the guide calls rare). */
+	virtual bool16 LowMemIsOK() const { return kFalse; }
 
 protected:
 	/** Deliberately empty: the mark is the notification. */
@@ -935,20 +937,17 @@ static void Follow()
 
 void KFCUndoFollow::DocumentClosing(const UIDRef& docRef)
 {
+	// The document is still whole at this signal (BeforeCloseDoc), so its subject can be asked - one never watched answers
+	// that the observer is not attached, and nothing happens.
 	IDataBase* const db = docRef.GetDataBase();
-	if (db == nil)
-		return;
-	const std::vector<IDataBase*>::iterator watched = std::find(gWatchedDocs.begin(), gWatchedDocs.end(), db);
-	if (watched == gWatchedDocs.end())
-		return;
-	gWatchedDocs.erase(watched);
-	// The document is still whole at this signal (BeforeCloseDoc), so its subject can be asked.
 	InterfacePtr<ISubject> subject(QueryMarkSubject(db));
 	InterfacePtr<IObserver> observer(subject, IID_IKFCDOCUNDOOBSERVER);
 	if (subject != nil && observer != nil
 		&& subject->IsAttached(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER))
+	{
 		subject->DetachObserver(ISubject::kLazyAttachment, observer, IID_IKFCUNDOMARK, IID_IKFCDOCUNDOOBSERVER);
-	KFC_DIAG_LOG("DOCCLOSING detach doc=%p", (void*)db);
+		KFC_DIAG_LOG("DOCCLOSING detach doc=%p", (void*)db);
+	}
 }
 
 void KFCUndoFollow::ForgetDocument(const UIDRef& docRef)
@@ -1089,7 +1088,6 @@ void KFCUndoFollow::ShutdownCleanup()
 	// Assigning fresh vectors releases the storage too (the KESCL ShutdownCleanup rule): the kept writes
 	// hold rows, and rows hold PMStrings.
 	std::vector<Step>().swap(gSteps);
-	std::vector<IDataBase*>().swap(gWatchedDocs);	// (the documents are gone by now; nothing is detached here)
 	CloseRecording();
 }
 
