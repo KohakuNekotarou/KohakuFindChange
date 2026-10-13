@@ -1087,7 +1087,7 @@ void KFCUndoFollow::RenameDocument(const UIDRef& docRef, const PMString& newName
 		KFCResultModel::ModelSnapshot* const sets[2] = { &gSteps[i].before, &gSteps[i].after };
 		for (size_t s = 0; s < 2; ++s)
 		{
-			if (sets[s]->fromBook)
+			if (sets[s]->header.fromBook)
 				continue;
 			for (size_t c = 0; c < sets[s]->chapters.size(); ++c)
 			{

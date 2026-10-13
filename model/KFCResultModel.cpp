@@ -30,29 +30,9 @@ namespace
 {
 	std::vector<KFCResultModel::Chapter> gChapters;
 
-	// Were these results produced by a book search? Decides whether the tree opens its chapters.
-	bool gFromBook = false;
-
-	// The Search: they were searched with. See KFCResultModel::SetSearchScope.
-	KFCResultModel::SearchScopeKind gSearchScope = KFCResultModel::kScopeDocument;
-
-	// The book those results came from (file name only). Drawn on the tree's book row.
-	PMString gBookName;
-
-	// The Find/Change tab the search ran in (an IFindChangeOptions::SearchMode value; -1 = nothing
-	// searched yet). See KFCResultModel::SetSearchMode for why the replace has to compare against it.
-	int32 gSearchMode = -1;
-
-	// The whole of what those results were WALKED by - query plus every switch that decides the match
-	// set - as one opaque key. See KFCResultModel::SetWalkSignature.
-	PMString gWalkSignature;
-
-	// Has a command been run since the results were last discarded? See KFCResultModel::NoteRun.
-	// Deliberately NOT "are there any chapters": a search that found nothing has still been run.
-	bool gHasRun = false;
-
-	// Did the last command write with InDesign's Change All and change something? See KFCResultModel::NoteChangeAllWrote.
-	bool gChangeAllWrote = false;
+	// What the list says about itself beside its chapters - book or not, the Search:, the tab, the walk's key, run or
+	// not, Change All or not (KFCResultModel::ListHeader: each field's setter is named beside it). Taken whole.
+	KFCResultModel::ListHeader gHeader;
 
 	// The rows copied aside before a write of ours changed them - see KFCResultModel::BeginRowBackup.
 	// RowCopy, the same struct the panel's following of Undo hands out.
@@ -238,17 +218,12 @@ void KFCResultModel::AppendChapter(Chapter&& chapter)
 void KFCResultModel::Clear()
 {
 	gChapters.clear();
-	gFromBook = false;
-	gSearchScope = kScopeDocument;
-	gBookName.Clear();
-	gSearchMode = -1;
-	gWalkSignature.Clear();
+	// A fresh header: discarding the results puts the panel back to the state it started in, illustration included
+	// (HasRun, HasChangeAllWritten).
+	gHeader = ListHeader();
 	// The rows' text foci go with them (KFCRowFoci - the one thing outside this model that describes these rows; the
 	// replace still checks the stored positions against a fresh walk rather than fingerprinting each chapter).
 	KFCRowFoci::DetachAll();
-	// Discarding the results puts the panel back to the state it started in, illustration included.
-	gHasRun = false;
-	gChangeAllWrote = false;
 	// A new result set, in its first layout: what KFCUndoFollow kept for the old one names
 	// rows that are gone.
 	gResultSetId = ++gIdCounter;
@@ -272,42 +247,42 @@ uint32 KFCResultModel::GetLayoutGeneration()
 
 void KFCResultModel::SetFromBook(bool fromBook)
 {
-	gFromBook = fromBook;
+	gHeader.fromBook = fromBook;
 }
 
 void KFCResultModel::NoteRun()
 {
-	gHasRun = true;
+	gHeader.hasRun = true;
 }
 
 bool KFCResultModel::HasRun()
 {
-	return gHasRun;
+	return gHeader.hasRun;
 }
 
 void KFCResultModel::NoteChangeAllWrote(bool wrote)
 {
-	gChangeAllWrote = wrote;
+	gHeader.changeAllWrote = wrote;
 }
 
 bool KFCResultModel::HasChangeAllWritten()
 {
-	return gChangeAllWrote;
+	return gHeader.changeAllWrote;
 }
 
 bool KFCResultModel::IsFromBook()
 {
-	return gFromBook;
+	return gHeader.fromBook;
 }
 
 void KFCResultModel::SetSearchScope(SearchScopeKind scope)
 {
-	gSearchScope = scope;
+	gHeader.searchScope = scope;
 }
 
 KFCResultModel::SearchScopeKind KFCResultModel::GetSearchScope()
 {
-	return gSearchScope;
+	return gHeader.searchScope;
 }
 
 void KFCResultModel::CloseChapter(int32 chapterIdx)
@@ -371,36 +346,36 @@ bool KFCResultModel::IsWorkOutcome(ChangeOutcome outcome)
 
 void KFCResultModel::SetSearchMode(int32 mode)
 {
-	gSearchMode = mode;
+	gHeader.searchMode = mode;
 }
 
 int32 KFCResultModel::GetSearchMode()
 {
-	return gSearchMode;
+	return gHeader.searchMode;
 }
 
 void KFCResultModel::SetWalkSignature(const PMString& signature)
 {
-	gWalkSignature = signature;
-	gWalkSignature.SetTranslatable(kFalse);
+	gHeader.walkSignature = signature;
+	gHeader.walkSignature.SetTranslatable(kFalse);
 }
 
 PMString KFCResultModel::GetWalkSignature()
 {
-	PMString signature(gWalkSignature);
+	PMString signature(gHeader.walkSignature);
 	signature.SetTranslatable(kFalse);
 	return signature;
 }
 
 void KFCResultModel::SetBookName(const PMString& name)
 {
-	gBookName = name;
-	gBookName.SetTranslatable(kFalse);
+	gHeader.bookName = name;
+	gHeader.bookName.SetTranslatable(kFalse);
 }
 
 PMString KFCResultModel::GetBookName()
 {
-	PMString name(gBookName);
+	PMString name(gHeader.bookName);
 	name.SetTranslatable(kFalse);
 	return name;
 }
@@ -414,14 +389,11 @@ void KFCResultModel::ShutdownCleanup()
 	// destructor at DLL unload finds nothing left to do (the KESCL ShutdownCleanup rule).
 	gChapters = std::vector<Chapter>();
 
-	// The static PMStrings, emptied for the same reason the vectors are: nothing of ours should
-	// still be holding storage when the DLL unloads (the KESCL ShutdownCleanup rule).
-	//
-	// ALL of them. A static string added above without a line here is left holding storage at unload
-	// (it has happened once). When a static is added above, it is added here too - that is what this
-	// list is.
-	gBookName.Clear();
-	gWalkSignature.Clear();
+	// The static strings, emptied for the same reason the vectors are: nothing of ours should still be holding
+	// storage when the DLL unloads (the KESCL ShutdownCleanup rule). Every one of them is a field of the list's
+	// header, so one statement empties them all - a field added to ListHeader goes with it (a string added beside
+	// the header without a line here was once left holding storage at unload).
+	gHeader = ListHeader();
 
 	// Normally already empty - a replace clears it on both of its exits - but a shutdown during
 	// one would leave copies behind, and these hold PMStrings like the chapters do.
@@ -539,15 +511,14 @@ int32 KFCResultModel::GetChapterReplacedCount(int32 chapterIdx)
 
 int32 KFCResultModel::GetFontReplacedCount(int32 chapterIdx, int32 fontIdx)
 {
-	const Chapter* c = ChapterAt(chapterIdx);
 	const FontGroup* group = GroupAt(chapterIdx, fontIdx);
-	if (c == nil || group == nil)
+	if (group == nil)
 		return 0;
 	int32 replaced = 0;
 	for (size_t i = 0; i < group->hitIndices.size(); ++i)
 	{
-		const int32 h = group->hitIndices[i];
-		if (h >= 0 && h < static_cast<int32>(c->hits.size()) && c->hits[static_cast<size_t>(h)].replaced)
+		const Hit* h = HitAt(chapterIdx, group->hitIndices[i]);
+		if (h != nil && h->replaced)
 			++replaced;
 	}
 	return replaced;
@@ -825,10 +796,11 @@ void KFCResultModel::SetHitWrittenText(int32 chapterIdx, int32 hitIdx, const PMS
 
 bool KFCResultModel::SetStoryLead(int32 chapterIdx, UID storyUID, const PMString& lead)
 {
-	if (chapterIdx < 0 || chapterIdx >= static_cast<int32>(gChapters.size()) || storyUID == kInvalidUID)
+	Chapter* c = ChapterAt(chapterIdx);
+	if (c == nil || storyUID == kInvalidUID)
 		return false;
 	bool changed = false;
-	std::vector<Hit>& hits = gChapters[static_cast<size_t>(chapterIdx)].hits;
+	std::vector<Hit>& hits = c->hits;
 	for (size_t i = 0; i < hits.size(); ++i)
 	{
 		Hit& hit = hits[i];
@@ -1229,13 +1201,7 @@ void KFCResultModel::TakeModelSnapshot(ModelSnapshot& out)
 {
 	out.chapters = gChapters;
 	out.layout = gLayoutGeneration;
-	out.fromBook = gFromBook;
-	out.searchScope = gSearchScope;
-	out.bookName = gBookName;
-	out.searchMode = gSearchMode;
-	out.walkSignature = gWalkSignature;
-	out.hasRun = gHasRun;
-	out.changeAllWrote = gChangeAllWrote;
+	out.header = gHeader;
 }
 
 void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
@@ -1244,13 +1210,7 @@ void KFCResultModel::RestoreModelSnapshot(const ModelSnapshot& snapshot)
 	KFCRowFoci::DetachAll();
 	gChapters = snapshot.chapters;
 	gLayoutGeneration = snapshot.layout;
-	gFromBook = snapshot.fromBook;
-	gSearchScope = snapshot.searchScope;
-	gBookName = snapshot.bookName;
-	gSearchMode = snapshot.searchMode;
-	gWalkSignature = snapshot.walkSignature;
-	gHasRun = snapshot.hasRun;
-	gChangeAllWrote = snapshot.changeAllWrote;
+	gHeader = snapshot.header;
 	// The row backup names rows by index, and these rows were just replaced (ReplaceStoryRows forgets it the same way).
 	ForgetRowBackup();
 	// The list put back - its rows' foci where KFC knows the stories as they stand (spec T7).

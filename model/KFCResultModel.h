@@ -739,23 +739,33 @@ namespace KFCResultModel
 	    ones. A row whose index is out of range is passed over. */
 	void ApplyRowStep(const RowStep& step, bool after);
 
-	/** The whole result set - for the one write that replaces it, the query run (KFCUndoFollow::RunRecorder). */
+	/** THE LIST'S HEADER - what a result set says about itself beside its chapters, each field written by the setter
+	    named beside it. ONE STRUCT, so each place that takes all of it takes it in one statement - Clear() puts back a
+	    fresh one, a snapshot carries it whole, the shutdown empties it - and a field added here cannot be left out of
+	    one of them. (Listed by hand in each of those places, it was: the snapshot once lacked the pencil cat's fact -
+	    case xq-icon-undo, the cat stayed over the list an Undo brought back - and a static string once missed the
+	    shutdown's list.) */
+	struct ListHeader
+	{
+		bool			fromBook;		// SetFromBook
+		SearchScopeKind	searchScope;	// SetSearchScope
+		PMString		bookName;		// SetBookName
+		int32			searchMode;		// SetSearchMode (-1 = nothing searched yet)
+		PMString		walkSignature;	// SetWalkSignature
+		bool			hasRun;			// NoteRun
+		bool			changeAllWrote;	// NoteChangeAllWrote
+		ListHeader() : fromBook(false), searchScope(kScopeDocument), searchMode(-1), hasRun(false),
+			changeAllWrote(false) {}
+	};
+
+	/** The whole result set - for the one write that replaces it, the query run (KFCUndoFollow::RunRecorder). Its
+	    header with it: a query run's Undo puts back a list of another kind, and the picture with it. */
 	struct ModelSnapshot
 	{
 		std::vector<Chapter>	chapters;
 		uint32					layout;
-		// the list's header: a query run's Undo puts back a list of another kind
-		bool					fromBook;
-		SearchScopeKind			searchScope;
-		PMString				bookName;
-		int32					searchMode;
-		PMString				walkSignature;
-		bool					hasRun;
-		// ...and the pencil cat's fact (NoteChangeAllWrote): an Undo of a query run puts the list before it back, and the
-		// picture with it (measured - case xq-icon-undo: the pencil cat stayed over the list the Undo brought back).
-		bool					changeAllWrote;
-		ModelSnapshot() : layout(0), fromBook(false), searchScope(kScopeDocument),
-			searchMode(-1), hasRun(false), changeAllWrote(false) {}
+		ListHeader				header;
+		ModelSnapshot() : layout(0) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);
 	/** Puts it back whole, its layout generation with it; the row backup is let go (it indexes the rows
