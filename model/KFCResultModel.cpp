@@ -6,8 +6,8 @@
 //
 //  Result model implementation. See KFCResultModel.h for the contract. All state is file-static, in
 //  the anonymous namespace below - the vector of chapters, the flags recorded beside it, the row
-//  backup, the right-click targets and the result-set / layout ids; the getters are bounds-checked
-//  so a repaint racing a rebuild (or a stale node id) reads "nothing" rather than crashing.
+//  backup and the result-set / layout ids; the getters are bounds-checked so a repaint racing a
+//  rebuild (or a stale node id) reads "nothing" rather than crashing.
 //
 //========================================================================================
 

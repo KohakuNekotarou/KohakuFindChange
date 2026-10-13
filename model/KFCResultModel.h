@@ -645,8 +645,8 @@ namespace KFCResultModel
 	    story's first row stood; the chapter is put in page order again, its story groups and their numbers rebuilt
 	    (BuildFontGroups, Hit::storyOrdinal), and the story's version recorded (storyVersion - the story as KFC knows it
 	    now). The rows' places in the list change, so whatever indexes them is let go: a kept write's rows (the layout
-	    generation moves - KFCUndoFollow drops it, UNDO-14), the right-click targets, the row backup, the chapter's text
-	    foci (attached again, KFCRowFoci). Returns the story's row count now; -1 = no such chapter. */
+	    generation moves - KFCUndoFollow drops it, UNDO-14), the row backup, the chapter's text foci (attached again,
+	    KFCRowFoci). Returns the story's row count now; -1 = no such chapter. */
 	int32 ReplaceStoryRows(int32 chapterIdx, UID story, std::vector<Hit>& storyHits, uint32 storyVersion);
 
 	/** SEARCH THIS DOCUMENT AGAIN's change to the list (KFCSearchEngine::SearchDocumentAgain - the author's call):
@@ -779,8 +779,8 @@ namespace KFCResultModel
 			searchMode(-1), hasRun(false), changeAllWrote(false) {}
 	};
 	void TakeModelSnapshot(ModelSnapshot& out);
-	/** Puts it back whole, its layout generation with it; the right-click targets are forgotten (they
-	    index the chapters that went). */
+	/** Puts it back whole, its layout generation with it; the row backup is let go (it indexes the rows
+	    that went). */
 	void RestoreModelSnapshot(const ModelSnapshot& snapshot);
 
 	/** Which result set the rows are: a new number with every Clear (a search, a query run, Clear Results, a close) -
