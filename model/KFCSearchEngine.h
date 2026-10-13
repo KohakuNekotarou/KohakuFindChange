@@ -12,7 +12,8 @@
 //  supplied its own literal text and pinned the mode to plain text - the walk takes the query as the
 //  user set it on the Find/Change panel, MODE INCLUDED (Text or GREP). What KFC writes to the panel
 //  is a value restated at what it already is (CommitSearchMode, CommitReplaceSide), the direction
-//  turned forward and back (KFCForwardSearchScope), or what a feature asks for: a query of its own
+//  turned forward and back (KFCForwardSearchScope - and backward for the Replace's write of a GREP query
+//  holding ^, KFCBackwardSearchScope), or what a feature asks for: a query of its own
 //  (SetQuery - the Application Bar's field; KFCSavedQueries::LoadIntoFindChange - the query run) or
 //  Search: put back after a click (RestoreSearchScope). The walk is read-only (a
 //  SaveRestoreModifiedState dirty guard per document).

@@ -1058,9 +1058,9 @@ bool ChapterMovedUnderRows(int32 chapterIdx, const UIDRef& docRef, const WalkerS
 		int32& left = waitingInStory[s->first];
 		{
 			// Required critical section around text-walker selection changes, held for the whole story - the
-			// same deliberate departure from Adobe's examples that KFCSearchEngine explains: its contents are
-			// the keyboard-focus hand-off (spellpanel names it in SpellCheckWalker.cpp:85), so entering it per
-			// match would run that dance once per match.
+			// same deliberate departure from Adobe's examples that KFCSearchEngine explains: by spellpanel's own
+			// hedged note (SpellCheckWalker.cpp:85, "hmm same code as") its contents are the keyboard-focus
+			// hand-off, so entering it per match would run that dance once per match.
 			const TextWalkerSelections_CriticalSection criticalSection(selUtils);
 
 			// How the walk moves forward is the walker's business alone: each find advances it to the next
@@ -1289,10 +1289,12 @@ static void StartStatus(PMString& out)
 	out = "Replace: ";
 }
 
-// THE ROW'S REPLACE'S SEQUENCE - ONE UNDO STEP, ROLLED BACK WHOLE ON A FAILURE. A PLAIN
-// sequence, as KCM's own reject is (KCMFacades.cpp, RejectImportChange): an abortable sequence, ended, was
-// measured to take the undo step below it away. Its rollback is the SDK's own: raise the error state, end
-// it, clear it (CmdUtils.h, SequenceContext) - EndPlainSequence. Begun with the name the Undo menu shows;
+// THE ROW'S REPLACE'S SEQUENCE - ONE UNDO STEP, ROLLED BACK WHOLE ON A FAILURE. A PLAIN sequence: one document's
+// step needs no abort, and its rollback is the SDK's own - raise the error state, end it, clear it (CmdUtils.h,
+// SequenceContext) - EndPlainSequence. (Chosen over an abortable one once KCM saw an ended abortable step take the
+// undo step below it away. That sighting was never told apart from InDesign itself dropping a document's undo
+// history at a script's boundary, and KFC's own abortable steps - Change All in Book, the query run - were measured
+// not to: docs/ai-notes/kfc-shipping-full-test-2026-10-09.md section 3.) Begun with the name the Undo menu shows;
 // nil = InDesign would not start one, and outStatus then says so.
 static ICommandSequence* BeginPlainSequence(const PMString& stepName, PMString& outStatus)
 {

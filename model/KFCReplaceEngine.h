@@ -5,9 +5,10 @@
 //  KohakuFindChange (KFC)
 //
 //  Replace engine: replaces the row the user asks for in the result panel (its right-click menu, or Return),
-//  using the CHANGE string of the official Find/Change dialog. KFC never writes to IFindChangeOptions - it only
-//  reads - so GREP back-references and escapes are interpreted by InDesign's own engine and are
-//  never parsed here.
+//  using the CHANGE string of the official Find/Change dialog. The Replace never writes that string - it uses it
+//  as the dialog holds it - so GREP back-references and escapes are interpreted by InDesign's own engine and are
+//  never parsed here. (What KFC does write to the panel - a value restated, the direction turned - is listed at
+//  the head of KFCSearchEngine.h.)
 //
 //  HOW IT WRITES: ONE MATCH AT A TIME, A STORY AT A TIME (the author's call). ReplaceInChapterOneByOne in
 //  the .cpp walks each story that holds a row asked for (kFindTextCmdBoss, then kTWReplaceTextCmdBoss on
