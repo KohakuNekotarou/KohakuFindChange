@@ -330,7 +330,7 @@ void KFCResultModel::EmptyChapter(Chapter& chapter)
 	chapter.storyVersions.clear();
 	// ...and the searched parts of its stories (SearchedRange): they describe the rows that just went.
 	chapter.searchedRanges.clear();
-	chapter.docRef = UIDRef(nil, kInvalidUID);
+	chapter.docRef = UIDRef::gNull;
 	chapter.file = IDFile();
 	chapter.shownEmpty = false;		// a closed document's chapter is not shown (CloseChapter)
 }
