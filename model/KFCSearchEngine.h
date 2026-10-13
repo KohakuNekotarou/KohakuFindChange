@@ -546,6 +546,23 @@ namespace KFCSearchEngine
 	    the snippet takes it. False = no walker at all; outSelUtils can still be nil - each caller keeps its own gate on it. */
 	bool AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils);
 
+	/** THE WALKER STOPPED ON EVERY WAY OUT OF A WALK - built right after Initialize, it halts the walker as it goes out of
+	    scope, so no exit, the next one written included, leaves it walking (the replace's writing walk and verify walk,
+	    a document's Change All). A walker left walking is not merely untidy: the shared one is the session's
+	    (AcquireWalker), and the next caller that guards its own Initialize with IsWalking CONTINUES it - which is what
+	    InDesign's own Find/Change does (SnpFindAndReplace.cpp:772). The stop is Adobe's shape: ask IsWalking, then Halt
+	    (SpellPreviousObserver.cpp:200-201). */
+	class WalkerStops
+	{
+	public:
+		explicit WalkerStops(ITextWalker* walker) : fWalker(walker) {}
+		~WalkerStops();
+	private:
+		ITextWalker* const	fWalker;
+		WalkerStops(const WalkerStops&);
+		WalkerStops& operator=(const WalkerStops&);
+	};
+
 	/** A WALK SCOPE WITH NOTHING IN IT TO WALK - no story the walker would visit: a document with no text frame at all, or
 	    one whose only text the options leave out (a master page's, with Include Master Pages off). InDesign's walker answers
 	    such a scope kFailure, the find (kFindTextCmdBoss) and the Change All (kReplaceAllTextCmdBoss) alike, with no error

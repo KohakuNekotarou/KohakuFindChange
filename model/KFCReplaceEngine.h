@@ -32,7 +32,10 @@
 #define __KFCReplaceEngine_h__
 
 #include "PMString.h"
+#include "UIDRef.h"				// DocsAfterWrite
 #include "KFCModelTypes.h"		// KFCRowsByChapter
+
+#include <vector>				// DocsAfterWrite
 
 class ICommandSequence;		// WriteStep
 class IAbortableCmdSeq;
@@ -123,7 +126,7 @@ namespace KFCReplaceEngine
 	    BeginWriteStep outside any other command sequence; false = InDesign would not start one (nothing to end - the
 	    caller says so). EndWriteStep keeps the step when ok and takes it back whole otherwise, and leaves the error state
 	    clear. Neither touches a document's "unsaved" flag: a rollback or an abort puts the text back and leaves the flag
-	    up, so the caller puts it back on a document that was clean (ChaptersAfter in the .cpp, KFCObjectReplace). */
+	    up, so the caller puts it back on a document that was clean (DocsAfterWrite, below). */
 	struct WriteStep
 	{
 		ICommandSequence*	plain;		// one document's
@@ -132,6 +135,50 @@ namespace KFCReplaceEngine
 	};
 	bool BeginWriteStep(bool acrossDocuments, WriteStep& outStep);
 	void EndWriteStep(WriteStep& step, bool ok);
+
+	/** WHAT EACH DOCUMENT OF A WRITE FROM THE LIST IS LEFT AS (the author's calls), once the write is over, whichever way
+	    it went - the one rule for the text rows (ReplaceHit, ReplaceHits) and the object rows selected together
+	    (KFCObjectReplace::ReplaceRows). A closed chapter was reopened windowless and is held
+	    (KFCBookScope::ReopenChapterDoc).
+	      - WRITTEN: a chapter of ours gets its window, so the write can be seen and saved
+	        (KFCBookScope::ShowChapterWindow); a document that is not ours is left as it is - one the user keeps WITHOUT a
+	        window (Search: = All Documents) stays hidden, and the status line says so. (Not a window for every write:
+	        ShowChapterWindow asks no IsHeldDoc, so a hidden document of the user's would be shown - measured.) A document
+	        another chapter of the write wrote is written: two chapters can be one document - a book listing one file
+	        twice reaches the same open document for both - and the one whose rows were not written must not take that
+	        document's "unsaved" flag down over the other's write, or any close would throw the write away without asking.
+	      - NOT WRITTEN (refused, rolled back, aborted): nothing of the write is in it, so a document that was clean is made
+	        clean again, and a chapter of ours is then handed back - flag first, since a held chapter that says "unsaved"
+	        is not closed. A rollback or an abort puts the text back and leaves the flag up (measured: a saved document, its
+	        write rolled back whole, came out modified=true with not a character changed, and asked to be saved on close);
+	        so can a check's walk. It is the product's own shape after an abort - the flag read before, put back only where
+	        it was clean (incopyfileactions FileActionsOpenDocResponder.cpp:113-114, 161-171) - and not
+	        IDataBase::SaveRestoreModifiedState, the read-only walks' guard, which puts the flag back whatever happened
+	        inside it, a write that went through included.
+	    Built before the first document is reached and told of each one as it is (Reached) and of each written one
+	    (Wrote); the rule runs as it goes out of scope, so no way out of a write can skip it. */
+	class DocsAfterWrite
+	{
+	public:
+		DocsAfterWrite() {}
+		~DocsAfterWrite();
+		/** A document the write reached - a chapter's. readFlag = the write has rows for it: its "unsaved" flag is read
+		    now, before anything of the write touches it (a document whose flag was not read is never made clean). */
+		void Reached(const UIDRef& doc, bool readFlag);
+		/** The write went into this document - every chapter of it. */
+		void Wrote(const UIDRef& doc);
+	private:
+		struct Doc
+		{
+			UIDRef	doc;
+			bool	flagRead;
+			bool	wasModified;
+			bool	wrote;
+		};
+		std::vector<Doc>	fDocs;
+		DocsAfterWrite(const DocsAfterWrite&);
+		DocsAfterWrite& operator=(const DocsAfterWrite&);
+	};
 
 	/** Can the row be replaced from its menu: a Find/Change match not replaced, not locked, with no
 	    outcome - WhyGreyed answering kGreyedNot. */

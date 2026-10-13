@@ -664,7 +664,7 @@ public:
 // row could not be read - left it open with no window until the next search (measured with the fault switch
 // jump-no-front: work/kbs-regress/hid-cases.tsv). So at the end of each landing the chapter's document, if KFC still holds
 // it, goes back - the model decides how (KFCBookScope::HandBackIfHeld: closed when windowless and clean, kept with unsaved
-// work), as the text Replace's own ChaptersAfter hands its chapters back on every exit (KFCReplaceEngine).
+// work), as a Replace from the list hands its chapters back on every exit (KFCReplaceEngine::DocsAfterWrite).
 // The chapter is asked for as the model holds it when the landing ends: every door that reaches a chapter rebinds it there
 // (RebindChapterDoc), so a chapter reopened anywhere in the landing is the one handed back.
 // DECLARED AFTER the landing's ActivationGuard (a landing dropped by that guard must not hand back what the landing in
@@ -1694,7 +1694,7 @@ bool KFCJump::ReplaceObjectRows(const KFCRowsByChapter& rows, int32 shownChapter
 	{
 		IDataBase::SaveRestoreModifiedState dirtyGuard(db);
 		// THE DOCUMENT OF THE ROW SELECTED LAST IN FRONT AGAIN (the spec map's OBJ-18 - the page shows that row). The write
-		// gives a window to each closed chapter it wrote (KFCObjectReplace's LeaveObjectChapters), and a window opened comes
+		// gives a window to each closed chapter it wrote (KFCReplaceEngine::DocsAfterWrite), and a window opened comes
 		// forward: rows of two closed chapters replaced together left the other chapter's window in front and nothing
 		// selected (the 1.3 -> 1.4 re-check of 2026-10-11 night - case sel-book-objects-replace read "active objC1.indd"
 		// over objC2's row). Put back in front with the zoom it has (EnsureDocFrontmost's carryZoom).

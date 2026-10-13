@@ -147,6 +147,7 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	if (walker->IsWalking())
 		walker->Halt();
 	walker->Initialize(client, scope, opts, nil);
+	const KFCSearchEngine::WalkerStops stops(walker);		// halted on every way out (KFCSearchEngine.h)
 	// NOTHING TO WALK IS NOTHING TO CHANGE (KFCSearchEngine::ScopeHasNothingToWalk - a document with no text frame, or with
 	// master-page text only and Include Master Pages off): the command would answer kFailure, read below as a failed Change
 	// All, and the caller would take its whole step back - a book stopped at its chapter of pictures, while InDesign's own
@@ -155,8 +156,6 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
 	{
 		KFC_DIAG_LOG("CHANGEALL doc=%p scope=%d nothing to walk - nothing to change", (void*)docRef.GetDataBase(), (int)selectionScope);
-		if (walker->IsWalking())
-			walker->Halt();
 		return true;
 	}
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(walker, UseDefaultIID());
@@ -182,8 +181,6 @@ bool KFCChangeAll::WriteDocument(const UIDRef& docRef, int32 selectionScope, con
 		}
 	}
 	ErrorUtils::PMSetGlobalErrorCode(kSuccess);
-	if (walker->IsWalking())
-		walker->Halt();
 	return ok;
 }
 
@@ -442,8 +439,8 @@ int32 KFCChangeAll::Run(PMString& outSummary)
 
 	// ===== AFTER THE SEQUENCE: a window for each held chapter written to, the rest handed back (the replace's rule).
 	// A DOCUMENT ANOTHER TARGET WROTE IS WRITTEN: a book listing one file twice gives two targets one document, and the
-	// second - nothing left to change - must not take its "unsaved" flag down over the first one's write (KFCObjectReplace's
-	// LeaveObjectChapters says why). It is left as the target that wrote it leaves it.
+	// second - nothing left to change - must not take its "unsaved" flag down over the first one's write
+	// (KFCReplaceEngine::DocsAfterWrite says why). It is left as the target that wrote it leaves it.
 	std::set<IDataBase*> writtenDBs;
 	for (size_t i = 0; i < targets.size(); ++i)
 		if (wroteTo[i] && targets[i].docRef.GetDataBase() != nil)

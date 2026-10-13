@@ -409,7 +409,8 @@ bool KFCObjectReplace::ReplaceRow(int32 chapterIdx, int32 hitIdx, PMString& outS
 			KFCUndoFollow::MarkWrite(db);		// in this step, so its Undo / Redo is heard
 	}
 	// The step's end, taken back whole on a failure (EndWriteStep) - and the "unsaved" flag with it on a document that was
-	// clean: a rollback puts the item back and leaves the flag up (the text rows' ChaptersAfter puts theirs back the same).
+	// clean: a rollback puts the item back and leaves the flag up (the other writes from the list put theirs back the same -
+	// KFCReplaceEngine::DocsAfterWrite; one row's window and hand-back are its landing's, as said above HandBackIfHeld).
 	KFCReplaceEngine::EndWriteStep(step, ok);
 	if (!ok && !wasModified)
 		db->SetModified(kFalse);
@@ -440,48 +441,17 @@ namespace
 {
 
 // ONE DOCUMENT'S OBJECT ROWS in a Replace of rows selected together (CheckRowsNow / ReplaceRows): its rows that pass the
-// checks, with their items, and what the write did to them.
+// checks, with their items, and what the write did to them. (What the document is left as afterwards is the text rows'
+// rule - KFCReplaceEngine::DocsAfterWrite.)
 struct ObjectChapterWrite
 {
 	int32								chapterIdx;
 	UIDRef								docRef;			// reached by CheckItem (a closed chapter reopened windowless, held)
-	bool								wasModified;	// its "unsaved" flag before the step
 	std::vector<std::pair<int32, UID> >	todo;			// (the row, its item)
 	std::set<UID>						written;
 	RowItems							watched;		// the rows its write can move, read before it (RowsTheWriteCanMove)
-	ObjectChapterWrite() : chapterIdx(-1), wasModified(false) {}
+	ObjectChapterWrite() : chapterIdx(-1) {}
 };
-
-// WHAT EACH DOCUMENT IS LEFT AS (the text rows' ChaptersAfter, KFCReplaceEngine.cpp): written - a chapter of ours is given
-// a window, to be seen and saved; not written - nothing of the step is in it, so a document that was clean is made clean
-// again (a step rolled back or aborted can leave the "unsaved" flag up - KFCChangeAll.cpp), and a chapter of ours is
-// handed back.
-void LeaveObjectChapters(const std::vector<ObjectChapterWrite>& chapters)
-{
-	// A DOCUMENT ANOTHER CHAPTER OF THE STEP WROTE IS WRITTEN. Two chapters can be one document - a book listing one file
-	// twice reaches the same open document for both (KFCBookScope::ReopenChapterDoc rebinds by file) - and the one whose
-	// rows were not written must not take that document's "unsaved" flag down over the other's write: any close would then
-	// throw the write away without asking (the 1.3 -> 1.4 re-check of 2026-10-11 night).
-	std::set<IDataBase*> writtenDBs;
-	for (size_t k = 0; k < chapters.size(); ++k)
-		if (!chapters[k].written.empty() && chapters[k].docRef.GetDataBase() != nil)
-			writtenDBs.insert(chapters[k].docRef.GetDataBase());
-	for (size_t k = 0; k < chapters.size(); ++k)
-	{
-		const ObjectChapterWrite& c = chapters[k];
-		if (c.docRef.GetDataBase() == nil)
-			continue;
-		if (writtenDBs.count(c.docRef.GetDataBase()) > 0)
-		{
-			if (KFCBookScope::IsHeldDoc(c.docRef))
-				(void)KFCBookScope::ShowChapterWindow(c.docRef);
-			continue;
-		}
-		if (!c.todo.empty() && !c.wasModified && KFCBookScope::IsDocStillOpen(c.docRef))
-			c.docRef.GetDataBase()->SetModified(kFalse);
-		HandBackIfHeld(c.docRef);
-	}
-}
 
 }	// anonymous namespace
 
@@ -545,6 +515,7 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	// O10 steps 3-5, row by row: the rows that pass are written, the rest are counted by their reason.
 	int32 counts[kRefusalCount] = {};
 	std::vector<ObjectChapterWrite> chapters(rows.size());
+	KFCReplaceEngine::DocsAfterWrite docsAfter;		// what each document is left as, on every way out from here
 	size_t toWrite = 0, documents = 0;
 	for (size_t c = 0; c < rows.size(); ++c)
 	{
@@ -571,12 +542,13 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		{
 			toWrite += chapter.todo.size();
 			++documents;
-			chapter.wasModified = chapter.docRef.GetDataBase()->IsModified() != kFalse;
 		}
+		// Its "unsaved" flag read now when it has rows to write (a document whose flag was not read is never made clean).
+		if (chapter.docRef.GetDataBase() != nil)
+			docsAfter.Reached(chapter.docRef, !chapter.todo.empty());
 	}
 	if (toWrite == 0)
 	{
-		LeaveObjectChapters(chapters);
 		SayNoneReplaceable(outStatus, total, counts);
 		return false;
 	}
@@ -584,7 +556,6 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	InterfacePtr<IObjectWalker> shared(KFCObjectSearch::QuerySharedWalker());
 	if (svc == nil || shared == nil)
 	{
-		LeaveObjectChapters(chapters);
 		Refuse(outStatus, "InDesign's object search could not be reached - nothing was changed.");
 		return false;
 	}
@@ -614,7 +585,6 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 	KFCReplaceEngine::WriteStep step;
 	if (!KFCReplaceEngine::BeginWriteStep(documents > 1, step))
 	{
-		LeaveObjectChapters(chapters);
 		Refuse(outStatus, "InDesign would not start a command sequence - nothing was changed.");
 		return false;
 	}
@@ -676,15 +646,12 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 			if (!chapters[c].written.empty())
 				KFCUndoFollow::MarkWrite(chapters[c].docRef.GetDataBase());		// in this step, so its Undo / Redo is heard
 	// Kept, or taken back whole when nothing was written or an error stands (EndWriteStep); the "unsaved" flags are
-	// LeaveObjectChapters'.
+	// DocsAfterWrite's (a document is written only when the step is kept - docsAfter.Wrote, below).
 	KFCReplaceEngine::EndWriteStep(step, ok);
 	KFCObjectSearch::AimSharedWalkerAtFront();		// 11 (O7)
 	if (!ok)
 	{
-		for (size_t c = 0; c < chapters.size(); ++c)
-			chapters[c].written.clear();		// rolled back: nothing of it is in the documents
 		KFCResultModel::RollBackRows();
-		LeaveObjectChapters(chapters);
 		if (errorStands)
 		{
 			Refuse(outStatus, searchError ? "InDesign's search stopped with an error - nothing was changed."
@@ -716,10 +683,10 @@ bool KFCObjectReplace::ReplaceRows(const KFCRowsByChapter& rows, PMString& outSt
 		{
 			FollowRowsTheWriteMoved(chapter.chapterIdx, db, chapter.watched, chapter.written);
 			KFC_DIAG_NOTE_WRITE(chapter.docRef);
+			docsAfter.Wrote(chapter.docRef);		// a chapter of ours has to be seen and saved
 		}
 	}
 	recorder.Keep();
-	LeaveObjectChapters(chapters);
 	// "Replaced 3 objects: ID:259, ID:260, ID:261." - and, when some were left, "Replaced 3 of 5 objects: ... Left as they
 	// were: 1 locked, 1 changed since the search." The IDs are listed up to kNamedIDs. Objects of several documents name
 	// each document before its IDs: "Replaced 3 objects in 2 documents: a.indd ID:259, ID:260; b.indd ID:12."

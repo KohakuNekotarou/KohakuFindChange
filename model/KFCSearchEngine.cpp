@@ -3362,6 +3362,12 @@ bool KFCSearchEngine::HasFindQueryNow()
 	return HasFindQuery();
 }
 
+KFCSearchEngine::WalkerStops::~WalkerStops()
+{
+	if (fWalker != nil && fWalker->IsWalking())
+		fWalker->Halt();
+}
+
 bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, InterfacePtr<ITextWalkerSelectionUtils>& outSelUtils)
 {
 	InterfacePtr<IK2ServiceRegistry> registry(GetExecutionContextSession(), UseDefaultIID());
