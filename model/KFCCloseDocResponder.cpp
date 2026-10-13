@@ -24,7 +24,7 @@
 //
 //  Why kBeforeCloseDoc and not kAfterCloseDoc: the signal data still carries a live IDocument
 //  before the close, and carries nil after it - the document we have to compare against is only
-//  available in the "before" signal (see [[signal-responder-catalog]]).
+//  available in the "before" signal (see memory signal-responder-catalog).
 //
 //  AND "BEFORE" DOES NOT MEAN "BEFORE THE USER HAS DECIDED". The standing warning about this family
 //  of signals is that a "before close" is not a close, because the save prompt can still be
@@ -113,7 +113,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// UIDRef and its results were cleared like any other (run-unsaved-close-test.ps1;
 	// docs/ai-notes/kbs-replace-path-audit-2026-08-08.md). Were it otherwise, its document-scope results
 	// would outlive their document, and the replace would ask IsDocStillOpen of a dead UIDRef (the
-	// address-reuse fault, [[uidref-reuse-after-close]]).
+	// address-reuse fault, memory uidref-reuse-after-close).
 	InterfacePtr<IDocumentSignalData> signalData(signalMgr, UseDefaultIID());
 	if (signalData == nil)
 		return;
@@ -130,7 +130,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 	// closes (the user, after the book panel windowed it; a script) would otherwise stay on gHeldDocs,
 	// its (IDataBase*, UID) dangling - and a reused address can make IsDocStillOpen answer YES about a
 	// DIFFERENT windowless document, which a later ReleaseHeldDocs would then close (the same
-	// address-reuse fault [[uidref-reuse-after-close]] records, aimed at somebody else's document). Forgetting it
+	// address-reuse fault memory uidref-reuse-after-close records, aimed at somebody else's document). Forgetting it
 	// here removes the stale entry at its source. Safe on every path: ForgetHeldDoc does nothing
 	// when the document is not held, and the closes KFC schedules itself come off the list BEFORE
 	// their Close call, so this is a no-op for them - which is why it may run even while a run of
@@ -187,7 +187,7 @@ void KFCCloseDocResponder::Respond(ISignalMgr* signalMgr)
 		return;
 	}
 
-	// THE KEPT WRITES LET IT GO, WHATEVER THE LIST SHOWS (the author's call, 2026-10-13 - the spec map's UNDO-12 for a query
+	// THE KEPT WRITES LET IT GO, WHATEVER THE LIST SHOWS (the author's call - the spec map's UNDO-12 for a query
 	// run): All Documents, one document, or no list at all - a query run leaves it empty (F7) while its write, kept, still
 	// names this document. Its stories and items come off every write and its chapter is emptied in every kept list
 	// (KFCUndoFollow::ForgetClosingDocument - a chapter of a kept book's list is frozen instead), so an Undo in a document

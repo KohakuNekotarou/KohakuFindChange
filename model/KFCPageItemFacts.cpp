@@ -264,7 +264,7 @@ bool IsPageItemLockedForEdit(IDataBase* db, UID frameUID)
 // anchor, a footnote's reference, an anchored object, a zero-width mark...) left out, and the cut mark
 // when the story goes on. Read from the first 200 characters, which is plenty for 24 that show.
 // A mark that belongs to the character before it (a combining voiced mark, an accent) goes with that
-// character and is not one of the 24, so the cut never falls between the two (KFCTextCut.h's rule).
+// character and is not one of the 24, so the cut never falls between the two (the rule in KFCTextCut.h).
 //
 // IN THE OFFICIAL TERMS. Read through
 // IComposeScanner::CopyText, like every other read in this file (and codesnippets/

@@ -29,7 +29,7 @@
 #define __KFCOversetLocator_h__
 
 #include "BaseType.h"		// TextIndex
-#include "UIDRef.h"			// UID / kInvalidUID
+#include "UIDRef.h"			// the story asked about
 #include "KFCModelTypes.h"	// KFCOversetLoc
 
 // (KFCOversetLoc - where the "+" is - lives in KFCModelTypes.h: the UI's jump reads it.)

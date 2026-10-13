@@ -87,7 +87,7 @@ namespace KFCObjectSearch
 	    overset text). false = nothing of the item could be read. */
 	bool Fingerprint(const UIDRef& item, uint64& outHash, uint32& outLength);
 
-	/** WHAT A WRITE OF KFC'S OWN CAN MOVE BESIDES THE ITEMS IT WRITES (spec OBJ-12, 2026-10-12). A fingerprint holds more
+	/** WHAT A WRITE OF KFC'S OWN CAN MOVE BESIDES THE ITEMS IT WRITES (spec OBJ-12). A fingerprint holds more
 	    than its item: a group's holds its members, a text frame's (and a path's) its story's version - and a change to an
 	    inline, an anchored item or a graphic cell's item moves the version of the story it hangs in (its table's). So a
 	    write can move the print of an item holding one it writes, of an item one it writes holds, and of a text frame or

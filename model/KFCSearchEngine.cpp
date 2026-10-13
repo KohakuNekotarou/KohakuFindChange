@@ -6,8 +6,9 @@
 //
 //  Search engine implementation. See KFCSearchEngine.h for the contract. The walker loop is
 //  ported from KESCL's CollectMatches (KESCL left untouched); the one change is the point of
-//  this plugin: KFC does NOT set the find string or pin the search mode - it walks with the
-//  user's current Find/Change options as they are, so the mode (Text or GREP) is followed.
+//  this plugin: the walk does NOT set the find string or pin the search mode - it walks with the
+//  user's current Find/Change options as they are, so the mode (Text or GREP) is followed (what KFC
+//  does write to the panel, and when: the head of KFCSearchEngine.h).
 //
 //  For each match the finder hands back (story, start, end); BuildHit then reads the containing
 //  paragraph (IComposeScanner::FindSurroundingParagraph + CopyText) and splits it into the three
@@ -73,7 +74,7 @@
 
 #include <vector>
 #include <utility>					// std::move - a finished chapter is handed to the model, not copied
-#include <algorithm>				// std::stable_sort (the matches' page order)
+#include <algorithm>				// std::sort, std::equal - a row looked for again (its places, its look-alike rows)
 #include <map>						// the per-frame cache one document's walk keeps (FrameFacts)
 #include <memory>					// std::unique_ptr - a Search: walk's dirty guards, one per open document
 
@@ -379,11 +380,12 @@ using KFCPageItemFacts::StoryLeadText;
 // text edited since - typed just before a search, or written by KFC itself just before the next row's lock test - is
 // composed only when something asks for it: InDesign's background composition is an idle task, and a windowless chapter
 // has no view to want it. The find on the session's shared walker - the one every KFC walk runs on (AcquireWalker) -
-// composes the text it finds, a frame at a time (measured 2026-10-05, the speed-up study; why is not known - not by
-// selecting it: the find does not select what it finds, the SDK's snippet selects it itself after the find,
-// SnpFindAndReplace.cpp:798-807). A walker of one's own does not, and from 2026-10-06 to 2026-10-14 KFC walked one: a row
-// read its page, its "overset" and its locks off the composition from before the edit. So, as the reading's own guard,
-// the position's parcels are composed first when any of them is damaged - nothing to do where the find composed them.
+// composes the text it finds, a frame at a time (measured - the speed-up study, see AcquireWalker; why is not known - not
+// by selecting it: the find does not select what it finds, the SDK's snippet selects it itself after the find,
+// SnpFindAndReplace.cpp:798-807). A walker of one's own does not - and while KFC walked one (now a test build's fault
+// switch, own-walker), a row read its page, its "overset" and its locks off the composition from before the edit. So, as
+// the reading's own guard, the position's parcels are composed first when any of them is damaged - nothing to do where
+// the find composed them.
 // THE OFFICIAL SHAPE: composed through the parcel list the position is then read from - a table cell's or a footnote's as
 // well as the frames' (SnpTextModelHelper::QueryParcelContaining, :467-484: GetFirstDamagedParcel, then
 // ITextParcelListComposer), only as far as the position (the guide, sol-03 "Recomposing text": the parcel list
@@ -391,14 +393,14 @@ using KFCPageItemFacts::StoryLeadText;
 // not the story to its end per row a Replace writes. NOT THE FRAME LIST'S COMPOSER: its TextIndex is the primary
 // thread's alone (the guide's own example guards it with GetPrimaryStoryThreadSpan; ITextParcelListComposer.h, the
 // TextIndex "MUST be part of the TextStoryThread mapped to the ParcelList"), and a table cell's position handed to the
-// frame list brought InDesign down in KCM (IFrameList::QueryFrameContaining, 2026-09-12). A note's or a deletion's
+// frame list brought InDesign down in KCM (IFrameList::QueryFrameContaining, twice). A note's or a deletion's
 // parcel list composes nothing: text "never composed for display" (the same section), its parcel interfaces empty
 // implementations (the guide's figures on Track Changes and on InCopy notes, vol2 chapters 3 and 20).
 // Every caller holds a SaveRestoreModifiedState guard or is writing anyway (composing dirties a document).
 void ComposeThrough(ITextModel* textModel, ITextParcelList* tpl, TextIndex pos)
 {
-	// (Fault switch frame-read-uncomposed, a test build's only - KFCDiag.h: the parcels read as they stand, the way before
-	// 2026-10-14.)
+	// (Fault switch frame-read-uncomposed, a test build's only - KFCDiag.h: the parcels read as they stand, nothing composed
+	// first - the old way.)
 	if (KFC_DIAG_FAULT("frame-read-uncomposed"))
 		return;
 	// A position the text model holds (the guide's check), in a parcel list with damage (the snippet's).
@@ -1206,7 +1208,7 @@ struct WalkBar
 // walking"). Not known to matter - InDesign's own Selection walks leave a scope over focuses the selection may drop - but
 // until it is measured (a test build's WALKSCOPE line), the walker is handed the part's story as the walk ends, by any
 // exit past Initialize, and stopped: the scope every story walk of KFC's leaves it with, taken while the focus still
-// stands. (From 2026-10-06 to 2026-10-14 the walker was KFC's own and went with the walk, so the question did not arise.)
+// stands. (A walker of KFC's own - the fault switch own-walker - goes with the walk: the question does not arise for it.)
 class SharedWalkerLetsGoOfGivenScope
 {
 public:
@@ -1347,7 +1349,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 	// What that costs: the walker is the session's shared one (AcquireWalker), so a search started from this panel takes a
 	// Find Next sequence the user had going in the Find/Change dialog back to the match it had found - measured,
 	// work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1 - the price of walking the official way (the author's
-	// call of 2026-10-14).
+	// call).
 	if (walker->IsWalking())
 		walker->Halt();
 
@@ -1409,7 +1411,7 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 
 	// NOTHING TO WALK IS A WALK TO THE END THAT FOUND NOTHING (KFCSearchEngine::ScopeHasNothingToWalk - a document with no
 	// text frame, or with master-page text only and Include Master Pages off). The find would answer kFailure, and the loop
-	// below would call this chapter a walk that broke off ("stopped with a search error" - measured 2026-10-12, case
+	// below would call this chapter a walk that broke off ("stopped with a search error" - measured, case
 	// sc-alldocs-notext). Past Initialize, so the walker is stopped as the bottom of this function stops it.
 	if (KFCSearchEngine::ScopeHasNothingToWalk(scope))
 	{
@@ -1565,10 +1567,10 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 				// CANCEL IS ASKED HERE, WHEN THE WALK MOVES ON TO ANOTHER STORY (the author's call: the middle
 				// option - see the note on the critical section above): a Cancel pressed in a large document is
 				// heard when the story being walked is done, not once the whole document - or, for an All
-				// Documents walk, every open document - has been walked and the hits are thrown away. ! The walk comes back to KFC only with a MATCH, so
-				// "another story" means the next story that holds one. Whether WasCancelled itself lets events
-				// in is not measured (KFCAdvanceProgress); the "safety first" call is in the note on the
-				// critical section above. kFalse = no global error state.
+				// Documents walk, every open document - has been walked and the hits are thrown away. ! The walk
+				// comes back to KFC only with a MATCH, so "another story" means the next story that holds one.
+				// Whether WasCancelled itself lets events in is not measured (KFCAdvanceProgress); the "safety
+				// first" call is in the note on the critical section above. kFalse = no global error state.
 				if (progressStory.GetDataBase() != nil && bar.bar->WasCancelled(kFalse))
 				{
 					outResult = kChapterCancelled;
@@ -1656,8 +1658,8 @@ void CollectHitsInDoc(const UIDRef& docRef, size_t maxHits, const WalkerScopeOpt
 // (kKFCCollectHitLimit, the rows the panel draws - spec F9). The row looked for can stand past its story's 300th match once
 // matches were added in front of it by an edit KFC did not follow, and a walk cut at 300 then lists every candidate but the
 // row's own: the row is called missing - or moved onto a look-alike (OneFreePlace), which a Replace then writes once an Undo
-// has brought the story's version back. 10000 is the ceiling this walk had from its first day (2026-09-29) until the list's
-// limit went to 300 (2026-10-06), when it took that constant with it. Reaching it is "cannot tell", never a list.
+// has brought the story's version back. 10000 is the ceiling this walk was written with, before the list's limit came down
+// to 300 and took that constant with it. Reaching it is "cannot tell", never a list.
 const size_t kKFCLookAgainMatchCeiling = 10000;
 
 // Every match of the current query in one story of an open document, as the search's walk meets them
@@ -1676,7 +1678,7 @@ bool CollectStoryHits(const UIDRef& storyRef, const WalkerScopeOptions& scopeOpt
 	bool capped = false;
 	ChapterWalkResult result = kChapterWalked;
 	// (Fault switch look-again-list-limit, a test build's only - KFCDiag.h: the walk cut at the list's limit and the cut not
-	// heard, the way before 2026-10-14.)
+	// heard - the old way.)
 	const bool listLimit = KFC_DIAG_FAULT("look-again-list-limit");
 	CollectHitsInDoc(UIDRef(db, db->GetRootUID()),
 		listLimit ? static_cast<size_t>(KFCResultModel::kKFCCollectHitLimit) : kKFCLookAgainMatchCeiling,
@@ -2423,16 +2425,16 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 {
 	out = KFCSearchEngine::CollectTally();
 
-	// ...and the five scope switches, read ONCE for the whole run. They come off the same dialog as
-	// everything above, they are the same for every chapter by definition (the replace pass has to
+	// THE FIVE SCOPE SWITCHES, read ONCE for the whole run. They come off the same dialog as the query the
+	// caller stated (SearchBook), they are the same for every chapter by definition (the replace pass has to
 	// re-walk with exactly these), and nothing can change them while the run is on: the progress bar
 	// below is modal - so not inside CollectHitsInDoc, once per chapter, for an answer that cannot differ.
 	WalkerScopeOptions scopeOptions;
 	KFCSearchEngine::GetKFCWalkerScopeOptions(scopeOptions);
 
 	// Walk every target; only chapters that hold a hit go into the model (no empty branches). The
-	// model was cleared above; each chapter is APPENDED as it finishes, and the caller draws the
-	// tree once the search returns (KFCSearchEngine::FileChapter).
+	// caller cleared the model at its commit point (SearchBook - DropResults); each chapter is APPENDED as it
+	// finishes, and the caller draws the tree once the search returns (KFCSearchEngine::FileChapter).
 	// The progress bar, shown for EVERY scope (the user's request) - not for a book only: a one-document
 	// search is a single CHAPTER with nothing to cancel between, but the bar is sized in stories, and a
 	// single document with a lot of them takes just as long and would have no way to be stopped.
@@ -2742,8 +2744,8 @@ void CollectTargets(std::vector<KFCBookScope::ChapterDoc>& targets, bool fromBoo
 		if (!KFCBookScope::HandBackHeldDocNow(chapterDocRef))
 			out.unclosed.push_back(targets[i].shortName);
 
-		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, the
-		// run is thrown away below.
+		// Cancel heard inside the walk, at a story's end: the chapter is handed back above, and the
+		// caller throws the run away (SearchBook's "Search cancelled.").
 		if (walkResult == kChapterCancelled)
 		{
 			out.cancelled = true;
@@ -3370,8 +3372,8 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		return false;
 	InterfacePtr<ITextWalkerSelectionUtils> selUtils(shared, UseDefaultIID());
 	outSelUtils.reset(selUtils.forget());
-	// (Fault switch own-walker, a test build's only - KFCDiag.h: a kBasicTextWalkerBoss of KFC's own, the way from
-	// 2026-10-06 to 2026-10-14 - the speed-up's S1, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12.)
+	// (Fault switch own-walker, a test build's only - KFCDiag.h: a kBasicTextWalkerBoss of KFC's own, the way KFC walked
+	// before the author's call below - the speed-up's S1, docs/ai-notes/kfc-speedup-ideas-2026-10-05.md section 12.)
 	if (KFC_DIAG_FAULT("own-walker"))
 	{
 		InterfacePtr<ITextWalker> mine(::CreateObject2<ITextWalker>(kBasicTextWalkerBoss));
@@ -3380,14 +3382,13 @@ bool KFCSearchEngine::AcquireWalker(InterfacePtr<ITextWalker>& outWalker, Interf
 		outWalker.reset(mine.forget());
 		return true;
 	}
-	// THE SESSION'S SHARED WALKER, THE ONE THE SDK'S SNIPPET WALKS (SnpFindAndReplace.cpp:758-770) - the author's call of
-	// 2026-10-14: "the same way as the official one". Its find composes the text it finds, a frame at a time, as InDesign's
-	// own does (measured 2026-10-05): what a row's frame - its page, "overset", its locks - is then read from.
+	// THE SESSION'S SHARED WALKER, THE ONE THE SDK'S SNIPPET WALKS (SnpFindAndReplace.cpp:758-770) - the author's call: "the
+	// same way as the official one". Its find composes the text it finds, a frame at a time, as InDesign's own does
+	// (measured - the speed-up study above): what a row's frame - its page, "overset", its locks - is then read from.
 	// What it costs, both measured: a search, a write or a jump that looks for its row again from this panel takes the
-	// dialog's Find Next sequence back to the match it had found (2026-10-06,
-	// work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1: Find Next found cat@8 again, not cat@16); and the
-	// composition costs the writing walk 20-35 % (2026-10-05, a Change Checked of thousands of rows - a row's Replace
-	// writes 300 at most). From 2026-10-06 to 2026-10-14 KFC walked a walker of its own (the switch above), which composes
+	// dialog's Find Next sequence back to the match it had found (work/note-scripts/2026-10-06-kfc-no-track/s1-findnext2.ps1:
+	// Find Next found cat@8 again, not cat@16); and the composition costs the writing walk 20-35 % (the speed-up study, over
+	// a write of thousands of rows - a row's Replace writes 300 at most). KFC's own walker (the switch above) composes
 	// nothing.
 	outWalker.reset(shared.forget());
 	return true;
@@ -3726,8 +3727,8 @@ void MoveRowTo(int32 chapterIdx, int32 hitIdx, const UIDRef& storyRef, TextIndex
 }
 
 // A ROW'S LOOK-ALIKE ROWS (spec T14): the rows of its chapter and story that read the same - the whole match (its hash
-// and length), the line around it, replaced or not - itself included, in the order the search found them in the
-// story (Hit::storyOrdinal). outRank = this row's place among them; -1 = not resolvable.
+// and length), the line around it - and are replaced, or not, as it is; itself included, in the order the search found
+// them in the story (Hit::storyOrdinal). outRank = this row's place among them; -1 = not resolvable.
 void LookAlikeRows(int32 chapterIdx, int32 hitIdx, std::vector<int32>& outRows, int32& outRank)
 {
 	outRows.clear();

@@ -9,9 +9,13 @@
 //  showing, or the active book when no panel can be reached: KFCBookScope::ResolveTargetBook), what
 //  Edit > Find/Change's Search: names when it is OFF, never a silent fallback between
 //  them - and collects the matches into KFCResultModel, grouped by chapter. Unlike KESCL - which
-//  supplied its own literal text and pinned the mode to plain text - KFC touches nothing on the
-//  Find/Change panel: it walks with whatever the user set there, MODE INCLUDED (Text or GREP). The
-//  walk is read-only (a SaveRestoreModifiedState dirty guard per document).
+//  supplied its own literal text and pinned the mode to plain text - the walk takes the query as the
+//  user set it on the Find/Change panel, MODE INCLUDED (Text or GREP). What KFC writes to the panel
+//  is a value restated at what it already is (CommitSearchMode, CommitReplaceSide), the direction
+//  turned forward and back (KFCForwardSearchScope), or what a feature asks for: a query of its own
+//  (SetQuery - the Application Bar's field; KFCSavedQueries::LoadIntoFindChange - the query run) or
+//  Search: put back after a click (RestoreSearchScope). The walk is read-only (a
+//  SaveRestoreModifiedState dirty guard per document).
 //
 //  Each collected hit carries the line's text pre-split into the three segments the colour cell
 //  paints (before / matched / after) and the jump anchors (story UID + text range).
@@ -278,8 +282,8 @@ namespace KFCSearchEngine
 	    "Find to End of Story", "Find in Selection" ("Find in Document" for a Search: this panel refuses). */
 	const char* FindCommandName(bool bookScopeOn);
 
-	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch). Asked by the menu (greys the command) and by the search itself (refuses), so the two
-	    cannot disagree. */
+	/** Can Find in ... run on this tab? No on Colour alone (the Object tab lists page items - KFCObjectSearch). Asked by
+	    the menu (greys the command) and by the search itself (refuses), so the two cannot disagree. */
 	bool CanSearchTab(int32 mode);
 
 	/** Put `text` into Edit > Find/Change on the tab `mode` names - IFindChangeOptions::kTextSearch or
@@ -343,7 +347,7 @@ namespace KFCSearchEngine
 	/** Drop the Find Format the search kept when the database its UIDs are in is the one closing - and
 	    nothing else. FindFormatHasChanged tells databases apart by address alone, and a closed
 	    document's address is free to be handed to the next document opened, so the copy goes with its
-	    database rather than being compared later against somebody else's ([[uidref-reuse-after-close]]).
+	    database rather than being compared later against somebody else's (memory uidref-reuse-after-close).
 	    KFCCloseDocResponder calls it for every close, the way the held list and the jump marker forget
 	    a closing document. Insurance: measured, that database has been one of the session's, which
 	    outlives every document (the note over gSearchedFindAttrDB in the .cpp). */
@@ -528,10 +532,10 @@ namespace KFCSearchEngine
 
 	/** THE WALKER A KFC WALK RUNS ON - the search's, the verify walk's and the write's. outWalker = the walker to Initialize
 	    and drive: the session's shared one (kTextWalkerServiceProviderBoss), the one Edit > Find/Change walks and the SDK's
-	    snippet takes (SnpFindAndReplace.cpp:758-770) - the author's call of 2026-10-14, "the same way as the official one";
-	    its find composes the text it finds, as InDesign's own does. It costs the dialog's Find Next sequence: after a search,
-	    a write or a jump that looks for its row again from this panel, Find Next goes back to the match it had found
-	    (measured). (From 2026-10-06 to 2026-10-14 a kBasicTextWalkerBoss of KFC's own - the speed-up's S1,
+	    snippet takes (SnpFindAndReplace.cpp:758-770) - the author's call, "the same way as the official one"; its find
+	    composes the text it finds, as InDesign's own does. It costs the dialog's Find Next sequence: after a search, a write
+	    or a jump that looks for its row again from this panel, Find Next goes back to the match it had found (measured).
+	    (Before that call, a kBasicTextWalkerBoss of KFC's own - the speed-up's S1,
 	    docs/superpowers/specs/2026-10-05-kfc-one-at-a-time-and-limits-design.md section 3 - which a test build's fault
 	    switch own-walker still gives.) outSelUtils = what the walk's critical section is taken on: the shared walker's, as
 	    the snippet takes it. False = no walker at all; outSelUtils can still be nil - each caller keeps its own gate on it. */
@@ -540,7 +544,7 @@ namespace KFCSearchEngine
 	/** A WALK SCOPE WITH NOTHING IN IT TO WALK - no story the walker would visit: a document with no text frame at all, or
 	    one whose only text the options leave out (a master page's, with Include Master Pages off). InDesign's walker answers
 	    such a scope kFailure, the find (kFindTextCmdBoss) and the Change All (kReplaceAllTextCmdBoss) alike, with no error
-	    raised - measured 2026-10-12 (a document with an EMPTY text frame, one story with no characters, answers
+	    raised - measured (a document with an EMPTY text frame, one story with no characters, answers
 	    kReplaceAllCompleted with 0 as any document without a match does). Read as an error, that put "stopped with a search
 	    error" on the line for a document with nothing in it to search, and stopped a Change All in Book or a query run whole
 	    - every chapter taken back - at a chapter of pictures, while InDesign's own Change All (app.changeText) goes past such

@@ -510,7 +510,7 @@ bool KFCResultModel::GetFontDisplay(int32 chapterIdx, int32 fontIdx, PMString& o
 	const Hit* first = group->hitIndices.empty() ? nil : HitAt(chapterIdx, group->hitIndices[0]);
 	if (first != nil)
 	{
-		// The story's first words keep their breaks (KFCSearchEngine's StoryLeadText): drawn as the marks a hit row
+		// The story's first words keep their breaks (KFCPageItemFacts::StoryLeadText): drawn as the marks a hit row
 		// draws, by the same function.
 		PMString lead(first->storyLead);
 		MarkUpBreaksForDisplay(lead);

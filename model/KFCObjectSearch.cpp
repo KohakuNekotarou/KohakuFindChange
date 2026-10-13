@@ -150,10 +150,11 @@ enum WalkEnd
 const int32 kDocSpan = 1000;
 
 // THE BAR INSIDE ONE DOCUMENT (the author's call: a Cancel is heard inside a document, not only between documents, where
-// the 300 items of one could not be stopped). The walk does not know how many items a document holds until it has found them all, but
-// it knows where it stands - the spread of the item it is on - as the text search knows the story (KFCSearchEngine.cpp,
-// its slice cut by stories). So: one step per item listed, and on to a later spread's share of the slice when the walk
-// gets there; a parent page's spread (not in the spread list) only crawls. Never backwards, never past the slice.
+// the 300 items of one could not be stopped). The walk does not know how many items a document holds until it has found
+// them all, but it knows where it stands - the spread of the item it is on - as the text search knows the story
+// (KFCSearchEngine.cpp, its slice cut by stories). So: one step per item listed, and on to a later spread's share of the
+// slice when the walk gets there; a parent page's spread (not in the spread list) only crawls. Never backwards, never past
+// the slice.
 // Moved at every item, and asked at every item (WalkDoc): which call on the bar lets a click on Cancel in is not
 // measured (KFCSearchEngine.cpp's KFCAdvanceProgress), so the walk makes both, as KIDMCP's working cancel does. Each item
 // already costs a fingerprint, so the two calls were judged to add little - against the snippet print of the time (20-75
@@ -312,7 +313,8 @@ bool PrintObject(IDataBase* db, UID uid, Print& print)
 		return false;
 	KFCMemXferBytes bytes;
 	{
-		// takeOwnership and recycleBoss both kFalse: the bytes live on this frame (KIDMCPVerify.cpp's rule).
+		// takeOwnership and recycleBoss both kFalse: the bytes live on this frame - the stream must not delete them, and a
+		// recycled stream boss may keep hold of them until it is reused (StreamUtil.h, CreateMemoryStreamWrite).
 		InterfacePtr<IPMStream> stream(StreamUtil::CreateMemoryStreamWrite(&bytes, kFalse, kFalse));
 		if (stream == nil)
 			return false;
@@ -661,7 +663,7 @@ void KFCObjectSearch::ReachOfWrite(IDataBase* db, const std::set<UID>& toWrite, 
 			// graphic cell's adapter (kCellPageItemAdapterBoss), where the walk up from such an item ends (measured - cases
 			// obj-f2-inline, obj-f2-cell): the story it is placed in, a table's for a cell (IPageItemAdapter.h - "always
 			// available on such objects"). Asked of the wrapper alone: ITableUtils::QueryCellContentfromPlacedItem asked of an
-			// inline brought InDesign down - a read of address 0 inside TABLE MODEL.RPLN (2026-10-12, case obj-f2-inline).
+			// inline brought InDesign down - a read of address 0 inside TABLE MODEL.RPLN (case obj-f2-inline).
 			InterfacePtr<IPageItemAdapter> adapter(db, uid, UseDefaultIID());
 			InterfacePtr<ITextModel> placedIn((adapter != nil) ? adapter->QueryTextModel() : nil);
 			if (placedIn != nil)
